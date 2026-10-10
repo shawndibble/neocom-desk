@@ -181,7 +181,7 @@ export function useComparedBuildResults({
   useEffect(() => {
     plansRef.current = plans;
   });
-  const plansKey = plans.map((p) => `${p.id}:${p.updatedAt}`).join(',');
+  const plansKey = plans.map((p) => `${p.id}:${p.updatedAt}:${p.hubId}`).join(',');
 
   useEffect(() => {
     const currentPlans = plansRef.current;

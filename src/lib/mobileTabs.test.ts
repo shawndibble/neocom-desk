@@ -21,9 +21,9 @@ describe('parseMobileTabs', () => {
   });
 
   it('repairs the order rather than rejecting it — the set is still the choice', () => {
-    expect(parseMobileTabs(['/mail', '/industry', '/alerts', '/overview'])).toEqual([
+    expect(parseMobileTabs(['/mail', '/industry', '/skills', '/overview'])).toEqual([
       '/overview',
-      '/alerts',
+      '/skills',
       '/industry',
       '/mail',
     ]);
@@ -57,9 +57,9 @@ describe('parseMobileTabs', () => {
   });
 
   it('keeps a stored Fittings choice as Ships (the section was renamed)', () => {
-    expect(parseMobileTabs(['/overview', '/alerts', '/industry', '/fittings'])).toEqual([
+    expect(parseMobileTabs(['/overview', '/skills', '/industry', '/fittings'])).toEqual([
       '/overview',
-      '/alerts',
+      '/skills',
       '/industry',
       '/ships',
     ]);
@@ -97,7 +97,6 @@ describe('the choice list', () => {
   it('is the rail order without /corp, /settings and /help, /characters last (derived from the nav descriptor)', () => {
     expect(MOBILE_TAB_CHOICES).toEqual([
       '/overview',
-      '/alerts',
       '/skills',
       '/industry',
       '/ships',

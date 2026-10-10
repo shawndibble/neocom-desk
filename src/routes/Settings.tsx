@@ -225,7 +225,7 @@ function ActivityLogPanel() {
       title={t('activityLog.title')}
       actions={
         <>
-          <Button size="sm" onClick={handleClear} disabled={entries.length === 0}>
+          <Button size="sm" onClick={handleClear} aria-disabled={entries.length === 0}>
             {t('activityLog.clearLog')}
           </Button>
           {entries.length > 0 && (
@@ -428,7 +428,7 @@ function ExportPanel() {
             />
             <Button
               size="sm"
-              disabled={!canExport || status === 'exporting'}
+              aria-disabled={!canExport || status === 'exporting'}
               onClick={() => void handleExport()}
             >
               {t('settings.backup.exportButton')}
@@ -518,7 +518,7 @@ function ImportPanel() {
             />
             <Button
               size="sm"
-              disabled={!file || password.length === 0 || status === 'importing'}
+              aria-disabled={!file || password.length === 0 || status === 'importing'}
               onClick={() => void handleImport()}
             >
               {t('settings.backup.importButton')}
@@ -747,9 +747,10 @@ function MarketDefaultsPanel() {
   const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);
   const collateralHydrated = useHydratedStore(useCourierCollateralRatio);
   const hydrated = hubHydrated && collateralHydrated;
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   return (
-    <Panel title={t('settings.marketDefaultsTitle')}>
+    <Panel title={t('settings.marketDefaultsTitle')} headingRef={headingRef}>
       {hydrated ? (
         <div className="space-y-4">
           <DefaultsSyncHint />
@@ -784,7 +785,7 @@ function MarketDefaultsPanel() {
 
             <LpValueField id="settings-lp-value" />
           </Fields>
-          <StructureFeesList />
+          <StructureFeesList panelHeading={headingRef} />
         </div>
       ) : (
         <Spinner />

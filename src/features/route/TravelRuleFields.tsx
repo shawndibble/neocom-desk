@@ -8,7 +8,7 @@
  * value would write that default over it.
  */
 import { tappableRowClassName } from '@/components/ui/controlStyles';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, IconButton, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -17,6 +17,7 @@ import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { EDENCOM_SYSTEMS, TRIGLAVIAN_MINOR_VICTORY_SYSTEMS } from '@/engine/route/invasionSystems';
 import { clampInt } from '@/features/industry/clampInt';
 import { cx } from '@/lib/cx';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { addAvoidedSystem, removeAvoidedSystem, useAvoidedSystems } from './avoidedSystems';
 import {
   MAX_POD_KILL_THRESHOLD,
@@ -185,6 +186,10 @@ export function AvoidedSystemsEditor({
     [avoided, byId]
   );
 
+  const removeRefs = useRef(new Map<number, HTMLButtonElement>());
+  const addTriggerRef = useRef<HTMLButtonElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
+
   if (!hydrated || !enabledHydrated) return null;
 
   return (
@@ -207,6 +212,7 @@ export function AvoidedSystemsEditor({
           }
           exclude={exclude}
           showSecurity
+          triggerRef={addTriggerRef}
         />
       </div>
       {rows.length === 0 ? (
@@ -220,7 +226,7 @@ export function AvoidedSystemsEditor({
             !narrow && 'sm:grid-cols-2 sm:gap-x-6 xl:grid-cols-3'
           )}
         >
-          {rows.map(({ id, system }) => {
+          {rows.map(({ id, system }, index) => {
             const name = system?.name ?? `#${id}`;
             return (
               <li key={id} className="flex items-center gap-2 border-b border-line px-2 py-1">
@@ -232,8 +238,19 @@ export function AvoidedSystemsEditor({
                   size="sm"
                   variant="plain"
                   icon={<Icon.Close />}
+                  ref={(el) => {
+                    if (el) removeRefs.current.set(id, el);
+                    else removeRefs.current.delete(id);
+                  }}
                   label={t('settings.avoidedSystems.remove', { name })}
-                  onClick={() => void setAvoided(removeAvoidedSystem(avoided, id))}
+                  onClick={() => {
+                    // The removed row's button unmounts: hand focus to a neighbour, else Add.
+                    const near = [rows[index + 1]?.id, rows[index - 1]?.id].map(
+                      (key) => () => (key === undefined ? null : removeRefs.current.get(key))
+                    );
+                    focusAfterCommit(...near, addTriggerRef);
+                    void setAvoided(removeAvoidedSystem(avoided, id));
+                  }}
                 />
               </li>
             );

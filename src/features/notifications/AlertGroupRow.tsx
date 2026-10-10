@@ -62,6 +62,8 @@ export function AlertGroupRow({
   entryDismissRef,
 }: AlertGroupRowProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
+  const newestFiredAt = new Date(group.newestFiredAt);
 
   return (
     <li className={group.muted ? 'text-text-dim' : undefined}>
@@ -72,11 +74,14 @@ export function AlertGroupRow({
           `w-full` on the third flex child), which meant even "New Mail"
           dropped to a second line it never needed.
 
-          The row used to also carry "newest Xh ago" beside the label, which
-          was one thing too many at phone width: on a longer label ("New
-          Calendar Event") it left no room and the label itself started
-          ellipsizing. Dropping it costs nothing a reader can't get by
-          opening the type — every fire inside already carries its own age.
+          The newest fire's age sits right-aligned before the mute control from
+          `md` up only. At phone width it left no room on a longer label ("New
+          Calendar Event") and the label itself started ellipsizing, so there
+          it is left off — every fire inside already carries its own age.
+          From `md` up the row has ~900px of empty space, and groups sort by
+          severity first, so order alone doesn't say whether a type is new.
+          The label still truncates first; the age is `shrink-0` at a fixed
+          width so its right edge lines up on every row.
         */}
         <button
           ref={toggleRef}
@@ -103,6 +108,15 @@ export function AlertGroupRow({
             )}
           </span>
         </button>
+        <time
+          dateTime={newestFiredAt.toISOString()}
+          className="hidden w-16 shrink-0 text-right text-[0.6875rem] tabular-nums text-text-dim md:block"
+        >
+          <HintText content={formatTimestamp(newestFiredAt, timeZone)}>
+            {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
+            {formatAge(Math.max(0, Date.now() - group.newestFiredAt), t)}
+          </HintText>
+        </time>
         {/*
           One glyph, pressed or not, rather than two. `HideInFeed` is the feed
           channel's own icon; its opposite number in the Bell family belongs to
