@@ -200,6 +200,7 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
     it('does not ask about an ore the latest scan already lacked', async () => {
       loadSurvey.mockResolvedValue({
         ok: true,
+        ignored: new Set(),
         expiresAt: EXPIRES,
         owner: 'Shawn Dibble',
         tax: null,
