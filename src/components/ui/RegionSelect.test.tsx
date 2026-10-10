@@ -89,7 +89,7 @@ describe('RegionSelect', () => {
 
     await user.type(screen.getByRole('combobox', { name: 'Search regions…' }), 'zzz');
     expect(optionNames()).toEqual(['All regions']);
-    expect(screen.getByText('No matching regions')).toBeInTheDocument();
+    expect(screen.getByText('No matching regions', { selector: 'p' })).toBeInTheDocument();
   });
 
   it('picks with the keyboard', async () => {
@@ -123,5 +123,18 @@ describe('RegionSelect', () => {
     expect(trigger()).toHaveTextContent('Domain');
     await user.click(trigger());
     expect(optionNames()).toEqual(['Domain', 'Heimatar', 'Sinq Laison', 'The Forge']);
+  });
+
+  it('names the dialog and announces no results', async () => {
+    const user = userEvent.setup();
+    render(<Harness allLabel="All regions" />);
+    await user.click(trigger());
+    expect(screen.getByRole('dialog', { name: 'Region' })).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText('Search regions…'), 'zzzz');
+    expect(await screen.findByRole('status')).toHaveTextContent('No matching regions');
+    expect(screen.getByText('No matching regions', { selector: 'p' })).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
   });
 });
