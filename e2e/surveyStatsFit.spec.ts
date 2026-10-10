@@ -108,6 +108,17 @@ for (const viewport of [
         };
       })
     );
+    // Rows are even: one row of 6, or two rows of 3 (never 4 + 2 or 5 + 1).
+    const rows = await tiles.evaluateAll((nodes) => {
+      const counts = new Map<number, number>();
+      for (const node of nodes) {
+        const top = Math.round(node.getBoundingClientRect().top);
+        counts.set(top, (counts.get(top) ?? 0) + 1);
+      }
+      return [...counts.values()];
+    });
+    expect(rows.every((count) => count === rows[0])).toBe(true);
+    expect([3, 6]).toContain(rows[0]);
     for (const tile of measured) {
       expect(tile.clipped, tile.text).toBe(false);
       expect(tile.overflow, tile.text).not.toBe('ellipsis');
