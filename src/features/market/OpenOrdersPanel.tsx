@@ -923,6 +923,7 @@ export function OpenOrdersPanel() {
                   </Select>
                   {showLocationFilter && (
                     <MultiSelect
+                      label={t('market.orders.filter.location')}
                       trigger={
                         <Button size="sm">
                           {draft.locationIds.length === 0
