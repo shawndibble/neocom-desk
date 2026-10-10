@@ -66,15 +66,19 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
  * text `Button` narrowed to `w-7` kept its `px-2.5` padding and squeezed a
  * 1rem icon into what was left, down to a dot.
  */
-const ICON_BUTTON = iconButtonClassName({ size: 'sm' });
+const ICON_BUTTON = cx(iconButtonClassName({ size: 'sm' }), 'lg:scroll-mt-40');
 /** A row's drag grip: the shared recipe plus the grab cursor and the touch hit area. */
 const GRIP_BUTTON = cx(
   'cursor-grab touch-none rounded-xs px-1 text-text-faint hover:text-text',
   interactiveClassName,
   focusRingClassName,
-  gripHitAreaClassName
+  gripHitAreaClassName,
+  'lg:scroll-mt-40'
 );
-const DANGER_ICON_BUTTON = iconButtonClassName({ size: 'sm', tone: 'danger' });
+const DANGER_ICON_BUTTON = cx(
+  iconButtonClassName({ size: 'sm', tone: 'danger' }),
+  'lg:scroll-mt-40'
+);
 /**
  * Every training-time cell and its desktop column header, so the two cannot
  * drift apart and leave the numbers unaligned. 6rem holds the widest duration
@@ -231,7 +235,7 @@ function PriorityPill({
         <button
           type="button"
           aria-label={t('plans.priorityLabel', { priority: t(priorityLabelKey(priority)), name })}
-          className={`group inline-flex items-center ${touchTarget ? controlHeightClassName.sm : ''}`}
+          className={`group inline-flex items-center lg:scroll-mt-40 ${touchTarget ? controlHeightClassName.sm : ''}`}
         >
           <span
             className={`${interactiveClassName} rounded-xs border px-1 text-[0.6875rem] tracking-widest uppercase group-hover:border-line-bright group-focus-visible:outline-2 group-focus-visible:outline-offset-1 group-focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
@@ -471,7 +475,7 @@ const EntryRow = memo(function EntryRow({
       <SkillLink
         typeId={entry.skillTypeID}
         onClick={() => onStageSkillDetail(entry.skillTypeID)}
-        className="truncate"
+        className="truncate lg:scroll-mt-40"
       >
         {name}
       </SkillLink>{' '}
@@ -598,14 +602,14 @@ const EntryRow = memo(function EntryRow({
                   label={t('plans.columnDoneBy')}
                 />
               )}
-              <RowMoreActions />
+              <RowMoreActions className="lg:scroll-mt-40" />
             </div>
           ) : (
             <>
               <div className="flex items-center justify-between gap-2">
                 {dragHandle}
                 {nameSpan}
-                <RowMoreActions />
+                <RowMoreActions className="lg:scroll-mt-40" />
               </div>
               {metaLine}
             </>
@@ -686,7 +690,7 @@ const PrereqRow = memo(function PrereqRow({
       <SkillLink
         typeId={row.step.skillTypeID}
         onClick={() => onStageSkillDetail(row.step.skillTypeID)}
-        className="truncate"
+        className="truncate lg:scroll-mt-40"
       >
         {name}
       </SkillLink>{' '}
@@ -816,7 +820,7 @@ const MarkerRow = memo(function MarkerRow({
         <button
           type="button"
           onClick={() => onEdit(markerIndex)}
-          className={entityLinkClassName('flex-1 truncate text-left tabular-nums')}
+          className={entityLinkClassName('flex-1 truncate text-left tabular-nums lg:scroll-mt-40')}
         >
           {remapInstruction(attributes, implants)}
         </button>
@@ -827,7 +831,9 @@ const MarkerRow = memo(function MarkerRow({
             type="button"
             onClick={() => onEdit(markerIndex)}
             aria-label={t('plans.markerEdit', { position: markerIndex + 1 })}
-            className={entityLinkClassName('font-semibold tracking-widest uppercase')}
+            className={entityLinkClassName(
+              'font-semibold tracking-widest uppercase lg:scroll-mt-40'
+            )}
           >
             {t('plans.markerRow')}
           </button>

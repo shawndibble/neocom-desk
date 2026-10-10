@@ -62,9 +62,12 @@ function GoToButton() {
 }
 
 /** Small heading introducing a group of pages in the rail. */
-function NavGroupLabel({ children }: { children: string }) {
+function NavGroupLabel({ id, children }: { id: string; children: string }) {
   return (
-    <p className="mt-3 px-2 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+    <p
+      id={id}
+      className="mt-3 px-2 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase"
+    >
       {children}
     </p>
   );
@@ -226,6 +229,7 @@ const RailNavBody = memo(function RailNavBody({
 
   const [moreOpen, setMoreOpen] = useState(false);
   const moreId = useId();
+  const groupId = useId();
   // Pages the short rail leaves out, flat and in nav order (no headings: one
   // level, not a second tree). The page you are on stays in its own group.
   const morePages = RAIL_GROUPS.flatMap((group) => group.pages).filter(
@@ -262,20 +266,28 @@ const RailNavBody = memo(function RailNavBody({
           if (pages.length === 0) return null;
           return (
             <Fragment key={group.id}>
-              {group.labelKey !== null && <NavGroupLabel>{t(group.labelKey)}</NavGroupLabel>}
-              {pages.map((page) => (
-                <RailPage
-                  key={page.path}
-                  page={page}
-                  views={views.get(page.path) ?? []}
-                  open={open.path === page.path}
-                  onToggle={toggleOpen}
-                  locked={page.gating === 'scope' && locked.has(page.path)}
-                  hidden={hidden}
-                  editing={editing}
-                  activeViewPath={activeViewPath}
-                />
-              ))}
+              {group.labelKey !== null && (
+                <NavGroupLabel id={`${groupId}-${group.id}`}>{t(group.labelKey)}</NavGroupLabel>
+              )}
+              <div
+                role={group.labelKey !== null ? 'group' : undefined}
+                aria-labelledby={group.labelKey !== null ? `${groupId}-${group.id}` : undefined}
+                className="flex flex-col gap-0.5"
+              >
+                {pages.map((page) => (
+                  <RailPage
+                    key={page.path}
+                    page={page}
+                    views={views.get(page.path) ?? []}
+                    open={open.path === page.path}
+                    onToggle={toggleOpen}
+                    locked={page.gating === 'scope' && locked.has(page.path)}
+                    hidden={hidden}
+                    editing={editing}
+                    activeViewPath={activeViewPath}
+                  />
+                ))}
+              </div>
             </Fragment>
           );
         })}

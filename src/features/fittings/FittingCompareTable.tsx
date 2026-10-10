@@ -89,9 +89,11 @@ export function FittingCompareTable({
       <CompareColGroup count={columns.length} />
       <thead>
         <tr>
-          <th className="p-2 text-left text-text-dim">{t('fittings.compare.statColumn')}</th>
+          <th scope="col" className="p-2 text-left text-text-dim">
+            {t('fittings.compare.statColumn')}
+          </th>
           {columns.map((column) => (
-            <th key={column.index} className="p-2 text-right text-text">
+            <th key={column.index} scope="col" className="p-2 text-right text-text">
               {column.header}
             </th>
           ))}
@@ -120,7 +122,9 @@ export function FittingCompareTable({
       <tbody>
         {shown.map((row) => (
           <tr key={row.key} className="border-t border-line">
-            <td className="p-2 text-text-dim">{t(`fittings.compare.stat.${row.key}`)}</td>
+            <th scope="row" className="p-2 text-left font-normal text-text-dim">
+              {t(`fittings.compare.stat.${row.key}`)}
+            </th>
             {columns.map((column) => {
               const statsIndex = column.statsIndex;
               const best = statsIndex !== null && row.bestIndices.includes(statsIndex);
