@@ -95,7 +95,8 @@ function PrefetchIndicator() {
       <span
         role="status"
         aria-label={label}
-        className="inline-block size-2 shrink-0 motion-safe:animate-pulse rounded-full bg-accent"
+        tabIndex={0}
+        className={`inline-block size-2 shrink-0 motion-safe:animate-pulse rounded-full bg-accent ${focusRingClassName}`}
       />
     </Tooltip>
   );
@@ -413,7 +414,6 @@ export const Layout = memo(function Layout() {
               to={path}
               label={t(NAV_LABEL_KEYS[path])}
               locked={locked.has(path)}
-              badge={path === '/alerts' ? unreadAlerts : undefined}
               presentation="tab"
             />
           ))}
@@ -452,7 +452,6 @@ export const Layout = memo(function Layout() {
             onClose={() => setMoreOpen(false)}
             locked={locked}
             tabs={tabs}
-            unreadAlerts={unreadAlerts}
             renderCharacterLink={(originPath) => (
               <CharacterFooterLink
                 activeCharacter={activeCharacter}

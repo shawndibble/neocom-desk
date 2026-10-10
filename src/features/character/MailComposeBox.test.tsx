@@ -75,6 +75,35 @@ function renderBox(kind: 'reply' | 'forward', onSent = vi.fn(), onClose = vi.fn(
   );
 }
 
+describe('visible labels', () => {
+  it('Reply: Subject and Message have visible <label>s, Subject has no placeholder', async () => {
+    renderBox('reply');
+    const subject = await screen.findByLabelText('Subject');
+    expect(subject.id).not.toBe('');
+    expect(document.querySelector(`label[for="${subject.id}"]`)).toBeVisible();
+    expect(subject).not.toHaveAttribute('aria-label');
+    expect(subject).not.toHaveAttribute('placeholder');
+    const message = screen.getByLabelText('Message');
+    expect(message).not.toHaveAttribute('aria-label');
+    expect(document.querySelector(`label[for="${message.id}"]`)).toBeVisible();
+  });
+
+  it('names the recipients group by a visible "To" label', async () => {
+    renderBox('reply');
+    const group = await screen.findByRole('group', { name: 'To' });
+    expect(group).not.toHaveAttribute('aria-label');
+    expect(screen.getByText('To')).toBeVisible();
+  });
+
+  it('Forward: recipient search has a visible label and keeps its hint placeholder', async () => {
+    renderBox('forward');
+    const search = await screen.findByLabelText('Add recipient');
+    expect(search).not.toHaveAttribute('aria-label');
+    expect(document.querySelector(`label[for="${search.id}"]`)).toBeVisible();
+    expect(search).toHaveAttribute('placeholder', 'Search by character name…');
+  });
+});
+
 describe('focus (issue #1485)', () => {
   it('focuses the Subject field on mount for Reply', async () => {
     renderBox('reply');

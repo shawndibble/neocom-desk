@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { inlineLinkClassName } from './controlStyles';
+import { LiveStatus } from './LiveStatus';
 import { usePortalContainer } from './portalContainer';
 
 export interface ToastProps {
@@ -31,11 +32,13 @@ export interface ToastProps {
 export function Toast({ message, undo, action }: ToastProps) {
   const portalContainer = usePortalContainer();
   return createPortal(
-    <div
-      role="status"
-      className="bg-panel border-line text-text fixed bottom-32 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-lg md:bottom-16"
-    >
-      <span>{message}</span>
+    <div className="bg-panel border-line text-text fixed bottom-32 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-lg md:bottom-16">
+      {/* Visible copy is hidden from AT; the live region below announces it. The
+          toast mounts already filled, which a bare role="status" announces unreliably. */}
+      <span aria-hidden="true">{message}</span>
+      <LiveStatus announceKey={typeof message === 'string' ? message : undefined}>
+        {message}
+      </LiveStatus>
       {undo && (
         <button type="button" className={inlineLinkClassName} onClick={undo.onUndo}>
           {undo.label}

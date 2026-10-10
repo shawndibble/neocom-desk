@@ -1,6 +1,7 @@
 import { Select as SelectPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
+import { useDescribedBy } from './fieldNote';
 import { usePortalContainer } from './portalContainer';
 import * as Icon from './icons';
 import {
@@ -35,7 +36,14 @@ interface SelectTriggerProps extends ComponentProps<typeof SelectPrimitive.Trigg
   size?: ControlSize;
 }
 
-export function SelectTrigger({ className, children, size = 'md', ...props }: SelectTriggerProps) {
+export function SelectTrigger({
+  className,
+  children,
+  size = 'md',
+  'aria-describedby': describedBy,
+  ...props
+}: SelectTriggerProps) {
+  const described = useDescribedBy(describedBy);
   return (
     <SelectPrimitive.Trigger
       className={cx(
@@ -53,6 +61,7 @@ export function SelectTrigger({ className, children, size = 'md', ...props }: Se
         className
       )}
       {...props}
+      aria-describedby={described}
     >
       {children}
       <SelectPrimitive.Icon asChild>

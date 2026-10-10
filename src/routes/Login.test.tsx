@@ -106,6 +106,18 @@ describe('Login', () => {
     expect(buttons.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('exposes banner and contentinfo landmarks and hides decorative icons', async () => {
+    const { container } = renderLogin();
+    await screen.findByRole('heading', { name: /answers, not api dumps/i });
+
+    // Panel headers match 'banner' in jsdom; only a header outside <main> is one in a browser.
+    const main = container.querySelector('main');
+    expect(screen.getAllByRole('banner').some((el) => !main?.contains(el))).toBe(true);
+    expect(screen.getByRole('contentinfo')).not.toBeNull();
+    expect(main?.contains(screen.getByRole('contentinfo'))).toBe(false);
+    expect(container.querySelectorAll('main svg:not([aria-hidden])')).toHaveLength(0);
+  });
+
   it('links the footer "Free & open source" text to the repo', async () => {
     renderLogin();
     await screen.findByRole('heading', {

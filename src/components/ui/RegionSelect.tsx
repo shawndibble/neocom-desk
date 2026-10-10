@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { cx } from '@/lib/cx';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
+import { LiveStatus } from './LiveStatus';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 import { SearchInput } from './SearchInput';
 import * as Icon from './icons';
@@ -141,7 +142,11 @@ export function RegionSelect({
           />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 min-w-[var(--radix-popover-trigger-width)] p-0">
+      <PopoverContent
+        align="start"
+        aria-label={ariaLabel}
+        className="w-64 min-w-[var(--radix-popover-trigger-width)] p-0"
+      >
         <div className="p-1">
           <SearchInput
             autoFocus
@@ -193,9 +198,12 @@ export function RegionSelect({
             );
           })}
           {matches.length === 0 && (
-            <p className="px-2 py-1.5 text-sm text-text-dim">{noResultsLabel}</p>
+            <p aria-hidden="true" className="px-2 py-1.5 text-sm text-text-dim">
+              {noResultsLabel}
+            </p>
           )}
         </div>
+        <LiveStatus>{matches.length === 0 && noResultsLabel}</LiveStatus>
       </PopoverContent>
     </Popover>
   );

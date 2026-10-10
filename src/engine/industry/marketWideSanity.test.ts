@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   RARELY_SOLD_PER_DAY,
+  averageDailyOrders,
   averageDailyVolume,
   isRarelySold,
   reliableSellPrice,
@@ -58,6 +59,15 @@ describe('averageDailyVolume', () => {
     const forge = [day('2026-09-28', 150)];
     const domain = [day('2026-09-28', 30)];
     expect(averageDailyVolume([forge, domain], NOW)).toBeCloseTo(6);
+  });
+});
+
+describe('averageDailyOrders', () => {
+  const orders = (date: string, orderCount: number) => ({ ...day(date, 1), orderCount });
+
+  it('averages the last 30 days over every day and ignores older ones', () => {
+    const history = [orders('2026-09-28', 60), orders('2026-09-20', 30), orders('2026-07-01', 999)];
+    expect(averageDailyOrders(history, NOW)).toBeCloseTo(3);
   });
 });
 

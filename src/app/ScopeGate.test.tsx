@@ -86,6 +86,13 @@ describe('ScopeGate', () => {
     expect(screen.queryByText('Mail from Aura')).not.toBeInTheDocument();
   });
 
+  it('names a locked page with an h1, which the banner’s own <p> title cannot', async () => {
+    await seedGrant(['esi-assets.read_assets.v1']);
+    renderGate();
+
+    expect(await screen.findByRole('heading', { level: 1, name: /mail/i })).toBeInTheDocument();
+  });
+
   it('sizes the banner’s button at the touch tier — it is the locked route’s only control', async () => {
     await seedGrant(['esi-assets.read_assets.v1']);
     renderGate();

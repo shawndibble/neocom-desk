@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, useEffect, useRef, type ErrorInfo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 
@@ -25,6 +25,9 @@ interface State {
  */
 function ErrorScreen({ inline }: { inline: boolean }) {
   const { t } = useTranslation();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // The failed page took the focused control with it; say what happened.
+  useEffect(() => headingRef.current?.focus(), []);
   // Inside the shell the page already sits in `Layout`'s `<main>`.
   const Wrapper = inline ? 'section' : 'main';
   return (
@@ -33,7 +36,11 @@ function ErrorScreen({ inline }: { inline: boolean }) {
         inline ? 'py-16' : 'min-h-screen bg-bg'
       }`}
     >
-      <h1 className="text-sm font-semibold tracking-widest uppercase">
+      <h1
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-sm font-semibold tracking-widest uppercase focus:outline-none"
+      >
         {t('error.title', { defaultValue: 'Something went wrong' })}
       </h1>
       <p className="max-w-prose text-xs text-text-dim">

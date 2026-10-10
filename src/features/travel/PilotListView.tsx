@@ -68,6 +68,13 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
 /** How many hulls a row names under "Flew on kills". */
 const ROW_HULLS = 2;
 
+// Widths for the Standing and kill-count columns. Each group is its own table,
+// so without them every table sizes the counts to its own content and they
+// start at a different x down the page. Pilot and Flew on stay unpinned: a
+// long name or hull list wraps instead of being clipped.
+const STANDING_COLUMN_WIDTH = 'w-40';
+const COUNT_COLUMN_WIDTH = 'w-24';
+
 function recentKills(row: PilotListRow, now: number) {
   if (row.kills.kind !== 'ready') return [];
   // Same window as the counts: what they flew lately, not years ago.
@@ -193,6 +200,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     {
       id: 'standing',
       header: t('travel.pilot.list.standing'),
+      headerCellClassName: STANDING_COLUMN_WIDTH,
       render: (row) => <StandingCell row={row} />,
     },
     ...spaces.map((space): DataTableColumn<PilotListRow> => ({
@@ -200,6 +208,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       header: t(`common.spaceOption.${space}`),
       align: 'right',
       className: 'tabular-nums',
+      headerCellClassName: COUNT_COLUMN_WIDTH,
       render: (row) => <SpaceCell row={row} space={space} now={now} />,
     })),
     {
@@ -259,6 +268,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
         label={groupTitle(id, t, here.space)}
         columns={columns}
         rows={list}
+        className="table-fixed"
         rowKey={(row) => row.name}
         rowClassName={(row) => {
           const threat = rowThreat(row, now);

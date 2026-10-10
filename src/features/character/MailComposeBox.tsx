@@ -7,6 +7,7 @@
  */
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -93,6 +94,11 @@ export function MailComposeBox({
   const [pickerOpen, setPickerOpen] = useState(false);
   const listboxId = `mail-compose-recipient-listbox-${header.mail_id}`;
   const errorId = `mail-compose-error-${header.mail_id}`;
+  const fieldId = useId();
+  const toLabelId = `${fieldId}-to`;
+  const recipientSearchId = `${fieldId}-recipient-search`;
+  const subjectId = `${fieldId}-subject`;
+  const bodyId = `${fieldId}-body`;
 
   // First-field focus (issue #1485): Forward's recipient search is the real
   // first field (it sits above Subject); `skipNextPickerOpenRef` stops that
@@ -356,6 +362,10 @@ export function MailComposeBox({
 
   const headingKey = kind === 'reply' ? 'mail.composeReplyHeading' : 'mail.composeForwardHeading';
   const noRecipientsError = error !== null && recipients.length === 0;
+  // Plain stacked labels, not the `Fields`/`Field` label-column primitive: a
+  // side label column would take width from the 8-row message box in the
+  // narrow reading pane. Don't "fix" this to `Fields`.
+  const labelClass = 'block text-[0.6875rem] text-text-dim';
 
   return (
     <div className="mt-3 space-y-3 border-t border-line pt-3">
@@ -363,36 +373,45 @@ export function MailComposeBox({
         {t(headingKey)}
       </p>
 
-      <div
-        role="group"
-        aria-label={t('mail.recipientsLabel')}
-        aria-describedby={noRecipientsError ? errorId : undefined}
-        className="flex flex-wrap gap-1.5"
-      >
-        {recipients.map((r) => (
-          <span
-            key={chipKey(r)}
-            className="flex items-center gap-1 rounded-xs border border-line bg-panel-2 py-1 pr-1 pl-2 text-xs text-text"
-          >
-            {r.name}
-            {r.removable ? (
-              <IconButton
-                icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
-                label={t('mail.removeRecipient', { name: r.name })}
-                size="sm"
-                variant="plain"
-                onClick={() => removeRecipient(r)}
-              />
-            ) : (
-              <span className="sr-only">{t('mail.senderNotRemovable')}</span>
-            )}
-          </span>
-        ))}
+      <div className="space-y-1">
+        <p id={toLabelId} className={labelClass}>
+          {t('mail.toLabel')}
+        </p>
+        <div
+          role="group"
+          aria-labelledby={toLabelId}
+          aria-describedby={noRecipientsError ? errorId : undefined}
+          className="flex flex-wrap gap-1.5"
+        >
+          {recipients.map((r) => (
+            <span
+              key={chipKey(r)}
+              className="flex items-center gap-1 rounded-xs border border-line bg-panel-2 py-1 pr-1 pl-2 text-xs text-text"
+            >
+              {r.name}
+              {r.removable ? (
+                <IconButton
+                  icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
+                  label={t('mail.removeRecipient', { name: r.name })}
+                  size="sm"
+                  variant="plain"
+                  onClick={() => removeRecipient(r)}
+                />
+              ) : (
+                <span className="sr-only">{t('mail.senderNotRemovable')}</span>
+              )}
+            </span>
+          ))}
+        </div>
       </div>
 
       {kind === 'forward' && (
-        <div className="relative">
+        <div className="relative space-y-1">
+          <label htmlFor={recipientSearchId} className={labelClass}>
+            {t('mail.addRecipient')}
+          </label>
           <TextInput
+            id={recipientSearchId}
             ref={recipientSearchRef}
             size="sm"
             role="combobox"
@@ -403,7 +422,6 @@ export function MailComposeBox({
               highlight !== null ? `${listboxId}-option-${highlight}` : undefined
             }
             placeholder={t('mail.recipientSearchPlaceholder')}
-            aria-label={t('mail.addRecipient')}
             aria-invalid={noRecipientsError}
             aria-describedby={noRecipientsError ? errorId : undefined}
             value={recipientQuery}
@@ -463,29 +481,38 @@ export function MailComposeBox({
         </div>
       )}
 
-      <TextInput
-        ref={subjectRef}
-        size="sm"
-        aria-label={t('mail.subjectLabel')}
-        placeholder={t('mail.subjectLabel')}
-        value={subject}
-        onChange={(e) => {
-          touchedRef.current = true;
-          setSubject(e.target.value);
-        }}
-        className="w-full"
-      />
+      <div className="space-y-1">
+        <label htmlFor={subjectId} className={labelClass}>
+          {t('mail.subjectLabel')}
+        </label>
+        <TextInput
+          id={subjectId}
+          ref={subjectRef}
+          size="sm"
+          value={subject}
+          onChange={(e) => {
+            touchedRef.current = true;
+            setSubject(e.target.value);
+          }}
+          className="w-full"
+        />
+      </div>
 
-      <TextArea
-        aria-label={t('mail.bodyLabel')}
-        value={body}
-        onChange={(e) => {
-          touchedRef.current = true;
-          setBody(e.target.value);
-        }}
-        rows={8}
-        className="text-sm"
-      />
+      <div className="space-y-1">
+        <label htmlFor={bodyId} className={labelClass}>
+          {t('mail.bodyLabel')}
+        </label>
+        <TextArea
+          id={bodyId}
+          value={body}
+          onChange={(e) => {
+            touchedRef.current = true;
+            setBody(e.target.value);
+          }}
+          rows={8}
+          className="text-sm"
+        />
+      </div>
 
       {error && (
         <p id={errorId} role="alert" className="text-xs text-danger">
