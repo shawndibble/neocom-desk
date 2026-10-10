@@ -8059,7 +8059,6 @@
     "openInApp": "Open Neocom Desk",
     "logIn": "Log in",
     "choosePermissions": "Choose permissions…",
-    "expiresOn": "This link expires {{date}}.",
     "goneTitle": "This link has expired",
     "goneHint": "Shared links last 7 days. Ask whoever sent it to share it again.",
     "unsupportedTitle": "This link needs a newer Neocom Desk",
@@ -8075,7 +8074,7 @@
     "loadFailedTitle": "Could not load this fitting",
     "loadFailedHint": "Something went wrong working out its stats. Try again.",
     "moduleListTitle": "Modules",
-    "openInApp": "Open in Neocom Desk",
+    "expiresLabel": "Expires",
     "copyEft": "Copy Fitting",
     "copied": "Copied",
     "copyFailed": "Couldn't copy"

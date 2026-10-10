@@ -96,10 +96,10 @@ describe('FittingShared', () => {
     ).toBeInTheDocument();
     expect(await screen.findByText('125mm Gatling AutoCannon I')).toBeInTheDocument();
     await waitFor(() => expect(computeFittingStats).toHaveBeenCalled());
-    expect(screen.getByRole('link', { name: 'Open in Neocom Desk' })).toHaveAttribute(
-      'href',
-      '/login'
-    );
+    expect(screen.getByRole('link', { name: /Neocom Desk/ })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Choose permissions/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Open in Neocom Desk' })).not.toBeInTheDocument();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Copy Fitting' }));
     expect(clipboardText).toContain('[Rifter, Rifter]');
