@@ -426,13 +426,28 @@ describe('Market Browser', () => {
     await screen.findByRole('button', SHIPS_GROUP);
     await user.type(screen.getByRole('searchbox'), 'ri');
 
-    expect(screen.getByText('Type 3+ characters to search.')).toBeInTheDocument();
+    expect(screen.getAllByText('Type 3+ characters to search.').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.getByText('Ore')).toBeInTheDocument(); // full, unfiltered tree — still explicit about why
 
     await user.type(screen.getByRole('searchbox'), 'ft');
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
     expect(screen.queryByText('Type 3+ characters to search.')).not.toBeInTheDocument();
+  });
+
+  it('announces the match count, and a miss, through a status region (issue #3354)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('button', SHIPS_GROUP);
+    await user.type(screen.getByRole('searchbox'), 'rifter');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 item matches'));
+
+    await user.clear(screen.getByRole('searchbox'));
+    await user.type(screen.getByRole('searchbox'), 'zzzzqqq');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('No items match your search.')
+    );
   });
 
   it('lets a matched group be collapsed and re-expanded while a search is active', async () => {
@@ -920,13 +935,15 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await openVariationsTab(user);
 
     await user.click(screen.getByRole('button', { name: 'Compare' }));
-    const toast = await screen.findByRole('status');
+    const toast = (await screen.findByRole('button', { name: 'Undo' })).closest(
+      '[role="status"]'
+    ) as HTMLElement;
     expect(toast).toHaveTextContent(/Added \d+ variants of Merlin/);
     expect(useCompareSet.getState().items.length).toBeGreaterThan(2);
 
     await user.click(within(toast).getByRole('button', { name: 'Undo' }));
     expect(useCompareSet.getState().items).toEqual([{ typeId: 999999, itemName: 'Pre-existing' }]);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
   });
 
   it('right-clicks a Variations row to open its item context menu, including Compare Variations (issue #147)', async () => {

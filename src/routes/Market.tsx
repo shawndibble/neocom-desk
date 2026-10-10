@@ -19,6 +19,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  LiveStatus,
   Spinner,
   TabPanel,
   Tabs,
@@ -504,6 +505,18 @@ export function Market() {
     itemTab,
     setItemTab,
   } = useMarketBrowser({ groups, types, marketRegions, groupsById });
+
+  // Spoken summary of the finder's result: the visible notes and the swap to
+  // "No results" are plain text, so a screen reader hears nothing as you type.
+  let browserStatus: string | null = null;
+  if (filterResult) {
+    browserStatus =
+      filterResult.visibleGroupIds.size === 0 && !filterResult.bestMatch
+        ? t('market.noResults')
+        : t('market.searchMatchCount', { count: filterResult.totalMatches });
+  } else if (query.trim().length > 0) {
+    browserStatus = t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH });
+  }
 
   // Focus management for the finder <-> item panel swap below the `lg:`
   // breakpoint (issue #1485): selecting an item hides the finder and shows
@@ -1014,6 +1027,8 @@ export function Market() {
                     />
                   }
                 />
+
+                <LiveStatus>{browserStatus}</LiveStatus>
 
                 {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
                   <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
