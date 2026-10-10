@@ -595,13 +595,13 @@ describe('BuildPlanDetail shopping list', () => {
   });
 
   it('names the Blueprint Acquisition row left out of the copied text (issue #1778)', async () => {
+    const user = userEvent.setup();
     configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
     // Default fixture's "Rifter Blueprint" Blueprint Acquisition row (issue
     // #838) is what gets left out here.
     render(<Harness />);
 
-    // fireEvent, not userEvent: the pointer-event simulation was what ran past findBy's 1s under CI load.
-    fireEvent.click(copyButton());
+    await user.click(copyButton());
 
     expect(
       await screen.findByText('1 blueprint left out — buy it by contract')
