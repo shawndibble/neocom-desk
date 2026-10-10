@@ -31,7 +31,7 @@ Glossary (CONTEXT.md): **Pilot Lookup** - portrait, corporation, alliance, chara
 - Nav: no page of its own (no Intel group); Ctrl K lists it as "Travel › Pilot Lookup" from `TRAVEL_TABS`. Tab label `nav.pilotLookup`.
 - Legacy redirects: `/pilot-lookup` -> `/travel/pilot` (`src/app/legacyPaths.ts`, query, hash and route state kept); defaulted `/travel?pilot=` -> `/travel/pilot` (`src/routes/Travel.tsx`).
 - Scope: only suggestions use one - `esi-search.search_structures.v1` (`getCharacterSearch`, `src/esi/registry.ts:573`), gated by `useEndpointsGranted(['getCharacterSearch'])` and an active Character (`PilotLookupPanel.tsx:75`). Without it the hint reads "Type the pilot's full name and press Enter. Suggestions need this character's search permission." and exact-name lookup still works. No grant banner or Grant button on the page.
-- Layout: `mx-auto max-w-6xl`; `PageHeader` title `nav.pilotLookup`; no tabs; `DataAgeBadge` on the profile panel (when the profile loaded).
+- Layout: `mx-auto max-w-6xl`; `PageHeader` title `travel.title` over the Travel tab bar; `DataAgeBadge` on the profile panel (when the profile loaded).
 
 ## Data sources
 
@@ -240,7 +240,7 @@ Folder is `features/travel/`, where the tab lives.
 - Profile, stats and killmail failures each offer a Try again control (failures are not cached, so it refetches).
 - Killmail row shows only victim or final blow; no attacker count, damage, or location detail.
 - Top ships use zKillboard's all-time "ships used on kills" only; no losses-by-hull or recent-activity timeline.
-- Show Info Character tab and this page duplicate one view; Show Info does not link to `/pilot-lookup`.
+- Show Info Character tab and this page duplicate one view; Show Info does not link to `/travel/pilot`.
 - Orphaned i18n key `travel.pilotTab` remains in `en.json`; the tab label is `nav.pilotLookup`.
 - Opening a `?pilot=` link leaves the search box empty (query text is local state, never filled from the URL or the loaded profile).
 - Kill row shows the victim's hull for both kills and losses, so the pilot's own ship on a kill is not shown.
