@@ -4034,7 +4034,7 @@
       "orange": "highest price"
     },
     "valueLow": "cheaper",
-    "valueHigh": "dearer",
+    "valueHigh": "pricier",
     "legendRate": "Mining rate",
     "sharePanelTitle": "Field progress",
     "shareTitle": "Mining Survey",
