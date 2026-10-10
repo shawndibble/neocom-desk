@@ -20,7 +20,7 @@ export interface ToastProps {
  * fixed` is relative to the nearest ancestor with a `transform`/`filter`/
  * `backdrop-filter` (every `Panel` has one, for its `backdrop-blur-sm`), not
  * the viewport, in every browser that implements the spec. A caller inside a
- * long `Panel` — Hauling's Copy Multibuy button, at the very top of a list
+ * long `Panel` — Hauling's Copy multibuy list button, at the very top of a list
  * that scrolls the page well past the viewport — pinned the toast off-screen
  * at the bottom of that panel instead of the bottom of the screen.
  *

@@ -8,12 +8,13 @@ import {
   MAX_SCAN_TEXT,
   MAX_SURVEY_NOTES,
   setSurveyInfo,
+  setSurveyOwner,
   setSurveyScanIgnored,
   setSurveyTax,
   startSurvey,
 } from './surveyStore';
 
-const { addDoc, getDocs, loadShare, saveShare, FakeTimestamp } = vi.hoisted(() => {
+const { addDoc, updateDoc, getDocs, loadShare, saveShare, FakeTimestamp } = vi.hoisted(() => {
   class FakeTimestamp {
     constructor(readonly millis: number) {}
     static fromMillis(millis: number) {
@@ -25,6 +26,7 @@ const { addDoc, getDocs, loadShare, saveShare, FakeTimestamp } = vi.hoisted(() =
   }
   return {
     addDoc: vi.fn(),
+    updateDoc: vi.fn(),
     getDocs: vi.fn(),
     loadShare: vi.fn(),
     saveShare: vi.fn(),
@@ -34,7 +36,9 @@ const { addDoc, getDocs, loadShare, saveShare, FakeTimestamp } = vi.hoisted(() =
 
 vi.mock('firebase/firestore/lite', () => ({
   addDoc,
+  updateDoc,
   getDocs,
+  doc: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
   collection: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
   serverTimestamp: () => 'SERVER_TIME',
   Timestamp: FakeTimestamp,
@@ -51,6 +55,7 @@ const EXPIRES = Date.UTC(2026, 9, 15);
 
 beforeEach(() => {
   addDoc.mockReset();
+  updateDoc.mockReset();
   getDocs.mockReset();
   loadShare.mockReset();
   saveShare.mockReset();
@@ -280,6 +285,23 @@ describe('location and notes', () => {
     );
   });
 
+  it('stores a manual location by name alone, with no id', async () => {
+    await setSurveyInfo({
+      id: 'abc123XYZ',
+      expiresAt: EXPIRES,
+      location: { id: null, name: 'Moro - This is not a moodrill' },
+      notes: '',
+    });
+    expect(addDoc).toHaveBeenCalledWith(
+      { path: 'shares/abc123XYZ/surveyInfo' },
+      {
+        locationName: 'Moro - This is not a moodrill',
+        createdAt: 'SERVER_TIME',
+        expiresAt: FakeTimestamp.fromMillis(EXPIRES),
+      }
+    );
+  });
+
   it('leaves out what is empty, so clearing a field stores its absence', async () => {
     await setSurveyInfo({ id: 'abc123XYZ', expiresAt: EXPIRES, location: null, notes: '  ' });
     expect(addDoc).toHaveBeenCalledWith(
@@ -312,6 +334,12 @@ describe('location and notes', () => {
       docs: ref.path.endsWith('surveyInfo') ? docs : [],
     }));
   };
+
+  it('loads a name-only location as a manual one with no id', async () => {
+    withInfo([info({ locationName: 'Moro', notes: 'hi' }, 1)]);
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && result.info).toEqual({ location: { id: null, name: 'Moro' }, notes: 'hi' });
+  });
 
   it('loads the newest valid info with the survey', async () => {
     withInfo([
@@ -484,5 +512,21 @@ describe('finishing a survey', () => {
     });
     const result = await loadSurvey('abc123XYZ');
     expect(result.ok && result.scans).toEqual([]);
+  });
+});
+
+describe('setSurveyOwner', () => {
+  it('updates only the survey share payload owner', async () => {
+    updateDoc.mockResolvedValue(undefined);
+    await setSurveyOwner({ id: 'abc123XYZ', owner: '  New Pilot ' });
+    expect(updateDoc).toHaveBeenCalledWith(
+      { path: 'shares/abc123XYZ' },
+      { 'payload.owner': 'New Pilot' }
+    );
+  });
+
+  it('refuses an empty name', async () => {
+    await expect(setSurveyOwner({ id: 'abc123XYZ', owner: '  ' })).rejects.toThrow();
+    expect(updateDoc).not.toHaveBeenCalled();
   });
 });

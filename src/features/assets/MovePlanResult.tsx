@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Checkbox, Disclosure, Modal } from '@/components/ui';
@@ -10,6 +10,7 @@ import {
 } from '@/features/character/CharacterScopeReadout';
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { firstConnected, useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatCubicMetres } from '@/lib/volume';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { Rail, RailHeading, RailStop } from './MovePlanRail';
@@ -38,6 +39,8 @@ interface PlanResultProps {
   scope: CharacterScopeReadoutProps;
   compareOpen: boolean;
   onToggleCompare: () => void;
+  /** The plan's screen-reader heading, where focus lands once the plan shows. */
+  headingRef: Ref<HTMLHeadingElement>;
   onBack: () => void;
   onDone: () => void;
   /** Haul this ship (itemID) packaged instead of flying it. */
@@ -61,6 +64,7 @@ export function PlanResult({
   scope,
   compareOpen,
   onToggleCompare,
+  headingRef,
   onBack,
   onDone,
   onPackShip,
@@ -81,10 +85,18 @@ export function PlanResult({
   useEffect(() => {
     void hydrateSkip();
   }, [hydrateSkip]);
-  const askToPack = (itemId: number, typeId: number) => {
+  const focusAfterCommit = useFocusAfterCommit();
+  /** Pickup the ship being packed sits in; its heading takes focus once the Pack button is gone. */
+  const packFrom = useRef<string | null>(null);
+  const pickupHeading = () =>
+    document.querySelector<HTMLElement>(`[data-pickup-heading="${packFrom.current}"]`);
+  const askToPack = (itemId: number, typeId: number, pickupKey: string) => {
     const rigs = rigsOf(itemId);
-    if (rigs === 0 || skipRigWarning) onPackShip(itemId);
-    else {
+    packFrom.current = pickupKey;
+    if (rigs === 0 || skipRigWarning) {
+      onPackShip(itemId);
+      focusAfterCommit(pickupHeading);
+    } else {
       setDontRemind(false);
       setAsking({ itemId, typeId, rigs });
     }
@@ -94,6 +106,9 @@ export function PlanResult({
   if (plan.perCharacter.length === 0) {
     return (
       <div className="flex flex-col gap-3">
+        <h3 ref={headingRef} tabIndex={-1} className="sr-only focus:outline-none">
+          {t('assets.movePlan.title')}
+        </h3>
         <p className="font-medium">{t('assets.movePlan.nothingToMove')}</p>
         <p className="text-text-dim">{t('assets.movePlan.nothingToMoveHint')}</p>
         <div className="flex justify-end gap-2">
@@ -118,6 +133,9 @@ export function PlanResult({
   return (
     <div className="flex flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h3 ref={headingRef} tabIndex={-1} className="sr-only focus:outline-none">
+          {t('assets.movePlan.title')}
+        </h3>
         <CharacterScopeReadout {...scope} />
       </div>
       {plan.suggested ? (
@@ -236,7 +254,11 @@ export function PlanResult({
               <RailStop key={p.locationId} hue={hueOf(p.locationId)}>
                 <section className="rounded-xs border border-line bg-panel-2 px-3 pb-1">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line pt-2.5 pb-1.5">
-                    <h3 className="m-0 flex min-w-0 flex-[1_1_12em] flex-wrap max-sm:contents items-baseline gap-x-3 gap-y-0.5 text-sm">
+                    <h3
+                      data-pickup-heading={`${c.characterId}:${p.locationId}`}
+                      tabIndex={-1}
+                      className="m-0 flex min-w-0 flex-[1_1_12em] flex-wrap max-sm:contents items-baseline gap-x-3 gap-y-0.5 text-sm focus:outline-none"
+                    >
                       <span className="min-w-0 flex-1 font-bold max-sm:basis-full [overflow-wrap:anywhere]">
                         {placeLabel(p.locationId)}
                       </span>
@@ -294,7 +316,12 @@ export function PlanResult({
                         }
                         trailing={
                           canPack(s.typeId) ? (
-                            <Button size="sm" onClick={() => askToPack(s.itemId, s.typeId)}>
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                askToPack(s.itemId, s.typeId, `${c.characterId}:${p.locationId}`)
+                              }
+                            >
                               {t('assets.movePlan.packInstead')}
                             </Button>
                           ) : null
@@ -328,6 +355,7 @@ export function PlanResult({
         open={asking !== null}
         onClose={() => setAsking(null)}
         title={t('assets.movePlan.packTitle', { ship: asking ? name(asking.typeId) : '' })}
+        returnFocusFallback={() => firstConnected([pickupHeading])}
       >
         <div className="flex flex-col gap-3 text-sm">
           <p className="m-0">{t('assets.movePlan.packRigWarning', { count: asking?.rigs ?? 0 })}</p>

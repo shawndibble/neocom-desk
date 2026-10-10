@@ -18,7 +18,15 @@
  * (`surveyInfo`): each doc is the whole current info, so the newest alone
  * decides and a notes edit can't drop the location.
  */
-import { addDoc, collection, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore/lite';
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  serverTimestamp,
+  Timestamp,
+  updateDoc,
+} from 'firebase/firestore/lite';
 import { generateShareId } from '@/engine/share/shareId';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import type { SurveyRock, SurveyScan } from '@/engine/survey/series';
@@ -45,9 +53,11 @@ export const MAX_TAX_NAME = 100;
  * Where to mine, and the starter's notes for the fleet. The location is a solar
  * system, NPC station or structure id (what ESI's waypoint call takes), with its
  * name stored beside it: a visitor with no sign-in can't resolve a structure's.
+ * A manual location (a structure the search couldn't find, typed as free text)
+ * has a name and no id, so there is nothing to send as a waypoint.
  */
 export interface SurveyInfoShare {
-  location: { id: number; name: string } | null;
+  location: { id: number | null; name: string } | null;
   notes: string;
 }
 
@@ -133,7 +143,7 @@ export async function setSurveyTax(input: {
 export async function setSurveyInfo(input: {
   id: string;
   expiresAt: number;
-  location: { id: number; name: string } | null;
+  location: { id: number | null; name: string } | null;
   notes: string;
 }): Promise<void> {
   const notes = input.notes.trim().slice(0, MAX_SURVEY_NOTES);
@@ -141,13 +151,24 @@ export async function setSurveyInfo(input: {
     ...(input.location === null
       ? {}
       : {
-          locationId: input.location.id,
+          ...(input.location.id === null ? {} : { locationId: input.location.id }),
           locationName: input.location.name.slice(0, MAX_LOCATION_NAME),
         }),
     ...(notes === '' ? {} : { notes }),
     createdAt: serverTimestamp(),
     expiresAt: Timestamp.fromMillis(input.expiresAt),
   });
+}
+
+/**
+ * Hands the survey to another Character: the one update a `survey` share allows
+ * (`payload.owner` alone). The rules can't tell who the current owner is, so
+ * the app only offers this to them.
+ */
+export async function setSurveyOwner(input: { id: string; owner: string }): Promise<void> {
+  const owner = input.owner.trim().slice(0, MAX_SCAN_BY);
+  if (owner === '') throw new Error('A survey needs an owner name.');
+  await updateDoc(doc(getSyncFirestore(), 'shares', input.id), { 'payload.owner': owner });
 }
 
 /**
@@ -267,14 +288,19 @@ async function loadSurveyInfo(id: string): Promise<SurveyInfoShare | null> {
       const at = data.createdAt.toMillis();
       if (newest !== null && at <= newest.at) continue;
       let location: SurveyInfoShare['location'] = null;
-      if (data.locationId !== undefined) {
-        // A location is an id and a name together; half of one is a bad doc.
+      if (data.locationId !== undefined || data.locationName !== undefined) {
+        // A location is a name, with an id unless it was typed as a manual one.
         const { locationId, locationName } = data;
-        if (typeof locationId !== 'number' || !Number.isInteger(locationId) || locationId <= 0) {
-          continue;
+        if (data.locationId !== undefined) {
+          if (typeof locationId !== 'number' || !Number.isInteger(locationId) || locationId <= 0) {
+            continue;
+          }
         }
         if (typeof locationName !== 'string' || locationName.trim() === '') continue;
-        location = { id: locationId, name: locationName.trim().slice(0, MAX_LOCATION_NAME) };
+        location = {
+          id: data.locationId === undefined ? null : (locationId as number),
+          name: locationName.trim().slice(0, MAX_LOCATION_NAME),
+        };
       }
       const notes = typeof data.notes === 'string' ? data.notes.slice(0, MAX_SURVEY_NOTES) : '';
       newest = { at, info: { location, notes } };

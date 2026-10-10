@@ -99,6 +99,14 @@ test.describe('Journal phone table', () => {
       amount: -5000000,
       balance: 900,
     },
+    {
+      id: 4,
+      date: '2026-08-31T00:00:00Z',
+      ref_type: 'contract_price_payment_corp',
+      description: 'A very long description '.repeat(3).trim().slice(0, 60),
+      amount: -999999999999,
+      balance: 800,
+    },
   ];
 
   test.beforeEach(async ({ page }) => {
@@ -135,10 +143,28 @@ test.describe('Journal phone table', () => {
     const amounts = () =>
       table.locator('tbody tr:not(.dt-spacer) td[data-label="Amount"]').allTextContents();
     const before = await amounts();
-    expect(before).toHaveLength(3);
+    expect(before).toHaveLength(4);
     // Newest first by default: the 100 ISK gift leads. Sorting by Amount moves it.
     await table.getByRole('button', { name: /Amount/ }).click();
     await expect.poll(async () => (await amounts())[0]).not.toBe(before[0]);
+    await expectNoPageOverflow(page);
+  });
+
+  test('journal keeps every Amount cell inside the 390px viewport', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./wallet/journal');
+
+    const table = page.getByRole('table', { name: 'Journal' });
+    await expect(table.locator('tbody tr:not(.dt-spacer)').first()).toBeVisible();
+    const rights = await table
+      .locator('thead th, tbody tr:not(.dt-spacer) td[data-label="Amount"]')
+      .evaluateAll((cells) =>
+        cells
+          .filter((c) => /Amount/.test(c.getAttribute('data-label') ?? c.textContent ?? ''))
+          .map((c) => c.getBoundingClientRect().right)
+      );
+    expect(rights.length).toBeGreaterThanOrEqual(5);
+    for (const right of rights) expect(right).toBeLessThanOrEqual(PHONE.width);
     await expectNoPageOverflow(page);
   });
 

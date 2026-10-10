@@ -503,12 +503,6 @@ function acrossIdentity(row: AcrossCharactersRow): ContactIdentity {
 const ACROSS_PORTRAIT_COLUMN = portraitColumn<AcrossCharactersRow>(acrossIdentity);
 const CHARACTER_PORTRAIT_COLUMN = portraitColumn<CharacterContact>((contact) => contact);
 
-/**
- * A faction row has no Show Info (no public faction endpoint), so it must not
- * look clickable: the row's own `cursor-pointer` is overridden, not removed —
- * `onRowClick` is table-wide.
- */
-const NOT_CLICKABLE = 'cursor-default!';
 const ACROSS_SORT = { columnId: 'held', direction: 'asc' } as const;
 
 interface AcrossCharactersPanelProps {
@@ -730,9 +724,8 @@ function AcrossCharactersPanel({
             const kind = contactPublicInfoKind(acrossIdentity(row));
             if (kind) open(kind, row.contactId);
           }}
-          rowClassName={(row) =>
-            contactPublicInfoKind(acrossIdentity(row)) ? undefined : NOT_CLICKABLE
-          }
+          // A faction has no Show Info (no public faction endpoint): not a tab stop either.
+          rowClickable={(row) => contactPublicInfoKind(acrossIdentity(row)) !== null}
         />
       )}
     </Panel>
@@ -1082,7 +1075,7 @@ export function Contacts() {
     <Tabs
       tabsId={tabsId}
       label={t('contacts.title')}
-      value={tab}
+      value={view === 'across' ? 'across' : tab === 'standings' ? 'standings' : 'character'}
       onChange={(id) => setTab(id as typeof tab)}
       tabs={tabBarTabs(CONTACTS_TABS)
         .filter((item) => item.id !== 'across' || acrossLists.length > 1)
@@ -1233,9 +1226,7 @@ export function Contacts() {
                       const kind = contactPublicInfoKind(contact);
                       if (kind) openPublicInfo(kind, contact.contact_id);
                     }}
-                    rowClassName={(contact) =>
-                      contactPublicInfoKind(contact) ? undefined : NOT_CLICKABLE
-                    }
+                    rowClickable={(contact) => contactPublicInfoKind(contact) !== null}
                   />
                 )}
               </Panel>

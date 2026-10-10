@@ -1,19 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { BootScreen } from '@/app/BootScreen';
 import {
   Button,
-  buttonClassName,
   EmptyState,
   LiveStatus,
-  LogoMark,
   Spinner,
+  StatChip,
+  StatChips,
   TypeIcon,
 } from '@/components/ui';
-import { setLoginReturnTo } from '@/auth/loginReturnTo';
+import { ShareShell } from '@/features/share/ShareShell';
 import { writeToClipboard } from '@/lib/clipboard';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { resolveFittingShareView } from '@/features/fittings/resolveFittingShareView';
@@ -149,7 +148,16 @@ export function FittingShareView({
     };
   }, [readyFitting, t]);
 
-  if (characterCount === undefined) return <BootScreen gate="fitting-shared" />;
+  // Same frame as the ready page, so a stored link does not swap frames while the count loads.
+  if (characterCount === undefined) {
+    return (
+      <ShareShell title={t('fittingShare.title')}>
+        <div className="flex justify-center py-10">
+          <Spinner label={t('common.loading')} />
+        </div>
+      </ShareShell>
+    );
+  }
   // A visitor with a Character never gets the All-V view — the same link
   // opens in the editor, under their own pilot (CONTEXT.md **Fitting Share Code**).
   if (characterCount > 0) {
@@ -157,7 +165,7 @@ export function FittingShareView({
   }
 
   const editLocation = fittingEditLocation(code);
-  const returnPath = `${editLocation.pathname}${editLocation.search}`;
+  const openInApp = { path: `${editLocation.pathname}${editLocation.search}` };
 
   async function copyEft() {
     if (state.status !== 'ready' || typeName === null) return;
@@ -173,22 +181,43 @@ export function FittingShareView({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-6 text-text">
-      <div className="flex items-center gap-2">
-        <LogoMark className="size-6" />
-        <h1 className="text-sm font-semibold tracking-widest uppercase">
-          {t('fittingShare.title')}
-        </h1>
-      </div>
-
+    <ShareShell
+      title={t('fittingShare.title')}
+      openInApp={openInApp}
+      actions={
+        state.status === 'ready' ? (
+          <>
+            {/* Absolutely positioned, so it adds no flex gap. */}
+            <LiveStatus announceKey={copyCount}>
+              {copied ? t('fittingShare.copied') : copyFailed ? t('fittingShare.copyFailed') : null}
+            </LiveStatus>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => void copyEft()}
+              disabled={typeName === null}
+            >
+              {copied
+                ? t('fittingShare.copied')
+                : copyFailed
+                  ? t('fittingShare.copyFailed')
+                  : t('fittingShare.copyEft')}
+            </Button>
+          </>
+        ) : undefined
+      }
+    >
       <p className="rounded-xs border border-warning bg-panel-2 px-3 py-2 text-xs text-warning">
         {t('fittingShare.banner')}
       </p>
 
       {expiresAt !== undefined && (
-        <p className="text-xs text-text-dim">
-          {t('share.expiresOn', { date: new Date(expiresAt).toLocaleString() })}
-        </p>
+        <StatChips>
+          <StatChip
+            label={t('fittingShare.expiresLabel')}
+            value={new Date(expiresAt).toLocaleString()}
+          />
+        </StatChips>
       )}
 
       {state.status === 'loading' && (
@@ -259,29 +288,6 @@ export function FittingShareView({
           )}
         </>
       )}
-
-      <div className="flex flex-wrap gap-2">
-        <Link
-          to="/login"
-          onClick={() => setLoginReturnTo(returnPath)}
-          className={buttonClassName({ size: 'sm', variant: 'primary' })}
-        >
-          {t('fittingShare.openInApp')}
-        </Link>
-        {/* Absolutely positioned, so it adds no flex gap. */}
-        <LiveStatus announceKey={copyCount}>
-          {copied ? t('fittingShare.copied') : copyFailed ? t('fittingShare.copyFailed') : null}
-        </LiveStatus>
-        {state.status === 'ready' && (
-          <Button size="sm" onClick={() => void copyEft()} disabled={typeName === null}>
-            {copied
-              ? t('fittingShare.copied')
-              : copyFailed
-                ? t('fittingShare.copyFailed')
-                : t('fittingShare.copyEft')}
-          </Button>
-        )}
-      </div>
-    </main>
+    </ShareShell>
   );
 }

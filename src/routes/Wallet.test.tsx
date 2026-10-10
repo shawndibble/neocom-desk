@@ -480,11 +480,11 @@ describe('Wallet', () => {
       .map((header) => header.textContent);
     expect(headers).toEqual(['Ref type', 'Net']);
     const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
-    expect(bountyRow).toHaveTextContent('+1,000.00');
+    expect(bountyRow).toHaveTextContent('+1,000');
     // Single-sided ref types carry no second in/out line.
     expect(breakdown).not.toHaveTextContent(/in S+ · out/);
     // The In / Out / Net summary is a ledger: full figures, not shorthand.
-    expect(screen.getAllByText('+500.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('+500').length).toBeGreaterThan(0);
   });
 
   it('tones the filtered net total by sign (issue #1961)', async () => {
@@ -497,11 +497,11 @@ describe('Wallet', () => {
     await user.click(screen.getByRole('combobox', { name: 'Ref type' }));
     await user.click(await screen.findByRole('option', { name: 'Bounty prize' }));
 
-    const net = (await screen.findAllByText('+1,000.00')).find((el) =>
+    const net = (await screen.findAllByText('+1,000')).find((el) =>
       el.parentElement?.textContent?.includes('1 entry')
     ) as HTMLElement;
     expect(net).toHaveClass('text-isk-pos');
-    expect(net.parentElement).toHaveTextContent('1 entry · net +1,000.00');
+    expect(net.parentElement).toHaveTextContent('1 entry · net +1,000');
   });
 
   it('narrows the journal by free text against the description (issue #413)', async () => {
@@ -534,9 +534,10 @@ describe('Wallet', () => {
 
     await user.type(screen.getByPlaceholderText('Search description…'), 'Donation');
 
-    const summary = await screen.findByText(/1 entry/);
-    expect(summary).toHaveTextContent('1 entry · net -500.00');
-    expect(within(summary).getByText('-500.00')).toHaveClass('text-isk-neg');
+    // The sr-only live region repeats the line as plain text; the visible one is the <p>.
+    const summary = (await screen.findAllByText(/1 entry/)).find((el) => el.tagName === 'P')!;
+    expect(summary).toHaveTextContent('1 entry · net -500');
+    expect(within(summary).getByText('-500')).toHaveClass('text-isk-neg');
   });
 
   it('shows a filtered-empty message, not the no-data empty state, when the filter matches nothing (issue #413)', async () => {

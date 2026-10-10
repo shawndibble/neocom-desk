@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import '@/i18n';
+import i18n from '@/i18n';
 import type { StatusResult } from '@/esi/cache';
 import type { CharacterCorporationRoles } from '@/esi/endpoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { beginEveLogin } from '@/app/loginFlow';
-import { ESI_REGISTRY, SCOPE_GROUPS } from '@/esi/registry';
+import { ESI_REGISTRY, PERMISSIONS, SCOPE_GROUPS } from '@/esi/registry';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import { loadCharacterRoles } from '@/features/corp/roles';
 import { AUTHORIZED_APPS_URL } from '@/lib/links';
@@ -79,6 +79,31 @@ describe('PermissionsPanel — every Permission', () => {
     expect(
       within(row('Structure markets')).getByRole('button', { name: 'Grant Structure markets' })
     ).toBeInTheDocument();
+  });
+
+  it('lists Not granted rows before Granted ones, each half in catalogue order', () => {
+    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedLoadRoles.mockReturnValue(new Promise(() => {}));
+    render(<PermissionsPanel />);
+    const items = screen.getAllByRole('listitem');
+    const states = items.map((li) => (within(li).queryByText('Not granted') ? 'missing' : 'other'));
+    const firstOther = states.indexOf('other');
+    expect(firstOther).toBeGreaterThan(0);
+    expect(states.slice(0, firstOther)).not.toContain('other');
+    expect(states.slice(firstOther)).not.toContain('missing');
+    expect(items).toHaveLength(SCOPE_GROUPS.length);
+  });
+
+  it('keeps catalogue order when nothing is missing', () => {
+    mockedGrantedScopes.mockReturnValue(undefined);
+    render(<PermissionsPanel />);
+    const shown = screen
+      .getAllByRole('listitem')
+      .map((li) => li.querySelector('div > div')?.textContent);
+    const catalogue = SCOPE_GROUPS.map((group) => i18n.t(PERMISSIONS[group].labelKey)).filter(
+      (label) => shown.includes(label)
+    );
+    expect(shown).toEqual(catalogue);
   });
 
   it('offers Grant on every Permission a Core-only Character is missing', () => {

@@ -9,6 +9,7 @@
     "stalledPending": "Reloading…"
   },
   "nav": {
+    "skipToContent": "Skip to content",
     "characters": "Characters",
     "overview": "Overview",
     "corp": "Corporation",
@@ -2594,7 +2595,7 @@
     "productionRunStatusClosed": "Closed",
     "deleteProductionRun": "Delete production run",
     "deleteProductionRunMenu": "Delete production run…",
-    "deleteProductionRunConfirm": "Delete this production run? Its logged cost, linked sales and watched orders are deleted from every device you sync with. This cannot be undone.",
+    "deleteProductionRunConfirm": "Delete this production run? Its logged cost, linked sales and watched orders are deleted from every device you sync with. This can't be undone.",
     "cancel": "Cancel",
     "realizedRevenue": "Realized revenue",
     "realizedProfit": "Realized profit",
@@ -2755,7 +2756,7 @@
     "deleteGroup": "Delete group",
     "deleteGroupConfirm": "Delete this group? All build plans in it will also be deleted.",
     "deletePlan": "Delete build plan",
-    "deletePlanConfirm": "Delete \"{{name}}\"? This cannot be undone.",
+    "deletePlanConfirm": "Delete \"{{name}}\"? This can't be undone.",
     "toggleGroup": "Show or hide the plans in {{name}}",
     "moveToGroup": "Move to group",
     "removeFromGroup": "No group",
@@ -3435,6 +3436,8 @@
     "unstar": "Unstar {{name}}",
     "sortBy": "Sort by",
     "sortDirection": "Reverse sort direction",
+    "sortDirectionAsc": "Reverse sort direction (sorted ascending)",
+    "sortDirectionDesc": "Reverse sort direction (sorted descending)",
     "sortKeys": {
       "name": "Name",
       "skillPoints": "Skill points",
@@ -3471,7 +3474,7 @@
     "remove": "Remove",
     "removeButtonLabel": "Remove {{name}}",
     "removeMenuLabel": "Remove {{name}}…",
-    "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device. If sync is on, their synced copy stays on our servers, so adding {{name}} back restores it. It is deleted automatically once no device has synced {{name}} for 90 days. This cannot be undone here.",
+    "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device. If sync is on, their synced copy stays on our servers, so adding {{name}} back restores it. It is deleted automatically once no device has synced {{name}} for 90 days. This can't be undone here.",
     "removeFailed": "Could not remove {{name}}. Nothing was deleted — try again.",
     "cancel": "Cancel",
     "searchPlaceholder": "Search by name or corporation…",
@@ -3759,6 +3762,7 @@
     },
     "opensInNewTab": "(opens in a new tab)",
     "iskAmountHint": "= {{amount}} ISK",
+    "iskInvalid": "Not an ISK amount. Try 1.5b, 500m or 1,000,000.",
     "unknownType": "Type {{id}}",
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",
@@ -3969,6 +3973,8 @@
     "journalBountyKills_other": "{{count}} NPCs killed",
     "journalFilteredSummary_one": "{{count}} entry · net <net>{{net}}</net>",
     "journalFilteredSummary_other": "{{count}} entries · net <net>{{net}}</net>",
+    "journalFilteredSummaryStatus_one": "{{count}} entry · net {{net}}",
+    "journalFilteredSummaryStatus_other": "{{count}} entries · net {{net}}",
     "journalBreakdownTitle": "Where the ISK went",
     "journalBreakdownIn": "In",
     "journalBreakdownOut": "Out",
@@ -4020,6 +4026,17 @@
     "loadFailed": "Couldn't load this survey. It will retry.",
     "emptyTitle": "No survey yet",
     "emptyHint": "Paste a Survey Scanner copy or press Ctrl+V anywhere in the app, to start tracking this field. Paste a newer one later to update it.",
+    "howTo": {
+      "title": "How to copy a scan",
+      "menuAlt": "The Mining Surveyor icon and its right-click menu, with Open Scan Results Window highlighted.",
+      "resultsAlt": "The Mining Survey Results window: the Scan button below a list of ores, each expanded.",
+      "openMenu": "Right-click the Mining Surveyor icon.",
+      "openResults": "Choose Open Scan Results Window.",
+      "scan": "Click Scan in the new window.",
+      "expand": "Expand every ore, so all its rocks are listed.",
+      "copy": "Click in the list, press Ctrl+A to select everything, then Ctrl+C to copy.",
+      "paste": "Come back here and press Ctrl+V."
+    },
     "minedPercent": "{{percent}}% mined",
     "seenOf": "of {{volume}} m³ seen",
     "statLeft": "m³ left",
@@ -4076,13 +4093,9 @@
     "moonTax": {
       "label": "Moon tax",
       "to": "to",
-      "set": "Set who gets the tax",
-      "noRate": "Set rate",
       "payee": "Who gets the tax",
       "payeePlaceholder": "Corporation or pilot",
       "rate": "Tax rate, percent",
-      "rateButton": "Tax rate, percent: {{value}}",
-      "payeeButton": "Who gets the tax: {{value}}",
       "open": "Manage Taxes",
       "manage": "Manage Taxes",
       "failed": "Couldn't save that Payee. Try again."
@@ -4098,8 +4111,22 @@
       "kind": {
         "system": "System",
         "station": "Station",
-        "structure": "Structure"
-      }
+        "structure": "Structure",
+        "manual": "Manual"
+      },
+      "useManual": "Use \"{{name}}\" as a manual location"
+    },
+    "changeOwner": {
+      "open": "Change owner",
+      "title": "Change owner",
+      "search": "New owner",
+      "searchPlaceholder": "Character name",
+      "noMatches": "No character found.",
+      "confirm": "Make {{name}} the owner of this survey?",
+      "warning": "{{name}} becomes the owner and you will only be able to view it. They may need to log into Neocom Desk before they can edit the survey.",
+      "submit": "Change owner",
+      "back": "Back",
+      "failed": "Couldn't change the owner. Try again."
     },
     "formCompressed": "compressed",
     "formRaw": "raw",
@@ -5065,11 +5092,13 @@
       "clearDay": "Show all days",
       "pastHint": "Hatched days are behind you: no new calendar event can land there, though anything overdue still shows.",
       "dayWithLoad": "{{date}} — {{count}} due: {{kinds}}",
-      "dayEmpty": "{{date}} — nothing due"
+      "dayEmpty": "{{date}} — nothing due",
+      "todayPrefix": "Today, {{label}}"
     },
     "density": {
       "toMonth": "Show the whole month",
-      "toFortnight": "Show a fortnight"
+      "toFortnight": "Show a fortnight",
+      "fortnightView": "Fortnight view"
     },
     "day": {
       "today": "Today · {{date}}",
@@ -5079,6 +5108,8 @@
       "title": "Coming up",
       "count_one": "{{count}} ahead",
       "count_other": "{{count}} ahead",
+      "countForDay_one": "{{count}} ahead on this day",
+      "countForDay_other": "{{count}} ahead on this day",
       "empty": "Nothing coming up",
       "emptyHint": "Nothing due from any of your clocks.",
       "emptyForDay": "Nothing due on this day",
@@ -6585,6 +6616,7 @@
     "expiresLabel": "Expires",
     "contractIdLabel": "Contract",
     "copyContractId": "Copy contract ID",
+    "contractIdCopied": "Contract ID copied",
     "contentsHeading": "Everything on this contract",
     "youReceiveHeading": "What you get",
     "youHandOverHeading": "What you hand over",
@@ -7388,7 +7420,7 @@
       "bringRow": "Quantity of {{item}} to bring",
       "fillHold": "Fill my hold",
       "clearAll": "Clear all",
-      "copyMultibuy": "Copy Multibuy",
+      "copyMultibuy": "Copy multibuy list",
       "copied": "Multibuy list copied",
       "copyFailed": "Couldn't copy — copy the list below by hand.",
       "showMultibuyList": "Show multibuy list",
@@ -8132,7 +8164,6 @@
     "openInApp": "Open Neocom Desk",
     "logIn": "Log in",
     "choosePermissions": "Choose permissions…",
-    "expiresOn": "This link expires {{date}}.",
     "goneTitle": "This link has expired",
     "goneHint": "Shared links last 7 days. Ask whoever sent it to share it again.",
     "unsupportedTitle": "This link needs a newer Neocom Desk",
@@ -8148,7 +8179,7 @@
     "loadFailedTitle": "Could not load this fitting",
     "loadFailedHint": "Something went wrong working out its stats. Try again.",
     "moduleListTitle": "Modules",
-    "openInApp": "Open in Neocom Desk",
+    "expiresLabel": "Expires",
     "copyEft": "Copy Fitting",
     "copied": "Copied",
     "copyFailed": "Couldn't copy"
@@ -9100,6 +9131,8 @@
     "suggestionsLabel": "Matching items",
     "suggestionOffers_one": "{{count}} offer",
     "suggestionOffers_other": "{{count}} offers",
+    "suggestionsCount_one": "{{count}} matching item, listed below the search",
+    "suggestionsCount_other": "{{count}} matching items, listed below the search",
     "offersLabel": "Offers",
     "cheapestLabel": "Cheapest",
     "medianLabel": "Median",

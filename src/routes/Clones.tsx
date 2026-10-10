@@ -630,7 +630,7 @@ export function Clones() {
       <OverviewSubNav />
 
       {showSummary && (
-        <>
+        <div className="flex flex-col gap-4">
           <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-4 text-sm">
             <Panel className="h-full">
               <section aria-label={t('clones.cooldown')} className="space-y-1">
@@ -717,14 +717,17 @@ export function Clones() {
               </Panel>
             )}
           </div>
+          {/* One DOM: below md the answer leads, from md up the order is as before. */}
           {verdictCard && (
-            <CloneVerdictCard
-              state={verdictCard}
-              names={training?.skillNames ?? NO_NAMES}
-              timeZone={timeZone}
-            />
+            <div className="order-first md:order-none">
+              <CloneVerdictCard
+                state={verdictCard}
+                names={training?.skillNames ?? NO_NAMES}
+                timeZone={timeZone}
+              />
+            </div>
           )}
-        </>
+        </div>
       )}
 
       {/*
@@ -743,7 +746,7 @@ export function Clones() {
               icon={<Icon.Refresh />}
               label={t('clones.refresh')}
               onClick={refresh}
-              disabled={loading}
+              busy={loading}
             />
             <TableActionsMenu name={t('clones.title')} tableExport={clonesExport} />
           </span>

@@ -58,7 +58,8 @@ export function CalendarDayTicker({
             type="button"
             aria-pressed={isSelected}
             /* The bar is colour and nothing else, so the name carries the words. */
-            aria-label={dayLabel(day.date, load)}
+            aria-label={dayLabel(day.date, load, day.isToday)}
+            aria-current={day.isToday ? 'date' : undefined}
             onClick={() => onSelectDay(isSelected ? null : dayStartMs)}
             className={cx(
               'flex min-h-11 w-12 shrink-0 flex-col items-center gap-1 rounded-xs border px-1 py-1.5',

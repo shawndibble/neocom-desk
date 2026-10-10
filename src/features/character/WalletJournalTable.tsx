@@ -16,6 +16,7 @@ import {
   EmptyState,
   FilterBar,
   FilterField,
+  LiveStatus,
   SearchInput,
   Select,
   SelectContent,
@@ -28,7 +29,10 @@ import {
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
-import { useJournalBreakdownPref } from '@/features/character/journalBreakdownPref';
+import {
+  defaultBreakdownOpen,
+  useJournalBreakdownPref,
+} from '@/features/character/journalBreakdownPref';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
@@ -64,9 +68,9 @@ interface JournalFilterBarProps {
  */
 const ALL_REF_TYPES = '__all';
 
-/** Ledger figure at full precision, with an explicit `+` on gains (the wallet reconciles against the game client). */
+/** Whole-ISK ledger figure, with an explicit `+` on gains (the wallet reconciles against the game client). */
 function formatIskSigned(value: number): string {
-  const text = formatIsk(value, 2);
+  const text = formatIsk(value);
   return value > 0 && !text.startsWith('-') ? `+${text}` : text;
 }
 
@@ -166,8 +170,8 @@ export function JournalTable({
 }: JournalTableProps) {
   const { t } = useTranslation();
   const breakdown = useMemo(() => journalRefTypeBreakdown(breakdownJournal), [breakdownJournal]);
-  // Open on desktop, folded on a phone where the headline alone answers the
-  // question — until the pilot toggles it, then their choice sticks.
+  // Open on desktop when the list is short, folded on a phone or a long list
+  // where the headline alone answers the question — until the pilot toggles it, then their choice sticks.
   const isNarrow = useIsNarrow();
   const storedBreakdownOpen = useJournalBreakdownPref((state) => state.value);
   const breakdownPrefHydrated = useJournalBreakdownPref((state) => state.hydrated);
@@ -176,7 +180,8 @@ export function JournalTable({
   useEffect(() => {
     void hydrateBreakdownOpen();
   }, [hydrateBreakdownOpen]);
-  const breakdownOpen = storedBreakdownOpen ?? !isNarrow;
+  const breakdownOpen =
+    storedBreakdownOpen ?? defaultBreakdownOpen(isNarrow, breakdown.rows.length);
   const breakdownColumns = useMemo<DataTableColumn<RefTypeBreakdownRow>[]>(
     () => [
       {
@@ -197,8 +202,8 @@ export function JournalTable({
             {row.income > 0 && row.expense > 0 && (
               <span className="block text-xs font-normal text-text-dim">
                 {t('wallet.journalBreakdownBothSides', {
-                  in: formatIsk(row.income, 2),
-                  out: formatIsk(row.expense, 2),
+                  in: formatIsk(row.income),
+                  out: formatIsk(row.expense),
                 })}
               </span>
             )}
@@ -213,11 +218,11 @@ export function JournalTable({
     <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
       <span>
         {t('wallet.journalBreakdownIn')}{' '}
-        <span className="text-isk-pos">{formatIsk(breakdown.totalIn, 2)}</span>
+        <span className="text-isk-pos">{formatIsk(breakdown.totalIn)}</span>
       </span>
       <span>
         {t('wallet.journalBreakdownOut')}{' '}
-        <span className="text-isk-neg">{formatIsk(breakdown.totalOut, 2)}</span>
+        <span className="text-isk-neg">{formatIsk(breakdown.totalOut)}</span>
       </span>
       <span>
         {t('wallet.journalBreakdownNet')}{' '}
@@ -305,12 +310,12 @@ export function JournalTable({
           <Trans
             i18nKey="wallet.journalFilteredSummary"
             count={filteredJournal.length}
-            values={{ net: signedIsk(filteredNet, 2) }}
+            values={{ net: signedIsk(filteredNet, 0) }}
             components={{
               net: (
                 <span
                   className={`tabular-nums ${
-                    clampIskZero(filteredNet, 2) === 0 ? '' : iskToneClass(filteredNet)
+                    clampIskZero(filteredNet, 0) === 0 ? '' : iskToneClass(filteredNet)
                   }`}
                 />
               ),
@@ -318,6 +323,14 @@ export function JournalTable({
           />
         </p>
       )}
+      <LiveStatus>
+        {filterIsActive &&
+          filteredJournal.length > 0 &&
+          t('wallet.journalFilteredSummaryStatus', {
+            count: filteredJournal.length,
+            net: signedIsk(filteredNet, 2),
+          })}
+      </LiveStatus>
       {filteredJournal.length === 0 ? (
         <EmptyState
           title={t('wallet.journalNoFilterMatches')}
