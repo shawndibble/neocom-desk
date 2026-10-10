@@ -4012,6 +4012,7 @@
     "historyEmpty": "No scans yet · {{time}}",
     "historyRemove": "Remove {{name}} from your surveys",
     "historyRemoveShort": "Remove",
+    "historyRemoveKeyHint": "Press Delete to remove from this list",
     "notAScan": "That isn't a Survey Scanner copy. Select the rows in the scanner window and copy them.",
     "tooLarge": "That scan is too large to store.",
     "saveFailed": "Couldn't save the scan. Try again.",
@@ -4076,6 +4077,8 @@
       "payee": "Who gets the tax",
       "payeePlaceholder": "Corporation or pilot",
       "rate": "Tax rate, percent",
+      "rateButton": "Tax rate, percent: {{value}}",
+      "payeeButton": "Who gets the tax: {{value}}",
       "open": "Manage Taxes",
       "manage": "Manage Taxes",
       "failed": "Couldn't save that Payee. Try again."

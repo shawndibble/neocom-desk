@@ -166,4 +166,38 @@ describe('MoonTaxReadout', () => {
       '/mining/tax'
     );
   });
+
+  it('names the buttons by their visible text when nothing is set', () => {
+    renderRow(SURVEY);
+    const names = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? '');
+    expect(screen.getByRole('button', { name: /set rate/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /set who gets the tax/i })).toBeTruthy();
+    expect(names.some((name) => /: %$/.test(name))).toBe(false);
+  });
+
+  it('keeps the saved rate and payee in the button names', () => {
+    renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 10 } });
+    expect(screen.getByRole('button', { name: /10%/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Moon Corp/ })).toBeTruthy();
+  });
+
+  it.each([['Enter'], ['Escape']])('returns focus to the rate button on %s', async (key) => {
+    renderRow(SURVEY);
+    edit(/set rate/i);
+    const input = screen.getByLabelText('Tax rate, percent');
+    fireEvent.change(input, { target: { value: '10' } });
+    fireEvent.keyDown(input, { key });
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /tax rate/i }))
+    );
+  });
+
+  it('returns focus to the payee button on Enter in the payee field', async () => {
+    renderRow(SURVEY);
+    edit(/set who gets the tax/i);
+    fireEvent.keyDown(screen.getByLabelText('Who gets the tax'), { key: 'Enter' });
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /who gets the tax/i }))
+    );
+  });
 });
