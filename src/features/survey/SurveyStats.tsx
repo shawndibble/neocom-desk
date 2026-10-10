@@ -60,7 +60,7 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
   // Once the field is cleared, the time it was marked cleared; until then, the estimate.
   const doneAt = summary.finished ? summary.finishedAt : summary.etaAt;
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-x-4 gap-y-3">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-x-3 gap-y-3">
       {!summary.finished && (
         <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
       )}
