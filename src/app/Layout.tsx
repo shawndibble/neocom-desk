@@ -391,7 +391,7 @@ export const Layout = memo(function Layout() {
           <CharacterFooterLink activeCharacter={activeCharacter} />
         </aside>
 
-        <main className="min-w-0 flex-1 px-2 py-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-4 md:pb-4">
+        <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px))]">
           <AlertCharacterSwitch />
           <AuthFailureNotice />
           <StandingsScopeNotice />
