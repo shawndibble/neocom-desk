@@ -4,7 +4,7 @@
  * when) is read from the survey's Share Link (the one in view right away, the rest the
  * first time the dropdown opens), one at a time, and a link found gone drops out of the history.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   IconButton,
@@ -31,6 +31,7 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+  const hintId = useId();
   const [open, setOpen] = useState(false);
   const [labels, setLabels] = useState<Record<string, string>>({});
   const requested = useRef(new Set<string>());
@@ -105,13 +106,29 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
         {history.map((entry) => {
           const label = labels[entry.id] ?? t('common.loading');
           return (
-            <SelectItem key={entry.id} value={entry.id}>
+            <SelectItem
+              key={entry.id}
+              value={entry.id}
+              aria-keyshortcuts="Delete"
+              aria-describedby={`${hintId}-${entry.id}`}
+              onKeyDown={(event) => {
+                // Radix Select traps Tab, so the nested remove button is out of keyboard reach.
+                if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+                event.preventDefault();
+                event.stopPropagation();
+                void forgetSurvey(entry.id);
+              }}
+            >
+              <span id={`${hintId}-${entry.id}`} aria-hidden className="sr-only">
+                {t('survey.historyRemoveKeyHint')}
+              </span>
               <span className="flex w-full min-w-0 items-center justify-between gap-2">
                 <span className="min-w-0 flex-1 max-md:[overflow-wrap:anywhere] md:truncate">
                   {label}
                 </span>
                 {/* Radix picks the item on pointer-up / click / key: keep the remove button's own. */}
                 <span
+                  aria-hidden
                   className="shrink-0"
                   onPointerDown={(e) => e.stopPropagation()}
                   onPointerUp={(e) => e.stopPropagation()}
@@ -125,6 +142,7 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
                     tooltip={t('survey.historyRemoveShort')}
                     variant="plain"
                     size="row"
+                    tabIndex={-1}
                     onClick={() => void forgetSurvey(entry.id)}
                   />
                 </span>

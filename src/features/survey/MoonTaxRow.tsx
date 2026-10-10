@@ -21,6 +21,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, buttonClassName, Panel, TextInput } from '@/components/ui';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import * as Icon from '@/components/ui/icons';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
@@ -60,6 +61,9 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
   // Which field was clicked: both show while editing, and this one takes focus.
   const [editing, setEditing] = useState<'name' | 'pct' | null>(null);
   const inFlight = useRef(false);
+  const rateButton = useRef<HTMLButtonElement>(null);
+  const payeeButton = useRef<HTMLButtonElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const pct = parseTaxPct(saved.pct);
   const name = saved.name.trim();
@@ -107,16 +111,18 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
   }
 
   // Focus moving between the two fields keeps editing; only leaving the pair ends it.
-  const stopEditing = {
-    onBlur: (event: FocusEvent<HTMLInputElement>) => {
-      if (!event.currentTarget.closest('[data-tax-fields]')?.contains(event.relatedTarget)) {
-        setEditing(null);
-      }
-    },
-    onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === 'Enter' || event.key === 'Escape') setEditing(null);
-    },
-  };
+  function stopOnBlur(event: FocusEvent<HTMLInputElement>) {
+    if (!event.currentTarget.closest('[data-tax-fields]')?.contains(event.relatedTarget)) {
+      setEditing(null);
+    }
+  }
+
+  function stopOnKey(event: KeyboardEvent<HTMLInputElement>, field: 'name' | 'pct') {
+    if (event.key !== 'Enter' && event.key !== 'Escape') return;
+    setEditing(null);
+    // The field unmounts: hand focus to the button that replaces it.
+    focusAfterCommit(field === 'pct' ? rateButton : payeeButton);
+  }
 
   return (
     <Panel title={t('survey.moonTax.label')}>
@@ -137,15 +143,19 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
                 placeholder="0"
                 aria-invalid={saved.pct !== '' && pct === null}
                 onChange={(event) => setSaved({ ...saved, pct: event.target.value })}
-                {...stopEditing}
+                onBlur={stopOnBlur}
+                onKeyDown={(event) => stopOnKey(event, 'pct')}
               />
               <span className="text-text-dim">%</span>
             </span>
           ) : (
             <button
+              ref={rateButton}
               type="button"
               className={`${editClassName} tabular-nums`}
-              aria-label={`${t('survey.moonTax.rate')}: ${saved.pct}%`}
+              aria-label={t('survey.moonTax.rateButton', {
+                value: saved.pct === '' ? t('survey.moonTax.noRate') : `${saved.pct}%`,
+              })}
               onClick={() => setEditing('pct')}
             >
               {saved.pct === '' ? t('survey.moonTax.noRate') : `${saved.pct}%`}
@@ -164,7 +174,8 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
                 value={saved.name}
                 placeholder={t('survey.moonTax.payeePlaceholder')}
                 onChange={(event) => changeName(event.target.value)}
-                {...stopEditing}
+                onBlur={stopOnBlur}
+                onKeyDown={(event) => stopOnKey(event, 'name')}
               />
               <datalist id={listId}>
                 {payees.map((p) => (
@@ -174,9 +185,12 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
             </>
           ) : (
             <button
+              ref={payeeButton}
               type="button"
               className={`${editClassName} min-w-0 [overflow-wrap:anywhere]`}
-              aria-label={`${t('survey.moonTax.payee')}: ${saved.name}`}
+              aria-label={t('survey.moonTax.payeeButton', {
+                value: name === '' ? t('survey.moonTax.set') : saved.name,
+              })}
               onClick={() => setEditing('name')}
             >
               {name === '' ? t('survey.moonTax.set') : saved.name}
