@@ -369,7 +369,7 @@
     },
     "ring": {
       "title": "Ring",
-      "slotFitted": "{{rack}} {{index}}, {{state}}",
+      "slotFitted": "{{rack}} {{index}}: {{name}}, {{state}}",
       "slotEmpty": "{{rack}} {{index}}, empty",
       "tooltipFitted": "{{rack}} {{index}}: {{name}} ({{state}})",
       "tooltipCharge": "Loaded: {{name}}",
