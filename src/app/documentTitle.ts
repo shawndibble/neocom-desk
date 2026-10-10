@@ -60,7 +60,6 @@ const ROUTE_TITLE_KEYS = {
   '/bpc-contracts': ['nav.industry'],
   '/contacts': ['contacts.title'],
   '/travel': ['travel.title'],
-  '/travel/pilot': ['nav.pilotLookup'],
   '/pilot-lookup': ['nav.pilotLookup'],
   '/settings': ['settings.title'],
   '/settings/shortcuts': ['nav.help'],

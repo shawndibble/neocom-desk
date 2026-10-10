@@ -15,6 +15,7 @@ import {
   useState,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
@@ -58,7 +59,7 @@ const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
 /** Same debounce as Mail's recipient search, which calls the same ESI search. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-export function PilotLookupPanel() {
+export function PilotLookupPanel({ tabBar }: { tabBar: ReactNode }) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
   const [resolved, setResolved] = useState<PilotSummary | null>(null);
@@ -83,7 +84,8 @@ export function PilotLookupPanel() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('nav.pilotLookup')} />
+      <PageHeader title={t('travel.title')} />
+      {tabBar}
       {/* Each Panel's backdrop-blur is its own stacking context; lifting this one keeps the suggestion list above the panel below. */}
       <Panel className="relative z-20">
         <PilotSearch

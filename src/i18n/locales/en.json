@@ -19,8 +19,7 @@
     "groups": {
       "progression": "Progression",
       "economy": "Economy",
-      "social": "Social",
-      "intel": "Intel"
+      "social": "Social"
     },
     "wallet": "Wallet",
     "miningTax": "Mining",
@@ -4050,7 +4049,7 @@
       "orange": "highest price"
     },
     "valueLow": "cheaper",
-    "valueHigh": "dearer",
+    "valueHigh": "pricier",
     "legendRate": "Mining rate",
     "sharePanelTitle": "Field progress",
     "shareTitle": "Mining Survey",

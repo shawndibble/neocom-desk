@@ -93,7 +93,6 @@ const Calendar = lazy(routeChunks.loadCalendar);
 const Contracts = lazy(routeChunks.loadContracts);
 const Contacts = lazy(routeChunks.loadContacts);
 const Travel = lazy(routeChunks.loadTravel);
-const PilotLookup = lazy(routeChunks.loadPilotLookup);
 const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
 const Settings = lazy(routeChunks.loadSettings);
 const Help = lazy(routeChunks.loadHelp);
@@ -203,9 +202,8 @@ const ROUTE_ELEMENTS = {
   '/bpc-contracts': <Navigate to={industryTabHref('sourcing')} replace />,
   '/contacts': <Contacts />,
   '/travel': <Travel />,
-  // Pilot Lookup was a Travel tab; the old path redirects for good.
-  '/travel/pilot': <LegacyPathRedirect />,
-  '/pilot-lookup': <PilotLookup />,
+  // Pilot Lookup is the Travel tab `/travel/pilot`; its short-lived own page redirects there.
+  '/pilot-lookup': <LegacyPathRedirect />,
   '/settings': <Settings />,
   // Shortcuts, FAQ and Help left Settings for their own page; the old paths redirect for good.
   '/settings/shortcuts': <LegacyPathRedirect />,

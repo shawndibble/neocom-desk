@@ -1,6 +1,6 @@
 # Travel (Route Safety, Thera / Turnur, Travel Settings)
 
-Intel group page `/travel`. Two tabs (`TRAVEL_TABS`, `src/app/pageTabs.ts:29`): Route Safety (`/travel/route`, default for bare `/travel`) and Thera / Turnur (`/travel/thera`). Pilot Lookup left Travel for `/pilot-lookup` (see `docs/features/pilot-lookup.md`). Settings > Travel edits the same stores as the Route rules panel.
+Progression group page `/travel` (last in the group). Three tabs (`TRAVEL_TABS`, `src/app/pageTabs.ts`): Route Safety (`/travel/route`, default for bare `/travel`), Thera / Turnur (`/travel/thera`) and Pilot Lookup (`/travel/pilot`, see `docs/features/pilot-lookup.md`). Settings > Travel edits the same stores as the Route rules panel.
 
 Glossary terms (CONTEXT.md): Route Safety, Route strip, Quiet stretch, Stop, Leg, Hole jump, Ansiblex, Way to fly, Pinned way, Avoided Systems, Route Preference, Travel Settings, Jump Basis, Gank Chokepoint, Current System.
 
@@ -37,8 +37,8 @@ Principle in every scope decision: conditions, never verdicts (`20260912-172628`
 ## Routing, access, scopes
 
 - Route `/travel` gating `ungated` (`src/app/routeScopes.ts:216`): public ESI + local stargate graph, no scope can lock it. Still requires a signed-in Character: `Travel.tsx` waits for `hydrated`, then `Navigate to /characters` when `activeCharacterId === null` (`src/routes/Travel.tsx:35-40`). Logged-out access noted as a possible follow-up (`20260929-234357`).
-- Nav: Intel group, `mobileTab: true` (`src/app/navDestinations.ts:234`). Document title `travel.title`.
-- Legacy: a defaulted `/travel?pilot=<id>` link redirects to `/pilot-lookup` (only when the tab was defaulted, not explicit): `src/routes/Travel.tsx:25-31`.
+- Nav: Progression group, last, `mobileTab: true` (`src/app/navDestinations.ts:234`). Document title `travel.title`.
+- Legacy: a defaulted `/travel?pilot=<id>` link redirects to `/travel/pilot` (only when the tab was defaulted, not explicit): `src/routes/Travel.tsx:25-31`.
 - Optional scopes:
   - `esi-ui.write_waypoint.v1` (Permission "Autopilot waypoints", default-on in Base Grant, fifth write exception): Set waypoints / Set waypoint in game. Decision `20261003-175151`.
   - `esi-search.search_structures.v1` + `esi-universe.read_structures.v1`: Ansiblex structure search only (`ANSIBLEX_SEARCH_ENDPOINTS`, `src/features/travel/ansiblexGates.ts`).
@@ -485,7 +485,7 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 - Gank Chokepoints list is hand-maintained, 7 systems (`chokepoints.ts:26`); no rule derives them.
 - Avoid preview and waypoint set cannot account for the in-game client's own avoidance list (ESI cannot read it; `CONTEXT.md` Avoided Systems).
 - J-space systems always show N/A for ESI figures; bubble tag only applies in nullsec.
-- `travel.pilotTab` string remains in `src/i18n/locales/en.json` with no code using it (Pilot Lookup left Travel).
+- `travel.pilotTab` string remains in `src/i18n/locales/en.json` with no code using it (the tab uses `nav.pilotLookup`).
 - Ansiblex list is per device only and needs re-find/paste on every other device (by design: `routeBridgeSettings.ts`).
 - Use jump bridges is device-local while the other route settings sync; a link's `jb` can differ from what another device has.
 - Optimize cap 10 stops; past it no heuristic by design (`20261003-173108`).

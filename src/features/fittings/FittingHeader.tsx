@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  AlertsBell,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -158,6 +159,8 @@ function CompactFittingHeader({
             {...mastery}
           />
         )}
+        {/* This header stands in for `PageHeader`, which carries the bell elsewhere. */}
+        <AlertsBell />
       </div>
     </div>
   );

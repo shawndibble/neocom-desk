@@ -73,6 +73,15 @@ describe('CorpTransactionsPanel — a read-only ledger row', () => {
   });
 });
 
+describe('CorpTransactionsPanel — pinned item column', () => {
+  it('sits on the panel surface, not the page background', async () => {
+    renderPanel();
+    const cell = (await screen.findByRole('link', { name: 'Damage Control II' })).closest('td')!;
+    expect(cell).toHaveClass('sticky', 'left-0', 'bg-panel');
+    expect(cell).not.toHaveClass('bg-bg');
+  });
+});
+
 describe('CorpTransactionsPanel — filtered to zero', () => {
   it('shows a hint naming which filters to clear', () => {
     renderPanel({ filteredTransactions: [] });

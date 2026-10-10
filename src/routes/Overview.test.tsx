@@ -768,16 +768,18 @@ describe('Overview board', () => {
     expect(within(rows[0]).getByRole('link')).toHaveAttribute('href', '/alerts');
   });
 
-  it('puts an unread count on the rail’s Alerts entry, and nothing at all at zero', async () => {
+  it('puts an unread count on the header bell, with no rail row and nothing at all at zero', async () => {
     render(<App />);
     await screen.findByText(/1,234,567\.89/);
-    const nav = within(document.querySelector('nav') as HTMLElement);
-    expect(nav.getByRole('link', { name: 'Alerts' })).toHaveAttribute('href', '/alerts');
+    // The rail is the first nav: Alerts left it for the bell.
+    const rail = within(document.querySelector('nav') as HTMLElement);
+    expect(rail.queryByRole('link', { name: /alerts/i })).not.toBeInTheDocument();
+    const main = within(screen.getByRole('main'));
+    expect(main.queryByRole('link', { name: /alerts/i })).not.toBeInTheDocument();
 
     await seedFeed([feedEntry({ id: 'a', eventId: 'newMail', title: 'New mail' })]);
-    // Scoped to the rail: the phone's tab bar carries the same entry, and the
-    // shell renders both on every route (one is merely `hidden`).
-    expect(await nav.findByRole('link', { name: /alerts, 1 waiting/i })).toBeInTheDocument();
+    const bell = await main.findByRole('link', { name: /alerts, 1 waiting/i });
+    expect(bell).toHaveAttribute('href', '/alerts');
   });
 });
 

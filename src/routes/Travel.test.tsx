@@ -427,7 +427,7 @@ describe('Travel › Route Safety', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/pilot-lookup');
+    expect(window.location.pathname).toBe('/travel/pilot');
     expect(window.location.search).toBe('?pilot=42');
     expect(await screen.findByText('No kills or losses on zKillboard')).toBeInTheDocument();
   });
@@ -1293,7 +1293,7 @@ describe('Travel copy', () => {
     // (`travel.pilot`) is checked by its own test: it names zKillboard's
     // "danger ratio" statistic, which is a figure, not a verdict.
     walk(Object.entries(catalog.travel).filter(([key]) => key !== 'pilot'));
-    walk([catalog.nav.travel, (catalog.nav.groups as Record<string, string>).intel]);
+    walk([catalog.nav.travel]);
     walk(catalog.contractSearch.routePreference);
     for (const text of strings) {
       expect(text, text).not.toMatch(/\b(safe|safest|unsafe|dangerous|danger|camp\w*)\b/i);

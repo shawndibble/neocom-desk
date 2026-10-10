@@ -151,6 +151,7 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         header: t('corp.members.columnMember'),
         // Pinned while the other columns scroll sideways on a phone.
         stickyStart: true,
+        stickyStartOnPanel: true,
         className: 'truncate',
         // The name truncates, the tag does not: a long name must not ellipsize it away.
         render: (row) => (

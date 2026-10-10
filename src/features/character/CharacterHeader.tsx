@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { CharacterAvatar, StatChip, StatChips } from '@/components/ui';
+import { AlertsBell, CharacterAvatar, StatChip, StatChips } from '@/components/ui';
 import { AllianceLink, CorporationLink } from '@/features/entities';
 import { usePublicInfo } from '@/stores/publicInfo';
 
@@ -97,6 +97,8 @@ export function CharacterHeader({ characterId, totalSp, unallocatedSp }: Charact
         <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />
         <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />
       </StatChips>
+      {/* This header stands in for `PageHeader` on Overview, Clones and Employment History. */}
+      <AlertsBell />
     </header>
   );
 }
