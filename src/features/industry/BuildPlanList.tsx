@@ -579,7 +579,7 @@ function PlanRow({
                   tabIndex={0}
                   role="img"
                   aria-label={t('industry.reactionBlocked.profitNotReal')}
-                  className="mr-1 inline-flex align-middle"
+                  className="-my-1 mr-0 inline-flex size-6 items-center justify-center align-middle focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <Icon.Warn size={Icon.ICON_SIZE.sm} className="text-warning" />
                 </span>

@@ -2350,7 +2350,7 @@
       "callout": "Reactions can't run in highsec. {{facility}} · {{system}} is in highsec, so this plan can't be built as shown.",
       "move": "Move reactions to {{system}} (lowsec)",
       "chooseLocation": "Choose location…",
-      "setupRule": "Reactions can't run in highsec. The plan's profit is struck through until this is lowsec or nullsec.",
+      "setupRule": "Reactions can't run in highsec. The plan's profit isn't real until this is lowsec or nullsec.",
       "fixLocationTag": "Fix location",
       "profitNotReal": "Profit isn't real until the build location is fixed"
     },
