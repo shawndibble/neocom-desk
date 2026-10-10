@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import { AlertsBell } from './AlertsBell';
+import { UnreadAlertsContext } from './unreadAlertsContext';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { PageViewPicker } from './PageViewPicker';
 import { usesViewPicker, type PageViews } from './viewPicker';
@@ -74,6 +76,9 @@ export function PageHeader({
 }: PageHeaderProps) {
   const isPhone = useIsPhone();
   const picker = views && usesViewPicker(views.tabs.length, isPhone) ? views : null;
+  // The bell joins the cluster only while it has something to say, so a route
+  // with no actions still draws no empty wrapper.
+  const hasAlerts = useContext(UnreadAlertsContext) > 0;
   return (
     <header
       className={cx(
@@ -94,7 +99,7 @@ export function PageHeader({
           {picker ? <PageViewPicker title={title} {...picker} /> : title}
         </h1>
         {meta}
-        {actions && (
+        {(actions || hasAlerts) && (
           // `md:order-1`: after the sub-nav, which sits between meta and actions at `md`.
           <div
             className={cx(
@@ -103,6 +108,7 @@ export function PageHeader({
             )}
           >
             {actions}
+            <AlertsBell />
           </div>
         )}
       </div>

@@ -103,6 +103,7 @@ describe('the choice list', () => {
       '/ships',
       '/mining',
       '/planetary-industry',
+      '/travel',
       '/market',
       '/wallet',
       '/assets',
@@ -110,8 +111,6 @@ describe('the choice list', () => {
       '/mail',
       '/calendar',
       '/contacts',
-      '/travel',
-      '/pilot-lookup',
       '/characters',
     ]);
   });

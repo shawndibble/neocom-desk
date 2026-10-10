@@ -72,7 +72,7 @@ describe('documentTitleFor', () => {
     '/skills/ships',
     '/wallet/loyalty',
     '/wallet/loyalty/:corporationId',
-    '/travel/pilot',
+    '/pilot-lookup',
     '/settings/shortcuts',
     '/settings/faq',
     '/settings/help',

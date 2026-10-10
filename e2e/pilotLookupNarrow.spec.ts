@@ -107,7 +107,7 @@ async function mockPilot(page: Page) {
 async function openPilot(page: Page) {
   await signInAndGoto(page);
   await mockPilot(page);
-  await page.goto(`./pilot-lookup?pilot=${CHARACTER_ID}`);
+  await page.goto(`./travel/pilot?pilot=${CHARACTER_ID}`);
   await expect(page.getByText(VICTIM_NAME)).toBeVisible(COLD_LOAD);
 }
 
