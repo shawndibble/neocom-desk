@@ -555,6 +555,11 @@ describe('Characters', () => {
     const input = screen.getByRole('textbox', { name: 'Rename group' });
     await user.clear(input);
     await user.type(input, 'Scouts{Enter}');
+    await new Promise((r) => setTimeout(r, 300));
+    console.log(
+      'DBG',
+      [...document.querySelectorAll('h2,input')].map((e) => e.outerHTML.slice(0, 160))
+    );
     expect(await screen.findByRole('heading', { name: 'Scouts' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Move Mains up' }));
@@ -562,6 +567,56 @@ describe('Characters', () => {
       const groups = (value as { groups: { id: string }[] }).groups;
       return groups[0]?.id === 'b';
     });
+  });
+
+  it('keeps keyboard focus on a live control after group actions', async () => {
+    await useOverviewGroups.getState().setValue({
+      groups: [
+        { id: 'a', name: 'Alts', characterIds: [] },
+        { id: 'b', name: 'Mains', characterIds: [] },
+      ],
+      updatedAt: 1,
+    });
+    const user = userEvent.setup();
+    renderCharacters();
+
+    // Rename: Enter returns focus to that group's Rename button.
+    await user.click(await screen.findByRole('button', { name: 'Rename group Alts' }));
+    await user.type(screen.getByRole('textbox', { name: 'Rename group' }), '{Enter}');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Rename group Alts' })).toHaveFocus()
+    );
+
+    // Moving the second group up makes "Move up" disabled: the sibling is focused.
+    await user.click(screen.getByRole('button', { name: 'Move Mains up' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Move Mains down' })).toHaveFocus()
+    );
+
+    // New group + Enter lands on the new group's heading; Escape on "New group".
+    await user.click(screen.getByRole('button', { name: 'New group' }));
+    await user.type(screen.getByRole('textbox', { name: 'New group name' }), 'Scouts{Enter}');
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Scouts' })).toHaveFocus());
+    await user.click(screen.getByRole('button', { name: 'New group' }));
+    await user.type(screen.getByRole('textbox', { name: 'New group name' }), '{Escape}');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'New group' })).toHaveFocus());
+
+    // Deleting a group focuses the next group's heading.
+    await user.click(screen.getByRole('button', { name: 'Delete group Mains' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete group' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete group' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Alts' })).toHaveFocus());
+  });
+
+  it('names the sort direction button after the current direction', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(screen.getByRole('button', { name: /reverse sort direction.*ascending/i }));
+    expect(
+      await screen.findByRole('button', { name: /reverse sort direction.*descending/i })
+    ).toBeInTheDocument();
   });
 
   it('deletes a group via the confirmation Modal, not window.confirm', async () => {
@@ -609,10 +664,10 @@ describe('Characters', () => {
 
     // Sort lives behind the funnel with the filters; the box stays open after.
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
-    await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
+    await user.click(screen.getByRole('button', { name: /reverse sort direction/i }));
     await waitFor(() => expect(firstCardName()).toContain('Pilot Two'));
 
-    await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
+    await user.click(screen.getByRole('button', { name: /reverse sort direction/i }));
     await waitFor(() => expect(firstCardName()).toContain('Pilot One'));
   });
 
@@ -931,10 +986,10 @@ describe('Characters URL state', () => {
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
-    await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
+    await user.click(screen.getByRole('button', { name: /reverse sort direction/i }));
     await waitFor(() => expect(locationSearch()).toBe('?dir=desc'));
 
-    await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
+    await user.click(screen.getByRole('button', { name: /reverse sort direction/i }));
     await waitFor(() => expect(locationSearch()).toBe(''));
   });
 
