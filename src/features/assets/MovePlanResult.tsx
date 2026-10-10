@@ -13,7 +13,7 @@ import { routeToHref } from '@/features/travel/routeSafetyLink';
 import { formatCubicMetres } from '@/lib/volume';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { Rail, RailHeading, RailStop } from './MovePlanRail';
-import { pickupHueVar, splitSegments, tripLanes } from './movePlanView';
+import { pickupHueVar, splitSegments, tripLanes, tripRuns } from './movePlanView';
 
 /** Alternatives shown beside the suggested hauler; the rest sit under "All haulers". */
 const INLINE_ALTERNATIVES = 3;
@@ -110,6 +110,8 @@ export function PlanResult({
   const segments = splitSegments(pickups.map((p, i) => ({ key: i, m3: p.totalM3 })));
   const capacity = plan.suggested?.hull.capacityM3 ?? 0;
   const lanes = tripLanes(totals.totalM3, capacity);
+  /** Ships flown out: each is a flight of its own, outside the hauler's trips. */
+  const flown = pickups.flatMap((p) => p.ships);
   const alternatives = plan.comparison.filter((o) => o.hull.typeId !== plan.suggested?.hull.typeId);
 
   return (
@@ -188,18 +190,23 @@ export function PlanResult({
               />
             ))}
           </div>
-          {lanes.length > 0 && (
-            <div className="flex text-xs text-text-dim" aria-hidden="true">
-              {lanes.map((l) => (
-                <span
-                  key={l.trip}
-                  className="truncate border-l-2 border-line-bright pt-0.5 pl-1.5 whitespace-nowrap"
-                  style={{ width: `${l.share * 100}%` }}
-                >
-                  {t('assets.movePlan.tripLane', { n: l.trip })} · {formatCubicMetres(l.m3)} m³
-                </span>
+          {(lanes.length > 0 || flown.length > 0) && (
+            <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-text-dim">
+              {tripRuns(lanes).map((r) => (
+                <li key={r.from} className="tabular-nums">
+                  {r.from === r.to
+                    ? t('assets.movePlan.tripLane', { n: r.from })
+                    : t('assets.movePlan.tripRange', { from: r.from, to: r.to })}{' '}
+                  · {formatCubicMetres(r.m3)} m³
+                  {r.from === r.to ? '' : ` ${t('assets.movePlan.each')}`}
+                </li>
               ))}
-            </div>
+              {flown.map((s) => (
+                <li key={s.itemId} className="font-semibold text-warning">
+                  {t('assets.movePlan.flyShip', { ship: name(s.typeId) })}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

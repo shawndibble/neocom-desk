@@ -109,6 +109,11 @@ describe('PlanResult', () => {
       return onPackShip;
     };
 
+    it('names each ship being flown beside the cargo trips', () => {
+      setup(0);
+      expect(screen.getByText('Fly Badger')).toBeTruthy();
+    });
+
     it('packs a ship with no rigs straight away', async () => {
       const onPackShip = setup(0);
       await userEvent.click(screen.getByRole('button', { name: 'Pack instead' }));
