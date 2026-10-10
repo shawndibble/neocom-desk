@@ -120,6 +120,14 @@ describe('ShipTreeTab — map', () => {
     expect(screen.getByText('4 / 5 hulls flyable')).toBeInTheDocument();
   });
 
+  it('sets the artwork credit in a readable colour, not the decorative faint one', async () => {
+    renderTab();
+    await screen.findByRole('region', { name: 'Caldari State ship tree' });
+    const credit = screen.getByText(/EVE Online artwork/);
+    expect(credit).toHaveClass('text-text-dim');
+    expect(credit).not.toHaveClass('text-text-faint');
+  });
+
   it('marks each tile with its tone and tech corner', async () => {
     const { container } = renderTab();
     await screen.findByRole('region', { name: 'Caldari State ship tree' });
