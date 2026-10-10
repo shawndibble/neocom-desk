@@ -32,15 +32,33 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIsk, formatIskCompact, formatMarketIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatPriceRange, formatVolume } from './format';
-import { priceHistoryCsvColumns } from './priceHistoryCsv';
+import { compareRegionStroke } from './compareRegionStrokes';
+import { priceHistoryCsvColumns, type PriceHistoryTableRow } from './priceHistoryCsv';
 import type { MarketHistoryPoint, MovingAveragePoint } from '@/engine/market/priceHistory';
+import { joinRegionAverages } from '@/engine/market/priceHistoryCompare';
+
+/** One compared region's average line, as the panel has it so far. */
+export interface ComparedRegionSeries {
+  regionId: number;
+  name: string;
+  /** `loading` and `error` still get a legend entry saying so; only `ready` draws. */
+  status: 'loading' | 'error' | 'ready';
+  /** Daily averages already cut to the selected range. */
+  points: readonly MovingAveragePoint[];
+}
 
 interface PriceHistoryChartProps {
   points: MarketHistoryPoint[];
   itemName: string;
   /** Empty when the item has fewer real days of history than the moving-average window — no line, not a truncated one. */
   movingAverage?: readonly MovingAveragePoint[];
+  /** Compared regions in pick order — each one's slot fixes its colour and dash. Empty draws today's single-region chart. */
+  comparisons?: readonly ComparedRegionSeries[];
+  /** Names the primary average once other regions' averages sit beside it. */
+  primaryRegionName?: string;
 }
+
+const NO_COMPARISONS: readonly ComparedRegionSeries[] = [];
 
 /**
  * Links the two charts' tooltips and cursors, so hovering either strip
@@ -96,11 +114,29 @@ function formatTick(date: string): string {
   });
 }
 
-interface ChartRow extends MarketHistoryPoint {
+/**
+ * One plotted day. The primary region's fields are absent on a day only a
+ * compared region traded — the chart's X axis is the union of every drawn
+ * region's days (`joinRegionAverages`).
+ */
+interface ChartRow extends Partial<Omit<MarketHistoryPoint, 'date'>> {
+  date: string;
   dateLabel: string;
   /** `[lowest, highest]` — Recharts reads a two-element array off a `dataKey` as a range area rather than a value. */
-  range: [number, number];
+  range: [number, number] | undefined;
   movingAverage: number | undefined;
+  /** Each compared region's average that day, by region id. */
+  comparison: Readonly<Record<number, number>>;
+}
+
+/** "Domain average" once regions are compared; plain "Average Price" otherwise. */
+function averageLabel(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  region?: string
+) {
+  return region
+    ? t('market.priceHistory.regionAverage', { region })
+    : t('market.priceHistory.average');
 }
 
 /**
@@ -113,39 +149,62 @@ function HistoryTooltip({
   active,
   payload,
   label,
-}: TooltipContentProps): React.ReactElement | null {
+  comparisons,
+  primaryRegionName,
+}: TooltipContentProps & {
+  comparisons: readonly ComparedRegionSeries[];
+  primaryRegionName: string | undefined;
+}): React.ReactElement | null {
   const { t } = useTranslation();
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0]?.payload as ChartRow | undefined;
   if (!point) return null;
+  const drawn = comparisons.filter((c) => c.status === 'ready');
   return (
     <ChartTooltipShell>
       <p className="font-semibold text-text">{label}</p>
-      <p>
-        {t('market.priceHistory.average')}: {formatMarketIsk(point.average)}
-      </p>
-      <p>
-        {t('market.priceHistory.priceRange')}: {formatPriceRange(point.lowest, point.highest)}
-      </p>
-      <p>
-        {t('market.priceHistory.volume')}: {formatVolume(point.volume)}
-      </p>
-      <p>
-        {t('market.priceHistory.orderCount')}: {formatVolume(point.orderCount)}
-      </p>
+      {point.average !== undefined && (
+        <>
+          <p>
+            {averageLabel(t, drawn.length > 0 ? primaryRegionName : undefined)}:{' '}
+            {formatMarketIsk(point.average)}
+          </p>
+          <p>
+            {t('market.priceHistory.priceRange')}:{' '}
+            {formatPriceRange(point.lowest ?? 0, point.highest ?? 0)}
+          </p>
+          <p>
+            {t('market.priceHistory.volume')}: {formatVolume(point.volume ?? 0)}
+          </p>
+          <p>
+            {t('market.priceHistory.orderCount')}: {formatVolume(point.orderCount ?? 0)}
+          </p>
+        </>
+      )}
+      {drawn.map((c) => {
+        const value = point.comparison[c.regionId];
+        return (
+          <p key={c.regionId}>
+            {averageLabel(t, c.name)}:{' '}
+            {value === undefined ? t('market.priceHistory.noTrades') : formatMarketIsk(value)}
+          </p>
+        );
+      })}
     </ChartTooltipShell>
   );
 }
 
 interface LegendItemProps {
   label: string;
-  /** A filled block for the band and the volume bars; a rule for the three line series. */
+  /** A filled block for the band and the volume bars; a rule for the line series. */
   shape: 'swatch' | 'line' | 'dashed';
   color: string;
   opacity?: number;
+  /** The rule's own dash pattern, for a compared region's line; `dashed` alone means the moving average's `4 3`. */
+  dash?: string;
 }
 
-function LegendItem({ label, shape, color, opacity = 1 }: LegendItemProps) {
+function LegendItem({ label, shape, color, opacity = 1, dash }: LegendItemProps) {
   return (
     <span className="flex items-center gap-1.5">
       <svg width="14" height="8" aria-hidden="true" className="shrink-0">
@@ -172,7 +231,7 @@ function LegendItem({ label, shape, color, opacity = 1 }: LegendItemProps) {
             y2="4"
             stroke={color}
             strokeWidth="2"
-            strokeDasharray={shape === 'dashed' ? '4 3' : undefined}
+            strokeDasharray={dash ?? (shape === 'dashed' ? '4 3' : undefined)}
           />
         )}
       </svg>
@@ -197,6 +256,8 @@ export default function PriceHistoryChart({
   points,
   itemName,
   movingAverage = [],
+  comparisons = NO_COMPARISONS,
+  primaryRegionName,
 }: PriceHistoryChartProps) {
   const { t } = useTranslation();
   // Below `sm` the two grouped-integer gutters the desktop chart reserves
@@ -211,15 +272,36 @@ export default function PriceHistoryChart({
   // axis would be. Two separately-written widths is how the plots drift.
   const ordersAxisWidth = isPhone ? 0 : COMPACT_COUNT_Y_AXIS_WIDTH;
 
+  const drawnComparisons = useMemo(
+    () => comparisons.filter((c) => c.status === 'ready'),
+    [comparisons]
+  );
+  const joined = useMemo(
+    () => joinRegionAverages(points, drawnComparisons),
+    [points, drawnComparisons]
+  );
+
   const chartData = useMemo<ChartRow[]>(() => {
     const maByDate = new Map(movingAverage.map((p) => [p.date, p.average]));
-    return points.map((p) => ({
-      ...p,
-      dateLabel: formatTick(p.date),
-      range: [p.lowest, p.highest],
-      movingAverage: maByDate.get(p.date),
+    return joined.map(({ date, primary, averages }) => ({
+      ...primary,
+      date,
+      dateLabel: formatTick(date),
+      range: primary ? [primary.lowest, primary.highest] : undefined,
+      movingAverage: maByDate.get(date),
+      comparison: averages,
     }));
-  }, [points, movingAverage]);
+  }, [joined, movingAverage]);
+
+  // The day table and its export stay the primary region's days, each
+  // carrying the compared regions' averages for that day as extra columns.
+  const tableRows = useMemo<PriceHistoryTableRow[]>(
+    () =>
+      joined.flatMap(({ primary, averages }) =>
+        primary ? [{ ...primary, comparison: averages }] : []
+      ),
+    [joined]
+  );
 
   /**
    * Explicit rather than `['dataMin', 'dataMax']`: that pair collapses to a
@@ -231,8 +313,13 @@ export default function PriceHistoryChart({
     let lo = Infinity;
     let hi = -Infinity;
     for (const p of chartData) {
-      lo = Math.min(lo, p.lowest);
-      hi = Math.max(hi, p.highest);
+      if (p.lowest !== undefined) lo = Math.min(lo, p.lowest);
+      if (p.highest !== undefined) hi = Math.max(hi, p.highest);
+      // A compared region's line must fit too, or it clips at the strip's edge.
+      for (const value of Object.values(p.comparison)) {
+        lo = Math.min(lo, value);
+        hi = Math.max(hi, value);
+      }
     }
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [0, 1];
     if (lo === hi) {
@@ -246,7 +333,7 @@ export default function PriceHistoryChart({
   const priceDecimals =
     priceDomain[0] >= 10_000 ? 0 : priceTickDecimals(priceDomain[1] - priceDomain[0]);
 
-  const columns = useMemo<DataTableColumn<ChartRow>[]>(
+  const columns = useMemo<DataTableColumn<PriceHistoryTableRow>[]>(
     () => [
       {
         id: 'date',
@@ -283,16 +370,39 @@ export default function PriceHistoryChart({
         render: (p) => formatVolume(p.orderCount),
         sortValue: (p) => p.orderCount,
       },
+      // Shed on a phone like the range: the chart and tooltip carry each
+      // region's line there, and five price columns do not fit 390px.
+      ...drawnComparisons.map((c): DataTableColumn<PriceHistoryTableRow> => ({
+        id: `region-${c.regionId}`,
+        header: averageLabel(t, c.name),
+        phoneHidden: true,
+        render: (p) => {
+          const value = p.comparison?.[c.regionId];
+          return value === undefined ? t('market.priceHistory.noTrades') : formatMarketIsk(value);
+        },
+        sortValue: (p) => p.comparison?.[c.regionId],
+      })),
     ],
-    [t]
+    [t, drawnComparisons]
   );
 
-  const csvColumns = useMemo(() => priceHistoryCsvColumns(t), [t]);
-  const tableExport = useTableExport<ChartRow>({
+  const csvColumns = useMemo(
+    () =>
+      priceHistoryCsvColumns(
+        t,
+        drawnComparisons.map(({ regionId, name }) => ({ regionId, name }))
+      ),
+    [t, drawnComparisons]
+  );
+  const tableExport = useTableExport<PriceHistoryTableRow>({
     surface: 'market-price-history',
-    rows: chartData,
+    rows: tableRows,
     columns: csvColumns,
   });
+  const primaryAverageLabel = averageLabel(
+    t,
+    drawnComparisons.length > 0 ? primaryRegionName : undefined
+  );
 
   // `role="img"` collapses everything inside it into one opaque image for
   // assistive tech, so the sr-only table below must be a *sibling*, not a
@@ -344,7 +454,15 @@ export default function PriceHistoryChart({
                   both on one hover, so a second one here pops an identical
                   box over the lower strip; this one already reports the whole
                   day, activity included. */}
-              <Tooltip content={(props) => <HistoryTooltip {...props} />} />
+              <Tooltip
+                content={(props) => (
+                  <HistoryTooltip
+                    {...props}
+                    comparisons={comparisons}
+                    primaryRegionName={primaryRegionName}
+                  />
+                )}
+              />
               {/* First, so the two price lines draw over the band, not under it. */}
               <Area
                 isAnimationActive={false}
@@ -353,6 +471,10 @@ export default function PriceHistoryChart({
                 stroke="none"
                 fill="var(--color-accent-dim)"
                 fillOpacity={BAND_FILL_OPACITY}
+                // Bridges a day only a compared region traded, rather than
+                // breaking there. With nothing compared there is no such day,
+                // so the single-region chart draws exactly as before.
+                connectNulls
                 name={t('market.priceHistory.priceRange')}
               />
               <Line
@@ -362,7 +484,8 @@ export default function PriceHistoryChart({
                 stroke="var(--color-accent)"
                 strokeWidth={2}
                 dot={false}
-                name={t('market.priceHistory.average')}
+                connectNulls
+                name={primaryAverageLabel}
               />
               {movingAverage.length > 0 && (
                 <Line
@@ -373,9 +496,30 @@ export default function PriceHistoryChart({
                   strokeWidth={1.5}
                   strokeDasharray="4 3"
                   dot={false}
-                  connectNulls={false}
+                  // Bridges only a compared region's extra days: the window's
+                  // leading gap has no point before it to connect from.
+                  connectNulls
                   name={t('market.priceHistory.movingAverage')}
                 />
+              )}
+              {/* After the primary series, one per compared region in pick
+                  order: the slot fixes the colour and dash, so a region keeps
+                  its line when another is added or removed after it. */}
+              {comparisons.map((c, slot) =>
+                c.status === 'ready' ? (
+                  <Line
+                    key={c.regionId}
+                    isAnimationActive={false}
+                    type={CURVE_TYPE}
+                    dataKey={(row: ChartRow) => row.comparison[c.regionId]}
+                    stroke={compareRegionStroke(slot).color}
+                    strokeWidth={1.5}
+                    strokeDasharray={compareRegionStroke(slot).dash}
+                    dot={false}
+                    connectNulls
+                    name={averageLabel(t, c.name)}
+                  />
+                ) : null
               )}
             </ComposedChart>
           </ResponsiveContainer>
@@ -447,6 +591,7 @@ export default function PriceHistoryChart({
                 stroke="var(--color-series-order-count)"
                 strokeWidth={1.5}
                 dot={false}
+                connectNulls
                 name={t('market.priceHistory.orderCount')}
               />
             </ComposedChart>
@@ -474,11 +619,7 @@ export default function PriceHistoryChart({
             />
           </li>
           <li>
-            <LegendItem
-              label={t('market.priceHistory.average')}
-              shape="line"
-              color="var(--color-accent)"
-            />
+            <LegendItem label={primaryAverageLabel} shape="line" color="var(--color-accent)" />
           </li>
           {movingAverage.length > 0 && (
             <li>
@@ -503,6 +644,25 @@ export default function PriceHistoryChart({
               color="var(--color-series-order-count)"
             />
           </li>
+          {/* A region still loading, failed, or with no days in the range
+              keeps its entry and says so — the reader picked it, and a line
+              that silently never appears reads as a bug. */}
+          {comparisons.map((c, slot) => {
+            const stroke = compareRegionStroke(slot);
+            const label =
+              c.status === 'loading'
+                ? t('market.priceHistory.compareLoading', { region: c.name })
+                : c.status === 'error'
+                  ? t('market.priceHistory.compareFailed', { region: c.name })
+                  : c.points.length === 0
+                    ? t('market.priceHistory.compareEmpty', { region: c.name })
+                    : averageLabel(t, c.name);
+            return (
+              <li key={c.regionId}>
+                <LegendItem label={label} shape="line" color={stroke.color} dash={stroke.dash} />
+              </li>
+            );
+          })}
         </ul>
         <TableActionsMenu name={t('market.tabHistory')} tableExport={tableExport} />
       </div>
@@ -525,7 +685,7 @@ export default function PriceHistoryChart({
         <DataTable
           {...tableExport.tableProps}
           columns={columns}
-          rows={chartData}
+          rows={tableRows}
           rowKey={(p) => p.date}
           label={t('market.priceHistory.chartLabel', { item: itemName })}
           responsive="table"

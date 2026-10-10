@@ -125,8 +125,9 @@ magnitudes. These eight are **nominal**: no order, no magnitude, identity only. 
 which part of the app a deadline came from, and they are read by
 `src/components/ui/kindTone.ts` (`KIND_FILL`, `KIND_TEXT`).
 
-- **Other categorical series borrow these tokens**, as the Net Worth layers and the D-Scan
-  Fleet board's roles do (their legends name each one), instead of minting hues.
+- **Other categorical series borrow these tokens**, as the Net Worth layers, the D-Scan
+  Fleet board's roles and Price History's compared regions (each also with its own dash) do
+  (their legends name each one), instead of minting hues.
 - **This is meant to be the app's only nominal set.** The next categorical thing that
   genuinely needs color extends these tokens rather than minting a parallel palette —
   the fork is the failure mode the Mail decision named when it refused per-folder hues.
