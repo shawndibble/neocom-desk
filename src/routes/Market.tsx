@@ -956,7 +956,7 @@ export function Market() {
             <OrderHistoryPanel
               focusViewOnMount={focusHistoryView}
               onViewChange={(view) => {
-                focusHistoryView.current = true;
+                focusHistoryView.current = view === 'transactions';
                 changeTab(view === 'transactions' ? 'history/transactions' : 'history');
               }}
             />
@@ -965,7 +965,7 @@ export function Market() {
             <TransactionsPanel
               focusViewOnMount={focusHistoryView}
               onViewChange={(view) => {
-                focusHistoryView.current = true;
+                focusHistoryView.current = view === 'history';
                 changeTab(view === 'transactions' ? 'history/transactions' : 'history');
               }}
             />
@@ -1254,7 +1254,10 @@ export function Market() {
                                 ref={clearFilterRef}
                                 size="sm"
                                 onClick={() => {
-                                  focusAfterCommit(sellHeadingRef);
+                                  // Sell's heading, or Buy's when the phone toggle hides Sell.
+                                  focusAfterCommit(
+                                    isPhone && phoneSide === 'buy' ? buyHeadingRef : sellHeadingRef
+                                  );
                                   setStationFilter(null);
                                 }}
                               >
