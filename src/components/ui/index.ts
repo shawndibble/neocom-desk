@@ -13,6 +13,7 @@ export { CachedEmptyState } from './CachedEmptyState';
 export { EmptyState } from './EmptyState';
 export { Toast } from './Toast';
 export { useTimedToast } from './useTimedToast';
+export { useOpenAfterMenu } from './useOpenAfterMenu';
 export { Tabs } from './Tabs';
 export type { TabItem } from './Tabs';
 export { Spinner } from './Spinner';
