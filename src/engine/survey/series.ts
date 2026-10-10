@@ -3,7 +3,6 @@
  * how fast, and when it will be gone. Pure — the scans arrive already parsed
  * (and, for a shared Survey, already fetched); nothing here reads a clock.
  */
-import { sortByValuePerM3, valuePerM3 } from './valueTier';
 
 export interface SurveyRock {
   /** Ore name as the scanner printed it, e.g. "Glistening Sylvite". */
@@ -47,8 +46,8 @@ export interface SurveyOre {
   isk: number;
   /** m³ of it the scans have shown in all: its first showing plus any that came into range. */
   startVolume: number;
-  /** ISK per m³ of it as the latest scan that still showed it priced; null if none did. Keeps a mined-out ore in its place. */
-  iskPerM3: number | null;
+  /** ISK for one unit of it, which is what the ore lists and the chart's layers sort by, however much of it is in the scans; null when it has no price. */
+  unitPrice: number | null;
 }
 
 /** One scan as a point on the volume chart. */
@@ -134,7 +133,11 @@ const signature = (scan: SurveyScan): string =>
     .sort()
     .join(';');
 
-export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | null {
+export function summarizeSurvey(
+  input: readonly SurveyScan[],
+  /** Market ISK per unit by ore name as the scanner printed it; sorts the ores. */
+  unitPrices?: ReadonlyMap<string, number>
+): SurveySummary | null {
   const scans: SurveyScan[] = [];
   const seen = new Set<string>();
   for (const s of [...input].sort((a, b) => a.at - b.at)) {
@@ -200,19 +203,21 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
 
   const byOre = new Map<string, SurveyOre>();
   for (const [ore, startVolume] of Object.entries(startByOre)) {
-    byOre.set(ore, { ore, rocks: 0, volume: 0, isk: 0, startVolume, iskPerM3: null });
+    byOre.set(ore, {
+      ore,
+      rocks: 0,
+      volume: 0,
+      isk: 0,
+      startVolume,
+      unitPrice: unitPrices?.get(ore) ?? null,
+    });
   }
+  // With no market price for an ore, the unit price its latest priced rock implies stands in.
   for (const scan of scans) {
-    const seen = new Map<string, { volume: number; isk: number }>();
     for (const rock of scan.rocks) {
-      const sum = seen.get(rock.ore) ?? { volume: 0, isk: 0 };
-      sum.volume += rock.volume;
-      sum.isk += rock.isk ?? 0;
-      seen.set(rock.ore, sum);
-    }
-    for (const [name, sum] of seen) {
-      const density = valuePerM3(sum);
-      if (density !== null) byOre.get(name)!.iskPerM3 = density;
+      const entry = byOre.get(rock.ore)!;
+      if (unitPrices?.has(rock.ore) || rock.units === undefined || rock.units <= 0) continue;
+      if (rock.isk !== undefined && rock.isk > 0) entry.unitPrice = rock.isk / rock.units;
     }
   }
   for (const rock of last.rocks) {
@@ -221,11 +226,16 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     entry.volume += rock.volume;
     entry.isk += rock.isk ?? 0;
   }
-  // Biggest value left first when the scan carries ISK, else biggest volume.
+  // Dearest unit first, however much of each is in the scans; unpriced ores fall back to the biggest
+  // value left, else the biggest volume.
   const hasIsk = last.rocks.some((r) => r.isk !== undefined);
   const rank = (o: SurveyOre): number => (hasIsk ? o.isk : o.volume);
   const ores = [...byOre.values()].sort(
-    (a, b) => rank(b) - rank(a) || b.volume - a.volume || b.startVolume - a.startVolume
+    (a, b) =>
+      (b.unitPrice ?? -1) - (a.unitPrice ?? -1) ||
+      rank(b) - rank(a) ||
+      b.volume - a.volume ||
+      b.startVolume - a.startVolume
   );
 
   return {
@@ -239,8 +249,8 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     ores,
     intervals,
     points,
-    // The chart's layer order: richest per m³ first, as the ore bars list them.
-    oreNames: (hasIsk ? sortByValuePerM3(ores) : ores).map((o) => o.ore),
+    // The chart's layer order: dearest unit first, as the ore bars list them.
+    oreNames: ores.map((o) => o.ore),
     pace,
     etaAt,
     finished,

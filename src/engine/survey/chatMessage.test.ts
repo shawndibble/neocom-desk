@@ -162,10 +162,10 @@ describe('surveyChatMessage', () => {
     expect(box[2]).toBe('│ Left: 1 A · 1 B · 4 other');
   });
 
-  it('calls out the two ores richest per m³, with how many rocks each has', () => {
-    // Per m³: Scordite 50k, Kernite 20k, Pyroxeres 8k, Veldspar 5k (total ISK would put Pyroxeres second).
+  it('calls out the two dearest ores per unit, with how many rocks each has', () => {
+    // Per unit: Scordite 500, Kernite 200, Pyroxeres 80, Veldspar 50 (total ISK would put Pyroxeres second).
     const rocks = (ore: string, count: number, each: number) =>
-      Array.from({ length: count }, () => ({ ore, volume: 100, isk: each }));
+      Array.from({ length: count }, () => ({ ore, volume: 100, units: 10_000, isk: each }));
     const { box } = message([
       {
         at: T0,

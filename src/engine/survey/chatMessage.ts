@@ -9,7 +9,6 @@
  */
 import type { SurveySummary } from './series';
 import { textWidth } from './chatFont';
-import { sortByValuePerM3 } from './valueTier';
 
 export interface SurveyMessageLabels {
   /** The first line, before the box: chat puts the speaker's name beside it. */
@@ -257,8 +256,8 @@ export function surveyChatMessage(
           left: formatDuration(summary.etaAt - summary.lastAt),
         });
 
-  // Richest per m³ first, as the page lists them; with no ISK the volume order stands.
-  const present = sortByValuePerM3(summary.ores.filter((o) => o.rocks > 0));
+  // Dearest unit first, as the page lists them.
+  const present = summary.ores.filter((o) => o.rocks > 0);
   const ore = oreLine(present, shortOreNames(present.map((o) => o.ore)), labels);
   return lead + box(timing, summary.percent, false, ore, url).join('\n');
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { oreValueTiers, sortByValuePerM3, valuePerM3 } from './valueTier';
+import { oreValueTiers, valuePerM3 } from './valueTier';
 
 const ore = (name: string, volume: number, isk: number) => ({
   ore: name,
@@ -7,7 +7,7 @@ const ore = (name: string, volume: number, isk: number) => ({
   volume,
   isk,
   startVolume: volume,
-  iskPerM3: null,
+  unitPrice: null,
 });
 
 describe('valuePerM3', () => {
@@ -47,33 +47,9 @@ describe('oreValueTiers', () => {
   });
 
   it('is gray for an ore with nothing left, and for every ore when no scan carried ISK', () => {
-    const mined = { ore: 'Gone', rocks: 0, volume: 0, isk: 0, startVolume: 500, iskPerM3: null };
+    const mined = { ore: 'Gone', rocks: 0, volume: 0, isk: 0, startVolume: 500, unitPrice: null };
     expect(oreValueTiers([ore('Real', 1000, 50_000), mined]).get('Gone')).toBe('gray');
     const noIsk = oreValueTiers([ore('A', 1000, 0), ore('B', 500, 0)]);
     expect([...noIsk.values()]).toEqual(['gray', 'gray']);
-  });
-});
-
-describe('sortByValuePerM3', () => {
-  it('puts the richest ore per m3 first, not the biggest total, and unpriced ores last', () => {
-    const gone = { ore: 'Gone', rocks: 0, volume: 0, isk: 0, startVolume: 500, iskPerM3: null };
-    const sorted = sortByValuePerM3([
-      gone,
-      ore('Big poor', 100_000, 3_000_000), // 30/m3
-      ore('Small rich', 1000, 90_000), // 90/m3
-      ore('Mid', 1000, 50_000), // 50/m3
-    ]);
-    expect(sorted.map((o) => o.ore)).toEqual(['Small rich', 'Mid', 'Big poor', 'Gone']);
-  });
-
-  it('keeps a mined-out ore where its last known value per m3 put it', () => {
-    const gone = { ore: 'Gone', rocks: 0, volume: 0, isk: 0, startVolume: 500, iskPerM3: 70 };
-    const sorted = sortByValuePerM3([ore('Rich', 1000, 90_000), ore('Poor', 1000, 50_000), gone]);
-    expect(sorted.map((o) => o.ore)).toEqual(['Rich', 'Gone', 'Poor']);
-  });
-
-  it('keeps the given order when no ore carries a value', () => {
-    const sorted = sortByValuePerM3([ore('A', 1000, 0), ore('B', 500, 0)]);
-    expect(sorted.map((o) => o.ore)).toEqual(['A', 'B']);
   });
 });

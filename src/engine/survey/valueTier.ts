@@ -33,14 +33,3 @@ export function oreValueTiers(ores: readonly SurveyOre[]): Map<string, ValueTier
     })
   );
 }
-
-/**
- * Ores richest per m³ first (the order to mine them in), unpriced ores last, ties kept in order. An
- * ore's `iskPerM3` (its last known value) wins over what is left, so a mined-out ore keeps its place.
- */
-export function sortByValuePerM3<
-  T extends Pick<SurveyOre, 'volume' | 'isk'> & { iskPerM3?: number | null },
->(ores: readonly T[]): T[] {
-  const key = (o: T): number => o.iskPerM3 ?? valuePerM3(o) ?? -1;
-  return [...ores].sort((a, b) => key(b) - key(a));
-}
