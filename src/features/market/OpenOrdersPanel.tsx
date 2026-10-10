@@ -27,6 +27,7 @@ import {
   IskAmount,
   MenuItem,
   MultiSelect,
+  LiveStatus,
   Panel,
   SearchInput,
   Select,
@@ -1040,6 +1041,15 @@ export function OpenOrdersPanel() {
             would read as a broken filter, so the count steps aside and the
             folded Healthy group speaks for itself.
           */}
+          <LiveStatus>
+            {matchCountVisible
+              ? t('market.orders.filter.matchCount', {
+                  count: visibleRows.length,
+                  total: allRows.length,
+                })
+              : groups.length === 0 && t('orders.noResults')}
+          </LiveStatus>
+
           {matchCountVisible && (
             <p className="px-3 pt-2 text-xs text-text-dim">
               {t('market.orders.filter.matchCount', {
