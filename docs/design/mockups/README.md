@@ -5,5 +5,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | Folder | Issue | Chosen |
 |---|---|---|
 | [lp-store-search](lp-store-search/README.md) | Issue #2873 | option B, one box for item or corporation |
+| [stock-targets](stock-targets/index.html) | Issue #3521 | A (gap table) with C's Builder switch, plus D's alert and Overview card; HTML, not PNGs |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
