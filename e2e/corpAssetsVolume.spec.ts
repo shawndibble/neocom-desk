@@ -106,6 +106,7 @@ test.describe('Corp Assets — item row volume', () => {
       // corp scope group — not just the assets/divisions this spec cares
       // about. Answer them empty rather than letting them hit the network
       // guard.
+      if (path === `/corporation/${CORPORATION_ID}/mining/extractions`) return json([]);
       if (path === `/corporations/${CORPORATION_ID}/structures`) return json([]);
       if (path === `/corporations/${CORPORATION_ID}/industry/jobs`) return json([]);
       if (path === `/corporations/${CORPORATION_ID}/members`) return json([]);

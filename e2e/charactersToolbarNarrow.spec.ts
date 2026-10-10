@@ -37,7 +37,6 @@ test('picking a Character from the More sheet returns to the page you switched f
   await landOnCharactersAtPhoneWidth(page);
   await page.getByRole('button', { name: `Select ${CHARACTER_NAME}` }).click();
   await expect(page).toHaveURL(/\/overview$/);
-  await answerRailQuestion(page);
 
   const mobileNav = page.getByRole('navigation', { name: 'Mobile navigation' });
 
