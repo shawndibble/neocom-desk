@@ -24,14 +24,14 @@ const journal: WalletJournalEntry[] = [
   },
 ];
 
-function Harness() {
+function Harness({ rows = journal }: { rows?: WalletJournalEntry[] }) {
   const journalColumns = useJournalColumnsBuilder()(
     () => undefined,
     () => ''
   );
   const tableExport = useTableExport({
     surface: 'wallet-journal',
-    rows: journal,
+    rows,
     columns: walletJournalCsvColumns((key: string) => key),
   });
   return (
@@ -40,8 +40,8 @@ function Harness() {
         filter={EMPTY_WALLET_JOURNAL_FILTER}
         onFilterChange={() => {}}
         refTypeOptions={['bounty_prize', 'market_escrow']}
-        filteredJournal={journal}
-        breakdownJournal={journal}
+        filteredJournal={rows}
+        breakdownJournal={rows}
         journalColumns={journalColumns}
         label="Journal"
         sort={{ columnId: 'date', direction: 'desc' }}
@@ -51,6 +51,15 @@ function Harness() {
     </MemoryRouter>
   );
 }
+
+const manyTypes = (n: number): WalletJournalEntry[] =>
+  Array.from({ length: n }, (_, i) => ({
+    id: 100 + i,
+    date: '2026-10-07T23:47:00Z',
+    ref_type: `type_${i}`,
+    amount: 1000,
+    description: 'z',
+  }));
 
 const realMatchMedia = window.matchMedia;
 
@@ -87,6 +96,26 @@ describe('JournalTable breakdown panel', () => {
     render(<Harness />);
     expect(await toggle()).toHaveAttribute('aria-expanded', 'true');
     expect(breakdownTable()).toBeInTheDocument();
+  });
+
+  it('starts folded on a wide screen when there are more than 6 ref types', async () => {
+    setNarrow(false);
+    render(<Harness rows={manyTypes(7)} />);
+    expect(await toggle()).toHaveAttribute('aria-expanded', 'false');
+    expect(breakdownTable()).not.toBeInTheDocument();
+  });
+
+  it('starts open on a wide screen with exactly 6 ref types', async () => {
+    setNarrow(false);
+    render(<Harness rows={manyTypes(6)} />);
+    expect(await toggle()).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('keeps a stored open choice with many ref types', async () => {
+    setNarrow(false);
+    await db.settings.put({ key: JOURNAL_BREAKDOWN_SETTING_KEY, value: true });
+    render(<Harness rows={manyTypes(14)} />);
+    expect(await toggle()).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('is folded on a phone until the pilot toggles it', async () => {
