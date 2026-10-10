@@ -143,7 +143,7 @@ describe('PlanResult', () => {
     it('counts each flown ship as a trip on top of the hauls', () => {
       setup(0);
       expect(screen.getByText('2 hauls + 1 ship')).toBeTruthy();
-      expect(screen.getByText('3', { selector: 'div' }).textContent).toContain('trips');
+      expect(screen.getByText('trips').parentElement?.textContent).toBe('3trips');
     });
 
     it('names each ship being flown beside the cargo trips', () => {
@@ -152,6 +152,7 @@ describe('PlanResult', () => {
     });
 
     it('still names the ship when nothing is hauled', () => {
+      // no hauler to suggest: the ship trips still head the plan
       const none = {
         ...shipPlan,
         totals: { ...shipPlan.totals, totalM3: 0, trips: null },
@@ -189,6 +190,7 @@ describe('PlanResult', () => {
         </MemoryRouter>
       );
       expect(screen.getByText('Fly Badger')).toBeTruthy();
+      expect(screen.getByText('1 ship')).toBeTruthy();
     });
 
     it('packs a ship with no rigs straight away', async () => {
