@@ -215,7 +215,12 @@ function DamageText({ choice }: { choice: ChargeChoice }) {
 }
 
 /** A loadable row's accessible name: its cells run together otherwise. */
-function rowLabel(t: TFunction, c: ChargeChoice, distance: number | null): string {
+function rowLabel(
+  t: TFunction,
+  c: ChargeChoice,
+  distance: number | null,
+  extra: { pricey: boolean; worse: ChargeChoice | null }
+): string {
   const label = t('fittings.chargePicker.rowLabel', {
     name: c.name,
     dps: Math.round(chargeScore(c, distance)),
@@ -224,13 +229,20 @@ function rowLabel(t: TFunction, c: ChargeChoice, distance: number | null): strin
         ? t('fittings.chargePicker.noPrice')
         : t('fittings.chargePicker.isk', { isk: formatIsk(c.price) }),
   });
+  const perMin = iskPerMinute(c);
+  const parts = [
+    label,
+    c.cargo > 0
+      ? t('fittings.chargePicker.inCargo', { count: formatCompactNumber(c.cargo) })
+      : null,
+    perMin === null ? null : t('fittings.chargePicker.perMinute', { isk: formatIsk(perMin) }),
+    extra.pricey ? t('fittings.chargePicker.priceyLabel') : null,
+    extra.worse ? t('fittings.chargePicker.worseThan', { name: tierLabel(t, extra.worse) }) : null,
+  ].filter(Boolean);
   const lasts =
-    c.price !== null && iskPerMinute(c) === null
-      ? `. ${t('fittings.chargePicker.lastsTitle')}`
-      : '';
-  return c.skillMissing
-    ? `${label}${lasts}. ${t('fittings.chargePicker.needsSkill')}`
-    : `${label}${lasts}`;
+    c.price !== null && perMin === null ? `. ${t('fittings.chargePicker.lastsTitle')}` : '';
+  const joined = `${parts.join(', ')}${lasts}`;
+  return c.skillMissing ? `${joined}. ${t('fittings.chargePicker.needsSkill')}` : joined;
 }
 
 function signedPct(value: number): string {
@@ -606,7 +618,7 @@ function TypeDetail({
                   disabled={!onLoad || c.skillMissing}
                   onClick={() => onLoad?.(c.typeId)}
                   aria-pressed={isLoaded}
-                  aria-label={rowLabel(t, c, distance)}
+                  aria-label={rowLabel(t, c, distance, { pricey, worse })}
                   className={chargeRowClassName(
                     isLoaded,
                     cx(
@@ -630,8 +642,7 @@ function TypeDetail({
                       <Icon.PriceHigh
                         size={Icon.ICON_SIZE.sm}
                         className="ml-1 inline"
-                        aria-label={t('fittings.chargePicker.priceyLabel')}
-                        role="img"
+                        aria-hidden
                       />
                     )}
                   </span>
@@ -756,7 +767,7 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                           disabled={!onLoad || c.skillMissing}
                           onClick={() => onLoad?.(c.typeId)}
                           aria-pressed={isLoaded}
-                          aria-label={rowLabel(t, c, distance)}
+                          aria-label={rowLabel(t, c, distance, { pricey, worse: worse[i] })}
                           className={chargeRowClassName(
                             isLoaded,
                             cx(
@@ -772,8 +783,7 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                               <Icon.InCargo
                                 size={Icon.ICON_SIZE.sm}
                                 className="ml-1 inline text-text-dim"
-                                aria-label={t('fittings.chargePicker.inCargoLabel')}
-                                role="img"
+                                aria-hidden
                               />
                             )}
                           </span>
@@ -785,8 +795,7 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                               <Icon.PriceHigh
                                 size={Icon.ICON_SIZE.sm}
                                 className="ml-1 inline"
-                                aria-label={t('fittings.chargePicker.priceyLabel')}
-                                role="img"
+                                aria-hidden
                               />
                             )}
                           </span>

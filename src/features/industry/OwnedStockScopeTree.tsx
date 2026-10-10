@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, Checkbox } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -61,6 +61,7 @@ export function OwnedStockScopeTree({
   labelFor,
 }: OwnedStockScopeTreeProps) {
   const { t } = useTranslation();
+  const listId = useId();
   // A station already narrowed opens on its children, so a saved scope shows what it picked.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(
     () => new Set(stations.filter((s) => stationState(scope, s) === 'partial').map((s) => s.key))
@@ -79,7 +80,7 @@ export function OwnedStockScopeTree({
     const open = expanded.has(station.key);
     const label = labelFor(station.location);
     return (
-      <li key={station.key} role="treeitem" aria-expanded={hasChildren ? open : undefined}>
+      <li key={station.key}>
         <div className="flex items-center gap-1">
           {hasChildren ? (
             <button
@@ -106,9 +107,9 @@ export function OwnedStockScopeTree({
           />
         </div>
         {hasChildren && open && (
-          <ul role="group" className="ml-7 border-l border-line pl-2">
+          <ul className="ml-7 border-l border-line pl-2">
             {station.hangars.map((division) => (
-              <li key={`h${division}`} role="treeitem">
+              <li key={`h${division}`}>
                 <TriCheckbox
                   state={isHangarChecked(scope, station, division) ? 'checked' : 'empty'}
                   label={t('industry.ownedStockScopeHangar', { division })}
@@ -117,7 +118,7 @@ export function OwnedStockScopeTree({
               </li>
             ))}
             {station.containers.map((container) => (
-              <li key={`c${container.containerId}`} role="treeitem">
+              <li key={`c${container.containerId}`}>
                 <TriCheckbox
                   state={isContainerChecked(scope, station, container) ? 'checked' : 'empty'}
                   label={t('industry.ownedStockScopeContainer', { id: container.containerId })}
@@ -132,20 +133,29 @@ export function OwnedStockScopeTree({
   };
 
   // Grouped only once a corp station exists: a lone "Personal" header would be noise.
-  const group = (heading: string | null, list: readonly ScopeTreeStation[]) =>
-    list.length === 0 ? null : (
-      <li key={heading ?? 'all'} role="none">
+  const group = (heading: string | null, list: readonly ScopeTreeStation[]) => {
+    if (list.length === 0) return null;
+    const key = heading ?? 'all';
+    const headingId = heading
+      ? `${listId}-${list[0].location.corporationId === undefined ? 'personal' : 'corp'}`
+      : undefined;
+    return (
+      <li key={key}>
         {heading && (
-          <p className="px-1 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <p
+            id={headingId}
+            className="px-1 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+          >
             {heading}
           </p>
         )}
-        <ul role="group">{list.map(renderStation)}</ul>
+        <ul aria-labelledby={headingId}>{list.map(renderStation)}</ul>
       </li>
     );
+  };
 
   return (
-    <ul role="tree" aria-label={t('industry.ownedStockScopeLabel')} className="flex flex-col">
+    <ul aria-label={t('industry.ownedStockScopeLabel')} className="flex flex-col">
       {corp.length === 0
         ? group(null, personal)
         : [

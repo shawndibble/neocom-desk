@@ -11,6 +11,7 @@ import {
   DataTable,
   EmptyState,
   IskAmount,
+  LiveStatus,
   Panel,
   SearchInput,
   Spinner,
@@ -72,6 +73,18 @@ export function LpStoreSearch({
   const search = useLpStoreSearch(query);
   const { result } = search;
   const hasQuery = query.trim() !== '';
+  const noMatches = result.groups.length === 0 && result.corporations.length === 0;
+  let resultsStatus: string | null = null;
+  if (hasQuery) {
+    if (!noMatches) {
+      resultsStatus = t('loyaltyStore.search.resultsStatus', {
+        stores: t('loyaltyStore.search.storeCount', { count: result.corporations.length }),
+        items: t('loyaltyStore.search.itemCount', { count: result.groups.length }),
+      });
+    } else if (search.status !== 'loading' && search.status !== 'unavailable') {
+      resultsStatus = t('loyaltyStore.search.noResultsTitle');
+    }
+  }
 
   const columns: DataTableColumn<ItemSearchStore>[] = [
     {
@@ -121,6 +134,7 @@ export function LpStoreSearch({
         aria-label={t('loyaltyStore.search.label')}
         className="max-w-xl"
       />
+      <LiveStatus>{resultsStatus}</LiveStatus>
       <JumpsNote status={search.jumpsStatus} />
 
       {!hasQuery ? (

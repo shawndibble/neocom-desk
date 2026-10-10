@@ -26,13 +26,12 @@ vi.mock('./surveyStore', () => ({
 vi.mock('@/features/share/shareStore', () => ({
   shareUrl: (id: string) => `https://neocomdesk.test/s/${id}`,
 }));
-// The moon tax has its own test; here only who sees it editable matters.
+// The info panel has its own test; here only who sees it editable matters.
 vi.mock('./useHasMoonOre', () => ({ useHasMoonOre: () => true }));
-vi.mock('./MoonTaxRow', () => ({
-  MoonTaxRow: () => <div data-testid="tax-edit" />,
-  MoonTaxReadout: ({ tax }: { tax: { name: string } }) => (
-    <div data-testid="tax-readout">{tax.name}</div>
-  ),
+vi.mock('./SurveyInfoPanel', () => ({
+  SurveyInfoEditor: () => <div data-testid="tax-edit" />,
+  SurveyInfoReadout: ({ tax }: { tax: { name: string } | null }) =>
+    tax === null ? null : <div data-testid="tax-readout">{tax.name}</div>,
 }));
 // Its own test covers the ledger read; here it would reach for ESI.
 vi.mock('./YourShareRow', () => ({ YourShareRow: () => null }));
@@ -68,7 +67,7 @@ function renderTab(entry: string | { pathname: string; state: unknown } = '/mini
   return render(
     <MemoryRouter initialEntries={[entry]}>
       <Grab />
-      <SurveyTab tabBar={<div />} />
+      <SurveyTab tabBar={<div />} tabsId="t" />
     </MemoryRouter>
   );
 }

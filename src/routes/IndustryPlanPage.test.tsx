@@ -710,7 +710,11 @@ describe('IndustryPlanPage: waits for the pricing-settings hydration gate (#2054
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
-    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    // One `waitFor` so the find and the assert run in the same tick: the boot
+    // screen's own spinner is also "Loading" and unmounts as the route lands.
+    await waitFor(() =>
+      expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument()
+    );
     expect(screen.queryByRole('heading', { name: 'Rifter' })).not.toBeInTheDocument();
 
     // Resolves on its own once the (real, Dexie-backed) hydrate() call

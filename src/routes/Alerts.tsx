@@ -60,6 +60,7 @@ import {
   useNotificationPreferences,
 } from '@/features/notifications/preferences';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { SETTINGS_TABS } from '@/app/pageTabs';
@@ -78,12 +79,6 @@ const FILTERABLE_SEVERITIES: readonly DeadlineSeverity[] = DEADLINE_SEVERITIES.f
 
 /** Radix `Select` has no empty-string value, so "every character" needs a sentinel of its own. */
 const ALL_CHARACTERS = 'all';
-
-/**
- * Sentinel in `focusAfterRemoval`'s candidate list for the panel heading —
- * never collides with a real group/entry key (Dexie ids, `alertGroupLabel` output).
- */
-const PANEL_HEADING_FOCUS = '__panel-heading__';
 
 /**
  * `AlertsFilter` kept in the URL (ADR 0015) so a reload — or a link shared
@@ -112,34 +107,18 @@ export function Alerts() {
   const [filter, setFilter] = useUrlParams(ALERTS_FILTER_PARAMS);
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
 
-  // Focus anchors for `focusAfterRemoval` below, tracking rows still mounted
-  // after a dismiss/mute unmounts the clicked one (WCAG 2.4.3). Plain
-  // mutable maps, not state: only read inside a click handler, never render.
+  // Focus anchors for `focusAfterCommit`, tracking rows still mounted after a
+  // dismiss/mute unmounts the clicked one (WCAG 2.4.3). Plain mutable maps,
+  // not state: only read when the hook resolves a candidate, never render.
   const panelRef = useRef<HTMLElement>(null);
   const groupRefs = useRef(new Map<string, HTMLButtonElement>());
   const entryRefs = useRef(new Map<string, HTMLButtonElement>());
+  const focusAfterCommit = useFocusAfterCommit();
 
-  // Focuses the first candidate still mounted — caller lists next row,
-  // previous row, then `PANEL_HEADING_FOCUS`. Safe to call before the click's
-  // own row unmounts: candidates are always other rows, already in the DOM.
-  function focusAfterRemoval(candidates: readonly string[]) {
-    for (const key of candidates) {
-      if (key === PANEL_HEADING_FOCUS) {
-        const heading = panelRef.current?.querySelector<HTMLHeadingElement>('h2');
-        if (heading) {
-          heading.tabIndex = -1;
-          heading.focus();
-          return;
-        }
-        continue;
-      }
-      const el = groupRefs.current.get(key) ?? entryRefs.current.get(key);
-      if (el) {
-        el.focus();
-        return;
-      }
-    }
-  }
+  // Candidate getters: a row's toggle/dismiss button by key, and the panel heading.
+  const rowFocus = (key: string | undefined) =>
+    key === undefined ? null : () => groupRefs.current.get(key) ?? entryRefs.current.get(key);
+  const panelHeading = () => panelRef.current?.querySelector<HTMLHeadingElement>('h2');
 
   useEffect(() => {
     void hydrateNotificationPreferences();
@@ -227,9 +206,7 @@ export function Alerts() {
                   // Every unmuted group is about to empty out; only a muted
                   // group shown via the chip can still be there afterwards.
                   const survivor = visible.find((group) => group.muted);
-                  focusAfterRemoval(
-                    survivor ? [survivor.key, PANEL_HEADING_FOCUS] : [PANEL_HEADING_FOCUS]
-                  );
+                  focusAfterCommit(rowFocus(survivor?.key), panelHeading);
                   void dismissFeedEntriesAndSync(liveEntries);
                 }}
               />
@@ -343,10 +320,9 @@ export function Alerts() {
               // Next row, else previous, else panel heading — shared by
               // dismiss-group, hide-on-mute, and dismiss-entry's last-in-group fallback.
               const groupCandidates = [
-                visible[groupIndex + 1]?.key,
-                visible[groupIndex - 1]?.key,
-                PANEL_HEADING_FOCUS,
-              ].filter((key): key is string => key !== undefined);
+                ...[visible[groupIndex + 1]?.key, visible[groupIndex - 1]?.key].map(rowFocus),
+                panelHeading,
+              ];
 
               return (
                 <AlertGroupRow
@@ -355,13 +331,13 @@ export function Alerts() {
                   expanded={expandedKeys.has(group.key)}
                   onToggle={() => toggleExpanded(group.key)}
                   onDismissGroup={() => {
-                    focusAfterRemoval(groupCandidates);
+                    focusAfterCommit(...groupCandidates);
                     void dismissFeedEntriesAndSync(group.entries);
                   }}
                   onToggleMute={() => {
                     // Only disappears when muting it while the "muted types"
                     // chip is off — otherwise this same row stays mounted.
-                    if (!group.muted && !filter.showMuted) focusAfterRemoval(groupCandidates);
+                    if (!group.muted && !filter.showMuted) focusAfterCommit(...groupCandidates);
                     void setFeedMutedForCharacters(group.characterIds, group.target, !group.muted);
                   }}
                   nameById={nameById}
@@ -371,14 +347,13 @@ export function Alerts() {
                   showCharacter={characters.length > 1}
                   onDismissEntry={(entry) => {
                     const entryIndex = group.entries.findIndex((e) => e.id === entry.id);
-                    const entryCandidates = [
-                      group.entries[entryIndex + 1]?.id,
-                      group.entries[entryIndex - 1]?.id,
-                    ].filter((id): id is string => id !== undefined);
-                    // No sibling entry: this was the group's last one, so
-                    // fall through to the group-level candidates.
-                    focusAfterRemoval(
-                      entryCandidates.length > 0 ? entryCandidates : groupCandidates
+                    // Sibling entries first; with none, this was the group's last
+                    // one, so fall through to the group-level candidates.
+                    focusAfterCommit(
+                      ...[group.entries[entryIndex + 1]?.id, group.entries[entryIndex - 1]?.id].map(
+                        rowFocus
+                      ),
+                      ...groupCandidates
                     );
                     void dismissFeedEntriesAndSync([entry]);
                   }}

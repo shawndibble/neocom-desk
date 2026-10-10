@@ -533,6 +533,19 @@ describe('Skills', () => {
     }
   });
 
+  it('announces the match count, and no matches, for a search', async () => {
+    const statusTexts = () => screen.getAllByRole('status').map((el) => el.textContent ?? '');
+    render(<App />);
+    await screen.findByRole('button', { name: /Spaceship Command/ });
+    const search = screen.getByPlaceholderText('Search skills…');
+    fireEvent.change(search, { target: { value: 'frigate' } });
+    await waitFor(() =>
+      expect(statusTexts()).toContainEqual(expect.stringMatching(/\d+ skills? match/i))
+    );
+    fireEvent.change(search, { target: { value: 'zzzqqq' } });
+    await waitFor(() => expect(statusTexts()).toContain('No skills match your search.'));
+  });
+
   it('exports only the skills a search leaves on screen', async () => {
     render(<App />);
     await screen.findByRole('button', { name: /Spaceship Command/ });
@@ -636,6 +649,30 @@ describe('Skills', () => {
 
     fireEvent.click(frigateRow);
     expect(screen.queryByText('Prerequisites')).not.toBeInTheDocument();
+  });
+
+  it('announces the inspector without moving focus, and returns focus to the row on Close', async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
+    const frigateRow = await screen.findByRole('button', { name: /^Frigate/ });
+    frigateRow.focus();
+    fireEvent.click(frigateRow);
+    expect(await screen.findByText('Prerequisites')).toBeInTheDocument();
+    expect(frigateRow).toHaveFocus();
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole('status')
+          .some((el) => /details for frigate/i.test(el.textContent ?? ''))
+      ).toBe(true)
+    );
+
+    const close = screen.getByRole('button', { name: /^Close$/ });
+    close.focus();
+    fireEvent.click(close);
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Frigate/ })).toHaveFocus());
+    expect(screen.queryByText(/details for frigate/i)).not.toBeInTheDocument();
   });
 
   it('starts every group collapsed, expands on header click, and collapses again on a second click', async () => {

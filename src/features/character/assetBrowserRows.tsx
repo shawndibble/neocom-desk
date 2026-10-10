@@ -100,7 +100,10 @@ export function JumpsAwayText({
     // Plain Tooltip, not HintText: this sits inside a row link, where a focusable,
     // tap-to-toggle trigger would fight the navigation.
     <Tooltip content={t(`assets.jumpsAway.unknownReason.${result.reason}`)}>
-      <span className="tabular-nums">{t('assets.jumpsAway.unknown')}</span>
+      <span className="relative z-10 tabular-nums">
+        <span aria-hidden="true">{t('assets.jumpsAway.unknown')}</span>
+        <span className="sr-only">{t(`assets.jumpsAway.unknownReason.${result.reason}`)}</span>
+      </span>
     </Tooltip>
   );
 }
@@ -590,6 +593,8 @@ interface SectionHeadingProps {
 export function SectionHeading({ children, tone = 'default' }: SectionHeadingProps) {
   return (
     <div
+      role="heading"
+      aria-level={3}
       className={cx(
         'flex items-center gap-1.5 border-y border-line px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
         tone === 'warning' ? 'bg-panel-2 text-warning' : 'bg-panel-2 text-text-dim'

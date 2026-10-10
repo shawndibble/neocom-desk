@@ -94,7 +94,7 @@ export function PageHeader({
         {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
         <h1
           tabIndex={-1}
-          className="min-w-0 text-xl font-semibold tracking-widest break-words uppercase focus:outline-none"
+          className="max-w-full min-w-0 shrink-0 text-xl font-semibold tracking-widest break-words uppercase focus:outline-none"
         >
           {picker ? <PageViewPicker title={title} {...picker} /> : title}
         </h1>
