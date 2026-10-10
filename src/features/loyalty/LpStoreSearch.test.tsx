@@ -183,6 +183,7 @@ describe('LpStoreSearch', () => {
     ]);
     fireEvent.click(links[0]!);
     expect(probe.pathname).toBe('/market/lp-store/1000120');
+    expect(probe.state).toBeNull();
   });
 
   it('notes that stores are not ranked by jumps without a current system', () => {

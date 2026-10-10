@@ -471,14 +471,12 @@ const CRUMB_CLASS =
 function StoreCrumbs() {
   const { t } = useTranslation();
   const state = useLocation().state as Partial<LpSearchCrumbState> | null;
-  const q = state?.from === 'lp-search' ? (state.q ?? '') : null;
+  // An empty query is the landing itself, which "Change store" already links to.
+  const q = state?.from === 'lp-search' && state.q ? state.q : null;
   return (
     <div className="flex flex-wrap items-center gap-x-2 self-start">
       {q !== null && (
-        <Link
-          to={q === '' ? '/market/lp-store' : `/market/lp-store?q=${encodeURIComponent(q)}`}
-          className={CRUMB_CLASS}
-        >
+        <Link to={`/market/lp-store?q=${encodeURIComponent(q)}`} className={CRUMB_CLASS}>
           <span aria-hidden="true">‹</span>
           {t('loyaltyStore.search.crumb')}
         </Link>

@@ -134,7 +134,6 @@ export function LpStoreSearch({
                 <li key={store.corporationId} className="py-1.5">
                   <Link
                     to={lpStorePath(store.corporationId)}
-                    state={{ from: 'lp-search', q: query } satisfies LpSearchCrumbState}
                     className={entityLinkClassName('flex items-baseline justify-between gap-3')}
                   >
                     <span>{store.name}</span>
