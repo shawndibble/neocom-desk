@@ -113,7 +113,8 @@ export function CalendarMap({
                 lists them in words — which is also what makes the weekday
                 header row safe to hide from assistive tech.
               */
-              aria-label={dayLabel(day.date, load)}
+              aria-label={dayLabel(day.date, load, day.isToday)}
+              aria-current={day.isToday ? 'date' : undefined}
               // A past day is still a real button: pressing it scopes the rail
               // to a day that is genuinely empty, which is a truthful answer.
               // Disabling it would leave the pilot with a dead control and no
