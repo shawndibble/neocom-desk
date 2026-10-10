@@ -102,7 +102,7 @@ export function MyOrderMark({ t }: { t: TFunction }) {
     <span
       role="img"
       aria-label={t('market.myOrder')}
-      className="mr-1 inline-flex align-text-bottom text-accent"
+      className="mr-1 inline-flex align-text-bottom text-text"
     >
       <Icon.MyOrder aria-hidden size={Icon.ICON_SIZE.sm} />
     </span>

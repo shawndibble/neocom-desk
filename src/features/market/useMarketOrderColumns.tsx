@@ -138,9 +138,9 @@ export function useMarketOrderColumns({
         cardCorner: visibleOrderColumns.includes('location'),
         render: (o) => (
           <>
-            {/* Left of the figure, so the prices stay right-aligned in one column. */}
             {/*
-              Mine, then bait, then the price, all on one line: the row tint
+              Left of the figure, so the prices stay right-aligned in one
+              column. Mine, then bait, then the price, all on one line: the row tint
               (`row-mine`, styles/index.css) is not enough alone (colour is
               never the sole signal, docs/DESIGN.md §7), and a second line
               would break the column of a book scanned by price.
