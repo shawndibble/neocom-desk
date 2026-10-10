@@ -276,7 +276,7 @@ describe('Ship Info window', () => {
       [{ skillTypeID: INTERCEPTORS, targetLevel: 3 }],
       'Crow'
     );
-    expect(await screen.findByText(/Added 1 skill to Crow/)).toBeVisible();
+    expect((await screen.findAllByText(/Added 1 skill to Crow/))[0]).toBeVisible();
   });
 
   it('Skills & Mastery: a tier already covered by the target Skill Plan shows In plan, not a no-op Add', async () => {
