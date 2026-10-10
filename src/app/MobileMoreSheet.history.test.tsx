@@ -30,7 +30,6 @@ function Harness() {
         onClose={() => setOpen(false)}
         locked={NO_LOCKS}
         tabs={[]}
-        unreadAlerts={0}
         renderCharacterLink={() => null}
       />
     </BrowserRouter>

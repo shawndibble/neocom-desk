@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret, FilterChip, SearchInput } from '@/components/ui';
+import { Button, Caret, FilterChip, LiveStatus, SearchInput } from '@/components/ui';
+import { PLAN_HANDLE_ATTR } from './focusNeighbour';
 import {
   focusRingInsetClassName,
   inlineLinkClassName,
@@ -194,6 +195,7 @@ export function SkillPicker({
         <span
           role="status"
           aria-live="polite"
+          data-testid="pick-status"
           className={
             announcementVisible ? 'flex items-center gap-1.5 text-xs text-text-dim' : 'sr-only'
           }
@@ -203,11 +205,14 @@ export function SkillPicker({
             <button
               type="button"
               className={inlineLinkClassName}
-              onClick={() =>
-                document
-                  .getElementById(jumpTargetId)
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              }
+              onClick={() => {
+                const row = document.getElementById(jumpTargetId);
+                row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Focus moves with the view; the handle, not the <li>, so no row ring.
+                row
+                  ?.querySelector<HTMLElement>(`[${PLAN_HANDLE_ATTR}]`)
+                  ?.focus({ preventScroll: true });
+              }}
             >
               {t('plans.jumpToAdded')}
             </button>
@@ -235,6 +240,13 @@ export function SkillPicker({
           ))}
         </div>
       )}
+      <LiveStatus>
+        {debouncedQuery.trim() === ''
+          ? null
+          : results.length > 0
+            ? t('plans.searchResultCount', { count: results.length })
+            : t('plans.noSkillsMatch', { query: debouncedQuery })}
+      </LiveStatus>
       {results.length > 0 ? (
         <ul className="mt-1 max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">
           {results.map((skill) => (

@@ -118,6 +118,21 @@ describe('TableActionsMenu', () => {
     await waitFor(() => expect(copied).toHaveLength(1));
   });
 
+  it('announces the copy result in a live region, then clears it after 2s', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Sell orders' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    await choose(user, 'Copy for Google Sheets / Excel');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Copied 2 rows'));
+    await waitFor(() => expect(screen.getByRole('status')).toBeEmptyDOMElement(), {
+      timeout: 3000,
+    });
+  });
+
   it('copies the table as TSV, in on-screen sort order', async () => {
     const user = userEvent.setup();
     render(<Harness />);

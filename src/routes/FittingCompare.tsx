@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   Button,
   EmptyState,
   IconButton,
+  LiveStatus,
   entityLinkClassName,
   PageHeader,
   Panel,
@@ -26,6 +27,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useCompareCodes, MAX_COMPARE_SLOTS } from '@/features/fittings/compareUrl';
 import { FittingComparePicker } from '@/features/fittings/FittingComparePicker';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
@@ -82,6 +84,12 @@ export function FittingCompare() {
   const [page, setPage] = useState(0);
   const [differencesOnly, setDifferencesOnly] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const focusAfterCommit = useFocusAfterCommit();
+  const addFittingRef = useRef<HTMLButtonElement>(null);
+  const countRef = useRef(codes.length);
+  useLayoutEffect(() => {
+    countRef.current = codes.length;
+  });
 
   const count = codes.length;
   const pageWindow = isPhone ? compareWindow(count, page) : { start: 0, end: count };
@@ -96,6 +104,20 @@ export function FittingCompare() {
   function removeSlot(index: number) {
     // Pending adds only ever append, so a rendered index still names the same slot in `prev`.
     setCodes((prev) => prev.filter((_, i) => i !== index));
+    // The pressed Remove leaves with its column. The next column slides into
+    // this index; failing that the previous one, then "Add fitting". The URL
+    // write lands in a later commit than this handler's, so a candidate only
+    // counts once the column count has dropped (before that, it is the old button).
+    const expected = codes.length - 1;
+    const afterRemoval = (find: () => HTMLElement | null | undefined) => () =>
+      countRef.current === expected ? find() : null;
+    const removeAt = (i: number) =>
+      afterRemoval(() => document.querySelector<HTMLElement>(`[data-compare-remove="${i}"]`));
+    focusAfterCommit(
+      removeAt(index),
+      removeAt(index - 1),
+      afterRemoval(() => addFittingRef.current)
+    );
   }
 
   const anyError = slots.some((slot) => slot?.shareError);
@@ -202,6 +224,7 @@ export function FittingCompare() {
             })}
             tooltip={t('fittings.compare.remove')}
             onClick={() => removeSlot(index)}
+            data-compare-remove={index}
             tone="danger"
           />
         </div>
@@ -260,6 +283,7 @@ export function FittingCompare() {
             })}
             tooltip={t('fittings.compare.remove')}
             onClick={() => removeSlot(index)}
+            data-compare-remove={index}
             tone="danger"
           />
         </div>
@@ -291,6 +315,7 @@ export function FittingCompare() {
         title={t('fittings.compare.title')}
         actions={
           <Button
+            ref={addFittingRef}
             variant="primary"
             disabled={count >= MAX_COMPARE_SLOTS}
             onClick={() => setPickerOpen(true)}
@@ -325,18 +350,29 @@ export function FittingCompare() {
             <div className="flex items-center justify-between">
               <Button
                 className="min-h-11 min-w-11"
-                disabled={pageWindow.start === 0}
-                onClick={() => setPage((p) => p - 1)}
+                aria-disabled={pageWindow.start === 0 || undefined}
+                onClick={() => {
+                  if (pageWindow.start > 0) setPage((p) => p - 1);
+                }}
               >
                 {t('fittings.compare.pagePrev')}
               </Button>
               <Button
                 className="min-h-11 min-w-11"
-                disabled={pageWindow.end >= count}
-                onClick={() => setPage((p) => p + 1)}
+                aria-disabled={pageWindow.end >= count || undefined}
+                onClick={() => {
+                  if (pageWindow.end < count) setPage((p) => p + 1);
+                }}
               >
                 {t('fittings.compare.pageNext')}
               </Button>
+              <LiveStatus>
+                {t('fittings.compare.pageStatus', {
+                  from: pageWindow.start + 1,
+                  to: pageWindow.end,
+                  count,
+                })}
+              </LiveStatus>
             </div>
           )}
 

@@ -185,6 +185,17 @@ export function ShipTreeMap({
     onOpenShip(ship);
   }
 
+  // Escape dismisses the hover card without moving focus or stopping the key.
+  const hovering = hover !== null;
+  useEffect(() => {
+    if (!hovering) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setHover(null);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [hovering]);
+
   const { flyable, total } = useMemo(
     () =>
       flyableCount(
@@ -217,10 +228,8 @@ export function ShipTreeMap({
           disabled={cam.z <= MIN_ZOOM}
           onClick={() => zoomBy(1 / BUTTON_STEP)}
         />
-        <span
-          className="w-10 text-center text-xs text-text-dim tabular-nums"
-          aria-label={t('ships.tree.zoomLevel')}
-        >
+        <span className="w-10 text-center text-xs text-text-dim tabular-nums">
+          <span className="sr-only">{t('ships.tree.zoomLevel')}: </span>
           {Math.round(cam.z * 100)}%
         </span>
         <IconButton

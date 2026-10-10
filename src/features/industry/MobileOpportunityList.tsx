@@ -263,9 +263,13 @@ export function MobileOpportunityList({
                 {/* The hero rides the name row's right edge like a price tag, matching the owned-blueprint cards. */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className={entityLinkClassName('text-sm font-semibold break-words')}>
+                    <button
+                      type="button"
+                      className={entityLinkClassName('text-sm font-semibold break-words text-left')}
+                      onClick={() => startPlanFromRow(row.candidate.catalogEntry)}
+                    >
                       {productName}
-                    </span>
+                    </button>
                     {members.length > 1 && (
                       <span className="text-[0.6875rem] font-semibold text-text-dim">
                         {t('industry.opportunitiesCopies', { count: members.length })}
