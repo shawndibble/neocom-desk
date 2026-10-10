@@ -21,11 +21,15 @@ import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadLpCorporations } from '@/sde/loadMarketSde';
+import type { LpCorporationEntry } from '@/sde/marketTypes';
+import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
+import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { usePriceBasis } from './priceBasis';
 import { loadLpStoreSnapshot } from './lpStoreSnapshot';
+import { lpStorePickerOptions, type LpStorePickerOption } from './lpStorePickerOptions';
 import { searchLpStores, type LpSearchResult, type LpSnapshotStore } from './itemSearch';
 import { computeLoyaltyOfferRows, offerPriceTypeIds, type LoyaltyOfferRow } from './offerRows';
 
@@ -36,6 +40,8 @@ export interface LpStoreSearchState {
   /** When the backend last published the snapshot. */
   syncedAt: number | null;
   result: LpSearchResult;
+  /** Stores the active Character holds LP with, highest balance first; empty until the balances load. */
+  heldStores: LpStorePickerOption[];
   /** Matched offers' rows, keyed by the offer object the result carries. */
   rowFor: (offer: LoyaltyStoreOffer) => LoyaltyOfferRow | null;
   systemName: (systemId: number | null) => string | null;
@@ -44,8 +50,6 @@ export interface LpStoreSearchState {
   /** Prices for the matched offers are still loading. */
   pricing: boolean;
 }
-
-const EMPTY_RESULT: LpSearchResult = { groups: [], corporations: [], totalItemMatches: 0 };
 
 export function useLpStoreSearch(query: string): LpStoreSearchState {
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
@@ -61,7 +65,8 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
   const [stores, setStores] = useState<LpSnapshotStore[] | null>(null);
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
-  const [corporationNames, setCorporationNames] = useState<ReadonlyMap<number, string>>(new Map());
+  const [corporations, setCorporations] = useState<LpCorporationEntry[]>([]);
+  const [balances, setBalances] = useState<CharacterLoyaltyPoints[]>([]);
   const [itemNames, setItemNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [systemNames, setSystemNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
@@ -90,7 +95,7 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
     let cancelled = false;
     void loadLpCorporations()
       .then((corps) => {
-        if (!cancelled) setCorporationNames(new Map(corps.map((corp) => [corp.id, corp.name])));
+        if (!cancelled) setCorporations(corps);
       })
       .catch(() => {});
     void loadSolarSystemsById().then((byId) => {
@@ -104,6 +109,27 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
       cancelled = true;
     };
   }, []);
+
+  // Keyed on the Character, so a switch never lists the previous one's stores.
+  const [balancesFor, setBalancesFor] = useState(activeCharacterId);
+  if (balancesFor !== activeCharacterId) {
+    setBalancesFor(activeCharacterId);
+    setBalances([]);
+  }
+
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    let cancelled = false;
+    // A failed read just leaves the empty-box list empty; searching still works.
+    void loadCharacterLoyaltyPoints(activeCharacterId)
+      .then((read) => {
+        if (!cancelled) setBalances(read.cached?.data ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId]);
 
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -136,12 +162,26 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
   }, [stores]);
 
   const deferredQuery = useDeferredValue(query);
+  const corporationNames = useMemo(
+    () => new Map(corporations.map((corp) => [corp.id, corp.name] as const)),
+    [corporations]
+  );
+  // Store names come from the baked list, so they match with no snapshot;
+  // item matches and distances still need it.
   const result = useMemo(
     () =>
-      stores
-        ? searchLpStores({ stores, corporationNames, itemNames, query: deferredQuery, jumps })
-        : EMPTY_RESULT,
+      searchLpStores({
+        stores: stores ?? [],
+        corporationNames,
+        itemNames,
+        query: deferredQuery,
+        jumps,
+      }),
     [stores, corporationNames, itemNames, deferredQuery, jumps]
+  );
+  const heldStores = useMemo(
+    () => lpStorePickerOptions(corporations, balances, '').filter((option) => option.lp !== null),
+    [corporations, balances]
   );
 
   const matchedOffers = useMemo(
@@ -181,6 +221,7 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
       stores !== null ? 'ready' : failed || activeCharacterId === null ? 'unavailable' : 'loading',
     syncedAt,
     result,
+    heldStores,
     rowFor: (offer) => rowsByOffer.get(offer) ?? null,
     systemName: (systemId) => (systemId === null ? null : (systemNames.get(systemId) ?? null)),
     jumpsStatus,

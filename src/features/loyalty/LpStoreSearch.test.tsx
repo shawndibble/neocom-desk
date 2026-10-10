@@ -50,6 +50,7 @@ function state(overrides: Partial<LpStoreSearchState> = {}): LpStoreSearchState 
       corporations: [],
       totalItemMatches: 1,
     },
+    heldStores: [],
     rowFor: (offer) =>
       offer.offer_id === NEAR.offer.offer_id
         ? row(offer, 125_000, 41.5)
@@ -130,10 +131,59 @@ describe('LpStoreSearch', () => {
     expect(screen.getByText('Nothing matches')).toBeInTheDocument();
   });
 
-  it('explains when the snapshot is unavailable', () => {
-    useLpStoreSearch.mockReturnValue(state({ status: 'unavailable' }));
+  it('explains when the snapshot is unavailable and nothing else matches', () => {
+    useLpStoreSearch.mockReturnValue(
+      state({
+        status: 'unavailable',
+        result: { groups: [], corporations: [], totalItemMatches: 0 },
+      })
+    );
     renderSearch();
     expect(screen.getByText("Search isn't available")).toBeInTheDocument();
+  });
+
+  it('still lists matching stores while the snapshot is unavailable', () => {
+    useLpStoreSearch.mockReturnValue(
+      state({
+        status: 'unavailable',
+        result: {
+          groups: [],
+          corporations: [
+            {
+              corporationId: 1000120,
+              corporationName: 'Federal Navy Academy',
+              nearestSystemId: null,
+              jumps: null,
+            },
+          ],
+          totalItemMatches: 0,
+        },
+      })
+    );
+    renderSearch('fed');
+    const link = screen.getByRole('link', { name: 'Federal Navy Academy' });
+    expect(link).toHaveAttribute('href', '/market/lp-store/1000120');
+    expect(screen.queryByText(/No stargate route/)).not.toBeInTheDocument();
+  });
+
+  it('lists the stores the Character holds LP with when the box is empty, with balances', () => {
+    useLpStoreSearch.mockReturnValue(
+      state({
+        heldStores: [
+          { corporationId: 1000120, name: 'Federal Navy Academy', lp: 12_000 },
+          { corporationId: 1000130, name: 'Sisters of EVE', lp: 300 },
+        ],
+      })
+    );
+    renderSearch('');
+    const links = screen.getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual([
+      'Federal Navy Academy12,000 LP',
+      'Sisters of EVE300 LP',
+    ]);
+    fireEvent.click(links[0]!);
+    expect(probe.pathname).toBe('/market/lp-store/1000120');
+    expect(probe.state).toBeNull();
   });
 
   it('notes that stores are not ranked by jumps without a current system', () => {

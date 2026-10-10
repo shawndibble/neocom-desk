@@ -4037,7 +4037,7 @@
       "orange": "highest price"
     },
     "valueLow": "cheaper",
-    "valueHigh": "dearer",
+    "valueHigh": "pricier",
     "legendRate": "Mining rate",
     "sharePanelTitle": "Field progress",
     "shareTitle": "Mining Survey",
@@ -6807,12 +6807,15 @@
       "noResultsTitle": "Nothing matches",
       "noResultsHint": "No LP Store sells an item or has a name matching that.",
       "unavailableTitle": "Search isn't available",
-      "unavailableHint": "The LP Store search reads a daily snapshot that needs a synced account. You can still pick a corporation above.",
+      "unavailableHint": "Item matches read a daily snapshot that needs a synced account. Corporation names still work.",
+      "unavailableNote": "Item matches need a synced account's daily snapshot, so only corporations are shown.",
+      "heldPanel": "Your stores",
       "storesPanel": "Corporations",
       "storeCount_one": "{{count}} store",
       "storeCount_other": "{{count}} stores",
       "moreItems": "Showing the best {{shown}} of {{total}} matching items. Type more to narrow it down.",
-      "crumb": "LP Store search"
+      "crumb": "LP Store search",
+      "changeStore": "Change store"
     },
     "needMoreLp": "Needs {{amount}} more LP",
     "sellPriceAt": "Sell price ({{hub}})",
