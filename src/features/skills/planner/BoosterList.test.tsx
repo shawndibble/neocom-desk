@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -186,5 +187,38 @@ describe('BoosterList quick picks', () => {
       ROW({ expiresAt: futureStart }),
       ROW({ startsAt: futureStart, expiresAt: futureStart + 60 * 60 * 1000 }),
     ]);
+  });
+});
+
+describe('BoosterList focus after remove', () => {
+  function StatefulList({ initial }: { initial: PlanBooster[] }) {
+    const [boosters, setBoosters] = useState(initial);
+    return <BoosterList boosters={boosters} detectedAccelerator={null} onChange={setBoosters} />;
+  }
+
+  function renderStateful(initial: PlanBooster[]) {
+    render(
+      <MemoryRouter>
+        <StatefulList initial={initial} />
+      </MemoryRouter>
+    );
+  }
+
+  it("moves focus to the previous row's Remove button", async () => {
+    const user = userEvent.setup();
+    renderStateful([ROW({ bonus: 3 }), ROW({ bonus: 6 })]);
+
+    await user.click(screen.getByRole('button', { name: 'Remove accelerator 2' }));
+
+    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toHaveFocus();
+  });
+
+  it('moves focus to Add accelerator when the first row goes', async () => {
+    const user = userEvent.setup();
+    renderStateful([ROW({ bonus: 3 }), ROW({ bonus: 6 })]);
+
+    await user.click(screen.getByRole('button', { name: 'Remove accelerator 1' }));
+
+    expect(screen.getByRole('button', { name: 'Add accelerator' })).toHaveFocus();
   });
 });
