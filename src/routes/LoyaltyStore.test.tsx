@@ -861,6 +861,10 @@ describe('LoyaltyStore switching stores through the search', () => {
 
     await user.type(screen.getByPlaceholderText('Search offers…'), 'Scourge');
     // The visible count is `md:` only; the status region carries it at every width.
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 / 2 offers'));
+    await waitFor(() =>
+      expect(screen.getAllByRole('status').some((el) => el.textContent === '1 / 2 offers')).toBe(
+        true
+      )
+    );
   });
 });
