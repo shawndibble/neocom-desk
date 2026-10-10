@@ -125,6 +125,7 @@ function renderPanel(
           pricePercent={90}
           onPricePercentChange={onPricePercentChange}
           hub={TRADE_HUBS[0]}
+          onHubChange={vi.fn()}
           standing={ZERO_STANDINGS}
           characterId={1}
           {...props}
@@ -204,6 +205,7 @@ describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => 
             pricePercent={90}
             onPricePercentChange={vi.fn()}
             hub={TRADE_HUBS[0]}
+            onHubChange={vi.fn()}
             standing={ZERO_STANDINGS}
             characterId={1}
           />
@@ -848,7 +850,8 @@ describe('AppraisalPanel', () => {
 
   it('names the hub and percentage the figures are quoted at', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
-    expect(screen.getByText('Jita')).toBeInTheDocument();
+    expect(screen.getAllByText('Jita').length).toBeGreaterThan(1);
+    expect(screen.getByRole('combobox', { name: /Trade Hub/i })).toHaveTextContent('Jita');
     expect(screen.getByText('90%')).toBeInTheDocument();
   });
 

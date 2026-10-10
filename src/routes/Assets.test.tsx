@@ -298,6 +298,25 @@ describe('Assets', () => {
     expect(window.location.search).toBe('?chars=current&min=5');
   });
 
+  it('keeps focus in the tab strip when arrowing from Ships onto Items (WCAG 2.4.3)', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/assets/ships');
+    render(<App />);
+    const ships = await screen.findByRole('tab', { name: 'Ships' });
+    ships.focus();
+    await user.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(window.location.pathname).toBe('/assets/items'));
+    expect(screen.getByRole('tab', { name: 'Items' })).toHaveFocus();
+  });
+
+  it('puts focus back on the search box when Clear search removes itself (WCAG 2.4.3)', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/assets/items?q=trit');
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /clear search/i }));
+    await waitFor(() => expect(screen.getByRole('searchbox')).toHaveFocus());
+  });
+
   it('moves a pre-tabs drill-down link under the Items tab', async () => {
     window.history.replaceState({}, '', '/assets/60003760?min=5');
     render(<App />);
