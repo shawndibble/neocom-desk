@@ -31,23 +31,19 @@ export function EveSsoButton({
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={pending}
-      aria-busy={pending || undefined}
+      // aria-disabled, not disabled: the press that starts the login keeps focus (DESIGN.md §6c).
+      onClick={pending ? undefined : onClick}
+      aria-disabled={pending || undefined}
       className={cx(
         'relative inline-block rounded-xs',
+        // The small artwork is 30px tall; a touch screen still gets a 44px hit area.
+        size === 'small' && 'touch:inline-flex touch:min-h-11 touch:items-center',
         interactiveClassName,
         focusRingClassName,
         disabledClassName
       )}
     >
-      <img
-        src={src}
-        alt={label}
-        width={width}
-        height={height}
-        className={cx('block', pending && 'opacity-50')}
-      />
+      <img src={src} alt={label} width={width} height={height} className="block" />
       {pending && (
         <span className="absolute inset-0 flex items-center justify-center">
           <Spinner size="sm" label={t('common.loading')} />
