@@ -152,6 +152,52 @@ describe('ShipTreeTab — map', () => {
     expect(within(card).getByText('5%')).toBeVisible();
   });
 
+  it('dismisses the hover card with Escape, leaving focus on the tile', async () => {
+    renderTab();
+    const tile = await screen.findByRole('button', { name: 'Merlin — Can fly' });
+    tile.focus();
+    fireEvent.mouseEnter(tile);
+    expect(screen.getByTestId('ship-tree-hover-card')).toBeVisible();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByTestId('ship-tree-hover-card')).not.toBeInTheDocument();
+    expect(tile).toHaveFocus();
+  });
+
+  it('labels the zoom percentage for screen readers', async () => {
+    renderTab();
+    const label = await screen.findByText(/zoom level/i, { selector: 'span.sr-only' });
+    expect(label.parentElement).toHaveTextContent('Zoom level: 100%');
+    expect(label.parentElement).not.toHaveAttribute('aria-label');
+  });
+
+  it('announces the search result count, and says so when nothing matches', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    const search = await screen.findByRole('searchbox', { name: 'Search hulls in every faction' });
+    await user.type(search, 'wor');
+    await waitFor(() =>
+      expect(screen.getAllByRole('status')[0]).toHaveTextContent(/\d+ hulls? match/)
+    );
+    await user.clear(search);
+    await user.type(search, 'zzzz');
+    await waitFor(() =>
+      expect(screen.getAllByRole('status')[0]).toHaveTextContent('No hulls match')
+    );
+    await user.clear(search);
+    await waitFor(() => expect(screen.getAllByRole('status')[0]).toBeEmptyDOMElement());
+  });
+
+  it('names a search result with its fly status', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.type(
+      await screen.findByRole('searchbox', { name: 'Search hulls in every faction' }),
+      'merlin'
+    );
+    const results = screen.getByRole('list', { name: 'Matching hulls' });
+    expect(within(results).getByRole('button', { name: /Can fly\s*Merlin/ })).toBeInTheDocument();
+  });
+
   it('resets to 100% on a faction switch, even after the reader zoomed', async () => {
     const user = userEvent.setup();
     renderTab();
@@ -324,7 +370,7 @@ describe('ShipTreeTab — ladder', () => {
       'worm'
     );
     expect(screen.getByText('No hulls match.')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Worm' }));
+    await user.click(screen.getByRole('button', { name: /^Can fly\s*Worm$/ }));
     expect(screen.getByTestId('location')).toHaveTextContent('faction=500010');
     expect(await screen.findByRole('dialog', { name: 'Worm' })).toBeVisible();
   });

@@ -47,18 +47,22 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  LiveStatus,
   Spinner,
   StatChip,
   StatChips,
   Tabs,
   TabPanel,
   useTabsId,
+  usesViewPicker,
   type DataTableColumn,
+  type PageViews,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import {
   LOYALTY_STORE_OFFERS_COLUMN_IDS,
@@ -429,22 +433,24 @@ function LpStoreActions() {
  * LP Store is a Market tab, but its own route outranks Market's, so the page
  * draws Market's tab bar itself. Every other tab is a path under `/market`.
  */
-function MarketTabBar({ tabsId }: { tabsId: string }) {
+function useMarketViews(): PageViews {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  return (
-    <Tabs
-      tabsId={tabsId}
-      label={t('market.title')}
-      value="lp-store"
-      onChange={(id) =>
-        navigate(tabPath(MARKET_TABS, id as (typeof MARKET_TABS.tabs)[number]['id']))
-      }
-      tabs={MARKET_TABS.tabs
-        .filter((tab) => tab.id !== 'history/transactions')
-        .map((tab) => ({ id: tab.id, label: t(tab.labelKey) }))}
-    />
-  );
+  return {
+    value: 'lp-store',
+    onChange: (id) => navigate(tabPath(MARKET_TABS, id as (typeof MARKET_TABS.tabs)[number]['id'])),
+    tabs: MARKET_TABS.tabs
+      .filter((tab) => tab.id !== 'history/transactions')
+      .map((tab) => ({ id: tab.id, label: t(tab.labelKey) })),
+  };
+}
+
+/** The strip on desktop; a phone gets the title-row picker (`PageHeader`'s `views`) instead. */
+function MarketTabBar({ tabsId, views }: { tabsId: string; views: PageViews }) {
+  const { t } = useTranslation();
+  const isPhone = useIsPhone();
+  if (usesViewPicker(views.tabs.length, isPhone)) return null;
+  return <Tabs tabsId={tabsId} label={t('market.title')} {...views} tabs={[...views.tabs]} />;
 }
 
 /** `/market/lp-store` with no corporation chosen yet: the item-first search. */
@@ -452,10 +458,17 @@ function LoyaltyStoreLanding() {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(LANDING_PARAMS);
   const tabsId = useTabsId();
+  const views = useMarketViews();
+  const isPhone = useIsPhone();
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3">
-      <PageHeader title={t('loyaltyStore.title')} actions={<LpStoreActions />} />
-      <MarketTabBar tabsId={tabsId} />
+      {/* The phone's picker reads "<page> <view>": "Market  LP Store", not "LP Store  LP Store". */}
+      <PageHeader
+        title={isPhone ? t('market.title') : t('loyaltyStore.title')}
+        views={views}
+        actions={<LpStoreActions />}
+      />
+      <MarketTabBar tabsId={tabsId} views={views} />
       <TabPanel tabsId={tabsId} tabId="lp-store">
         <LpStoreSearch query={params.q} onQueryChange={(q) => setParams({ q })} />
       </TabPanel>
@@ -515,6 +528,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const tabsId = useTabsId();
+  const views = useMarketViews();
 
   const hydrateHub = useMarketHub((s) => s.hydrate);
   const hubId = useMarketHub((s) => s.value);
@@ -761,7 +775,10 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       meta={
         ready && (
           <span className="flex min-w-0 items-center gap-2 text-[0.6875rem] text-text-dim max-md:basis-full">
-            <span className="hidden text-xs tabular-nums md:inline">
+            <LiveStatus>
+              {filteredRows.length} / {t('loyaltyStore.offerCount', { count: rows.length })}
+            </LiveStatus>
+            <span aria-hidden="true" className="hidden text-xs tabular-nums md:inline">
               {filteredRows.length} / {t('loyaltyStore.offerCount', { count: rows.length })}
             </span>
             <span data-testid="lp-basis-readout" className="min-w-0 truncate">
@@ -902,9 +919,10 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
               </StatChips>
             </div>
           }
+          views={views}
           actions={<LpStoreActions />}
         />
-        <MarketTabBar tabsId={tabsId} />
+        <MarketTabBar tabsId={tabsId} views={views} />
 
         <TabPanel tabsId={tabsId} tabId="lp-store" className="flex flex-col gap-3">
           <FilterBar
