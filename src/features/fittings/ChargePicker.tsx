@@ -745,7 +745,7 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                   <span className="text-right">{t('fittings.chargePicker.dpsUnit')}</span>
                   <span className="text-right">{t('fittings.chargePicker.colIsk')}</span>
                 </div>
-                {rows.map((c) => {
+                {rows.map((c, i) => {
                   const score = chargeScore(c, distance);
                   const isLoaded = group.loaded.has(c.typeId);
                   const tech1 = choices.find(
