@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput } from '@/components/ui';
+import { Button, LiveStatus, Modal, TextInput } from '@/components/ui';
 import type { FacilityKind, RigFit, SecurityBand } from '@/engine/industry/types';
 import { matchRigFits, parseReadingPct } from '@/engine/industry/rigMatch';
 import { rigFitSummaryLabel } from './rigFitLabels';
@@ -68,6 +68,15 @@ export function RigMatchHelper({ facility, security, onApply }: RigMatchHelperPr
                 />
               </label>
             </div>
+            <LiveStatus>
+              {matches === null
+                ? null
+                : matches.length === 0
+                  ? t('industry.rigMatch.noMatch')
+                  : matches.length > 1
+                    ? t('industry.rigMatch.ambiguous')
+                    : t('industry.rigMatch.matchCount', { count: matches.length })}
+            </LiveStatus>
             {matches !== null && matches.length === 0 && (
               <p className="text-warning">{t('industry.rigMatch.noMatch')}</p>
             )}

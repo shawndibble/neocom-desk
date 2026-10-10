@@ -21,6 +21,13 @@ import type { BuildGroup } from './buildGroups';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 
+/** The toast's status region: the sr-only LiveStatus regions are empty here. */
+function toastStatus() {
+  const live = screen.getAllByRole('status').filter((el) => el.textContent);
+  expect(live).toHaveLength(1);
+  return live[0];
+}
+
 vi.mock('./useComparedBuildResults', async () => {
   const actual = await vi.importActual<typeof import('./useComparedBuildResults')>(
     './useComparedBuildResults'
@@ -416,11 +423,11 @@ describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use none' }));
     expect(onOwnedStockChange).toHaveBeenLastCalledWith({});
-    expect(screen.getByRole('status').textContent).toContain('Cleared Have on 1 material');
+    expect(toastStatus().textContent).toContain('Cleared Have on 1 material');
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onOwnedStockChange).toHaveBeenLastCalledWith({ 34: 40 });
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryAllByRole('status').filter((el) => el.textContent)).toHaveLength(0);
   });
 
   it('says so when "Use all" has nothing to fill', async () => {
@@ -431,7 +438,7 @@ describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use all' }));
     expect(onOwnedStockChange).not.toHaveBeenCalled();
-    expect(screen.getByRole('status').textContent).toContain('Nothing to fill');
+    expect(toastStatus().textContent).toContain('Nothing to fill');
   });
 });
 
