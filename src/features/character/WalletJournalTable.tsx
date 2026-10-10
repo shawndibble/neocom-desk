@@ -29,7 +29,10 @@ import {
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
-import { useJournalBreakdownPref } from '@/features/character/journalBreakdownPref';
+import {
+  defaultBreakdownOpen,
+  useJournalBreakdownPref,
+} from '@/features/character/journalBreakdownPref';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
@@ -167,8 +170,8 @@ export function JournalTable({
 }: JournalTableProps) {
   const { t } = useTranslation();
   const breakdown = useMemo(() => journalRefTypeBreakdown(breakdownJournal), [breakdownJournal]);
-  // Open on desktop, folded on a phone where the headline alone answers the
-  // question — until the pilot toggles it, then their choice sticks.
+  // Open on desktop when the list is short, folded on a phone or a long list
+  // where the headline alone answers the question — until the pilot toggles it, then their choice sticks.
   const isNarrow = useIsNarrow();
   const storedBreakdownOpen = useJournalBreakdownPref((state) => state.value);
   const breakdownPrefHydrated = useJournalBreakdownPref((state) => state.hydrated);
@@ -177,7 +180,8 @@ export function JournalTable({
   useEffect(() => {
     void hydrateBreakdownOpen();
   }, [hydrateBreakdownOpen]);
-  const breakdownOpen = storedBreakdownOpen ?? !isNarrow;
+  const breakdownOpen =
+    storedBreakdownOpen ?? defaultBreakdownOpen(isNarrow, breakdown.rows.length);
   const breakdownColumns = useMemo<DataTableColumn<RefTypeBreakdownRow>[]>(
     () => [
       {
