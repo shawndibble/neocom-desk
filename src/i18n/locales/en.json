@@ -4052,9 +4052,23 @@
       "payee": "Who gets the tax",
       "payeePlaceholder": "Corporation or pilot",
       "rate": "Tax rate, percent",
-      "open": "Open in Mining Tax",
-      "manage": "Manage moon taxes",
+      "open": "Manage Taxes",
+      "manage": "Manage Taxes",
       "failed": "Couldn't save that Payee. Try again."
+    },
+    "info": {
+      "title": "Additional information",
+      "location": "Location",
+      "locationPlaceholder": "System, station or structure",
+      "setWaypoint": "Set waypoint",
+      "setWaypointTo": "Set waypoint to {{placeName}}",
+      "notes": "Notes",
+      "notesPlaceholder": "Anything the fleet should know, such as where to dock",
+      "kind": {
+        "system": "System",
+        "station": "Station",
+        "structure": "Structure"
+      }
     },
     "formCompressed": "compressed",
     "formRaw": "raw",
