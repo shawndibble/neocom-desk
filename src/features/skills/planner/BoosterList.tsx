@@ -3,8 +3,12 @@
  * a Skill Plan is costed under, one after another — EVE has a single booster
  * slot, so extracted from `PlanEditor.tsx` (#1407, which added the list) into
  * its own component since a single accelerator's editing state (draft text
- * per datetime field, the blur-commit rule, quick picks) multiplies by row
+ * per duration box, the blur-commit rule, quick picks) multiplies by row
  * count and was crowding the editor that owns a dozen other concerns.
+ *
+ * A row's life is edited the way EVE's tooltip shows it — days, hours and
+ * minutes left — and stored as the instant that lands on. There is no Starts
+ * field: a queued row starts when the one before it expires (`linkBoosterChain`).
  *
  * Fully controlled: `boosters` is the resolved list (`resolvePlanBoosters`)
  * and every edit calls `onChange` with the next list — except one that would
@@ -14,7 +18,7 @@
  * some other way (synced from an older build, restored from an import), but
  * this component's whole point is to stop the user from typing one.
  */
-import { useState } from 'react';
+import { useState, type FocusEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, TextInput } from '@/components/ui';
 import {
@@ -33,11 +37,14 @@ import {
   BOOSTER_QUICK_PICKS,
   DEFAULT_PLAN_BOOSTER,
   MAX_BOOSTER_BONUS,
-  boosterExpiryFromInput,
+  boosterDurationBase,
   boosterExpiryFromNow,
-  boosterExpiryToInput,
   clampBoosterBonus,
   hasOverlappingBoosters,
+  joinBoosterDuration,
+  linkBoosterChain,
+  rebaseBooster,
+  splitBoosterDuration,
 } from './planBooster';
 
 interface BoosterListProps {
@@ -48,59 +55,75 @@ interface BoosterListProps {
   onChange: (boosters: PlanBooster[]) => void;
 }
 
-/**
- * A `datetime-local` field bound to a nullable instant, with the round-33
- * blur-commit rule: a value that parses commits immediately, an emptied
- * field commits `null` only on blur (a native `datetime-local` reports `''`
- * for any incomplete state, including mid-retype of an already-complete
- * value, so committing on `change` would erase a saved instant while the
- * user is still typing), and anything else left on blur is simply dropped,
- * leaving the committed value standing.
- *
- * `onCommit` returns whether the value actually applied — a row-level commit
- * that `hasOverlappingBoosters` rejects returns `false`, and the draft is
- * kept rather than cleared so the user's rejected input stays on screen
- * beside the inline error, instead of snapping back to the last-good value.
- */
-function useInstantField(
-  committedValue: number | null,
-  draftKeyBase: string,
-  onCommit: (value: number | null) => boolean
-) {
-  const [draft, setDraft] = useState<{ key: string; text: string } | null>(null);
-  const key = `${draftKeyBase}:${committedValue ?? ''}`;
-  const inputValue =
-    (draft?.key === key ? draft.text : null) ?? boosterExpiryToInput(committedValue);
+const DURATION_UNITS = ['days', 'hours', 'minutes'] as const;
+type DurationUnit = (typeof DURATION_UNITS)[number];
+type DurationDraft = Record<DurationUnit, string>;
 
-  const onChange = (raw: string): void => {
-    const value = boosterExpiryFromInput(raw);
-    if (value === null) {
-      setDraft({ key, text: raw });
+/**
+ * The Expires boxes: days, hours and minutes left, bound to a nullable
+ * instant, with the round-33 blur-commit rule. A set of boxes that adds up to
+ * something commits immediately (a blank box counts as zero); one that adds up
+ * to nothing — including every box emptied — commits `null` only when focus
+ * leaves the group and only if all of them are blank, because clearing a box
+ * to retype it must not erase a saved expiry mid-edit.
+ *
+ * The typed text is kept until focus leaves the group, so "30" hours does not
+ * reshuffle itself into 1 day 6 hours under the caret; leaving normalizes it.
+ *
+ * `onCommit` returns whether the value applied (an overlap rejects it); a
+ * rejected draft stays on screen beside the inline error.
+ */
+function useDurationFields(
+  expiresAt: number | null,
+  startsAt: number | null,
+  onCommit: (expiresAt: number | null) => boolean
+) {
+  // `syncedTo` is the committed expiry the draft was typed against: a draft
+  // for any other value (a quick pick, a sync, the row in front moving) is stale.
+  const [draft, setDraft] = useState<{ syncedTo: number | null; text: DurationDraft } | null>(null);
+  // eslint-disable-next-line react-hooks/purity -- display-only: the time left reads the clock
+  const now = Date.now();
+  let text: DurationDraft = { days: '', hours: '', minutes: '' };
+  if (draft !== null && draft.syncedTo === expiresAt) {
+    text = draft.text;
+  } else if (expiresAt !== null) {
+    const d = splitBoosterDuration(expiresAt, startsAt, now);
+    text = { days: String(d.days), hours: String(d.hours), minutes: String(d.minutes) };
+  }
+
+  const onChange = (unit: DurationUnit, raw: string): void => {
+    if (!/^\d{0,5}$/.test(raw)) return;
+    const next = { ...text, [unit]: raw };
+    const duration = joinBoosterDuration({
+      days: Number(next.days),
+      hours: Number(next.hours),
+      minutes: Number(next.minutes),
+    });
+    if (duration <= 0) {
+      setDraft({ syncedTo: expiresAt, text: next });
       return;
     }
-    setDraft(onCommit(value) ? null : { key, text: raw });
+    const nextExpiry = boosterDurationBase(startsAt, Date.now()) + duration;
+    setDraft({ syncedTo: onCommit(nextExpiry) ? nextExpiry : expiresAt, text: next });
   };
 
-  const onBlur = (): void => {
-    if (draft === null) return;
-    if (draft.text === '' && committedValue !== null && onCommit(null)) {
-      setDraft(null);
-      return;
+  const onBlur = (event: FocusEvent<HTMLElement>): void => {
+    // Tabbing between the boxes is still editing the same value.
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    if (draft !== null && DURATION_UNITS.every((unit) => draft.text[unit] === '')) {
+      if (expiresAt !== null) onCommit(null);
     }
     setDraft(null);
   };
 
-  return { inputValue, onChange, onBlur };
+  return { text, onChange, onBlur };
 }
 
 interface BoosterRowProps {
   row: PlanBooster;
   /** 1-based position, naming the row among its siblings. */
   position: number;
-  rowKey: string;
   detectedAccelerator: number | null;
-  /** Whether this row shows its Starts field. */
-  showStart: boolean;
   overlaps: boolean;
   onPatch: (patch: Partial<PlanBooster>) => boolean;
   onRemove: () => void;
@@ -109,9 +132,7 @@ interface BoosterRowProps {
 function BoosterRow({
   row,
   position,
-  rowKey,
   detectedAccelerator,
-  showStart,
   overlaps,
   onPatch,
   onRemove,
@@ -131,10 +152,7 @@ function BoosterRow({
     return ok;
   };
 
-  const startsAtField = useInstantField(row.startsAt, `${rowKey}:startsAt`, (startsAt) =>
-    patch({ startsAt })
-  );
-  const expiresAtField = useInstantField(row.expiresAt, `${rowKey}:expiresAt`, (expiresAt) =>
+  const expiresIn = useDurationFields(row.expiresAt, row.startsAt, (expiresAt) =>
     patch({ expiresAt })
   );
 
@@ -167,38 +185,40 @@ function BoosterRow({
           className="field-no-spinner w-16 text-center"
         />
       </label>
-      {showStart && (
-        <label className="flex items-center justify-between gap-2">
-          {t('plans.boosterStartsAt')}
-          <TextInput
-            size="md"
-            type="datetime-local"
-            placeholder={t('plans.boosterStartsNow')}
-            value={startsAtField.inputValue}
-            onChange={(e) => startsAtField.onChange(e.target.value)}
-            onBlur={startsAtField.onBlur}
-            className="min-w-0 flex-1"
-          />
-        </label>
-      )}
-      <label className="flex items-center justify-between gap-2">
-        {t('plans.boosterExpiresAt')}
-        <TextInput
-          size="md"
-          type="datetime-local"
-          value={expiresAtField.inputValue}
-          onChange={(e) => expiresAtField.onChange(e.target.value)}
-          onBlur={expiresAtField.onBlur}
-          className="min-w-0 flex-1"
-        />
-      </label>
+      <div role="group" aria-label={t('plans.boosterExpiresIn')} onBlur={expiresIn.onBlur}>
+        <div className="flex items-center justify-between gap-2">
+          {t('plans.boosterExpiresIn')}
+          <div className="flex items-center gap-1">
+            {DURATION_UNITS.map((unit) => (
+              <label key={unit} className="flex items-center gap-1 text-text-dim">
+                <TextInput
+                  size="md"
+                  type="text"
+                  inputMode="numeric"
+                  aria-label={t(`plans.boosterUnit.${unit}`)}
+                  placeholder="0"
+                  value={expiresIn.text[unit]}
+                  onChange={(e) => expiresIn.onChange(unit, e.target.value)}
+                  className="w-12 text-center"
+                />
+                <span aria-hidden>{t(`plans.boosterUnitShort.${unit}`)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        {position > 1 && (
+          <p className="mt-1 text-[0.6875rem] text-text-dim">
+            {t('plans.boosterStartsAfterPrevious')}
+          </p>
+        )}
+      </div>
       <div role="group" aria-label={t('plans.boosterQuickPicks')} className="flex flex-wrap gap-1">
         {BOOSTER_QUICK_PICKS.map(({ hours }) => (
           <button
             key={hours}
             type="button"
             onClick={() =>
-              patch({ expiresAt: boosterExpiryFromNow(hours, row.startsAt ?? Date.now()) })
+              patch({ expiresAt: boosterExpiryFromNow(hours, row.startsAt, Date.now()) })
             }
             className={cx(
               tappableRowClassName,
@@ -228,14 +248,23 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
   const { t } = useTranslation();
 
   function patchRow(index: number, patch: Partial<PlanBooster>): boolean {
-    const next = boosters.map((row, i) => (i === index ? { ...row, ...patch } : row));
+    const edited = boosters.map((row, i) => (i === index ? { ...row, ...patch } : row));
+    // Later rows keep their length and follow the edited one's new expiry.
+    // eslint-disable-next-line react-hooks/purity -- event handler, not render
+    const next = linkBoosterChain(edited, Date.now());
     if (hasOverlappingBoosters(next)) return false;
     onChange(next);
     return true;
   }
 
   function removeRow(index: number): void {
-    onChange(boosters.filter((_, i) => i !== index));
+    // eslint-disable-next-line react-hooks/purity -- event handler, not render
+    const now = Date.now();
+    const rest = boosters.filter((_, i) => i !== index);
+    // Whatever was queued behind the removed row now runs first, from now.
+    const reopened =
+      index === 0 && rest.length > 0 ? [rebaseBooster(rest[0], null, now), ...rest.slice(1)] : rest;
+    onChange(linkBoosterChain(reopened, now));
   }
 
   function addRow(): void {
@@ -265,12 +294,9 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
         return (
           <BoosterRow
             key={index}
-            rowKey={`booster-${index}`}
             row={row}
             position={index + 1}
             detectedAccelerator={detectedAccelerator}
-            // A start only matters for an accelerator queued behind another.
-            showStart={index > 0 || row.startsAt !== null}
             overlaps={overlaps}
             onPatch={(patch) => patchRow(index, patch)}
             onRemove={() => removeRow(index)}

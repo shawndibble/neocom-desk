@@ -12,10 +12,11 @@
  * module:
  *
  * - `startsAt`/`expiresAt` are stored as **instants** (epoch ms), not as the
- *   `datetime-local` strings the controls edit. A bare wall-clock string means
- *   a different moment in every timezone, so `boosterExpiryToInput` /
- *   `boosterExpiryFromInput` convert at the edge instead — for both fields,
- *   despite the "expiry" name, since the round trip is identical for either.
+ *   days/hours/minutes the editor shows. EVE's own tooltip reads an
+ *   accelerator as time left, so the editor edits a duration
+ *   (`splitBoosterDuration` / `joinBoosterDuration`) and stores the instant it
+ *   lands on — a duration alone would mean a different moment on every device
+ *   the plan syncs to.
  * - Everything read back is normalized rather than trusted, the same way
  *   `markers.ts` normalizes marker positions on every read: a stored value
  *   can come from an older build or a remote doc, and a NaN bonus reaching
@@ -54,9 +55,6 @@ export const DEFAULT_PLAN_BOOSTER: PlanBooster = {
   startsAt: null,
   expiresAt: null,
 };
-
-/** The shape a `datetime-local` control emits: `YYYY-MM-DDTHH:mm`. */
-const DATETIME_LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
 /**
  * A whole bonus inside the accelerator range.
@@ -257,44 +255,90 @@ export const BOOSTER_QUICK_PICKS: readonly BoosterQuickPick[] = [
   { hours: 24 * 30 },
 ];
 
-/**
- * The expiry a quick pick sets: `from` plus the picked duration. `from`
- * defaults to now, but a row with its own future `startsAt` passes that
- * instead — a quick pick measured from "now" on a row that has not started
- * yet would set an expiry before its own start.
- *
- * Takes `now`/`from` as a parameter rather than reading the clock itself so
- * the caller's own impurity is the only one on record (see `boosterExpired`
- * in `PlanEditor`, which does the same for the same reason) and so this stays
- * unit-testable without faking `Date`.
- */
-export function boosterExpiryFromNow(hours: number, from: number = Date.now()): number {
-  return from + hours * 60 * 60 * 1000;
-}
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
 
-/** An instant as the local wall-clock string a `datetime-local` input takes. */
-export function boosterExpiryToInput(expiresAt: number | null): string {
-  if (expiresAt === null) return '';
-  const date = new Date(expiresAt);
-  if (Number.isNaN(date.getTime())) return '';
-  const pad = (value: number): string => String(value).padStart(2, '0');
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
+/**
+ * Where a row's duration is measured from: its own start, but never before
+ * now. A row with no start is already running, so it counts from now; a
+ * queued row counts from when the one before it lapses — unless that moment
+ * has passed, in which case it is running now too.
+ *
+ * Takes `now` rather than reading the clock, so the caller's own impurity is
+ * the only one on record and this stays unit-testable without faking `Date`.
+ */
+export function boosterDurationBase(startsAt: number | null, now: number): number {
+  return startsAt === null ? now : Math.max(startsAt, now);
 }
 
 /**
- * The instant a `datetime-local` value names, reading it as local time (which
- * is what the control means by it).
- *
- * Anything that is not exactly that shape reads as "no expiry" — an empty
- * control, but also a half-typed value, which `Date` would otherwise happily
- * parse as something else entirely (`new Date('2026-09')` is a valid UTC
- * instant, and not one the user typed).
+ * The expiry a quick pick sets: `hours` past the row's duration base.
  */
-export function boosterExpiryFromInput(value: string): number | null {
-  if (!DATETIME_LOCAL.test(value)) return null;
-  const time = new Date(value).getTime();
-  return Number.isNaN(time) ? null : time;
+export function boosterExpiryFromNow(hours: number, startsAt: number | null, now: number): number {
+  return boosterDurationBase(startsAt, now) + hours * HOUR_MS;
+}
+
+/** Whole days, hours (0-23) and minutes (0-59) — the units EVE's tooltip uses. */
+export interface BoosterDuration {
+  days: number;
+  hours: number;
+  minutes: number;
+}
+
+/**
+ * What the Expires boxes show: the time from the row's duration base to its
+ * expiry, rounded **up** to the minute (so a just-set "1 day" does not read
+ * back as 23h 59m a heartbeat later). An expiry already past reads as zero.
+ */
+export function splitBoosterDuration(
+  expiresAt: number,
+  startsAt: number | null,
+  now: number
+): BoosterDuration {
+  const remaining = Math.max(0, expiresAt - boosterDurationBase(startsAt, now));
+  const total = Math.ceil(remaining / MINUTE_MS);
+  return {
+    days: Math.floor(total / (24 * 60)),
+    hours: Math.floor(total / 60) % 24,
+    minutes: total % 60,
+  };
+}
+
+/** The milliseconds a days/hours/minutes triple names. */
+export function joinBoosterDuration({ days, hours, minutes }: BoosterDuration): number {
+  return days * DAY_MS + hours * HOUR_MS + minutes * MINUTE_MS;
+}
+
+/**
+ * `row` re-started at `startsAt`, keeping how long it runs: its expiry moves
+ * by the same amount, so a 30-day accelerator queued behind another is still
+ * a 30-day accelerator when the one in front of it is edited. A row with no
+ * expiry, or one already lapsed, keeps its expiry as is.
+ */
+export function rebaseBooster(row: PlanBooster, startsAt: number | null, now: number): PlanBooster {
+  if (row.expiresAt === null) return { ...row, startsAt };
+  const duration = row.expiresAt - boosterDurationBase(row.startsAt, now);
+  if (duration <= 0) return { ...row, startsAt };
+  return { ...row, startsAt, expiresAt: boosterDurationBase(startsAt, now) + duration };
+}
+
+/**
+ * The list with every queued row starting when the row before it expires —
+ * "one after another" is the model, and the editor has no Starts field, so
+ * this is the only thing that sets a start. A row behind one with no expiry
+ * yet has nothing to wait for and is left alone. The first row's start is
+ * never touched.
+ */
+export function linkBoosterChain(boosters: readonly PlanBooster[], now: number): PlanBooster[] {
+  const linked: PlanBooster[] = [];
+  boosters.forEach((row, index) => {
+    const previous = linked[index - 1];
+    linked.push(
+      index === 0 || previous.expiresAt === null || row.startsAt === previous.expiresAt
+        ? row
+        : rebaseBooster(row, previous.expiresAt, now)
+    );
+  });
+  return linked;
 }
