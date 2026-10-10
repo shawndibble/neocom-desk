@@ -140,7 +140,7 @@ for (const width of [390, 1024, 1280]) {
 
     // From md up the count rides the list panel's title line, clear of the export button.
     if (width >= 768) {
-      const count = page.getByText(/^2 \/ 2 offers$/);
+      const count = page.locator('[aria-hidden="true"]').getByText(/^2 \/ 2 offers$/);
       await expect(count).toBeVisible();
       const panelHeader = count.locator('xpath=ancestor::header[1]');
       const title = panelHeader.getByRole('heading', { level: 2 });
@@ -152,7 +152,7 @@ for (const width of [390, 1024, 1280]) {
       expect(Math.abs(c!.y + c!.height / 2 - (t!.y + t!.height / 2))).toBeLessThan(t!.height);
       if (actions) expect(c!.x + c!.width).toBeLessThanOrEqual(actions.x + 1);
     } else {
-      await expect(page.getByText(/^2 \/ 2 offers$/)).toBeHidden();
+      await expect(page.locator('[aria-hidden="true"]').getByText(/^2 \/ 2 offers$/)).toBeHidden();
     }
   });
 }

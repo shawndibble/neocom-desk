@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, LogoMark, Spinner } from '@/components/ui';
+import { Button, LiveStatus, LogoMark, Spinner } from '@/components/ui';
 import { recoverFromStalledBoot } from './bootRecovery';
 import { reportBootStallOnce, reportBootStallResolved, type BootGate } from './bootStallReport';
 
@@ -55,14 +55,11 @@ export function BootScreen({ gate }: { gate?: BootGate }) {
       <Spinner label={t('common.loading')} />
       <p className="text-xs text-text-dim">{t('common.loadingEllipsis')}</p>
       {/* Mounted empty from the start so the hint is *announced* when it
-          lands: a live region inserted together with its text (or revealed
-          from display:none with it) is not reliably read out, and the
-          spinner's own status never changes. `sr-only` is absolutely
-          positioned, so it takes no flex gap while empty; the visible copy
+          lands; the spinner's own status never changes. The visible copy
           below is aria-hidden so the hint is not read twice. */}
-      <p role="status" data-testid="boot-stall-status" className="sr-only">
+      <LiveStatus data-testid="boot-stall-status">
         {stalled ? t('boot.stalledHint') : null}
-      </p>
+      </LiveStatus>
       {stalled && (
         <>
           <p aria-hidden="true" className="max-w-prose text-xs text-text-dim">
