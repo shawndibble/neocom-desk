@@ -27,10 +27,11 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'standings', labelKey: 'contacts.tabStandings' },
 ]);
 
-/** Travel (issue #2328), with Thera/Turnur (#2330). Pilot Lookup is its own page now. */
+/** Travel (issue #2328), with Thera/Turnur (#2330). Pilot Lookup (#2331) is its tab again. */
 export const TRAVEL_TABS = definePageTabs('/travel', [
   { id: 'route', labelKey: 'travel.routeTab' },
   { id: 'thera', labelKey: 'travel.thera.tab' },
+  { id: 'pilot', labelKey: 'nav.pilotLookup' },
 ]);
 
 /**

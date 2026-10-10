@@ -7,7 +7,8 @@
  */
 const MOVES: readonly (readonly [from: string, to: string, dropParams?: readonly string[]])[] = [
   ['/wallet/loyalty', '/market/lp-store'],
-  ['/travel/pilot', '/pilot-lookup'],
+  // Pilot Lookup was its own page for a while; it is a Travel tab again.
+  ['/pilot-lookup', '/travel/pilot'],
   ['/settings/shortcuts', '/help/shortcuts'],
   ['/settings/faq', '/help/faq'],
   ['/settings/help', '/help/support'],

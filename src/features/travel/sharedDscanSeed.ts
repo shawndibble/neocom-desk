@@ -13,7 +13,7 @@ import type { OpenInApp } from '@/features/share/ShareShell';
 import { loadShare } from '@/features/share/shareStore';
 
 export function sharedDscanOpenInApp(shareId: string): OpenInApp {
-  return { path: `/pilot-lookup?${new URLSearchParams({ [SHARE_PARAM]: shareId }).toString()}` };
+  return { path: `/travel/pilot?${new URLSearchParams({ [SHARE_PARAM]: shareId }).toString()}` };
 }
 
 /**

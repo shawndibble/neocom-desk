@@ -1,6 +1,6 @@
 # Pilot Lookup
 
-Intel group page `/pilot-lookup`. Find one pilot by name; see identity from public ESI and all-time + recent killboard figures from zKillboard. Its own page, not a Travel tab (scope decision `20261002-145653-lp-store-under-market-pilot-lookup-its-own`). Origin: issue #2331 (stats), #2332 (recent kills/fits), decision `20260929-234357`.
+Travel tab `/travel/pilot`. Find one pilot by name; see identity from public ESI and all-time + recent killboard figures from zKillboard. A Travel tab again (scope decision `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`, which supersedes the own-page half of `20261002-145653-lp-store-under-market-pilot-lookup-its-own`). Origin: issue #2331 (stats), #2332 (recent kills/fits), decision `20260929-234357`.
 
 Glossary (CONTEXT.md): **Pilot Lookup** - portrait, corporation, alliance, character age from public ESI; all-time kills, losses, ISK, solo kills, danger and gang ratios, most-used hulls from zKillboard; newest 25 kills and losses, each expanding to the victim's fit with Open in Fittings (killmail read only then). Numbers, never a verdict: no pilot is called hostile or safe. "No zKillboard history" and "zKillboard couldn't be reached" are different answers.
 
@@ -27,9 +27,9 @@ Glossary (CONTEXT.md): **Pilot Lookup** - portrait, corporation, alliance, chara
 
 ## Access, routing, scopes
 
-- Route `/pilot-lookup`, `ungated` (`src/app/routeScopes.ts:219`, comment: "Public ESI only, like Travel it came from"). Still needs a signed-in Character: `src/routes/PilotLookup.tsx` waits for `hydrated` then `Navigate to /characters` when none (`PilotLookup.tsx:21-26`).
-- Nav: Intel group, `mobileTab: true`, icon `NavPilotLookup` (`src/app/navDestinations.ts:245`). Title `nav.pilotLookup`.
-- Legacy redirects: `/travel/pilot` -> `/pilot-lookup` (`src/app/legacyPaths.ts:10`, query kept); defaulted `/travel?pilot=` -> `/pilot-lookup` (`src/routes/Travel.tsx:25-31`).
+- Route `/travel/pilot` is the `pilot` tab of `TRAVEL_TABS`; `src/routes/Travel.tsx` waits for `hydrated` and sends a missing Character to `/characters`, then renders `PilotLookupPanel` with the shared tab bar. Ungated like Travel.
+- Nav: no page of its own (no Intel group); Ctrl K lists it as "Travel › Pilot Lookup" from `TRAVEL_TABS`. Tab label `nav.pilotLookup`.
+- Legacy redirects: `/pilot-lookup` -> `/travel/pilot` (`src/app/legacyPaths.ts`, query, hash and route state kept); defaulted `/travel?pilot=` -> `/travel/pilot` (`src/routes/Travel.tsx`).
 - Scope: only suggestions use one - `esi-search.search_structures.v1` (`getCharacterSearch`, `src/esi/registry.ts:573`), gated by `useEndpointsGranted(['getCharacterSearch'])` and an active Character (`PilotLookupPanel.tsx:75`). Without it the hint reads "Type the pilot's full name and press Enter. Suggestions need this character's search permission." and exact-name lookup still works. No grant banner or Grant button on the page.
 - Layout: `mx-auto max-w-6xl`; `PageHeader` title `nav.pilotLookup`; no tabs; `DataAgeBadge` on the profile panel (when the profile loaded).
 
@@ -121,7 +121,7 @@ Answer "who is this pilot and what have they done" from facts: identity (public 
 | Data             | `src/features/travel/pilotLookup.ts`, `pilotKillmailFit.ts`, `src/lib/zkillboard.ts`              |
 | Figures          | `src/features/travel/zkillFigures.ts`                                                             |
 
-Folder is `features/travel/` for history only (page left Travel, `20261002-145653-lp-store-under-market-pilot-lookup-its-own`).
+Folder is `features/travel/`, where the tab lives.
 
 ## Formulas and parsing rules
 
@@ -241,7 +241,7 @@ Folder is `features/travel/` for history only (page left Travel, `20261002-14565
 - Killmail row shows only victim or final blow; no attacker count, damage, or location detail.
 - Top ships use zKillboard's all-time "ships used on kills" only; no losses-by-hull or recent-activity timeline.
 - Show Info Character tab and this page duplicate one view; Show Info does not link to `/pilot-lookup`.
-- Orphaned i18n key `travel.pilotTab` (`src/i18n/locales/en.json:8405`) remains from when Pilot Lookup was a Travel tab.
+- Orphaned i18n key `travel.pilotTab` remains in `en.json`; the tab label is `nav.pilotLookup`.
 - Opening a `?pilot=` link leaves the search box empty (query text is local state, never filled from the URL or the loaded profile).
 - Kill row shows the victim's hull for both kills and losses, so the pilot's own ship on a kill is not shown.
 - No test for keyboard navigation or the debounce/abort race beyond happy paths.

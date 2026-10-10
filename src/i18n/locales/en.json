@@ -19,8 +19,7 @@
     "groups": {
       "progression": "Progression",
       "economy": "Economy",
-      "social": "Social",
-      "intel": "Intel"
+      "social": "Social"
     },
     "wallet": "Wallet",
     "miningTax": "Mining",
