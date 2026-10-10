@@ -534,7 +534,8 @@ describe('Wallet', () => {
 
     await user.type(screen.getByPlaceholderText('Search description…'), 'Donation');
 
-    const summary = await screen.findByText(/1 entry/);
+    // The sr-only live region repeats the line as plain text; the visible one is the <p>.
+    const summary = (await screen.findAllByText(/1 entry/)).find((el) => el.tagName === 'P')!;
     expect(summary).toHaveTextContent('1 entry · net -500.00');
     expect(within(summary).getByText('-500.00')).toHaveClass('text-isk-neg');
   });
