@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addSurveyScan,
+  finishSurvey,
   loadSurvey,
   MAX_SCAN_BY,
   MAX_SCAN_TEXT,
@@ -332,5 +333,60 @@ describe('ignored scans', () => {
     const result = await loadSurvey('abc123XYZ');
     expect(result).toMatchObject({ ok: true, ignored: new Set() });
     expect(result.ok && result.scans).toHaveLength(1);
+  });
+});
+
+describe('finishing a survey', () => {
+  it('stores a cleared marker with no text, a server time, the survey expiry and who marked it', async () => {
+    await finishSurvey({ id: 'abc123XYZ', expiresAt: EXPIRES, by: ' Shawn ' });
+    expect(addDoc).toHaveBeenCalledWith(
+      { path: 'shares/abc123XYZ/surveyScans' },
+      {
+        text: '',
+        cleared: true,
+        by: 'Shawn',
+        createdAt: 'SERVER_TIME',
+        expiresAt: FakeTimestamp.fromMillis(EXPIRES),
+      }
+    );
+  });
+
+  it('leaves the name off for an anonymous visitor', async () => {
+    await finishSurvey({ id: 'abc123XYZ', expiresAt: EXPIRES });
+    expect(addDoc.mock.calls[0][1]).not.toHaveProperty('by');
+  });
+
+  it('loads a cleared marker as a scan with no rocks left', async () => {
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: { type: 'survey', payload: { v: 1 }, expiresAt: EXPIRES },
+    });
+    getDocs.mockResolvedValue({
+      docs: [
+        { data: () => ({ text: ROW(10, 5), createdAt: FakeTimestamp.fromMillis(1000) }) },
+        {
+          data: () => ({
+            text: '',
+            cleared: true,
+            by: 'Shawn',
+            createdAt: FakeTimestamp.fromMillis(2000),
+          }),
+        },
+      ],
+    });
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && result.scans[1]).toEqual({ at: 2000, rocks: [], by: 'Shawn' });
+  });
+
+  it('still skips an empty scan that is not marked cleared', async () => {
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: { type: 'survey', payload: { v: 1 }, expiresAt: EXPIRES },
+    });
+    getDocs.mockResolvedValue({
+      docs: [{ data: () => ({ text: '', createdAt: FakeTimestamp.fromMillis(1000) }) }],
+    });
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && result.scans).toEqual([]);
   });
 });

@@ -39,6 +39,7 @@ import { noteSurvey } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
 import {
   addSurveyScan,
+  finishSurvey,
   loadSurvey,
   setSurveyScanIgnored,
   startSurvey,
@@ -229,6 +230,20 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
     },
     [currentId, state, refresh]
   );
+  const finish = useCallback(async (): Promise<boolean> => {
+    if (currentId === null || state.status !== 'ready') return false;
+    try {
+      await finishSurvey({
+        id: currentId,
+        expiresAt: state.expiresAt,
+        by: await submitterName(characterId),
+      });
+      await refresh();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [currentId, state, characterId, refresh]);
   const expiresAt = state.status === 'ready' ? state.expiresAt : null;
 
   return (
@@ -280,6 +295,8 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
             scans={scans}
             ignored={state.status === 'ready' ? state.ignored : undefined}
             onSetIgnored={owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined}
+            onFinish={currentId !== null && state.status === 'ready' ? finish : undefined}
+            owned={owned}
             viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
             afterPanel={(summary) =>
               characterId !== null && (
