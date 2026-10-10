@@ -2,7 +2,7 @@
 
 Three connected surfaces plus background machinery:
 
-- **Alerts page** `/alerts` (nav: Overview/primary group, phone tab, unread badge): the record of every alert this device fired or received, grouped by type, device-wide across Characters. Glossary: Alert, Notification Feed.
+- **Alerts page** `/alerts` (no rail row or phone tab; reached from the header bell with its unread badge, and Ctrl K): the record of every alert this device fired or received, grouped by type, device-wide across Characters. Glossary: Alert, Notification Feed.
 - **Settings > Notifications** `/settings/notifications` (Settings rail group "Alerts"): what may fire, per Character, per event, per channel; master switch, channel gates, permission prompt/enable, thresholds.
 - **Browser permission explainer** (one-time banner) `NotificationPermissionPrompt`.
 - **Machinery**: Foreground Poller (5 min, open app), Scheduled Push (Projection uploaded to Firebase, delivered by FCM to the service worker), app-icon badge, Web Push registration, feed sync.

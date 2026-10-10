@@ -81,9 +81,33 @@ describe('SurveyPicker', () => {
     const onPick = vi.fn();
     render(<SurveyPicker currentId={A} onPick={onPick} />);
     await userEvent.click(await screen.findByRole('combobox', { name: 'Your surveys' }));
-    const remove = await screen.findAllByRole('button', { name: /^Remove .* from your surveys$/ });
+    const remove = await screen.findAllByRole('button', {
+      name: /^Remove .* from your surveys$/,
+      hidden: true,
+    });
     expect(remove).toHaveLength(2);
     await userEvent.click(remove[0]);
+    await waitFor(() =>
+      expect(useSurveyHistory.getState().value.map((entry) => entry.id)).toEqual([A])
+    );
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it('removes the highlighted survey on Delete, and its option name leaves out the remove button', async () => {
+    await noteSurvey(A);
+    await noteSurvey(B);
+    const onPick = vi.fn();
+    render(<SurveyPicker currentId={A} onPick={onPick} />);
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Your surveys' }));
+    const options = await screen.findAllByRole('option');
+    await waitFor(() => expect(options[0].textContent).toContain('Clear Icicle'));
+    expect(options[0].getAttribute('aria-keyshortcuts')).toBe('Delete');
+    expect(options[0].getAttribute('aria-describedby')).not.toBeNull();
+    expect(options[0].textContent).not.toMatch(/Remove/);
+    const remove = screen.getAllByRole('button', { name: /^Remove /, hidden: true })[0];
+    expect(remove.getAttribute('tabindex')).toBe('-1');
+    options[0].focus();
+    await userEvent.keyboard('{Delete}');
     await waitFor(() =>
       expect(useSurveyHistory.getState().value.map((entry) => entry.id)).toEqual([A])
     );

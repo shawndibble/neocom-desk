@@ -12,7 +12,7 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Panel, textActionClassName } from '@/components/ui';
+import { EmptyState, LiveStatus, Panel, textActionClassName } from '@/components/ui';
 import type { CharacterBoardItem } from '@/engine/character/board';
 import { groupByDay, relativeDayFor } from '@/engine/character/deadlines';
 import { CharacterBoardRow } from './CharacterBoardRow';
@@ -87,6 +87,18 @@ export function ComingUpRail({
     <EmptyState title={t('calendar.rail.emptyForDay')} />
   );
 
+  // The count alone would not change when a day holds the only event, so the
+  // status names its scope too, and says so when the list empties.
+  const status = noKindsSelected
+    ? t('calendar.rail.noKinds')
+    : items.length === 0
+      ? selectedDayMs === null
+        ? t('calendar.rail.empty')
+        : t('calendar.rail.emptyForDay')
+      : selectedDayMs === null
+        ? t('calendar.rail.count', { count: items.length })
+        : t('calendar.rail.countForDay', { count: items.length });
+
   return (
     <Panel
       padded={false}
@@ -94,6 +106,7 @@ export function ComingUpRail({
       meta={
         <span className="text-[0.6875rem] text-text-dim tabular-nums">
           {t('calendar.rail.count', { count: items.length })}
+          <LiveStatus announceKey={selectedDayMs ?? 'all'}>{status}</LiveStatus>
         </span>
       }
       actions={

@@ -41,6 +41,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { useRememberedUrlParams, useUrlSort } from '@/lib/useUrlState';
 import {
   bpcSourcingParams,
@@ -1741,7 +1742,7 @@ export function BpcSourcingPanel() {
               refresh();
               setMarketRefreshTick((tick) => tick + 1);
             }}
-            disabled={loading}
+            busy={loading}
           />
         </span>
       }
@@ -1863,7 +1864,9 @@ export function BpcSourcingPanel() {
                     onClick={() => selectBlueprint(suggestion)}
                     className={cx(
                       'flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-line px-3 py-1.5 text-left text-sm last:border-b-0 md:min-h-9',
-                      suggestion === highlightedSuggestion ? 'bg-panel-2' : 'hover:bg-panel-2'
+                      suggestion === highlightedSuggestion
+                        ? `bg-panel-2 ${activeOptionClassName}`
+                        : 'hover:bg-panel-2'
                     )}
                   >
                     <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>

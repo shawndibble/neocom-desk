@@ -252,10 +252,15 @@ describe('EmploymentHistory', () => {
     // The whole point: a load really is in flight, and no spinner is shown.
     expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
     // Refresh still reports the in-flight load honestly.
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
 
     release();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh' })).not.toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Refresh' })).not.toHaveAttribute('aria-disabled')
+    );
   });
 
   it('shows the empty state when there is no data at all', async () => {

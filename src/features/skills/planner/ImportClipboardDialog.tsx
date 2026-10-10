@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Tabs, TextArea, type TabItem } from '@/components/ui';
+import {
+  Button,
+  LiveStatus,
+  Modal,
+  TabPanel,
+  Tabs,
+  TextArea,
+  useTabsId,
+  type TabItem,
+} from '@/components/ui';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
@@ -60,6 +69,7 @@ export function ImportClipboardDialog({
   initialText,
 }: ImportClipboardDialogProps) {
   const { t } = useTranslation();
+  const tabsId = useTabsId();
   const tabs: TabItem[] = [
     { id: 'paste', label: t('plans.importPasteTab') },
     { id: 'file', label: t('plans.importFileTab') },
@@ -147,6 +157,7 @@ export function ImportClipboardDialog({
     <Modal open onClose={onClose} title={t('plans.importDialogTitle')}>
       <div className="space-y-3">
         <Tabs
+          tabsId={tabsId}
           tabs={tabs}
           value={tab}
           onChange={(id) => {
@@ -156,91 +167,108 @@ export function ImportClipboardDialog({
           label={t('plans.importDialogTitle')}
         />
 
-        {tab === 'paste' && (
-          <>
-            <label className="block text-xs text-text-dim" htmlFor="clipboard-import-text">
-              {t('plans.importPaste')}
-            </label>
-            <TextArea
-              id="clipboard-import-text"
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                setPreview(null);
-              }}
-              onSubmitChord={() => {
-                if (!parsing && text.trim() !== '') void handleParse();
-              }}
-              rows={8}
-              className="text-xs"
-            />
+        <TabPanel tabsId={tabsId} tabId={tab} className="space-y-3">
+          {tab === 'paste' && (
+            <>
+              <label className="block text-xs text-text-dim" htmlFor="clipboard-import-text">
+                {t('plans.importPaste')}
+              </label>
+              <TextArea
+                id="clipboard-import-text"
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  setPreview(null);
+                }}
+                onSubmitChord={() => {
+                  if (!parsing && text.trim() !== '') void handleParse();
+                }}
+                rows={8}
+                className="text-xs"
+              />
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="ghost" onClick={() => void handlePasteFromClipboard()}>
-                {t('plans.pasteFromClipboard')}
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => void handleParse()}
-                disabled={parsing || text.trim() === ''}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={() => void handlePasteFromClipboard()}>
+                  {t('plans.pasteFromClipboard')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => void handleParse()}
+                  disabled={text.trim() === ''}
+                  aria-disabled={parsing || undefined}
+                >
+                  {t('plans.importParse')}
+                </Button>
+              </div>
+              {pasteError && (
+                <p role="alert" className="text-xs text-danger">
+                  {t('plans.pasteFromClipboardFailed')}
+                </p>
+              )}
+            </>
+          )}
+
+          {tab === 'file' && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".emp,.xml"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) void handleFile(file);
+                }}
+              />
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) void handleFile(file);
+                }}
+                className={`rounded-xs border border-dashed bg-panel-2 p-4 text-center text-xs text-text-dim ${
+                  dragOver ? 'border-accent' : 'border-line'
+                }`}
               >
-                {t('plans.importParse')}
-              </Button>
-            </div>
-            {pasteError && (
-              <p role="alert" className="text-xs text-danger">
-                {t('plans.pasteFromClipboardFailed')}
-              </p>
-            )}
-          </>
-        )}
+                <p>{t('plans.importFileDrop')}</p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={parsing}
+                >
+                  {t('plans.importFileBrowse')}
+                </Button>
+              </div>
+            </>
+          )}
+        </TabPanel>
 
-        {tab === 'file' && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".emp,.xml"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (file) void handleFile(file);
-              }}
-            />
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                const file = e.dataTransfer.files?.[0];
-                if (file) void handleFile(file);
-              }}
-              className={`rounded-xs border border-dashed bg-panel-2 p-4 text-center text-xs text-text-dim ${
-                dragOver ? 'border-accent' : 'border-line'
-              }`}
-            >
-              <p>{t('plans.importFileDrop')}</p>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={parsing}
-              >
-                {t('plans.importFileBrowse')}
-              </Button>
-            </div>
-          </>
-        )}
+        {/* One wrapper: the status region sits beside Cancel, never as the
+            container's new last child while no preview shows. */}
+        <div className="flex">
+          <Button size="sm" onClick={onClose}>
+            {t('plans.importCancel')}
+          </Button>
 
-        <Button size="sm" onClick={onClose}>
-          {t('plans.importCancel')}
-        </Button>
+          <LiveStatus>
+            {preview && !preview.documentErrorCode
+              ? t('plans.importPreviewSummary', {
+                  ready: preview.entries.length,
+                  warnings: preview.warnings.length,
+                  errors: preview.errors.length,
+                })
+              : null}
+          </LiveStatus>
+        </div>
 
         {preview && (
           <div className="space-y-2 border-t border-line pt-2 text-xs">
@@ -250,7 +278,9 @@ export function ImportClipboardDialog({
             </p>
 
             {preview.documentErrorCode ? (
-              <p className="text-danger">{t(DOCUMENT_ERROR_KEYS[preview.documentErrorCode])}</p>
+              <p role="alert" className="text-danger">
+                {t(DOCUMENT_ERROR_KEYS[preview.documentErrorCode])}
+              </p>
             ) : (
               <>
                 <div>

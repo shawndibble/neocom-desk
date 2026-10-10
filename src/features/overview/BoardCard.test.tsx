@@ -1,9 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { BoardCard, FoldedRow, NumberTile } from './BoardCard';
-import { MiningTaxCard, OrdersCard, PlanetaryCard } from './cards';
+import {
+  AlertsColumn,
+  MailCard,
+  MiningTaxCard,
+  OrdersCard,
+  PlanetaryCard,
+  PriceAlertsCard,
+} from './cards';
+import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
 import { miningTaxSummaryNode } from './miningSummaryNode';
 
 function renderCard(help?: string) {
@@ -115,5 +123,95 @@ describe('FoldedRow mining summary', () => {
 
   it('has no node when nothing is owed', () => {
     expect(miningTaxSummaryNode(null)).toBeUndefined();
+  });
+});
+
+describe('Board row accessible names', () => {
+  it('Mail rows name the sender, and drop it cleanly when unresolved', () => {
+    const mail = (mailId: number, from: string | null) => ({
+      mailId,
+      subject: 'Fleet tonight',
+      from,
+      atMs: 0,
+    });
+    render(
+      <MemoryRouter>
+        <MailCard
+          nowMs={3_600_000}
+          data={{
+            unread: 2,
+            recent: [mail(1, 'Alice'), mail(2, null)],
+            needsReauth: false,
+            fetchedAt: null,
+          }}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('link', { name: /Fleet tonight, .*, Alice \(/ })).toBeTruthy();
+    const names = screen.getAllByRole('link').map((a) => a.getAttribute('aria-label') ?? '');
+    expect(names.some((n) => /Fleet tonight, [^,]*\s\([^)]+\)$/.test(n))).toBe(true);
+    expect(names.every((n) => !/, \(|\(\)|, ,/.test(n))).toBe(true);
+  });
+
+  it('Price alert rows name the target and the severity', () => {
+    render(
+      <MemoryRouter>
+        <PriceAlertsCard
+          nowMs={0}
+          data={{
+            checkedAt: 0,
+            alerts: [
+              {
+                typeId: 34,
+                name: 'Tritanium',
+                targetPrice: 5,
+                direction: 'above',
+                price: 6,
+                crossed: true,
+              },
+            ],
+          }}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('link', { name: /Tritanium.*(at least).*(due soon)/i })).toBeTruthy();
+  });
+});
+
+describe('AlertsColumn', () => {
+  const group = (severity: DisplayAlertGroup['severity']): DisplayAlertGroup => ({
+    key: severity,
+    target: { kind: 'event', eventId: 'characterNotTraining' },
+    severity,
+    count: 1,
+    newestFiredAt: 0,
+    entries: [],
+    characterIds: [],
+    label: 'Character Not Training',
+    muted: false,
+  });
+
+  it('names each row severity, not just colours it', () => {
+    render(
+      <MemoryRouter>
+        <AlertsColumn
+          groups={[group('warning'), group('critical')]}
+          unread={0}
+          onDismissAll={() => {}}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('img', { name: /due soon/i })).toBeTruthy();
+    expect(screen.getByRole('img', { name: /critical/i })).toBeTruthy();
+  });
+
+  it('moves focus to the heading when Dismiss all unmounts itself', () => {
+    render(
+      <MemoryRouter>
+        <AlertsColumn groups={[group('warning')]} unread={1} onDismissAll={() => {}} />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss all' }));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Alerts' }));
   });
 });

@@ -696,7 +696,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
               icon={<Icon.Refresh />}
               label={t('mail.refresh')}
               onClick={refresh}
-              disabled={loading}
+              busy={loading}
             />
           </>
         }

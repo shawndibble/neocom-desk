@@ -113,7 +113,7 @@ export function SoldSplitButton({
           icon={<Icon.Refresh />}
           label={t('industry.refresh')}
           onClick={onRefresh}
-          disabled={refreshing}
+          busy={refreshing}
         />
       )}
     </div>

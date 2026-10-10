@@ -6,7 +6,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, SlideOver, Tabs, Toast } from '@/components/ui';
+import { Modal, SlideOver, TabPanel, Tabs, Toast, useTabsId } from '@/components/ui';
 import { useTargetPlan } from '@/features/skills/useTargetPlan';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { romanLevel } from '@/engine/projection';
@@ -37,6 +37,7 @@ export function ShipInfoWindow({
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const tabsId = useTabsId();
   const [tab, setTab] = useState<InfoTab>('description');
   // Here rather than in the tab, so Undo survives a tab switch or a new hull.
   const [added, setAdded] = useState<AddedToPlan | null>(null);
@@ -47,8 +48,9 @@ export function ShipInfoWindow({
     <div className="space-y-3">
       <ShipInfoHeader ship={ship} source={source} />
       <Tabs
+        tabsId={tabsId}
         label={t('ships.info.tabsLabel')}
-        // A phone's sheet can't fit all four full labels; the tabpanel keeps the full name.
+        // A phone's sheet can't fit all four full labels.
         tabs={TABS.map((id) => ({
           id,
           label: t(isPhone ? `ships.info.tabsShort.${id}` : `ships.info.tabs.${id}`),
@@ -57,14 +59,14 @@ export function ShipInfoWindow({
         onChange={(id) => setTab(id as InfoTab)}
       />
       {/* Keyed by hull: retargeting the window starts each tab afresh. */}
-      <div key={ship.typeID} role="tabpanel" aria-label={t(`ships.info.tabs.${tab}`)}>
+      <TabPanel key={ship.typeID} tabsId={tabsId} tabId={tab}>
         {tab === 'description' && <DescriptionTab ship={ship} source={source} />}
         {tab === 'fitting' && <FittingTab ship={ship} />}
         {tab === 'skills' && (
           <SkillsMasteryTab ship={ship} source={source} target={target} onAdded={setAdded} />
         )}
         {tab === 'blueprint' && <BlueprintTab ship={ship} characterId={source.characterId} />}
-      </div>
+      </TabPanel>
       {added && (
         <Toast
           message={t('skills.fitCheck.addedToast', {

@@ -105,6 +105,15 @@ describe('EntryList step timeline renders in the viewer local timezone (#207)', 
   });
 });
 
+describe('EntryList drag instructions', () => {
+  it('does not point at a Move menu that rows do not have', () => {
+    render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
+    const text = document.querySelector('[id^="DndDescribedBy"]')?.textContent ?? '';
+    expect(text).toMatch(/to pick up an entry or remap marker/i);
+    expect(text).not.toMatch(/move menu/i);
+  });
+});
+
 describe('EntryList Booster marks', () => {
   it('marks only the entry row owning the boosted step', () => {
     const rows = [entryRow(1, [0]), entryRow(2, [1])];
@@ -148,7 +157,7 @@ describe('EntryList prereq rows', () => {
     render(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText(/prereq/i)).toBeInTheDocument();
     // Still no priority control — a prereq's priority is inherited (#27), not set.
-    expect(screen.queryByLabelText(/priority for skill 9/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/normal priority, skill 9/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
   });
 
@@ -201,7 +210,7 @@ describe('EntryList drag handles mention keyboard reordering (#408)', () => {
       />
     );
     expect(
-      screen.getByRole('button', { name: /reorder remap marker — press space then arrow keys/i })
+      screen.getByRole('button', { name: /reorder remap marker 1 — press space then arrow keys/i })
     ).toBeInTheDocument();
   });
 });
@@ -232,7 +241,7 @@ describe('EntryList column visibility', () => {
       />
     );
     expect(screen.queryByText('PER/WIL')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/priority for/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/ priority, /i)).not.toBeInTheDocument();
     expect(screen.queryByText('1m')).not.toBeInTheDocument();
     expect(screen.queryByText('10m')).not.toBeInTheDocument();
     // Always-present parts remain regardless of the column toggle.
@@ -253,12 +262,26 @@ describe('EntryList column visibility', () => {
       />
     );
     expect(screen.getByText('PER/WIL')).toBeInTheDocument();
-    expect(screen.getByLabelText(/priority for/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/ priority, /i)).toBeInTheDocument();
+  });
+
+  it('names the attribute pair for screen readers with sr-only text, not a label on a bare span', () => {
+    render(
+      <EntryList
+        rows={[entryRow(1, [0])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        attributesFor={() => ({ primary: 'perception', secondary: 'willpower' })}
+      />
+    );
+    expect(screen.getByText('PER/WIL')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Perception / Willpower attributes')).toBeInTheDocument();
+    expect(document.querySelector('span[aria-label$=" attributes"]')).toBeNull();
   });
 
   it('leaves priority off by default — it is an editing control, not a readout', () => {
     render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
-    expect(screen.queryByLabelText(/priority for/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/ priority, /i)).not.toBeInTheDocument();
   });
 
   it('sets a priority from the pill menu instead of a full-width select', async () => {
@@ -274,7 +297,7 @@ describe('EntryList column visibility', () => {
       />
     );
 
-    await user.click(screen.getByLabelText(/priority for skill 1/i));
+    await user.click(screen.getByLabelText(/normal priority, skill 1/i));
     await user.click(screen.getByRole('menuitem', { name: 'High' }));
 
     expect(calls).toEqual([[1, 'high']]);
@@ -303,7 +326,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
       // Line 2: attribute badge, priority pill, and both times, each labelled
       // in place rather than hidden behind a tooltip the user has to find.
       expect(screen.getByText('PER/WIL')).toBeInTheDocument();
-      expect(screen.getByLabelText(/priority for skill 1/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/normal priority, skill 1/i)).toBeInTheDocument();
       // Both labels ride the values themselves below `md`, since the desktop
       // column headers they'd otherwise sit under are not rendered here.
       expect(screen.getByText('Takes')).toBeInTheDocument();
@@ -376,7 +399,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
           columns={{ ...DEFAULT_COLUMN_VISIBILITY, priority: true }}
         />
       );
-      const pill = screen.getByLabelText(/priority for skill 1/i);
+      const pill = screen.getByLabelText(/normal priority, skill 1/i);
       expect(pill).toHaveClass('h-9');
       // The chip itself is untouched: same border and padding as the
       // attribute badge it sits beside.
@@ -397,7 +420,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
           columns={{ ...DEFAULT_COLUMN_VISIBILITY, priority: true }}
         />
       );
-      expect(screen.getByLabelText(/priority for skill 1/i)).not.toHaveClass('h-9');
+      expect(screen.getByLabelText(/normal priority, skill 1/i)).not.toHaveClass('h-9');
     } finally {
       restore();
     }
@@ -606,7 +629,7 @@ describe('EntryList marker row attributes', () => {
     const { unmount } = render(
       <EntryList rows={rows} bandsAt={new Map()} {...defaultProps} onEditMarker={onEditMarker} />
     );
-    await user.click(screen.getByRole('button', { name: 'Remap marker' }));
+    await user.click(screen.getByRole('button', { name: 'Remap marker 1' }));
     expect(onEditMarker).toHaveBeenCalledWith(0);
     unmount();
 

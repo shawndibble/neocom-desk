@@ -5,7 +5,6 @@ import {
   DataTable,
   EmptyState,
   IconButton,
-  PageHeader,
   Panel,
   SearchInput,
   Spinner,
@@ -29,15 +28,13 @@ const STANDINGS_SORT = { columnId: 'standing', direction: 'desc' } as const;
 const COLUMN_IDS = ['name', 'kind', 'standing', 'fees'] as const;
 const FEE_OWNERS = feeOwnerIds();
 
-/** The Contacts page's Standings tab (issue #2859): the Character's NPC faction, corp and agent standings. */
-export function ContactsStandings({
-  characterId,
-  tabBar,
-}: {
-  characterId: number;
-  /** The page's tab strip, placed between the header and the body like the other tabs. */
-  tabBar: ReactNode;
-}) {
+/**
+ * The Contacts page's Standings tab (issue #2859): the Character's NPC faction,
+ * corp and agent standings. A hook rather than a component so the page can
+ * keep one header and tab bar mounted across all three tabs (focus stays on
+ * the tab that was just chosen); `enabled` holds the fetch until the tab opens.
+ */
+export function useContactsStandings(characterId: number, enabled: boolean) {
   const { t } = useTranslation();
   const lacksScope = useCharacterLacksEndpoints(characterId, ['getCharacterStandings']);
   const [state, setState] = useState<{
@@ -71,6 +68,7 @@ export function ContactsStandings({
   );
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     void fetchState(false).then((next) => {
       if (!cancelled) setState(next);
@@ -78,7 +76,7 @@ export function ContactsStandings({
     return () => {
       cancelled = true;
     };
-  }, [fetchState]);
+  }, [fetchState, enabled]);
 
   // A refresh that outlives a character switch must not write the old
   // character's rows over the new one's, nor clear its loading flag.
@@ -201,24 +199,14 @@ export function ContactsStandings({
   }
 
   const ready = !lacksScope && state?.characterId === characterId && !state.failed;
-  return (
-    <>
-      <PageHeader
-        title={t('contacts.title')}
-        meta={ready && state.fetchedAt && <DataAgeBadge date={state.fetchedAt} />}
-        actions={
-          !lacksScope && (
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('contacts.refresh')}
-              onClick={refresh}
-              disabled={refreshing || !state || state.characterId !== characterId}
-            />
-          )
-        }
-      />
-      {tabBar}
-      {content}
-    </>
+  const meta = ready && state.fetchedAt && <DataAgeBadge date={state.fetchedAt} />;
+  const actions = !lacksScope && (
+    <IconButton
+      icon={<Icon.Refresh />}
+      label={t('contacts.refresh')}
+      onClick={refresh}
+      disabled={refreshing || !state || state.characterId !== characterId}
+    />
   );
+  return { meta, actions, content };
 }

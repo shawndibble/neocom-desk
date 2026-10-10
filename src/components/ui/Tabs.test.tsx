@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { Tabs } from './Tabs';
+import { TabPanel, Tabs } from './Tabs';
 
 const tabs = [
   { id: 'open', label: 'Open' },
@@ -10,7 +10,9 @@ const tabs = [
 
 describe('Tabs', () => {
   it('marks the active tab selected', () => {
-    render(<Tabs tabs={tabs} value="history" onChange={() => undefined} label="Orders" />);
+    render(
+      <Tabs tabsId="t" tabs={tabs} value="history" onChange={() => undefined} label="Orders" />
+    );
     expect(screen.getByRole('tablist', { name: 'Orders' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
@@ -18,7 +20,7 @@ describe('Tabs', () => {
 
   it('calls onChange on click', async () => {
     const onChange = vi.fn();
-    render(<Tabs tabs={tabs} value="open" onChange={onChange} />);
+    render(<Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={onChange} />);
     await userEvent.click(screen.getByRole('tab', { name: 'History' }));
     expect(onChange).toHaveBeenCalledWith('history');
   });
@@ -36,11 +38,15 @@ describe('Tabs', () => {
       .spyOn(Element.prototype, 'scrollIntoView')
       .mockImplementation(() => undefined);
 
-    const { rerender } = render(<Tabs tabs={tabs} value="open" onChange={() => undefined} />);
+    const { rerender } = render(
+      <Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={() => undefined} />
+    );
     expect(scrollIntoView.mock.instances.at(-1)).toBe(screen.getByRole('tab', { name: 'Open' }));
     expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'nearest' });
 
-    rerender(<Tabs tabs={tabs} value="history" onChange={() => undefined} />);
+    rerender(
+      <Tabs tabsId="t" label="Orders" tabs={tabs} value="history" onChange={() => undefined} />
+    );
     expect(scrollIntoView.mock.instances.at(-1)).toBe(screen.getByRole('tab', { name: 'History' }));
 
     scrollIntoView.mockRestore();
@@ -48,7 +54,7 @@ describe('Tabs', () => {
 
   it('moves selection with arrow keys, wrapping', async () => {
     const onChange = vi.fn();
-    render(<Tabs tabs={tabs} value="open" onChange={onChange} />);
+    render(<Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={onChange} />);
     screen.getByRole('tab', { name: 'Open' }).focus();
     await userEvent.keyboard('{ArrowRight}');
     expect(onChange).toHaveBeenLastCalledWith('history');
@@ -66,7 +72,16 @@ describe('Tabs', () => {
   describe('activation="manual"', () => {
     it('moves focus without selecting on arrow keys, then selects on Enter', async () => {
       const onChange = vi.fn();
-      render(<Tabs tabs={tabs} value="open" onChange={onChange} activation="manual" />);
+      render(
+        <Tabs
+          tabsId="t"
+          label="Orders"
+          tabs={tabs}
+          value="open"
+          onChange={onChange}
+          activation="manual"
+        />
+      );
 
       screen.getByRole('tab', { name: 'Open' }).focus();
       await userEvent.keyboard('{ArrowRight}');
@@ -79,9 +94,45 @@ describe('Tabs', () => {
 
     it('still selects immediately on click', async () => {
       const onChange = vi.fn();
-      render(<Tabs tabs={tabs} value="open" onChange={onChange} activation="manual" />);
+      render(
+        <Tabs
+          tabsId="t"
+          label="Orders"
+          tabs={tabs}
+          value="open"
+          onChange={onChange}
+          activation="manual"
+        />
+      );
       await userEvent.click(screen.getByRole('tab', { name: 'History' }));
       expect(onChange).toHaveBeenCalledWith('history');
+    });
+  });
+
+  describe('panel linkage', () => {
+    it('links the selected tab to its panel and names the panel from the tab', () => {
+      render(
+        <>
+          <Tabs tabsId="t" tabs={tabs} value="history" onChange={() => undefined} label="Orders" />
+          <TabPanel tabsId="t" tabId="history">
+            body
+          </TabPanel>
+        </>
+      );
+      const tab = screen.getByRole('tab', { name: 'History' });
+      const panel = screen.getByRole('tabpanel', { name: 'History' });
+      expect(tab.id).not.toBe('');
+      expect(tab).toHaveAttribute('aria-controls', panel.id);
+      expect(panel).toHaveAttribute('aria-labelledby', tab.id);
+      expect(panel).toHaveAttribute('tabindex', '0');
+    });
+
+    it('gives only the selected tab aria-controls', () => {
+      render(
+        <Tabs tabsId="t" tabs={tabs} value="open" onChange={() => undefined} label="Orders" />
+      );
+      expect(screen.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-controls');
+      expect(screen.getByRole('tab', { name: 'History' })).not.toHaveAttribute('aria-controls');
     });
   });
 });
