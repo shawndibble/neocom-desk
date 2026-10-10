@@ -99,6 +99,9 @@
       "searchPlaceholder": "Search hulls (press /)…",
       "searchLabel": "Search hulls in every faction",
       "searchResults": "Matching hulls",
+      "searchCount_zero": "No hulls match",
+      "searchCount_one": "{{count}} hull matches",
+      "searchCount_other": "{{count}} hulls match",
       "filterPlaceholder": "Search this faction…",
       "filterLabel": "Search this faction's hulls",
       "onlyFlyable": "Only ones I can fly",
@@ -439,6 +442,8 @@
         "cargo": "cargo hold"
       },
       "searchLabel": "Search items to add",
+      "added": "Added {{name}} to {{slot}}",
+      "addedDrone": "Added {{name}} to the drone bay",
       "searchPlaceholder": "Search modules, rigs, drones…",
       "fitsSlot": "Fits this slot",
       "fitsSlotTooltip": "Only items that go in the slot you picked. Pick an empty slot to use it.",
@@ -1367,6 +1372,7 @@
       "differencesOnly": "Show differences only",
       "pagePrev": "Previous",
       "pageNext": "Next",
+      "pageStatus": "Fittings {{from}}–{{to}} of {{count}}",
       "canFlyYes": "Can fly",
       "canFlyNo": "Can't fly",
       "canFlyUnknown": "Skills unknown",
@@ -4063,9 +4069,23 @@
       "payee": "Who gets the tax",
       "payeePlaceholder": "Corporation or pilot",
       "rate": "Tax rate, percent",
-      "open": "Open in Mining Tax",
-      "manage": "Manage moon taxes",
+      "open": "Manage Taxes",
+      "manage": "Manage Taxes",
       "failed": "Couldn't save that Payee. Try again."
+    },
+    "info": {
+      "title": "Additional information",
+      "location": "Location",
+      "locationPlaceholder": "System, station or structure",
+      "setWaypoint": "Set waypoint",
+      "setWaypointTo": "Set waypoint to {{placeName}}",
+      "notes": "Notes",
+      "notesPlaceholder": "Anything the fleet should know, such as where to dock",
+      "kind": {
+        "system": "System",
+        "station": "Station",
+        "structure": "Structure"
+      }
     },
     "formCompressed": "compressed",
     "formRaw": "raw",
