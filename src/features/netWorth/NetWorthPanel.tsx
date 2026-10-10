@@ -4,7 +4,7 @@
  * wider scope shows one line per Character with a "Balance by character" table
  * whose rows drill into that Character.
  */
-import { lazy, Suspense, useEffect, useMemo, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { guarded } from '@/app/routeChunks';
 import {
@@ -66,6 +66,10 @@ export interface NetWorthPanelProps {
   drilled?: boolean;
   onDrill: (characterId: number) => void;
   onBack: () => void;
+  /** The panel's title, so a drill swap can hand it focus (issue #3393). */
+  headingRef?: RefObject<HTMLHeadingElement | null>;
+  /** The drilled panel's "All characters" button. */
+  backRef?: RefObject<HTMLButtonElement | null>;
   /** Extra title-bar actions (the page refresh). */
   actions?: ReactNode;
   /** Replaces the title when the page already says what this is. */
@@ -149,6 +153,8 @@ export function NetWorthPanel({
   drilled = false,
   onDrill,
   onBack,
+  headingRef,
+  backRef,
   actions,
   title,
   stats,
@@ -371,6 +377,7 @@ export function NetWorthPanel({
   const panel = (
     <Panel
       title={title ?? t('wallet.netWorth.title')}
+      headingRef={headingRef}
       meta={
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {filterMeta}
@@ -387,6 +394,7 @@ export function NetWorthPanel({
       {drilled && (
         <button
           type="button"
+          ref={backRef}
           onClick={onBack}
           className={cx(
             inlineLinkClassName,

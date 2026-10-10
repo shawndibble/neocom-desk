@@ -826,6 +826,29 @@ describe('Wallet', () => {
       await waitFor(() => expect(window.location.search).not.toContain('drill='));
     });
 
+    it('moves focus to the drilled back button, then the Character row, never the body', async () => {
+      const user = userEvent.setup();
+      await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
+      await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+      render(<App />);
+
+      const table = await screen.findByRole('table', { name: 'Balance by character' });
+      await user.click(await within(table).findByText('Pilot Two'));
+      await waitFor(() => {
+        expect(document.activeElement?.tagName).toBe('BUTTON');
+        expect(document.activeElement).toHaveTextContent('All characters');
+      });
+
+      await user.click(document.activeElement as HTMLElement);
+      await waitFor(() =>
+        expect(document.activeElement?.closest('[data-row-key]')).toHaveAttribute(
+          'data-row-key',
+          '92'
+        )
+      );
+    });
+
     it('opens on "All characters" when the synced default says so, without the pilot touching the picker', async () => {
       await seedSecondCharacter();
       await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
