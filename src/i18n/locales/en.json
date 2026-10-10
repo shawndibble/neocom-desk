@@ -3435,6 +3435,8 @@
     "unstar": "Unstar {{name}}",
     "sortBy": "Sort by",
     "sortDirection": "Reverse sort direction",
+    "sortDirectionAsc": "Reverse sort direction (sorted ascending)",
+    "sortDirectionDesc": "Reverse sort direction (sorted descending)",
     "sortKeys": {
       "name": "Name",
       "skillPoints": "Skill points",
