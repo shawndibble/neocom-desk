@@ -724,10 +724,10 @@ function FittingsPage() {
           {/* Only a Load that opened a Fitting describes this one; a failed Load's
           warnings stay with the Load card that reported them. */}
           {workspace.lastLoad?.kind === 'fitting' && <LoadWarnings load={workspace.lastLoad} />}
-          {/* What the last charge load did: "loaded 3 of 4, cargo ran out". */}
           <LiveStatus data-testid="fitting-added-status" announceKey={added.n}>
             {added.message}
           </LiveStatus>
+          {/* What the last charge load did: "loaded 3 of 4, cargo ran out". */}
           <p role="status" className="text-xs text-text-dim empty:hidden">
             {charges.message}
           </p>
