@@ -45,6 +45,7 @@ import { TRADE_HUBS } from '@/market/hubs';
 import {
   COMPARE_COLUMN_IDS,
   COMPARE_DEFAULT_COLUMNS,
+  HUB_BOOK_COLUMN_IDS,
   HUB_COLUMN_IDS,
   PLAN_HUB,
   useCompareHub,
@@ -140,6 +141,7 @@ export function BuildPlanCompare({
   }, [hydrateHubChoice]);
 
   const showHubColumns = HUB_COLUMN_IDS.some(isVisible);
+  const showBookColumns = HUB_BOOK_COLUMN_IDS.some(isVisible);
   const targets = useMemo(() => {
     const byPlan = new Map<string, HubOrderTarget>();
     for (const plan of plans) {
@@ -149,7 +151,7 @@ export function BuildPlanCompare({
     }
     return byPlan;
   }, [plans, catalog, hubChoice]);
-  const hubOrders = useHubOrderCounts([...targets.values()], showHubColumns);
+  const hubOrders = useHubOrderCounts([...targets.values()], showBookColumns);
   const hubCountsFor = (row: ComparedBuildRow) => {
     const target = targets.get(row.planId);
     return target ? hubOrders.counts.get(hubOrderKey(target.hubId, target.typeId)) : undefined;
@@ -452,7 +454,9 @@ export function BuildPlanCompare({
       <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
       {showHubColumns && (
         <p className="mb-2 text-xs text-text-dim">
-          {hubOrders.failed ? t('industry.compareHubFailed') : t('industry.compareHubOrdersHint')}
+          {showBookColumns && hubOrders.failed
+            ? t('industry.compareHubFailed')
+            : t('industry.compareHubOrdersHint')}
         </p>
       )}
       <div className="overflow-x-auto">

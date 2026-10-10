@@ -51,6 +51,11 @@ export const HUB_COLUMN_IDS: readonly CompareColumnId[] = [
   'hubSellVolume',
 ];
 
+/** The columns read off the hub station's live order book (Fuzzwork) — the only ones that need that request. */
+export const HUB_BOOK_COLUMN_IDS: readonly CompareColumnId[] = HUB_COLUMN_IDS.filter(
+  (id) => id !== 'hubOrdersPerDay'
+);
+
 export const useVisibleCompareColumns = createColumnVisibilitySetting({
   key: 'buildPlanCompareVisibleColumns',
   ids: COMPARE_COLUMN_IDS,

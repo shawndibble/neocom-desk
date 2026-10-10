@@ -18,9 +18,9 @@ function figure(
 export interface CompareCsvOptions {
   /** The columns the table shows; the plan name is always first. Defaults to the table's own default set. */
   visible?: readonly CompareColumnId[];
-  /** A row's order counts at the chosen hub; null/undefined while loading, failed or unknown. */
   /** A row's average orders traded per day in the hub's region. */
   ordersPerDay?: (row: ComparedBuildRow) => number | null | undefined;
+  /** A row's open order counts at the chosen hub; null/undefined while loading, failed or unknown. */
   hubCounts?: (row: ComparedBuildRow) => HubOrderCounts | null | undefined;
 }
 
