@@ -14,7 +14,6 @@ import { surveyChatMessage, type SurveyMessageLabels } from '@/engine/survey/cha
 import { priceScans } from '@/engine/survey/pricing';
 import { summarizeSurvey, type SurveyScan, type SurveySummary } from '@/engine/survey/series';
 import { writeToClipboard } from '@/lib/clipboard';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { SurveyLegend } from './SurveyLegend';
 import { SurveyOres } from './SurveyOres';
@@ -74,7 +73,6 @@ export function SurveyBoard({
     [scans, orePrices.prices]
   );
   const [outcome, setOutcome] = useCopyOutcome();
-  const phone = useIsPhone();
 
   const labels: SurveyMessageLabels = {
     heading: t('survey.message.heading'),
@@ -93,10 +91,9 @@ export function SurveyBoard({
     );
   }
 
-  // The copy button sits in the panel header, or on a phone full width under the chart.
-  const copyButton = (current: SurveySummary, link: string, fill = false) => (
+  // The copy button sits in the panel header, on a phone too.
+  const copyButton = (current: SurveySummary, link: string) => (
     <SurveyCopyButton
-      fill={fill}
       outcome={outcome}
       onCopyChat={() => copy('chat', surveyChatMessage(current, link, labels))}
       onCopyLink={() => copy('link', link)}
@@ -124,7 +121,7 @@ export function SurveyBoard({
             </span>
           </span>
         }
-        actions={url !== null && !phone && copyButton(summary, url)}
+        actions={url !== null && copyButton(summary, url)}
       >
         <div className="space-y-4">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -158,8 +155,6 @@ export function SurveyBoard({
               </Suspense>
             </>
           )}
-
-          {url !== null && phone && copyButton(summary, url, true)}
 
           <SurveyStats summary={summary} />
 

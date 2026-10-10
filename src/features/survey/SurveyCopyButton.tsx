@@ -15,8 +15,6 @@ interface SurveyCopyButtonProps {
   onCopyChat: () => void;
   onCopyLink: () => void;
   outcome: CopyOutcome;
-  /** Stretch across the row, for a phone where it sits under the chart. */
-  fill?: boolean;
 }
 
 /**
@@ -25,12 +23,7 @@ interface SurveyCopyButtonProps {
  * pilot who wants the URL without the message around it. The message already
  * carries the link, so the menu holds nothing else.
  */
-export function SurveyCopyButton({
-  onCopyChat,
-  onCopyLink,
-  outcome,
-  fill = false,
-}: SurveyCopyButtonProps) {
+export function SurveyCopyButton({ onCopyChat, onCopyLink, outcome }: SurveyCopyButtonProps) {
   const { t } = useTranslation();
   const label =
     outcome === null
@@ -41,13 +34,13 @@ export function SurveyCopyButton({
           ? t('survey.copiedChat')
           : t('survey.copiedLink');
   return (
-    <div className={fill ? 'flex w-full' : 'flex'}>
+    <div className="flex">
       <Button
         variant="primary"
         size="sm"
         onClick={onCopyChat}
         aria-label={outcome === null ? t('survey.copyChat') : undefined}
-        className={fill ? 'flex-1 rounded-r-none' : 'rounded-r-none'}
+        className="rounded-r-none"
       >
         {outcome === null && <CopyToClipboard aria-hidden />}
         {label}

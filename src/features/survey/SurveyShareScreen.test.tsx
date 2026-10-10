@@ -60,9 +60,7 @@ describe('SurveyShareScreen', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Mining Survey' })).toBeTruthy();
     const banner = screen.getAllByRole('banner')[0];
     expect(within(banner).getByRole('link', { name: 'Neocom Desk' })).toHaveAttribute('href', '/');
-    expect(
-      await within(banner).findByRole('button', { name: 'Log in with EVE Online' })
-    ).toBeTruthy();
+    expect(await within(banner).findByRole('button', { name: 'Log in' })).toBeTruthy();
   });
 
   it('adds a scan pasted anywhere on the page, to this survey, with no sign-in', async () => {

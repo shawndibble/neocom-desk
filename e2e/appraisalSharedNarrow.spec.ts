@@ -222,7 +222,7 @@ test.describe('Shared appraisal — phone table', () => {
     await openShare(page);
 
     const header = page.getByRole('banner').first();
-    const login = header.getByRole('button', { name: 'Log in with EVE Online' });
+    const login = header.getByRole('button', { name: 'Log in' });
     const brand = header.getByRole('link', { name: 'Neocom Desk' });
     await expect(login).toBeVisible();
     await expect(brand).toBeVisible();

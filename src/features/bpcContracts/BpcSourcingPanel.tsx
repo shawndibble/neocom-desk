@@ -12,6 +12,9 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { marketLinkParams } from '@/engine/market/urlState';
+import { industryTabHref } from '@/features/industry/industryTabs';
+import { loadPlannableIndex, plannableProductTypeID } from '@/features/industry/plannableProduct';
+import { applyPlanSeed } from '@/features/industry/planSeed';
 import {
   Button,
   ColumnPickerMenu,
@@ -2114,6 +2117,23 @@ export function BpcSourcingPanel() {
                   if (row.source === 'market') {
                     const params = marketLinkParams(row.typeId, location.search);
                     navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+                    return;
+                  }
+                  if (row.source === 'owned') {
+                    // No contract to open: start a Build Plan from the owned
+                    // blueprint, seeded with its own ME/TE/runs.
+                    void loadPlannableIndex().then((index) => {
+                      const productTypeId = plannableProductTypeID(index, row.typeId);
+                      if (productTypeId === null) return;
+                      const params = new URLSearchParams({ product: String(productTypeId) });
+                      applyPlanSeed(
+                        params,
+                        row.runs === -1 || row.runs === null
+                          ? null
+                          : { me: row.me, te: row.te, runs: row.runs }
+                      );
+                      navigate(`${industryTabHref('plans')}?${params.toString()}`);
+                    });
                     return;
                   }
                   setOpenRow(asContract(row));
