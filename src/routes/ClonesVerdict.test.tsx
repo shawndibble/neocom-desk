@@ -291,6 +291,21 @@ describe('Clones training verdict', () => {
     expect(screen.queryByText('Stay put')).not.toBeInTheDocument();
   });
 
+  it('disables the training sort with its reason when there is no verdict, keeping the stored sort', async () => {
+    scenario.queue = () => [];
+    render(<App />);
+    await screen.findByText(/training queue is empty/);
+    const group = screen.getByRole('group', { name: 'Sort clones' });
+    const training = within(group).getByRole('button', { name: 'Best for training' });
+    expect(training).toHaveAttribute('aria-disabled', 'true');
+    for (const b of within(group).getAllByRole('button')) {
+      expect(b).toHaveAttribute('aria-pressed', 'false');
+    }
+    fireEvent.click(training);
+    expect(useClonesSort.getState().value).toBe('training');
+    expect(await db.settings.get('clonesSort')).toBeUndefined();
+  });
+
   it('shows no verdict for a paused queue', async () => {
     scenario.queue = () => [{ skill_id: 3300, queue_position: 0, finished_level: 5 }];
     render(<App />);
