@@ -8,18 +8,13 @@
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import {
-  defaultHiddenNav,
-  hiddenNavForActivities,
-  parseHiddenNav,
-  parseRecentNav,
-  pushRecentNav,
-} from './navRail';
+import { hiddenNavForActivities, parseHiddenNav, parseRecentNav, pushRecentNav } from './navRail';
 
 export const useHiddenNav = createSyncedSetting<readonly string[]>({
   key: 'sync.navHidden',
-  // The short rail: a pilot who never answered the first-run question sees it.
-  defaultValue: defaultHiddenNav(),
+  // Empty, not the short rail: `[]` is also a real choice, so "never asked" is
+  // `useNavSetupAnswered`'s to say, and answering writes the starting list.
+  defaultValue: [],
   parse: parseHiddenNav,
 });
 

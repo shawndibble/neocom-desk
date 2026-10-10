@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -6,6 +6,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { NavSetupQuestion } from './NavSetupQuestion';
 import { useHiddenNav, useNavSetupAnswered } from './navPreferences';
 import { defaultHiddenNav } from './navRail';
+
+vi.unmock('@/app/NavSetupQuestion');
 
 beforeEach(() => {
   useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
