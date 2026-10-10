@@ -3,7 +3,6 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { BootScreen } from '@/app/BootScreen';
 import {
   Button,
   EmptyState,
@@ -149,7 +148,16 @@ export function FittingShareView({
     };
   }, [readyFitting, t]);
 
-  if (characterCount === undefined) return <BootScreen gate="fitting-shared" />;
+  // Same frame as the ready page, so a stored link does not swap frames while the count loads.
+  if (characterCount === undefined) {
+    return (
+      <ShareShell title={t('fittingShare.title')}>
+        <div className="flex justify-center py-10">
+          <Spinner label={t('common.loading')} />
+        </div>
+      </ShareShell>
+    );
+  }
   // A visitor with a Character never gets the All-V view — the same link
   // opens in the editor, under their own pilot (CONTEXT.md **Fitting Share Code**).
   if (characterCount > 0) {
