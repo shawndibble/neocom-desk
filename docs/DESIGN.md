@@ -1213,6 +1213,15 @@ Every interactive element takes its states from one shared recipe in
   included.
   - Outset (`outline-offset-2`) on boxed controls and inline links.
   - Inset (`-outline-offset-2`) on full-bleed rows, tabs and nav items.
+- **Highlighted option:** the option a keyboard is on in a menu, Select,
+  search picker or the command palette (the one Enter picks) takes the inset
+  2px accent outline plus the `panel-2` fill, but the outline only while the
+  last input was the keyboard (`data-input="keyboard"` on `<html>`, set and
+  cleared in `app/inputModality.ts` alone). Hover and touch keep the fill and
+  nothing else, so a ring never follows the pointer. Pickers whose focus stays
+  in the search box compose `activeOptionClassName` on the `aria-activedescendant`
+  option; Radix menu items compose `highlightedOptionClassName` (via
+  `menuItemClassName` / `SelectItem`). Neither may set `outline-none`.
   - `scroll-padding` keeps a focused row clear of sticky headers and the
     phone tab bar (WCAG 2.4.11).
 - **Disabled:** `opacity-40` and `cursor-not-allowed`. When there's a reason

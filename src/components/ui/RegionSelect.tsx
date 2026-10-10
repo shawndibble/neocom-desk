@@ -4,7 +4,12 @@ import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/com
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 import { SearchInput } from './SearchInput';
 import * as Icon from './icons';
-import { fieldBaseClassName, fieldSizeClassName, type ControlSize } from './controlStyles';
+import {
+  activeOptionClassName,
+  fieldBaseClassName,
+  fieldSizeClassName,
+  type ControlSize,
+} from './controlStyles';
 
 export interface RegionSelectOption {
   readonly id: number;
@@ -175,7 +180,7 @@ export function RegionSelect({
                 aria-selected={selected}
                 className={cx(
                   'flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm hover:bg-panel-2',
-                  index === highlight && 'bg-panel-2'
+                  index === highlight && `bg-panel-2 ${activeOptionClassName}`
                 )}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(row)}

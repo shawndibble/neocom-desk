@@ -10110,6 +10110,7 @@
         "stateRest": "Rest: variants",
         "stateHoverPressed": "Hover and pressed",
         "stateFocus": "Focus-visible",
+        "stateHighlighted": "Highlighted option",
         "stateDisabled": "Disabled",
         "stateLoading": "Loading (Button loading)",
         "stateSelected": "Selected / on (aria-pressed)",
@@ -10124,12 +10125,14 @@
         "selectedRow": "Click a row. Selected never looks like hover.",
         "states": "Hover, pressed and focus can't be forced on real components. Try them on the samples below.",
         "hoverPressed": "Hover with a pointer: one step brighter. Press and hold: a step darker.",
+        "highlighted": "Open any menu or picker with the keyboard and press ArrowDown: 2px accent outline inside the option, shown here whenever the last input was the keyboard. A pointer keeps only the fill.",
         "focus": "Press Tab: 2px accent outline, outset on boxed controls and inline links.",
         "disabled": "opacity-40. aria-disabled keeps the tooltip reachable.",
         "selectedToggle": "On takes the accent tint.",
         "fieldCaret": "The box is a control (§6); the caret says it opens a list."
       },
       "samples": {
+        "option": "Option",
         "character": "Character name",
         "skill": "Skill name",
         "sentenceBefore": "A link",

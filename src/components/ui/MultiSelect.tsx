@@ -8,6 +8,7 @@ import {
 } from '@/lib/multiSelectSearch';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 import { SearchInput } from './SearchInput';
+import { activeOptionClassName } from './controlStyles';
 import { menuItemClassName } from './menuStyles';
 
 export type { MultiSelectGroup, MultiSelectOption };
@@ -148,7 +149,10 @@ export function MultiSelect<Id>({
                     id={`${listId}-${index}`}
                     role="option"
                     aria-selected={checked}
-                    className={cx(menuItemClassName, index === highlight && 'bg-panel-2')}
+                    className={cx(
+                      menuItemClassName,
+                      index === highlight && `bg-panel-2 ${activeOptionClassName}`
+                    )}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => onToggle(option.id)}
                   >

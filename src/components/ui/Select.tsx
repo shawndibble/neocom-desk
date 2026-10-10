@@ -6,6 +6,7 @@ import * as Icon from './icons';
 import {
   fieldBaseClassName,
   fieldSizeClassName,
+  highlightedOptionClassName,
   interactiveClassName,
   type ControlSize,
 } from './controlStyles';
@@ -100,8 +101,9 @@ export function SelectItem({
   return (
     <SelectPrimitive.Item
       className={cx(
-        'relative flex cursor-pointer items-center rounded-xs py-1.5 pr-2 pl-7 text-sm outline-none touch:min-h-11',
+        'relative flex cursor-pointer items-center rounded-xs py-1.5 pr-2 pl-7 text-sm touch:min-h-11',
         interactiveClassName,
+        highlightedOptionClassName,
         'data-[disabled]:cursor-not-allowed data-[disabled]:text-text-dim data-[disabled]:opacity-40 data-[highlighted]:bg-panel-2 data-[highlighted]:text-text active:bg-panel',
         className
       )}
