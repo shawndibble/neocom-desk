@@ -60,6 +60,8 @@ describe('PilotKillActivity', () => {
     const section = await screen.findByRole('region', { name: 'Where they kill' });
     const chart = within(section).getByRole('img', { name: /Kills per month by space/ });
     expect(chart.getAttribute('aria-label')).toMatch(/[A-Z][a-z]{2}: \d/);
+    // Two nullsec kills this month, so the label names the space, not just the total.
+    expect(chart.getAttribute('aria-label')).toMatch(/: 2 \(2 nullsec\)/);
   });
 
   it('keys each count to its space by name and colour, and nullsec is not the verdict red', async () => {

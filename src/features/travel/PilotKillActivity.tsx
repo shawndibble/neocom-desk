@@ -143,7 +143,14 @@ export function PilotKillActivityView({
       <div
         role="img"
         aria-label={t('travel.pilot.activity.chartLabel', {
-          summary: months.map((m) => `${monthName(m.key)}: ${monthTotal(m)}`).join(', '),
+          summary: months
+            .map((m) => {
+              const parts = KILL_SPACES.filter((sp) => m[sp] > 0).map(
+                (sp) => `${m[sp]} ${t(`common.spaceOption.${sp}`).toLowerCase()}`
+              );
+              return `${monthName(m.key)}: ${monthTotal(m)}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}`;
+            })
+            .join(', '),
         })}
         className="space-y-1"
       >
