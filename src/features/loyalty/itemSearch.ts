@@ -74,6 +74,7 @@ export interface LpSearchResult {
 
 export interface LpSearchInputs {
   stores: readonly LpSnapshotStore[];
+  /** Every NPC corporation with an LP Store (the baked list), whether or not the snapshot has it. */
   corporationNames: ReadonlyMap<number, string>;
   itemNames: ReadonlyMap<number, string>;
   query: string;
@@ -167,12 +168,9 @@ export function searchLpStores(inputs: LpSearchInputs): LpSearchResult {
   }));
 
   const matchedCorporations = rankedSearch(
-    stores.map((store) => ({
-      corporationId: store.corporationId,
-      name: nameOf(store.corporationId),
-    })),
+    [...corporationNames].map(([corporationId, name]) => ({ corporationId, name })),
     query,
-    { primary: (corp) => corp.name, limit: stores.length }
+    { primary: (corp) => corp.name, limit: corporationNames.size }
   );
   const corporations = matchedCorporations
     .map(({ corporationId, name }) => ({

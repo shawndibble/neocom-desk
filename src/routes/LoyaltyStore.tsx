@@ -8,9 +8,9 @@
  * src/features/loyalty/useLoyaltyStoreOffers.ts for how the numbers are
  * assembled.
  *
- * The header's `LpStorePicker` opens any NPC corporation's store, LP or not
- * (issue #2321); `/market/lp-store` with no corporation is the picker's
- * landing state.
+ * The landing search opens any NPC corporation's store, LP or not; an open
+ * store's "Change store" link returns to it (`/market/lp-store` with no
+ * corporation is the landing state).
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
@@ -78,7 +78,6 @@ import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import { nameForType } from '@/features/industry/blueprintCatalog';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useLoyaltyStoreOffers } from '@/features/loyalty/useLoyaltyStoreOffers';
-import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import { LpStoreSearch } from '@/features/loyalty/LpStoreSearch';
 import type { LpSearchCrumbState } from '@/features/loyalty/itemSearch';
 import { MARKET_TABS } from '@/app/pageTabs';
@@ -412,15 +411,11 @@ const FILTER_PARAMS = {
 
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 
-/** The picker in the page header, sized so it wraps onto its own line on a phone. */
-const PICKER_CLASS = 'w-72 max-w-full';
-
-/** The header's picker plus the gear for the one setting this page's numbers lean on, LP Value. */
-function LpStoreActions({ corporationName }: { corporationName: string | null }) {
+/** The header's gear for the one setting this page's numbers lean on, LP Value. */
+function LpStoreActions() {
   const { t } = useTranslation();
   return (
     <>
-      <LpStorePicker corporationName={corporationName} className={PICKER_CLASS} />
       <PageSettingsButton pageName={t('loyaltyStore.title')} section="market">
         <LpValueSettingsForm />
       </PageSettingsButton>
@@ -455,10 +450,7 @@ function LoyaltyStoreLanding() {
   const [params, setParams] = useUrlParams(LANDING_PARAMS);
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3">
-      <PageHeader
-        title={t('loyaltyStore.title')}
-        actions={<LpStoreActions corporationName={null} />}
-      />
+      <PageHeader title={t('loyaltyStore.title')} actions={<LpStoreActions />} />
       <MarketTabBar />
       <LpStoreSearch query={params.q} onQueryChange={(q) => setParams({ q })} />
     </div>
@@ -468,26 +460,40 @@ function LoyaltyStoreLanding() {
 /** The search box's text, in the URL (ADR 0015) so a search can be linked and Back returns to it. */
 const LANDING_PARAMS = { q: textParam() };
 
-/** The crumb back to the search a store was opened from (a result row carries the query in the location state). */
-function SearchCrumb() {
+const CRUMB_CLASS =
+  'inline-flex min-h-11 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:min-h-0';
+
+/**
+ * The links above an open store: back to the search it was opened from (a
+ * result row carries the query in the location state), and "Change store" to
+ * the landing search, the way to switch stores.
+ */
+function StoreCrumbs() {
   const { t } = useTranslation();
   const state = useLocation().state as Partial<LpSearchCrumbState> | null;
-  if (state?.from !== 'lp-search') return null;
-  const q = state.q ?? '';
+  const q = state?.from === 'lp-search' ? (state.q ?? '') : null;
   return (
-    <Link
-      to={q === '' ? '/market/lp-store' : `/market/lp-store?q=${encodeURIComponent(q)}`}
-      className="inline-flex min-h-11 items-center gap-1 self-start rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:min-h-0"
-    >
-      <span aria-hidden="true">‹</span>
-      {t('loyaltyStore.search.crumb')}
-    </Link>
+    <div className="flex flex-wrap items-center gap-x-2 self-start">
+      {q !== null && (
+        <Link
+          to={q === '' ? '/market/lp-store' : `/market/lp-store?q=${encodeURIComponent(q)}`}
+          className={CRUMB_CLASS}
+        >
+          <span aria-hidden="true">‹</span>
+          {t('loyaltyStore.search.crumb')}
+        </Link>
+      )}
+      <Link to="/market/lp-store" className={CRUMB_CLASS}>
+        <span aria-hidden="true">‹</span>
+        {t('loyaltyStore.search.changeStore')}
+      </Link>
+    </div>
   );
 }
 
 /**
  * The route: `/market/lp-store` (landing) or `/market/lp-store/:corporationId`.
- * Keyed on the corporation so switching stores from the picker remounts the
+ * Keyed on the corporation so switching stores remounts the
  * page — no previous store's offers, selection or loaded state carried over
  * under the new store's URL.
  */
@@ -872,7 +878,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   return (
     <ItemActionsProvider page={itemActions}>
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
-        <SearchCrumb />
+        <StoreCrumbs />
         <PageHeader
           title={corpName ?? t('loyaltyStore.title')}
           meta={
@@ -891,7 +897,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
               </StatChips>
             </div>
           }
-          actions={<LpStoreActions corporationName={corpName} />}
+          actions={<LpStoreActions />}
         />
         <MarketTabBar />
 

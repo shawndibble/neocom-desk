@@ -22,29 +22,13 @@ vi.mock('@/features/loyalty/useLpStoreSearch', () => ({
     status: 'ready',
     syncedAt: null,
     result: { groups: [], corporations: [], totalItemMatches: 0 },
+    heldStores: [],
     rowFor: () => null,
     systemName: () => null,
     jumpsStatus: 'ready',
     pricing: false,
   }),
 }));
-
-// The picker loads the LP-corp snapshot and the Character's balances itself
-// (its own tests cover that); here it only has to show which store is open
-// and let a test switch stores.
-vi.mock('@/features/loyalty/LpStorePicker', async () => {
-  const { useNavigate } = await import('react-router-dom');
-  return {
-    LpStorePicker: ({ corporationName }: { corporationName: string | null }) => {
-      const navigate = useNavigate();
-      return (
-        <button type="button" onClick={() => navigate('/loyalty/1000169')}>
-          picker: {corporationName ?? 'none'}
-        </button>
-      );
-    },
-  };
-});
 
 const { LoyaltyStore } = await import('./LoyaltyStore');
 const { useMarketHub } = await import('@/features/market/hub');
@@ -785,7 +769,7 @@ describe('LoyaltyStore offer detail market links (issue #2205)', () => {
   });
 });
 
-describe('LoyaltyStore corporation picker (issue #2321)', () => {
+describe('LoyaltyStore switching stores through the search', () => {
   function renderAt(path: string) {
     return render(
       <MemoryRouter initialEntries={[path]}>
@@ -802,7 +786,8 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'LP Store' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Search LP Stores' })).toBeInTheDocument();
     expect(screen.getByText('Search every LP Store')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'picker: none' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Change store' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /corporation/i })).not.toBeInTheDocument();
     expect(useLoyaltyStoreOffers).not.toHaveBeenCalled();
   });
 
@@ -834,11 +819,13 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
     );
   });
 
-  it('puts the picker in the header, naming the open store', () => {
+  it('has no store select in the header, and an open store links back to the landing', () => {
     renderAt('/loyalty/1000168');
-    expect(
-      screen.getByRole('button', { name: 'picker: Federal Navy Academy' })
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /LP Store corporation/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Change store/ })).toHaveAttribute(
+      'href',
+      '/market/lp-store'
+    );
   });
 
   it("offers the corporation's Show Info from the header", () => {
@@ -874,11 +861,5 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
 
     await user.type(screen.getByPlaceholderText('Search offers…'), 'Scourge');
     expect(await screen.findByText('1 / 2 offers')).toBeInTheDocument();
-  });
-
-  it('opens the picked store from the URL', () => {
-    renderAt('/loyalty/1000168');
-    fireEvent.click(screen.getByRole('button', { name: /^picker:/ }));
-    expect(useLoyaltyStoreOffers).toHaveBeenLastCalledWith(1000169);
   });
 });
