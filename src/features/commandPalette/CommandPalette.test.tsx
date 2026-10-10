@@ -273,11 +273,14 @@ describe('CommandPalette', () => {
     await user.type(await screen.findByRole('combobox'), 'settings');
 
     const items = await screen.findByRole('group', { name: 'Market items' });
-    expect(await within(items).findByText("Couldn't load these results.")).toBeInTheDocument();
+    expect(await within(items).findByText("Couldn't load these results.")).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
     expect(within(items).queryByRole('option')).not.toBeInTheDocument();
     const pages = screen.getByRole('group', { name: 'Pages' });
     // Announced too: the error row is not an option, so the count alone would miss it.
-    expect(screen.getByText(/results?\. Couldn't load these results\.$/)).toHaveAttribute(
+    expect(screen.getByText(/^\d+ results?\..*Couldn't load these results\.$/)).toHaveAttribute(
       'aria-live',
       'polite'
     );
@@ -285,6 +288,17 @@ describe('CommandPalette', () => {
     expect(within(pages).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{Enter}');
     expect(screen.getByTestId('where')).toHaveTextContent('/settings');
+  });
+
+  it('hides the capped note from the listbox and announces it in the status region', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('combobox'), 'a');
+
+    const note = await screen.findByText(/keep typing to narrow/i, { selector: 'div' });
+    expect(note).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText(/results?\. Top \d+ shown/i)).toHaveAttribute('aria-live', 'polite');
   });
 
   it('opens Item Detail over the current page and hands focus back on close', async () => {
