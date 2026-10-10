@@ -3926,6 +3926,20 @@
   },
   "survey": {
     "title": "Mining Survey",
+    "scanList": {
+      "title_one": "{{count}} scan",
+      "title_other": "{{count}} scans",
+      "titleWithRemoved_one": "{{count}} scan · {{removed}} removed",
+      "titleWithRemoved_other": "{{count}} scans · {{removed}} removed",
+      "volume": "{{volume}} m³",
+      "hint": "Remove a bad paste and the survey stops counting it. You can restore it here. On the chart, right-click a point, or press and hold it.",
+      "remove": "Remove",
+      "restore": "Restore",
+      "removed": "Removed",
+      "removeFailed": "Couldn't change that scan. Try again."
+    },
+    "removeScan": "Remove scan",
+    "chartNode": "Scan at {{time}}",
     "adding": "Adding…",
     "differentField": "That scan is a different field than the survey you have open.",
     "expandedCheckLabel": "Check that every section is expanded",

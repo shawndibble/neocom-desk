@@ -17,6 +17,7 @@ import { db } from '@/db';
 import { Button, EmptyState, PageHeader, textActionClassName } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
 import { ownsSurvey } from '@/engine/survey/owner';
+import { countedScans } from '@/engine/survey/series';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { classifyScan, lastSeenField, missingOres } from '@/engine/survey/scanUpdate';
 import { shareUrl } from '@/features/share/shareStore';
@@ -36,7 +37,13 @@ import { useHasMoonOre } from './useHasMoonOre';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { noteSurvey } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
-import { addSurveyScan, loadSurvey, startSurvey, type SurveyTaxShare } from './surveyStore';
+import {
+  addSurveyScan,
+  loadSurvey,
+  setSurveyScanIgnored,
+  startSurvey,
+  type SurveyTaxShare,
+} from './surveyStore';
 import { useSurvey } from './useSurvey';
 
 interface SurveyTabProps {
@@ -113,12 +120,14 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
         // scan since, and a paste is compared against the latest one.
         const found = currentId === null ? null : await loadSurvey(currentId);
         if (found?.ok) {
-          const latest = found.scans[found.scans.length - 1];
+          // Against what the survey counts: a removed bad paste is no field to match.
+          const counted = countedScans(found.scans, found.ignored);
+          const latest = counted[counted.length - 1];
           const sameField =
             choice === 'existing' ||
             latest === undefined ||
             classifyScan(
-              lastSeenField(found.scans.map((scan) => scan.rocks)),
+              lastSeenField(counted.map((scan) => scan.rocks)),
               parseSurveyScan(text) ?? []
             ) === 'update';
           if (!sameField) {
@@ -204,6 +213,22 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
 
   const characterNames = useLiveQuery(() => db.characters.toArray())?.map((c) => c.name) ?? [];
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
+  const owned = state.status === 'ready' && ownsSurvey(state.owner, characterNames);
+  // Only the owner sets a scan aside; the rules can't tell who that is, so this is the guard.
+  const [ignoreFailed, setIgnoreFailed] = useState(false);
+  const setIgnored = useCallback(
+    async (scanId: string, ignored: boolean) => {
+      if (currentId === null || state.status !== 'ready') return;
+      setIgnoreFailed(false);
+      try {
+        await setSurveyScanIgnored({ id: currentId, expiresAt: state.expiresAt, scanId, ignored });
+        await refresh();
+      } catch {
+        setIgnoreFailed(true);
+      }
+    },
+    [currentId, state, refresh]
+  );
   const expiresAt = state.status === 'ready' ? state.expiresAt : null;
 
   return (
@@ -246,15 +271,22 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
             />
           )}
           <ScanFeedback busy={busy} error={error} />
+          {ignoreFailed && (
+            <p role="alert" className="text-sm text-danger">
+              {t('survey.scanList.removeFailed')}
+            </p>
+          )}
           <SurveyBoard
             scans={scans}
+            ignored={state.status === 'ready' ? state.ignored : undefined}
+            onSetIgnored={owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined}
             viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
             afterPanel={(summary) =>
               characterId !== null && (
                 <MoonTaxLine
                   characterId={characterId}
                   oreNames={summary.oreNames}
-                  owned={state.status === 'ready' && ownsSurvey(state.owner, characterNames)}
+                  owned={owned}
                   published={state.status === 'ready' ? state.tax : null}
                   survey={
                     currentId !== null && state.status === 'ready'

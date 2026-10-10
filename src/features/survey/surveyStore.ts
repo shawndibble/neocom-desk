@@ -26,6 +26,7 @@ export { MAX_SCAN_TEXT };
 
 export const SURVEY_SCANS_COLLECTION = 'surveyScans';
 export const SURVEY_TAX_COLLECTION = 'surveyTax';
+export const SURVEY_IGNORES_COLLECTION = 'surveyIgnores';
 
 /** Who gets the moon tax on a Survey, and the rate (0 to 100). */
 export interface SurveyTaxShare {
@@ -86,6 +87,25 @@ export async function setSurveyTax(input: {
   });
 }
 
+/**
+ * Sets a scan aside (or takes it back). Create-only like the scans: the newest
+ * doc for a scan decides, so restoring is a newer doc, never an update. Only
+ * the survey's owner is offered this; the rules can't tell who that is.
+ */
+export async function setSurveyScanIgnored(input: {
+  id: string;
+  expiresAt: number;
+  scanId: string;
+  ignored: boolean;
+}): Promise<void> {
+  await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_IGNORES_COLLECTION), {
+    scanId: input.scanId,
+    ignored: input.ignored,
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(input.expiresAt),
+  });
+}
+
 export type LoadSurveyResult =
   | {
       ok: true;
@@ -93,6 +113,8 @@ export type LoadSurveyResult =
       expiresAt: number;
       owner: string | null;
       tax: SurveyTaxShare | null;
+      /** Ids of the scans the owner set aside; the survey's totals leave them out. */
+      ignored: ReadonlySet<string>;
     }
   | { ok: false; reason: 'not-found' | 'failed' };
 
@@ -118,7 +140,12 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
       const rocks = typeof data.text === 'string' ? parseSurveyScan(data.text) : null;
       if (rocks === null || !(data.createdAt instanceof Timestamp)) continue;
       const by = typeof data.by === 'string' && data.by.trim() !== '' ? data.by.trim() : undefined;
-      scans.push({ at: data.createdAt.toMillis(), rocks, ...(by === undefined ? {} : { by }) });
+      scans.push({
+        id: d.id,
+        at: data.createdAt.toMillis(),
+        rocks,
+        ...(by === undefined ? {} : { by }),
+      });
     }
     scans.sort((a, b) => a.at - b.at);
     return {
@@ -127,6 +154,7 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
       expiresAt: found.share.expiresAt,
       owner: ownerOf(found.share.payload),
       tax: await loadSurveyTax(id),
+      ignored: await loadSurveyIgnored(id),
     };
   } catch {
     return { ok: false, reason: 'failed' };
@@ -153,5 +181,27 @@ async function loadSurveyTax(id: string): Promise<SurveyTaxShare | null> {
     return newest?.tax ?? null;
   } catch {
     return null;
+  }
+}
+
+/** The ids of the scans whose newest ignore doc says ignored. A failed read is "none": the scans still load. */
+async function loadSurveyIgnored(id: string): Promise<Set<string>> {
+  try {
+    const snapshot = await getDocs(
+      collection(getSyncFirestore(), 'shares', id, SURVEY_IGNORES_COLLECTION)
+    );
+    const newest = new Map<string, { at: number; ignored: boolean }>();
+    for (const d of snapshot.docs) {
+      const data = d.data();
+      if (typeof data.scanId !== 'string' || typeof data.ignored !== 'boolean') continue;
+      if (!(data.createdAt instanceof Timestamp)) continue;
+      const at = data.createdAt.toMillis();
+      const seen = newest.get(data.scanId);
+      if (seen === undefined || at > seen.at)
+        newest.set(data.scanId, { at, ignored: data.ignored });
+    }
+    return new Set([...newest].filter(([, v]) => v.ignored).map(([scanId]) => scanId));
+  } catch {
+    return new Set();
   }
 }

@@ -1027,6 +1027,9 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   ore as of the newest scan that had it; no new ore, none with more m³) is an
   update of the Survey, even if an ore dropped out of the latest scan; any other scan is a different
   field. Shown on the Mining › Survey tab and on the public page of its link.
+- **Removed scan** (also: ignored scan): A Survey Scan its owner has set aside as
+  a bad paste. It stays stored and listed, but the Survey's totals, chart and
+  same-field check leave it out, and the owner can restore it.
 - **Survey Scan**: One copy of the in-game Survey Scanner results: a row per
   rock (ore, units, volume in m³, ISK value, distance), pasted as text. Stored
   as that text, timed by the server's clock. Between two scans, rocks are

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
+import { countedScans } from '@/engine/survey/series';
 import { classifyScan, lastSeenField, missingOres } from '@/engine/survey/scanUpdate';
 import { ShareShell } from '@/features/share/ShareShell';
 import { shareUrl } from '@/features/share/shareStore';
@@ -50,11 +51,12 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
         // pilot may have just added.
         const found = await loadSurvey(shareId);
         if (!found.ok) return 'failed';
-        const latest = found.scans[found.scans.length - 1];
+        const counted = countedScans(found.scans, found.ignored);
+        const latest = counted[counted.length - 1];
         if (
           latest !== undefined &&
           classifyScan(
-            lastSeenField(found.scans.map((scan) => scan.rocks)),
+            lastSeenField(counted.map((scan) => scan.rocks)),
             parseSurveyScan(text) ?? []
           ) === 'different'
         ) {
@@ -143,6 +145,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
           <ScanFeedback busy={busy} error={error} />
           <SurveyBoard
             scans={state.scans}
+            ignored={state.ignored}
             url={shareUrl(shareId)}
             expiresAt={state.expiresAt}
             afterPanel={(summary) => <MoonTaxIfMoon tax={state.tax} oreNames={summary.oreNames} />}

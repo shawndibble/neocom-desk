@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeSurvey, type SurveyScan } from './series';
+import { countedScans, summarizeSurvey, type SurveyScan } from './series';
 
 const MIN = 60_000;
 const T0 = Date.UTC(2026, 9, 8, 16, 40, 0);
@@ -225,5 +225,38 @@ describe('summarizeSurvey', () => {
       new Map([['Veldspar', 20]])
     )!;
     expect(s.oreNames).toEqual(['Veldspar', 'Odd']);
+  });
+});
+
+describe('countedScans', () => {
+  const withId = (id: string, s: SurveyScan): SurveyScan => ({ ...s, id });
+
+  it('drops the scans whose id is ignored and keeps the rest in order', () => {
+    const a = withId('a', scan(0, ['Sylvite', 1000]));
+    const b = withId('b', scan(5, ['Sylvite', 9]));
+    const c = withId('c', scan(10, ['Sylvite', 400]));
+    expect(countedScans([a, b, c], new Set(['b']))).toEqual([a, c]);
+  });
+
+  it('keeps a scan with no id, which can never be ignored', () => {
+    const a = scan(0, ['Sylvite', 1000]);
+    expect(countedScans([a], new Set(['a']))).toEqual([a]);
+  });
+
+  it('keeps everything when nothing is ignored', () => {
+    const a = withId('a', scan(0, ['Sylvite', 1000]));
+    expect(countedScans([a], new Set())).toEqual([a]);
+  });
+
+  it('leaves a bad paste out of the totals, so the survey reads as if it never came', () => {
+    const scans = [
+      withId('a', scan(0, ['Sylvite', 1000])),
+      withId('bad', scan(2, ['Sylvite', 50_000])),
+      withId('c', scan(5, ['Sylvite', 700])),
+    ];
+    const s = summarizeSurvey(countedScans(scans, new Set(['bad'])))!;
+    expect(s.startVolume).toBe(1000);
+    expect(s.leftVolume).toBe(700);
+    expect(s.percent).toBe(30);
   });
 });

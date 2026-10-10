@@ -12,13 +12,21 @@ import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import { surveyChatMessage, type SurveyMessageLabels } from '@/engine/survey/chatMessage';
 import { priceScans } from '@/engine/survey/pricing';
-import { summarizeSurvey, type SurveyScan, type SurveySummary } from '@/engine/survey/series';
+import {
+  countedScans,
+  summarizeSurvey,
+  type SurveyScan,
+  type SurveySummary,
+} from '@/engine/survey/series';
 import { writeToClipboard } from '@/lib/clipboard';
 import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { SurveyLegend } from './SurveyLegend';
 import { SurveyOres } from './SurveyOres';
+import { SurveyScanList } from './SurveyScanList';
 import { SurveyStats } from './SurveyStats';
 import { useOrePrices } from './useOrePrices';
+
+const NONE: ReadonlySet<string> = new Set();
 
 const LazySurveyCharts = lazy(() =>
   import('./SurveyCharts').then((m) => ({ default: m.SurveyCharts }))
@@ -26,6 +34,10 @@ const LazySurveyCharts = lazy(() =>
 
 interface SurveyBoardProps {
   scans: SurveyScan[];
+  /** Ids of the scans the owner set aside: they stay out of the totals and the chart. */
+  ignored?: ReadonlySet<string>;
+  /** Offered to the survey's owner only: sets a scan aside or takes it back. Absent, the board is read-only. */
+  onSetIgnored?: (scanId: string, ignored: boolean) => void;
   /** The survey's short link; null until it has been stored. */
   url: string | null;
   /** Epoch ms the link stops working; null until stored. */
@@ -56,7 +68,9 @@ function useCopyOutcome(): [CopyOutcome, (next: CopyOutcome) => void] {
 }
 
 export function SurveyBoard({
-  scans,
+  scans: allScans,
+  ignored = NONE,
+  onSetIgnored,
   url,
   expiresAt,
   footerActions,
@@ -65,6 +79,7 @@ export function SurveyBoard({
   panelTitle,
 }: SurveyBoardProps) {
   const { t, i18n } = useTranslation();
+  const scans = useMemo(() => countedScans(allScans, ignored), [allScans, ignored]);
   const oreNames = useMemo(() => scans.flatMap((s) => s.rocks.map((r) => r.ore)), [scans]);
   const orePrices = useOrePrices(oreNames);
   // The scanner's own ISK column is not trusted: rocks are valued at market.
@@ -73,6 +88,18 @@ export function SurveyBoard({
     [scans, orePrices.prices]
   );
   const [outcome, setOutcome] = useCopyOutcome();
+
+  // Every scan, so a removed one can be restored; the chart and totals use `scans`.
+  const scanList = onSetIgnored !== undefined && allScans.length > 0 && (
+    <SurveyScanList scans={allScans} ignored={ignored} onSetIgnored={onSetIgnored} />
+  );
+  const removeAt =
+    onSetIgnored === undefined
+      ? undefined
+      : (at: number) => {
+          const id = scans.find((s) => s.at === at)?.id;
+          if (id !== undefined) onSetIgnored(id, true);
+        };
 
   const labels: SurveyMessageLabels = {
     heading: t('survey.message.heading'),
@@ -105,6 +132,7 @@ export function SurveyBoard({
       <div className="space-y-4">
         <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
         {footerActions}
+        {scanList}
       </div>
     );
   }
@@ -151,7 +179,7 @@ export function SurveyBoard({
                   </div>
                 }
               >
-                <LazySurveyCharts summary={summary} />
+                <LazySurveyCharts summary={summary} onRemoveScan={removeAt} />
               </Suspense>
             </>
           )}
@@ -181,6 +209,9 @@ export function SurveyBoard({
           priceNote={{ hub: orePrices.hub.systemName, compressed: orePrices.compressed }}
         />
       )}
+
+      {/* Last on the page, and only for the owner (no `onSetIgnored` otherwise). */}
+      {scanList}
     </div>
   );
 }
