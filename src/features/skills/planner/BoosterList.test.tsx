@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -31,7 +32,7 @@ const ROW = (overrides: Partial<PlanBooster> = {}): PlanBooster => ({
 describe('BoosterList empty state', () => {
   it('shows only the add affordance when there are no rows', () => {
     renderList([]);
-    expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Remove accelerator [0-9]/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
   });
 
@@ -54,7 +55,7 @@ describe('BoosterList row editing', () => {
     const rows = [ROW({ bonus: 3 }), ROW({ bonus: 6 })];
     const { onChange } = renderList(rows);
 
-    await user.click(screen.getAllByRole('button', { name: 'Remove accelerator' })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^Remove accelerator [0-9]/ })[0]);
 
     expect(onChange).toHaveBeenCalledWith([rows[1]]);
   });
@@ -186,5 +187,57 @@ describe('BoosterList quick picks', () => {
       ROW({ expiresAt: futureStart }),
       ROW({ startsAt: futureStart, expiresAt: futureStart + 60 * 60 * 1000 }),
     ]);
+  });
+});
+
+describe('BoosterList overlap warning', () => {
+  it('announces the overlap and ties it to the inputs', () => {
+    renderList([ROW({ expiresAt: 9000 }), ROW({ startsAt: 1000, expiresAt: 5000 })]);
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts[0]).toHaveTextContent(/overlaps another one/i);
+    const hours = screen.getAllByRole('textbox', { name: /hours/i })[0];
+    expect(hours).toHaveAttribute('aria-invalid', 'true');
+    expect(hours).toHaveAttribute('aria-describedby', alerts[0].id);
+  });
+
+  it('stays silent without an overlap', () => {
+    renderList([ROW({ expiresAt: 5000 })]);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getAllByRole('textbox', { name: /hours/i })[0]).not.toHaveAttribute(
+      'aria-invalid'
+    );
+  });
+});
+
+describe('BoosterList focus after remove', () => {
+  function StatefulList({ initial }: { initial: PlanBooster[] }) {
+    const [boosters, setBoosters] = useState(initial);
+    return <BoosterList boosters={boosters} detectedAccelerator={null} onChange={setBoosters} />;
+  }
+
+  function renderStateful(initial: PlanBooster[]) {
+    render(
+      <MemoryRouter>
+        <StatefulList initial={initial} />
+      </MemoryRouter>
+    );
+  }
+
+  it("moves focus to the previous row's Remove button", async () => {
+    const user = userEvent.setup();
+    renderStateful([ROW({ bonus: 3 }), ROW({ bonus: 6 })]);
+
+    await user.click(screen.getByRole('button', { name: 'Remove accelerator 2' }));
+
+    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toHaveFocus();
+  });
+
+  it('moves focus to Add accelerator when the first row goes', async () => {
+    const user = userEvent.setup();
+    renderStateful([ROW({ bonus: 3 }), ROW({ bonus: 6 })]);
+
+    await user.click(screen.getByRole('button', { name: 'Remove accelerator 1' }));
+
+    expect(screen.getByRole('button', { name: 'Add accelerator' })).toHaveFocus();
   });
 });

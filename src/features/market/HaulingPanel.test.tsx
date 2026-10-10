@@ -163,12 +163,16 @@ describe('HaulingPanel trip summary', () => {
   it('select all in the summary row unticks and reticks every row', async () => {
     const user = userEvent.setup();
     renderPanel();
-    const all = screen.getByRole('checkbox', { name: 'Select all' });
+    const all = screen.getByRole('checkbox', { name: /select all.*[0-9]+ of [0-9]+/i });
     const row = screen.getByRole('checkbox', { name: /Include Damage Control II/ });
     expect(all).toBeChecked();
     await user.click(all);
     expect(row).not.toBeChecked();
     expect(screen.getByText('0 of 1')).toBeInTheDocument();
+    expect(row.closest('tr')?.className).not.toMatch(/opacity-/);
+    expect(
+      screen.getByRole('textbox', { name: 'Quantity of Damage Control II to bring' })
+    ).toHaveValue('');
     await user.click(all);
     expect(row).toBeChecked();
   });
@@ -193,7 +197,7 @@ describe('HaulingPanel trip summary', () => {
     });
     renderPanel();
 
-    await user.click(screen.getByRole('button', { name: 'Copy Multibuy' }));
+    await user.click(screen.getByRole('button', { name: 'Copy multibuy list' }));
 
     expect(await screen.findByLabelText('Multibuy list')).toHaveTextContent('Damage Control II');
   });

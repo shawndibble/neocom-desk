@@ -94,7 +94,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
     // At 390px the ring is an overview — its tiles are too small to be the
     // tap target (scope decision 20260924-205720) — so the rack buttons are.
-    await expect(page.getByLabel(/^High slots 1,/)).toBeVisible();
+    await expect(page.getByLabel(/^High slots 1[:,]/)).toBeVisible();
     const rackButton = page.getByRole('button', { name: /^High slots\s*\d+ \/ \d+/ });
     const rackBox = await rackButton.boundingBox();
     expect(rackBox!.height).toBeGreaterThanOrEqual(44);

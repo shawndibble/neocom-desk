@@ -379,6 +379,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   // search reports across every division, so the two compose rather than
   // one replacing the other.
   const [search, setSearch] = useUrlParam('q', SEARCH_PARAM);
+  const searchRef = useRef<HTMLInputElement>(null);
   // Query string carried onto every drill-down link, as on the Assets page.
   const { search: query } = useLocation();
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -607,6 +608,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
               </p>
             )}
             <SearchInput
+              ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('corp.assets.searchPlaceholder')}
@@ -698,7 +700,10 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                     variant="plain"
                     size="sm"
                     className="ml-auto"
-                    onClick={() => setSearch('')}
+                    onClick={() => {
+                      setSearch('');
+                      searchRef.current?.focus();
+                    }}
                   />
                 </div>
               )}
@@ -723,6 +728,8 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                 <div
                   ref={scrollParentRef}
                   data-virtual-scroll-root
+                  role="region"
+                  aria-label={t('corp.assets.treeLabel')}
                   className="min-h-0 overflow-y-auto"
                 >
                   {showItemColumns && <ItemColumnLabels t={t} />}

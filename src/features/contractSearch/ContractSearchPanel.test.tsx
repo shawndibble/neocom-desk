@@ -610,6 +610,17 @@ describe('ContractSearchPanel', () => {
     expect(within(rows[0]).queryByText('buyout')).not.toBeInTheDocument();
   });
 
+  it('announces how many items match the typed text', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+
+    await user.type(screen.getByPlaceholderText('Search item name…'), 'trit');
+
+    const status = await screen.findByText('1 matching item, listed below the search');
+    expect(status).toHaveAttribute('role', 'status');
+  });
+
   it('narrows to one item type when a suggestion is picked, and summarises its offers', async () => {
     const user = userEvent.setup();
     renderWithRouter();

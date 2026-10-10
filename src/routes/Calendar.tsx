@@ -364,7 +364,10 @@ export function Calendar() {
         <IconButton
           size="sm"
           icon={<Icon.CalendarEvent />}
-          label={
+          label={t('calendar.density.fortnightView')}
+          // The name stays put and `pressed` carries the state; the bubble
+          // still says what a press will do.
+          tooltip={
             density === 'month' ? t('calendar.density.toFortnight') : t('calendar.density.toMonth')
           }
           pressed={density === 'fortnight'}
@@ -405,7 +408,7 @@ export function Calendar() {
               icon={<Icon.Refresh />}
               label={t('calendar.refresh')}
               onClick={refresh}
-              disabled={loading}
+              busy={loading}
             />
           </>
         }

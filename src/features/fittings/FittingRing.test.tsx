@@ -246,7 +246,7 @@ describe('FittingRing', () => {
         ]}
       />
     );
-    expect(screen.getByLabelText('Low slots 1, online')).toBeTruthy();
+    expect(screen.getByLabelText(/^Low slots 1: .*, online$/)).toBeTruthy();
   });
 
   it('marks each module that takes a charge with a rim pip, filled once one is loaded', () => {
@@ -307,7 +307,7 @@ describe('FittingRing', () => {
     expect(screen.getByLabelText('High slots 2, empty')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('High slots 3, empty')).toHaveAttribute('aria-pressed', 'false');
     // A fitted tile opens its module rather than toggling, so it is no pressed button.
-    expect(screen.getByLabelText('High slots 1, active')).not.toHaveAttribute('aria-pressed');
+    expect(screen.getByLabelText(/^High slots 1: .*, active$/)).not.toHaveAttribute('aria-pressed');
   });
 
   it('marks no slot as pressed on the phone overview, whose tiles only explain themselves', () => {
@@ -395,10 +395,10 @@ describe('FittingRing', () => {
     expect(
       container.querySelector('[data-ring-slot] img[src*="/images/fitting/hardpoint-"]')
     ).toBeNull();
-    expect(screen.getByLabelText('High slots 1, active, turret hardpoint')).toBeTruthy();
-    expect(screen.getByLabelText('High slots 2, active, launcher hardpoint')).toBeTruthy();
+    expect(screen.getByLabelText(/^High slots 1: .*, active, turret hardpoint$/)).toBeTruthy();
+    expect(screen.getByLabelText(/^High slots 2: .*, active, launcher hardpoint$/)).toBeTruthy();
     // A utility high (a neut, a cloak) takes no hardpoint.
-    expect(screen.getByLabelText('High slots 3, active')).toBeTruthy();
+    expect(screen.getByLabelText(/^High slots 3: .*, active$/)).toBeTruthy();
 
     fireEvent.pointerMove(container.querySelector('[data-ring-slot="high-1"]')!, {
       pointerType: 'mouse',
@@ -458,36 +458,40 @@ describe('FittingRing with the editor’s item actions', () => {
     const onSlotSelect = vi.fn();
     renderRing(actions, { onSlotSelect });
     // A mouse click carries detail 1: the active autocannon goes to overload.
-    fireEvent.click(screen.getByLabelText(/^High slots 1, active/), { detail: 1 });
+    fireEvent.click(screen.getByLabelText(/^High slots 1: .*, active/), { detail: 1 });
     expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
     // The passive module tops out at online, so its click wraps to offline.
-    fireEvent.click(screen.getByLabelText(/^Low slots 1, online/), { detail: 1 });
+    fireEvent.click(screen.getByLabelText(/^Low slots 1: .*, online/), { detail: 1 });
     expect(actions.setState).toHaveBeenCalledWith('low', 0, 'offline');
     expect(onSlotSelect).not.toHaveBeenCalled();
     // Enter/Space arrive as a click with no detail: they keep selecting.
-    fireEvent.click(screen.getByLabelText(/^High slots 1, active/));
+    fireEvent.click(screen.getByLabelText(/^High slots 1: .*, active/));
     expect(onSlotSelect).toHaveBeenCalledWith('high', 0);
     // The keyboard cycles with S.
-    fireEvent.keyDown(screen.getByLabelText(/^Low slots 1, online/), { key: 's' });
+    fireEvent.keyDown(screen.getByLabelText(/^Low slots 1: .*, online/), { key: 's' });
     expect(actions.setState).toHaveBeenCalledTimes(3);
   });
 
   it('never recolours a state-bearing tile’s border on hover', () => {
     renderRing(fakeItemActions({ names }), { onSlotSelect: vi.fn() });
     // The border colour is the module's state; hover would read as a state change.
-    expect(screen.getByLabelText(/^High slots 1, active/).className).not.toMatch(/hover:border/);
-    expect(screen.getByLabelText(/^Low slots 1, online/).className).not.toMatch(/hover:border/);
-    expect(screen.getByLabelText(/^High slots 1, active/).className).toMatch(/\bborder-success\b/);
+    expect(screen.getByLabelText(/^High slots 1: .*, active/).className).not.toMatch(
+      /hover:border/
+    );
+    expect(screen.getByLabelText(/^Low slots 1: .*, online/).className).not.toMatch(/hover:border/);
+    expect(screen.getByLabelText(/^High slots 1: .*, active/).className).toMatch(
+      /\bborder-success\b/
+    );
     // An empty slot has no state to confuse, so it keeps its hover.
     expect(screen.getByLabelText(/^Mid slots 1, empty/).className).toMatch(/hover:border-accent/);
     // The keyboard focus ring stays.
-    expect(screen.getByLabelText(/^High slots 1, active/).className).toMatch(/focus-visible/);
+    expect(screen.getByLabelText(/^High slots 1: .*, active/).className).toMatch(/focus-visible/);
   });
 
   it('keeps the border on the state a click reached', () => {
     const actions = fakeItemActions({ names });
     const { rerender } = renderRing(actions);
-    fireEvent.click(screen.getByLabelText(/^High slots 1, active/), { detail: 1 });
+    fireEvent.click(screen.getByLabelText(/^High slots 1: .*, active/), { detail: 1 });
     expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
     rerender(
       <MemoryRouter>
@@ -506,14 +510,16 @@ describe('FittingRing with the editor’s item actions', () => {
         </FakeItemActions>
       </MemoryRouter>
     );
-    expect(screen.getByLabelText(/^High slots 1, overloaded/).className).toMatch(
+    expect(screen.getByLabelText(/^High slots 1: .*, overloaded/).className).toMatch(
       /\bborder-warning\b/
     );
   });
 
   it('says in the one tooltip what a click does, where a click does something', async () => {
     renderRing(fakeItemActions({ names }));
-    fireEvent.pointerMove(screen.getByLabelText(/^High slots 1, active/), { pointerType: 'mouse' });
+    fireEvent.pointerMove(screen.getByLabelText(/^High slots 1: .*, active/), {
+      pointerType: 'mouse',
+    });
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Autocannon (active)');
     expect(tooltip).toHaveTextContent('Click to set Overheated');
@@ -523,7 +529,7 @@ describe('FittingRing with the editor’s item actions', () => {
   it('opens a fitted tile’s menu: its reachable states, unload, remove', async () => {
     const actions = fakeItemActions({ names });
     renderRing(actions);
-    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.contextMenu(screen.getByLabelText(/^High slots 1: .*, active$/));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'State' }));
     const states = await screen.findAllByRole('menuitemradio');
     expect(states.map((item) => item.textContent?.replace('✓', ''))).toEqual([
@@ -539,11 +545,11 @@ describe('FittingRing with the editor’s item actions', () => {
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Overloaded' }));
     expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
 
-    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.contextMenu(screen.getByLabelText(/^High slots 1: .*, active$/));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Unload EMP S' }));
     expect(actions.unloadCharge).toHaveBeenCalledWith('high', 0);
 
-    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.contextMenu(screen.getByLabelText(/^High slots 1: .*, active$/));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove Autocannon' }));
     expect(actions.remove).toHaveBeenCalledWith('high', 0);
   });
@@ -551,7 +557,7 @@ describe('FittingRing with the editor’s item actions', () => {
   it('asks how many of a module’s charge to put in the cargo, from its menu', async () => {
     const actions = fakeItemActions({ names });
     renderRing(actions);
-    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.contextMenu(screen.getByLabelText(/^High slots 1: .*, active$/));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Put EMP S in cargo…' }));
     expect(actions.changeCargoQuantity).toHaveBeenCalledWith(20);
   });
@@ -559,7 +565,7 @@ describe('FittingRing with the editor’s item actions', () => {
   it('loads a module’s charge into every compatible module from its menu', async () => {
     const actions = fakeItemActions({ names });
     renderRing(actions);
-    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.contextMenu(screen.getByLabelText(/^High slots 1: .*, active$/));
     fireEvent.click(
       await screen.findByRole('menuitem', { name: 'Load EMP S into all compatible' })
     );
@@ -568,7 +574,7 @@ describe('FittingRing with the editor’s item actions', () => {
 
   it('offers a passive module only the states it can reach', async () => {
     renderRing(fakeItemActions({ names }));
-    fireEvent.contextMenu(screen.getByLabelText('Low slots 1, online'));
+    fireEvent.contextMenu(screen.getByLabelText(/^Low slots 1: .*, online$/));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'State' }));
     const states = await screen.findAllByRole('menuitemradio');
     expect(states.map((item) => item.textContent?.replace('✓', ''))).toEqual(['Offline', 'Online']);
@@ -583,7 +589,7 @@ describe('FittingRing with the editor’s item actions', () => {
       ],
     };
     renderRing(fakeItemActions({ names }), { fitting: t3, moduleResults: null });
-    fireEvent.contextMenu(screen.getByLabelText(/^Subsystems 1, /));
+    fireEvent.contextMenu(screen.getByLabelText(/^Subsystems 1: /));
     const menu = await screen.findByRole('menu');
     expect(within(menu).queryByRole('menuitem', { name: 'State' })).toBeNull();
     expect(within(menu).getByRole('menuitem', { name: 'Remove #30' })).toBeTruthy();
@@ -604,14 +610,14 @@ describe('FittingRing with the editor’s item actions', () => {
         { state: 'offline' as const, maxState: 'offline' as const, chargeGroupIds: [] },
       ],
     });
-    const tile = screen.getByLabelText('Subsystems 1, online');
+    const tile = screen.getByLabelText(/^Subsystems 1: .*, online$/);
     expect(tile.getAttribute('data-module-state')).toBe('online');
   });
 
   it('removes a focused module with Delete', () => {
     const actions = fakeItemActions({ names });
     renderRing(actions);
-    fireEvent.keyDown(screen.getByLabelText('High slots 1, active'), { key: 'Delete' });
+    fireEvent.keyDown(screen.getByLabelText(/^High slots 1: .*, active$/), { key: 'Delete' });
     expect(actions.remove).toHaveBeenCalledWith('high', 0);
   });
 
@@ -629,7 +635,7 @@ describe('FittingRing with the editor’s item actions', () => {
 
   it('is one tab stop, the arrow keys walking the slots in ring order', () => {
     renderRing(fakeItemActions({ names }));
-    const first = screen.getByLabelText('High slots 1, active');
+    const first = screen.getByLabelText(/^High slots 1: .*, active$/);
     const second = screen.getByLabelText('High slots 2, empty');
     expect(first).toHaveAttribute('tabindex', '0');
     expect(second).toHaveAttribute('tabindex', '-1');
@@ -651,16 +657,18 @@ describe('FittingRing with the editor’s item actions', () => {
       targets: ['high-0'],
     };
     act(() => useFittingDrag.setState({ payload }));
-    expect(screen.getByLabelText('Low slots 1, online').className).toContain('opacity-35');
-    expect(screen.getByLabelText('High slots 1, active').className).not.toContain('opacity-35');
+    expect(screen.getByLabelText(/^Low slots 1: .*, online$/).className).toContain('opacity-35');
+    expect(screen.getByLabelText(/^High slots 1: .*, active$/).className).not.toContain(
+      'opacity-35'
+    );
 
     // A dim tile doesn't take it, so it falls through to the ring, which places it.
-    fireEvent.drop(screen.getByLabelText('Low slots 1, online'), dropWith(payload));
+    fireEvent.drop(screen.getByLabelText(/^Low slots 1: .*, online$/), dropWith(payload));
     expect(actions.drop).toHaveBeenCalledWith(payload, { kind: 'ring' }, undefined);
     vi.mocked(actions.drop).mockClear();
 
     // jsdom has no DragEvent, so the drop can't carry altKey on its own.
-    const target = screen.getByLabelText('High slots 1, active');
+    const target = screen.getByLabelText(/^High slots 1: .*, active$/);
     const altDrop = createEvent.drop(target, dropWith(payload));
     Object.defineProperty(altDrop, 'altKey', { value: true });
     fireEvent(target, altDrop);
@@ -676,7 +684,7 @@ describe('FittingRing with the editor’s item actions', () => {
     renderRing(actions, { onDropType: vi.fn() });
     const medium: FittingDragPayload = { kind: 'type', typeId: 99, rack: 'medium' };
     // Over a low tile, which doesn't take a mid-slot module.
-    fireEvent.drop(screen.getByLabelText('Low slots 1, online'), dropWith(medium));
+    fireEvent.drop(screen.getByLabelText(/^Low slots 1: .*, online$/), dropWith(medium));
     expect(actions.drop).toHaveBeenCalledWith(medium, { kind: 'ring' }, undefined);
     vi.mocked(actions.drop).mockClear();
 
@@ -691,7 +699,7 @@ describe('FittingRing with the editor’s item actions', () => {
     const onDropType = vi.fn();
     renderRing(actions, { onDropType });
     const high: FittingDragPayload = { kind: 'type', typeId: 99, rack: 'high' };
-    fireEvent.drop(screen.getByLabelText('High slots 1, active'), dropWith(high));
+    fireEvent.drop(screen.getByLabelText(/^High slots 1: .*, active$/), dropWith(high));
     expect(onDropType).toHaveBeenCalledWith('high', 0, 99);
     expect(actions.drop).not.toHaveBeenCalled();
   });

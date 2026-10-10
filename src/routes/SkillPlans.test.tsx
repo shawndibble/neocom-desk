@@ -289,7 +289,7 @@ describe('SkillPlans CRUD', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     expect(await within(dialog).findByText(/Detected: skill plan/)).toBeInTheDocument();
-    expect(within(dialog).getByLabelText(/paste/i)).toHaveValue('Gunnery V');
+    expect(within(dialog).getByRole('textbox', { name: /paste/i })).toHaveValue('Gunnery V');
 
     const stored = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
     expect(stored).toHaveLength(1);
@@ -1135,7 +1135,7 @@ describe('SkillPlans editor: remap markers', () => {
     await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([4]));
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
 
-    await user.click(screen.getByRole('button', { name: 'Remove marker' }));
+    await user.click(screen.getByRole('button', { name: 'Remove remap marker 1' }));
     await waitFor(() => expect(screen.queryByText('Remap marker')).not.toBeInTheDocument());
     expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([]);
   });
@@ -1645,7 +1645,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     expect(await screen.findByLabelText('Days')).toHaveValue('5');
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
-    expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toBeInTheDocument();
   });
 });
 

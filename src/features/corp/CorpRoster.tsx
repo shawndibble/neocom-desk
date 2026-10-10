@@ -14,6 +14,7 @@
  */
 import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { ItemInfoLink } from '@/features/entities';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -177,12 +178,23 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         // to this cell rather than the whole row, so the amber reads as a
         // statement about the silence and not about the person.
         cellClassName: (row) => (row.standing.isDark ? 'text-warning' : undefined),
-        render: (row) =>
-          row.standing.neverSeen
+        render: (row) => {
+          const age = row.standing.neverSeen
             ? t('corp.members.never')
             : // Clamped here, not in the engine: a negative span is clock skew,
               // and "just now" is the honest rendering of it.
-              formatAge(Math.max(0, row.standing.darkForMs ?? 0), t),
+              formatAge(Math.max(0, row.standing.darkForMs ?? 0), t);
+          // Amber alone is the only signal otherwise (WCAG 1.4.1); the glyph
+          // is decorative, the age text beside it is what is read.
+          return row.standing.isDark ? (
+            <span className="inline-flex items-center gap-1">
+              <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0" />
+              {age}
+            </span>
+          ) : (
+            age
+          );
+        },
         // Sorted on the span, matching what the cell prints — see the module
         // note. `undefined` for a member with no date at all sinks them to the
         // end in either direction, which is right: nothing is known about them.

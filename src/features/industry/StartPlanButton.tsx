@@ -50,14 +50,13 @@ export function StartPlanButton({ onStart, compact, planKey }: StartPlanButtonPr
         size="row"
         icon={<Icon.AddToPlan />}
         label={t('industry.startPlanFor', { name: compact.name })}
-        disabled={starting}
-        aria-busy={starting}
+        busy={starting}
         onClick={start}
       />
     );
   }
   return (
-    <Button size="sm" disabled={starting} aria-busy={starting} onClick={start}>
+    <Button size="sm" aria-disabled={starting || undefined} aria-busy={starting} onClick={start}>
       {starting
         ? t('industry.marketOpportunitiesStartingPlan')
         : t('industry.marketOpportunitiesStartPlan')}
