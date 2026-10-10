@@ -2288,6 +2288,7 @@
     "verdictTagBuy": "Buy",
     "verdictTagUnknown": "—",
     "verdictTagAmount": "{{amount}} ISK",
+    "verdictTagSummary": "{{verdict}}: build {{buildCost}}, buy {{buyCost}}",
     "addPlan": "Add build plan",
     "searchPlaceholder": "Search and add…",
     "blueprintMissing": "This plan's blueprint isn't in the current SDE snapshot.",
