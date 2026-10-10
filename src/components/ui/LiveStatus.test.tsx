@@ -33,10 +33,11 @@ describe('LiveStatus', () => {
     expect(region).toHaveTextContent('Copied');
   });
 
-  it('does not fill after unmount', () => {
+  it('clears its pending fill timer on unmount', () => {
     const { unmount } = render(<LiveStatus>Copied</LiveStatus>);
+    expect(vi.getTimerCount()).toBe(1);
     unmount();
-    expect(() => flush()).not.toThrow();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('empties then refills when announceKey changes with the same text', () => {
