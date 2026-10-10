@@ -41,6 +41,7 @@ import {
   StatChips,
   TextInput,
   IskAmount,
+  LiveStatus,
   type DataTableColumn,
 } from '@/components/ui';
 import {
@@ -1157,6 +1158,11 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                 <div className="px-3 pt-2 text-[0.6875rem] text-text-dim empty:hidden">
                   <JumpRangeNote status={jumpRangeFilter.status} />
                 </div>
+
+                <LiveStatus>
+                  {suggestions.length > 0 &&
+                    t('contractSearch.suggestionsCount', { count: suggestions.length })}
+                </LiveStatus>
 
                 {suggestions.length > 0 && (
                   <div className="border-b border-line bg-panel-2 px-3 py-2">
