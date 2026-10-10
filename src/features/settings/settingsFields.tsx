@@ -16,13 +16,9 @@ export function DefaultsSyncHint() {
 
 /** The chips' group, described by its `Field`'s note — a group has no `htmlFor` to hang one on. */
 function ChipGroup({ label, children }: { label: string; children: ReactNode }) {
+  const noteId = useContext(FieldNoteContext);
   return (
-    <div
-      role="group"
-      aria-label={label}
-      aria-describedby={useContext(FieldNoteContext)}
-      className="flex flex-wrap gap-2"
-    >
+    <div role="group" aria-label={label} aria-describedby={noteId} className="flex flex-wrap gap-2">
       {children}
     </div>
   );
