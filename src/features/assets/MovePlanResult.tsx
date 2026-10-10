@@ -87,12 +87,12 @@ export function PlanResult({
   }, [hydrateSkip]);
   const focusAfterCommit = useFocusAfterCommit();
   /** Pickup the ship being packed sits in; its heading takes focus once the Pack button is gone. */
-  const packFrom = useRef<number | null>(null);
+  const packFrom = useRef<string | null>(null);
   const pickupHeading = () =>
     document.querySelector<HTMLElement>(`[data-pickup-heading="${packFrom.current}"]`);
-  const askToPack = (itemId: number, typeId: number, locationId: number) => {
+  const askToPack = (itemId: number, typeId: number, pickupKey: string) => {
     const rigs = rigsOf(itemId);
-    packFrom.current = locationId;
+    packFrom.current = pickupKey;
     if (rigs === 0 || skipRigWarning) {
       onPackShip(itemId);
       focusAfterCommit(pickupHeading);
@@ -255,7 +255,7 @@ export function PlanResult({
                 <section className="rounded-xs border border-line bg-panel-2 px-3 pb-1">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line pt-2.5 pb-1.5">
                     <h3
-                      data-pickup-heading={p.locationId}
+                      data-pickup-heading={`${c.characterId}:${p.locationId}`}
                       tabIndex={-1}
                       className="m-0 flex min-w-0 flex-[1_1_12em] flex-wrap max-sm:contents items-baseline gap-x-3 gap-y-0.5 text-sm focus:outline-none"
                     >
@@ -318,7 +318,9 @@ export function PlanResult({
                           canPack(s.typeId) ? (
                             <Button
                               size="sm"
-                              onClick={() => askToPack(s.itemId, s.typeId, p.locationId)}
+                              onClick={() =>
+                                askToPack(s.itemId, s.typeId, `${c.characterId}:${p.locationId}`)
+                              }
                             >
                               {t('assets.movePlan.packInstead')}
                             </Button>
