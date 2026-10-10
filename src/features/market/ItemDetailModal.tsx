@@ -350,6 +350,7 @@ export function ItemDetailModal({
                               trainedSkills={trainedSkills}
                               target={targetPlan}
                               itemName={itemName}
+                              attributeName={attribute.name}
                             >
                               {valueText}
                             </AttributeModifierTrigger>
@@ -500,6 +501,7 @@ function AttributeModifierTrigger({
   trainedSkills,
   target,
   itemName,
+  attributeName,
   children,
 }: {
   modifiers: readonly ModifyingSkillEffect[];
@@ -507,8 +509,11 @@ function AttributeModifierTrigger({
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   target: TargetPlan;
   itemName: string;
+  attributeName: string;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
+  const modifiersLabel = t('market.itemDetail.modifiersFor', { attribute: attributeName });
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -523,10 +528,11 @@ function AttributeModifierTrigger({
           )}
         >
           {children}
+          <span className="sr-only">{modifiersLabel}</span>
           <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 space-y-2">
+      <PopoverContent align="end" className="w-64 space-y-2" aria-label={modifiersLabel}>
         {modifiers.map((modifier) => (
           <AttributeModifierRow
             key={modifier.ownerSkillTypeID}
