@@ -1,7 +1,7 @@
 /**
  * The Survey tab's two charts, drawn with Recharts on one shared time axis:
- * the volume left in the field, stacked by ore with a dot and a "pasted
- * amount" label on every scan and a dashed run to zero at the current pace,
+ * the volume left in the field, stacked by ore with a dot and a total-volume
+ * label on every scan and a dashed run to zero at the current pace,
  * and under it the mining rate between each pair of scans. Statically imports
  * `recharts`, so — same rule as `miningTax/MiningYieldCharts.tsx` — this must
  * only be reached through a dynamic `import()` from `SurveyBoard.tsx`.
@@ -35,7 +35,7 @@ import { oreTone } from './surveyTones';
 /** Left edge shared by both charts so their time axes line up. */
 const Y_AXIS_WIDTH = 52;
 const MARGIN = { top: 16, right: 12, bottom: 0, left: 0 };
-/** Room a label needs, in px: "−301.8K" and "1,116" at 10px. */
+/** Room a label needs, in px: "301.8K" and "1,116" at 10px. */
 const DELTA_LABEL_GAP = 46;
 const RATE_LABEL_GAP = 34;
 
@@ -44,8 +44,8 @@ interface VolumeRow {
   total?: number;
   delta?: number;
   projected?: number;
-  /** `delta`, only on the scans whose label has room. */
-  deltaLabel?: number;
+  /** `total`, only on the scans whose label has room. */
+  totalLabel?: number;
   [ore: string]: number | undefined;
 }
 
@@ -92,14 +92,14 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
     plotPx === 0 ? new Set(labels.keys()) : spacedLabels(labels, gap);
   // The projected finish row sits after the scans and draws no label.
   const deltaShown = thin(
-    rows.slice(0, summary.points.length).map((r) => ({ x: pxAt(r.at), weight: r.delta ?? 0 })),
+    rows.slice(0, summary.points.length).map((r) => ({ x: pxAt(r.at), weight: r.total ?? 0 })),
     DELTA_LABEL_GAP
   );
   const rateShown = thin(
     rateLabels.map((r) => ({ x: pxAt(r.at), weight: r.rate })),
     RATE_LABEL_GAP
   );
-  const chartRows = rows.map((r, i) => (deltaShown.has(i) ? { ...r, deltaLabel: r.delta } : r));
+  const chartRows = rows.map((r, i) => (deltaShown.has(i) ? { ...r, totalLabel: r.total } : r));
   const shownRateLabels = rateLabels.filter((_, i) => rateShown.has(i));
   // Both charts share this axis so their times line up; only the lower one shows it.
   const xAxis = (hide: boolean) => (
@@ -170,7 +170,8 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
       <figure aria-label={t('survey.chartVolume')} className="m-0">
         <div className="h-56 w-full">
           <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
-            <ComposedChart data={chartRows} margin={MARGIN}>
+            {/* Recharts stacks in the order the areas first registered, and a re-sort only moves them, so a new order remounts the chart. */}
+            <ComposedChart key={summary.oreNames.join('|')} data={chartRows} margin={MARGIN}>
               <CartesianGrid stroke="var(--color-line)" vertical={false} />
               {xAxis(true)}
               <YAxis
@@ -211,13 +212,13 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
                 legendType="none"
               >
                 <LabelList
-                  dataKey="deltaLabel"
+                  dataKey="totalLabel"
                   position="top"
                   offset={8}
                   fill="var(--color-text)"
                   fontSize={10}
                   formatter={(value: unknown) =>
-                    typeof value === 'number' && value > 0 ? `−${formatCompactNumber(value)}` : ''
+                    typeof value === 'number' ? formatCompactNumber(value) : ''
                   }
                 />
               </Line>

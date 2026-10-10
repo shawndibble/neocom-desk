@@ -1379,7 +1379,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
-    await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
+    await user.type(await screen.findByLabelText('Days'), '5');
 
     await waitFor(() => {
       expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
@@ -1559,23 +1559,31 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     });
   });
 
-  it('shows the bonus/expiry inputs only once an accelerator row exists, and flags a past expiry as expired', async () => {
+  it('shows the bonus/time-left inputs only once an accelerator row exists, and flags a past expiry as expired', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    const first = render(<App />);
     await openPlanTools();
     await openAssumptions();
 
-    expect(screen.queryByLabelText('Expires')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Days')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     // `find`, not `get`: the Booster is saved on the plan now, so the row
-    // travels through Dexie and back before the expiry field exists.
-    const expiresInput = await screen.findByLabelText('Expires');
+    // travels through Dexie and back before the time-left field exists.
+    await screen.findByLabelText('Days');
     expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
-    await user.type(expiresInput, '2000-01-01T00:00');
+    // A past expiry can't be typed as time left, only reached by waiting or
+    // by a plan saved earlier — so reopen on one.
+    await db.skillPlans.update('plan-1', {
+      boosters: [{ enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() - 60_000 }],
+    });
+    first.unmount();
+    render(<App />);
+    await openPlanTools();
+    await openAssumptions();
     expect(await screen.findByText('Expired')).toBeInTheDocument();
   });
 
@@ -1597,7 +1605,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const durationBefore = durationHeader().textContent;
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
-    await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
+    await user.type(await screen.findByLabelText('Days'), '5');
     expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
     await waitFor(() => {
@@ -1616,19 +1624,16 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
     await user.click(await screen.findByRole('option', { name: '+5' }));
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
-    await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
+    await user.type(await screen.findByLabelText('Days'), '5');
 
     await waitFor(async () => {
       const stored = await db.skillPlans.get('plan-1');
       expect(stored?.whatIfImplants).toEqual({ kind: 'preset', preset: '+5' });
-      expect(stored?.boosters).toEqual([
-        {
-          enabled: true,
-          bonus: 3,
-          startsAt: null,
-          expiresAt: new Date(2099, 0, 1, 0, 0).getTime(),
-        },
-      ]);
+      expect(stored?.boosters).toHaveLength(1);
+      expect(stored?.boosters?.[0]).toMatchObject({ enabled: true, bonus: 3, startsAt: null });
+      const left = (stored?.boosters?.[0].expiresAt ?? 0) - Date.now();
+      expect(left).toBeGreaterThan(5 * 24 * 60 * 60 * 1000 - 60_000);
+      expect(left).toBeLessThanOrEqual(5 * 24 * 60 * 60 * 1000);
     });
 
     // The reported bug: reopening the page put every control back to its
@@ -1638,7 +1643,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     await openPlanTools();
     await openAssumptions();
 
-    expect(await screen.findByLabelText('Expires')).toHaveValue('2099-01-01T00:00');
+    expect(await screen.findByLabelText('Days')).toHaveValue('5');
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
     expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
   });

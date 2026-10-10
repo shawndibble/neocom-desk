@@ -3,7 +3,6 @@
  * how fast, and when it will be gone. Pure — the scans arrive already parsed
  * (and, for a shared Survey, already fetched); nothing here reads a clock.
  */
-import { sortByValuePerM3 } from './valueTier';
 
 export interface SurveyRock {
   /** Ore name as the scanner printed it, e.g. "Glistening Sylvite". */
@@ -47,6 +46,8 @@ export interface SurveyOre {
   isk: number;
   /** m³ of it the scans have shown in all: its first showing plus any that came into range. */
   startVolume: number;
+  /** Market ISK for one unit of it, which the ore list, the chart's layers and the bar colours go by, however much of it is in the scans; null when it has no price. */
+  unitPrice: number | null;
 }
 
 /** One scan as a point on the volume chart. */
@@ -67,12 +68,12 @@ export interface SurveySummary {
   rocksLeft: number;
   /** The scanner's ISK value of everything left, summed; null when no row carried one. */
   iskLeft: number | null;
-  /** Every ore the scans showed, the most valuable left first (biggest volume when no scan carries ISK); mined-out ores last. */
+  /** Every ore the scans showed, dearest unit price first; unpriced ores last, by value left. */
   ores: SurveyOre[];
   intervals: SurveyInterval[];
   /** Every scan, oldest first, for the chart. */
   points: SurveyPoint[];
-  /** Every ore any scan showed, in `ores` order (most valuable left first), so chart layers read like the ore list. */
+  /** Every ore any scan showed, in `ores` order (dearest unit first), so chart layers read like the ore list. */
   oreNames: string[];
   /** m³/s over the last few intervals, or null before there is any real mining. */
   pace: number | null;
@@ -132,7 +133,11 @@ const signature = (scan: SurveyScan): string =>
     .sort()
     .join(';');
 
-export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | null {
+export function summarizeSurvey(
+  input: readonly SurveyScan[],
+  /** Market ISK per unit by ore name as the scanner printed it; sorts the ores. */
+  unitPrices?: ReadonlyMap<string, number>
+): SurveySummary | null {
   const scans: SurveyScan[] = [];
   const seen = new Set<string>();
   for (const s of [...input].sort((a, b) => a.at - b.at)) {
@@ -198,7 +203,14 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
 
   const byOre = new Map<string, SurveyOre>();
   for (const [ore, startVolume] of Object.entries(startByOre)) {
-    byOre.set(ore, { ore, rocks: 0, volume: 0, isk: 0, startVolume });
+    byOre.set(ore, {
+      ore,
+      rocks: 0,
+      volume: 0,
+      isk: 0,
+      startVolume,
+      unitPrice: unitPrices?.get(ore) ?? null,
+    });
   }
   for (const rock of last.rocks) {
     const entry = byOre.get(rock.ore)!;
@@ -206,12 +218,16 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     entry.volume += rock.volume;
     entry.isk += rock.isk ?? 0;
   }
-  // Biggest value left first when the scan carries ISK, else biggest volume.
+  // Dearest unit first, whatever amount of each is in the scans; equal prices go by name. Ores with
+  // no market price come last, the biggest value left first, else the biggest volume.
   const hasIsk = last.rocks.some((r) => r.isk !== undefined);
   const rank = (o: SurveyOre): number => (hasIsk ? o.isk : o.volume);
-  const ores = [...byOre.values()].sort(
-    (a, b) => rank(b) - rank(a) || b.volume - a.volume || b.startVolume - a.startVolume
-  );
+  const ores = [...byOre.values()].sort((a, b) => {
+    if (a.unitPrice === null && b.unitPrice === null) {
+      return rank(b) - rank(a) || b.volume - a.volume || b.startVolume - a.startVolume;
+    }
+    return (b.unitPrice ?? -1) - (a.unitPrice ?? -1) || a.ore.localeCompare(b.ore);
+  });
 
   return {
     startVolume,
@@ -224,8 +240,8 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     ores,
     intervals,
     points,
-    // The chart's layer order: richest per m³ first, as the ore bars list them.
-    oreNames: (hasIsk ? sortByValuePerM3(ores) : ores).map((o) => o.ore),
+    // The chart's layer order: dearest unit first, as the ore bars list them.
+    oreNames: ores.map((o) => o.ore),
     pace,
     etaAt,
     finished,

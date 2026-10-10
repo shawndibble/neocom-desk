@@ -11,6 +11,7 @@ import type { GroupMember } from './groupRows';
 import { settle } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
 import { missingPaymentEndpoints, type MadePaymentSources } from './madePayments';
+import * as Icon from '@/components/ui/icons';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
@@ -362,13 +363,18 @@ export function LinkWalletPaymentDialog({
                       : 'text-isk-neg'
                 )}
               >
-                {difference === 0
-                  ? t('miningTax.linkWallet.matches')
-                  : difference > 0
-                    ? t('miningTax.linkWallet.over', { amount: `${formatIsk(difference, 0)} ISK` })
-                    : t('miningTax.linkWallet.short', {
-                        amount: `${formatIsk(-difference, 0)} ISK`,
-                      })}
+                {difference === 0 ? (
+                  <>
+                    {t('miningTax.linkWallet.matches')}
+                    <Icon.Done size={Icon.ICON_SIZE.sm} className="ml-1 inline" aria-hidden />
+                  </>
+                ) : difference > 0 ? (
+                  t('miningTax.linkWallet.over', { amount: `${formatIsk(difference, 0)} ISK` })
+                ) : (
+                  t('miningTax.linkWallet.short', {
+                    amount: `${formatIsk(-difference, 0)} ISK`,
+                  })
+                )}
               </p>
             )}
           </div>

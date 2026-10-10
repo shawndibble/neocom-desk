@@ -90,7 +90,8 @@ function isUnblocked(issue) {
   for (const n of refs) {
     let state;
     try {
-      state = ghJson(['issue', 'view', String(n), '--json', 'state']).state;
+      // `gh issue view` returns empty output in the agent shell; the API is reliable.
+      state = String(ghJson(['api', `repos/{owner}/{repo}/issues/${n}`]).state).toUpperCase();
     } catch {
       return false; // can't confirm closed — treat as still blocked
     }

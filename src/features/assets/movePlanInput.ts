@@ -91,3 +91,13 @@ export function holdCapacityM3(holds: readonly CargoHold[]): number | null {
   const total = holds.reduce((s, h) => s + h.capacityM3, 0);
   return total > 0 ? total : null;
 }
+
+/** Rigs fitted to each assembled ship, by the ship's itemID; ships with none are absent. */
+export function fittedRigCounts(sources: readonly MovePlanSource[]): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const { assets } of sources)
+    for (const a of assets)
+      if (a.location_type === 'item' && a.location_flag.startsWith('RigSlot'))
+        counts.set(a.location_id, (counts.get(a.location_id) ?? 0) + 1);
+  return counts;
+}

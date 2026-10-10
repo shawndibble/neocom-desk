@@ -82,6 +82,14 @@ describe('createMarketItemCatalogue', () => {
 });
 
 describe('createMarketItemsProvider', () => {
+  it('is the last group, after Contacts (order 6): it is the biggest', () => {
+    const provider = createMarketItemsProvider({
+      catalogue: createMarketItemCatalogue(async () => CATALOGUE),
+      onSelect: () => {},
+    });
+    expect(provider.order).toBeGreaterThan(6);
+  });
+
   it('is not searched below three characters', () => {
     const provider = createMarketItemsProvider({
       catalogue: createMarketItemCatalogue(async () => CATALOGUE),

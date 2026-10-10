@@ -1,13 +1,13 @@
 /**
- * What is left of each ore, richest per m³ first: its rocks, volume, ISK and the percent of it still
- * there, as a bar. The bar's colour is how rich the ore is, ISK per m³ left,
+ * What is left of each ore, dearest unit first: its rocks, volume, ISK and the percent of it still
+ * there, as a bar. The bar's colour is how dear the ore is, its price per unit,
  * on a gray, blue, yellow, orange ramp (`engine/survey/valueTier.ts`), so a
  * pilot sees which rocks are worth the trip without reading the numbers.
  */
 import { Trans, useTranslation } from 'react-i18next';
 import { IskAmount, Panel } from '@/components/ui';
 import type { SurveySummary } from '@/engine/survey/series';
-import { oreValueTiers, sortByValuePerM3 } from '@/engine/survey/valueTier';
+import { oreValueTiers } from '@/engine/survey/valueTier';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { VALUE_TIER_COLORS, VALUE_TIER_ORDER } from './surveyTones';
 
@@ -22,13 +22,12 @@ export function SurveyOres({
   const { t } = useTranslation();
   const tiers = oreValueTiers(summary.ores);
   const hasIsk = summary.iskLeft !== null;
-  // Richest per m³ first: the rocks to mine up front. Without ISK the volume order stands.
-  const ores = hasIsk ? sortByValuePerM3(summary.ores) : summary.ores;
+  // `summary.ores` is dearest unit first: the rocks to mine up front.
   return (
     <Panel title={t('survey.oresTitle')}>
       <div className="space-y-4">
         <ul className="space-y-3">
-          {ores.map((ore) => {
+          {summary.ores.map((ore) => {
             const leftPercent =
               ore.startVolume > 0 ? Math.round((ore.volume / ore.startVolume) * 100) : 0;
             return (

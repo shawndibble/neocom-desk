@@ -42,9 +42,12 @@ describe('SurveyPicker', () => {
     await noteSurvey(B);
     const onPick = vi.fn();
     render(<SurveyPicker currentId={A} onPick={onPick} />);
-    expect(loadSurvey).not.toHaveBeenCalled();
+    // The closed trigger shows the survey in view, not "Loading…".
+    const trigger = await screen.findByRole('combobox', { name: 'Your surveys' });
+    await waitFor(() => expect(trigger.textContent).toContain('Clear Icicle · 0% mined'));
+    expect(loadSurvey).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Your surveys' }));
+    await userEvent.click(trigger);
     const options = await screen.findAllByRole('option');
     await waitFor(() => expect(loadSurvey).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(options[0].textContent).toContain('Clear Icicle · 0% mined'));

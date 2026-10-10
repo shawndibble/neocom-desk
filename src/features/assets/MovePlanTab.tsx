@@ -17,10 +17,11 @@ import { hullCargoHolds } from '@/features/market/haulingCargo';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { formatCubicMetres } from '@/lib/volume';
-import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
+import { loadGroupCategories, loadShipTree, loadTypes } from '@/sde/loadSde';
 import { PickerList } from './MovePlanPicker';
 import { PlanResult, type PlanState } from './MovePlanResult';
 import {
+  fittedRigCounts,
   holdCapacityM3,
   pickerStacks,
   selectedPlanCharacters,
@@ -55,6 +56,8 @@ interface Loaded {
   systems: Map<number, number | null>;
   /** Palette slot of each pickup location, stable from picker to plan. */
   hues: Map<number, number>;
+  /** Rigs fitted to each assembled ship, by itemID. */
+  rigs: Map<number, number>;
 }
 
 function placeName(stack: PickerStack): Promise<string | null> {
@@ -99,7 +102,8 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
     })
   );
   const hues = pickupHues(stacks.map((s) => s.locationId));
-  return { sources, shipTypeIds, stacks, typeNames, unitM3, places, systems, hues };
+  const rigs = fittedRigCounts(sources);
+  return { sources, shipTypeIds, stacks, typeNames, unitM3, places, systems, hues, rigs };
 }
 
 interface MovePlanTabProps {
@@ -130,6 +134,10 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
   /** Collapsed pickup groups, `characterId:locationId`. */
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [planFailed, setPlanFailed] = useState(false);
+  /** Ships (itemID) the plan hauls packaged instead of flying. */
+  const [packed, setPacked] = useState<ReadonlySet<number>>(new Set());
+  /** What the shown plan was worked out from, so packing a ship can re-plan it. */
+  const planBase = useRef<Omit<Parameters<typeof planMove>[0], 'packedShipIds'> | null>(null);
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
   const hullSource = useRef<HullSourceData>({ catalogue: null, profile: null });
@@ -148,6 +156,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     setCompareOpen(false);
     setCollapsed(new Set());
     setPlanFailed(false);
+    setPacked(new Set());
     setWorking(false);
     session.current += 1;
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -250,20 +259,23 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     const owned = new Set(
       loaded.sources.flatMap((s) => s.assets.filter((a) => a.is_singleton).map((a) => a.type_id))
     );
-    return haulers.flatMap((h) => {
-      const capacityM3 = hullCapacity.current.get(h.typeId);
-      return capacityM3
-        ? [
-            {
-              typeId: h.typeId,
-              name: h.name,
-              hullClass: h.group,
-              capacityM3,
-              owned: owned.has(h.typeId),
-            },
-          ]
-        : [];
-    });
+    const sized = haulers.filter((h) => hullCapacity.current.get(h.typeId));
+    // From the bundled ship tree, so no ESI call per hauler; a hull it lacks counts as flyable.
+    const tree = await loadShipTree().catch(() => null);
+    const required = new Map(tree?.ships.map((ship) => [ship.typeID, ship.required]));
+    const flyable = sized.map((h) =>
+      (required.get(h.typeId) ?? []).every(
+        (r) => (profile.skillLevels.get(r.skillTypeID) ?? 0) >= r.level
+      )
+    );
+    return sized.map((h, i) => ({
+      typeId: h.typeId,
+      name: h.name,
+      hullClass: h.group,
+      capacityM3: hullCapacity.current.get(h.typeId)!,
+      owned: owned.has(h.typeId),
+      canFly: flyable[i],
+    }));
   }
 
   async function showPlan() {
@@ -277,14 +289,17 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
           ? await loadStationSystemId(destStation).catch(() => null)
           : destSystem;
       const hulls = await loadHulls();
-      const plan = planMove({
+      const base = {
         destinationLocationIds: atDestination,
         characters: selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, selected),
         unitM3: loaded.unitM3,
         shipTypeIds: loaded.shipTypeIds,
         hulls,
-      });
-      if (mine === session.current)
+      };
+      const plan = planMove(base);
+      if (mine === session.current) {
+        planBase.current = base;
+        setPacked(new Set());
         setResult({
           plan,
           destinationSystem,
@@ -292,11 +307,21 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
             destStation !== null ? (loaded.places.get(destStation) ?? null) : null,
           pickupSystems: loaded.systems,
         });
+      }
     } catch {
       if (mine === session.current) setPlanFailed(true);
     } finally {
       if (mine === session.current) setWorking(false);
     }
+  }
+
+  /** Hauls this ship packaged instead of flying it, and re-plans around its volume. */
+  function packShip(itemId: number) {
+    const base = planBase.current;
+    if (!base) return;
+    const next = new Set(packed).add(itemId);
+    setPacked(next);
+    setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
   }
 
   const name = (typeId: number) => loaded?.typeNames.get(typeId) ?? `#${typeId}`;
@@ -337,6 +362,9 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
             onToggleCompare={() => setCompareOpen((v) => !v)}
             onBack={() => setResult(null)}
             onDone={onClose}
+            onPackShip={packShip}
+            rigsOf={(itemId) => loaded.rigs.get(itemId) ?? 0}
+            canPack={(typeId) => loaded.unitM3.has(typeId)}
             name={name}
             placeLabel={placeLabel}
             hueOf={hueOf}
@@ -426,7 +454,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
             </section>
             {planFailed && <p className="text-text-dim">{t('assets.movePlan.planFailed')}</p>}
             {/* Sticky to the tab body's own scroller, so the totals stay in reach. */}
-            <div className="sticky bottom-0 mt-auto -mx-3 -mb-3 flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-line bg-panel px-3 pt-2 pb-2">
+            <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-line bg-panel px-3 pt-2 pb-2">
               <div className="flex min-w-0 basis-full flex-col gap-1.5 sm:flex-1 sm:basis-0">
                 <div className="flex h-2.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
                   {segments.map((s) => (

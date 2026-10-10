@@ -71,50 +71,119 @@ describe('BoosterList row editing', () => {
   });
 });
 
-describe('BoosterList overlap validation', () => {
-  it('rejects an expiry edit that would overlap the next row, without calling onChange', async () => {
-    const user = userEvent.setup();
-    const rows = [
-      ROW({ startsAt: null, expiresAt: 1000 }),
-      ROW({ startsAt: 1000, expiresAt: 2000 }),
-    ];
-    const { onChange } = renderList(rows);
+describe('BoosterList time left', () => {
+  const DAY = 24 * 60 * 60 * 1000;
 
-    // Push the first row's expiry past the second row's start.
-    const expiresInputs = screen.getAllByLabelText<HTMLInputElement>('Expires');
-    await user.clear(expiresInputs[0]);
-    await user.type(expiresInputs[0], '2099-01-01T00:00');
+  it('shows the saved expiry as days, hours and minutes left', () => {
+    const expiresAt = Date.now() + 2 * DAY + 5 * 60 * 60 * 1000 + 30 * 60 * 1000;
+    renderList([ROW({ expiresAt })]);
 
-    expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getAllByText(/overlaps another/i).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText<HTMLInputElement>('Days').value).toBe('2');
+    expect(screen.getByLabelText<HTMLInputElement>('Hours').value).toBe('5');
+    expect(screen.getByLabelText<HTMLInputElement>('Minutes').value).toMatch(/^(29|30)$/);
   });
 
-  it('accepts an edit that keeps rows non-overlapping', async () => {
+  it('stores what is typed as an instant that long from now', async () => {
     const user = userEvent.setup();
-    const rows = [
-      ROW({ startsAt: null, expiresAt: 1000 }),
-      ROW({ startsAt: 1000, expiresAt: 2000 }),
-    ];
-    const { onChange } = renderList(rows);
+    const { onChange } = renderList([ROW()]);
 
-    const bonusInputs = screen.getAllByLabelText<HTMLInputElement>('Bonus');
-    await user.clear(bonusInputs[0]);
-    await user.type(bonusInputs[0], '5');
+    const before = Date.now();
+    await user.type(screen.getByLabelText('Days'), '3');
 
-    expect(onChange).toHaveBeenCalled();
-    expect(screen.queryByText(/overlaps another/i)).toBeNull();
+    const [rows] = onChange.mock.calls.at(-1) as [PlanBooster[]];
+    expect(rows[0].expiresAt).toBeGreaterThanOrEqual(before + 3 * DAY);
+    expect(rows[0].expiresAt).toBeLessThan(before + 3 * DAY + 5000);
+  });
+
+  it('counts a blank box as zero', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderList([ROW()]);
+
+    const before = Date.now();
+    await user.type(screen.getByLabelText('Hours'), '2');
+
+    const [rows] = onChange.mock.calls.at(-1) as [PlanBooster[]];
+    expect(rows[0].expiresAt).toBeGreaterThanOrEqual(before + 2 * 60 * 60 * 1000);
+    expect(rows[0].expiresAt).toBeLessThan(before + 2 * 60 * 60 * 1000 + 5000);
+  });
+
+  it('ignores anything that is not digits', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderList([ROW()]);
+
+    await user.type(screen.getByLabelText('Days'), 'ab-.');
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('does not erase a saved expiry while a box is cleared to be retyped', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderList([ROW({ expiresAt: Date.now() + 5 * DAY })]);
+
+    await user.clear(screen.getByLabelText('Days'));
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('clears the expiry once every box is emptied and focus leaves', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderList([ROW({ expiresAt: Date.now() + 5 * DAY })]);
+
+    await user.clear(screen.getByLabelText('Days'));
+    await user.clear(screen.getByLabelText('Hours'));
+    await user.clear(screen.getByLabelText('Minutes'));
+    await user.tab();
+
+    expect(onChange).toHaveBeenCalledWith([ROW({ expiresAt: null })]);
+  });
+
+  it('has no Starts field — a queued row says it follows the one before', () => {
+    renderList([ROW({ expiresAt: 5000 }), ROW({ startsAt: 5000 })]);
+
+    expect(screen.queryByLabelText('Starts')).toBeNull();
+    expect(screen.getAllByText(/before it runs out/i)).toHaveLength(1);
+  });
+
+  it('runs a first row from now even if an older build saved a future start on it', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderList([ROW({ startsAt: Date.now() + 9 * DAY, expiresAt: null })]);
+
+    await user.type(screen.getByLabelText('Days'), '2');
+
+    const [rows] = onChange.mock.calls.at(-1) as [PlanBooster[]];
+    expect(rows[0].startsAt).toBeNull();
+    expect(rows[0].expiresAt).toBeLessThan(Date.now() + 2 * DAY + 5000);
+  });
+
+  it('moves a queued row with the one in front of it, keeping its length', async () => {
+    const user = userEvent.setup();
+    const now = Date.now();
+    const { onChange } = renderList([
+      ROW({ expiresAt: now + 5 * DAY }),
+      ROW({ startsAt: now + 5 * DAY, expiresAt: now + 35 * DAY }),
+    ]);
+
+    await user.type(screen.getAllByLabelText('Days')[0], '0');
+
+    const [rows] = onChange.mock.calls.at(-1) as [PlanBooster[]];
+    expect(rows[1].startsAt).toBe(rows[0].expiresAt);
+    expect((rows[1].expiresAt as number) - (rows[1].startsAt as number)).toBe(30 * DAY);
   });
 });
 
 describe('BoosterList quick picks', () => {
-  it('measures a quick pick from the row’s own startsAt, not from now', async () => {
+  it('measures a queued row’s quick pick from its own start, not from now', async () => {
     const user = userEvent.setup();
     const futureStart = new Date(2099, 0, 1).getTime();
-    const { onChange } = renderList([ROW({ startsAt: futureStart, expiresAt: null })]);
+    const { onChange } = renderList([
+      ROW({ expiresAt: futureStart }),
+      ROW({ startsAt: futureStart, expiresAt: null }),
+    ]);
 
-    await user.click(screen.getByRole('button', { name: '+1h' }));
+    await user.click(screen.getAllByRole('button', { name: '+1h' })[1]);
 
     expect(onChange).toHaveBeenCalledWith([
+      ROW({ expiresAt: futureStart }),
       ROW({ startsAt: futureStart, expiresAt: futureStart + 60 * 60 * 1000 }),
     ]);
   });

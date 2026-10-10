@@ -7,6 +7,7 @@ import {
   splitSegments,
   sortStacksByVolume,
   tripLanes,
+  tripRuns,
 } from './movePlanView';
 import type { PickerStack } from './movePlanInput';
 
@@ -143,5 +144,18 @@ describe('sortStacksByVolume', () => {
     const input = [stack('p', 1, 3, 10), stack('m', 1, 2, 10)];
     expect(sortStacksByVolume(input, unitM3, name).map((s) => s.key)).toEqual(['m', 'p']);
     expect(input.map((s) => s.key)).toEqual(['p', 'm']);
+  });
+});
+
+describe('tripRuns', () => {
+  it('folds neighbouring full trips into one range and keeps the short last trip apart', () => {
+    expect(tripRuns(tripLanes(23862, 6500))).toEqual([
+      { from: 1, to: 3, m3: 6500 },
+      { from: 4, to: 4, m3: 4362 },
+    ]);
+  });
+  it('is one single-trip run when it fits, and empty without lanes', () => {
+    expect(tripRuns(tripLanes(100, 6500))).toEqual([{ from: 1, to: 1, m3: 100 }]);
+    expect(tripRuns([])).toEqual([]);
   });
 });

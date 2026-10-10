@@ -105,7 +105,7 @@ here — they go one per file in `docs/context/decisions/`.
   formulas cannot be copied. See
   `docs/context/decisions/20260911-073307-blueprint-acquisition-cost-as-a-tier-optimized-material.md`
   (issue #838).
-- **Booster**: Cerebral accelerator; user adds it manually with an optional start and an expiry date for training-time math. A Skill Plan holds an ordered list of Boosters, run one after another — EVE has a single booster slot, so at most one is ever live — with overlaps rejected in the editor and clamped on read (#1407). Stored on the Skill Plan and synced with it, like What-If Implants above (round 33).
+- **Booster**: Cerebral accelerator; user adds it manually, entering the days, hours and minutes left the way EVE's tooltip shows them (stored as an expiry instant) for training-time math; a queued one starts when the one before it expires, with no Starts field. A Skill Plan holds an ordered list of Boosters, run one after another — EVE has a single booster slot, so at most one is ever live — with overlaps rejected in the editor and clamped on read (#1407). Stored on the Skill Plan and synced with it, like What-If Implants above (round 33).
 - **BPC**: An owned Blueprint Copy — an ESI blueprint instance with a finite
   number of `runs` remaining (`CharacterBlueprint.runs`,
   `esi/endpoints.ts`). Distinct from a **BPO**, which never depletes.
@@ -1035,7 +1035,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   It also keeps the Character name of whoever pasted it (none for an anonymous
   visitor), shown in the chart tooltip as "Scanned by". A scanner group left
   collapsed pastes without its ore, so a pilot's first scan that lacks an ore
-  the Survey has shown is confirmed ("All are expanded") before it is added.
+  the Survey's latest scan showed is confirmed ("All are expanded") before it is added.
 - **Survey chat message**: What "Copy chat message" puts on the clipboard:
   four lines (status word with finish time in EVE time and time left, a block
   bar with the percent, the rocks left by short ore name, the link), none wider

@@ -9,7 +9,6 @@
  */
 import type { SurveySummary } from './series';
 import { textWidth } from './chatFont';
-import { sortByValuePerM3 } from './valueTier';
 
 export interface SurveyMessageLabels {
   /** The first line, before the box: chat puts the speaker's name beside it. */
@@ -182,9 +181,9 @@ export function formatDuration(ms: number): string {
 const MAX_NAMED_ORES = 2;
 
 /**
- * "Left: 5 Scordite · 4 Kernite · 35 other": the two ores richest per m³ left
+ * "Left: 5 Scordite · 4 Kernite · 35 other": the two ores with the dearest unit price
  * (the order the page lists them in), each with its rock count, and the rocks
- * of every other ore grouped into one count. `ores` arrives richest first, and
+ * of every other ore grouped into one count. `ores` arrives dearest first, and
  * fewer than two are named if a longer line would wrap.
  */
 function oreLine(
@@ -257,8 +256,8 @@ export function surveyChatMessage(
           left: formatDuration(summary.etaAt - summary.lastAt),
         });
 
-  // Richest per m³ first, as the page lists them; with no ISK the volume order stands.
-  const present = sortByValuePerM3(summary.ores.filter((o) => o.rocks > 0));
+  // Dearest unit first, as the page lists them.
+  const present = summary.ores.filter((o) => o.rocks > 0);
   const ore = oreLine(present, shortOreNames(present.map((o) => o.ore)), labels);
   return lead + box(timing, summary.percent, false, ore, url).join('\n');
 }

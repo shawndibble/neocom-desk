@@ -20,7 +20,7 @@ const ORE_TONES = [
 export const oreTone = (index: number): string => ORE_TONES[Math.max(0, index) % ORE_TONES.length];
 
 /**
- * The ore bars' value ramp, gray to orange by ISK per m³ left (`valueTier.ts`).
+ * The ore bars' value ramp, gray to orange by unit price (`valueTier.ts`).
  * It follows Kill heat's rule (DESIGN.md): yellow is `warning`, orange is
  * halfway from `warning` to `danger`, and the low end is a neutral, so the
  * hue itself says "hotter" without a new palette.

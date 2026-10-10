@@ -1,8 +1,8 @@
 /**
  * Switches between the Surveys this pilot created or opened in the last 7 days
  * (`surveyHistory`). The list is only ids; each label (main ore, percent mined,
- * when) is read from the survey's Share Link the first time the dropdown opens,
- * one at a time, and a link found gone drops out of the history.
+ * when) is read from the survey's Share Link (the one in view right away, the rest the
+ * first time the dropdown opens), one at a time, and a link found gone drops out of the history.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,7 +36,7 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
   const requested = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!open) return;
+    if (history.length < 2) return;
     let cancelled = false;
     const time = new Intl.DateTimeFormat(i18n.language, {
       month: 'short',
@@ -47,7 +47,10 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
       timeZone: 'UTC',
     });
     void (async () => {
-      for (const entry of history) {
+      // The closed trigger shows the survey in view, so its label loads up front;
+      // the rest wait for the dropdown to open.
+      const wanted = history.filter((entry) => open || entry.id === currentId);
+      for (const entry of wanted) {
         if (requested.current.has(entry.id)) continue;
         requested.current.add(entry.id);
         const result = await loadSurvey(entry.id);
@@ -77,7 +80,7 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
     return () => {
       cancelled = true;
     };
-  }, [open, history, i18n.language, t]);
+  }, [open, currentId, history, i18n.language, t]);
 
   // One survey is the one in view: nothing to switch to.
   if (history.length < 2) return null;
@@ -95,15 +98,21 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
           {currentId !== null ? (labels[currentId] ?? t('common.loading')) : undefined}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent
+        className="max-md:max-w-[var(--radix-select-content-available-width)]"
+        collisionPadding={8}
+      >
         {history.map((entry) => {
           const label = labels[entry.id] ?? t('common.loading');
           return (
             <SelectItem key={entry.id} value={entry.id}>
-              <span className="flex items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate">{label}</span>
+              <span className="flex w-full min-w-0 items-center justify-between gap-2">
+                <span className="min-w-0 flex-1 max-md:[overflow-wrap:anywhere] md:truncate">
+                  {label}
+                </span>
                 {/* Radix picks the item on pointer-up / click / key: keep the remove button's own. */}
                 <span
+                  className="shrink-0"
                   onPointerDown={(e) => e.stopPropagation()}
                   onPointerUp={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
