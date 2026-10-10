@@ -4,23 +4,31 @@ import {
   Button,
   Caret,
   DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   IconButton,
   InfoTooltip,
   IskAmount,
   MenuItem,
+  Modal,
   Panel,
   RowActionsMenu,
   RowCaret,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   textActionClassName,
+  useOpenAfterMenu,
 } from '@/components/ui';
 import { ExternalLink, ExternalMark } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
 import {
+  activeOptionClassName,
   focusRingClassName,
   focusRingInsetClassName,
   inlineLinkClassName,
@@ -28,6 +36,7 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
+import { MyOrderMark } from '@/features/market/marketOrderCells';
 import { cx } from '@/lib/cx';
 
 const SAMPLE_ROWS = [
@@ -46,6 +55,33 @@ function Cue({ rule, note, children }: { rule: string; note?: string; children: 
       <div className="flex flex-wrap items-center gap-3 text-sm">{children}</div>
       {note && <p className="text-xs text-text-dim">{note}</p>}
     </div>
+  );
+}
+
+/** A menu item that opens a dialog, opened only once the menu has closed (`useOpenAfterMenu`). */
+function MenuOpensDialogSample({ k }: { k: (key: string) => string }) {
+  const [open, setOpen] = useState(false);
+  const afterMenu = useOpenAfterMenu();
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <IconButton
+            icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+            label={k('samples.menuDialogTrigger')}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" onCloseAutoFocus={afterMenu.onCloseAutoFocus}>
+          <DropdownMenuItem onSelect={() => afterMenu.run(() => setOpen(true))}>
+            {k('samples.menuDialogItem')}
+          </DropdownMenuItem>
+          <DropdownMenuItem>{k('samples.menuItemDuplicate')}</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Modal open={open} onClose={() => setOpen(false)} title={k('samples.menuDialogTitle')}>
+        <p className="text-sm">{k('samples.menuDialogBody')}</p>
+      </Modal>
+    </>
   );
 }
 
@@ -131,6 +167,12 @@ export function InteractionGrammar() {
           <button type="button" className={textActionClassName()}>
             {t('market.structureFee.setFee')}
           </button>
+        </Cue>
+        <Cue rule={k('rules.myOrder')}>
+          <span className="tabular-nums">
+            <MyOrderMark t={t} />
+            {k('samples.myOrder')}
+          </span>
         </Cue>
         <Cue rule={k('rules.iskAmount')} note={k('notes.iskAmount')}>
           <IskAmount value={1_342_500_000} />
@@ -225,6 +267,9 @@ export function InteractionGrammar() {
             />
           </div>
         </Cue>
+        <Cue rule={k('rules.menuOpensDialog')} note={k('notes.menuOpensDialog')}>
+          <MenuOpensDialogSample k={k} />
+        </Cue>
         <Cue rule={k('rules.selectedRow')} note={k('notes.selectedRow')}>
           <div className="w-full">
             <DataTable
@@ -266,6 +311,16 @@ export function InteractionGrammar() {
                 {k('samples.inlineLink')}
               </a>
             </Cue>
+            <Cue rule={k('rules.stateHighlighted')} note={k('notes.highlighted')}>
+              <span
+                className={cx(
+                  'rounded-xs bg-panel-2 px-2 py-1.5 text-sm text-text',
+                  activeOptionClassName
+                )}
+              >
+                {k('samples.option')}
+              </span>
+            </Cue>
             <Cue rule={k('rules.stateDisabled')} note={k('notes.disabled')}>
               <Button disabled>{k('samples.disabled')}</Button>
               <Button aria-disabled="true">{k('samples.ariaDisabled')}</Button>
@@ -279,6 +334,17 @@ export function InteractionGrammar() {
             <Cue rule={k('rules.stateSelected')} note={k('notes.selectedToggle')}>
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOn')} pressed />
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOff')} pressed={false} />
+            </Cue>
+            <Cue rule={k('rules.stateSelectedSegment')} note={k('notes.selectedSegment')}>
+              <SegmentedControl
+                label={k('rules.stateSelectedSegment')}
+                options={[
+                  { value: 'a', label: k('samples.segmentOn') },
+                  { value: 'b', label: k('samples.segmentOff') },
+                ]}
+                value="a"
+                onChange={() => undefined}
+              />
             </Cue>
           </div>
         </div>

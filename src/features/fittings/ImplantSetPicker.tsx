@@ -22,8 +22,10 @@ import {
   IconButton,
   Modal,
   SearchInput,
+  TabPanel,
   Tabs,
   TypeIcon,
+  useTabsId,
   type TabItem,
 } from '@/components/ui';
 import { boosterSideEffects, withBoosters } from '@/engine/fittings/boosterSideEffects';
@@ -201,6 +203,7 @@ export function ImplantSetPicker({
   onUseClone,
 }: ImplantSetPickerProps) {
   const { t } = useTranslation();
+  const tabsId = useTabsId();
   const [tab, setTab] = useState<'find' | 'set'>('find');
   const [nameMap, setNameMap] = useState<Map<string, { typeID: number }>>(new Map());
   const [names, setNames] = useState<Map<number, string>>(new Map());
@@ -352,23 +355,26 @@ export function ImplantSetPicker({
       <div className="space-y-3 p-3">
         {inUse}
         <Tabs
+          tabsId={tabsId}
           tabs={tabs}
           value={tab}
           onChange={(id) => setTab(id as 'find' | 'set')}
           label={t('fittings.implants.modalTitle')}
         />
-        {tab === 'find' ? (
-          <ImplantFinder
-            open={open}
-            fitting={plannedFitting}
-            profile={finder.profile}
-            basis={finder.basis}
-            implantSet={set}
-            onChange={onChange}
-          />
-        ) : (
-          setEditor
-        )}
+        <TabPanel tabsId={tabsId} tabId={tab}>
+          {tab === 'find' ? (
+            <ImplantFinder
+              open={open}
+              fitting={plannedFitting}
+              profile={finder.profile}
+              basis={finder.basis}
+              implantSet={set}
+              onChange={onChange}
+            />
+          ) : (
+            setEditor
+          )}
+        </TabPanel>
       </div>
     </Modal>
   );

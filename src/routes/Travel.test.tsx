@@ -495,7 +495,7 @@ describe('Travel › Route Safety › Stops', () => {
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
     await screen.findByRole('table', { name: 'Systems on the route' });
-    await user.click(screen.getByRole('button', { name: 'Add a stop' }));
+    await user.click(screen.getByRole('button', { name: /^add stop/i }));
     await user.type(await systemPickerInput(), 'Sobas');
     await user.click(await screen.findByRole('option', { name: /Sobaseki/ }));
 
@@ -605,9 +605,9 @@ describe('Travel › Route Safety › Stops', () => {
       visit(`?stops=${SOBASEKI},${UEDAMA}`);
 
       expect(await screen.findByText('Jita → 2 stops')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Add a stop' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^add stop/i })).not.toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Edit stops' }));
-      expect(screen.getByRole('button', { name: 'Add a stop' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^add stop/i })).toBeInTheDocument();
     } finally {
       matchMedia.mockRestore();
     }
@@ -1012,7 +1012,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       expect(
         await screen.findByText('Add a stop to fly there through the pinned wormhole.')
       ).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'Add a stop' }));
+      await user.click(screen.getByRole('button', { name: /^add stop/i }));
       await user.type(await systemPickerInput(), 'Ueda');
       await user.click(await screen.findByRole('option', { name: /Uedama/ }));
 

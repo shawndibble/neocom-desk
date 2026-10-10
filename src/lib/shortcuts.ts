@@ -100,7 +100,14 @@ export const OVERLAY_SELECTOR = `dialog[open], [role="menu"], [role="listbox"], 
 export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
-  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+    return true;
+  }
+  // A Radix Select trigger is a button doing its own typeahead.
+  return (
+    target.closest('[role="combobox"], [role="listbox"], [role="spinbutton"], [role="slider"]') !==
+    null
+  );
 }
 
 /**

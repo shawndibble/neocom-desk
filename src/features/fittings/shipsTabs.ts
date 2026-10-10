@@ -20,3 +20,6 @@ export const SHIPS_TABS = definePageTabs<ShipsTab>('/ships', [
   { id: 'tree', labelKey: 'ships.tabs.tree' },
   { id: 'fittings/edit', labelKey: 'fittings.editTitle', standalone: true },
 ]);
+
+/** The Ships tab bar's `tabsId`: one bar per page, so its panels (in other components) can name it. */
+export const SHIPS_TABS_ID = 'ships-tabs';

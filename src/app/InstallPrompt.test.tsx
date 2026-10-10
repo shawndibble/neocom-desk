@@ -106,6 +106,20 @@ describe('InstallPrompt', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/tap share.*add to home screen/i);
   });
 
+  it('reserves scroll clearance while shown and releases it on dismiss', async () => {
+    const user = userEvent.setup();
+    const clearance = () =>
+      document.documentElement.style.getPropertyValue('--onboarding-banner-clearance');
+    setUserAgent(iosSafariUA);
+    render(<InstallPrompt />);
+    await screen.findByRole('alert');
+    expect(clearance()).not.toBe('');
+
+    await user.click(screen.getByRole('button', { name: /dismiss/i }));
+
+    expect(clearance()).toBe('');
+  });
+
   it('dismisses the iOS banner and records seen permanently', async () => {
     const user = userEvent.setup();
     setUserAgent(iosSafariUA);

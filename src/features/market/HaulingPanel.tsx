@@ -997,12 +997,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     className={`flex items-center gap-2 text-xs text-text-dim ${tappableRowClassName}`}
                   >
                     <Checkbox
-                      aria-label={t('market.hauling.selectAll')}
                       checked={allSelected}
                       onChange={(event) =>
                         event.target.checked ? setOverrides(new Map()) : clearAll()
                       }
                     />
+                    <span className="sr-only">{t('market.hauling.selectAll')}</span>
                     {t('market.hauling.plan.selectedOf', {
                       selected: selectedCount,
                       total: shown.length,
@@ -1114,9 +1114,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     ),
                     hideIcon: true,
                   }}
-                  rowClassName={(row) =>
-                    overrides.get(row.typeId)?.selected === false ? 'opacity-60' : undefined
-                  }
                 />
               </div>
 

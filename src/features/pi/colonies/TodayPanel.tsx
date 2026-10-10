@@ -252,11 +252,9 @@ function LoginNext({
                   </span>
                   <span className="min-w-0 flex-1 truncate">{nameOf(row)}</span>
                   {multi && (
-                    <span
-                      className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs bg-panel-2 px-1.5 text-[0.6875rem] font-semibold text-text-dim"
-                      aria-label={characterNameOf(row.characterId)}
-                    >
-                      {initials(characterNameOf(row.characterId))}
+                    <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs bg-panel-2 px-1.5 text-[0.6875rem] font-semibold text-text-dim">
+                      <span aria-hidden="true">{initials(characterNameOf(row.characterId))}</span>
+                      <span className="sr-only">{characterNameOf(row.characterId)}</span>
                     </span>
                   )}
                   <span className="shrink-0 text-text-dim tabular-nums">

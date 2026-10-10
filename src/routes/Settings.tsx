@@ -225,7 +225,7 @@ function ActivityLogPanel() {
       title={t('activityLog.title')}
       actions={
         <>
-          <Button size="sm" onClick={handleClear} disabled={entries.length === 0}>
+          <Button size="sm" onClick={handleClear} aria-disabled={entries.length === 0}>
             {t('activityLog.clearLog')}
           </Button>
           {entries.length > 0 && (
@@ -413,24 +413,28 @@ function ExportPanel() {
       <div className="space-y-2">
         <p className="max-w-2xl text-xs text-text-dim">{t('settings.backup.exportHint')}</p>
         <p className="max-w-2xl text-xs text-warning">{t('settings.backup.passwordWarning')}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <TextInput
-            type="password"
-            autoComplete="new-password"
-            aria-label={t('settings.backup.passwordLabel')}
-            placeholder={t('settings.backup.passwordLabel')}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="max-w-xs min-w-0 flex-1 basis-48"
-          />
-          <Button
-            size="sm"
-            disabled={!canExport || status === 'exporting'}
-            onClick={() => void handleExport()}
+        <Fields variant="form">
+          <Field
+            label={t('settings.backup.passwordLabel')}
+            htmlFor="settings-backup-export-password"
           >
-            {t('settings.backup.exportButton')}
-          </Button>
-        </div>
+            <TextInput
+              id="settings-backup-export-password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="max-w-xs min-w-0 flex-1 basis-48"
+            />
+            <Button
+              size="sm"
+              aria-disabled={!canExport || status === 'exporting'}
+              onClick={() => void handleExport()}
+            >
+              {t('settings.backup.exportButton')}
+            </Button>
+          </Field>
+        </Fields>
         {status === 'done' && <ActionConfirmation message={t('settings.backup.exportDone')} />}
         {status === 'error' && (
           <p role="alert" className="text-xs text-danger">
@@ -499,24 +503,28 @@ function ImportPanel() {
             {file ? file.name : t('settings.backup.noFileChosen')}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <TextInput
-            type="password"
-            autoComplete="current-password"
-            aria-label={t('settings.backup.passwordLabel')}
-            placeholder={t('settings.backup.passwordLabel')}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="max-w-xs min-w-0 flex-1 basis-48"
-          />
-          <Button
-            size="sm"
-            disabled={!file || password.length === 0 || status === 'importing'}
-            onClick={() => void handleImport()}
+        <Fields variant="form">
+          <Field
+            label={t('settings.backup.passwordLabel')}
+            htmlFor="settings-backup-import-password"
           >
-            {t('settings.backup.importButton')}
-          </Button>
-        </div>
+            <TextInput
+              id="settings-backup-import-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="max-w-xs min-w-0 flex-1 basis-48"
+            />
+            <Button
+              size="sm"
+              aria-disabled={!file || password.length === 0 || status === 'importing'}
+              onClick={() => void handleImport()}
+            >
+              {t('settings.backup.importButton')}
+            </Button>
+          </Field>
+        </Fields>
         {status === 'error' && (
           <p role="alert" className="text-xs text-danger">
             {t('settings.backup.importError')}
@@ -739,9 +747,10 @@ function MarketDefaultsPanel() {
   const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);
   const collateralHydrated = useHydratedStore(useCourierCollateralRatio);
   const hydrated = hubHydrated && collateralHydrated;
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   return (
-    <Panel title={t('settings.marketDefaultsTitle')}>
+    <Panel title={t('settings.marketDefaultsTitle')} headingRef={headingRef}>
       {hydrated ? (
         <div className="space-y-4">
           <DefaultsSyncHint />
@@ -776,7 +785,7 @@ function MarketDefaultsPanel() {
 
             <LpValueField id="settings-lp-value" />
           </Fields>
-          <StructureFeesList />
+          <StructureFeesList panelHeading={headingRef} />
         </div>
       ) : (
         <Spinner />

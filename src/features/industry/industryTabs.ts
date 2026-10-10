@@ -26,3 +26,6 @@ export function industryTabs(t: TFunction): { id: IndustryTab; label: string }[]
 export function industryTabHref(id: IndustryTab): string {
   return tabPath(INDUSTRY_TABS, id);
 }
+
+/** The Industry tab bar's `tabsId`, shared by the header and each page's content panel. */
+export const INDUSTRY_TABS_ID = 'industry-tabs';

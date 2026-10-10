@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { CertifiedPlan } from '@/sde/types';
@@ -71,6 +71,12 @@ describe('CertifiedPlanDialog', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Caldari State')).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: /Manufacturer/ })).not.toBeInTheDocument();
+  });
+
+  it('groups the plan radios under a labelled radiogroup', async () => {
+    renderDialog();
+    const group = await screen.findByRole('radiogroup', { name: /certified plans/i });
+    expect(within(group).getAllByRole('radio').length).toBeGreaterThan(0);
   });
 
   it('switches career path', async () => {

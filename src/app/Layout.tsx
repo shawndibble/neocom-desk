@@ -96,7 +96,8 @@ function PrefetchIndicator() {
       <span
         role="status"
         aria-label={label}
-        className="inline-block size-2 shrink-0 motion-safe:animate-pulse rounded-full bg-accent"
+        tabIndex={0}
+        className={`inline-block size-2 shrink-0 motion-safe:animate-pulse rounded-full bg-accent ${focusRingClassName}`}
       />
     </Tooltip>
   );
@@ -393,7 +394,7 @@ export const Layout = memo(function Layout() {
           <CharacterFooterLink activeCharacter={activeCharacter} />
         </aside>
 
-        <main className="min-w-0 flex-1 px-2 py-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-4 md:pb-4">
+        <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px))]">
           <AlertCharacterSwitch />
           <AuthFailureNotice />
           <StandingsScopeNotice />
@@ -416,7 +417,6 @@ export const Layout = memo(function Layout() {
               to={path}
               label={t(NAV_LABEL_KEYS[path])}
               locked={locked.has(path)}
-              badge={path === '/alerts' ? unreadAlerts : undefined}
               presentation="tab"
             />
           ))}
@@ -455,7 +455,6 @@ export const Layout = memo(function Layout() {
             onClose={() => setMoreOpen(false)}
             locked={locked}
             tabs={tabs}
-            unreadAlerts={unreadAlerts}
             renderCharacterLink={(originPath) => (
               <CharacterFooterLink
                 activeCharacter={activeCharacter}
