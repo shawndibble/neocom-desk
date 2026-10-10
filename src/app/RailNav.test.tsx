@@ -206,7 +206,7 @@ describe('the More sheet', () => {
     renderAt('/overview');
     const { sheet } = await openSheet();
 
-    expect(within(sheet).getByRole('link', { name: 'Market' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('link', { name: 'Wallet' })).toBeInTheDocument();
     expect(within(sheet).getByRole('link', { name: 'Travel' })).toBeInTheDocument();
     expect(within(sheet).queryByRole('link', { name: 'Appraisal' })).not.toBeInTheDocument();
   });
