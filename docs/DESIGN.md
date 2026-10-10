@@ -1221,7 +1221,9 @@ Every interactive element takes its states from one shared recipe in
   - Outset (`outline-offset-2`) on boxed controls and inline links.
   - Inset (`-outline-offset-2`) on full-bleed rows, tabs and nav items.
   - `scroll-padding` keeps a focused row clear of sticky headers and the
-    phone tab bar (WCAG 2.4.11).
+    phone tab bar (WCAG 2.4.11). A bar pinned over the bottom of the page
+    reserves its height with `useStickyClearance`, and `index.css` sums
+    every bar's term.
 - **Disabled:** `opacity-40` and `cursor-not-allowed`. When there's a reason
   to show, use `aria-disabled` plus a tooltip instead of the native
   attribute.
