@@ -568,7 +568,7 @@ describe('BuildPlanDetail shopping list', () => {
     expect(await screen.findByRole('button', { name: 'Shopping list copied' })).toBeInTheDocument();
   });
 
-  it('announces both outcomes in a status region, with no visible text', async () => {
+  it('announces a successful copy in a status region', async () => {
     const user = userEvent.setup();
     configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
     render(<Harness />);

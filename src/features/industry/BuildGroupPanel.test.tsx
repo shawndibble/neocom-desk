@@ -6,7 +6,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -245,6 +245,23 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
 
     expect(screen.getByRole('button', { name: 'Jita list copied' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Copy Amarr list' })).toBeTruthy();
+  });
+
+  it('announces a whole-group copy in a status region', async () => {
+    configureClipboard(async () => {});
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [material(34, 100)]),
+      row('b', [material(35, 50)]),
+    ]);
+    renderPanel([plan('a', 'jita'), plan('b', 'jita')]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('status').some((el) => el.textContent === 'Shopping list copied')
+      ).toBe(true)
+    );
   });
 
   it('leaves the whole-group control disabled — no one list covers both hubs', () => {
