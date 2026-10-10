@@ -128,6 +128,7 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
         >
           {days.map((day, index) => {
             const isToday = index === 0;
+            const severity = day.severity ?? 'clear';
             const percent =
               day.count === 0 ? 0 : Math.max(MIN_BAR_PERCENT, (day.count / busiest) * 100);
             return (
@@ -140,7 +141,7 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
                 <div className="flex h-8 flex-col items-center justify-end">
                   {day.count > 0 && (
                     <>
-                      <SeverityIcon severity={day.severity ?? 'clear'} size="0.75rem" />
+                      <SeverityIcon severity={severity} size="0.75rem" />
                       <span className="text-xs leading-4 font-semibold tabular-nums">
                         {day.count}
                       </span>
@@ -150,7 +151,7 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
                 <div className="flex h-16 w-full items-end border-b border-line">
                   {day.count > 0 && (
                     <div
-                      className={`w-full rounded-t-[4px] ${SEVERITY_FILL[day.severity ?? 'clear']}`}
+                      className={`w-full rounded-t-[4px] ${SEVERITY_FILL[severity]}`}
                       style={{ height: `${percent}%` }}
                     />
                   )}
