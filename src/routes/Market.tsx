@@ -1325,7 +1325,7 @@ export function Market() {
                             side="sell"
                             rows={sellRows}
                             total={shownSell.length}
-                            hiddenCount={hiddenBaitCount}
+                            hiddenBaitCount={hiddenBaitCount}
                             best={loadedView?.summary.bestSell ?? null}
                             columns={baseColumns}
                             availableColumns={pickableColumns(SELL_ORDER_COLUMN_IDS)}

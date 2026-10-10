@@ -7263,7 +7263,7 @@
     "filterSecurity": "Security",
     "filterNpcOnly": "NPC stations only",
     "filterHideBait": "Hide bait sells",
-    "filterHideBaitHint": "Hides sell orders asking 10 times the best sell or more, the ones flagged as likely bait. Depth and best prices still count them.",
+    "filterHideBaitHint": "Hides sell orders asking {{times}} times the best sell or more, the ones flagged as likely bait. Depth, best prices and CSV export still count them.",
     "globalMarketNote": "Reading from {{regionName}} — this item trades in a market region of its own, not the one picked above.",
     "refresh": "Refresh",
     "searchLabel": "Search items",

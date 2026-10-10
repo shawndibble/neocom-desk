@@ -575,7 +575,10 @@ export function useOrderBookOrchestration({
     npcOnly,
     hideBait,
   ].filter(Boolean).length;
-  const filtersNarrowBook = activeFilterCount > 0 || stationFilter !== null;
+  // Hide bait sells counts on the badge but never empties a side: the best
+  // sell can't be bait against itself, and buys are never hidden — so an
+  // empty book is no reason to blame it.
+  const filtersNarrowBook = activeFilterCount > (hideBait ? 1 : 0) || stationFilter !== null;
   function handleBrowserFiltersChange(next: BrowserFilterValue) {
     setBrowserFilters({
       'browser.jumps': next.jumps,
