@@ -16,6 +16,7 @@
  */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
+import { answerRailQuestion } from './support/login';
 import {
   CHARACTER_NAME,
   CHARACTER_ID,
@@ -119,6 +120,7 @@ async function openCorpBoard(page: Page, name: string, structureCount = 1): Prom
   await page.goto('./');
   await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
   await expect(page).toHaveURL(/\/overview$/);
+  await answerRailQuestion(page);
 
   await page.goto('./corp');
   await expect(page.getByText(name, { exact: true })).toBeVisible();

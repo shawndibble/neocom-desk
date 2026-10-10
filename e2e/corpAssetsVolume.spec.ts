@@ -17,6 +17,7 @@
  * grant prompt off every other spec.
  */
 import { test, expect } from './support/testBase';
+import { answerRailQuestion } from './support/login';
 import {
   CHARACTER_NAME,
   CHARACTER_ID,
@@ -122,6 +123,7 @@ test.describe('Corp Assets — item row volume', () => {
       await page.goto('./');
       await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
       await expect(page).toHaveURL(/\/overview$/);
+      await answerRailQuestion(page);
 
       await page.setViewportSize({ width, height: 900 });
       await page.goto('./corp/assets');
@@ -143,6 +145,7 @@ test.describe('Corp Assets — item row volume', () => {
     await page.goto('./');
     await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
     await expect(page).toHaveURL(/\/overview$/);
+    await answerRailQuestion(page);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('./corp/assets');
