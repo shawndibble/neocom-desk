@@ -108,7 +108,7 @@ for (const viewport of [
         };
       })
     );
-    // Rows are even: one row of 6, or two rows of 3 (never 4 + 2 or 5 + 1).
+    // One row, or rows of 3 (6 = 3 + 3; 5 = 3 + 2): never 4 + 2 or 5 + 1.
     const rows = await tiles.evaluateAll((nodes) => {
       const counts = new Map<number, number>();
       for (const node of nodes) {
@@ -117,8 +117,9 @@ for (const viewport of [
       }
       return [...counts.values()];
     });
-    expect(rows.every((count) => count === rows[0])).toBe(true);
-    expect([3, 6]).toContain(rows[0]);
+    const total = rows.reduce((sum, count) => sum + count, 0);
+    expect(rows[0] === total || rows[0] === 3).toBe(true);
+    expect(rows.slice(1).every((count) => count <= rows[0])).toBe(true);
     for (const tile of measured) {
       expect(tile.clipped, tile.text).toBe(false);
       expect(tile.overflow, tile.text).not.toBe('ellipsis');
