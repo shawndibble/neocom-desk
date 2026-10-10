@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
-import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -540,6 +540,19 @@ describe('BuildPlanDetail facility tax fields', () => {
 
 describe('BuildPlanDetail shopping list', () => {
   const copyButton = () => screen.getByRole('button', { name: 'Copy shopping list for multibuy' });
+
+  // One throwaway render-and-copy, so no test pays for the first one. The click
+  // re-renders this very large component once the clipboard write resolves, and
+  // under CI load that first re-render outlasted `findBy*`'s 1s default and
+  // landed on whichever test ran first. Paid here under the hook's own budget.
+  beforeAll(async () => {
+    configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
+    const { unmount } = render(<Harness />);
+    await userEvent.click(copyButton());
+    await screen.findByRole('button', { name: 'Shopping list copied' }, { timeout: 25_000 });
+    unmount();
+    configureClipboard(null);
+  }, 30_000);
 
   afterEach(() => configureClipboard(null));
 

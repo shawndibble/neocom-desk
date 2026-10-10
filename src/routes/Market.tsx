@@ -109,7 +109,6 @@ import {
   type MarketOrderColumnId,
   useVisibleMarketOrderColumns,
 } from '@/features/market/marketOrderColumns';
-import { useTimedToast } from '@/components/ui/useTimedToast';
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
@@ -438,7 +437,6 @@ export function Market() {
     count: number;
     itemName: string;
   } | null>(null);
-  useTimedToast(compareUndo, () => setCompareUndo(null));
   function handleCompareVariations() {
     if (!variationsResult || !selectedItem || selectedTypeId === null) return;
     const added = addManyToCompare([
@@ -1464,6 +1462,7 @@ export function Market() {
               name: compareUndo.itemName,
             })}
             undo={{ label: t('market.compareUndo.undo'), onUndo: handleUndoCompareVariations }}
+            onClose={() => setCompareUndo(null)}
           />
         )}
       </div>
