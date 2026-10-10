@@ -16,6 +16,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, Spinner, TextArea, TextInput } from '@/components/ui';
+import { activeOptionClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import {
@@ -465,7 +466,7 @@ export function MailComposeBox({
                     aria-selected={highlight === i}
                     className={cx(
                       'cursor-pointer px-3 py-1.5 text-xs text-text',
-                      highlight === i ? 'bg-panel-2' : 'hover:bg-panel-2'
+                      highlight === i ? `bg-panel-2 ${activeOptionClassName}` : 'hover:bg-panel-2'
                     )}
                     onMouseEnter={() => setHighlight(i)}
                     // Keeps the input focused — a plain click would blur it first and close the list.

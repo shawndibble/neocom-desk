@@ -1226,6 +1226,15 @@ Every interactive element takes its states from one shared recipe in
     phone tab bar (WCAG 2.4.11). A bar pinned over the bottom of the page
     reserves its height with `useStickyClearance`, and `index.css` sums
     every bar's term.
+- **Highlighted option:** the option a keyboard is on in a menu, Select,
+  search picker or the command palette (the one Enter picks) takes the inset
+  2px accent outline plus the `panel-2` fill, but the outline only while the
+  last input was the keyboard (`data-input="keyboard"` on `<html>`, set and
+  cleared in `app/inputModality.ts` alone). Hover and touch keep the fill and
+  nothing else, so a ring never follows the pointer. Pickers whose focus stays
+  in the search box compose `activeOptionClassName` on the `aria-activedescendant`
+  option; Radix menu items compose `highlightedOptionClassName` (via
+  `menuItemClassName` / `SelectItem`). Neither may set `outline-none`.
 - **Disabled:** `opacity-40` and `cursor-not-allowed`. When there's a reason
   to show, use `aria-disabled` plus a tooltip instead of the native
   attribute. A control that its own press puts to work (Refresh, Scan, Start

@@ -30,6 +30,7 @@ import {
   TextArea,
   TabPanel,
 } from '@/components/ui';
+import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import {
   MIN_RECIPIENT_SEARCH_LENGTH,
@@ -374,7 +375,7 @@ function PilotSearch({
                       className={cx(
                         'cursor-pointer px-3 py-1.5 text-xs text-text',
                         'hover:bg-panel-2',
-                        highlight === i && 'bg-panel-2'
+                        highlight === i && `bg-panel-2 ${activeOptionClassName}`
                       )}
                       onMouseEnter={() => setHighlight(i)}
                       // Keeps the input focused — a plain click would blur it first and close the list.

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { Modal, SearchInput, Spinner } from '@/components/ui';
+import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -332,7 +333,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                             className={cx(
                               'flex min-h-11 cursor-pointer md:min-h-9 items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
                               highlighted
-                                ? 'bg-panel-2 text-text'
+                                ? `bg-panel-2 text-text ${activeOptionClassName}`
                                 : 'text-text-dim hover:bg-panel-2'
                             )}
                           >
