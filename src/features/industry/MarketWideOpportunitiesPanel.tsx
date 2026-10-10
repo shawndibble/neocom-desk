@@ -754,7 +754,12 @@ export function MarketWideOpportunitiesPanel({
             />
           )}
           {filterBar}
-          <Button size="sm" onClick={() => scan(filter)} disabled={loading || !trees || !catalog}>
+          <Button
+            size="sm"
+            onClick={() => scan(filter)}
+            disabled={!trees || !catalog}
+            aria-disabled={loading || undefined}
+          >
             {loading
               ? t('industry.marketOpportunitiesScanning')
               : t('industry.marketOpportunitiesRunScan')}
