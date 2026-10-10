@@ -6,7 +6,6 @@ import {
   DataAgeBadge,
   EmptyState,
   IconButton,
-  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -30,6 +29,7 @@ import {
   type CertificateSort,
 } from '@/features/skills/certificates/certificatesModel';
 import { useCertificatesData } from '@/features/skills/certificates/useCertificatesData';
+import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
@@ -282,8 +282,7 @@ export function SkillCertificates() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        title={t('nav.skills')}
+      <SkillsPageHeader
         meta={data.fetchedAt && <DataAgeBadge date={data.fetchedAt} />}
         actions={
           <IconButton icon={<Icon.Refresh />} label={t('skills.refresh')} onClick={data.refresh} />
