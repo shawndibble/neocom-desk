@@ -1,5 +1,6 @@
 import { forwardRef, type SelectHTMLAttributes } from 'react';
 import { cx } from '@/lib/cx';
+import { useDescribedBy } from './fieldNote';
 import * as Icon from './icons';
 import { fieldBaseClassName, fieldSizeClassName, type ControlSize } from './controlStyles';
 
@@ -30,9 +31,10 @@ interface NativeSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>
  * that reads as a stray light pixel next to every field.
  */
 export const NativeSelect = forwardRef<HTMLSelectElement, NativeSelectProps>(function NativeSelect(
-  { size = 'md', className = '', children, ...rest },
+  { size = 'md', className = '', children, 'aria-describedby': describedBy, ...rest },
   ref
 ) {
+  const described = useDescribedBy(describedBy);
   return (
     <div className={cx('relative', className)}>
       <select
@@ -44,6 +46,7 @@ export const NativeSelect = forwardRef<HTMLSelectElement, NativeSelectProps>(fun
           size === 'sm' ? 'pr-6' : 'pr-8'
         )}
         {...rest}
+        aria-describedby={described}
       >
         {children}
       </select>

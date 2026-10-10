@@ -62,6 +62,7 @@ import {
   Spinner,
   StatChip,
   StatChips,
+  TabPanel,
 } from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
 import type { TheraConnection } from '@/engine/route/theraConnections';
@@ -220,7 +221,7 @@ function RouteFacts({
   );
 }
 
-export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
+export function RouteSafetyTab({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: string }) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(ROUTE_PARAMS);
   const current = useCurrentSystem();
@@ -333,99 +334,103 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
         }
       />
       {tabBar}
-      {/* The route table needs ~612px but only gets ~427px beside the rail at 1024, so the
+      <TabPanel tabsId={tabsId} tabId="route" className="space-y-4">
+        {/* The route table needs ~612px but only gets ~427px beside the rail at 1024, so the
           rail and route sit side by side only from `xl` (#2591). Below it the rail
           dissolves (`contents`) so Stops, the route, then Route rules stack in order. */}
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="contents xl:block xl:space-y-4">
-          <div className="order-1 xl:order-none">
-            <StopsPanel
-              fromId={fromId}
-              fromName={fromId === null ? fromTrigger : nameOf(fromId)}
-              fromTrigger={fromTrigger}
-              // A new start is a new first leg: its pin no longer applies.
-              onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
-              stops={stops}
-              onStopsChange={(next) =>
-                setParams(
-                  // Pins belong to legs by position: a new stop list drops them,
-                  // but the first stop keeps the pin a Route via link made for it.
-                  { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
-                  { push: true }
-                )
-              }
-              settings={settings}
-              onSettingsChange={(patch) =>
-                setParams({
-                  pin: [],
-                  ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
-                  ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
-                  ...(patch.keepLastStopLast === undefined ? {} : { keep: patch.keepLastStopLast }),
-                })
-              }
-              optimizeBlocked={state.kind === 'route' && state.unreachable}
-              orderNote={orderNote}
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="contents xl:block xl:space-y-4">
+            <div className="order-1 xl:order-none">
+              <StopsPanel
+                fromId={fromId}
+                fromName={fromId === null ? fromTrigger : nameOf(fromId)}
+                fromTrigger={fromTrigger}
+                // A new start is a new first leg: its pin no longer applies.
+                onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
+                stops={stops}
+                onStopsChange={(next) =>
+                  setParams(
+                    // Pins belong to legs by position: a new stop list drops them,
+                    // but the first stop keeps the pin a Route via link made for it.
+                    { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
+                    { push: true }
+                  )
+                }
+                settings={settings}
+                onSettingsChange={(patch) =>
+                  setParams({
+                    pin: [],
+                    ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
+                    ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
+                    ...(patch.keepLastStopLast === undefined
+                      ? {}
+                      : { keep: patch.keepLastStopLast }),
+                  })
+                }
+                optimizeBlocked={state.kind === 'route' && state.unreachable}
+                orderNote={orderNote}
+                nameOf={nameOf}
+              />
+            </div>
+            <div className="order-3 xl:order-none">
+              <RouteRulesPanel
+                preference={routeQuery.rules.preference}
+                onPreferenceChange={(pref) => {
+                  void useDefaultRoutePreference.getState().setValue(pref);
+                  setParams({ pref: null });
+                }}
+                holeQuery={holeQuery}
+                onHoleChange={(change) => {
+                  saveRouteHoleDefault(change);
+                  setParams({ [HOLE_PARAM[change.field]]: null });
+                }}
+                bridges={{
+                  bridgeQuery,
+                  onBridgesChange: (enabled) => {
+                    void useRouteBridgesEnabled.getState().setValue(enabled);
+                    setParams({ jb: null });
+                  },
+                  bridgeCount: gateRecords?.length ?? 0,
+                  onManageBridges: () => setBridgeDialog('search'),
+                }}
+                jump={{
+                  enabled: jumpEnabled,
+                  onEnabledChange: (enabled) =>
+                    void useRouteJumpsEnabled.getState().setValue(enabled),
+                  range: jumpRange,
+                  onRangeChange: (range) => void useRouteJumpRange.getState().setValue(range),
+                }}
+              />
+            </div>
+          </div>
+          <div className="order-2 min-w-0 space-y-4 xl:order-none">
+            <RouteBody
+              state={state}
+              multiStop={stops.length > 1}
               nameOf={nameOf}
-            />
-          </div>
-          <div className="order-3 xl:order-none">
-            <RouteRulesPanel
-              preference={routeQuery.rules.preference}
-              onPreferenceChange={(pref) => {
-                void useDefaultRoutePreference.getState().setValue(pref);
-                setParams({ pref: null });
-              }}
-              holeQuery={holeQuery}
-              onHoleChange={(change) => {
-                saveRouteHoleDefault(change);
-                setParams({ [HOLE_PARAM[change.field]]: null });
-              }}
-              bridges={{
-                bridgeQuery,
-                onBridgesChange: (enabled) => {
-                  void useRouteBridgesEnabled.getState().setValue(enabled);
-                  setParams({ jb: null });
-                },
-                bridgeCount: gateRecords?.length ?? 0,
-                onManageBridges: () => setBridgeDialog('search'),
-              }}
-              jump={{
-                enabled: jumpEnabled,
-                onEnabledChange: (enabled) =>
-                  void useRouteJumpsEnabled.getState().setValue(enabled),
-                range: jumpRange,
-                onRangeChange: (range) => void useRouteJumpRange.getState().setValue(range),
-              }}
+              killsOf={killsOf}
+              avoidAction={avoidAction}
+              holesState={holesState}
+              pinned={params.pin.some((token) => token !== '')}
+              onUse={pinLeg}
+              bridges={bridges === null ? 'off' : bridges.length === 0 ? 'none' : 'known'}
+              onSetUpBridges={setBridgeDialog}
             />
           </div>
         </div>
-        <div className="order-2 min-w-0 space-y-4 xl:order-none">
-          <RouteBody
-            state={state}
-            multiStop={stops.length > 1}
-            nameOf={nameOf}
-            killsOf={killsOf}
-            avoidAction={avoidAction}
-            holesState={holesState}
-            pinned={params.pin.some((token) => token !== '')}
-            onUse={pinLeg}
-            bridges={bridges === null ? 'off' : bridges.length === 0 ? 'none' : 'known'}
-            onSetUpBridges={setBridgeDialog}
-          />
-        </div>
-      </div>
-      <AvoidSystemDialog
-        target={avoidTarget}
-        route={state.kind === 'route' ? state : null}
-        onClose={() => setAvoidTarget(null)}
-      />
-      {bridgeDialog !== null && (
-        <AnsiblexGatesDialog
-          mode={bridgeDialog}
-          systems={systems}
-          onClose={() => setBridgeDialog(null)}
+        <AvoidSystemDialog
+          target={avoidTarget}
+          route={state.kind === 'route' ? state : null}
+          onClose={() => setAvoidTarget(null)}
         />
-      )}
+        {bridgeDialog !== null && (
+          <AnsiblexGatesDialog
+            mode={bridgeDialog}
+            systems={systems}
+            onClose={() => setBridgeDialog(null)}
+          />
+        )}
+      </TabPanel>
     </div>
   );
 }

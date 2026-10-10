@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
+import { focusRingClassName } from '@/components/ui/controlStyles';
 import type { SyncStatus } from '@/sync';
 import { syncDisplayState, type SyncDisplayState } from './syncStatus';
 
@@ -25,7 +26,8 @@ export function SyncStatusDot({ status, online }: SyncStatusDotProps) {
       <span
         role="status"
         aria-label={label}
-        className={`inline-block size-2 shrink-0 rounded-full ${DOT_CLASS[displayState]}`}
+        tabIndex={0}
+        className={`inline-block size-2 shrink-0 rounded-full ${DOT_CLASS[displayState]} ${focusRingClassName}`}
       />
     </Tooltip>
   );

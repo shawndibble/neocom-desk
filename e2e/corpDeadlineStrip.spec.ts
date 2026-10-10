@@ -22,7 +22,6 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { answerRailQuestion } from './support/login';
 import {
   CHARACTER_NAME,
   CHARACTER_ID,
@@ -110,7 +109,6 @@ async function signInWithMockedDeadline(page: Page) {
   await page.goto('./');
   await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
   await expect(page).toHaveURL(/\/overview$/);
-  await answerRailQuestion(page);
   await page.goto('./corp');
 }
 

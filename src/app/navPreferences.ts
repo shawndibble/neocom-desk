@@ -8,7 +8,7 @@
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { hiddenNavForActivities, parseHiddenNav, parseRecentNav, pushRecentNav } from './navRail';
+import { parseHiddenNav, parseRecentNav, pushRecentNav } from './navRail';
 
 export const useHiddenNav = createSyncedSetting<readonly string[]>({
   key: 'sync.navHidden',
@@ -24,16 +24,6 @@ export const useNavSetupAnswered = createSyncedSetting<boolean>({
   defaultValue: false,
   parse: (raw) => (typeof raw === 'boolean' ? raw : null),
 });
-
-/**
- * Settles the first-run question: writes the starting hidden list and the flag
- * together, so a second device pulling the flag never asks again. Skipping
- * (no activities) gives the default set.
- */
-export async function answerNavSetup(activities: readonly string[]): Promise<void> {
-  await useHiddenNav.getState().setValue(hiddenNavForActivities(activities));
-  await useNavSetupAnswered.getState().setValue(true);
-}
 
 export const useRecentNav = createLocalSetting<readonly string[]>({
   key: 'navRecent',
