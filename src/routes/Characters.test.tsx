@@ -555,11 +555,6 @@ describe('Characters', () => {
     const input = screen.getByRole('textbox', { name: 'Rename group' });
     await user.clear(input);
     await user.type(input, 'Scouts{Enter}');
-    await new Promise((r) => setTimeout(r, 300));
-    console.log(
-      'DBG',
-      [...document.querySelectorAll('h2,input')].map((e) => e.outerHTML.slice(0, 160))
-    );
     expect(await screen.findByRole('heading', { name: 'Scouts' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Move Mains up' }));
