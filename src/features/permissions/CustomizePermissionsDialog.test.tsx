@@ -54,6 +54,15 @@ describe('CustomizePermissionsDialog', () => {
     expect(screen.getAllByText('Opt-in')).toHaveLength(2);
   });
 
+  it('reads the Opt-in tag in an opt-in checkbox’s description', async () => {
+    render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
+    const corp = await screen.findByRole('checkbox', { name: 'Corporation' });
+    expect(corp).toHaveAccessibleDescription(/Opt-in/);
+    expect(screen.getByRole('checkbox', { name: 'Wallet' })).not.toHaveAccessibleDescription(
+      /Opt-in/
+    );
+  });
+
   it('unchecking a Permission updates the count and the submitted request', async () => {
     const user = userEvent.setup();
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);

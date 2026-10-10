@@ -39,7 +39,6 @@ import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { useHiddenNav, useNavSetupAnswered, useRecentNav } from './navPreferences';
-import { NavSetupQuestion } from './NavSetupQuestion';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
 import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
@@ -393,7 +392,6 @@ export function App() {
         <SkillDetailModal />
         <ItemInfoModal />
         <InstallPrompt />
-        <NavSetupQuestion />
       </BrowserRouter>
     </ErrorBoundary>
   );
