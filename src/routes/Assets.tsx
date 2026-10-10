@@ -36,7 +36,9 @@ import {
   IskInput,
   LiveStatus,
   Tabs,
-  TabPanel,
+  usesViewPicker,
+  useTabPanelProps,
+  type PageViews,
   useTabsId,
 } from '@/components/ui';
 import { usePageTab } from '@/lib/usePageTab';
@@ -659,6 +661,32 @@ function isUnresolvedParent(
 }
 
 /** Character assets, browsed one level at a time. Read-only, cached for offline. */
+/**
+ * The view's panel: a labelled tabpanel under the strip, a plain container
+ * under the phone's view picker, which has no tab for it to point at.
+ */
+function AssetsViewPanel({
+  tabsId,
+  tabId,
+  labelled,
+  children,
+}: {
+  tabsId: string;
+  tabId: string;
+  labelled: boolean;
+  children: ReactNode;
+}) {
+  const { className, ...panel } = useTabPanelProps(tabsId, tabId);
+  const layout = 'flex min-h-0 flex-1 flex-col gap-3';
+  return labelled ? (
+    <div {...panel} className={cx(className, layout)}>
+      {children}
+    </div>
+  ) : (
+    <div className={layout}>{children}</div>
+  );
+}
+
 export function Assets() {
   const isPhone = useIsPhone();
   const { t } = useTranslation();
@@ -675,6 +703,12 @@ export function Assets() {
   // page — the single most important thing about drill-down on a phone.
   const [tab, setTab] = usePageTab(ASSETS_TABS);
   const tabsId = useTabsId();
+  // Four views: a strip on desktop, the title-row picker on a phone (DESIGN.md §6c).
+  const assetsViews: PageViews = {
+    value: tab,
+    onChange: (id) => setTab(id as typeof tab),
+    tabs: tabBarTabs(ASSETS_TABS).map((item) => ({ id: item.id, label: t(item.labelKey) })),
+  };
   const wildcard = useParams()['*'] ?? '';
   const { stationId: pathStationId, segments: pathSegments } = useMemo(
     () => parseAssetPath(wildcard),
@@ -1706,6 +1740,7 @@ export function Assets() {
         <FromWalletCrumb />
         <PageHeader
           title={t('assets.title')}
+          views={assetsViews}
           // `CharacterFilterControl` rides here rather than in `actions` per
           // `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`
           // — Assets has no titled inner `Panel` to attach it to, so it takes
@@ -1721,7 +1756,8 @@ export function Assets() {
                   characterName={viewedCharacter.name}
                 />
               )}
-              {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+              {/* Targets reads every Character's assets and shows its own age. */}
+              {assetsResult && tab !== 'targets' && <DataAgeBadge date={assetsResult.fetchedAt} />}
               {crossCharacterFilterMeta}
               {otherCharacterIds.length > 0 && crossCharacterLoading && (
                 <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
@@ -1767,15 +1803,21 @@ export function Assets() {
             </>
           }
         />
-        <Tabs
-          tabsId={tabsId}
-          label={t('assets.title')}
-          value={tab}
-          onChange={(id) => setTab(id as typeof tab)}
-          tabs={tabBarTabs(ASSETS_TABS).map((item) => ({ id: item.id, label: t(item.labelKey) }))}
-        />
+        {!usesViewPicker(assetsViews.tabs.length, isPhone) && (
+          <Tabs
+            tabsId={tabsId}
+            label={t('assets.title')}
+            value={tab}
+            onChange={assetsViews.onChange}
+            tabs={[...assetsViews.tabs]}
+          />
+        )}
 
-        <TabPanel tabsId={tabsId} tabId={tab} className="flex min-h-0 flex-1 flex-col gap-3">
+        <AssetsViewPanel
+          tabsId={tabsId}
+          tabId={tab}
+          labelled={!usesViewPicker(assetsViews.tabs.length, isPhone)}
+        >
           {tab === 'ships' && (
             <MyShipsView
               characterIds={shipCharacterIds}
@@ -2200,7 +2242,7 @@ export function Assets() {
               </AssetItemActionsContext.Provider>
             </div>
           )}
-        </TabPanel>
+        </AssetsViewPanel>
       </div>
     </ItemActionsProvider>
   );

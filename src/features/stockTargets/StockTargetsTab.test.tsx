@@ -36,6 +36,7 @@ vi.mock('./stockTargetsData', () => ({
       incompleteCharacters: [],
       oldestFetchedAt: null,
       locations: [],
+      groups: new Map(),
     };
   }),
 }));

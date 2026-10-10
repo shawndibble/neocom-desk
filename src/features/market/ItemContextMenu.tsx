@@ -42,6 +42,8 @@ export interface ItemContextMenuProps {
   onCompareVariations?: () => void;
   /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
   onViewInIndustryAsMaterial?: () => void;
+  /** Leaves out "Set stock target…" where the page already edits the Stock Target in place (Assets › Targets). */
+  hideStockTarget?: boolean;
   /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
   extraItems?: ReactNode;
   /** A right-click or hold on a link in the row stays the browser's (`RowActionsMenu`'s `linksKeepBrowserMenu`). */
@@ -195,7 +197,9 @@ function useItemMenuItems(
         </DisabledMenuItem>
       )}
       <PriceAlertMenuItem typeId={typeId} available={canAddToQuickbar} onSelect={onAlertRequest} />
-      <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
+      {!props.hideStockTarget && (
+        <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
+      )}
       <ShowInfoMenuItem typeId={typeId} itemName={itemName} />
       <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
         {t('market.contextMenu.addToCompare')}

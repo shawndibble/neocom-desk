@@ -11,8 +11,8 @@ import { cx } from '@/lib/cx';
 const PILL_CLASS: Record<StockStatus, string> = {
   out: 'text-danger bg-danger/10',
   low: 'text-warning bg-warning/10',
-  ok: 'text-success',
-  over: 'text-accent',
+  ok: 'text-success bg-success/10',
+  over: 'text-accent bg-accent/10',
 };
 
 const BAR_CLASS: Record<StockStatus, string> = {

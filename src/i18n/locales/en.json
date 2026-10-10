@@ -10324,6 +10324,7 @@
     "incomplete": "Some characters could not be read, so these counts are at least: {{names}}",
     "liveSummary": "{{out}} out, {{low}} low",
     "filterLabel": "Status",
+    "groupFilterLabel": "Market group",
     "filterAll": "All",
     "list": {
       "pickerLabel": "Stock list",
@@ -10339,6 +10340,7 @@
       "deleteConfirm": "Delete \"{{name}}\" and its stock targets? Your assets are not touched.",
       "deleteAction": "Delete",
       "nameLabel": "Name",
+      "nameRequired": "Give the list a name.",
       "namePlaceholder": "e.g. Home market"
     },
     "countAt": {
@@ -10353,6 +10355,17 @@
       "placeholder": "Catalyst 40\nAntimatter Charge M x 20000\nNanite Repair Paste\t1500",
       "unmatched_one": "{{count}} line did not match an item and is left in the box.",
       "unmatched_other": "{{count}} lines did not match an item and are left in the box.",
+      "searchTitle": "Add items to {{name}}",
+      "searchLabel": "Item",
+      "searchPlaceholder": "Search items",
+      "pickItem": "Pick an item from the list.",
+      "quantityRequired": "Enter how many to keep on hand.",
+      "added_one": "Added {{name}}: keep {{count}} on hand.",
+      "added_other": "Added {{name}}: keep {{count}} on hand.",
+      "done": "Done",
+      "pasteOpen": "Paste a list…",
+      "pasteTitle": "Paste items into {{name}}",
+      "pasteRequired": "Paste at least one item.",
       "confirm": "Add"
     },
     "summary": {

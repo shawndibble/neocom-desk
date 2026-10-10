@@ -47,11 +47,13 @@ import { STOCK_STATUSES, summarizeStock, type StockStatus } from '@/engine/stock
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { formatIskCompact } from '@/lib/isk';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { writeToClipboard } from '@/lib/clipboard';
 import { decodeStockListShare, encodeStockListShare } from '@/engine/stockTargets/stockListShare';
 import {
-  AddStockItemsDialog,
+  AddStockItemDialog,
   DeleteStockListDialog,
+  PasteStockItemsDialog,
   StockListNameDialog,
 } from './StockListDialogs';
 import { StockBuilderView } from './StockBuilderView';
@@ -60,7 +62,7 @@ import { newStockListId, useSelectedStockList, useStockLists } from './stockList
 import { loadStockTargetsData, type StockTargetsData } from './stockTargetsData';
 
 type View = 'manager' | 'builder';
-type Dialog = 'new' | 'rename' | 'delete' | 'add' | null;
+type Dialog = 'new' | 'rename' | 'delete' | 'add' | 'paste' | null;
 
 const ANYWHERE = 'anywhere';
 /** The Targets tab's query param carrying a shared Stock List's code. */
@@ -87,6 +89,7 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
   const list = lists.find((l) => l.id === selectedId) ?? lists[0] ?? null;
   const [view, setView] = useState<View>('manager');
   const [statusFilter, setStatusFilter] = useState<StockStatus | null>(null);
+  const [groupFilter, setGroupFilter] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
@@ -122,6 +125,11 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
   const loading = loadKey !== null && loaded?.key !== loadKey && failedKey !== loadKey;
   const failed = failedKey === loadKey && loaded?.key !== loadKey;
   const summary = useMemo(() => (data ? summarizeStock(data.rows) : null), [data]);
+  // Retry unmounts into a spinner: focus waits on the results wrapper instead of the page body.
+  const [resultsRef, , holdRetryFocus] = useRetryFocus(
+    loading ? 'busy' : failed ? 'failed' : 'ok',
+    list?.id
+  );
 
   function update(next: StockList[]) {
     void setLists(next);
@@ -158,10 +166,20 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
           name={list.name}
           onConfirm={() => update(removeStockList(lists, list.id))}
           onClose={() => setDialog(null)}
+          returnFocusFallback={() =>
+            document.querySelector<HTMLElement>('[data-stock-list-picker], [data-stock-new-list]')
+          }
         />
       )}
       {dialog === 'add' && list && (
-        <AddStockItemsDialog
+        <AddStockItemDialog
+          listName={list.name}
+          onAdd={(typeId, quantity) => update(setStockTarget(lists, list.id, typeId, quantity))}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'paste' && list && (
+        <PasteStockItemsDialog
           listName={list.name}
           onAdd={(items) =>
             update(
@@ -206,7 +224,8 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
       aria-label={t('stockTargets.share.bannerLabel')}
       className="flex flex-wrap items-center gap-2 rounded-xs border border-accent-dim bg-panel px-3 py-2 text-sm"
     >
-      <span className="min-w-0 flex-1">
+      {/* Its own line on a phone, so the buttons wrap under it rather than squeeze it. */}
+      <span className="min-w-0 basis-full sm:basis-auto sm:flex-1">
         {t('stockTargets.share.banner', { name: shared.name, count: shared.items.length })}
       </span>
       <Button variant="primary" onClick={saveSharedCopy}>
@@ -225,7 +244,7 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
           title={t('stockTargets.emptyTitle')}
           hint={t('stockTargets.emptyHint')}
           action={
-            <Button variant="primary" onClick={() => setDialog('new')}>
+            <Button variant="primary" data-stock-new-list onClick={() => setDialog('new')}>
               {t('stockTargets.list.new')}
             </Button>
           }
@@ -237,9 +256,20 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
   }
 
   const rows = data?.rows ?? [];
-  const filteredRows =
-    statusFilter === null ? rows : rows.filter((row) => row.status === statusFilter);
-  const countOf = (status: StockStatus) => rows.filter((row) => row.status === status).length;
+  const groupOf = (typeId: number) => data?.groups.get(typeId);
+  const groupNames = [
+    ...new Set(rows.map((row) => groupOf(row.typeId)).filter((g): g is string => !!g)),
+  ].sort((a, b) => a.localeCompare(b));
+  const inGroup = (typeId: number) => groupFilter === null || groupOf(typeId) === groupFilter;
+  const filteredRows = rows.filter(
+    (row) => (statusFilter === null || row.status === statusFilter) && inGroup(row.typeId)
+  );
+  const countOf = (status: StockStatus) =>
+    rows.filter((row) => row.status === status && inGroup(row.typeId)).length;
+  const shareUrl = () => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    return `${window.location.origin}${base}/assets/targets?${SHARE_PARAM}=${encodeStockListShare(list)}`;
+  };
   const viewSwitch = (
     <SegmentedControl<View>
       label={t('stockTargets.view.label')}
@@ -260,6 +290,7 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
       <div className="flex flex-wrap items-center gap-2">
         <Select value={list.id} onValueChange={(id) => void setSelectedId(id)}>
           <SelectTrigger
+            data-stock-list-picker
             aria-label={t('stockTargets.list.pickerLabel')}
             className="max-w-full min-w-40 font-semibold sm:w-auto"
           >
@@ -286,16 +317,6 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setDialog('rename')}>
               {t('stockTargets.list.renameEllipsis')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={list.items.length === 0}
-              onSelect={() => {
-                const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-                const url = `${window.location.origin}${base}/assets/targets?${SHARE_PARAM}=${encodeStockListShare(list)}`;
-                void writeToClipboard(url).then(() => setToast(t('stockTargets.share.copied')));
-              }}
-            >
-              {t('stockTargets.share.copy')}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setDialog('delete')}>
               {t('stockTargets.list.deleteEllipsis')}
@@ -324,6 +345,15 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
             ))}
           </SelectContent>
         </Select>
+        {list.items.length > 0 && (
+          <Button
+            onClick={() =>
+              void writeToClipboard(shareUrl()).then(() => setToast(t('stockTargets.share.copied')))
+            }
+          >
+            {t('stockTargets.share.copy')}
+          </Button>
+        )}
         <Button variant="primary" onClick={() => setDialog('add')}>
           {t('stockTargets.add.open')}
         </Button>
@@ -387,56 +417,102 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
               ))}
             </div>
           )}
+          {groupNames.length > 1 && (
+            <div
+              role="group"
+              aria-label={t('stockTargets.groupFilterLabel')}
+              className="flex flex-wrap items-center gap-1.5"
+            >
+              {groupNames.map((group) => (
+                <FilterChip
+                  key={group}
+                  label={group}
+                  selected={groupFilter === group}
+                  onToggle={() => setGroupFilter(groupFilter === group ? null : group)}
+                />
+              ))}
+            </div>
+          )}
+          <span className="flex-1" />
+          <Button onClick={() => setDialog('paste')}>{t('stockTargets.add.pasteOpen')}</Button>
         </div>
       )}
 
       <LiveStatus>
-        {data && t('stockTargets.liveSummary', { out: summary?.out ?? 0, low: summary?.low ?? 0 })}
+        {failed
+          ? t('stockTargets.loadFailedHint')
+          : data &&
+            [
+              t('stockTargets.liveSummary', { out: summary?.out ?? 0, low: summary?.low ?? 0 }),
+              data.incompleteCharacters.length > 0 &&
+                t('stockTargets.incomplete', { names: data.incompleteCharacters.join(', ') }),
+            ]
+              .filter(Boolean)
+              .join('. ')}
       </LiveStatus>
 
-      {list.items.length === 0 ? (
-        <EmptyState
-          title={t('stockTargets.listEmptyTitle')}
-          hint={t('stockTargets.listEmptyHint')}
-          action={<Button onClick={() => setDialog('add')}>{t('stockTargets.add.open')}</Button>}
-        />
-      ) : failed ? (
-        <EmptyState
-          title={t('common.loadFailedTitle')}
-          hint={t('stockTargets.loadFailedHint')}
-          action={<Button onClick={() => setRefreshKey((k) => k + 1)}>{t('common.retry')}</Button>}
-        />
-      ) : !data ? (
-        <Spinner label={t('common.loading')} />
-      ) : view === 'manager' ? (
-        filteredRows.length === 0 ? (
+      <div ref={resultsRef} tabIndex={-1} className="flex flex-col gap-3 focus:outline-none">
+        {list.items.length === 0 ? (
           <EmptyState
-            title={t('stockTargets.filteredEmpty')}
+            title={t('stockTargets.listEmptyTitle')}
+            hint={t('stockTargets.listEmptyHint')}
+            action={<Button onClick={() => setDialog('add')}>{t('stockTargets.add.open')}</Button>}
+          />
+        ) : failed ? (
+          <EmptyState
+            title={t('common.loadFailedTitle')}
+            hint={t('stockTargets.loadFailedHint')}
             action={
-              <Button onClick={() => setStatusFilter(null)}>{t('common.resetFilters')}</Button>
+              <Button
+                onClick={() => {
+                  holdRetryFocus();
+                  setRefreshKey((k) => k + 1);
+                }}
+              >
+                {t('common.retry')}
+              </Button>
             }
           />
-        ) : (
-          <Panel padded={false}>
-            <StockManagerTable
-              rows={filteredRows}
-              nameOf={nameOf}
-              onSetTarget={(typeId, target) =>
-                update(setStockTarget(lists, list.id, typeId, target))
+        ) : !data ? (
+          <Spinner label={t('common.loading')} />
+        ) : view === 'manager' ? (
+          filteredRows.length === 0 ? (
+            <EmptyState
+              title={t('stockTargets.filteredEmpty')}
+              action={
+                <Button
+                  onClick={() => {
+                    setStatusFilter(null);
+                    setGroupFilter(null);
+                  }}
+                >
+                  {t('common.resetFilters')}
+                </Button>
               }
-              onRemove={(typeId) => update(removeStockTarget(lists, list.id, typeId))}
             />
-          </Panel>
-        )
-      ) : (
-        <StockBuilderView
-          rows={rows}
-          nameOf={nameOf}
-          listName={list.name}
-          activeCharacterId={activeCharacterId}
-          viewSwitch={viewSwitch}
-        />
-      )}
+          ) : (
+            <Panel padded={false}>
+              <StockManagerTable
+                rows={filteredRows}
+                nameOf={nameOf}
+                groupOf={groupOf}
+                onSetTarget={(typeId, target) =>
+                  update(setStockTarget(lists, list.id, typeId, target))
+                }
+                onRemove={(typeId) => update(removeStockTarget(lists, list.id, typeId))}
+              />
+            </Panel>
+          )
+        ) : (
+          <StockBuilderView
+            rows={rows}
+            nameOf={nameOf}
+            listName={list.name}
+            activeCharacterId={activeCharacterId}
+            viewSwitch={viewSwitch}
+          />
+        )}
+      </div>
       {dialogs}
       {toastEl}
     </div>

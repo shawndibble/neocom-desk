@@ -19,6 +19,9 @@ import { resolveStockLocationNames } from '@/features/industry/ownedStockDetecti
 import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
 import type { TradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
+import { rootOf } from '@/features/market/marketTree';
+import { loadMarketGroups } from '@/sde/loadMarketSde';
+import { loadMarketTypesById } from '@/sde/marketTypesById';
 
 export interface StockTargetsData {
   rows: StockRow[];
@@ -28,6 +31,8 @@ export interface StockTargetsData {
   incompleteCharacters: string[];
   /** The oldest asset read behind the counts, or null when none was read. */
   oldestFetchedAt: Date | null;
+  /** Each item's top-level Market Group ("Ships", "Ammunition & Charges"), when the catalogue has it. */
+  groups: Map<number, string>;
   /** Every place the list's items sit or are listed, named, for the "Count at" picker. */
   locations: { id: number; name: string }[];
 }
@@ -40,11 +45,12 @@ export async function loadStockTargetsData(
   hub: TradeHub
 ): Promise<StockTargetsData> {
   const typeIds = list.items.map((item) => item.typeId);
-  const [assets, orders, names, prices] = await Promise.all([
+  const [assets, orders, names, prices, groups] = await Promise.all([
     loadAllCharactersAssets(),
     loadAllCharactersOpenOrders(),
     loadTypeNames(typeIds),
     getHubPrices(hub, typeIds).catch(() => new Map<number, { sellMin: number | null }>()),
+    loadRootGroupNames(typeIds).catch(() => new Map<number, string>()),
   ]);
 
   const detected = detectOwnedStock(
@@ -101,7 +107,21 @@ export async function loadStockTargetsData(
     .map((id) => ({ id, name: locationNames.get(id) ?? String(id) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  return { rows, names, counts, incompleteCharacters, oldestFetchedAt, locations };
+  return { rows, names, counts, incompleteCharacters, oldestFetchedAt, locations, groups };
+}
+
+/** Each type's top-level Market Group name, from the bundled market catalogue. */
+async function loadRootGroupNames(typeIds: readonly number[]): Promise<Map<number, string>> {
+  const [types, groupList] = await Promise.all([loadMarketTypesById(), loadMarketGroups()]);
+  const groupsById = new Map(groupList.map((group) => [group.id, group]));
+  const result = new Map<number, string>();
+  for (const typeId of typeIds) {
+    const groupId = types.get(typeId)?.marketGroupId;
+    if (groupId === undefined) continue;
+    const root = groupsById.get(rootOf(groupId, groupsById));
+    if (root) result.set(typeId, root.name);
+  }
+  return result;
 }
 
 /**

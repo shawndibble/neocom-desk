@@ -3,9 +3,15 @@
  * in place (§6c's faint pencil); a row opens Show Info; the row's ⋮ is the
  * item menu every other item row has, plus "Remove from list".
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, MenuItem, TextInput, type DataTableColumn } from '@/components/ui';
+import {
+  DataTable,
+  MenuItem,
+  MenuSeparator,
+  TextInput,
+  type DataTableColumn,
+} from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { StockRow } from '@/engine/stockTargets/stockRows';
@@ -13,6 +19,7 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { StockFillBar, StockStatusPill } from './StockStatus';
 
 /** Editable-in-place value (§6c): faint pencil at rest, field box on hover/focus; 44px tap area via ::after. */
@@ -33,11 +40,22 @@ function TargetCell({
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<string | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  // Set once the field has closed, so the blur its own unmount fires cannot save an escaped value.
+  const closed = useRef(false);
+  const focusAfterCommit = useFocusAfterCommit();
+  function close() {
+    closed.current = true;
+    setDraft(null);
+    // The field swaps back to the button: focus follows it (DESIGN.md §7).
+    focusAfterCommit(buttonRef);
+  }
   if (draft !== null) {
     const commit = () => {
+      if (closed.current) return;
       const next = Math.floor(Number(draft));
       if (Number.isFinite(next) && next > 0 && next !== row.target) onSetTarget(row.typeId, next);
-      setDraft(null);
+      close();
     };
     return (
       <TextInput
@@ -51,12 +69,21 @@ function TargetCell({
         onChange={(e) => setDraft(e.target.value)}
         onFocus={(e) => e.currentTarget.select()}
         onClick={(e) => e.stopPropagation()}
-        onBlur={commit}
+        onBlur={() => {
+          // Blur that is not the field's own close saves, as leaving any edit field does.
+          if (closed.current) return;
+          const next = Math.floor(Number(draft));
+          if (Number.isFinite(next) && next > 0 && next !== row.target) {
+            onSetTarget(row.typeId, next);
+          }
+          closed.current = true;
+          setDraft(null);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') commit();
           if (e.key === 'Escape') {
             e.stopPropagation();
-            setDraft(null);
+            close();
           }
         }}
       />
@@ -64,16 +91,19 @@ function TargetCell({
   }
   return (
     <button
+      ref={buttonRef}
       type="button"
+      data-stock-target-edit={row.typeId}
       className={editableValueClassName}
       onClick={(e) => {
         e.stopPropagation();
+        closed.current = false;
         setDraft(String(row.target));
       }}
     >
       <span className="sr-only">{t('stockTargets.table.editTargetFor', { name })}, </span>
       {row.target.toLocaleString()}
-      <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-text-faint" />
+      <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-text-dim" />
     </button>
   );
 }
@@ -81,23 +111,51 @@ function TargetCell({
 export function StockManagerTable({
   rows,
   nameOf,
+  groupOf,
   onSetTarget,
   onRemove,
 }: {
   rows: readonly StockRow[];
   nameOf: (typeId: number) => string;
+  /** The item's top-level Market Group, under its name on desktop. */
+  groupOf: (typeId: number) => string | undefined;
   onSetTarget: (typeId: number, target: number) => void;
   onRemove: (typeId: number) => void;
 }) {
   const { t } = useTranslation();
   const { showInfo } = useItemActions();
+  const focusAfterCommit = useFocusAfterCommit();
+  const editButton = (typeId: number | undefined) => () =>
+    typeId === undefined
+      ? null
+      : document.querySelector<HTMLElement>(`[data-stock-target-edit="${typeId}"]`);
+
+  /** Removing a row moves focus to the next row's control, else the previous one (DESIGN.md §7). */
+  function remove(typeId: number) {
+    const index = rows.findIndex((row) => row.typeId === typeId);
+    onRemove(typeId);
+    focusAfterCommit(editButton(rows[index + 1]?.typeId), editButton(rows[index - 1]?.typeId), () =>
+      document.querySelector<HTMLElement>('[data-stock-list-picker]')
+    );
+  }
 
   const columns: DataTableColumn<StockRow>[] = [
     {
       id: 'item',
       header: t('stockTargets.table.item'),
       primary: true,
-      render: (row) => <span className="font-medium">{nameOf(row.typeId)}</span>,
+      render: (row) => {
+        const group = groupOf(row.typeId);
+        return (
+          <>
+            <span className="font-medium">{nameOf(row.typeId)}</span>
+            {/* Desktop only: the phone card's title stays one line (§4a). */}
+            {group && (
+              <span className="hidden text-[0.6875rem] text-text-dim sm:block">{group}</span>
+            )}
+          </>
+        );
+      },
       sortValue: (row) => nameOf(row.typeId),
     },
     {
@@ -177,17 +235,23 @@ export function StockManagerTable({
       rowKey={(row) => row.typeId}
       label={t('stockTargets.table.label')}
       stackLayout="dense"
-      className="sm:table-fixed"
+      // The ⋮ pins to the card's edge on a phone, so line one stays text-tall (§4a).
+      className="dt-actions-pinned-only"
       onRowClick={(row) => showInfo(row.typeId, nameOf(row.typeId))}
       rowMoreActions
       rowContextMenu={(row, tr) => (
         <ItemContextMenu
           typeId={row.typeId}
           itemName={nameOf(row.typeId)}
+          // The pencil already edits the Stock Target here (§6c restraint).
+          hideStockTarget
           extraItems={
-            <MenuItem onSelect={() => onRemove(row.typeId)}>
-              {t('stockTargets.table.remove')}
-            </MenuItem>
+            <>
+              <MenuSeparator />
+              <MenuItem className="text-danger" onSelect={() => remove(row.typeId)}>
+                {t('stockTargets.table.remove')}
+              </MenuItem>
+            </>
           }
         >
           {tr}
