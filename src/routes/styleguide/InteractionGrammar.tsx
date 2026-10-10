@@ -16,6 +16,7 @@ import {
   Panel,
   RowActionsMenu,
   RowCaret,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -326,6 +327,17 @@ export function InteractionGrammar() {
             <Cue rule={k('rules.stateSelected')} note={k('notes.selectedToggle')}>
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOn')} pressed />
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOff')} pressed={false} />
+            </Cue>
+            <Cue rule={k('rules.stateSelectedSegment')} note={k('notes.selectedSegment')}>
+              <SegmentedControl
+                label={k('rules.stateSelectedSegment')}
+                options={[
+                  { value: 'a', label: k('samples.segmentOn') },
+                  { value: 'b', label: k('samples.segmentOff') },
+                ]}
+                value="a"
+                onChange={() => undefined}
+              />
             </Cue>
           </div>
         </div>
