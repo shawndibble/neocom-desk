@@ -931,7 +931,7 @@ export function AppraisalPanel({
               )}
               <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
                 {minusOwned && (
-                  <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                  <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
                   </span>
                 )}

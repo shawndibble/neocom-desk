@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { PageHeader } from '@/components/ui';
+import { PageHeader, TabPanel } from '@/components/ui';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
-import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
+import { SHIPS_TABS, SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
 import { ShipTreeTab } from '@/features/fittings/shipTree/ShipTreeTab';
 import { usePageTab } from '@/lib/usePageTab';
 import { Fittings } from './Fittings';
@@ -22,7 +22,9 @@ export function Ships() {
     <div className="space-y-3">
       <PageHeader title={t('nav.ships')} />
       <ShipsTabBar />
-      <ShipTreeTab />
+      <TabPanel tabsId={SHIPS_TABS_ID} tabId={tab}>
+        <ShipTreeTab />
+      </TabPanel>
     </div>
   );
 }

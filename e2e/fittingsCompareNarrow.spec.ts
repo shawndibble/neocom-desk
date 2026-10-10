@@ -241,7 +241,7 @@ test.describe('Fitting Compare pinned names row', () => {
     const cells = table.locator('tbody tr').first().locator('td');
     for (const i of [1, 2]) {
       const nameBox = (await names.nth(i).boundingBox())!;
-      const cellBox = (await cells.nth(i).boundingBox())!;
+      const cellBox = (await cells.nth(i - 1).boundingBox())!; // the stat name is a row header (th), so td 0 is column 1
       expect(Math.abs(nameBox.x + nameBox.width - (cellBox.x + cellBox.width))).toBeLessThanOrEqual(
         1
       );

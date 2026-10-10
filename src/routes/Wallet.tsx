@@ -13,7 +13,9 @@ import {
   Panel,
   Spinner,
   RowCaret,
+  TabPanel,
   Tabs,
+  useTabsId,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -179,6 +181,7 @@ export function Wallet() {
   // control's own switch is a history push the same way any other tab
   // switch is (ADR 0015, issue #1302).
   const [tab, setTab] = usePageTab(WALLET_TABS);
+  const tabsId = useTabsId();
   // The journal line a `walletBalanceChanged` alert pointed at, if any.
   const highlightedEntryId = useHighlightParam();
 
@@ -531,6 +534,7 @@ export function Wallet() {
         would not be a tab.
       */}
       <Tabs
+        tabsId={tabsId}
         label={t('wallet.title')}
         value={tab}
         onChange={(id) => setTab(id as typeof tab)}
@@ -540,15 +544,16 @@ export function Wallet() {
         ]}
       />
 
-      {loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : tab === 'balance' ? (
-        <div className="space-y-4">
-          {/*
+      <TabPanel tabsId={tabsId} tabId={tab} className="space-y-4">
+        {loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : tab === 'balance' ? (
+          <div className="space-y-4">
+            {/*
             The picker stays visible in both branches, even while pinned to
             "This character" — otherwise there is no way to discover the
             cross-character view at all (issue #607) — but it rides in each
@@ -556,237 +561,238 @@ export function Wallet() {
             swaps beneath it: unchanged for "This character", a per-character
             table + total for anything wider.
           */}
-          {drilledCharacter ? (
-            <NetWorthPanel
-              mode="single"
-              drilled
-              characters={drilledCharacters}
-              liveWallet={liveWallet}
-              filterMeta={walletCharacterFilterMeta}
-              onDrill={drillInto}
-              onBack={leaveDrill}
-            />
-          ) : showingAllWalletBalances ? (
-            <NetWorthPanel
-              mode="multi"
-              characters={multiCharacters}
-              liveWallet={liveWallet}
-              filterMeta={walletCharacterFilterMeta}
-              onDrill={drillInto}
-              onBack={leaveDrill}
-              actions={
-                <IconButton
-                  size="sm"
-                  icon={<Icon.Refresh />}
-                  label={t('wallet.refresh')}
-                  onClick={refreshWalletBalances}
-                  disabled={walletBalancesLoading}
-                />
-              }
-            />
-          ) : (
-            <>
+            {drilledCharacter ? (
               <NetWorthPanel
                 mode="single"
-                characters={activeCharacters}
+                drilled
+                characters={drilledCharacters}
                 liveWallet={liveWallet}
                 filterMeta={walletCharacterFilterMeta}
                 onDrill={drillInto}
                 onBack={leaveDrill}
-                stats={
-                  <div>
-                    <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('wallet.everMarks')}
-                      <InfoTooltip
-                        label={t('wallet.everMarksTooltipLabel')}
-                        content={t('wallet.everMarksTooltip')}
-                      />
-                    </p>
-                    <p className="text-xl font-medium tabular-nums">
-                      {loyaltyResult && !loyaltyNeedsReauth
-                        ? everMarks.toLocaleString()
-                        : t('common.unknown')}
-                    </p>
-                  </div>
-                }
-                notices={
-                  <>
-                    {balanceNeedsReauth && (
-                      <div className="mt-3">
-                        <GrantBanner
-                          characterId={activeCharacterId}
-                          endpoints={['getCharacterWallet']}
-                          title={t('wallet.reauthTitle')}
-                          hint={t('wallet.reauthHint')}
-                          actionLabel={t('wallet.reauthAction')}
-                        />
-                      </div>
-                    )}
-                    {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
-                      <p className="mt-3 text-[0.6875rem] text-warning uppercase">
-                        {t(offlineTitleKey)}
-                      </p>
-                    )}
-                    {journalNeedsReauth ? (
-                      <div className="mt-4">
-                        <GrantBanner
-                          characterId={activeCharacterId}
-                          endpoints={['getCharacterWalletJournal']}
-                          title={t('wallet.reauthTitle')}
-                          hint={t('wallet.reauthHint')}
-                          actionLabel={t('wallet.reauthAction')}
-                        />
-                      </div>
-                    ) : (
-                      journalTruncated && (
-                        <p className="mt-4 px-1 text-[0.6875rem] text-warning uppercase">
-                          {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                        </p>
-                      )
-                    )}
-                  </>
-                }
               />
-            </>
-          )}
-
-          {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length === 0 ? (
-            // Nothing to list: one muted line instead of an empty panel. The
-            // picker stays as the way into any corp's store (issue #2321).
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-text-dim">
-              <span>{t('loyalty.noneLine')}</span>
-              <LpStorePicker corporationName={null} size="sm" className="w-44" />
-            </div>
-          ) : (
-            <Panel
-              // Lifts this panel's stacking context over the next one, so the
-              // picker's popover isn't painted under it.
-              className="relative z-10"
-              padded={false}
-              title={t('loyalty.title')}
-              actions={
-                <span className="flex items-center gap-2">
-                  {/* Always shown, LP or not (issue #2321): the way into any
-                    corp's store for a pilot who holds LP nowhere yet. */}
-                  <LpStorePicker corporationName={null} size="sm" className="w-44" />
-                  {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (
-                    <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
-                  )}
-                </span>
-              }
-            >
-              {loyaltyNeedsReauth ? (
-                <div className="p-3">
-                  <GrantBanner
-                    characterId={activeCharacterId}
-                    endpoints={['getCharacterLoyaltyPoints']}
-                    title={t('loyalty.reauthTitle')}
-                    hint={t('loyalty.reauthHint')}
-                    actionLabel={t('loyalty.reauthAction')}
+            ) : showingAllWalletBalances ? (
+              <NetWorthPanel
+                mode="multi"
+                characters={multiCharacters}
+                liveWallet={liveWallet}
+                filterMeta={walletCharacterFilterMeta}
+                onDrill={drillInto}
+                onBack={leaveDrill}
+                actions={
+                  <IconButton
+                    size="sm"
+                    icon={<Icon.Refresh />}
+                    label={t('wallet.refresh')}
+                    onClick={refreshWalletBalances}
+                    disabled={walletBalancesLoading}
                   />
-                </div>
-              ) : !loyaltyResult || otherLoyalty.length === 0 ? (
-                <CachedEmptyState
-                  result={loyaltyResult}
-                  title={t('loyalty.emptyTitle')}
-                  hint={t('loyalty.emptyHint')}
-                  fetchedTitle={t('loyalty.emptyTitle')}
-                  className="py-8"
+                }
+              />
+            ) : (
+              <>
+                <NetWorthPanel
+                  mode="single"
+                  characters={activeCharacters}
+                  liveWallet={liveWallet}
+                  filterMeta={walletCharacterFilterMeta}
+                  onDrill={drillInto}
+                  onBack={leaveDrill}
+                  stats={
+                    <div>
+                      <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                        {t('wallet.everMarks')}
+                        <InfoTooltip
+                          label={t('wallet.everMarksTooltipLabel')}
+                          content={t('wallet.everMarksTooltip')}
+                        />
+                      </p>
+                      <p className="text-xl font-medium tabular-nums">
+                        {loyaltyResult && !loyaltyNeedsReauth
+                          ? everMarks.toLocaleString()
+                          : t('common.unknown')}
+                      </p>
+                    </div>
+                  }
+                  notices={
+                    <>
+                      {balanceNeedsReauth && (
+                        <div className="mt-3">
+                          <GrantBanner
+                            characterId={activeCharacterId}
+                            endpoints={['getCharacterWallet']}
+                            title={t('wallet.reauthTitle')}
+                            hint={t('wallet.reauthHint')}
+                            actionLabel={t('wallet.reauthAction')}
+                          />
+                        </div>
+                      )}
+                      {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
+                        <p className="mt-3 text-[0.6875rem] text-warning uppercase">
+                          {t(offlineTitleKey)}
+                        </p>
+                      )}
+                      {journalNeedsReauth ? (
+                        <div className="mt-4">
+                          <GrantBanner
+                            characterId={activeCharacterId}
+                            endpoints={['getCharacterWalletJournal']}
+                            title={t('wallet.reauthTitle')}
+                            hint={t('wallet.reauthHint')}
+                            actionLabel={t('wallet.reauthAction')}
+                          />
+                        </div>
+                      ) : (
+                        journalTruncated && (
+                          <p className="mt-4 px-1 text-[0.6875rem] text-warning uppercase">
+                            {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
+                          </p>
+                        )
+                      )}
+                    </>
+                  }
                 />
-              ) : (
-                <DataTable
-                  {...loyaltyExport.tableProps}
-                  label={t('loyalty.title')}
-                  columns={loyaltyColumns}
-                  rows={otherLoyalty}
-                  rowKey={(entry) => entry.corporation_id}
-                  sort={loyaltySortProps.sort}
-                  onSortChange={loyaltySortProps.onSortChange}
-                  responsive="table"
-                  rowClassName={() => 'group'}
-                  onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
-                />
-              )}
-            </Panel>
-          )}
-        </div>
-      ) : (
-        <Panel
-          padded={false}
-          title={t('wallet.journalTab')}
-          meta={<WalletOriginCrumb />}
-          actions={
-            <span className="flex items-center gap-2">
-              <Link
-                to="/market/history/transactions"
-                className={cx(
-                  'inline-flex min-h-11 min-w-11 items-center justify-center text-xs md:min-h-0 md:min-w-0',
-                  inlineLinkClassName
-                )}
+              </>
+            )}
+
+            {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length === 0 ? (
+              // Nothing to list: one muted line instead of an empty panel. The
+              // picker stays as the way into any corp's store (issue #2321).
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-text-dim">
+                <span>{t('loyalty.noneLine')}</span>
+                <LpStorePicker corporationName={null} size="sm" className="w-44" />
+              </div>
+            ) : (
+              <Panel
+                // Lifts this panel's stacking context over the next one, so the
+                // picker's popover isn't painted under it.
+                className="relative z-10"
+                padded={false}
+                title={t('loyalty.title')}
+                actions={
+                  <span className="flex items-center gap-2">
+                    {/* Always shown, LP or not (issue #2321): the way into any
+                    corp's store for a pilot who holds LP nowhere yet. */}
+                    <LpStorePicker corporationName={null} size="sm" className="w-44" />
+                    {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (
+                      <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
+                    )}
+                  </span>
+                }
               >
-                {t('wallet.transactionsLink')}
-              </Link>
-              {journalResult && (
-                <>
-                  <TableActionsMenu name={t('wallet.journalTab')} tableExport={journalExport} />
-                  <DataAgeBadge date={journalResult.fetchedAt} />
-                </>
-              )}
-            </span>
-          }
-        >
-          {journalNeedsReauth ? (
-            <div className="p-3">
-              <GrantBanner
-                characterId={activeCharacterId}
-                endpoints={['getCharacterWalletJournal']}
-                title={t('wallet.reauthTitle')}
-                hint={t('wallet.reauthHint')}
-                actionLabel={t('wallet.reauthAction')}
+                {loyaltyNeedsReauth ? (
+                  <div className="p-3">
+                    <GrantBanner
+                      characterId={activeCharacterId}
+                      endpoints={['getCharacterLoyaltyPoints']}
+                      title={t('loyalty.reauthTitle')}
+                      hint={t('loyalty.reauthHint')}
+                      actionLabel={t('loyalty.reauthAction')}
+                    />
+                  </div>
+                ) : !loyaltyResult || otherLoyalty.length === 0 ? (
+                  <CachedEmptyState
+                    result={loyaltyResult}
+                    title={t('loyalty.emptyTitle')}
+                    hint={t('loyalty.emptyHint')}
+                    fetchedTitle={t('loyalty.emptyTitle')}
+                    className="py-8"
+                  />
+                ) : (
+                  <DataTable
+                    {...loyaltyExport.tableProps}
+                    label={t('loyalty.title')}
+                    columns={loyaltyColumns}
+                    rows={otherLoyalty}
+                    rowKey={(entry) => entry.corporation_id}
+                    sort={loyaltySortProps.sort}
+                    onSortChange={loyaltySortProps.onSortChange}
+                    responsive="table"
+                    rowClassName={() => 'group'}
+                    onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
+                  />
+                )}
+              </Panel>
+            )}
+          </div>
+        ) : (
+          <Panel
+            padded={false}
+            title={t('wallet.journalTab')}
+            meta={<WalletOriginCrumb />}
+            actions={
+              <span className="flex items-center gap-2">
+                <Link
+                  to="/market/history/transactions"
+                  className={cx(
+                    'inline-flex min-h-11 min-w-11 items-center justify-center text-xs md:min-h-0 md:min-w-0',
+                    inlineLinkClassName
+                  )}
+                >
+                  {t('wallet.transactionsLink')}
+                </Link>
+                {journalResult && (
+                  <>
+                    <TableActionsMenu name={t('wallet.journalTab')} tableExport={journalExport} />
+                    <DataAgeBadge date={journalResult.fetchedAt} />
+                  </>
+                )}
+              </span>
+            }
+          >
+            {journalNeedsReauth ? (
+              <div className="p-3">
+                <GrantBanner
+                  characterId={activeCharacterId}
+                  endpoints={['getCharacterWalletJournal']}
+                  title={t('wallet.reauthTitle')}
+                  hint={t('wallet.reauthHint')}
+                  actionLabel={t('wallet.reauthAction')}
+                />
+              </div>
+            ) : !journalResult || journal.length === 0 ? (
+              <CachedEmptyState
+                result={journalResult}
+                title={t('wallet.journalEmptyTitle')}
+                hint={t('wallet.journalEmptyHint')}
+                fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
+                className="py-8"
               />
-            </div>
-          ) : !journalResult || journal.length === 0 ? (
-            <CachedEmptyState
-              result={journalResult}
-              title={t('wallet.journalEmptyTitle')}
-              hint={t('wallet.journalEmptyHint')}
-              fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
-              className="py-8"
-            />
-          ) : (
-            <>
-              {journalResult.fromCache && (
-                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                  {t(offlineTitleKey)}
-                </p>
-              )}
-              {journalTruncated && (
-                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                  {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                </p>
-              )}
-              {itemNamesTruncated && (
-                <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
-                  {t('wallet.journalItemNamesCappedHint')}
-                </p>
-              )}
-              <JournalTable
-                filter={journalFilter}
-                onFilterChange={setJournalFilter}
-                refTypeOptions={refTypeOptions}
-                filteredJournal={filteredJournal}
-                breakdownJournal={breakdownJournal}
-                journalColumns={journalColumns}
-                label={t('wallet.journalTab')}
-                sort={journalSortProps.sort}
-                onSortChange={journalSortProps.onSortChange}
-                highlightRowKey={highlightedEntryId}
-                tableExport={journalExport}
-              />
-            </>
-          )}
-        </Panel>
-      )}
+            ) : (
+              <>
+                {journalResult.fromCache && (
+                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                    {t(offlineTitleKey)}
+                  </p>
+                )}
+                {journalTruncated && (
+                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                    {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
+                  </p>
+                )}
+                {itemNamesTruncated && (
+                  <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
+                    {t('wallet.journalItemNamesCappedHint')}
+                  </p>
+                )}
+                <JournalTable
+                  filter={journalFilter}
+                  onFilterChange={setJournalFilter}
+                  refTypeOptions={refTypeOptions}
+                  filteredJournal={filteredJournal}
+                  breakdownJournal={breakdownJournal}
+                  journalColumns={journalColumns}
+                  label={t('wallet.journalTab')}
+                  sort={journalSortProps.sort}
+                  onSortChange={journalSortProps.onSortChange}
+                  highlightRowKey={highlightedEntryId}
+                  tableExport={journalExport}
+                />
+              </>
+            )}
+          </Panel>
+        )}
+      </TabPanel>
     </div>
   );
 }

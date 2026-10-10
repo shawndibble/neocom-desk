@@ -58,20 +58,7 @@
     "morePages_one": "{{count}} more page",
     "morePages_other": "{{count}} more pages",
     "customize": "Customize",
-    "showPermanently": "Always show {{page}}",
-    "setup": {
-      "title": "What do you do in EVE?",
-      "hint": "Pick what you play and the rail starts with those pages. Everything else stays in Go to and under \"more pages\".",
-      "skip": "Skip",
-      "done": "Start",
-      "activity": {
-        "mining": "Mining",
-        "pi": "Planetary Industry",
-        "trading": "Trading",
-        "industry": "Industry",
-        "social": "Mail and contacts"
-      }
-    }
+    "showPermanently": "Always show {{page}}"
   },
   "reauth": {
     "navLocked": "Needs a new login",
@@ -369,7 +356,7 @@
     },
     "ring": {
       "title": "Ring",
-      "slotFitted": "{{rack}} {{index}}, {{state}}",
+      "slotFitted": "{{rack}} {{index}}: {{name}}, {{state}}",
       "slotEmpty": "{{rack}} {{index}}, empty",
       "tooltipFitted": "{{rack}} {{index}}: {{name}} ({{state}})",
       "tooltipCharge": "Loaded: {{name}}",
@@ -589,7 +576,6 @@
       "rankMostDamage": "most damage",
       "bestAt": "BEST AT {{km}} KM",
       "inCargo": "{{count}} in cargo",
-      "inCargoLabel": "in cargo",
       "loadedLabel": "loaded",
       "skillTag": "SKILL",
       "tech1": "Tech I",
@@ -1374,6 +1360,8 @@
       "title": "Compare Fittings",
       "addFitting": "Compare with…",
       "remove": "Remove",
+      "removeNamed": "Remove {{name}} from comparison",
+      "slotFallback": "Fitting {{n}}",
       "emptyTitle": "Nothing to compare yet",
       "emptyHint": "Add a Fitting to start comparing.",
       "differencesOnly": "Show differences only",
@@ -2027,8 +2015,16 @@
     "boosterMarketLink": "View cerebral accelerators in Market",
     "boosterBonus": "Bonus",
     "boosterExpiresIn": "Time left",
-    "boosterUnit": { "days": "Days", "hours": "Hours", "minutes": "Minutes" },
-    "boosterUnitShort": { "days": "d", "hours": "h", "minutes": "m" },
+    "boosterUnit": {
+      "days": "Days",
+      "hours": "Hours",
+      "minutes": "Minutes"
+    },
+    "boosterUnitShort": {
+      "days": "d",
+      "hours": "h",
+      "minutes": "m"
+    },
     "boosterStartsAfterPrevious": "Starts when the accelerator before it runs out.",
     "boosterExpired": "Expired",
     "boosterOverlap": "This accelerator overlaps another one — EVE only has one booster slot, so they can't both run at once.",
@@ -3995,7 +3991,6 @@
     "showLocalTime": "Show in your time zone",
     "showEveTime": "Show in EVE time (UTC)",
     "addSecondScan": "Add another scan to see the chart",
-    "finished": "Field cleared",
     "scanCount_one": "{{count}} scan",
     "scanCount_other": "{{count}} scans",
     "copyChat": "Copy chat message",
@@ -7680,6 +7675,14 @@
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
       "reorderItem": "Reorder {{name}}",
+      "drag": {
+        "start": "Picked up {{name}}.",
+        "over": "{{name}} moved to position {{position}} of {{total}}.",
+        "overNone": "{{name}} is no longer over a valid position.",
+        "end": "{{name}} dropped at position {{position}} of {{total}}.",
+        "cancelled": "Reordering cancelled. {{name}} stayed at its original position.",
+        "instructions": "Press space to pick up an item. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel."
+      },
       "addItem": "Add {{name}} to Quickbar"
     },
     "priceAlert": {
@@ -7714,6 +7717,7 @@
       "groupNoneSold_other": "{{count}} items · none sold at {{scope}}"
     },
     "itemDetail": {
+      "modifiersFor": "skills that change {{attribute}}",
       "openInMarket": "View in Market",
       "volume": "Volume: {{volume}} m3",
       "bestSell": "Best sell:",
@@ -7961,6 +7965,7 @@
         "matchCount": "{{count}} of {{total}} orders match"
       },
       "checkDeeper": "Refresh system & region prices",
+      "checkDeeperGroup": "Refresh system & region prices for {{group}}",
       "checkingDeeper": "Checking…",
       "refreshOrders": "Refresh orders & market prices",
       "scopeNotChecked": "Not checked yet",
@@ -8473,6 +8478,7 @@
       "corpWalletTransactionCeilingLabel": "Transaction ceiling (ISK):",
       "walletBalanceChangedThresholdLabel": "Notify on changes of at least:",
       "walletBalanceChangedThresholdHint": "Accepts shorthand: 10.5m, 10,500,000, or 10500000 (b = billion, m = million, t = thousand).",
+      "channelsLegend": "Delivery channels",
       "browserChannelLabel": "Device notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
       "feedChannelLabel": "Alerts notifications",
