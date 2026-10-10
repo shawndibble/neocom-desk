@@ -48,7 +48,12 @@ export function MobileSortToolbar<Id extends string>({
           <button
             type="button"
             className={textActionClassName('gap-1.5 px-2 md:min-h-9')}
-            aria-label={t('industry.opportunitiesSortByField', { field: activeLabel })}
+            aria-label={t(
+              sort.direction === 'asc'
+                ? 'industry.opportunitiesSortByFieldAsc'
+                : 'industry.opportunitiesSortByFieldDesc',
+              { field: activeLabel }
+            )}
           >
             <span className="font-normal text-text-dim">{t('industry.opportunitiesSortBy')}</span>{' '}
             {activeLabel}
@@ -63,6 +68,13 @@ export function MobileSortToolbar<Id extends string>({
             <DropdownMenuItem
               key={field.id}
               onSelect={() => onSortChange(nextDataTableSort(sort, field.id))}
+              aria-label={
+                field.id === sort.columnId
+                  ? t(sort.direction === 'asc' ? 'industry.sortedAsc' : 'industry.sortedDesc', {
+                      column: field.label,
+                    })
+                  : undefined
+              }
             >
               {field.label}
             </DropdownMenuItem>
