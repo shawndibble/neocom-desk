@@ -682,7 +682,7 @@ export function Market() {
     singleStationBook ? ids.filter((id) => id !== 'location') : ids;
   const orderBookWidths = orderBookWidthsRem(
     singleStationBook ? pickedOrderColumns.filter((id) => id !== 'location') : pickedOrderColumns,
-    orderBookFigureChars([...sellRows, ...buyRows], bookBestSell)
+    orderBookFigureChars([...sellRows, ...buyRows], bookBestSell, myOrderIds)
   );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
     useElementNarrowerThan<HTMLDivElement>([orderBookWidths.roomy, orderBookWidths.cards]);

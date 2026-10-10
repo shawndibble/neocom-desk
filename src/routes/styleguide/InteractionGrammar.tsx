@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
+import { MyOrderMark } from '@/features/market/marketOrderCells';
 import { cx } from '@/lib/cx';
 
 const SAMPLE_ROWS = [
@@ -164,6 +165,12 @@ export function InteractionGrammar() {
           <button type="button" className={textActionClassName()}>
             {t('market.structureFee.setFee')}
           </button>
+        </Cue>
+        <Cue rule={k('rules.myOrder')}>
+          <span className="tabular-nums">
+            <MyOrderMark t={t} />
+            {k('samples.myOrder')}
+          </span>
         </Cue>
         <Cue rule={k('rules.iskAmount')} note={k('notes.iskAmount')}>
           <IskAmount value={1_342_500_000} />
