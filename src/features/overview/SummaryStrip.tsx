@@ -140,7 +140,7 @@ export function SummaryStrip({
             icon={<Icon.Refresh />}
             label={t('overview.board.refresh')}
             onClick={onRefresh}
-            disabled={refreshing}
+            busy={refreshing}
           />
         </span>
 

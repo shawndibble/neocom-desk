@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { ReauthBanner } from '@/components/ui';
+import { pageTitleFor } from './documentTitle';
 import { beginEveLogin } from './loginFlow';
 import { useGrantedScopes } from './useGrantedScopes';
 import {
@@ -51,12 +52,15 @@ export function ScopeGate({ path, children }: ScopeGateProps) {
 
   const namespace = routeStringsNamespace(path);
   return (
-    <ReauthBanner
-      title={t(`${namespace}.reauthTitle`)}
-      hint={t(`${namespace}.reauthHint`)}
-      actionLabel={t(`${namespace}.reauthAction`)}
-      onLogin={() => void beginEveLogin({ groups: permissionsForRoute(path) })}
-      soleAction
-    />
+    <>
+      <h1 className="sr-only">{pageTitleFor(path, t)}</h1>
+      <ReauthBanner
+        title={t(`${namespace}.reauthTitle`)}
+        hint={t(`${namespace}.reauthHint`)}
+        actionLabel={t(`${namespace}.reauthAction`)}
+        onLogin={() => void beginEveLogin({ groups: permissionsForRoute(path) })}
+        soleAction
+      />
+    </>
   );
 }

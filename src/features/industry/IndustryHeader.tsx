@@ -8,7 +8,7 @@ import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
-import { industryTabs, type IndustryTab } from './industryTabs';
+import { INDUSTRY_TABS_ID, industryTabs, type IndustryTab } from './industryTabs';
 
 export interface IndustryHeaderProps {
   activeCharacterId: number;
@@ -101,6 +101,7 @@ export function IndustryHeader({
 
       {!usesViewPicker(tabs.length, isPhone) && (
         <Tabs
+          tabsId={INDUSTRY_TABS_ID}
           label={t('nav.industry')}
           value={activeTab}
           onChange={onChange}

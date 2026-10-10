@@ -166,7 +166,8 @@ function BoosterRow({
         <span>{t('plans.boosterRowLabel', { position })}</span>
         <IconButton
           icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
-          label={t('plans.boosterRemove')}
+          label={t('plans.boosterRemoveNamed', { position })}
+          tooltip={t('plans.boosterRemove')}
           onClick={onRemove}
           size="sm"
           variant="plain"

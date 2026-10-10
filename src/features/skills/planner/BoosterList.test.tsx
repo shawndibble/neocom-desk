@@ -31,7 +31,7 @@ const ROW = (overrides: Partial<PlanBooster> = {}): PlanBooster => ({
 describe('BoosterList empty state', () => {
   it('shows only the add affordance when there are no rows', () => {
     renderList([]);
-    expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Remove accelerator [0-9]/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
   });
 
@@ -54,7 +54,7 @@ describe('BoosterList row editing', () => {
     const rows = [ROW({ bonus: 3 }), ROW({ bonus: 6 })];
     const { onChange } = renderList(rows);
 
-    await user.click(screen.getAllByRole('button', { name: 'Remove accelerator' })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^Remove accelerator [0-9]/ })[0]);
 
     expect(onChange).toHaveBeenCalledWith([rows[1]]);
   });

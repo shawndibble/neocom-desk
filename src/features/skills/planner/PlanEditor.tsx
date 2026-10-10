@@ -2175,7 +2175,11 @@ export function PlanEditor({
                       value={groupingMode}
                       onValueChange={(value) => void setGroupingMode(value as GroupingMode)}
                     >
-                      <SelectTrigger size="sm" aria-label={t('plans.groupBy')} className="w-36">
+                      <SelectTrigger
+                        size="sm"
+                        aria-label={t('plans.groupBy')}
+                        className="w-36 lg:scroll-mt-40"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2191,7 +2195,11 @@ export function PlanEditor({
                   </label>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <IconButton icon={<Icon.ColumnsPicker />} label={t('plans.columns')} />
+                      <IconButton
+                        icon={<Icon.ColumnsPicker />}
+                        label={t('plans.columns')}
+                        className="lg:scroll-mt-40"
+                      />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       {(

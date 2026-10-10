@@ -113,6 +113,7 @@ interface AppraisalPanelProps {
   onPricePercentChange: (value: number) => void;
   /** The hub the figures are quoted at — the panel's own provenance chip, and what a Share Link is stored against. */
   hub: TradeHub;
+  onHubChange: (id: TradeHub['id']) => void;
   /** The active Character's standing toward this hub's NPC station owner, for the net-of-fees chips' broker fee. */
   standing: ResolvedStandings;
   /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
@@ -198,6 +199,7 @@ export function AppraisalPanel({
   pricePercent,
   onPricePercentChange,
   hub,
+  onHubChange,
   standing,
   characterId,
   defaultCompareExpanded = false,
@@ -745,9 +747,25 @@ export function AppraisalPanel({
                 onChange={(event) => handlePercentChange(event.target.value)}
                 className="field-no-spinner w-16 text-right"
               />
-              <span className="text-xs text-text-dim">
-                {t('market.appraisal.pricePercentHint')}
-              </span>
+              <Select
+                value={hub.id}
+                onValueChange={(value) => onHubChange(value as TradeHub['id'])}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('market.tradeHub')}
+                  className="min-w-0 flex-1"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRADE_HUBS.map((h) => (
+                    <SelectItem key={h.id} value={h.id}>
+                      {h.systemName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -931,7 +949,7 @@ export function AppraisalPanel({
               )}
               <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
                 {minusOwned && (
-                  <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                  <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
                   </span>
                 )}

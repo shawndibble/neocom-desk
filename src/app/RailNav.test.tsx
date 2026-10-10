@@ -128,6 +128,13 @@ describe('the rail', () => {
     expect(within(rail()).getByRole('button', { name: /more page/ })).toBeInTheDocument();
   });
 
+  it('groups the rail’s pages under their labels', () => {
+    renderAt('/overview');
+
+    const economy = within(rail()).getByRole('group', { name: /economy/i });
+    expect(within(economy).getByRole('link', { name: 'Market' })).toBeInTheDocument();
+  });
+
   it('starts a new pilot on the eight-page default, the rest behind "N more pages"', async () => {
     const user = userEvent.setup();
     useHiddenNav.setState({ value: defaultHiddenNav() });
@@ -171,6 +178,18 @@ describe('the rail', () => {
     expect(
       within(rail()).queryByRole('button', { name: 'Show Overview in navigation' })
     ).not.toBeInTheDocument();
+  });
+
+  it('hands focus to Done after Customize and back after Done, rather than dropping it to the page', async () => {
+    const user = userEvent.setup();
+    renderAt('/overview');
+
+    await user.click(within(rail()).getByRole('button', { name: 'Customize' }));
+    await waitFor(() => expect(within(rail()).getByRole('button', { name: 'Done' })).toHaveFocus());
+    await user.click(within(rail()).getByRole('button', { name: 'Done' }));
+    await waitFor(() =>
+      expect(within(rail()).getByRole('button', { name: 'Customize' })).toHaveFocus()
+    );
   });
 });
 

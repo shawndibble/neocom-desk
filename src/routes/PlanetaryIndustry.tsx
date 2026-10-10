@@ -5,7 +5,16 @@ import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { hrefWithout, MAP_ONLY_PARAMS } from '@/features/pi/piPlanLink';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
-import { Button, DataAgeBadge, IconButton, PageHeader, Spinner, Tabs } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  IconButton,
+  PageHeader,
+  Spinner,
+  TabPanel,
+  Tabs,
+  useTabsId,
+} from '@/components/ui';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import * as Icon from '@/components/ui/icons';
@@ -85,6 +94,7 @@ export function PlanetaryIndustry() {
     void hydrateExpiringWindow();
   }, [hydrateExpiringWindow]);
   const [tab, setTab] = usePageTab(PI_TABS);
+  const tabsId = useTabsId();
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [{ type: seedTypeId, goals, off: disabledColonies, colony: linkedColonyId }, setPiParams] =
     useUrlParams(PI_URL_PARAMS);
@@ -190,6 +200,7 @@ export function PlanetaryIndustry() {
         )}
 
         <Tabs
+          tabsId={tabsId}
           label={t('piPlan.tabsLabel')}
           value={tab}
           onChange={(id) => setTab(id as typeof tab)}
@@ -212,32 +223,34 @@ export function PlanetaryIndustry() {
           eveTime={tab === 'colonies'}
         />
 
-        {tab === 'map' ? (
-          <PiMapTab characterId={activeCharacterId} />
-        ) : tab === 'plan' ? (
-          <PlanPanel
-            seedingGoal={seedTypeId !== null}
-            characterId={activeCharacterId}
-            goals={goals}
-            onGoalsChange={setGoals}
-            disabled={disabledColonies}
-            onDisabledChange={setDisabledColonies}
-          />
-        ) : loading && !data ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
-        ) : (
-          <ColoniesTab
-            characterId={activeCharacterId}
-            snapshot={data}
-            loading={loading}
-            error={error}
-            linkedColonyId={linkedColonyId}
-            onClearLinkedColony={clearLinkedColony}
-            onRetry={refresh}
-          />
-        )}
+        <TabPanel tabsId={tabsId} tabId={tab} className="space-y-4">
+          {tab === 'map' ? (
+            <PiMapTab characterId={activeCharacterId} />
+          ) : tab === 'plan' ? (
+            <PlanPanel
+              seedingGoal={seedTypeId !== null}
+              characterId={activeCharacterId}
+              goals={goals}
+              onGoalsChange={setGoals}
+              disabled={disabledColonies}
+              onDisabledChange={setDisabledColonies}
+            />
+          ) : loading && !data ? (
+            <div className="flex justify-center py-16">
+              <Spinner label={t('common.loading')} />
+            </div>
+          ) : (
+            <ColoniesTab
+              characterId={activeCharacterId}
+              snapshot={data}
+              loading={loading}
+              error={error}
+              linkedColonyId={linkedColonyId}
+              onClearLinkedColony={clearLinkedColony}
+              onRetry={refresh}
+            />
+          )}
+        </TabPanel>
       </div>
     </ItemActionsProvider>
   );
