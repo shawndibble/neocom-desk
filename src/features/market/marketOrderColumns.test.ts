@@ -9,7 +9,7 @@ import {
 } from './marketOrderColumns';
 
 /** "5.50" at one unit: every figure narrower than its column's header. */
-const SHORT = { priceChars: 4, quantityChars: 1, baitFlag: false };
+const SHORT = { priceChars: 4, quantityChars: 1, baitFlag: false, myOrder: false };
 
 describe('orderBookWidthsRem', () => {
   it('sizes a book of short figures by its headers alone', () => {
@@ -25,6 +25,7 @@ describe('orderBookWidthsRem', () => {
       priceChars: 13,
       quantityChars: 10,
       baitFlag: false,
+      myOrder: false,
     });
     // Price 4.75 -> 7.18rem, Quantity 4.125 -> 6.1rem.
     expect(long.cards - short.cards).toBeCloseTo(4.405);
@@ -32,9 +33,18 @@ describe('orderBookWidthsRem', () => {
 
   it("adds the bait flag's icon beside a price that already fills its column", () => {
     const figures = { priceChars: 13, quantityChars: 1 };
-    const plain = orderBookWidthsRem(['price'], { ...figures, baitFlag: false });
-    const flagged = orderBookWidthsRem(['price'], { ...figures, baitFlag: true });
+    const plain = orderBookWidthsRem(['price'], { ...figures, baitFlag: false, myOrder: false });
+    const flagged = orderBookWidthsRem(['price'], { ...figures, baitFlag: true, myOrder: false });
     expect(flagged.cards - plain.cards).toBeCloseTo(1.25);
+  });
+
+  it('adds the own-order glyph, and again when a bait flag sits beside it', () => {
+    const figures = { priceChars: 13, quantityChars: 1 };
+    const plain = orderBookWidthsRem(['price'], { ...figures, baitFlag: false, myOrder: false });
+    const mine = orderBookWidthsRem(['price'], { ...figures, baitFlag: false, myOrder: true });
+    const both = orderBookWidthsRem(['price'], { ...figures, baitFlag: true, myOrder: true });
+    expect(mine.cards - plain.cards).toBeCloseTo(1.25);
+    expect(both.cards - plain.cards).toBeCloseTo(2.5);
   });
 
   it('lets a table with fewer columns hold on at a narrower width', () => {
@@ -80,7 +90,12 @@ describe('orderBookFigureChars', () => {
         ],
         null
       )
-    ).toEqual({ priceChars: '8,880,000'.length, quantityChars: '12,345'.length, baitFlag: false });
+    ).toEqual({
+      priceChars: '8,880,000'.length,
+      quantityChars: '12,345'.length,
+      baitFlag: false,
+      myOrder: false,
+    });
   });
 
   it('notes a bait-priced sell order, whose flag sits beside its price', () => {
@@ -91,11 +106,19 @@ describe('orderBookFigureChars', () => {
     );
   });
 
+  it("notes the pilot's own order, whose glyph sits beside its price", () => {
+    const rows = [order({ order_id: 7 }), order({ order_id: 8 })];
+    expect(orderBookFigureChars(rows, null, new Set([8])).myOrder).toBe(true);
+    expect(orderBookFigureChars(rows, null, new Set([9])).myOrder).toBe(false);
+    expect(orderBookFigureChars(rows, null).myOrder).toBe(false);
+  });
+
   it('has nothing to measure in an empty book', () => {
     expect(orderBookFigureChars([], null)).toEqual({
       priceChars: 0,
       quantityChars: 0,
       baitFlag: false,
+      myOrder: false,
     });
   });
 });

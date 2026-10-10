@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
@@ -52,6 +52,12 @@ function QueueBar({
   action?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const listId = useId();
+  const segmentText = (s: VerdictSegment) =>
+    t('clones.verdict.segment', {
+      skill: skillName(t, names, s.skillTypeID),
+      duration: formatDuration(s.seconds),
+    });
   const total = segments.reduce((sum, s) => sum + s.seconds, 0);
   return (
     <div className="space-y-1">
@@ -62,20 +68,20 @@ function QueueBar({
           {action}
         </span>
       </p>
+      {/* The bar's per-segment breakdown lives in tooltips a screen reader never reaches; this list carries it. */}
+      <ol id={listId} className="sr-only">
+        {segments.map((s, i) => (
+          <li key={`${s.skillTypeID}-${i}`}>{segmentText(s)}</li>
+        ))}
+      </ol>
       <div
         role="img"
+        aria-describedby={listId}
         aria-label={t('clones.verdict.barLabel', { label, duration: formatDuration(total) })}
         className="flex h-3 overflow-hidden rounded-xs bg-line"
       >
         {segments.map((s, i) => (
-          <Tooltip
-            key={`${s.skillTypeID}-${i}`}
-            openOnTap
-            content={t('clones.verdict.segment', {
-              skill: skillName(t, names, s.skillTypeID),
-              duration: formatDuration(s.seconds),
-            })}
-          >
+          <Tooltip key={`${s.skillTypeID}-${i}`} openOnTap content={segmentText(s)}>
             <div
               className={`${SEGMENT_TONES[i % SEGMENT_TONES.length]} border-r border-panel last:border-r-0`}
               style={{ width: `${scale > 0 ? (s.seconds / scale) * 100 : 0}%` }}

@@ -50,6 +50,22 @@ describe('SegmentedControl', () => {
   });
 });
 
+describe('SegmentedControl selected cue', () => {
+  const underline = 'shadow-[inset_0_-2px_0_var(--color-accent)]';
+
+  it('draws an inset accent underline on the selected segment only', () => {
+    render(<SegmentedControl label="Pick" options={options} value="b" onChange={noop} />);
+    expect(screen.getByRole('button', { name: 'Beta', pressed: true }).className).toContain(
+      underline
+    );
+    for (const name of ['Alpha', 'Gamma']) {
+      expect(screen.getByRole('button', { name, pressed: false }).className).not.toContain(
+        'shadow-'
+      );
+    }
+  });
+});
+
 describe('SegmentedControl states', () => {
   it('fills an idle segment with panel-2 on hover and darkens it on press', () => {
     render(
@@ -83,6 +99,30 @@ describe('SegmentedControl states', () => {
     );
     expect(screen.getByRole('button', { name: 'B' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'B' }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('explains a disabled segment in a tooltip, stays focusable, and never shows it pressed', async () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        label="View"
+        options={[
+          { value: 'a', label: 'A', disabled: true, disabledReason: 'No data yet' },
+          { value: 'b', label: 'B' },
+        ]}
+        value="a"
+        onChange={onChange}
+      />
+    );
+    const a = screen.getByRole('button', { name: 'A' });
+    expect(a).toHaveAttribute('aria-disabled', 'true');
+    expect(a).not.toBeDisabled();
+    expect(a).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'B' })).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.hover(a);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('No data yet');
+    await userEvent.click(a);
     expect(onChange).not.toHaveBeenCalled();
   });
 });

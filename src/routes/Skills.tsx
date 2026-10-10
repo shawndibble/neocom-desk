@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import {
@@ -14,6 +15,7 @@ import {
   StatChip,
   StatChips,
   IconButton,
+  LiveStatus,
   Tooltip,
 } from '@/components/ui';
 import {
@@ -165,6 +167,8 @@ async function loadSkillsSnapshot(
 }
 
 const GROUP_SEARCH_PARAM = textParam();
+/** Pause before the match count is announced to a screen reader. */
+const SEARCH_ANNOUNCE_DEBOUNCE_MS = 250;
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
@@ -200,6 +204,8 @@ export function Skills() {
 
   const [selectedSkillTypeID, setSelectedSkillTypeID] = useState<number | null>(null);
   const inspectorRef = useRef<HTMLDivElement>(null);
+  const rowButtons = useRef(new Map<number, HTMLButtonElement>());
+  const focusAfterCommit = useFocusAfterCommit();
 
   // The inspector renders above the sticky search bar and the row that
   // opened it, so a plain selection change can leave it off-screen.
@@ -312,6 +318,19 @@ export function Skills() {
   // and clearing the search restores the prior collapse state exactly (same
   // approach as the Assets tree's search/expand interaction).
   const searching = filterResult !== null;
+  const matchCount = filterResult
+    ? [...filterResult.matchedSkillsByGroup.values()].reduce(
+        (sum, skills) => sum + skills.length,
+        0
+      )
+    : null;
+  // Filtering is per keystroke; the announcement waits out a pause so a screen
+  // reader is not read every intermediate count.
+  const [announcedCount, setAnnouncedCount] = useState<number | null>(null);
+  useEffect(() => {
+    const id = setTimeout(() => setAnnouncedCount(matchCount), SEARCH_ANNOUNCE_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [matchCount]);
 
   function toggleGroup(groupName: string) {
     if (searching) return;
@@ -376,6 +395,9 @@ export function Skills() {
         }
       />
       <SkillsSubNav />
+      <LiveStatus>
+        {inspector ? t('skills.inspector.shownAnnouncement', { name: inspector.name }) : null}
+      </LiveStatus>
 
       <StatChips>
         <StatChip
@@ -462,7 +484,11 @@ export function Skills() {
                 description={inspector.description}
                 prereqs={inspector.prereqs}
                 unlocks={inspector.unlocks}
-                onClose={() => setSelectedSkillTypeID(null)}
+                onClose={() => {
+                  const opener = selectedSkillTypeID;
+                  setSelectedSkillTypeID(null);
+                  if (opener !== null) focusAfterCommit(() => rowButtons.current.get(opener));
+                }}
                 planAction={
                   selectedSkill && (
                     <SkillPlanAdd
@@ -486,6 +512,13 @@ export function Skills() {
                 placeholder={t('skills.searchPlaceholder')}
                 className="min-w-48 flex-1"
               />
+              <LiveStatus>
+                {announcedCount === null
+                  ? null
+                  : announcedCount === 0
+                    ? t('skills.noResults')
+                    : t('skills.searchResultCount', { count: announcedCount })}
+              </LiveStatus>
               {/* `md`, not `sm`: these sit on the search box's own line, and the
                   shared control scale is what keeps the three the same height. */}
               <IconButton
@@ -532,7 +565,7 @@ export function Skills() {
                         disabled={searching}
                         onClick={() => toggleGroup(group.groupName)}
                         className={cx(
-                          'flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left disabled:hover:bg-transparent md:min-h-0',
+                          'flex min-h-11 w-full scroll-mt-14 items-center justify-between gap-2 border-line px-3 py-1 text-left disabled:hover:bg-transparent md:min-h-0',
                           rowInteractiveClassName,
                           focusRingInsetClassName,
                           expanded && 'border-b'
@@ -562,6 +595,10 @@ export function Skills() {
                             const row = (
                               <button
                                 type="button"
+                                ref={(el) => {
+                                  if (el) rowButtons.current.set(skill.skillTypeID, el);
+                                  else rowButtons.current.delete(skill.skillTypeID);
+                                }}
                                 aria-pressed={selected}
                                 onClick={() =>
                                   setSelectedSkillTypeID((current) =>
@@ -570,7 +607,7 @@ export function Skills() {
                                 }
                                 className={cx(
                                   tappableRowClassName,
-                                  'flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs',
+                                  'flex w-full scroll-mt-14 items-center justify-between gap-2 py-1.5 text-left text-xs',
                                   rowInteractiveClassName,
                                   focusRingInsetClassName,
                                   selected

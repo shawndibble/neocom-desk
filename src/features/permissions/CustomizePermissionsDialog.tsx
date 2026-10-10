@@ -208,6 +208,7 @@ function CaptionedCheckbox({
   tag,
 }: CaptionedCheckboxProps) {
   const captionId = `${domId}-caption`;
+  const tagId = `${domId}-tag`;
   return (
     <>
       <label className={touchCheckboxLabelClassName}>
@@ -216,14 +217,14 @@ function CaptionedCheckbox({
           disabled={disabled}
           onChange={onChange}
           aria-label={label}
-          aria-describedby={captionId}
+          aria-describedby={tag ? `${captionId} ${tagId}` : captionId}
           className="mt-0.5 disabled:cursor-default! disabled:opacity-100!"
         />
       </label>
       <span className="block min-w-0">
         <span className="flex items-center gap-1.5 font-semibold">
           {label}
-          {tag}
+          {tag ? <span id={tagId}>{tag}</span> : null}
         </span>
         <span id={captionId} className="block text-xs text-text-dim">
           {caption}

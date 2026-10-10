@@ -34,11 +34,6 @@ function renderRow(survey?: Parameters<typeof MoonTaxRow>[0]['survey']) {
   );
 }
 
-/** Opens the field behind the rate or the name, as a click on that text does. */
-function edit(label: RegExp) {
-  fireEvent.click(screen.getByRole('button', { name: label }));
-}
-
 function type(label: string, value: string) {
   const input = screen.getByLabelText(label);
   fireEvent.change(input, { target: { value } });
@@ -53,57 +48,32 @@ beforeEach(async () => {
 afterEach(cleanup);
 
 describe('MoonTaxRow', () => {
-  it('reads as text until the name or rate is clicked, then edits both together', async () => {
+  it('shows the rate and name as plain fields, with what the survey stored', () => {
     renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
-    expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.getByRole('button', { name: /who gets the tax/i }).textContent).toBe('Moon Corp');
-    edit(/tax rate/i);
-    const rate = screen.getByLabelText('Tax rate, percent') as HTMLInputElement;
-    expect(rate.value).toBe('8');
+    expect((screen.getByLabelText('Tax rate, percent') as HTMLInputElement).value).toBe('8');
     expect((screen.getByLabelText('Who gets the tax') as HTMLInputElement).value).toBe('Moon Corp');
-    fireEvent.change(rate, { target: { value: '12' } });
-    fireEvent.keyDown(rate, { key: 'Enter' });
-    expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.getByRole('button', { name: /tax rate/i }).textContent).toBe('12%');
-  });
-
-  it('keeps editing while focus moves between the two fields, and stops when it leaves them', async () => {
-    renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
-    edit(/who gets the tax/i);
-    const name = screen.getByLabelText('Who gets the tax');
-    const rate = screen.getByLabelText('Tax rate, percent');
-    fireEvent.blur(name, { relatedTarget: rate });
-    // The name input has a datalist, so it is a combobox, not a textbox.
-    expect(screen.getByLabelText('Who gets the tax')).toBeTruthy();
-    expect(screen.getByLabelText('Tax rate, percent')).toBeTruthy();
-    fireEvent.blur(rate, { relatedTarget: document.body });
-    expect(screen.queryByLabelText('Tax rate, percent')).toBeNull();
-    expect(screen.queryByLabelText('Who gets the tax')).toBeNull();
+    expect(screen.queryByRole('button', { name: /tax rate|who gets the tax/i })).toBeNull();
   });
 
   it("fills in a known Payee's rate from its name and offers the Payees to complete", async () => {
     await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 8 });
     const { container } = renderRow();
-    edit(/who gets the tax/i);
     await waitFor(() => expect(container.querySelectorAll('datalist option')).toHaveLength(1));
     type('Who gets the tax', 'moon corp');
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /tax rate/i }).textContent).toBe('8%')
+      expect((screen.getByLabelText('Tax rate, percent') as HTMLInputElement).value).toBe('8')
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Open in Mining Tax' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
   });
 
   it('stays disabled until there is a name and a rate from 0 to 100, then creates the Payee', async () => {
     renderRow();
-    const open = screen.getByRole('button', { name: 'Open in Mining Tax' });
+    const open = screen.getByRole('button', { name: 'Manage Taxes' });
     expect((open as HTMLButtonElement).disabled).toBe(true);
-    edit(/who gets the tax/i);
     type('Who gets the tax', 'New Corp');
-    edit(/tax rate/i);
     type('Tax rate, percent', '150');
     await waitFor(() => expect((open as HTMLButtonElement).disabled).toBe(true));
-    edit(/tax rate/i);
     type('Tax rate, percent', '12');
     await waitFor(() => expect((open as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(open);
@@ -111,16 +81,18 @@ describe('MoonTaxRow', () => {
     expect((await db.payees.toArray())[0]).toMatchObject({ name: 'New Corp', defaultTaxPct: 12 });
   });
 
-  it('stores a complete name and rate on the survey once editing stops, and only then', async () => {
+  it('stores a complete name and rate on the survey when focus leaves the pair, and only then', async () => {
     renderRow(SURVEY);
-    edit(/who gets the tax/i);
-    type('Who gets the tax', 'Moon Corp');
+    const name = screen.getByLabelText('Who gets the tax');
+    const rate = screen.getByLabelText('Tax rate, percent');
+    fireEvent.focus(name);
+    fireEvent.change(name, { target: { value: 'Moon Corp' } });
+    // Focus moving to the rate field is still inside the pair.
+    fireEvent.blur(name, { relatedTarget: rate });
+    fireEvent.focus(rate);
+    fireEvent.change(rate, { target: { value: '8' } });
     expect(setSurveyTax).not.toHaveBeenCalled();
-    edit(/tax rate/i);
-    fireEvent.change(screen.getByLabelText('Tax rate, percent'), { target: { value: '8' } });
-    // Mid-edit: a half-typed rate is not sent.
-    expect(setSurveyTax).not.toHaveBeenCalled();
-    fireEvent.blur(screen.getByLabelText('Tax rate, percent'));
+    fireEvent.blur(rate, { relatedTarget: document.body });
     await waitFor(() =>
       expect(setSurveyTax).toHaveBeenCalledWith({
         id: 'abc123XYZ',
@@ -134,21 +106,17 @@ describe('MoonTaxRow', () => {
 
   it('does not store what the survey already has', async () => {
     renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
-    await screen.findByRole('button', { name: /tax rate/i });
+    await screen.findByLabelText('Tax rate, percent');
     expect(setSurveyTax).not.toHaveBeenCalled();
   });
-});
 
-describe('MoonTaxRow blank start', () => {
-  it('starts blank on a survey with no stored tax, whatever was set on another', async () => {
+  it('starts blank on a survey with no stored tax, whatever was set on another', () => {
     const first = renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
-    expect(screen.getByRole('button', { name: /tax rate/i }).textContent).toBe('8%');
+    expect((screen.getByLabelText('Tax rate, percent') as HTMLInputElement).value).toBe('8');
     first.unmount();
     renderRow(SURVEY);
-    expect(screen.getByRole('button', { name: /tax rate/i }).textContent).not.toContain('8');
-    expect(screen.getByRole('button', { name: /who gets the tax/i }).textContent).not.toContain(
-      'Moon Corp'
-    );
+    expect((screen.getByLabelText('Tax rate, percent') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Who gets the tax') as HTMLInputElement).value).toBe('');
   });
 });
 
@@ -162,7 +130,7 @@ describe('MoonTaxReadout', () => {
     expect(screen.getByText('8%')).toBeTruthy();
     expect(screen.getByText('Moon Corp').className).not.toContain('text-accent');
     expect(screen.queryByRole('button')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Manage moon taxes' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: 'Manage Taxes' }).getAttribute('href')).toBe(
       '/mining/tax'
     );
   });

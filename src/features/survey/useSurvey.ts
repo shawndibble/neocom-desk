@@ -5,7 +5,12 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SurveyScan } from '@/engine/survey/series';
-import { loadSurvey, type LoadSurveyResult, type SurveyTaxShare } from './surveyStore';
+import {
+  loadSurvey,
+  type LoadSurveyResult,
+  type SurveyInfoShare,
+  type SurveyTaxShare,
+} from './surveyStore';
 
 export const SURVEY_POLL_MS = 60_000;
 
@@ -18,6 +23,7 @@ export type SurveyLoadState =
       expiresAt: number;
       owner: string | null;
       tax: SurveyTaxShare | null;
+      info: SurveyInfoShare | null;
       ignored: ReadonlySet<string>;
     }
   | { status: 'gone' }
@@ -38,8 +44,12 @@ function settle(prev: Loaded, id: string, result: LoadSurveyResult): Loaded {
     if (
       result.ok &&
       result.expiresAt === before.expiresAt &&
+      result.owner === before.owner &&
       result.tax?.name === before.tax?.name &&
       result.tax?.pct === before.tax?.pct &&
+      result.info?.notes === before.info?.notes &&
+      result.info?.location?.id === before.info?.location?.id &&
+      result.info?.location?.name === before.info?.location?.name &&
       result.ignored.size === before.ignored.size &&
       [...result.ignored].every((scanId) => before.ignored.has(scanId)) &&
       result.scans.length === before.scans.length &&
@@ -93,6 +103,7 @@ export function useSurvey(id: string | null): {
         expiresAt: result.expiresAt,
         owner: result.owner,
         tax: result.tax,
+        info: result.info,
         ignored: result.ignored,
       };
     }

@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Caret,
@@ -7,9 +7,11 @@ import {
   NativeSelect,
   RowMoreActions,
   SearchInput,
+  TabPanel,
   Tabs,
   TextInput,
   TypeIcon,
+  useTabsId,
 } from '@/components/ui';
 import {
   disabledClassName,
@@ -191,8 +193,12 @@ function ItemRow({ entry, rack, placeable, problems, blocked, draggable, onAdd }
     >
       <button
         type="button"
-        disabled={!placeable || blocked}
-        onClick={() => onAdd(entry.typeId, rack)}
+        // aria-disabled, not disabled: adding into the last free slot greys the
+        // row while it holds focus, and a native disabled button drops it.
+        aria-disabled={!placeable || blocked || undefined}
+        onClick={() => {
+          if (placeable && !blocked) onAdd(entry.typeId, rack);
+        }}
         className={cx(
           'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
           rowInteractiveClassName,
@@ -253,6 +259,7 @@ export function FittingAddPanel({
   slotFreeFor,
 }: FittingAddPanelProps) {
   const { t } = useTranslation();
+  const tabsId = useTabsId();
   const [query, setQuery] = useState('');
   const [fitsSlot, setFitsSlot] = useState(true);
   // The three in-game icon toggles (hull, resources, skills) — all on by
@@ -315,6 +322,7 @@ export function FittingAddPanel({
     next.delete('skills');
     return next;
   }, [fitFilters]);
+  const searchRef = useRef<HTMLInputElement>(null);
   const hiddenByFilters = useMemo(() => {
     if (catalogue === null || hullFit === null || relaxed.size === fitFilters.size) return 0;
     const base = { tab, slotRack, metaGroupId, hullFit };
@@ -329,7 +337,11 @@ export function FittingAddPanel({
       <button
         type="button"
         className={`${inlineLinkClassName} min-h-11 text-left text-xs md:min-h-9`}
-        onClick={() => setFitFilters(relaxed)}
+        onClick={() => {
+          setFitFilters(relaxed);
+          // This button goes away with the filters it lifts; focus follows to the search.
+          searchRef.current?.focus();
+        }}
       >
         {t('fittings.add.hiddenByFilters', { count: hiddenByFilters })}
       </button>
@@ -432,6 +444,7 @@ export function FittingAddPanel({
   return (
     <div className="space-y-2">
       <Tabs
+        tabsId={tabsId}
         tabs={[
           { id: 'modules', label: t('fittings.add.tab.modules') },
           { id: 'charges', label: t('fittings.add.tab.charges') },
@@ -443,132 +456,135 @@ export function FittingAddPanel({
         label={t('fittings.add.tabsLabel')}
       />
 
-      {target?.kind === 'slot' && tab === 'modules' && (
-        <div className="flex items-center justify-between gap-2 rounded-xs border border-accent-dim bg-panel-2 px-2 py-1 text-xs">
-          <span>
-            {t('fittings.add.addingTo', {
-              slot: t(RACK_LABEL_KEY[target.slot]),
-              index: target.slotIndex + 1,
-            })}
-          </span>
-          {onClearTarget && (
-            <IconButton
-              icon={<Close />}
-              size="sm"
-              label={t('fittings.add.clearTarget')}
-              onClick={onClearTarget}
-            />
-          )}
-        </div>
-      )}
-
-      {tab === 'charges' ? (
-        <ChargesTab
-          fitting={fitting}
-          catalogue={catalogue}
-          context={context}
-          moduleResults={moduleResults ?? null}
-          onLoadCharge={onLoadCharge}
-          dragToFit={dragToRing}
-        />
-      ) : tab === 'cargo' && onAddCargo ? (
-        <CargoTab catalogue={catalogue} cargo={fitting.cargo} onAddCargo={onAddCargo} />
-      ) : (
-        <>
-          <SearchInput
-            aria-label={t('fittings.add.searchLabel')}
-            placeholder={t('fittings.add.searchPlaceholder')}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <div className="flex flex-wrap items-center gap-1.5">
-            {slotIcon ? (
+      <TabPanel tabsId={tabsId} tabId={tab} className="space-y-2">
+        {target?.kind === 'slot' && tab === 'modules' && (
+          <div className="flex items-center justify-between gap-2 rounded-xs border border-accent-dim bg-panel-2 px-2 py-1 text-xs">
+            <span>
+              {t('fittings.add.addingTo', {
+                slot: t(RACK_LABEL_KEY[target.slot]),
+                index: target.slotIndex + 1,
+              })}
+            </span>
+            {onClearTarget && (
               <IconButton
-                icon={<img src={slotIcon} alt="" width={16} height={16} />}
-                label={t('fittings.add.fitsSlot')}
-                tooltip={t('fittings.add.fitsSlotTooltip')}
+                icon={<Close />}
                 size="sm"
-                pressed={fitsSlot}
-                onClick={toggleFitsSlot}
+                label={t('fittings.add.clearTarget')}
+                onClick={onClearTarget}
               />
-            ) : (
-              target?.kind === 'slot' && (
-                <FilterChip
-                  label={t('fittings.add.fitsSlot')}
-                  selected={fitsSlot}
-                  tooltip={t('fittings.add.fitsSlotTooltip')}
-                  onToggle={toggleFitsSlot}
-                />
-              )
             )}
-            <div className="flex items-center gap-1">
-              {FIT_FILTERS.map(({ kind, icon, labelKey, tooltipKey }) => (
-                <IconButton
-                  key={kind}
-                  icon={<img src={icon} alt="" width={16} height={16} />}
-                  label={t(labelKey)}
-                  tooltip={t(tooltipKey)}
-                  size="sm"
-                  pressed={fitFilters.has(kind) && hullFit !== null}
-                  disabled={hullFit === null}
-                  onClick={() => toggleFitFilter(kind)}
-                />
-              ))}
-            </div>
-            <NativeSelect
-              size="sm"
-              aria-label={t('fittings.add.metaLabel')}
-              value={metaGroupId ?? ''}
-              onChange={(event) =>
-                setMetaGroupId(event.target.value === '' ? null : Number(event.target.value))
-              }
-            >
-              <option value="">{t('fittings.add.metaAny')}</option>
-              {metaGroups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </NativeSelect>
           </div>
+        )}
 
-          {context === null && (
-            <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>
-          )}
-          {context !== null && hullFit === null && (
-            <p className="text-xs text-text-dim">{t('fittings.add.checkingHull')}</p>
-          )}
-          {dragToRing && tab === 'modules' && hullFit !== null && (
-            <p className="text-xs text-text-dim">{t('fittings.add.dragHint')}</p>
-          )}
+        {tab === 'charges' ? (
+          <ChargesTab
+            fitting={fitting}
+            catalogue={catalogue}
+            context={context}
+            moduleResults={moduleResults ?? null}
+            onLoadCharge={onLoadCharge}
+            dragToFit={dragToRing}
+          />
+        ) : tab === 'cargo' && onAddCargo ? (
+          <CargoTab catalogue={catalogue} cargo={fitting.cargo} onAddCargo={onAddCargo} />
+        ) : (
+          <>
+            <SearchInput
+              ref={searchRef}
+              aria-label={t('fittings.add.searchLabel')}
+              placeholder={t('fittings.add.searchPlaceholder')}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <div className="flex flex-wrap items-center gap-1.5">
+              {slotIcon ? (
+                <IconButton
+                  icon={<img src={slotIcon} alt="" width={16} height={16} />}
+                  label={t('fittings.add.fitsSlot')}
+                  tooltip={t('fittings.add.fitsSlotTooltip')}
+                  size="sm"
+                  pressed={fitsSlot}
+                  onClick={toggleFitsSlot}
+                />
+              ) : (
+                target?.kind === 'slot' && (
+                  <FilterChip
+                    label={t('fittings.add.fitsSlot')}
+                    selected={fitsSlot}
+                    tooltip={t('fittings.add.fitsSlotTooltip')}
+                    onToggle={toggleFitsSlot}
+                  />
+                )
+              )}
+              <div className="flex items-center gap-1">
+                {FIT_FILTERS.map(({ kind, icon, labelKey, tooltipKey }) => (
+                  <IconButton
+                    key={kind}
+                    icon={<img src={icon} alt="" width={16} height={16} />}
+                    label={t(labelKey)}
+                    tooltip={t(tooltipKey)}
+                    size="sm"
+                    pressed={fitFilters.has(kind) && hullFit !== null}
+                    disabled={hullFit === null}
+                    onClick={() => toggleFitFilter(kind)}
+                  />
+                ))}
+              </div>
+              <NativeSelect
+                size="sm"
+                aria-label={t('fittings.add.metaLabel')}
+                value={metaGroupId ?? ''}
+                onChange={(event) =>
+                  setMetaGroupId(event.target.value === '' ? null : Number(event.target.value))
+                }
+              >
+                <option value="">{t('fittings.add.metaAny')}</option>
+                {metaGroups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
 
-          {catalogue === null ? (
-            <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>
-          ) : trimmed !== '' ? (
-            results.length === 0 ? (
+            {context === null && (
+              <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>
+            )}
+            {context !== null && hullFit === null && (
+              <p className="text-xs text-text-dim">{t('fittings.add.checkingHull')}</p>
+            )}
+            {dragToRing && tab === 'modules' && hullFit !== null && (
+              <p className="text-xs text-text-dim">{t('fittings.add.dragHint')}</p>
+            )}
+
+            {catalogue === null ? (
+              <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>
+            ) : trimmed !== '' ? (
+              results.length === 0 ? (
+                <>
+                  <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
+                  {hiddenNote}
+                </>
+              ) : (
+                <>
+                  <ul>{results.map(row)}</ul>
+                  {hiddenNote}
+                </>
+              )
+            ) : hullFit !== null && tree.length === 0 ? (
               <>
                 <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
                 {hiddenNote}
               </>
             ) : (
               <>
-                <ul>{results.map(row)}</ul>
+                <ul>{top.map((node) => branch(node, 0))}</ul>
                 {hiddenNote}
               </>
-            )
-          ) : hullFit !== null && tree.length === 0 ? (
-            <>
-              <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
-              {hiddenNote}
-            </>
-          ) : (
-            <>
-              <ul>{top.map((node) => branch(node, 0))}</ul>
-              {hiddenNote}
-            </>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
+      </TabPanel>
     </div>
   );
 }

@@ -91,3 +91,20 @@ export function BaitFlag({ multiple, t }: { multiple: number | null; t: TFunctio
     </Tooltip>
   );
 }
+
+/**
+ * An order of the pilot's own, marked left of its price (before `BaitFlag`).
+ * Not a tooltip or a tab stop: the row's tint and the glyph's name ("You")
+ * already say it, and a stop inside a clickable row fights docs/DESIGN.md §6c.
+ */
+export function MyOrderMark({ t }: { t: TFunction }) {
+  return (
+    <span
+      role="img"
+      aria-label={t('market.myOrder')}
+      className="mr-1 inline-flex align-text-bottom text-text"
+    >
+      <Icon.MyOrder aria-hidden size={Icon.ICON_SIZE.sm} />
+    </span>
+  );
+}

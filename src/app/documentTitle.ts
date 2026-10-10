@@ -93,6 +93,11 @@ function namesFor(pathname: string, t: Translate): string[] {
   return (match ? match[1] : ['notFound.title']).map(t);
 }
 
+/** A feature route's page name alone (no tab, no app name) — the h1 a locked page still needs. */
+export function pageTitleFor(path: AppRoutePath, t: Translate): string {
+  return t(ROUTE_TITLE_KEYS[path][0]);
+}
+
 export function documentTitleFor(pathname: string, t: Translate): string {
   const names = namesFor(pathname, t);
   // Market's Browser tab is labelled "Market"; say it once.

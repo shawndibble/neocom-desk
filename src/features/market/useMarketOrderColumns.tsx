@@ -20,7 +20,12 @@ import {
   type NpcStationLookup,
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
-import { BaitFlag, LocationCell, SecurityCell } from '@/features/market/marketOrderCells';
+import {
+  BaitFlag,
+  LocationCell,
+  MyOrderMark,
+  SecurityCell,
+} from '@/features/market/marketOrderCells';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
 import type { JumpRangeFilter, JumpsCellValue } from '@/features/route/currentSystem';
 import type { RegionOrder } from '@/esi/endpoints';
@@ -133,20 +138,18 @@ export function useMarketOrderColumns({
         cardCorner: visibleOrderColumns.includes('location'),
         render: (o) => (
           <>
-            {/* Left of the figure, so the prices stay right-aligned in one column. */}
+            {/*
+              Left of the figure, so the prices stay right-aligned in one
+              column. Mine, then bait, then the price, all on one line: the row tint
+              (`row-mine`, styles/index.css) is not enough alone (colour is
+              never the sole signal, docs/DESIGN.md §7), and a second line
+              would break the column of a book scanned by price.
+            */}
+            {myOrderIds.has(o.order_id) && <MyOrderMark t={t} />}
             {!o.is_buy_order && (
               <BaitFlag multiple={sellOutlierMultiple(o.price, bestSell)} t={t} />
             )}
             {formatMarketIsk(o.price)}
-            {/*
-              The tinted row (`row-mine`, styles/index.css) is the visible
-              marker for "this one is mine" — no badge, no gap figure,
-              nothing that adds a line to every row of a book you scan by
-              price. Colour is never the sole signal though (docs/DESIGN.md
-              §7), so the word rides along unseen, the way `CorpBoardRow`'s
-              severity label does.
-            */}
-            {myOrderIds.has(o.order_id) && <span className="sr-only">{t('market.myOrder')}</span>}
           </>
         ),
         sortValue: (o) => o.price,

@@ -5,7 +5,7 @@ import {
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import { HintText } from '@/components/ui/HintText';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -54,6 +54,7 @@ import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { useNow } from '@/lib/useNow';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roster';
 import {
   rosterCoreMap,
@@ -367,6 +368,7 @@ function CharacterCard({
               <button
                 type="button"
                 aria-label={t('characters.select', { name: character.name })}
+                data-character-select={character.characterId}
                 onClick={() => onSelect(character.characterId)}
                 className={cx(
                   'max-w-full truncate rounded-xs text-left text-sm font-semibold',
@@ -417,6 +419,7 @@ function CharacterCard({
               <SelectTrigger
                 size="sm"
                 aria-label={t('characters.groupFor', { name: character.name })}
+                data-group-select={character.characterId}
                 className="w-32 shrink-0"
               >
                 <SelectValue />
@@ -500,9 +503,14 @@ function GroupSectionHeader({
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(group.name);
+  const renameButton = useRef<HTMLButtonElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
-  function commitRename() {
+  // `returnFocus`: Enter and Escape remove the input, so focus goes back to
+  // the Rename button; a blur means the user already went elsewhere.
+  function commitRename(returnFocus: boolean) {
     setRenaming(false);
+    if (returnFocus) focusAfterCommit(renameButton);
     const name = draftName.trim();
     if (name && name !== group.name) onRename(group.id, name);
     else setDraftName(group.name);
@@ -517,19 +525,26 @@ function GroupSectionHeader({
           value={draftName}
           aria-label={t('characters.renameGroup')}
           onChange={(e) => setDraftName(e.target.value)}
-          onBlur={commitRename}
+          onBlur={() => commitRename(false)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commitRename();
+            if (e.key === 'Enter') {
+              // Focus moves to the Rename button below; without this the Enter's own
+              // keypress would land on it and reopen the input.
+              e.preventDefault();
+              commitRename(true);
+            }
             if (e.key === 'Escape') {
               setDraftName(group.name);
               setRenaming(false);
+              focusAfterCommit(renameButton);
             }
           }}
           className="flex-1"
         />
       ) : (
         <h2
-          className="flex-1 truncate text-xs font-semibold tracking-widest text-text-dim uppercase"
+          data-group-heading={group.id}
+          className="flex-1 truncate text-xs font-semibold tracking-widest text-text-dim uppercase focus:outline-none"
           onDoubleClick={() => setRenaming(true)}
         >
           {group.name}
@@ -544,6 +559,7 @@ function GroupSectionHeader({
         size="sm"
         icon={<Icon.Ascending />}
         label={t('characters.moveGroupUp', { name: group.name })}
+        data-move-group={`${group.id}:up`}
         onClick={() => onMove(index, -1)}
         disabled={index === 0}
       />
@@ -551,11 +567,13 @@ function GroupSectionHeader({
         size="sm"
         icon={<Icon.Descending />}
         label={t('characters.moveGroupDown', { name: group.name })}
+        data-move-group={`${group.id}:down`}
         onClick={() => onMove(index, 1)}
         disabled={index === groupCount - 1}
       />
       <IconButton
         size="sm"
+        ref={renameButton}
         icon={<Icon.Rename />}
         label={`${t('characters.renameGroup')} ${group.name}`}
         onClick={() => setRenaming(true)}
@@ -700,6 +718,7 @@ function buildColumns(
           <SelectTrigger
             size="sm"
             aria-label={t('characters.groupFor', { name: row.character.name })}
+            data-group-select={row.character.characterId}
             className="w-32"
           >
             <SelectValue />
@@ -950,6 +969,8 @@ export function Characters() {
   }
 
   const [addingGroup, setAddingGroup] = useState(false);
+  const newGroupButton = useRef<HTMLButtonElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   const [newGroupName, setNewGroupName] = useState('');
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [removingCharacter, setRemovingCharacter] = useState<{
@@ -1250,10 +1271,24 @@ export function Characters() {
   async function confirmRemoveCharacter() {
     if (!removingCharacter) return;
     const { id, name } = removingCharacter;
+    // Neighbours are read now: the removed card is gone from the DOM afterwards.
+    const ids = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-character-select]'),
+      (el) => el.dataset.characterSelect
+    );
+    const at = ids.indexOf(String(id));
+    const cardButton = (cardId: string | undefined) => () =>
+      cardId ? document.querySelector<HTMLElement>(`[data-character-select="${cardId}"]`) : null;
     setRemovingCharacter(null);
     try {
       await removeCharacterAfterSync(id, isSyncConfigured());
       useAuthFailure.getState().dismissNeedsLogin(id);
+      // The dialog has closed by now, so this isn't overridden by its focus return.
+      focusAfterCommit(
+        cardButton(at >= 0 ? ids[at + 1] : undefined),
+        cardButton(at > 0 ? ids[at - 1] : undefined),
+        () => document.querySelector<HTMLElement>('h1')
+      );
     } catch {
       // The local removal is one transaction, so a failure left every row in
       // place — say so rather than leave the click looking ignored.
@@ -1270,14 +1305,25 @@ export function Characters() {
         Date.now()
       )
     );
+    // The card remounts under its new group, so the Select that ran this is gone.
+    focusAfterCommit(() =>
+      document.querySelector<HTMLElement>(`[data-group-select="${characterId}"]`)
+    );
   }
 
-  async function handleCreateGroup() {
+  /** `returnFocus` is false on blur: the user already went elsewhere. */
+  async function handleCreateGroup(returnFocus: boolean) {
     const name = newGroupName.trim();
     setAddingGroup(false);
     setNewGroupName('');
+    if (returnFocus) focusAfterCommit(newGroupButton);
     if (!name) return;
     const group: CharacterGroup = { id: crypto.randomUUID(), name, characterIds: [] };
+    if (returnFocus) {
+      focusAfterCommit(() =>
+        document.querySelector<HTMLElement>(`[data-group-heading="${group.id}"]`)
+      );
+    }
     await setGroupsValue(
       updateGroups(groupsValue, (groups) => addGroup(groups, group), Date.now())
     );
@@ -1290,13 +1336,21 @@ export function Characters() {
   }
 
   async function handleRemoveGroup(groupId: string) {
+    const at = groupsValue.groups.findIndex((group) => group.id === groupId);
+    const nextId = groupsValue.groups[at + 1]?.id;
     setDeletingGroupId(null);
     await setGroupsValue(
       updateGroups(groupsValue, (groups) => removeGroup(groups, groupId), Date.now())
     );
+    focusAfterCommit(
+      () => document.querySelector<HTMLElement>(`[data-group-heading="${nextId}"]`),
+      () => document.querySelector<HTMLElement>('[data-ungrouped-heading]'),
+      newGroupButton
+    );
   }
 
   async function handleMoveGroup(index: number, direction: -1 | 1) {
+    const groupId = groupsValue.groups[index]?.id;
     await setGroupsValue(
       updateGroups(
         groupsValue,
@@ -1304,6 +1358,15 @@ export function Characters() {
         Date.now()
       )
     );
+    // At the top or bottom the pressed button turns disabled; the sibling takes focus.
+    const enabledMove = (side: 'up' | 'down') => () => {
+      const el = document.querySelector<HTMLButtonElement>(
+        `[data-move-group="${groupId}:${side}"]`
+      );
+      return el && !el.disabled ? el : null;
+    };
+    const [same, other] = direction === -1 ? (['up', 'down'] as const) : (['down', 'up'] as const);
+    focusAfterCommit(enabledMove(same), enabledMove(other));
   }
 
   /** Card view only — called once per group section plus once for Ungrouped, same as before (decision 20260927-071415 keeps group sectioning card-view-only). */
@@ -1731,7 +1794,12 @@ export function Characters() {
                   <IconButton
                     size="sm"
                     icon={draft.sortDirection === 'asc' ? <Icon.Ascending /> : <Icon.Descending />}
-                    label={t('characters.sortDirection')}
+                    label={t(
+                      draft.sortDirection === 'asc'
+                        ? 'characters.sortDirectionAsc'
+                        : 'characters.sortDirectionDesc'
+                    )}
+                    tooltip={t('characters.sortDirection')}
                     onClick={() =>
                       setDraft({
                         ...draft,
@@ -1753,17 +1821,21 @@ export function Characters() {
                   aria-label={t('characters.newGroupName')}
                   onChange={(e) => setNewGroupName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleCreateGroup();
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleCreateGroup(true);
+                    }
                     if (e.key === 'Escape') {
                       setNewGroupName('');
                       setAddingGroup(false);
+                      focusAfterCommit(newGroupButton);
                     }
                   }}
-                  onBlur={() => void handleCreateGroup()}
+                  onBlur={() => void handleCreateGroup(false)}
                   className="w-40"
                 />
               ) : (
-                <Button size="md" onClick={() => setAddingGroup(true)}>
+                <Button ref={newGroupButton} size="md" onClick={() => setAddingGroup(true)}>
                   {t('characters.newGroup')}
                 </Button>
               )}
@@ -1839,7 +1911,10 @@ export function Characters() {
               {(groupsValue.groups.length === 0 || ungroupedIds.length > 0) && (
                 <section className="space-y-2">
                   {groupsValue.groups.length > 0 && (
-                    <h2 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
+                    <h2
+                      data-ungrouped-heading
+                      className="text-xs font-semibold tracking-widest text-text-dim uppercase focus:outline-none"
+                    >
                       {t('characters.ungrouped')}
                     </h2>
                   )}

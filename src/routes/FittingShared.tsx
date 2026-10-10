@@ -4,7 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { BootScreen } from '@/app/BootScreen';
-import { Button, EmptyState, Spinner, StatChip, StatChips, TypeIcon } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  LiveStatus,
+  Spinner,
+  StatChip,
+  StatChips,
+  TypeIcon,
+} from '@/components/ui';
 import { ShareShell } from '@/features/share/ShareShell';
 import { writeToClipboard } from '@/lib/clipboard';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
@@ -69,6 +77,8 @@ export function FittingShareView({
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [typeName, setTypeName] = useState<TypeName | null>(null);
   const [copied, setCopied] = useState(false);
+  // Bumped per attempt so a repeat copy is announced again.
+  const [copyCount, setCopyCount] = useState(0);
   const targetProfiles = useTargetProfiles();
   const [copyFailed, setCopyFailed] = useState(false);
 
@@ -151,6 +161,7 @@ export function FittingShareView({
 
   async function copyEft() {
     if (state.status !== 'ready' || typeName === null) return;
+    setCopyCount((count) => count + 1);
     try {
       await writeToClipboard(fittingToEft(state.fitting, typeName));
       setCopied(true);
@@ -167,18 +178,24 @@ export function FittingShareView({
       openInApp={openInApp}
       actions={
         state.status === 'ready' ? (
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => void copyEft()}
-            disabled={typeName === null}
-          >
-            {copied
-              ? t('fittingShare.copied')
-              : copyFailed
-                ? t('fittingShare.copyFailed')
-                : t('fittingShare.copyEft')}
-          </Button>
+          <>
+            {/* Absolutely positioned, so it adds no flex gap. */}
+            <LiveStatus announceKey={copyCount}>
+              {copied ? t('fittingShare.copied') : copyFailed ? t('fittingShare.copyFailed') : null}
+            </LiveStatus>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => void copyEft()}
+              disabled={typeName === null}
+            >
+              {copied
+                ? t('fittingShare.copied')
+                : copyFailed
+                  ? t('fittingShare.copyFailed')
+                  : t('fittingShare.copyEft')}
+            </Button>
+          </>
         ) : undefined
       }
     >

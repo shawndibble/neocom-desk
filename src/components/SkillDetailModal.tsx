@@ -25,6 +25,7 @@ import {
   buildSkillRequirements,
   type SkillRequirements,
 } from '@/features/skills/skillRequirements';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { loadSkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -50,6 +51,14 @@ export function SkillDetailModal() {
   // Bumped by "Try again" to re-run the load effect in place — the page's
   // own Refresh sits behind the modal overlay, out of reach.
   const [attempt, setAttempt] = useState(0);
+  const [resultRef, armRetryFocus] = useRetryFocus(
+    state.status === 'error'
+      ? 'failed'
+      : state.status === 'loading' || state.status === 'idle'
+        ? 'busy'
+        : 'ok',
+    request
+  );
 
   useEffect(() => {
     if (!request) return;
@@ -93,51 +102,59 @@ export function SkillDetailModal() {
 
   return (
     <Modal open onClose={close} title={title} closeOnBack={false}>
-      {state.status === 'loading' || state.status === 'idle' ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : state.status === 'error' ? (
-        <EmptyState
-          title={t('common.loadFailedTitle')}
-          hint={t('skills.detail.loadFailedHint')}
-          action={
-            <Button size="sm" onClick={() => setAttempt((n) => n + 1)}>
-              {t('common.retry')}
-            </Button>
-          }
-          className="py-8"
-        />
-      ) : state.status === 'not-found' ? (
-        <EmptyState
-          title={t('skills.detail.notFoundTitle')}
-          hint={t('skills.detail.notFoundHint')}
-          className="py-8"
-        />
-      ) : (
-        <div className="space-y-3">
-          {/* What the skill does leads: it's what a click on a skill name is asking. */}
-          <div className="space-y-1">
-            {state.data.description && (
-              <p className="text-sm whitespace-pre-line text-text">{state.data.description}</p>
-            )}
-            <p className="text-xs text-text-dim">
-              {t('skills.inspector.facts', {
-                group: state.data.groupName,
-                rank: state.data.rank,
-                primary: t(`skills.attr.${state.data.primaryAttr}`),
-                secondary: t(`skills.attr.${state.data.secondaryAttr}`),
-              })}
-            </p>
+      <div ref={resultRef} tabIndex={-1} className="focus:outline-none">
+        {state.status === 'loading' || state.status === 'idle' ? (
+          <div className="flex justify-center py-8">
+            <Spinner label={t('common.loading')} />
           </div>
-          <SkillPriceSection typeID={request.typeID} npcPrice={state.data.npcPrice} />
-          <SkillRequirementsList
-            prereqs={state.data.prereqs}
-            unlocks={state.data.unlocks}
-            planEntries={request.planEntries}
+        ) : state.status === 'error' ? (
+          <EmptyState
+            title={t('common.loadFailedTitle')}
+            hint={t('skills.detail.loadFailedHint')}
+            action={
+              <Button
+                size="sm"
+                onClick={() => {
+                  armRetryFocus();
+                  setAttempt((n) => n + 1);
+                }}
+              >
+                {t('common.retry')}
+              </Button>
+            }
+            className="py-8"
           />
-        </div>
-      )}
+        ) : state.status === 'not-found' ? (
+          <EmptyState
+            title={t('skills.detail.notFoundTitle')}
+            hint={t('skills.detail.notFoundHint')}
+            className="py-8"
+          />
+        ) : (
+          <div className="space-y-3">
+            {/* What the skill does leads: it's what a click on a skill name is asking. */}
+            <div className="space-y-1">
+              {state.data.description && (
+                <p className="text-sm whitespace-pre-line text-text">{state.data.description}</p>
+              )}
+              <p className="text-xs text-text-dim">
+                {t('skills.inspector.facts', {
+                  group: state.data.groupName,
+                  rank: state.data.rank,
+                  primary: t(`skills.attr.${state.data.primaryAttr}`),
+                  secondary: t(`skills.attr.${state.data.secondaryAttr}`),
+                })}
+              </p>
+            </div>
+            <SkillPriceSection typeID={request.typeID} npcPrice={state.data.npcPrice} />
+            <SkillRequirementsList
+              prereqs={state.data.prereqs}
+              unlocks={state.data.unlocks}
+              planEntries={request.planEntries}
+            />
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }

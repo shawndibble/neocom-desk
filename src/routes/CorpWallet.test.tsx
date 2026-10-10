@@ -245,6 +245,21 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(screen.queryByText('EverMarks')).toBeNull();
   });
 
+  it('keeps focus on the caret after a phone folds the panel on a division pick (WCAG 2.4.3)', async () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      ({ ...real(query), matches: query.includes('max-width') }) as MediaQueryList) as typeof real;
+    try {
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByRole('button', { name: /show all divisions/i }));
+      await user.click(divisionButton('SRP'));
+      expect(screen.getByRole('button', { name: /show all divisions/i })).toHaveFocus();
+    } finally {
+      window.matchMedia = real;
+    }
+  });
+
   it('carries a long division name in full as the label tooltip (issue #2600)', async () => {
     const long = 'Industry operating expenses and logistics';
     server.use(

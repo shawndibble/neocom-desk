@@ -18,7 +18,7 @@ import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
 import { PlanetImage } from './PlanetImage';
-import { useRetryFocus } from './useRetryFocus';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import {
   openingQuestion,
   pickedQuestion,

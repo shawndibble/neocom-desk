@@ -344,7 +344,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     // `.all()` resolves against whatever is in the DOM right now and never
     // waits, so the count — one Outstanding row plus one Unassigned — is what
     // holds until the table has actually rendered.
-    const boxes = page.getByLabel('Select this row');
+    const boxes = page.getByRole('checkbox', { name: /^Select / });
     await expect(boxes).toHaveCount(2);
     for (const box of await boxes.all()) await box.check();
     const dismiss = page.getByRole('button', { name: 'Dismiss 1' });
@@ -487,7 +487,7 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     await seedPayeeBalance(page);
     await page.goto('./mining/tax');
 
-    const boxes = page.getByLabel('Select this row');
+    const boxes = page.getByRole('checkbox', { name: /^Select / });
     await expect(boxes).toHaveCount(1);
     await boxes.first().check();
 
@@ -545,7 +545,7 @@ test.describe('Mining Tax phone card — tick box on the date line (#2983)', () 
     await seedPayeeBalance(page);
     await page.goto('./mining/tax');
 
-    const box = page.getByLabel('Select this row');
+    const box = page.getByRole('checkbox', { name: /^Select / });
     await expect(box).toHaveCount(1);
     const row = page.locator('tr', { has: box });
     const boxRect = (await box.boundingBox())!;
@@ -587,7 +587,7 @@ test.describe('Mining Tax table row — tick box clears the date (#2983)', () =>
       await seedPayeeBalance(page);
       await page.goto('./mining/tax');
 
-      const box = page.getByLabel('Select this row');
+      const box = page.getByRole('checkbox', { name: /^Select / });
       await expect(box).toHaveCount(1);
       const row = page.locator('tr', { has: box });
       const boxRect = (await box.boundingBox())!;
@@ -829,4 +829,48 @@ test.describe('Mining Tax ledger — Needs Review status hint (#3122)', () => {
     );
     expect(overflow).toBeLessThanOrEqual(0);
   });
+});
+
+test.describe('Mining Tax ledger — checkbox names and toolbar clearance (#3391)', () => {
+  for (const [label, viewport] of [
+    ['phone', PHONE],
+    ['desktop', DESKTOP],
+  ] as const) {
+    test(`${label}: each row checkbox has its own name; the toolbar reserves scroll room`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await signInAndGoto(page);
+      await seedPayeeBalance(page, { withUnassignedEntry: true });
+      await page.goto('./mining/tax');
+
+      const boxes = page.getByRole('checkbox', { name: /^Select / });
+      await expect(boxes).toHaveCount(2);
+      const names = await boxes.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+      expect(new Set(names).size).toBe(names.length);
+
+      const clearance = () =>
+        page.evaluate(() =>
+          document.documentElement.style.getPropertyValue('--selection-toolbar-clearance')
+        );
+      expect(await clearance()).toBe('');
+      await boxes.first().check();
+      await expect.poll(clearance).not.toBe('');
+      const toolbarHeight = await page
+        .getByRole('button', { name: 'Clear' })
+        .evaluate((el) => el.closest('.sticky')?.getBoundingClientRect().height ?? 0);
+      const reserved = await page.evaluate(() => {
+        const probe = document.createElement('div');
+        probe.style.height = 'var(--selection-toolbar-clearance)';
+        document.body.append(probe);
+        const px = probe.getBoundingClientRect().height;
+        probe.remove();
+        return px;
+      });
+      expect(reserved).toBeGreaterThanOrEqual(toolbarHeight);
+
+      await page.getByRole('button', { name: 'Clear' }).click();
+      await expect.poll(clearance).toBe('');
+    });
+  }
 });

@@ -3,7 +3,13 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
-import { HEADING_WAIT_MS, focusKeyFor, useRouteFocus } from './routeFocus';
+import {
+  HEADING_WAIT_MS,
+  focusKeyFor,
+  resetPublicRouteRendered,
+  useMarkPublicRouteRendered,
+  useRouteFocus,
+} from './routeFocus';
 
 describe('focusKeyFor', () => {
   it('collapses a tabbed page’s tabs to the page', () => {
@@ -77,6 +83,7 @@ function renderShell(initial: string, extraRoutes: ReactNode = null) {
 
 describe('useRouteFocus', () => {
   afterEach(() => {
+    resetPublicRouteRendered();
     vi.useRealTimers();
   });
 
@@ -123,5 +130,24 @@ describe('useRouteFocus', () => {
     });
 
     expect(document.activeElement).toBe(screen.getByTestId('outlet'));
+  });
+
+  it('focuses the h1 when the shell is entered from a public page', async () => {
+    function Public() {
+      useMarkPublicRouteRendered();
+      return <Link to="/overview">go</Link>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/nowhere']}>
+        <Routes>
+          <Route path="/nowhere" element={<Public />} />
+          <Route element={<Shell />}>
+            <Route path="/overview" element={<h1>Overview</h1>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+    await userEvent.click(screen.getByRole('link', { name: 'go' }));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Overview' }));
   });
 });

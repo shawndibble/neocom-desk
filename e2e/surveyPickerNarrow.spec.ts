@@ -93,7 +93,8 @@ test('the open survey list fits a phone and keeps the remove button on screen', 
   await picker.click();
   const list = page.getByRole('listbox');
   await expect(list).toBeVisible();
-  const removes = list.getByRole('button', { name: /^Remove/ });
+  // The remove buttons are pointer-only (aria-hidden, Delete key for keyboards), so no role query.
+  const removes = list.locator('button[aria-label^="Remove"]');
   await expect(removes).toHaveCount(2);
 
   const box = await list.evaluate((el) => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FilterChip, Spinner } from '@/components/ui';
+import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
 import { planMove, type MoveHull } from '@/engine/assets/movePlan';
@@ -16,6 +16,7 @@ import {
 import { hullCargoHolds } from '@/features/market/haulingCargo';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatCubicMetres } from '@/lib/volume';
 import { loadGroupCategories, loadShipTree, loadTypes } from '@/sde/loadSde';
 import { PickerList } from './MovePlanPicker';
@@ -143,6 +144,9 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
   const hullSource = useRef<HullSourceData>({ catalogue: null, profile: null });
   const hullCapacity = useRef(new Map<number, number | null>());
   const idsKey = characterIds.join(',');
+  const focusAfterCommit = useFocusAfterCommit();
+  const planHeadingRef = useRef<HTMLHeadingElement>(null);
+  const deliverHeadingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     let live = true;
@@ -307,6 +311,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
             destStation !== null ? (loaded.places.get(destStation) ?? null) : null,
           pickupSystems: loaded.systems,
         });
+        focusAfterCommit(planHeadingRef);
       }
     } catch {
       if (mine === session.current) setPlanFailed(true);
@@ -338,10 +343,13 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
   return (
     <section
       aria-label={t('assets.movePlan.title')}
-      className="min-h-0 flex-1 overflow-y-auto rounded-xs border border-line bg-panel p-3"
+      className="min-h-0 flex-1 scroll-pb-32 overflow-y-auto rounded-xs max-sm:scroll-pt-48 border border-line bg-panel p-3"
     >
       <div className="flex min-h-full flex-col gap-3 text-sm">
         <HullSource characterId={activeCharacterId} intoRef={hullSource} />
+        <LiveStatus>
+          {failed ? t('assets.movePlan.failed') : planFailed ? t('assets.movePlan.planFailed') : ''}
+        </LiveStatus>
         {failed ? (
           <p className="text-text-dim">{t('assets.movePlan.failed')}</p>
         ) : !loaded ? (
@@ -360,7 +368,11 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
             }
             compareOpen={compareOpen}
             onToggleCompare={() => setCompareOpen((v) => !v)}
-            onBack={() => setResult(null)}
+            headingRef={planHeadingRef}
+            onBack={() => {
+              setResult(null);
+              focusAfterCommit(deliverHeadingRef);
+            }}
             onDone={onClose}
             onPackShip={packShip}
             rigsOf={(itemId) => loaded.rigs.get(itemId) ?? 0}
@@ -377,7 +389,11 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
               className="sticky -top-3 z-20 -mx-3 bg-panel px-3 pt-3 pb-1 sm:static sm:mx-0 sm:p-0"
             >
               <div className="flex flex-col gap-2 rounded-xs border border-accent-dim bg-accent/10 p-3">
-                <h3 className="text-xs font-semibold tracking-wide text-accent uppercase">
+                <h3
+                  ref={deliverHeadingRef}
+                  tabIndex={-1}
+                  className="text-xs font-semibold tracking-wide text-text-dim uppercase focus:outline-none"
+                >
                   {t('assets.movePlan.deliverTo')}
                 </h3>
                 <SolarSystemPicker

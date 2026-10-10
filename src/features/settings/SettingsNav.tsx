@@ -35,10 +35,13 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
     >
       {groups.map((group) => (
         <div key={group.id} className="mb-3">
-          <p className="px-2 pb-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+          <p
+            id={`settings-nav-${group.id}`}
+            className="px-2 pb-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase"
+          >
             {t(group.labelKey)}
           </p>
-          <ul className="space-y-px">
+          <ul aria-labelledby={`settings-nav-${group.id}`} className="space-y-px">
             {group.sections.map((id) => {
               const active = id === value;
               return (

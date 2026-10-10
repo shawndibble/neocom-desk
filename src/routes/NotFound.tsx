@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LogoMark, buttonClassName } from '@/components/ui';
 import { DISCORD_URL } from '@/lib/links';
+import { useMarkPublicRouteRendered } from '@/app/routeFocus';
 
 /**
  * The `*` route. Replaces a silent `<Navigate to="/" replace />`, which sent a
@@ -16,6 +17,7 @@ import { DISCORD_URL } from '@/lib/links';
  */
 export function NotFound() {
   const { t } = useTranslation();
+  useMarkPublicRouteRendered();
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg p-6 text-center text-text">
       <LogoMark className="size-7" />
