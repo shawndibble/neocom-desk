@@ -21,6 +21,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, buttonClassName, TextInput } from '@/components/ui';
+import { focusRingClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { InfoRow } from './InfoRow';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import * as Icon from '@/components/ui/icons';
@@ -31,8 +33,10 @@ import { setSurveyTax, type SurveyTaxShare } from './surveyStore';
 
 // Accent text is clickable and the faint pencil after it says "edit in place" (DESIGN.md §6c);
 // `touch:min-h-11` keeps the phone target at 44px.
-const editClassName =
-  'inline-flex items-center gap-1.5 rounded-xs text-left text-accent hover:underline touch:min-h-11';
+const editClassName = cx(
+  'inline-flex items-center gap-1.5 rounded-xs text-left text-accent hover:underline touch:min-h-11',
+  focusRingClassName
+);
 
 function Pencil() {
   return <Icon.Rename aria-hidden className="size-[0.6em] shrink-0 text-text-dim" />;

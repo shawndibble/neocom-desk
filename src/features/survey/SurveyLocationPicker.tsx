@@ -149,7 +149,7 @@ export function SurveyLocationPicker({
           id={listId}
           onMouseDown={(event) => event.preventDefault()}
           role="listbox"
-          className="absolute inset-x-0 top-full z-20 mt-1 flex max-h-72 flex-col overflow-auto rounded-xs border border-line bg-panel-2 py-1 shadow-lg"
+          className="absolute inset-x-0 top-full z-20 mt-1 flex max-h-72 flex-col overflow-auto rounded-xs border border-line bg-panel py-1 shadow-lg"
         >
           {places.map((place, index) => (
             <li
@@ -158,8 +158,8 @@ export function SurveyLocationPicker({
               role="option"
               aria-selected={index === highlight}
               className={cx(
-                'flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1 hover:bg-panel touch:min-h-11 touch:items-center',
-                index === highlight && 'bg-panel'
+                'flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1 hover:bg-panel-2 touch:min-h-11 touch:items-center',
+                index === highlight && 'bg-panel-2'
               )}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => choose(place)}
