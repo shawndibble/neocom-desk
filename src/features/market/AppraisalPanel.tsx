@@ -989,7 +989,6 @@ export function AppraisalPanel({
                   {...tableExport.tableProps}
                   columns={columns}
                   rows={tableRows}
-                  rowClassName={(row) => ((row as OwnedRow).need === 0 ? 'opacity-50' : undefined)}
                   rowKey={(row) => row.typeId}
                   label={t('market.appraisal.resultTitle')}
                   className="pb-1"
