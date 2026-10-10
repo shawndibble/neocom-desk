@@ -164,32 +164,34 @@ export function PlanResult({
           </ul>
         </Disclosure>
       )}
-      {segments.length > 0 && (
+      {(segments.length > 0 || flown.length > 0) && (
         <div className="flex flex-col gap-1.5">
-          <div
-            role="img"
-            aria-label={t('assets.movePlan.loadSplit')}
-            className="relative flex h-11 overflow-hidden rounded-xs border border-line"
-          >
-            {segments.map((s) => (
-              <i
-                key={s.key}
-                className="block h-full"
-                style={{
-                  width: `${s.share * 100}%`,
-                  background: pickupHueVar(hueOf(pickups[s.key].locationId)),
-                }}
-              />
-            ))}
-            {lanes.slice(0, -1).map((l) => (
-              <u
-                key={l.trip}
-                aria-hidden="true"
-                className="absolute inset-y-0 w-0 border-l-2 border-dashed border-panel no-underline"
-                style={{ left: `${((l.trip * capacity) / totals.totalM3) * 100}%` }}
-              />
-            ))}
-          </div>
+          {segments.length > 0 && (
+            <div
+              role="img"
+              aria-label={t('assets.movePlan.loadSplit')}
+              className="relative flex h-11 overflow-hidden rounded-xs border border-line"
+            >
+              {segments.map((s) => (
+                <i
+                  key={s.key}
+                  className="block h-full"
+                  style={{
+                    width: `${s.share * 100}%`,
+                    background: pickupHueVar(hueOf(pickups[s.key].locationId)),
+                  }}
+                />
+              ))}
+              {lanes.slice(0, -1).map((l) => (
+                <u
+                  key={l.trip}
+                  aria-hidden="true"
+                  className="absolute inset-y-0 w-0 border-l-2 border-dashed border-panel no-underline"
+                  style={{ left: `${((l.trip * capacity) / totals.totalM3) * 100}%` }}
+                />
+              ))}
+            </div>
+          )}
           {(lanes.length > 0 || flown.length > 0) && (
             <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-text-dim">
               {tripRuns(lanes).map((r) => (
@@ -202,7 +204,7 @@ export function PlanResult({
                 </li>
               ))}
               {flown.map((s) => (
-                <li key={s.itemId} className="font-semibold text-warning">
+                <li key={s.itemId} className="font-semibold text-text">
                   {t('assets.movePlan.flyShip', { ship: name(s.typeId) })}
                 </li>
               ))}

@@ -66,6 +66,35 @@ describe('PlanResult', () => {
     expect(screen.getByText('Trip 2 · 50 m³')).toBeTruthy();
   });
 
+  it('folds equal full trips into one range', () => {
+    const big = { ...plan, totals: { ...plan.totals, totalM3: 350, trips: 4 } } as MovePlan;
+    render(
+      <MemoryRouter>
+        <PlanResult
+          state={{
+            plan: big,
+            destinationSystem: null,
+            destinationStation: 'Amarr VIII',
+            pickupSystems: new Map(),
+          }}
+          scope={{ characters: [], activeCharacterId: null } as never}
+          compareOpen={false}
+          onToggleCompare={vi.fn()}
+          onBack={vi.fn()}
+          onDone={vi.fn()}
+          onPackShip={vi.fn()}
+          rigsOf={() => 0}
+          canPack={() => true}
+          name={() => 'Tritanium'}
+          placeLabel={() => 'Jita 4-4'}
+          hueOf={() => 0}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Trips 1–3 · 100 m³ each')).toBeTruthy();
+    expect(screen.getByText('Trip 4 · 50 m³')).toBeTruthy();
+  });
+
   describe('Pack instead', () => {
     const shipPlan = {
       ...plan,
@@ -111,6 +140,46 @@ describe('PlanResult', () => {
 
     it('names each ship being flown beside the cargo trips', () => {
       setup(0);
+      expect(screen.getByText('Fly Badger')).toBeTruthy();
+    });
+
+    it('still names the ship when nothing is hauled', () => {
+      const none = {
+        ...shipPlan,
+        totals: { ...shipPlan.totals, totalM3: 0, trips: null },
+        perCharacter: [
+          {
+            ...shipPlan.perCharacter[0],
+            totalM3: 0,
+            pickups: [{ ...shipPlan.perCharacter[0].pickups[0], totalM3: 0 }],
+          },
+        ],
+        suggested: null,
+        comparison: [],
+      } as MovePlan;
+      render(
+        <MemoryRouter>
+          <PlanResult
+            state={{
+              plan: none,
+              destinationSystem: null,
+              destinationStation: 'Amarr VIII',
+              pickupSystems: new Map(),
+            }}
+            scope={{ characters: [], activeCharacterId: null } as never}
+            compareOpen={false}
+            onToggleCompare={vi.fn()}
+            onBack={vi.fn()}
+            onDone={vi.fn()}
+            onPackShip={vi.fn()}
+            rigsOf={() => 0}
+            canPack={() => true}
+            name={() => 'Badger'}
+            placeLabel={() => 'Jita 4-4'}
+            hueOf={() => 0}
+          />
+        </MemoryRouter>
+      );
       expect(screen.getByText('Fly Badger')).toBeTruthy();
     });
 
