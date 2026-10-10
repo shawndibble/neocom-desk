@@ -2317,6 +2317,8 @@
       "basisRigOnly": "Matches the rig bonus alone",
       "basisWithHull": "Matches rigs plus the structure's own bonus",
       "use": "Use this fit",
+      "matchCount_one": "{{count}} rig fit matches",
+      "matchCount_other": "{{count}} rig fits match",
       "ambiguous": "More than one fit matches. Pick the one that fits what you see in the structure's fitting window."
     },
     "rigMeT1": "ME I",
