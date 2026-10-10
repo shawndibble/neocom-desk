@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -209,6 +209,22 @@ describe('OrderDetailModal', () => {
     expandAll();
     await user.click(screen.getByRole('button', { name: 'Refresh system & region prices' }));
     expect(onCheckDeeper).toHaveBeenCalledTimes(1);
+  });
+
+  it('moves focus to the who-is-cheaper table when the refresh button unmounts itself', async () => {
+    const user = userEvent.setup();
+    renderModal({ stationChecked: true });
+    expandAll();
+    await user.click(screen.getByRole('button', { name: 'Refresh system & region prices' }));
+    expect(screen.getByRole('table', { name: 'Who is cheaper, and where' })).toHaveFocus();
+  });
+
+  it('announces the checking text through a status region while the deep load runs', async () => {
+    renderModal({ stationChecked: true, loadingDeep: true });
+    expandAll();
+    await waitFor(() =>
+      expect(screen.getAllByRole('status').some((el) => el.textContent === 'Checking…')).toBe(true)
+    );
   });
 
   it('renders an unresolved system scope as "not checked" rather than clean, once the region book is in but my own system could not be recovered', () => {
@@ -796,7 +812,9 @@ describe('OrderDetailModal', () => {
       const quickAnswer = screen.getByText('Quick answer').closest('section')!;
       await user.click(within(quickAnswer).getByRole('button', { name: /449\.90/ }));
       expect(written).toEqual(['449.90']);
-      expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
+      expect(
+        screen.getAllByRole('status').some((el) => el.textContent === 'Copied to clipboard')
+      ).toBe(true);
 
       configureClipboard(null);
     });
