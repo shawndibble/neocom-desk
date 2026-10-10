@@ -99,12 +99,12 @@ describe('Toast', () => {
       act(() => {
         vi.advanceTimersByTime(5_000);
       });
-      fireEvent.mouseEnter(toast);
+      fireEvent.pointerEnter(toast, { pointerType: 'mouse' });
       act(() => {
         vi.advanceTimersByTime(60_000);
       });
       expect(onClose).not.toHaveBeenCalled();
-      fireEvent.mouseLeave(toast);
+      fireEvent.pointerLeave(toast, { pointerType: 'mouse' });
       act(() => {
         vi.advanceTimersByTime(2_999);
       });

@@ -112,12 +112,13 @@ export function Toast({ message, undo, action, onClose, durationMs = TOAST_MS }:
     <div
       ref={rootRef}
       className="bg-panel border-line text-text fixed bottom-32 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-lg md:bottom-16"
-      onMouseEnter={() => setHeld(true)}
-      onMouseLeave={() => setHeld(false)}
+      // Mouse only: a tap emulates mouseenter and nothing ever sends the leave.
+      onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
+      onPointerLeave={(e) => e.pointerType === 'mouse' && setHeld(false)}
       onFocus={(e) => {
         const from = e.relatedTarget;
-        if (from instanceof HTMLElement && !rootRef.current?.contains(from)) {
-          cameFrom.current = from;
+        if (!rootRef.current?.contains(from)) {
+          cameFrom.current = from instanceof HTMLElement ? from : null;
         }
         setHeld(true);
       }}
