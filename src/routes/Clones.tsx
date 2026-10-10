@@ -795,14 +795,9 @@ export function Clones() {
                   options={CLONES_SORTS.map((value) => ({
                     value,
                     label: t(`clones.sort.${value}`),
-                    ...(value === 'training' && !showTraining
-                      ? {
-                          disabled: true,
-                          disabledReason:
-                            verdictCard?.kind === 'note'
-                              ? verdictCard.message
-                              : t('clones.verdict.noteQueue'),
-                        }
+                    // Only a note card means "no verdict"; null is still loading.
+                    ...(value === 'training' && verdictCard?.kind === 'note'
+                      ? { disabled: true, disabledReason: verdictCard.message }
                       : {}),
                   }))}
                 />
