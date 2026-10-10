@@ -120,7 +120,7 @@ export function PermissionsPanel() {
                 </Button>
                 <Button
                   size="sm"
-                  disabled={chosen.length === 0}
+                  aria-disabled={chosen.length === 0}
                   onClick={() => setPicked(new Set())}
                 >
                   {t('settings.permissions.selectNone')}

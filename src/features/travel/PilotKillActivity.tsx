@@ -20,6 +20,7 @@ import {
 import { resolveStanding } from '@/engine/pilotList/standing';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useNow } from '@/lib/useNow';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadViewerContext, type ViewerContext } from './pilotListData';
@@ -65,6 +66,15 @@ export function PilotKillActivityView({
     };
   }, [kills, now]);
 
+  const [resultRef, , holdFocus] = useRetryFocus<HTMLElement>(
+    history.kind === 'loading'
+      ? 'busy'
+      : history.kind === 'failed' || view === null
+        ? 'failed'
+        : 'ok',
+    null
+  );
+
   const heading = (
     <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
       {t('travel.pilot.activity.title')}
@@ -73,7 +83,7 @@ export function PilotKillActivityView({
 
   if (history.kind === 'loading') {
     return (
-      <section className="space-y-2">
+      <section ref={resultRef} tabIndex={-1} className="space-y-2 outline-none">
         {heading}
         <Spinner label={t('common.loading')} />
       </section>
@@ -81,11 +91,17 @@ export function PilotKillActivityView({
   }
   if (history.kind === 'failed' || view === null) {
     return (
-      <section className="space-y-2">
+      <section ref={resultRef} tabIndex={-1} className="space-y-2 outline-none">
         {heading}
         <p className="flex flex-wrap items-center gap-3 text-sm text-text-dim">
           {t('travel.pilot.activity.failed')}
-          <Button size="sm" onClick={onRetry}>
+          <Button
+            size="sm"
+            onClick={() => {
+              holdFocus();
+              onRetry();
+            }}
+          >
             {t('travel.pilot.retry')}
           </Button>
         </p>
@@ -94,7 +110,7 @@ export function PilotKillActivityView({
   }
   if (history.kills.length === 0) {
     return (
-      <section className="space-y-2">
+      <section ref={resultRef} tabIndex={-1} className="space-y-2 outline-none">
         {heading}
         <p className="text-sm text-text-dim">{t('travel.pilot.activity.empty')}</p>
       </section>
@@ -110,8 +126,10 @@ export function PilotKillActivityView({
 
   return (
     <section
+      ref={resultRef}
+      tabIndex={-1}
       aria-label={t('travel.pilot.activity.title')}
-      className="@container/kills flex h-full flex-col gap-2.5 rounded-xs border border-line bg-panel px-3.5 py-3"
+      className="@container/kills flex h-full flex-col gap-2.5 rounded-xs border border-line bg-panel px-3.5 py-3 outline-none"
     >
       <div className="flex items-baseline justify-between gap-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         <h3>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { Caret } from './Disclosure';
 import { IconButton } from './IconButton';
 import { Panel } from './Panel';
@@ -36,6 +36,8 @@ interface CollapsiblePanelProps {
    * for figures. `meta` stays the one-line read.
    */
   collapsedSummary?: ReactNode;
+  /** The caret button, for a caller that must put focus back on it after folding the panel. */
+  toggleRef?: Ref<HTMLButtonElement>;
   className?: string;
   children: ReactNode;
 }
@@ -64,6 +66,7 @@ export function CollapsiblePanel({
   padded = true,
   collapsible = true,
   collapsedSummary,
+  toggleRef,
   className,
   children,
 }: CollapsiblePanelProps) {
@@ -81,6 +84,7 @@ export function CollapsiblePanel({
           {actions}
           {collapsible && (
             <IconButton
+              ref={toggleRef}
               size="sm"
               icon={<Caret expanded={open} />}
               label={open ? labels.hide : labels.show}

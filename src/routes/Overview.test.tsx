@@ -8,6 +8,7 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { selectActiveEntryFromSorted, sortQueueEntries, selectQueueDepth } from './overviewQueue';
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
@@ -188,7 +189,26 @@ const OPEN_ORDER = {
   is_corporation: false,
 };
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render, so no test pays for the worker's first `App` render
+  // (lazy route chunks, jsdom, React warm-up) inside a 1s `findBy` wait.
+  await routeChunks.loadOverview();
+  await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
+  await db.tokens.put({
+    characterId: CHAR_ID,
+    accessToken: 'access-token-91',
+    refreshToken: 'refresh-91',
+    expiresAt: Date.now() + 3_600_000,
+    scopes: ['esi-wallet.read_character_wallet.v1'],
+  });
+  await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
+  window.history.pushState({}, '', '/overview');
+  const { unmount } = render(<App />);
+  await screen.findByRole('heading', { name: 'Pilot One' }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+}, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {
