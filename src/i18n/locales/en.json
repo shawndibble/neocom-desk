@@ -4672,7 +4672,8 @@
     "tabs": {
       "items": "Items",
       "ships": "Ships",
-      "move": "Move"
+      "move": "Move",
+      "targets": "Targets"
     },
     "movePlan": {
       "title": "Plan a move",
@@ -8445,7 +8446,7 @@
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
-            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Mining Survey: the survey links you created or opened.",
+            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure, and your stock lists with their stock targets. Mining Survey: the survey links you created or opened.",
             "layout": "Layout: hidden and reordered Overview cards, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }
@@ -10290,6 +10291,107 @@
         "region": "Region",
         "pending": "RSVP pending"
       }
+    }
+  },
+  "stockTargets": {
+    "status": {
+      "out": "Out",
+      "low": "Low",
+      "ok": "OK",
+      "over": "Over"
+    },
+    "emptyTitle": "No stock lists yet",
+    "emptyHint": "Make a list of what you want kept on hand, such as a market you stock, and see what is missing and what is running low across all your characters.",
+    "listEmptyTitle": "This list has no items",
+    "listEmptyHint": "Paste the items and how many of each to keep on hand.",
+    "filteredEmpty": "No items have that status",
+    "loadFailedHint": "Your assets or orders could not be read. Try again in a moment.",
+    "incomplete": "Some characters could not be read, so these counts are at least: {{names}}",
+    "liveSummary": "{{out}} out, {{low}} low",
+    "filterLabel": "Status",
+    "filterAll": "All",
+    "list": {
+      "pickerLabel": "Stock list",
+      "actionsLabel": "Actions for {{name}}",
+      "new": "New list…",
+      "newTitle": "New stock list",
+      "create": "Create",
+      "renameEllipsis": "Rename…",
+      "renameTitle": "Rename stock list",
+      "rename": "Rename",
+      "deleteEllipsis": "Delete…",
+      "deleteTitle": "Delete stock list",
+      "deleteConfirm": "Delete \"{{name}}\" and its stock targets? Your assets are not touched.",
+      "deleteAction": "Delete",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Home market"
+    },
+    "countAt": {
+      "label": "Count stock at",
+      "anywhere": "Counted anywhere",
+      "at": "Counted at {{name}}"
+    },
+    "add": {
+      "open": "Add items…",
+      "title": "Add items to {{name}}",
+      "label": "One item per line, with how many to keep on hand",
+      "placeholder": "Catalyst 40\nAntimatter Charge M x 20000\nNanite Repair Paste\t1500",
+      "unmatched_one": "{{count}} line did not match an item and is left in the box.",
+      "unmatched_other": "{{count}} lines did not match an item and are left in the box.",
+      "confirm": "Add"
+    },
+    "summary": {
+      "out": "Out",
+      "low": "Low",
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items",
+      "costToFill": "Cost to fill",
+      "costToFillHint": "Every shortfall at the lowest sell price at {{hub}}. Items with no price there are left out."
+    },
+    "view": {
+      "label": "View",
+      "manager": "Manager",
+      "builder": "Builder"
+    },
+    "table": {
+      "label": "Stock targets",
+      "item": "Item",
+      "target": "Target",
+      "targetAffix": "Target",
+      "targetFor": "Stock target for {{name}}",
+      "editTargetFor": "Edit stock target for {{name}}",
+      "onHand": "On hand",
+      "onHandAffix": "on hand",
+      "shortfall": "Short",
+      "shortfallAffix": "short",
+      "none": "None",
+      "costToFill": "Cost to fill",
+      "noPrice": "No price",
+      "status": "Status",
+      "remove": "Remove from list"
+    },
+    "builder": {
+      "canBuild": "You can build now · {{count}}",
+      "canBuildLabel": "Short items you hold a blueprint for",
+      "needs": "Needs a blueprint or a buy · {{count}}",
+      "needsLabel": "Short items with no blueprint",
+      "noneBuildable": "None of the short items",
+      "noneBuildableHint": "The active character holds no blueprint for anything this list is short of.",
+      "nothingShort": "Nothing on this list is short.",
+      "blueprint": "Your blueprint",
+      "noBlueprint": "No blueprint",
+      "bpo": "BPO ME {{me}} / TE {{te}}",
+      "bpc_one": "BPC {{count}} run, ME {{me}}",
+      "bpc_other": "BPC {{count}} runs, ME {{me}}",
+      "timePerRun": "Time / run",
+      "timePerRunHint": "The blueprint's time with its own TE, before skills and the facility.",
+      "perRunAffix": "per run",
+      "shortAffix": "short",
+      "marketValue": "Market value",
+      "addToGroup_one": "Add {{count}} to a Build Group…",
+      "addToGroup_other": "Add {{count}} to a Build Group…",
+      "groupTitle": "New Build Group",
+      "groupConfirm": "Create group"
     }
   }
 }

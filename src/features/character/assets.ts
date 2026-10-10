@@ -35,6 +35,8 @@ export interface OtherCharacterAssets {
 export interface FannedOutCharacterAssets extends OtherCharacterAssets {
   /** Pages were capped or missing — this Character's list is short, so anything derived from it is a floor. */
   truncated: boolean;
+  /** When this Character's list was read from ESI, so a total can say how old it is. */
+  fetchedAt?: Date;
 }
 
 /** A Character whose assets could not be read at all: no scope, nothing cached, or a failed call. */
@@ -72,7 +74,13 @@ async function fanOutCharacterAssets(
     try {
       const { cached } = await loadCharacterAssets(characterId);
       if (cached) {
-        entries.push({ characterId, name, assets: cached.data, truncated: cached.truncated });
+        entries.push({
+          characterId,
+          name,
+          assets: cached.data,
+          truncated: cached.truncated,
+          fetchedAt: cached.fetchedAt,
+        });
       } else {
         skipped.push({ characterId, name });
       }

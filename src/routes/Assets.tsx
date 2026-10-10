@@ -133,6 +133,7 @@ import { hasItemRows } from '@/features/character/assetBrowserFormat';
 import { OreItemMenu } from '@/features/assets/oreDecision/OreItemMenu';
 import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { StockTargetsTab } from '@/features/stockTargets/StockTargetsTab';
 import { useItemActions } from '@/features/market/itemActions';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { addQuickbarItem } from '@/features/market/quickbar';
@@ -1788,6 +1789,8 @@ export function Assets() {
               route={assetsRoute}
             />
           )}
+
+          {tab === 'targets' && <StockTargetsTab activeCharacterId={activeCharacterId} />}
 
           {tab === 'move' && (
             <MovePlanTab
