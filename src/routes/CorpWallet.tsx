@@ -27,7 +27,7 @@ import {
   interactiveClassName,
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import {
@@ -184,6 +184,7 @@ function CorpDivisionsPanel({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const [expanded, setExpanded] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const walletsResult = balances?.walletsResult.cached ?? null;
   const selectedEntry = divisions.find((entry) => entry.division === selected) ?? divisions[0];
   // Seven full-width cards push the journal below the fold on a phone: fold to
@@ -199,6 +200,7 @@ function CorpDivisionsPanel({
       actions={walletsResult ? <DataAgeBadge date={walletsResult.fetchedAt} /> : undefined}
       expanded={expanded}
       onToggle={() => setExpanded((open) => !open)}
+      toggleRef={toggleRef}
       collapsible={foldable}
       labels={{ show: t('corp.wallet.divisionsShow'), hide: t('corp.wallet.divisionsHide') }}
       collapsedSummary={
@@ -242,6 +244,7 @@ function CorpDivisionsPanel({
                   onClick={() => {
                     onSelect(entry.division);
                     setExpanded(false);
+                    toggleRef.current?.focus();
                   }}
                   className={cx(
                     'min-h-11 rounded-xs border border-line px-3 py-2 text-left',

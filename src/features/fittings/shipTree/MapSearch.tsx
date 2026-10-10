@@ -5,12 +5,13 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SearchInput } from '@/components/ui';
+import { LiveStatus, SearchInput } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import type { ShipTreeData, ShipTreeShip } from '@/sde/types';
 import { FlyDot } from './FlyDot';
+import { flyLabel } from './flyLabel';
 import { searchHulls } from './shipTreeModel';
 
 export function MapSearch({
@@ -67,30 +68,37 @@ export function MapSearch({
           if (e.key === 'Escape') setQuery('');
         }}
       />
+      <LiveStatus>
+        {query.trim() !== '' && t('ships.tree.searchCount', { count: results.length })}
+      </LiveStatus>
       {results.length > 0 && (
         <ul
           aria-label={t('ships.tree.searchResults')}
           className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-xs border border-line-bright bg-panel py-1 shadow-lg shadow-black/50"
         >
-          {results.map((s) => (
-            <li key={s.typeID}>
-              <button
-                type="button"
-                onClick={() => pick(s)}
-                className={cx(
-                  'flex w-full items-center gap-2 px-2 py-1 text-left text-sm',
-                  rowInteractiveClassName,
-                  focusRingInsetClassName
-                )}
-              >
-                <FlyDot status={statuses.get(s.typeID)} />
-                <span className="flex-1 truncate">{s.name}</span>
-                <span className="text-xs text-text-dim">
-                  {data.groups[String(s.treeGroupID)]?.name}
-                </span>
-              </button>
-            </li>
-          ))}
+          {results.map((s) => {
+            const status = statuses.get(s.typeID);
+            return (
+              <li key={s.typeID}>
+                <button
+                  type="button"
+                  onClick={() => pick(s)}
+                  className={cx(
+                    'flex w-full items-center gap-2 px-2 py-1 text-left text-sm',
+                    rowInteractiveClassName,
+                    focusRingInsetClassName
+                  )}
+                >
+                  <FlyDot status={status} />
+                  {status && <span className="sr-only">{flyLabel(t, status)}</span>}
+                  <span className="flex-1 truncate">{s.name}</span>
+                  <span className="text-xs text-text-dim">
+                    {data.groups[String(s.treeGroupID)]?.name}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

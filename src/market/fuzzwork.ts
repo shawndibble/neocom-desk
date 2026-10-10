@@ -113,3 +113,37 @@ export async function fetchAggregates(
 
   return result;
 }
+
+/** How crowded one station's market is for a type right now: open orders and the units they hold. */
+export interface HubOrderCounts {
+  buyOrders: number;
+  sellOrders: number;
+  buyVolume: number;
+  sellVolume: number;
+}
+
+/**
+ * Open buy/sell order counts at one station, per type. Unlike `fetchAggregates`
+ * this keeps the counts themselves (ESI's market history only counts traded
+ * orders, and per region — never per hub). A type with no orders, or no entry,
+ * reads as zero rather than unknown: Fuzzwork answers for every type it was asked.
+ */
+export async function fetchOrderCounts(
+  stationId: number,
+  typeIds: number[]
+): Promise<Map<number, HubOrderCounts>> {
+  const result = new Map<number, HubOrderCounts>();
+  for (const batch of chunk(typeIds, MAX_TYPES_PER_REQUEST)) {
+    const body = await fetchBatch(stationId, batch, 'station');
+    for (const typeId of batch) {
+      const raw = body[String(typeId)];
+      result.set(typeId, {
+        buyOrders: toNumber(raw?.buy?.orderCount),
+        sellOrders: toNumber(raw?.sell?.orderCount),
+        buyVolume: toNumber(raw?.buy?.volume),
+        sellVolume: toNumber(raw?.sell?.volume),
+      });
+    }
+  }
+  return result;
+}

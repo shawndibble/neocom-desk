@@ -115,3 +115,16 @@ describe('ImportClipboardDialog', () => {
     });
   });
 });
+
+describe('ImportClipboardDialog announcements', () => {
+  it('announces the preview summary and keeps focus on Parse', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.type(screen.getByLabelText(/paste an eft fit/i), 'Not A Skill 4');
+    const parse = screen.getByRole('button', { name: 'Parse' });
+    await user.click(parse);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/1 errors?/i));
+    expect(screen.getByRole('status')).toHaveClass('sr-only');
+    expect(parse).toHaveFocus();
+  });
+});

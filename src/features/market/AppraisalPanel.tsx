@@ -17,6 +17,7 @@
  * `Panel` above an optional, foldable Compare Hubs section once something
  * has been appraised.
  */
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -113,6 +114,7 @@ interface AppraisalPanelProps {
   onPricePercentChange: (value: number) => void;
   /** The hub the figures are quoted at — the panel's own provenance chip, and what a Share Link is stored against. */
   hub: TradeHub;
+  onHubChange: (id: TradeHub['id']) => void;
   /** The active Character's standing toward this hub's NPC station owner, for the net-of-fees chips' broker fee. */
   standing: ResolvedStandings;
   /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
@@ -198,6 +200,7 @@ export function AppraisalPanel({
   pricePercent,
   onPricePercentChange,
   hub,
+  onHubChange,
   standing,
   characterId,
   defaultCompareExpanded = false,
@@ -214,13 +217,22 @@ export function AppraisalPanel({
   const [editingList, setEditingList] = useState(false);
   const [foldOnResult, setFoldOnResult] = useState(false);
   const [foldedFor, setFoldedFor] = useState(result);
+  // The fold unmounts the focused Appraise button; below `lg` the Result heading
+  // takes focus instead (WCAG 2.4.3), which also announces the result.
+  const [focusResultTick, setFocusResultTick] = useState(0);
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   if (result !== foldedFor) {
     setFoldedFor(result);
     if (foldOnResult) {
       setFoldOnResult(false);
       setEditingList(false);
+      if (!isDesktop) setFocusResultTick((n) => n + 1);
     }
   }
+  useEffect(() => {
+    if (focusResultTick > 0) focusAfterCommit(resultHeadingRef);
+  }, [focusResultTick, focusAfterCommit]);
   function appraiseFromForm(run: () => void) {
     setFoldOnResult(true);
     run();
@@ -745,9 +757,25 @@ export function AppraisalPanel({
                 onChange={(event) => handlePercentChange(event.target.value)}
                 className="field-no-spinner w-16 text-right"
               />
-              <span className="text-xs text-text-dim">
-                {t('market.appraisal.pricePercentHint')}
-              </span>
+              <Select
+                value={hub.id}
+                onValueChange={(value) => onHubChange(value as TradeHub['id'])}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('market.tradeHub')}
+                  className="min-w-0 flex-1"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRADE_HUBS.map((h) => (
+                    <SelectItem key={h.id} value={h.id}>
+                      {h.systemName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -813,6 +841,7 @@ export function AppraisalPanel({
       <div className="flex flex-col gap-4">
         <Panel
           title={t('market.appraisal.resultTitle')}
+          headingRef={resultHeadingRef}
           padded={result === null}
           meta={
             result !== null ? (

@@ -33,6 +33,8 @@ describe('buildPlanCompareCsvColumns', () => {
       'industry.csvMarginPct',
       'industry.iskPerHour',
       'industry.breakEvenPrice',
+      'industry.compareHubOrdersPerDay',
+      'industry.compareHubBuyOrders',
     ]);
   });
 
@@ -59,6 +61,8 @@ describe('buildPlanCompareCsvColumns', () => {
       20,
       250_000.5,
       80_000,
+      null,
+      null,
     ]);
   });
 
@@ -71,17 +75,26 @@ describe('buildPlanCompareCsvColumns', () => {
       iskPerHour: null,
       breakEvenPrice: null,
     });
-    expect(columns.slice(5).map((c) => c.value(unpriced))).toEqual([null, null, null, null]);
+    expect(columns.slice(5).map((c) => c.value(unpriced))).toEqual(Array(6).fill(null));
     const failed = row(null, { error: 'boom' });
-    expect(columns.slice(3).map((c) => c.value(failed))).toEqual([
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-    ]);
+    expect(columns.slice(3).map((c) => c.value(failed))).toEqual(Array(8).fill(null));
     const loading = row({ seconds: 60, totalCost: 5 }, { loading: true });
     expect(columns[3].value(loading)).toBeNull();
+  });
+});
+
+describe('buildPlanCompareCsvColumns with a column choice and hub counts', () => {
+  it('exports only the visible columns, in table order, with the hub counts', () => {
+    const columns = buildPlanCompareCsvColumns(t, {
+      visible: ['hubSellOrders', 'profit', 'hubBuyOrders'],
+      hubCounts: () => ({ buyOrders: 28, sellOrders: 44, buyVolume: 1, sellVolume: 2 }),
+    });
+    expect(columns.map((c) => c.header)).toEqual([
+      'industry.comparePlanColumn',
+      'industry.profit',
+      'industry.compareHubBuyOrders',
+      'industry.compareHubSellOrders',
+    ]);
+    expect(columns.map((c) => c.value(row({ profit: 5 })))).toEqual(['Rifter run', 5, 28, 44]);
   });
 });

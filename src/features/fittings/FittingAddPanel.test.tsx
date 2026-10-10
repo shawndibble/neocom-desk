@@ -88,7 +88,7 @@ describe('FittingAddPanel', () => {
     await user.type(screen.getByLabelText('Search items to add'), 'II');
 
     const result = screen.getByRole('button', { name: /Damage Control II/ });
-    expect(result).toBeDisabled();
+    expect(result).toHaveAttribute('aria-disabled', 'true');
     expect(screen.queryByRole('button', { name: /Damage Control I$/ })).not.toBeInTheDocument();
     expect(checkCandidates).not.toHaveBeenCalled();
   });
@@ -139,6 +139,8 @@ describe('FittingAddPanel', () => {
     );
     expect(await screen.findByRole('button', { name: /Damage Control II/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /hidden by filters/ })).not.toBeInTheDocument();
+    // The button left with the filter it lifted; focus lands in the search, not on the body.
+    expect(screen.getByLabelText('Search items to add')).toHaveFocus();
   });
 
   it('keeps the plain no-results wording when nothing matches at all', async () => {
@@ -202,7 +204,7 @@ describe('FittingAddPanel', () => {
     expect(await screen.findByText('Structure Equipment')).toBeInTheDocument();
     // Shown with the Hull filter off, but never addable — the hull refuses it outright.
     const anchoringArray = screen.getByRole('button', { name: /Anchoring Array/ });
-    expect(anchoringArray).toBeDisabled();
+    expect(anchoringArray).toHaveAttribute('aria-disabled', 'true');
     expect(
       within(anchoringArray.closest('li')!).getByRole('button', {
         name: "Can't add: Doesn't fit this hull",
@@ -641,7 +643,7 @@ describe('FittingAddPanel', () => {
 
     await user.type(screen.getByLabelText('Search items to add'), 'Ice Harvesting');
     const row = await screen.findByRole('button', { name: /Ice Harvesting Drone I/ });
-    expect(row).toBeDisabled();
+    expect(row).toHaveAttribute('aria-disabled', 'true');
     expect(
       within(row.closest('li')!).getByRole('button', {
         name: "Can't add: No room in drone bay",
@@ -656,11 +658,13 @@ describe('FittingAddPanel', () => {
     checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
       return new Map(ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: true }]));
     });
-    renderPanel({ target: null, slotFreeFor: () => false });
+    const { onAdd } = renderPanel({ target: null, slotFreeFor: () => false });
 
     await user.type(screen.getByLabelText('Search items to add'), 'Afterburner');
     const row = await screen.findByRole('button', { name: /1MN Afterburner II/ });
-    expect(row).toBeDisabled();
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    await user.click(row);
+    expect(onAdd).not.toHaveBeenCalled();
     expect(
       within(row.closest('li')!).getByRole('button', {
         name: "Can't add: No free mid slot left",

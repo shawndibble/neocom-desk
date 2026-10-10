@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@/i18n';
 import { summarizeSurvey } from '@/engine/survey/series';
+import { db } from '@/db';
 import { SurveyStats } from './SurveyStats';
-import { useDoneAtLocal } from './surveyPref';
+import { useDoneAtOverride } from './surveyPref';
 
 const T0 = Date.UTC(2026, 9, 8, 18);
 const summary = summarizeSurvey([
@@ -13,13 +14,14 @@ const summary = summarizeSurvey([
 
 afterEach(() => {
   cleanup();
-  useDoneAtLocal.setState({ value: false });
+  useDoneAtOverride.setState({ value: null });
+  return db.settings.delete('timeFormat');
 });
 
 describe('SurveyStats Done at', () => {
   it('shows EVE time, and a click switches it to local time and back', async () => {
     render(<SurveyStats summary={summary} />);
-    const button = screen.getByRole('button', { name: /EVE$/ });
+    const button = await screen.findByRole('button', { name: /EVE$/ });
     fireEvent.click(button);
     await waitFor(() => expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull());
     const local = screen.getByRole('button');
@@ -27,6 +29,22 @@ describe('SurveyStats Done at', () => {
     expect(local.className).not.toMatch(/underline/);
     fireEvent.click(local);
     await waitFor(() => expect(screen.getByRole('button', { name: /EVE$/ })).toBeTruthy());
+  });
+});
+
+describe('SurveyStats Done at default', () => {
+  it('follows the time format chosen in Settings', async () => {
+    await db.settings.put({ key: 'timeFormat', value: 'local' });
+    render(<SurveyStats summary={summary} />);
+    // Never EVE first: the tile waits for the stored choice instead of flashing the default.
+    expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull();
+    await waitFor(() => expect(screen.getByRole('button')).toBeTruthy());
+    expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull();
+  });
+
+  it('keeps EVE time when Settings holds no choice', async () => {
+    render(<SurveyStats summary={summary} />);
+    expect(await screen.findByRole('button', { name: /EVE$/ })).toBeTruthy();
   });
 });
 

@@ -39,6 +39,7 @@ import { isMultiLine, lineAt, namesOf, replaceLine } from '@/engine/pilotList/na
 import { classifyPilotPaste, type PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useTouchContext } from '@/lib/useMediaQuery';
 import type { PilotListState } from '@/lib/shortcuts';
 import { optionalIdParam } from '@/lib/urlState';
@@ -469,20 +470,33 @@ function PilotResult({
     };
   }, [characterId, attempt, onResolved]);
 
+  const [resultRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
+    profile.kind === 'loading' ? 'busy' : profile.kind === 'failed' ? 'failed' : 'ok',
+    null
+  );
+
   function retry() {
+    holdFocus();
     setProfile({ kind: 'loading' });
     setAttempt((n) => n + 1);
   }
 
+  // One wrapper in every state, so focus on Retry has somewhere to stay while the profile loads.
+  const wrap = (children: ReactNode) => (
+    <div ref={resultRef} tabIndex={-1} className="outline-none">
+      {children}
+    </div>
+  );
+
   if (profile.kind === 'loading') {
-    return (
+    return wrap(
       <div className="flex justify-center py-10">
         <Spinner label={t('common.loading')} />
       </div>
     );
   }
   if (profile.kind === 'failed') {
-    return (
+    return wrap(
       <EmptyState
         title={t('travel.pilot.profileFailedTitle')}
         hint={t('travel.pilot.profileFailedHint')}
@@ -495,11 +509,11 @@ function PilotResult({
     );
   }
   if (profile.kind === 'unknown') {
-    return (
+    return wrap(
       <EmptyState title={t('travel.pilot.unknownTitle')} hint={t('travel.pilot.unknownHint')} />
     );
   }
-  return (
+  return wrap(
     <Panel actions={<DataAgeBadge date={profile.fetchedAt} alwaysVisible />}>
       <PilotProfileView profile={profile.profile} />
     </Panel>
