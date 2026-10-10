@@ -416,7 +416,9 @@ describe('Layout desktop rail domain grouping', () => {
     const rail = screen.getByRole('navigation', { name: 'Main navigation' });
     // A page row is its link (the caret beside it is a button); the last child
     // is the rail editor's button, not a page.
+    // Each labelled group wraps its pages in a role=group div: flatten those.
     const items = Array.from(rail.children)
+      .flatMap((el) => (el.getAttribute('role') === 'group' ? Array.from(el.children) : [el]))
       .filter((el) => el.tagName !== 'BUTTON')
       .map((el) =>
         el.tagName === 'P'

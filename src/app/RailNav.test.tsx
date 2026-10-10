@@ -128,6 +128,13 @@ describe('the rail', () => {
     expect(within(rail()).getByRole('button', { name: /more page/ })).toBeInTheDocument();
   });
 
+  it('groups the rail’s pages under their labels', () => {
+    renderAt('/overview');
+
+    const economy = within(rail()).getByRole('group', { name: /economy/i });
+    expect(within(economy).getByRole('link', { name: 'Market' })).toBeInTheDocument();
+  });
+
   it('starts a new pilot on the eight-page default, the rest behind "N more pages"', async () => {
     const user = userEvent.setup();
     useHiddenNav.setState({ value: defaultHiddenNav() });

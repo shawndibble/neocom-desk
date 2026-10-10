@@ -377,7 +377,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
               className="sticky -top-3 z-20 -mx-3 bg-panel px-3 pt-3 pb-1 sm:static sm:mx-0 sm:p-0"
             >
               <div className="flex flex-col gap-2 rounded-xs border border-accent-dim bg-accent/10 p-3">
-                <h3 className="text-xs font-semibold tracking-wide text-accent uppercase">
+                <h3 className="text-xs font-semibold tracking-wide text-text-dim uppercase">
                   {t('assets.movePlan.deliverTo')}
                 </h3>
                 <SolarSystemPicker

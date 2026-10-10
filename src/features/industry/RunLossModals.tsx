@@ -107,7 +107,7 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
                   <ul
                     className="space-y-1"
                     role="radiogroup"
-                    aria-label={t('industry.lossInsurance')}
+                    aria-label={t('industry.lossInsuranceWalletPick')}
                   >
                     {dialog.journal.map((entry) => (
                       <li key={entry.id}>

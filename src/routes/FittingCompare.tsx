@@ -197,7 +197,10 @@ export function FittingCompare() {
           <span className="text-danger">{t(`fittings.load.shareError.${slot.shareError}`)}</span>
           <IconButton
             icon={<Icon.Close />}
-            label={t('fittings.compare.remove')}
+            label={t('fittings.compare.removeNamed', {
+              name: t(`fittings.load.shareError.${slot.shareError}`),
+            })}
+            tooltip={t('fittings.compare.remove')}
             onClick={() => removeSlot(index)}
             tone="danger"
           />
@@ -252,7 +255,10 @@ export function FittingCompare() {
         <div className="flex items-center gap-1">
           <IconButton
             icon={<Icon.Close />}
-            label={t('fittings.compare.remove')}
+            label={t('fittings.compare.removeNamed', {
+              name: name || t('fittings.compare.slotFallback', { n: index + 1 }),
+            })}
+            tooltip={t('fittings.compare.remove')}
             onClick={() => removeSlot(index)}
             tone="danger"
           />
