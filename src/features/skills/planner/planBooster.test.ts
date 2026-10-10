@@ -7,9 +7,12 @@ import {
   clampBoosterBonus,
   clampBoosterOverlaps,
   hasOverlappingBoosters,
-  boosterExpiryFromInput,
+  boosterDurationBase,
+  joinBoosterDuration,
+  linkBoosterChain,
+  rebaseBooster,
+  splitBoosterDuration,
   boosterExpiryFromNow,
-  boosterExpiryToInput,
   normalizePlanBoosterRow,
   normalizePlanBoosters,
   resolvePlanBoosters,
@@ -268,26 +271,96 @@ describe('toBoosters', () => {
   });
 });
 
-describe('booster instant <-> datetime-local input', () => {
-  it('round-trips an instant through the input value', () => {
-    const instant = new Date(2026, 8, 10, 14, 30).getTime();
-    const input = boosterExpiryToInput(instant);
-    expect(input).toBe('2026-09-10T14:30');
-    expect(boosterExpiryFromInput(input)).toBe(instant);
+describe('booster duration <-> days/hours/minutes', () => {
+  const NOW = Date.UTC(2026, 8, 10, 12, 0, 0);
+  const MIN = 60 * 1000;
+
+  it('splits the time left into the units EVE shows', () => {
+    const expiresAt = NOW + (2 * 24 * 60 + 5 * 60 + 7) * MIN;
+    expect(splitBoosterDuration(expiresAt, null, NOW)).toEqual({ days: 2, hours: 5, minutes: 7 });
   });
 
-  it('pads every field so the control accepts the value', () => {
-    expect(boosterExpiryToInput(new Date(2026, 0, 2, 3, 4).getTime())).toBe('2026-01-02T03:04');
+  it('rounds a part-minute up, so a just-set duration does not read one minute short', () => {
+    expect(splitBoosterDuration(NOW + 24 * 60 * MIN - 1000, null, NOW)).toEqual({
+      days: 1,
+      hours: 0,
+      minutes: 0,
+    });
   });
 
-  it('maps "no instant" to an empty control and back', () => {
-    expect(boosterExpiryToInput(null)).toBe('');
-    expect(boosterExpiryFromInput('')).toBe(null);
+  it('reads a lapsed expiry as zero', () => {
+    expect(splitBoosterDuration(NOW - 5 * MIN, null, NOW)).toEqual({
+      days: 0,
+      hours: 0,
+      minutes: 0,
+    });
   });
 
-  it('reads a half-typed or nonsense value as no instant', () => {
-    expect(boosterExpiryFromInput('2026-09')).toBe(null);
-    expect(boosterExpiryFromInput('not a date')).toBe(null);
+  it('measures a queued row from its own start, not from now', () => {
+    const start = NOW + 10 * 24 * 60 * MIN;
+    expect(splitBoosterDuration(start + 30 * 24 * 60 * MIN, start, NOW).days).toBe(30);
+  });
+
+  it('round-trips through joinBoosterDuration', () => {
+    const duration = { days: 3, hours: 4, minutes: 5 };
+    expect(splitBoosterDuration(NOW + joinBoosterDuration(duration), null, NOW)).toEqual(duration);
+  });
+
+  it('counts a start already past as now', () => {
+    expect(boosterDurationBase(NOW - 1000, NOW)).toBe(NOW);
+    expect(boosterDurationBase(null, NOW)).toBe(NOW);
+  });
+});
+
+describe('linkBoosterChain', () => {
+  const NOW = Date.UTC(2026, 8, 10, 12, 0, 0);
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('starts each queued row where the one before it expires, keeping its length', () => {
+    const rows = [
+      booster({ enabled: true, startsAt: null, expiresAt: NOW + 5 * DAY }),
+      booster({ enabled: true, startsAt: NOW + 2 * DAY, expiresAt: NOW + 32 * DAY }),
+    ];
+    expect(linkBoosterChain(rows, NOW)).toEqual([
+      rows[0],
+      { ...rows[1], startsAt: NOW + 5 * DAY, expiresAt: NOW + 35 * DAY },
+    ]);
+  });
+
+  it('leaves a row behind one with no expiry alone', () => {
+    const rows = [
+      booster({ enabled: true, startsAt: null, expiresAt: null }),
+      booster({ enabled: true, startsAt: null, expiresAt: NOW + DAY }),
+    ];
+    expect(linkBoosterChain(rows, NOW)).toEqual(rows);
+  });
+
+  it('never touches the first row', () => {
+    const rows = [booster({ enabled: true, startsAt: NOW + DAY, expiresAt: NOW + 2 * DAY })];
+    expect(linkBoosterChain(rows, NOW)).toEqual(rows);
+  });
+});
+
+describe('rebaseBooster', () => {
+  const NOW = Date.UTC(2026, 8, 10, 12, 0, 0);
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('keeps an expiry-less row expiry-less', () => {
+    expect(rebaseBooster(booster({ enabled: true }), NOW + DAY, NOW).expiresAt).toBeNull();
+  });
+
+  it('keeps the full length of a row whose start has already passed', () => {
+    const row = booster({ enabled: true, startsAt: NOW - 10 * DAY, expiresAt: NOW + 20 * DAY });
+    expect(rebaseBooster(row, NOW + 3 * DAY, NOW).expiresAt).toBe(NOW + 33 * DAY);
+  });
+
+  it('starts a queued row from now, with the same length', () => {
+    const row = booster({ enabled: true, startsAt: NOW + 5 * DAY, expiresAt: NOW + 35 * DAY });
+    expect(rebaseBooster(row, null, NOW)).toEqual({
+      ...row,
+      startsAt: null,
+      expiresAt: NOW + 30 * DAY,
+    });
   });
 });
 
@@ -324,21 +397,20 @@ describe('resolvePlanBoosters', () => {
 });
 
 describe('boosterExpiryFromNow', () => {
+  const now = Date.UTC(2026, 8, 10, 12, 0, 0);
+
   it('is now plus the duration, in hours', () => {
-    const now = Date.UTC(2026, 8, 10, 12, 0, 0);
-    expect(boosterExpiryFromNow(1, now)).toBe(now + 60 * 60 * 1000);
-    expect(boosterExpiryFromNow(24, now)).toBe(now + 24 * 60 * 60 * 1000);
+    expect(boosterExpiryFromNow(1, null, now)).toBe(now + 60 * 60 * 1000);
+    expect(boosterExpiryFromNow(24, null, now)).toBe(now + 24 * 60 * 60 * 1000);
   });
 
-  it('measures from a given instant, not necessarily now — a row with its own future start', () => {
+  it('measures from the row’s own future start, not from now', () => {
     const futureStart = Date.UTC(2027, 0, 1);
-    expect(boosterExpiryFromNow(1, futureStart)).toBe(futureStart + 60 * 60 * 1000);
+    expect(boosterExpiryFromNow(1, futureStart, now)).toBe(futureStart + 60 * 60 * 1000);
   });
 
-  it('defaults to the real clock when no instant is given', () => {
-    const before = Date.now();
-    const result = boosterExpiryFromNow(1);
-    expect(result).toBeGreaterThanOrEqual(before + 60 * 60 * 1000);
+  it('measures from now when the row’s start has already passed', () => {
+    expect(boosterExpiryFromNow(1, now - 1000, now)).toBe(now + 60 * 60 * 1000);
   });
 });
 

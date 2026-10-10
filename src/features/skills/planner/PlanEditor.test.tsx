@@ -6,7 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { SkillType } from '@/sde/types';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
-import { db, type SkillPlanRecord } from '@/db';
+import { db, type PlanBooster, type SkillPlanRecord } from '@/db';
 import type { CachedResult } from '@/features/skills/data';
 import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -1577,6 +1577,8 @@ describe('PlanEditor booster market link (issue #407)', () => {
  * control they already know, editable, and the one field the app cannot read —
  * the expiry — is called out rather than invented.
  */
+const DAY = 24 * 60 * 60 * 1000;
+
 describe('a cerebral accelerator detected in the ESI sheet', () => {
   const ACCELERATED = {
     kind: 'accelerated' as const,
@@ -1601,7 +1603,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('');
+    expect(screen.getByLabelText<HTMLInputElement>('Days').value).toBe('');
     expect(screen.getByText(/costed as if you had none/i)).toBeInTheDocument();
   });
 
@@ -1635,7 +1637,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
+    await user.type(screen.getByLabelText('Days'), '5');
 
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
   });
@@ -1648,7 +1650,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
 
     await user.click(screen.getByRole('button', { name: '+12h' }));
 
-    expect(screen.getByLabelText<HTMLInputElement>('Expires').value).not.toBe('');
+    expect(screen.getByLabelText<HTMLInputElement>('Hours').value).toBe('12');
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
   });
 });
@@ -1720,28 +1722,21 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     });
   });
 
-  it('stores the expiry as the instant the control names, not its wall-clock text', async () => {
+  it('stores the time left as the instant that long from now, not as the typed text', async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
     await openTools(user);
     await openAssumptions(user);
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
-    await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
+    const before = Date.now();
+    await user.type(screen.getByLabelText('Days'), '3');
 
-    // Local time, because that is what a datetime-local control means — and
-    // an instant, because the plan syncs to devices in other timezones.
-    expect(onUpdate).toHaveBeenLastCalledWith({
-      boosters: [
-        {
-          enabled: true,
-          bonus: 3,
-          startsAt: null,
-          expiresAt: new Date(2099, 0, 1, 0, 0).getTime(),
-        },
-      ],
-    });
-    expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('2099-01-01T00:00');
+    // An instant, because the plan syncs to devices that will read it later.
+    const [update] = onUpdate.mock.calls.at(-1) as [{ boosters: PlanBooster[] }];
+    expect(update.boosters).toHaveLength(1);
+    expect(update.boosters[0].expiresAt).toBeGreaterThanOrEqual(before + 3 * DAY);
+    expect(update.boosters[0].expiresAt).toBeLessThan(before + 3 * DAY + 10_000);
   });
 
   it('reopens on the Booster the plan was saved with', async () => {
@@ -1753,7 +1748,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
           enabled: true,
           bonus: 6,
           startsAt: null,
-          expiresAt: new Date(2099, 5, 2, 13, 45).getTime(),
+          expiresAt: Date.now() + 2 * DAY + 5 * 60 * 60 * 1000 + 30 * 60 * 1000,
         },
       },
     });
@@ -1762,39 +1757,45 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
     expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
     expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('6');
-    expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('2099-06-02T13:45');
+    expect(screen.getByLabelText<HTMLInputElement>('Days').value).toBe('2');
+    expect(screen.getByLabelText<HTMLInputElement>('Hours').value).toBe('5');
   });
 
-  it('does not erase a saved expiry when the control reports an incomplete value', async () => {
-    // The data-loss path: a native datetime-local reports '' for ANY
-    // incomplete state, including a segment cleared to be retyped. Writing
-    // null there would erase the stored expiry, re-cost the plan, and sync
-    // the erasure away.
+  it('does not erase a saved expiry when a box is cleared to be retyped', async () => {
+    // The data-loss path: emptying a box to retype it is not an answer.
+    // Writing null there would erase the stored expiry, re-cost the plan, and
+    // sync the erasure away.
     const user = userEvent.setup();
-    const saved = new Date(2099, 0, 1, 0, 0).getTime();
     const { onUpdate } = renderEditor(vi.fn(), {
-      plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: saved } },
+      plan: {
+        ...PLAN,
+        booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() + 5 * DAY },
+      },
     });
     await openTools(user);
     await openAssumptions(user);
 
-    const expires = screen.getByLabelText<HTMLInputElement>('Expires');
-    await user.clear(expires);
+    const days = screen.getByLabelText<HTMLInputElement>('Days');
+    await user.clear(days);
 
     expect(onUpdate).not.toHaveBeenCalled();
-    expect(expires.value).toBe('');
+    expect(days.value).toBe('');
   });
 
   it('commits an emptied expiry on blur — clearing it IS an answer', async () => {
     const user = userEvent.setup();
-    const saved = new Date(2099, 0, 1, 0, 0).getTime();
     const { onUpdate } = renderEditor(vi.fn(), {
-      plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: saved } },
+      plan: {
+        ...PLAN,
+        booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() + 5 * DAY },
+      },
     });
     await openTools(user);
     await openAssumptions(user);
 
-    await user.clear(screen.getByLabelText('Expires'));
+    await user.clear(screen.getByLabelText('Days'));
+    await user.clear(screen.getByLabelText('Hours'));
+    await user.clear(screen.getByLabelText('Minutes'));
     await user.tab();
 
     expect(onUpdate).toHaveBeenCalledWith({
@@ -1802,36 +1803,28 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     });
   });
 
-  it('replaces a saved expiry in one write, never through a null in between', async () => {
+  it('replaces a saved expiry in one write, never through an expiry of zero in between', async () => {
     const user = userEvent.setup();
-    const saved = new Date(2099, 0, 1, 0, 0).getTime();
     const { onUpdate } = renderEditor(vi.fn(), {
-      plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: saved } },
+      plan: {
+        ...PLAN,
+        booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() + 5 * DAY },
+      },
     });
     await openTools(user);
     await openAssumptions(user);
 
-    const expires = screen.getByLabelText<HTMLInputElement>('Expires');
-    await user.clear(expires);
-    await user.type(expires, '2100-06-02T13:45');
+    const days = screen.getByLabelText<HTMLInputElement>('Days');
+    await user.clear(days);
+    await user.type(days, '4');
     await user.tab();
 
-    // One write, carrying the new instant. The incomplete states the control
-    // reports along the way must not each land on the plan.
-    expect(onUpdate.mock.calls).toEqual([
-      [
-        {
-          boosters: [
-            {
-              enabled: true,
-              bonus: 3,
-              startsAt: null,
-              expiresAt: new Date(2100, 5, 2, 13, 45).getTime(),
-            },
-          ],
-        },
-      ],
-    ]);
+    // One write, carrying the new instant. The emptied box on the way there
+    // must not land on the plan.
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const [update] = onUpdate.mock.calls[0] as [{ boosters: PlanBooster[] }];
+    expect(update.boosters[0].expiresAt).toBeGreaterThan(Date.now() + 4 * DAY - 10_000);
+    expect(update.boosters[0].expiresAt).toBeLessThan(Date.now() + 4 * DAY + 10_000);
   });
 
   it('clamps the bonus where it is written, not only where it is read', async () => {
