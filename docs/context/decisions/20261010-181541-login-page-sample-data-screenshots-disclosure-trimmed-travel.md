@@ -9,7 +9,7 @@ Supersedes the "real captures" and disclosure points of
 - **The gallery is sample data, not a real pilot.** The captures were taken
   from a fictional pilot ("Aurelia Vex") with mocked ESI data through a
   throwaway Playwright spec, so the page no longer says "real screens from a
-  real pilot". A desktop Overview capture now leads the gallery (10 images).
+  real pilot". A desktop Overview capture now leads the gallery (19 images: the Overview board, Survey, fitting, Ship Tree, wallet journal, PI plan, and phone market-by-jumps, route safety, pilot lookup and survey were added).
 - **The write-exceptions paragraph is gone.** It repeated the "Five writes"
   trust card. The read-scope sentence stays (a test pins it to the Base Grant)
   minus its two trailing sentences, which the customize link and the app

@@ -151,7 +151,7 @@ describe('Login', () => {
     renderLogin();
     const gallery = within(await screen.findByRole('region', { name: /see it in action/i }));
     const images = gallery.getAllByRole('img');
-    expect(images).toHaveLength(10);
+    expect(images).toHaveLength(19);
     for (const image of images) {
       expect(image.getAttribute('alt')).toBeTruthy();
       expect(image).toHaveAttribute('loading', 'lazy');

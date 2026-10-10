@@ -176,6 +176,11 @@ const DESKTOP_SCREENSHOTS: Screenshot[] = [
   { file: 'desktop-lp-store', key: 'lpStore', size: DESKTOP_SIZE },
   { file: 'desktop-calendar', key: 'calendar', size: DESKTOP_SIZE },
   { file: 'desktop-contracts', key: 'contracts', size: DESKTOP_SIZE },
+  { file: 'desktop-survey', key: 'survey', size: DESKTOP_SIZE },
+  { file: 'desktop-fitting', key: 'fitting', size: DESKTOP_SIZE },
+  { file: 'desktop-ship-tree', key: 'shipTree', size: DESKTOP_SIZE },
+  { file: 'desktop-wallet-journal', key: 'walletJournal', size: DESKTOP_SIZE },
+  { file: 'desktop-pi-plan', key: 'piPlan', size: DESKTOP_SIZE },
 ];
 
 const PHONE_SCREENSHOTS: Screenshot[] = [
@@ -183,6 +188,10 @@ const PHONE_SCREENSHOTS: Screenshot[] = [
   { file: 'phone-alerts', key: 'phoneAlerts', size: PHONE_SIZE },
   { file: 'phone-wallet', key: 'phoneWallet', size: PHONE_SIZE },
   { file: 'phone-price-history', key: 'phonePriceHistory', size: PHONE_SIZE },
+  { file: 'phone-market-jumps', key: 'phoneMarketJumps', size: PHONE_SIZE },
+  { file: 'phone-route-safety', key: 'phoneRouteSafety', size: PHONE_SIZE },
+  { file: 'phone-pilot-lookup', key: 'phonePilotLookup', size: PHONE_SIZE },
+  { file: 'phone-survey', key: 'phoneSurvey', size: PHONE_SIZE },
 ];
 
 /**

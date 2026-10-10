@@ -3278,6 +3278,42 @@
       "phonePriceHistory": {
         "alt": "A market price history chart on a phone, with daily range, average and volume.",
         "caption": "Price history"
+      },
+      "survey": {
+        "alt": "A Mining Survey: percent of the field mined, volume left over time by ore, mining pace and an estimated finish time.",
+        "caption": "Mining surveys that tell you when the belt is gone"
+      },
+      "fitting": {
+        "alt": "A ship fitting on the ring: modules around a Caracal, with offense, applied DPS against a target profile, powergrid and CPU.",
+        "caption": "Fittings with DPS against a target"
+      },
+      "shipTree": {
+        "alt": "The Ship Tree ladder for one faction, listing each hull with whether you can fly it or how long until you can.",
+        "caption": "Which hulls you can fly, and how long until the rest"
+      },
+      "walletJournal": {
+        "alt": "The wallet journal with links from each line to its contract and the item that was traded.",
+        "caption": "A journal that links to what each line was"
+      },
+      "piPlan": {
+        "alt": "The Planetary Industry plan: ranked products to build, the planet types each one needs and ISK per day.",
+        "caption": "Planetary Industry plans ranked by ISK per day"
+      },
+      "phoneMarketJumps": {
+        "alt": "The market order book on a phone, limited to stations within 15 jumps of a chosen system, with jump counts per order.",
+        "caption": "Market within 15 jumps"
+      },
+      "phoneRouteSafety": {
+        "alt": "Route Safety on a phone: every system on a route with its security, ship kills and jumps in the last hour, and gank chokepoints flagged.",
+        "caption": "Route safety"
+      },
+      "phonePilotLookup": {
+        "alt": "Pilot Lookup on a phone: a pilot’s corporation, threat reading, danger and fleet-size ratios and kills per month by kind of space.",
+        "caption": "Pilot lookup"
+      },
+      "phoneSurvey": {
+        "alt": "A Mining Survey on a phone, with the progress chart and the finish time.",
+        "caption": "Mining survey"
       }
     },
     "featuresHeading": "Everything outside the client",
