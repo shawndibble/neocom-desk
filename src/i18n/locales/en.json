@@ -3997,7 +3997,7 @@
     "oreRocks_other": "{{count}} rocks",
     "oreRow": "{{rocks}} · {{volume}} m³ · {{percent}}% left",
     "oreRowIsk": "{{rocks}} · {{volume}} m³ · <isk/> ISK · {{percent}}% left",
-    "valueRamp": "Bar colour is ISK per m³ left · {{hub}} buy, {{form}}",
+    "valueRamp": "Bar colour is the price of one unit · {{hub}} buy, {{form}}",
     "moonTax": {
       "label": "Moon tax",
       "to": "to",
@@ -4013,13 +4013,13 @@
     "formCompressed": "compressed",
     "formRaw": "raw",
     "tier": {
-      "gray": "lowest value per m³",
-      "blue": "low value per m³",
-      "yellow": "high value per m³",
-      "orange": "highest value per m³"
+      "gray": "cheapest ore",
+      "blue": "cheap ore",
+      "yellow": "dear ore",
+      "orange": "dearest ore"
     },
-    "valueLow": "lower",
-    "valueHigh": "higher",
+    "valueLow": "cheaper",
+    "valueHigh": "dearer",
     "legendRate": "Mining rate",
     "sharePanelTitle": "Field progress",
     "shareTitle": "Mining Survey",

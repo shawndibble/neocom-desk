@@ -1,34 +1,31 @@
 /**
- * How rich each ore in a Survey is, as one of four tiers for the Survey tab's
- * ore bars: gray, blue, yellow, orange, richer left to right. Richness is the
- * ISK value of what is left per m³ of it (a miner is limited by cargo, so a
- * small rich ore beats a big poor one), judged against the richest ore on the
- * field, since what counts as rich moves with the market and the ore.
+ * How dear each ore in a Survey is, as one of four tiers for the Survey tab's
+ * ore bars: gray, blue, yellow, orange, dearer left to right. Dearness is the
+ * market price of one unit of the ore, placed between the cheapest and the
+ * dearest ore on the field, so the dearest is always orange and the cheapest
+ * always gray, whatever the market is doing.
  */
 import type { SurveyOre } from './series';
 
 export type ValueTier = 'gray' | 'blue' | 'yellow' | 'orange';
 
-/** Share of the richest ore's ISK/m³ an ore needs to reach each tier. */
+/** How far up the cheapest-to-dearest range an ore needs to be to reach each tier. */
 const TIER_FLOORS: readonly [ValueTier, number][] = [
-  ['orange', 0.9],
-  ['yellow', 0.75],
-  ['blue', 0.55],
+  ['orange', 0.75],
+  ['yellow', 0.5],
+  ['blue', 0.25],
 ];
 
-/** ISK per m³ of what is left, or null with nothing left or no value to divide. */
-export function valuePerM3(ore: Pick<SurveyOre, 'volume' | 'isk'>): number | null {
-  return ore.volume > 0 && ore.isk > 0 ? ore.isk / ore.volume : null;
-}
-
-export function oreValueTiers(ores: readonly SurveyOre[]): Map<string, ValueTier> {
-  const densities = ores.map((ore) => valuePerM3(ore));
-  const best = Math.max(0, ...densities.map((d) => d ?? 0));
+export function oreValueTiers(
+  ores: readonly Pick<SurveyOre, 'ore' | 'unitPrice'>[]
+): Map<string, ValueTier> {
+  const prices = ores.flatMap((o) => (o.unitPrice === null ? [] : [o.unitPrice]));
+  const best = Math.max(0, ...prices);
+  const worst = Math.min(best, ...prices);
   return new Map(
-    ores.map((ore, i) => {
-      const density = densities[i];
-      if (density === null || best === 0) return [ore.ore, 'gray'];
-      const share = density / best;
+    ores.map((ore) => {
+      if (ore.unitPrice === null || best === worst) return [ore.ore, 'gray'];
+      const share = (ore.unitPrice - worst) / (best - worst);
       return [ore.ore, TIER_FLOORS.find(([, floor]) => share >= floor)?.[0] ?? 'gray'];
     })
   );

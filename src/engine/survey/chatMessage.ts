@@ -181,9 +181,9 @@ export function formatDuration(ms: number): string {
 const MAX_NAMED_ORES = 2;
 
 /**
- * "Left: 5 Scordite · 4 Kernite · 35 other": the two ores richest per m³ left
+ * "Left: 5 Scordite · 4 Kernite · 35 other": the two ores with the dearest unit price
  * (the order the page lists them in), each with its rock count, and the rocks
- * of every other ore grouped into one count. `ores` arrives richest first, and
+ * of every other ore grouped into one count. `ores` arrives dearest first, and
  * fewer than two are named if a longer line would wrap.
  */
 function oreLine(

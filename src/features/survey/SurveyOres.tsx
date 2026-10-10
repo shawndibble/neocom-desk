@@ -1,6 +1,6 @@
 /**
  * What is left of each ore, dearest unit first: its rocks, volume, ISK and the percent of it still
- * there, as a bar. The bar's colour is how rich the ore is, ISK per m³ left,
+ * there, as a bar. The bar's colour is how dear the ore is, its price per unit,
  * on a gray, blue, yellow, orange ramp (`engine/survey/valueTier.ts`), so a
  * pilot sees which rocks are worth the trip without reading the numbers.
  */

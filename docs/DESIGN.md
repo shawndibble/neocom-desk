@@ -184,9 +184,10 @@ fill is plain `text`, and the figure is always printed, so colour is never the o
 ### Ore value ramp
 
 `oreValueTiers` (`src/engine/survey/valueTier.ts`) colours the Mining Survey's
-ore bars by ISK per m³ left, against the richest ore on the field: gray
+ore bars by unit price, between the cheapest and dearest ore on the field
+(dearest always orange, cheapest always gray): gray
 (`line-bright`), blue (`accent`), yellow (`warning`) and orange (halfway along
-`warning`→`danger`), richer left to right. It borrows Kill heat's yellow and
+`warning`→`danger`), dearer left to right. It borrows Kill heat's yellow and
 orange rather than adding tokens. The ISK and percent are printed beside every
 bar, and a legend line names the ramp (§7).
 

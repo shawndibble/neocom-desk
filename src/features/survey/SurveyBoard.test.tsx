@@ -16,9 +16,9 @@ vi.mock('./useOrePrices', () => ({
   useOrePrices: () => ({
     prices: new Map([
       ['Clear Icicle', 200_000],
-      ['Scordite', 1],
-      ['Veldspar', 1],
-      ['Pyroxeres', 1],
+      ['Scordite', 100],
+      ['Veldspar', 80],
+      ['Pyroxeres', 40],
     ]),
     hub: { id: 'jita', name: 'Jita IV - Moon 4', systemName: 'Jita' },
     compressed: true,
@@ -115,21 +115,22 @@ describe('SurveyBoard', () => {
   });
 
   describe('value colours and layout', () => {
-    // Priced at 1 ISK a unit by the mocked market, so units are the ISK.
+    // Priced by the mocked market at 100, 80 and 40 ISK a unit: the unit counts below are chosen so
+    // the ISK left is round.
     const row = (ore: string, volume: number, units: number) => ({ ore, volume, units });
-    // ISK per m3: Scordite 108, Veldspar 93, Pyroxeres 77, so orange, yellow and blue against the richest.
+    // Unit price: Scordite 100, Veldspar 80, Pyroxeres 40, so orange, yellow and gray down the range.
     const richScans = [
       {
         at: T0,
         rocks: [
-          row('Scordite', 5274, 570_000),
-          row('Veldspar', 8260, 772_000),
-          row('Pyroxeres', 1842, 141_000),
+          row('Scordite', 5274, 5_700),
+          row('Veldspar', 8260, 9_650),
+          row('Pyroxeres', 1842, 3_525),
         ],
       },
     ];
 
-    it('colours each ore bar by its ISK per m3 left, and says what the colours mean', () => {
+    it('colours each ore bar by its unit price, dearest orange, cheapest gray, and says what the colours mean', () => {
       render(<SurveyBoard scans={richScans} url={URL} expiresAt={null} />);
       const tierOf = (ore: string) =>
         screen
@@ -139,11 +140,13 @@ describe('SurveyBoard', () => {
           ?.getAttribute('data-value-tier');
       expect(tierOf('Scordite')).toBe('orange');
       expect(tierOf('Veldspar')).toBe('yellow');
-      expect(tierOf('Pyroxeres')).toBe('blue');
-      expect(screen.getByText('Bar colour is ISK per m³ left · Jita buy, compressed')).toBeTruthy();
+      expect(tierOf('Pyroxeres')).toBe('gray');
+      expect(
+        screen.getByText('Bar colour is the price of one unit · Jita buy, compressed')
+      ).toBeTruthy();
       // Colour is never the only signal: each row also says its tier in words for a screen reader.
-      expect(screen.getByText(/highest value per m³/)).toBeTruthy();
-      expect(screen.getByText(/low value per m³/)).toBeTruthy();
+      expect(screen.getByText(/dearest ore/)).toBeTruthy();
+      expect(screen.getByText(/cheapest ore/)).toBeTruthy();
     });
 
     it('shows each ore with its rocks and the ISK left in it', () => {
