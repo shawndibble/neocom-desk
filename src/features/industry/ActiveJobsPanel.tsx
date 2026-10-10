@@ -22,7 +22,6 @@ import {
   SegmentedControl,
   Spinner,
   Toast,
-  useTimedToast,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -572,7 +571,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const [historyToast, setHistoryToast] = useState<{ message: string; onUndo?: () => void } | null>(
     null
   );
-  useTimedToast(historyToast, () => setHistoryToast(null));
   const setDismissed = useCallback(
     async (job: JobRow, dismissed: boolean) => {
       const ok = await setJobDismissed(job.characterId, job.job_id, dismissed);
@@ -594,7 +592,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           : null
       );
     },
-    [t]
+    [t, setHistoryToast]
   );
   const planIds = useLiveQuery(() => db.buildPlans.toCollection().primaryKeys(), []);
   const showHistorySegment = historyRows.length > 0 || historyView;
@@ -1411,6 +1409,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               ? { label: t('industry.historyUndo'), onUndo: historyToast.onUndo }
               : undefined
           }
+          onClose={() => setHistoryToast(null)}
         />
       )}
       {logJobDialog && (

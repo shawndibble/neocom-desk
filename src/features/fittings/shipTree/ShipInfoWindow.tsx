@@ -22,7 +22,6 @@ import { SkillsMasteryTab, type AddedToPlan } from './SkillsMasteryTab';
 import { flyLabel } from './flyLabel';
 import { factionNameOf } from './shipTreeModel';
 import type { ShipTreeSource } from './useShipTreeData';
-import { useTimedToast } from '@/components/ui/useTimedToast';
 
 type InfoTab = 'description' | 'fitting' | 'skills' | 'blueprint';
 const TABS: readonly InfoTab[] = ['description', 'fitting', 'skills', 'blueprint'];
@@ -42,7 +41,6 @@ export function ShipInfoWindow({
   // Here rather than in the tab, so Undo survives a tab switch or a new hull.
   const [added, setAdded] = useState<AddedToPlan | null>(null);
   const target = useTargetPlan(source.characterId);
-  useTimedToast(added, () => setAdded(null));
 
   const body = ship && (
     <div className="space-y-3">
@@ -80,6 +78,7 @@ export function ShipInfoWindow({
               setAdded(null);
             },
           }}
+          onClose={() => setAdded(null)}
         />
       )}
     </div>

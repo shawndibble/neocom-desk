@@ -14,7 +14,6 @@ import {
   ownedStockBulkConfirmation,
   type OwnedStockBulkKind,
 } from '@/engine/industry/ownedStockBulkConfirmation';
-import { useTimedToast } from '@/components/ui/useTimedToast';
 import { ownedStockBulkText } from './ownedStockBulkText';
 
 interface BulkToast {
@@ -52,7 +51,6 @@ export function useOwnedStockBulk({ write, ownedFor, scopedQuantityFor }: OwnedS
   useEffect(() => {
     latestWrite.current = write;
   });
-  useTimedToast(bulkToast, () => setBulkToast(null));
 
   function apply(changes: readonly OwnedStockChange[], kind: OwnedStockBulkKind) {
     const { message, undo } = ownedStockBulkConfirmation(kind, changes);
@@ -75,6 +73,7 @@ export function useOwnedStockBulk({ write, ownedFor, scopedQuantityFor }: OwnedS
       <Toast
         message={bulkToast.message}
         undo={bulkToast.undo && { label: t('industry.errands.undo'), onUndo: bulkToast.undo }}
+        onClose={() => setBulkToast(null)}
       />
     ),
   };
