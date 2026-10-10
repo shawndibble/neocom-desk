@@ -92,6 +92,21 @@ test.describe('Corp Members narrow table', () => {
     expect(new URL(page.url()).search).toContain('sort');
   });
 
+  test('pinned Member column matches the panel surface at 1440 and 1024', async ({ page }) => {
+    for (const width of [1440, 1024]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('./corp/members');
+      const bg = (loc: ReturnType<typeof page.locator>) =>
+        loc.first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      const memberHeader = page.getByRole('columnheader', { name: /Member/ });
+      const lastSeenHeader = page.getByRole('columnheader', { name: /Last seen/ });
+      await expect(memberHeader).toBeVisible();
+      expect(await bg(memberHeader)).toBe(await bg(lastSeenHeader));
+      const row = page.locator('table tbody tr:not(.dt-spacer)').first();
+      expect(await bg(row.locator('td').first())).toBe(await bg(row.locator('td').nth(1)));
+    }
+  });
+
   test('no picker at 1280px', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto('./corp/members');

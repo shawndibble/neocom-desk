@@ -188,6 +188,7 @@ export function CorpTransactionsPanel({
         header: t('wallet.item'),
         /** Pinned while the figures scroll sideways on a phone. */
         stickyStart: true,
+        stickyStartOnPanel: true,
         render: (txn) => <ItemInfoLink typeId={txn.type_id}>{nameFor(txn.type_id)}</ItemInfoLink>,
         sortValue: (txn) => nameFor(txn.type_id),
       },
