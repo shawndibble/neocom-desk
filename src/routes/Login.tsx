@@ -563,8 +563,8 @@ export function Login() {
           and immediately before the closing CTA, and at hero size it was a
           wall of 11px text nobody read.
         */}
-          <p className="mt-6 max-w-4xl text-xs text-text-dim">{t('login.permissionsHint')}</p>
-          <p className="mt-2 max-w-4xl text-xs text-text-dim">{t('login.writeExceptions')}</p>
+          <p className="mt-6 max-w-3xl text-sm text-text-dim">{t('login.permissionsHint')}</p>
+          <p className="mt-2 max-w-3xl text-sm text-text-dim">{t('login.writeExceptions')}</p>
         </LandingSection>
 
         <section className="border-t border-line px-6 py-14 text-center">
