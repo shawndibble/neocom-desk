@@ -11,7 +11,14 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { InfoTooltip, Panel, RowCaret, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
+import {
+  InfoTooltip,
+  Panel,
+  RowCaret,
+  SEVERITY_LABEL,
+  SEVERITY_TEXT,
+  SeverityIcon,
+} from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { boardRowLinkBase, boardRowLinkClassName } from './boardRowLink';
@@ -176,6 +183,8 @@ export interface TriageRowProps {
   whenLabel?: string;
   subject: string;
   detail?: ReactNode;
+  /** Plain text for the row's accessible name — `detail` itself is often a node (a sender, an `IskAmount`). */
+  detailLabel?: string;
   /** Where the row leads. Every row on this board goes somewhere; there is no read-only variant. */
   to: string;
 }
@@ -185,20 +194,31 @@ export interface TriageRowProps {
  * (different items, different facilities, different clocks) and planetary
  * batches (each one a separate trip).
  */
-export function TriageRow({ severity, when, whenLabel, subject, detail, to }: TriageRowProps) {
+export function TriageRow({
+  severity,
+  when,
+  whenLabel,
+  subject,
+  detail,
+  detailLabel,
+  to,
+}: TriageRowProps) {
   const { t } = useTranslation();
+  const whenText = whenLabel ?? (typeof when === 'string' ? when : '');
+  // The name replaces the row's content, so it carries the detail line and the
+  // severity word too; each is left out entirely when absent.
+  const nameBase = detailLabel
+    ? t('overview.board.rowLabelWithDetail', { subject, when: whenText, detail: detailLabel })
+    : t('overview.board.rowLabel', { subject, when: whenText });
+  const name = t('overview.board.rowLabelSeverity', {
+    label: nameBase,
+    severity: t(SEVERITY_LABEL[severity]),
+  });
   return (
     <li className="border-b border-line last:border-b-0">
       {/* The row navigates: an `IskAmount` inside leaves the tap to it. */}
       <RowTappableContext.Provider value>
-        <Link
-          to={to}
-          aria-label={t('overview.board.rowLabel', {
-            subject,
-            when: whenLabel ?? (typeof when === 'string' ? when : ''),
-          })}
-          className={boardRowLinkClassName}
-        >
+        <Link to={to} aria-label={name} className={boardRowLinkClassName}>
           <span
             className={`flex w-24 shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold tabular-nums ${SEVERITY_TEXT[severity]}`}
           >

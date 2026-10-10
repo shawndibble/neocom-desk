@@ -3606,6 +3606,12 @@
       "queued_one": "{{count}} skill queued",
       "queued_other": "{{count}} skills queued",
       "rowLabel": "{{subject}}, {{when}}",
+      "rowLabelWithDetail": "{{subject}}, {{when}}, {{detail}}",
+      "rowLabelSeverity": "{{label}} ({{severity}})",
+      "priceAlertTargetLabel": {
+        "above": "Target at least {{isk}}",
+        "below": "Target at most {{isk}}"
+      },
       "orders": "Open orders",
       "ordersMeta_one": "{{count}} needs work",
       "ordersMeta_other": "{{count}} need work",
