@@ -173,7 +173,7 @@ export function SkillCertificates() {
     body = (
       <>
         <div
-          role="toolbar"
+          role="group"
           aria-label={t('skills.certificates.filtersLabel')}
           className="flex flex-wrap items-center gap-2"
         >

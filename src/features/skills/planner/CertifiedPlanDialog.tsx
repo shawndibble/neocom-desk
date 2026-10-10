@@ -145,7 +145,11 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
               </p>
             )}
             {visible.length > 0 && (
-              <ul className="divide-y divide-line border border-line">
+              <ul
+                role="radiogroup"
+                aria-label={t('plans.certified.pickLabel')}
+                className="divide-y divide-line border border-line"
+              >
                 {visible.map((plan) => {
                   const isPicked = plan.id === pickedId;
                   return (

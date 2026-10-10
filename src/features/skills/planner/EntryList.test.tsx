@@ -105,6 +105,15 @@ describe('EntryList step timeline renders in the viewer local timezone (#207)', 
   });
 });
 
+describe('EntryList drag instructions', () => {
+  it('does not point at a Move menu that rows do not have', () => {
+    render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
+    const text = document.querySelector('[id^="DndDescribedBy"]')?.textContent ?? '';
+    expect(text).toMatch(/to pick up an entry or remap marker/i);
+    expect(text).not.toMatch(/move menu/i);
+  });
+});
+
 describe('EntryList Booster marks', () => {
   it('marks only the entry row owning the boosted step', () => {
     const rows = [entryRow(1, [0]), entryRow(2, [1])];
