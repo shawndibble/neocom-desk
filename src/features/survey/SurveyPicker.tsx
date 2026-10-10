@@ -119,9 +119,6 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
                 void forgetSurvey(entry.id);
               }}
             >
-              <span id={`${hintId}-${entry.id}`} aria-hidden className="sr-only">
-                {t('survey.historyRemoveKeyHint')}
-              </span>
               <span className="flex w-full min-w-0 items-center justify-between gap-2">
                 <span className="min-w-0 flex-1 max-md:[overflow-wrap:anywhere] md:truncate">
                   {label}
@@ -146,6 +143,9 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
                     onClick={() => void forgetSurvey(entry.id)}
                   />
                 </span>
+              </span>
+              <span id={`${hintId}-${entry.id}`} aria-hidden className="sr-only">
+                {t('survey.historyRemoveKeyHint')}
               </span>
             </SelectItem>
           );
