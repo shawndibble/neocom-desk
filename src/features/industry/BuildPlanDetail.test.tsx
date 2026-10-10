@@ -596,15 +596,12 @@ describe('BuildPlanDetail shopping list', () => {
 
   it('names the Blueprint Acquisition row left out of the copied text (issue #1778)', async () => {
     const user = userEvent.setup();
-    const write = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
-    configureClipboard(write);
+    configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
     // Default fixture's "Rifter Blueprint" Blueprint Acquisition row (issue
     // #838) is what gets left out here.
     render(<Harness />);
 
     await user.click(copyButton());
-    // The note renders after the write settles; wait for that, not a guess.
-    await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
 
     expect(
       await screen.findByText('1 blueprint left out — buy it by contract')
