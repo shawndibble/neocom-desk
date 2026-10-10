@@ -32,7 +32,6 @@ import { SkillRow } from '@/features/skills/SkillRow';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 import { HeaderBadgeSlot } from './HeaderBadgeSlot';
-import { useTimedToast } from '@/components/ui/useTimedToast';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
 interface MasteryChipProps {
@@ -94,7 +93,6 @@ export function MasteryChip({
       .then(setMasteries)
       .catch(() => setMasteries({}));
   }, []);
-  useTimedToast(added, () => setAdded(null));
 
   const tiers = masteries?.[String(hullTypeId)];
   const hasData = tiers !== undefined && tiers.some((bundle) => bundle.length > 0);
@@ -274,6 +272,7 @@ export function MasteryChip({
               setAdded(null);
             },
           }}
+          onClose={() => setAdded(null)}
         />
       )}
     </>

@@ -190,6 +190,7 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
             <span className="inline-flex items-center gap-1">
               <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0" />
               {age}
+              <span className="sr-only">{t('corp.members.darkState')}</span>
             </span>
           ) : (
             age

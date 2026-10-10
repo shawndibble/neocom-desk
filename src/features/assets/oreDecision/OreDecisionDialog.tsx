@@ -102,7 +102,10 @@ function Card({
   return (
     <div className={cx(CARD, suggested ? CARD_SUGGESTED : 'border-line')}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        <p className={cx(CARD_LABEL, 'text-text-dim')}>{label}</p>
+        <p className={cx(CARD_LABEL, 'text-text-dim')}>
+          {label}
+          {suggested && <span className="sr-only"> — {t('assets.oreDecision.suggested')}</span>}
+        </p>
         {suggested && (
           // Decorative twin of a screen-reader "Suggested": hue alone never
           // marks the pick (WCAG 1.4.1), and `accent-dim` is not for text.

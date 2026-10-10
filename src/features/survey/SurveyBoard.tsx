@@ -34,6 +34,7 @@ import { useNow } from '@/lib/useNow';
 import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { SurveyLegend } from './SurveyLegend';
 import { SurveyOres } from './SurveyOres';
+import { SurveyHowTo } from './SurveyHowTo';
 import { SurveyScanList } from './SurveyScanList';
 import { SurveyStats } from './SurveyStats';
 import { useOrePrices } from './useOrePrices';
@@ -161,6 +162,7 @@ export function SurveyBoard({
     return (
       <div className="space-y-4">
         <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
+        <SurveyHowTo />
         {footerActions}
         {scanList}
       </div>

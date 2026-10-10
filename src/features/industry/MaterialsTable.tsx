@@ -58,7 +58,6 @@ import {
 } from './materialsEditSession';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
-import { useTimedToast } from '@/components/ui/useTimedToast';
 import { ownedStockBulkText } from './ownedStockBulkText';
 
 interface MaterialsTableProps {
@@ -686,7 +685,6 @@ export function MaterialsTable({
   }, [shown, ownedFor]);
 
   const toast = session.toast;
-  useTimedToast(toast, () => dispatch({ type: 'toastExpired' }));
 
   // Runs after every render: the toggled row only reaches its new section
   // once the plan write lands, which can be several renders later.
@@ -1508,6 +1506,7 @@ export function MaterialsTable({
         <Toast
           message={toastText(toast.message)}
           undo={toast.undo ? { label: t('industry.errands.undo'), onUndo: undo } : undefined}
+          onClose={() => dispatch({ type: 'toastExpired' })}
         />
       )}
     </div>

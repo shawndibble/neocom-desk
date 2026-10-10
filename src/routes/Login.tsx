@@ -8,23 +8,19 @@ import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
 import {
   Button,
+  EveSsoButton,
   DataAgeBadge,
   LogoMark,
   Modal,
   Panel,
   SEVERITY_TEXT,
   SeverityIcon,
-  Spinner,
   StatChip,
   StatChips,
 } from '@/components/ui';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
-import {
-  disabledClassName,
-  focusRingClassName,
-  interactiveClassName,
-} from '@/components/ui/controlStyles';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import {
   AllCharacters,
@@ -46,7 +42,6 @@ import {
   ReadOnly,
   ScheduledPush,
   Ships,
-  SignIn,
   Skills,
   Social,
   TokenPrivacy,
@@ -268,7 +263,7 @@ export function Login() {
       <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-bg px-6 py-10 text-center text-text">
         <LogoMark className="size-20" />
         <h1 className="text-2xl font-bold tracking-wide">{t('app.name')}</h1>
-        <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
+        <EveSsoButton size="large" pending={pending} onClick={onLogin} label={t('login.button')} />
         <CustomizeLink onClick={() => setCustomizing(true)} />
         <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
       </main>
@@ -295,7 +290,12 @@ export function Login() {
             </h1>
             <p className="mt-4 max-w-md text-text-dim">{t('app.tagline')}</p>
             <div className="mt-7 flex flex-col items-start gap-3">
-              <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
+              <EveSsoButton
+                size="large"
+                pending={pending}
+                onClick={onLogin}
+                label={t('login.button')}
+              />
               <CustomizeLink onClick={() => setCustomizing(true)} />
             </div>
           </div>
@@ -571,7 +571,12 @@ export function Login() {
           <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
           <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">{t('login.bottomCtaBody')}</p>
           <div className="mt-6 flex flex-col items-center gap-3">
-            <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
+            <EveSsoButton
+              size="large"
+              pending={pending}
+              onClick={onLogin}
+              label={t('login.button')}
+            />
             <CustomizeLink onClick={() => setCustomizing(true)} />
           </div>
         </section>
@@ -679,40 +684,6 @@ function CustomizeLink({ onClick }: { onClick: () => void }) {
     <Button size="sm" onClick={onClick}>
       {t('permissions.customize.linkLabel')}
     </Button>
-  );
-}
-
-function SsoButton({
-  pending,
-  onClick,
-  label,
-}: {
-  pending: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  const { t } = useTranslation();
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={pending}
-      // CCP's SSO button is black on any theme, so it stays hand-built; it
-      // takes the shared interaction recipe instead of a Button variant.
-      className={cx(
-        'inline-flex h-11 items-center gap-2 rounded-xs border border-line-bright bg-black px-5 text-sm font-semibold tracking-wider text-white hover:border-accent active:border-accent-dim',
-        interactiveClassName,
-        focusRingClassName,
-        disabledClassName
-      )}
-    >
-      {pending ? (
-        <Spinner size="sm" label={t('common.loading')} />
-      ) : (
-        <SignIn aria-hidden="true" className="text-accent" />
-      )}
-      {label}
-    </button>
   );
 }
 
