@@ -603,7 +603,9 @@ describe('BuildPlanDetail shopping list', () => {
 
     await user.click(copyButton());
 
-    // A Toast renders its text twice (visible copy + live region, filled a tick later).
+    // findAll: Toast renders its message twice (visible span + live region), and
+    // the live region fills in a beat later — `findByText` throws on the
+    // two-match state and never recovers while the toast stays up.
     expect(
       (await screen.findAllByText('1 blueprint left out — buy it by contract')).length
     ).toBeGreaterThan(0);

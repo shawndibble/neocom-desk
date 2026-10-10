@@ -317,9 +317,13 @@ describe('SkillCompare', () => {
 
     expect(
       await screen.findByText(
-        'Some characters in this comparison have been removed and are no longer shown.'
+        'Some characters in this comparison have been removed and are no longer shown.',
+        { selector: 'p' }
       )
     ).toBeInTheDocument();
+    expect(screen.getAllByRole('status').map((el) => el.textContent)).toContain(
+      'Some characters in this comparison have been removed and are no longer shown.'
+    );
     // The table is awaited *before* the pressed state is read: it renders only
     // once the selection has been applied, so it is the signal this assertion
     // needs — reading `aria-pressed` synchronously raced that. Note the click
