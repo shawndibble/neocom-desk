@@ -18,7 +18,7 @@
  * some other way (synced from an older build, restored from an import), but
  * this component's whole point is to stop the user from typing one.
  */
-import { useRef, useState, type FocusEvent } from 'react';
+import { useId, useRef, useState, type FocusEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, TextInput } from '@/components/ui';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -139,6 +139,7 @@ function BoosterRow({
   onRemove,
 }: BoosterRowProps) {
   const { t } = useTranslation();
+  const overlapId = useId();
 
   // `overlaps` (from the committed list) only catches an overlap that
   // already exists in props — it says nothing about a just-typed edit that
@@ -159,6 +160,11 @@ function BoosterRow({
 
   // eslint-disable-next-line react-hooks/purity -- display-only "expired" hint, same as PlanEditor's own clock read
   const expired = row.expiresAt !== null && row.expiresAt <= Date.now();
+
+  const overlapping = rejected || overlaps;
+  const overlapProps = overlapping
+    ? { 'aria-invalid': true, 'aria-describedby': overlapId }
+    : undefined;
 
   return (
     <div className="space-y-2 border-l border-line pl-2">
@@ -185,6 +191,7 @@ function BoosterRow({
           max={MAX_BOOSTER_BONUS}
           value={row.bonus}
           onChange={(e) => patch({ bonus: clampBoosterBonus(Number(e.target.value)) })}
+          {...overlapProps}
           className="field-no-spinner w-16 text-center"
         />
       </label>
@@ -202,6 +209,7 @@ function BoosterRow({
                   placeholder="0"
                   value={expiresIn.text[unit]}
                   onChange={(e) => expiresIn.onChange(unit, e.target.value)}
+                  {...overlapProps}
                   className="w-12 text-center"
                 />
                 <span aria-hidden>{t(`plans.boosterUnitShort.${unit}`)}</span>
@@ -236,7 +244,11 @@ function BoosterRow({
           </button>
         ))}
       </div>
-      {(rejected || overlaps) && <p className="text-warning">{t('plans.boosterOverlap')}</p>}
+      {overlapping && (
+        <p id={overlapId} role="alert" className="text-warning">
+          {t('plans.boosterOverlap')}
+        </p>
+      )}
       {detectedAccelerator !== null && row.expiresAt === null && (
         <p className="text-warning">{t('plans.boosterDetectedNoExpiry')}</p>
       )}
