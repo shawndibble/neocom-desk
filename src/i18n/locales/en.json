@@ -58,20 +58,7 @@
     "morePages_one": "{{count}} more page",
     "morePages_other": "{{count}} more pages",
     "customize": "Customize",
-    "showPermanently": "Always show {{page}}",
-    "setup": {
-      "title": "What do you do in EVE?",
-      "hint": "Pick what you play and the rail starts with those pages. Everything else stays in Go to and under \"more pages\".",
-      "skip": "Skip",
-      "done": "Start",
-      "activity": {
-        "mining": "Mining",
-        "pi": "Planetary Industry",
-        "trading": "Trading",
-        "industry": "Industry",
-        "social": "Mail and contacts"
-      }
-    }
+    "showPermanently": "Always show {{page}}"
   },
   "reauth": {
     "navLocked": "Needs a new login",
@@ -2029,8 +2016,16 @@
     "boosterMarketLink": "View cerebral accelerators in Market",
     "boosterBonus": "Bonus",
     "boosterExpiresIn": "Time left",
-    "boosterUnit": { "days": "Days", "hours": "Hours", "minutes": "Minutes" },
-    "boosterUnitShort": { "days": "d", "hours": "h", "minutes": "m" },
+    "boosterUnit": {
+      "days": "Days",
+      "hours": "Hours",
+      "minutes": "Minutes"
+    },
+    "boosterUnitShort": {
+      "days": "d",
+      "hours": "h",
+      "minutes": "m"
+    },
     "boosterStartsAfterPrevious": "Starts when the accelerator before it runs out.",
     "boosterExpired": "Expired",
     "boosterOverlap": "This accelerator overlaps another one — EVE only has one booster slot, so they can't both run at once.",
@@ -3997,7 +3992,6 @@
     "showLocalTime": "Show in your time zone",
     "showEveTime": "Show in EVE time (UTC)",
     "addSecondScan": "Add another scan to see the chart",
-    "finished": "Field cleared",
     "scanCount_one": "{{count}} scan",
     "scanCount_other": "{{count}} scans",
     "copyChat": "Copy chat message",

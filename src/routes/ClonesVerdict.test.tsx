@@ -270,6 +270,19 @@ describe('Clones training verdict', () => {
     expect(within(card).queryByRole('button', { name: /^Route to/ })).not.toBeInTheDocument();
   });
 
+  it('describes the queue bar segments to a screen reader without a new tab stop', async () => {
+    scenario.worn = [IMPLANT_INT5];
+    scenario.intelligence = 25;
+    scenario.jumpImplants = [[IMPLANT_PLAIN], []];
+    render(<App />);
+    const card = await verdictCard('Stay put');
+    const bar = within(card).getByRole('img', { name: /^Stay in this clone/ });
+    const list = document.getElementById(bar.getAttribute('aria-describedby') ?? '');
+    expect(list).toHaveClass('sr-only');
+    expect(within(list as HTMLElement).getAllByText(/: \d+[dhm]/).length).toBeGreaterThan(0);
+    expect(bar).not.toHaveAttribute('tabindex');
+  });
+
   it('shows no verdict for an empty queue', async () => {
     scenario.queue = () => [];
     render(<App />);
