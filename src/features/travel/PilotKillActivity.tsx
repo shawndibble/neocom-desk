@@ -129,7 +129,7 @@ export function PilotKillActivityView({
       ref={resultRef}
       tabIndex={-1}
       aria-label={t('travel.pilot.activity.title')}
-      className="@container/kills flex outline-none h-full flex-col gap-2.5 rounded-xs border border-line bg-panel px-3.5 py-3"
+      className="@container/kills flex h-full flex-col gap-2.5 rounded-xs border border-line bg-panel px-3.5 py-3 outline-none"
     >
       <div className="flex items-baseline justify-between gap-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         <h3>
