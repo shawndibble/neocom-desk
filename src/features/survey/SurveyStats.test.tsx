@@ -21,7 +21,7 @@ afterEach(() => {
 describe('SurveyStats Done at', () => {
   it('shows EVE time, and a click switches it to local time and back', async () => {
     render(<SurveyStats summary={summary} />);
-    const button = screen.getByRole('button', { name: /EVE$/ });
+    const button = await screen.findByRole('button', { name: /EVE$/ });
     fireEvent.click(button);
     await waitFor(() => expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull());
     const local = screen.getByRole('button');
@@ -36,12 +36,15 @@ describe('SurveyStats Done at default', () => {
   it('follows the time format chosen in Settings', async () => {
     await db.settings.put({ key: 'timeFormat', value: 'local' });
     render(<SurveyStats summary={summary} />);
-    await waitFor(() => expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull());
+    // Never EVE first: the tile waits for the stored choice instead of flashing the default.
+    expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull();
+    await waitFor(() => expect(screen.getByRole('button')).toBeTruthy());
+    expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull();
   });
 
-  it('keeps EVE time when Settings holds no choice', () => {
+  it('keeps EVE time when Settings holds no choice', async () => {
     render(<SurveyStats summary={summary} />);
-    expect(screen.getByRole('button', { name: /EVE$/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /EVE$/ })).toBeTruthy();
   });
 });
 

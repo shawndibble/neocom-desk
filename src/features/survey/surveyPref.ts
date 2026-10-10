@@ -28,14 +28,16 @@ export const useDoneAtOverride = createLocalSetting<TimeFormat | null>({
 /**
  * Which clock the "Done at" tile shows: the pilot's press on the tile, else
  * their Settings → App display time format when they have chosen one, else EVE
- * time. The setting's own default is `local`, so only a stored row counts as a
+ * time (null while that is being read). The setting's own default is `local`, so only a stored row counts as a
  * choice; reading the row (not the store) is how "never picked" shows.
  */
-export function useDoneAtClock(): TimeFormat {
+export function useDoneAtClock(): TimeFormat | null {
   const override = useDoneAtOverride((state) => state.value);
   const chosen = useLiveQuery(async () => {
     const stored = (await db.settings.get(TIME_FORMAT_SETTING_KEY))?.value;
     return TIME_FORMATS.includes(stored as TimeFormat) ? (stored as TimeFormat) : null;
   }, []);
-  return override ?? chosen ?? 'eve';
+  // `undefined` is the read still pending: say so rather than flash EVE time at a pilot who chose local.
+  if (override) return override;
+  return chosen === undefined ? null : (chosen ?? 'eve');
 }

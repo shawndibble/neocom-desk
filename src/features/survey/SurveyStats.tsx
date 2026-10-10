@@ -4,7 +4,7 @@
  * Bigger than a `StatChip` on purpose: these are what the pilot reads at a
  * glance and says in fleet chat, not small counts beside a title.
  */
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import { formatDuration as formatTotalTime } from '@/lib/duration';
@@ -55,7 +55,12 @@ function shortVolume(value: number, locale: string): string {
 
 export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const { t, i18n } = useTranslation();
-  const local = useDoneAtClock() === 'local';
+  const clock = useDoneAtClock();
+  const local = clock === 'local';
+  const hydrateClock = useDoneAtOverride((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateClock();
+  }, [hydrateClock]);
   const setClock = useDoneAtOverride((state) => state.setValue);
   const n = (value: number, digits = 0) =>
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
@@ -69,7 +74,7 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
       <Tile label={t('survey.statPace')}>{summary.pace === null ? '–' : n(summary.pace, 1)}</Tile>
       {/* Sizes to its clock ("12:44 AM CST") so it never stacks; the other tiles give way. */}
       <Tile label={t('survey.statDone')} emphasis className="shrink-0 grow-[2] whitespace-nowrap">
-        {doneAt === null ? (
+        {doneAt === null || clock === null ? (
           '–'
         ) : (
           <Tooltip content={t(local ? 'survey.showEveTime' : 'survey.showLocalTime')}>
