@@ -1379,9 +1379,21 @@
        compare bar's offset. */
     --bottom-nav-clearance: calc(3.5rem + env(safe-area-inset-bottom));
   }
+  /* Every bottom-pinned bar publishes its own term via useStickyClearance
+     (src/lib); unset terms are 0px, so with no bar mounted this equals the
+     tab-bar-only value below md and 0 from md up. */
+  :root {
+    scroll-padding-bottom: calc(
+      var(--onboarding-banner-clearance, 0px) + var(--selection-toolbar-clearance, 0px) +
+        var(--compare-drawer-clearance, 0px)
+    );
+  }
   @media (width < 48rem) {
     :root {
-      scroll-padding-bottom: var(--bottom-nav-clearance);
+      scroll-padding-bottom: calc(
+        var(--onboarding-banner-clearance, 0px) + var(--selection-toolbar-clearance, 0px) +
+          var(--compare-drawer-clearance, 0px) + var(--bottom-nav-clearance)
+      );
     }
   }
 
