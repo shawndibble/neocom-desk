@@ -34,7 +34,7 @@ interface SegmentedControlProps<T extends string> {
 
 /**
  * Pick exactly one of a few views: one joined group, one selected look
- * (`FilterChip`'s accent tint). A `role="group"` of `aria-pressed` buttons, not
+ * (`FilterChip`'s accent tint plus a 2px accent underline, so it isn't colour alone). A `role="group"` of `aria-pressed` buttons, not
  * a tablist — it switches what a panel shows rather than navigating between
  * places (`Tabs`), and it needs no open-then-pick step (`Select`).
  *
@@ -82,7 +82,7 @@ export function SegmentedControl<T extends string>({
               fill && 'flex-1 basis-0',
               index > 0 && 'border-l border-line',
               selected
-                ? 'bg-accent/15 text-accent enabled:hover:bg-accent/22 enabled:active:bg-accent/28'
+                ? 'bg-accent/15 text-accent shadow-[inset_0_-2px_0_var(--color-accent)] enabled:hover:bg-accent/22 enabled:active:bg-accent/28'
                 : 'text-text-dim enabled:hover:bg-panel-2 enabled:hover:text-text enabled:active:bg-panel'
             )}
           >

@@ -10127,6 +10127,7 @@
         "stateDisabled": "Disabled",
         "stateLoading": "Loading (Button loading)",
         "stateSelected": "Selected / on (aria-pressed)",
+        "stateSelectedSegment": "Selected segment",
         "fieldCaret": "CaretDown in field chrome (a box sized like a field): opens a list to pick from",
         "pending": "Hourglass: pending, awaiting an answer"
       },
@@ -10142,9 +10143,12 @@
         "focus": "Press Tab: 2px accent outline, outset on boxed controls and inline links.",
         "disabled": "opacity-40. aria-disabled keeps the tooltip reachable.",
         "selectedToggle": "On takes the accent tint.",
+        "selectedSegment": "Selected takes the accent tint and a 2px accent underline.",
         "fieldCaret": "The box is a control (§6); the caret says it opens a list."
       },
       "samples": {
+        "segmentOn": "Selected",
+        "segmentOff": "Idle",
         "character": "Character name",
         "skill": "Skill name",
         "sentenceBefore": "A link",
