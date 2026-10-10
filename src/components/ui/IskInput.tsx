@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useContext, useEffect, useId, useRef, useState, type ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatIsk, maskIsk, parseIskAmount } from '@/lib/isk';
+import { FieldNoteContext, mergeDescribedBy } from './fieldNote';
 import { TextInput } from './TextInput';
 
 interface IskInputProps extends Omit<
@@ -45,9 +46,12 @@ export function IskInput({
   onParseableChange,
   placeholder,
   className = '',
+  'aria-describedby': describedBy,
   ...rest
 }: IskInputProps) {
   const { t } = useTranslation();
+  const echoId = useId();
+  const noteId = useContext(FieldNoteContext);
   const [text, setText] = useState(value);
   // The last value this field itself committed: a `value` that differs came
   // from outside (Clear, a URL change) and replaces what was typed.
@@ -59,6 +63,7 @@ export function IskInput({
     }
   }, [value]);
   const parsed = text.trim() === '' ? null : parseIskAmount(text);
+  const showEcho = echo && parsed !== null;
   const parseable = text.trim() === '' || parsed !== null;
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
@@ -71,6 +76,7 @@ export function IskInput({
         }
         className="w-full tabular-nums"
         aria-invalid={parseable ? undefined : true}
+        aria-describedby={mergeDescribedBy(describedBy, noteId, showEcho ? echoId : undefined)}
         value={text}
         onChange={(event) => {
           const next = event.target.value;
@@ -83,8 +89,8 @@ export function IskInput({
           onChange(nextValue);
         }}
       />
-      {echo && parsed !== null && (
-        <span className="text-[0.6875rem] text-text-dim">
+      {showEcho && (
+        <span id={echoId} className="text-[0.6875rem] text-text-dim">
           {t('common.iskAmountHint', { amount: formatIsk(parsed) })}
         </span>
       )}

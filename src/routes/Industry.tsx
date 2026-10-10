@@ -9,6 +9,7 @@ import {
   EmptyState,
   Modal,
   Spinner,
+  TabPanel,
   Toast,
   useTimedToast,
 } from '@/components/ui';
@@ -64,7 +65,7 @@ import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImpor
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { computeGroupIndexStats } from '@/features/industry/groupIndexStats';
-import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import { INDUSTRY_TABS, INDUSTRY_TABS_ID } from '@/features/industry/industryTabs';
 import { applyBlueprintPaste, previewBlueprintPaste } from '@/features/industry/blueprintPaste';
 import { loadBlueprintNames } from '@/features/industry/blueprintNames';
 import type {
@@ -704,96 +705,98 @@ export function Industry() {
           }
         />
 
-        {!plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
-        ) : (
-          <>
-            {tab === 'sourcing' ? (
-              <BpcSourcingPanel />
-            ) : tab === 'opportunities' ? (
-              <div className="flex flex-col gap-4">
-                {/* "What's profitable" (the market-wide scan) always leads,
+        <TabPanel tabsId={INDUSTRY_TABS_ID} tabId={tab} className="space-y-4">
+          {!plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
+            <div className="flex justify-center py-16">
+              <Spinner label={t('common.loading')} />
+            </div>
+          ) : (
+            <>
+              {tab === 'sourcing' ? (
+                <BpcSourcingPanel />
+              ) : tab === 'opportunities' ? (
+                <div className="flex flex-col gap-4">
+                  {/* "What's profitable" (the market-wide scan) always leads,
                     open; the owned-blueprint ranking follows it. */}
-                {opportunitiesPanels}
-              </div>
-            ) : tab === 'records' ? (
-              <ProductionLogPanel
-                characterId={activeCharacterId}
-                catalog={catalog}
-                skills={modifiers.skills}
-                plans={plans}
-                onOpenRun={openRunFromRecords}
-              />
-            ) : comparing ? (
-              comparePlans.length >= 2 ? (
-                <BuildPlanCompare
-                  plans={comparePlans}
+                  {opportunitiesPanels}
+                </div>
+              ) : tab === 'records' ? (
+                <ProductionLogPanel
+                  characterId={activeCharacterId}
                   catalog={catalog}
-                  pi={pi}
-                  ownedBlueprints={ownedBlueprints}
-                  modifiers={modifiers}
-                  pricingInputs={pricingInputs}
-                  onDone={exitCompare}
-                  onOpenPlan={(planId) => {
-                    exitCompare();
-                    navigate(`/industry/plans/${planId}`);
-                  }}
+                  skills={modifiers.skills}
+                  plans={plans}
+                  onOpenRun={openRunFromRecords}
                 />
+              ) : comparing ? (
+                comparePlans.length >= 2 ? (
+                  <BuildPlanCompare
+                    plans={comparePlans}
+                    catalog={catalog}
+                    pi={pi}
+                    ownedBlueprints={ownedBlueprints}
+                    modifiers={modifiers}
+                    pricingInputs={pricingInputs}
+                    onDone={exitCompare}
+                    onOpenPlan={(planId) => {
+                      exitCompare();
+                      navigate(`/industry/plans/${planId}`);
+                    }}
+                  />
+                ) : (
+                  <EmptyState
+                    title={t('industry.compareNeedMore')}
+                    hint={t('industry.compareNeedMoreHint')}
+                    action={
+                      <Button size="sm" onClick={exitCompare}>
+                        {t('industry.compareDone')}
+                      </Button>
+                    }
+                  />
+                )
               ) : (
-                <EmptyState
-                  title={t('industry.compareNeedMore')}
-                  hint={t('industry.compareNeedMoreHint')}
-                  action={
-                    <Button size="sm" onClick={exitCompare}>
-                      {t('industry.compareDone')}
-                    </Button>
+                <BuildPlanList
+                  note={
+                    (plans?.length ?? 0) > 0 && (
+                      <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
+                    )
                   }
+                  plans={plans}
+                  catalog={catalog}
+                  selectedId={null}
+                  onSelect={(id) => navigate(`/industry/plans/${id}`)}
+                  // Stays on the index, same as duplicate — the search box adds
+                  // a row to manage, it doesn't presume the pilot wants to edit
+                  // it immediately. `void`: `onCreate` only takes the entry.
+                  onCreate={(entry) => void createPlan(entry)}
+                  onDuplicate={(id) => void handleDuplicate(id)}
+                  onDelete={setDeletingPlanId}
+                  onRename={(id, name) => void handleRename(id, name)}
+                  compareMode={compareMode}
+                  compareSelectedIds={compareSelectedIds}
+                  onToggleCompareMode={toggleCompareMode}
+                  onToggleCompareSelected={toggleCompareSelected}
+                  onOpenCompare={() => setComparing(true)}
+                  groups={groups}
+                  expandedGroupIds={expandedGroupIds}
+                  selectedGroupId={null}
+                  onToggleGroup={(groupId) =>
+                    void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
+                  }
+                  onSelectGroup={(groupId) => navigate(`/industry/groups/${groupId}`)}
+                  onCreateGroup={() => void handleCreateGroup()}
+                  onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
+                  onDeleteGroup={requestDeleteGroup}
+                  onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
+                  onOpenFitImport={() => setFitImportOpen(true)}
+                  statsByPlanId={statsByPlanId}
+                  ownedBlueprints={ownedBlueprints}
+                  statsByGroupId={statsByGroupId}
                 />
-              )
-            ) : (
-              <BuildPlanList
-                note={
-                  (plans?.length ?? 0) > 0 && (
-                    <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
-                  )
-                }
-                plans={plans}
-                catalog={catalog}
-                selectedId={null}
-                onSelect={(id) => navigate(`/industry/plans/${id}`)}
-                // Stays on the index, same as duplicate — the search box adds
-                // a row to manage, it doesn't presume the pilot wants to edit
-                // it immediately. `void`: `onCreate` only takes the entry.
-                onCreate={(entry) => void createPlan(entry)}
-                onDuplicate={(id) => void handleDuplicate(id)}
-                onDelete={setDeletingPlanId}
-                onRename={(id, name) => void handleRename(id, name)}
-                compareMode={compareMode}
-                compareSelectedIds={compareSelectedIds}
-                onToggleCompareMode={toggleCompareMode}
-                onToggleCompareSelected={toggleCompareSelected}
-                onOpenCompare={() => setComparing(true)}
-                groups={groups}
-                expandedGroupIds={expandedGroupIds}
-                selectedGroupId={null}
-                onToggleGroup={(groupId) =>
-                  void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
-                }
-                onSelectGroup={(groupId) => navigate(`/industry/groups/${groupId}`)}
-                onCreateGroup={() => void handleCreateGroup()}
-                onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
-                onDeleteGroup={requestDeleteGroup}
-                onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
-                onOpenFitImport={() => setFitImportOpen(true)}
-                statsByPlanId={statsByPlanId}
-                ownedBlueprints={ownedBlueprints}
-                statsByGroupId={statsByGroupId}
-              />
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
+        </TabPanel>
 
         <Modal
           open={deletingPlanId !== null}
