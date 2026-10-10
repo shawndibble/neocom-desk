@@ -8909,6 +8909,7 @@
       "leftName": "Left ·"
     },
     "members": {
+      "darkState": ", dark",
       "title": "Corp members",
       "refresh": "Refresh member list",
       "tableLabel": "Corporation members",
