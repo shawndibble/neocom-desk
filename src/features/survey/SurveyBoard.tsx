@@ -9,7 +9,8 @@
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import { DataAgeBadge, EmptyState, Panel, Spinner, textActionClassName } from '@/components/ui';
+import { canFinishSurvey } from '@/engine/survey/finish';
 import { surveyChatMessage, type SurveyMessageLabels } from '@/engine/survey/chatMessage';
 import { priceScans } from '@/engine/survey/pricing';
 import {
@@ -19,6 +20,7 @@ import {
   type SurveySummary,
 } from '@/engine/survey/series';
 import { writeToClipboard } from '@/lib/clipboard';
+import { useNow } from '@/lib/useNow';
 import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { SurveyLegend } from './SurveyLegend';
 import { SurveyOres } from './SurveyOres';
@@ -42,6 +44,14 @@ interface SurveyBoardProps {
   url: string | null;
   /** Epoch ms the link stops working; null until stored. */
   expiresAt: number | null;
+  /**
+   * Marks the field cleared; resolves false when it couldn't be stored. The scanner has nothing to copy once the
+   * last rock is gone, so this is how a Survey ends. Offered to the owner always, and to anyone once it is nearly
+   * done (`canFinishSurvey`); absent, the board has no such control.
+   */
+  onFinish?: () => Promise<boolean>;
+  /** The viewer started this survey, which lets them finish it at any point. */
+  owned?: boolean;
   /** Quiet controls at the foot of the panel, e.g. "New survey". */
   footerActions?: ReactNode;
   /** A line under the stats about the viewer, e.g. their own share; the public page has none. */
@@ -71,6 +81,8 @@ export function SurveyBoard({
   scans: allScans,
   ignored = NONE,
   onSetIgnored,
+  onFinish,
+  owned = false,
   url,
   expiresAt,
   footerActions,
@@ -88,6 +100,8 @@ export function SurveyBoard({
     [scans, orePrices.prices]
   );
   const [outcome, setOutcome] = useCopyOutcome();
+  const now = useNow();
+  const [finishing, setFinishing] = useState<'idle' | 'busy' | 'failed'>('idle');
 
   // Every scan, so a removed one can be restored; the chart and totals use `scans`.
   const scanList = onSetIgnored !== undefined && allScans.length > 0 && (
@@ -109,6 +123,12 @@ export function SurveyBoard({
     more: t('survey.message.more'),
     cleared: t('survey.message.cleared'),
   };
+
+  async function finish() {
+    if (onFinish === undefined) return;
+    setFinishing('busy');
+    setFinishing((await onFinish()) ? 'idle' : 'failed');
+  }
 
   function copy(what: 'chat' | 'link', text: string) {
     // Started inside the click so the browser still counts it as the user's gesture.
@@ -196,8 +216,25 @@ export function SurveyBoard({
                 })}
               </p>
             )}
-            {footerActions}
+            <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              {onFinish !== undefined && canFinishSurvey(summary, owned, now) && (
+                <button
+                  type="button"
+                  className={textActionClassName()}
+                  disabled={finishing === 'busy'}
+                  onClick={() => void finish()}
+                >
+                  {t('survey.markCleared')}
+                </button>
+              )}
+              {footerActions}
+            </span>
           </div>
+          {finishing === 'failed' && (
+            <p role="alert" className="text-sm text-danger">
+              {t('survey.finishFailed')}
+            </p>
+          )}
         </div>
       </Panel>
 

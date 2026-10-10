@@ -311,19 +311,22 @@ service cloud.firestore {
       // The doc carries no uid. `createdAt` is the server's clock, so a scan
       // can't be backdated; `expiresAt` must equal the survey's own, so the TTL
       // policy on `surveyScans` removes it with the survey. `by` is the optional
-      // Character name of whoever pasted it (an anonymous visitor sends none). A scan is only
+      // Character name of whoever pasted it (an anonymous visitor sends none). `cleared` marks the
+      // empty scan that says the field is mined out (no text; see finishSurvey). A scan is only
       // accepted while the survey exists and has not expired. The text cap
       // mirrors MAX_SCAN_TEXT.
       match /surveyScans/{scanId} {
         allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;
         allow create: if get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
           && get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time
-          && request.resource.data.keys().hasOnly(['text', 'createdAt', 'expiresAt', 'by'])
+          && request.resource.data.keys().hasOnly(['text', 'createdAt', 'expiresAt', 'by', 'cleared'])
           && request.resource.data.keys().hasAll(['text', 'createdAt', 'expiresAt'])
           && (!('by' in request.resource.data)
             || (request.resource.data.by is string && request.resource.data.by.size() <= 100))
           && request.resource.data.text is string
           && request.resource.data.text.size() <= 40000
+          && (!('cleared' in request.resource.data)
+            || (request.resource.data.cleared == true && request.resource.data.text == ''))
           && request.resource.data.createdAt == request.time
           && request.resource.data.expiresAt
             == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;

@@ -3998,6 +3998,8 @@
     "systemNotFound": "No system by that name.",
     "copiedLink": "Link copied",
     "newSurvey": "New survey",
+    "markCleared": "Mark field cleared",
+    "finishFailed": "Couldn't mark the field cleared. Try again.",
     "expires": "Link works until {{date}}",
     "chartVolume": "Volume left",
     "chartRate": "Mining rate",
