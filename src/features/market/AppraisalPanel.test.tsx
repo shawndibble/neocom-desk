@@ -1384,7 +1384,7 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     expect(await screen.findByRole('columnheader', { name: 'Need' })).toBeInTheDocument();
     expect(screen.getByText(/Minus owned ·/)).toBeInTheDocument();
     const covered = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
-    expect(covered).toHaveClass('opacity-50');
+    expect(covered.className).not.toMatch(/opacity-/);
     expect(within(covered).getByText('4 owned')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /^Multibuy/ }));
