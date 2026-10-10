@@ -5,7 +5,7 @@
  * Shared by the Jump Range's Current System picker and Route Safety's From and
  * To (issue #2328). The snapshot is only fetched once the popover first opens.
  */
-import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useId, useMemo, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Popover, PopoverContent, PopoverTrigger, SearchInput } from '@/components/ui';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -37,6 +37,8 @@ export interface SolarSystemPickerProps {
   exclude?: ReadonlySet<number>;
   /** Each result also shows its security status. */
   showSecurity?: boolean;
+  /** The trigger button, for a caller handing focus to it. */
+  triggerRef?: Ref<HTMLButtonElement>;
 }
 
 export function SolarSystemPicker({
@@ -50,6 +52,7 @@ export function SolarSystemPicker({
   footer,
   exclude,
   showSecurity = false,
+  triggerRef,
 }: SolarSystemPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -99,6 +102,7 @@ export function SolarSystemPicker({
         {/* Shrinks inside a tight row and ends in an ellipsis rather than
             widening the page or wrapping to a second line (issue #2519). */}
         <Button
+          ref={triggerRef}
           disabled={disabled}
           aria-label={ariaLabel}
           className="max-w-full min-w-0 whitespace-nowrap"

@@ -113,4 +113,41 @@ describe('IconButton states', () => {
     rerender(<IconButton icon="x" label="Pin" pressed disabled />);
     expect(screen.getByRole('button').className).not.toContain('hover:');
   });
+
+  it('with `busy`, is aria-disabled and aria-busy, ignores clicks, and stays focusable', async () => {
+    const onClick = vi.fn();
+    render(<IconButton icon={glyph} label="Refresh" busy onClick={onClick} />);
+    const button = screen.getByRole('button', { name: 'Refresh' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).not.toBeDisabled();
+
+    await userEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+
+    button.focus();
+    expect(button).toHaveFocus();
+  });
+
+  it('ignores clicks when `aria-disabled` is passed directly', async () => {
+    const onClick = vi.fn();
+    render(<IconButton icon={glyph} label="Soon" aria-disabled="true" onClick={onClick} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Soon' }));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('calls onClick when not busy', async () => {
+    const onClick = vi.fn();
+    render(<IconButton icon={glyph} label="Refresh" onClick={onClick} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps focus when `busy` flips on while focused', () => {
+    const { rerender } = render(<IconButton icon={glyph} label="Refresh" />);
+    const button = screen.getByRole('button', { name: 'Refresh' });
+    button.focus();
+    rerender(<IconButton icon={glyph} label="Refresh" busy />);
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveFocus();
+  });
 });
