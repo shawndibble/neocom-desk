@@ -1,6 +1,8 @@
 /**
  * The Survey's location box: type a system, an NPC station or a structure and
- * pick it from the list under the box. Emptying the box clears the location.
+ * pick it from the list under the box. Emptying the box clears the location, and
+ * a name no result carries can be kept as typed: the last row offers it as a manual
+ * location (free text, no id, so no waypoint).
  *
  * Systems and stations are matched off the local snapshot while typing; a
  * structure needs ESI's name search (three letters, debounced), and only for a
@@ -20,6 +22,7 @@ import { cx } from '@/lib/cx';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import type { NpcStationEntry } from '@/sde/marketTypes';
 import {
+  manualPlaceOption,
   MIN_STRUCTURE_SEARCH_LENGTH,
   searchLocalPlaces,
   searchStructures,
@@ -34,7 +37,7 @@ export function SurveyLocationPicker({
   characterId,
   onPick,
 }: {
-  value: { id: number; name: string } | null;
+  value: { id: number | null; name: string } | null;
   characterId: number;
   /** A place, or `null` when the pilot emptied the box. */
   onPick: (place: SurveyPlace | null) => void;
@@ -87,7 +90,9 @@ export function SurveyLocationPicker({
   const places = useMemo(() => {
     const local = searchLocalPlaces(systems ?? [], stations, typed);
     const found = structureHits?.key === searchKey ? structureHits.places : [];
-    return [...local, ...found];
+    const results = [...local, ...found];
+    const manual = manualPlaceOption(results, typed);
+    return manual === null ? results : [...results, manual];
   }, [systems, stations, typed, structureHits, searchKey]);
 
   function choose(place: SurveyPlace) {
@@ -103,9 +108,13 @@ export function SurveyLocationPicker({
       setOpen(true);
       setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, places.length));
     } else if (event.key === 'Enter') {
-      if (highlight !== null && places[highlight]) {
+      const picked = highlight === null ? undefined : places[highlight];
+      // Enter on typed text nothing matched keeps it as a manual location.
+      const manual = places.find((place) => place.kind === 'manual');
+      const place = picked ?? (places.length === 1 ? manual : undefined);
+      if (place !== undefined) {
         event.preventDefault();
-        choose(places[highlight]);
+        choose(place);
       }
     } else if (event.key === 'Escape') {
       setOpen(false);
@@ -153,7 +162,7 @@ export function SurveyLocationPicker({
         >
           {places.map((place, index) => (
             <li
-              key={`${place.kind}-${place.id}`}
+              key={`${place.kind}-${place.id ?? place.name}`}
               id={`${listId}-${index}`}
               role="option"
               aria-selected={index === highlight}
@@ -165,7 +174,9 @@ export function SurveyLocationPicker({
               onClick={() => choose(place)}
             >
               <span className="min-w-0 [overflow-wrap:anywhere]">
-                {place.name}
+                {place.kind === 'manual'
+                  ? t('survey.info.useManual', { name: place.name })
+                  : place.name}
                 {place.security !== undefined && (
                   <SecurityStatus security={place.security} className="ml-1" />
                 )}

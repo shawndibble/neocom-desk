@@ -164,3 +164,23 @@ describe('SurveyInfoReadout', () => {
     expect(screen.getByText('Just notes')).toBeTruthy();
   });
 });
+
+describe('manual locations', () => {
+  it('shows a manual location without a waypoint button, in the editor and the readout', () => {
+    const info = { location: { id: null, name: 'Moro' }, notes: '' };
+    const { unmount } = render(
+      <SurveyInfoEditor characterId={7} survey={{ ...SURVEY, info }} moon={false} />
+    );
+    expect(screen.getByTestId('picked').textContent).toBe('Moro');
+    expect(screen.queryByRole('button', { name: /Set waypoint/ })).toBeNull();
+    unmount();
+    render(<SurveyInfoReadout info={info} tax={null} />);
+    expect(screen.getByText('Moro')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Set waypoint/ })).toBeNull();
+  });
+
+  it('shows the waypoint for a resolved location on the readout', () => {
+    render(<SurveyInfoReadout info={{ location: { id: 5, name: 'Efa' }, notes: '' }} tax={null} />);
+    expect(screen.getByRole('button', { name: /Set waypoint to Efa/ })).toBeTruthy();
+  });
+});

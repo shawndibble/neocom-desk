@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NpcStationEntry, SolarSystemEntry } from '@/sde/marketTypes';
-import { searchLocalPlaces, searchStructures } from './surveyPlaces';
+import { manualPlaceOption, searchLocalPlaces, searchStructures } from './surveyPlaces';
 
 const { getCharacterSearch, loadStructureSummary } = vi.hoisted(() => ({
   getCharacterSearch: vi.fn(),
@@ -54,5 +54,20 @@ describe('searchStructures', () => {
       { id: 1001, name: 'Efa - Refinery', kind: 'structure' },
     ]);
     expect(getCharacterSearch).toHaveBeenCalledWith(7, ['structure'], 'efa', { signal: undefined });
+  });
+});
+
+describe('manualPlaceOption', () => {
+  const found = [{ id: 1, name: 'Jita', kind: 'system' as const }];
+  it('offers what was typed as a manual place with no id', () => {
+    expect(manualPlaceOption(found, '  Moro  ')).toEqual({
+      id: null,
+      name: 'Moro',
+      kind: 'manual',
+    });
+  });
+  it('offers nothing for an empty box or a name a result already carries', () => {
+    expect(manualPlaceOption(found, '  ')).toBeNull();
+    expect(manualPlaceOption(found, 'jita')).toBeNull();
   });
 });
