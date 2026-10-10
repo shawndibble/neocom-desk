@@ -187,6 +187,24 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
       );
     });
 
+    it('does not ask about an ore the latest scan already lacked', async () => {
+      loadSurvey.mockResolvedValue({
+        ok: true,
+        expiresAt: EXPIRES,
+        owner: 'Shawn Dibble',
+        tax: null,
+        scans: [
+          { at: Date.UTC(2026, 9, 8, 17), rocks: parseSurveyScan(TWO_ORES)! },
+          { at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! },
+        ],
+      });
+      renderTab();
+      await screen.findByText(/mined/);
+      pasteInApp(SHRUNK);
+      await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole('group', { name: /every section is expanded/i })).toBeNull();
+    });
+
     it('adds nothing when the upload is cancelled', async () => {
       renderTab();
       await screen.findByText(/mined/);

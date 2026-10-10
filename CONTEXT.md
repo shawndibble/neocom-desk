@@ -1035,7 +1035,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   It also keeps the Character name of whoever pasted it (none for an anonymous
   visitor), shown in the chart tooltip as "Scanned by". A scanner group left
   collapsed pastes without its ore, so a pilot's first scan that lacks an ore
-  the Survey has shown is confirmed ("All are expanded") before it is added.
+  the Survey's latest scan showed is confirmed ("All are expanded") before it is added.
 - **Survey chat message**: What "Copy chat message" puts on the clipboard:
   four lines (status word with finish time in EVE time and time left, a block
   bar with the percent, the rocks left by short ore name, the link), none wider
