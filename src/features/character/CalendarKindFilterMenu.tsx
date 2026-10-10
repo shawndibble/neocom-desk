@@ -30,12 +30,11 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui';
 import { DropdownMenuTrigger } from '@/components/ui';
 import { IconButton } from '@/components/ui';
-import { controlHeightClassName } from '@/components/ui/controlStyles';
-import { textActionClassName } from '@/components/ui/textActionClassName';
 import * as Icon from '@/components/ui/icons';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
@@ -170,18 +169,19 @@ export function CalendarKindFilterMenu({
             {t('calendar.skillPlan.errorReason', { reason: skillPlanError })}
           </p>
         )}
-        {/* `controlHeightClassName.md` rather than ad-hoc padding: a touch
-            viewport gets 44px here like every other control (DESIGN.md §3). */}
-        <button
-          type="button"
-          onClick={onShowAll}
+        {/* A real menu item, not a raw button: Radix roving focus only visits
+            registered items, so a plain button here is unreachable by keyboard
+            (WCAG 2.1.1). `preventDefault` keeps the menu open, like the rows above. */}
+        <DropdownMenuItem
           disabled={hidden.length === 0}
-          className={textActionClassName(
-            `mt-1 w-full rounded-none border-t border-line px-2 text-left disabled:text-text-faint ${controlHeightClassName.md}`
-          )}
+          onSelect={(event) => {
+            event.preventDefault();
+            onShowAll();
+          }}
+          className="mt-1 rounded-none border-t border-line touch:min-h-11"
         >
           {t('calendar.filter.showAll')}
-        </button>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
