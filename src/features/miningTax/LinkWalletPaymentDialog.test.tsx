@@ -110,10 +110,15 @@ describe('LinkWalletPaymentDialog', () => {
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   });
 
+  it('renders its filter as a search box', () => {
+    renderDialog();
+    expect(screen.getByRole('searchbox', { name: 'Search wallet payments' })).toBeInTheDocument();
+  });
+
   it('filters payments by search', async () => {
     renderDialog();
 
-    await userEvent.type(screen.getByRole('textbox', { name: 'Search wallet payments' }), 'Ore');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search wallet payments' }), 'Ore');
 
     expect(screen.getAllByRole('radio')).toHaveLength(1);
     expect(screen.getByText('Paid in kind · 2026-09-11')).toBeInTheDocument();

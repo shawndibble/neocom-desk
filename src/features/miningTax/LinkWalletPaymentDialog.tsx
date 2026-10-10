@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, IskInput, Modal, Radio, TextInput } from '@/components/ui';
+import { Button, Checkbox, IskInput, Modal, Radio, SearchInput } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PayeeRecord } from '@/db';
 import { GrantNote } from '@/app/GrantNote';
@@ -233,7 +233,7 @@ export function LinkWalletPaymentDialog({
           </p>
         ) : (
           <>
-            <TextInput
+            <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('miningTax.linkTransactionSearchPlaceholder')}

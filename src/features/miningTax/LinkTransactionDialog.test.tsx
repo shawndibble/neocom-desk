@@ -70,6 +70,11 @@ describe('LinkTransactionDialog', () => {
     expect(screen.queryByRole('radio', { checked: true })).not.toBeInTheDocument();
   });
 
+  it('renders its filter as a search box', () => {
+    renderDialog();
+    expect(screen.getByRole('searchbox', { name: 'Search transactions' })).toBeInTheDocument();
+  });
+
   it('filters candidates by search text', () => {
     renderDialog();
     fireEvent.change(screen.getByPlaceholderText('Search by amount, date, or description…'), {
