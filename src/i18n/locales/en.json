@@ -2722,7 +2722,7 @@
     "compareHubSellVolume": "Units on sell orders",
     "compareHubPicker": "Market hub",
     "comparePlanHub": "Each plan's hub",
-    "compareHubOrdersHint": "The market hub prices every column. Orders per day is traded orders averaged over 30 days across the hub's whole region (ESI has no per-hub history). The other hub columns are open orders right now at the hub's station.",
+    "compareHubOrdersHint": "Orders per day is traded orders averaged over 30 days across the hub's whole region (ESI has no per-hub history). The other hub columns are open orders right now at the hub's station.",
     "compareHubFailed": "Couldn't read the hub's orders.",
     "compareDone": "Done",
     "compareTableLabel": "Build plan comparison",
