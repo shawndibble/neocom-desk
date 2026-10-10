@@ -16,7 +16,7 @@ import { useDoneAtClock, useDoneAtOverride } from './surveyPref';
 
 // Accent says it's pressable; no underline, since that reads as a link to
 // somewhere. The tooltip names what a press does.
-const toggleClassName = `text-accent rounded-xs ${interactiveClassName} ${focusRingClassName}`;
+const toggleClassName = `text-accent text-left whitespace-normal rounded-xs ${interactiveClassName} ${focusRingClassName}`;
 
 function Tile({
   label,
@@ -71,7 +71,7 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
     tileCount === 6 ? '@4xl:grid-cols-6' : tileCount === 5 ? '@4xl:grid-cols-5' : '';
   return (
     <div className="@container">
-      <div className={`grid grid-cols-3 gap-x-4 gap-y-3 ${wideColumns}`}>
+      <div className={`grid grid-cols-3 gap-x-2 gap-y-3 @md:gap-x-4 ${wideColumns}`}>
         {!summary.finished && (
           <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
         )}
