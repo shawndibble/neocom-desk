@@ -152,7 +152,7 @@ describe('SurveyBoard', () => {
       expect(row?.textContent).toMatch(/1 rock · 5\.3K m³ · .*570K.* ISK · 100% left/);
     });
 
-    it('has one Copy chat message button, in the header on a desktop and under the chart on a phone', () => {
+    it('has one Copy chat message button, in the header, on a phone too', () => {
       const { unmount } = render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
       expect(screen.getAllByRole('button', { name: 'Copy chat message' })).toHaveLength(1);
       unmount();
