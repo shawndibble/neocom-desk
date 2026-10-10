@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { SyncStatusDot } from './SyncStatusDot';
 
@@ -29,5 +30,12 @@ describe('SyncStatusDot', () => {
     expect(
       screen.getByRole('status', { name: 'Offline — will sync when reconnected' })
     ).toBeInTheDocument();
+  });
+
+  it('is reachable by keyboard and shows its tooltip on focus', async () => {
+    render(<SyncStatusDot status={{ state: 'idle', lastSyncedAt: 1, error: null }} online />);
+    await userEvent.tab();
+    expect(screen.getByRole('status', { name: 'Synced' })).toHaveFocus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Synced');
   });
 });

@@ -179,6 +179,24 @@ describe('PilotListView (Local list)', () => {
     expect(within(quiet).getByText('Sleeper')).toBeTruthy();
   });
 
+  it('gives every group table the same Standing and kill-count column widths', async () => {
+    renderList();
+    await screen.findByRole('table', { name: 'Killed in highsec, last 30 days' });
+    const tables = screen.getAllByRole('table');
+    expect(tables.length).toBeGreaterThan(1);
+    const widthsOf = (table: HTMLElement) =>
+      within(table)
+        .getAllByRole('columnheader')
+        .map((th) => th.className.split(/\s+/).find((c) => /^w-\d+$/.test(c)) ?? null);
+    for (const table of tables) {
+      // Fixed layout, so the pinned widths hold whatever the group's content.
+      expect(table.className).toContain('table-fixed');
+      // Pilot and Flew on stay flexible; Standing, Highsec, Lowsec, Nullsec are pinned.
+      expect(widthsOf(table)).toEqual(widthsOf(tables[0]));
+      expect(widthsOf(table).filter((w) => w !== null)).toHaveLength(4);
+    }
+  });
+
   it('regroups when the space you are in changes', async () => {
     mocks.here.space = 'nullsec';
     renderList();

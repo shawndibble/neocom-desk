@@ -604,8 +604,10 @@ export function NotificationsPanel() {
           other.
         */}
         <fieldset disabled={!prefsValue.masterEnabled} className="ml-6 space-y-2">
+          <legend className="sr-only">{t('settings.notifications.channelsLegend')}</legend>
           <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
             <Checkbox
+              aria-describedby="notifications-browser-channel-hint"
               checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
               disabled={browserBlocked}
               onChange={() =>
@@ -616,11 +618,15 @@ export function NotificationsPanel() {
             />
             {t('settings.notifications.browserChannelLabel')}
           </label>
-          <p className="ml-6 text-[0.6875rem] text-text-dim">
+          <p
+            id="notifications-browser-channel-hint"
+            className="ml-6 text-[0.6875rem] text-text-dim"
+          >
             {t('settings.notifications.browserChannelHint')}
           </p>
           <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
             <Checkbox
+              aria-describedby="notifications-feed-channel-hint"
               checked={isFeedChannelEnabled(prefsValue)}
               onChange={() =>
                 void setDeviceNotificationPrefs(
@@ -630,7 +636,7 @@ export function NotificationsPanel() {
             />
             {t('settings.notifications.feedChannelLabel')}
           </label>
-          <p className="ml-6 text-[0.6875rem] text-text-dim">
+          <p id="notifications-feed-channel-hint" className="ml-6 text-[0.6875rem] text-text-dim">
             {t('settings.notifications.feedChannelHint')}
           </p>
         </fieldset>
