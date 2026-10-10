@@ -68,6 +68,7 @@ import { resolveCategories, resolveNames, type NameCategory } from '@/features/c
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { cx } from '@/lib/cx';
+import { focusRingClassName } from '@/components/ui/controlStyles';
 import { HintText } from '@/components/ui/HintText';
 import { formatCountdown } from '@/lib/duration';
 import { useTicker } from '@/lib/ticker';
@@ -148,9 +149,10 @@ function ContractStatusCell({ contract }: { contract: Contract }) {
   const label = t(CONTRACT_STATUS_KEY[contract.status]);
   return isStale(contract, nowMs) ? (
     <Tooltip content={t('contracts.staleTooltip')} openOnTap>
-      <span className="inline-flex items-center gap-1">
+      <span tabIndex={0} className={cx('inline-flex items-center gap-1', focusRingClassName)}>
         <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0" />
         {label}
+        <span className="sr-only">{t('contracts.staleTooltip')}</span>
       </span>
     </Tooltip>
   ) : (

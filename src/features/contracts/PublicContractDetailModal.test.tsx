@@ -167,6 +167,18 @@ describe('PublicContractDetailModal — contents', () => {
     expect(writeText).toHaveBeenCalledWith('235091192');
   });
 
+  it('announces the copy to screen readers', async () => {
+    const user = userEvent.setup();
+    configureClipboard(vi.fn(async () => undefined));
+    showItems([item({ record_id: 1 })]);
+    renderModal();
+
+    await user.click(await screen.findByRole('button', { name: 'Copy contract ID' }));
+
+    const status = await screen.findByText('Contract ID copied');
+    expect(status).toHaveAttribute('role', 'status');
+  });
+
   it('prices each side at the trade hub, so the asking price has something to sit against', async () => {
     showItems([
       item({ record_id: 1, quantity: 5 }),
