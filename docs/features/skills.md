@@ -22,6 +22,28 @@ Data sources (all views)
 - Firestore sync (when `isSyncConfigured()`): plans via `src/sync/planSync.ts` (`scheduleSync(characterId)`; deletes write a tombstone via `markPlanDeleted`). Synced settings: `sync.skillCloneStates` (Alpha/Omega per Character, `cloneState.ts:18`), `sync.targetSkillPlan` (target plan per Character, `targetPlan.ts:10`). Saved comparisons are NOT synced (`comparisons.ts:5`). FAQ text: `settings.faq.store.synced.*`.
 - Market hub sell orders for skill injectors / skill books (`src/market/prices`, Fuzzwork-era hub aggregate via `getHubPrices`).
 
+## Purpose and user goal
+
+"When will my plan finish, and how do I get there faster?" Planning is what a pilot comes to Skills to do; the trained list is reference (decision `20260902-173029`, which is why `/skills` opens on Plans). Owner issues add the cost side: what injectors or skill books the rest of a plan would cost (#1408, #2825), and getting a plan in from CCP's Certified Plans or a paste (#2392, #2981).
+
+- **Top jobs (ranked):** 1. "How long until this Skill Plan is done, and can order, a Remap, implants or a Booster shorten it?" 2. "Is my queue still training, and what finishes next?" (live queue on the Plans list). 3. "What would it cost to skip or buy my way through it?"
+- **Device and cadence:** both. Skills is one of the four default phone tabs (`DEFAULT_MOBILE_TABS` in `src/lib/mobileTabs.ts`: Overview, Skills, Industry, Market), so a phone glance at the queue is expected; plan editing is a desk session (sidebar + Plan Tools, attributes pane desktop-only, `20260901-092551`, `20260902-173029`). Cadence: a glance whenever the queue nears its end, a session when planning.
+- **Above the fold:** Plans list: live queue state and finish time, then each plan with its total time. Editor: plan summary strip (total time, finish date, which plan is open, #1709), then the entry list.
+- **Not for:** "which hulls can I fly" (Ships > Ship Tree); a Fitting's missing skills start in Fittings and land here as plan entries.
+- **Sources:** `20260902-173029`, `20260901-092551`, `20260930-201202`, `20261008-045030`; #1408, #1709, #2392, #2825, #2981.
+- **Unconfirmed:** cadence (glance vs session); that pilots check the queue here rather than on Overview; how much Compare and Certificates are used.
+
+### Mobbin brief
+
+- **Fit:** medium: plan list and an ordered, reorderable list with durations are generic; Remap, attribute and injector maths are EVE-specific.
+- **Analog apps:** Things, Todoist, Linear, Duolingo, Coursera.
+- **Screen queries:**
+  - `web: ordered task list with drag handles where each row shows its duration and a running finish date, with a summary bar of total time and end date above`
+  - `web: list of saved plans each with total time and finish date, beside a detail pane of the user's current stats`
+  - `ios: progress screen showing the item in progress with a countdown and the queued items below it`
+- **Flow queries:** `web: import a list by pasting text and review the parsed items before saving`
+- **Mobbin won't help with:** attribute Remap optimizer, Skill injector bracket maths, Certificate tier grids; reference EVEMon and the in-game skill queue and Certified Plans windows.
+
 ---
 
 ## 1. Plans list (`/skills/plans`)

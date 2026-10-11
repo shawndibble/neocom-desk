@@ -30,6 +30,28 @@ Code: `src/routes/Alerts.tsx`; `src/features/notifications/*` (see below); `src/
 | Scheduled Push         | 72 h Projection upload; OS push with app closed                                                  | `projectionRebuild.ts`, `projectionUpload.ts`, `deviceRegistration.ts`, `pushHandler.ts` |
 | Synced prefs           | Feed half of toggles + all thresholds                                                            | `syncedPreferences.ts`                                                                   |
 
+## Purpose and user goal
+
+"Tell me when something in game needs me, even when the app is closed." This doc owns being told: which Notification Events fire, for which Character, through which channel (device pop-up or the in-app Alerts list), and which can reach a closed app via Scheduled Push (ADR 0010; ADR 0009). Its sibling `alerts.md` owns the record of what already fired. Every Character is polled, not only the active one (`20260901-181135`).
+
+- **Top jobs (ranked):** 1. "Will I be told before my queue, job, extractor or courier runs out, for every Character?" (per-event, per-Character, per-channel toggles and thresholds). 2. "Turn on notifications on this device" (permission prompt, Enable, iOS install-to-home-screen notice). 3. "Why didn't this alert me?" (rows needing a Permission or corp role show why, with Grant, #1525; push-badged events, #2952).
+- **Device and cadence:** both. Phone is the delivery target for push: iOS needs the installed app, Android has the Play Store app, and the Install Prompt is phone-only (`20261002-165619`). Settings are set once and revisited rarely (inferred).
+- **Above the fold (Settings › Notifications):** permission state with Enable, the master switch and the two channel gates, search, then the active Character's section (open by default).
+- **Not for:** reading, dismissing or muting what already fired (`/alerts`, `alerts.md`); instant combat alerts with the app closed (only events whose time is known ahead are pushed, ADR 0010).
+- **Sources:** ADR 0009, ADR 0010; decisions `20260901-181135`, `20260925-112832`, `20260907-114310`; #1525, #2952, #2844, #2871.
+- **Unconfirmed:** that pilots mainly want the phone buzz rather than the in-app list; set-once cadence; whether quiet hours (#2871, closed) shipped or were dropped.
+
+### Mobbin brief
+
+- **Fit:** high. A notification preferences matrix, a permission priming banner and per-account sections are common patterns.
+- **Analog apps:** Slack, GitHub, Discord, Robinhood.
+- **Screen queries:**
+  - `web: notification settings with events as rows and delivery channels as checkbox columns, grouped by account in collapsible sections`
+  - `ios: permission priming banner explaining why to allow notifications with allow and dismiss buttons`
+  - `web: notification settings with a master switch above channel toggles and a search field over the event list`
+- **Flow queries:** `ios: turn on push notifications from settings through the system permission prompt`.
+- **Mobbin won't help with:** EVE notification families and their allow-list, corp-role gating hints, and what the scheduled-push badge promises. Those come from ESI and the EVE client's own notification settings.
+
 ## Alerts page (`/alerts`)
 
 - Route gate: `UNGATED` (`routeScopes.ts:89`): it reads Dexie only; a Character with no grants simply has an empty feed. Not shown until preferences have hydrated (`!prefsHydrated -> null`).

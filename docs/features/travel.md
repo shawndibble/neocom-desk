@@ -34,6 +34,29 @@ Principle in every scope decision: conditions, never verdicts (`20260912-172628`
 | Travel Settings                      | Settings > Travel                                      | Preference, penalty, avoid rules, wormhole/bridge defaults, Avoided Systems.                                                                                     |
 | Command palette                      | Ctrl/Cmd+K                                             | Only generic Pages entries; no travel commands.                                                                                                                  |
 
+## Purpose and user goal
+
+"What is on my way, and how do I get there?" A pilot about to fly (a hauling or buying run, a trip through several Stops, a hop through Thera or Turnur) checks the last hour's kills and jumps along the route, chooses how to fly each Leg, then sends the Stops to the game's autopilot. Travel became in scope with #2328 (`20260929-234357`); it states conditions, never verdicts (`20260912-172628`).
+
+- **Top jobs (ranked):** 1. "What happened along this route in the last hour?" (kills, jumps, Gank Chokepoints per system; #2328). 2. "What is the best order and way to fly my Stops, and does a Thera/Turnur hole or Ansiblex cut it short?" (#2475, `20261003-173108`, #2330). 3. "Put this route in my autopilot" (Set waypoints, `20261003-175151`).
+- **Device and cadence:** both. Not in the default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts`: Overview, Skills, Industry, Market), but phone-specific fixes #2519 and #2591 and dense phone route cards show phone use. Used per trip, not daily (inferred).
+- **Above the fold:** Stops (From, Stops; one line on a phone), facts chips (jumps, security counts, last-hour kills, chokepoints), Route strip, Set waypoints, then the first route rows. Route rules can sit below.
+- **Not for:** a "safe/unsafe" rating (never given); who is in Local (Pilot Lookup tab, `pilot-lookup.md`); the in-game avoidance list (ESI cannot read it, so Avoided Systems are entered by hand, `20260930-153212`).
+- **Sources:** #2328, #2330, #2475, #3540, #2519, #2591; decisions `20260929-234357`, `20260912-172628`, `20261003-173108`, `20261003-175151`, `20260930-153212`.
+- **Unconfirmed:** per-trip cadence; whether pilots plan on the phone mid-session (second screen) or at the desk before undocking; the ranking of Set waypoints above Thera / Turnur and Incursions near you.
+
+### Mobbin brief
+
+- **Fit:** medium. A trip planner with reorderable stops, a list of route options and a filterable live table are common patterns; the security-coloured Route strip, hole rows and kill heat are EVE-specific.
+- **Analog apps:** Google Maps, Citymapper, Waze, Flighty.
+- **Screen queries:**
+  - `web: multi-stop trip planner with a reorderable stop list beside a route summary and collapsible legs`
+  - `ios: route overview with a row of trip facts above a scrolling list of places along the way`
+  - `web: route options panel comparing alternative ways to travel one leg with time and transfers for each`
+  - `web: sortable table of live departures with filter selects above and a time-remaining column`
+- **Flow queries:** `web: add several stops to a trip, reorder them for the shortest route, then send the route to a phone`.
+- **Mobbin won't help with:** the Route strip, security bands, wormhole signatures and Ansiblex bridges, kill heat and chokepoints. Reference the EVE client's route and autopilot panel, Dotlan, EVE-Scout and zKillboard instead.
+
 ## Routing, access, scopes
 
 - Route `/travel` gating `ungated` (`src/app/routeScopes.ts:216`): public ESI + local stargate graph, no scope can lock it. Still requires a signed-in Character: `Travel.tsx` waits for `hydrated`, then `Navigate to /characters` when `activeCharacterId === null` (`src/routes/Travel.tsx:35-40`). Logged-out access noted as a possible follow-up (`20260929-234357`).

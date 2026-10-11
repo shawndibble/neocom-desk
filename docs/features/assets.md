@@ -30,6 +30,28 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 | Re-login, offline, truncated, stale-link states            | `Assets.tsx:1691-1722,1939`                 |                                                                                                                                                                                                |
 | Command Palette "Assets" group                             | `features/commandPalette/assetsProvider.ts` | item → `/assets/items?q=`                                                                                                                                                                      |
 
+## Purpose and user goal
+
+"Where is my stuff, and what is it worth?" Assets is the Character's (and, while searching, the account's) inventory across New Eden: Items finds a thing and drills into stations, ships and containers; Ships lists hulls; Move plans hauling scattered stock to one place (`20261009-110609`, `20261007-175555`, #2947).
+
+- **Top jobs (ranked):** 1. "Where is item X, and on which Character?" (search, cross-Character `?chars=`, palette "Assets" group) 2. "What do I have at this station, and how far is it?" (location list with pins, jumps away, value) 3. "How do I get it all to one place?" (Move). Ranking is inferred, see Unconfirmed.
+- **Device and cadence:** both. Not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`). Drill-down lives in the URL so phone Back steps up a level (`src/engine/assetPath.ts:1-14`); phone layout fixes (#2989, #3240) show phone use. On demand: no alert links here.
+- **Above the fold:** search box and Character filter; total value; pinned locations first with item count, value, jumps and security.
+- **Not for:** keeping a market stocked (Market › Stock, `20261010-182330`); fitting a ship (Fittings, via Open in Fittings); market pricing (values are a rough average price).
+- **Sources:** `20261009-110609`, `20261007-175555`, `20260831-230742`, `20261008-010431`, `20261010-182330`; #2846, #2936, #2947, #2989, #3240.
+- **Unconfirmed:** the job ranking; that "where is it" outranks "what is it worth"; how often Move is used; whether pilots want all Characters by default rather than the active one.
+
+### Mobbin brief
+
+- **Fit:** medium. Search across folders, drill-down with breadcrumbs, bulk select and an inventory value total are generic file-manager and inventory patterns; jumps away and a hauling plan are EVE-specific.
+- **Analog apps:** Google Drive, Dropbox, Sortly, Shopify (inventory), Steam (inventory).
+- **Screen queries:**
+  - `web: file browser with a breadcrumb path, folder rows showing item count and size, and a search box that flattens results across folders`
+  - `ios: inventory list grouped by location with total value per location and a pinned group at the top`
+  - `web: list in select mode with checkboxes and a bulk action bar`
+- **Flow queries:** `web: pick items and a destination, then see a move plan with trips and totals`.
+- **Mobbin won't help with:** jumps away under a route preference, security status, ship fitting contents and cargo-trip maths; reference the EVE client Asset window and EVE route tools.
+
 ## Route, nav, gating
 
 - Nav: `/assets`, `group: 'economy'`, `gating: 'scope'`, `mobileTab: true`.

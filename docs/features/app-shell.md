@@ -30,6 +30,29 @@ Everything around the feature pages: router and route table, the signed-in `Layo
 | Help & FAQ page                                                                         | `/help` (`/help/shortcuts` default, `/help/faq`, `/help/support`)              | `src/routes/Help.tsx:15`                                                                                              | open FAQ items in memory              | -                                    |
 | Settings (pointer)                                                                      | `/settings`                                                                    | `src/routes/Settings.tsx`                                                                                             | -                                     | -                                    |
 
+## Purpose and user goal
+
+"Get me to the page I need, as the Character I mean." The shell is the chrome around every page: navigation, the Character switcher, the alerts bell, and the gate that explains a locked page.
+
+- **Top jobs (ranked):** 1. "Go to a page or view" (rail, phone tab bar, More sheet, Go to). 2. "Switch to another Character" (portrait link, key `C`). 3. "Why is this page locked, and how do I fix it?" (ScopeGate, Grant).
+- **Device and cadence:** both, every session. Phone: a bar of the pilot's four pages (`20260913-095527`; default `DEFAULT_MOBILE_TABS` in `src/lib/mobileTabs.ts`: Overview, Skills, Industry, Market) plus More; desktop: the grouped rail.
+- **Above the fold:** n/a. Always visible: rail or tab bar, the Character portrait, the bell with its count.
+- **Not for:** page content; finding an item or asset (command palette, `command-palette.md`).
+- **Sources:** decisions `20260913-095527`, `20261002-145653-rail-opens-the-current-page-icons-hiding-and`, `20261009-163837`.
+- **Unconfirmed:** ranking of switching Character against navigating; how many pilots use hide-pages.
+
+### Mobbin brief
+
+- **Fit:** high. Sidebars, bottom tab bars, More sheets and account switchers are generic.
+- **Analog apps:** Linear, Notion, Slack, Discord.
+- **Screen queries:**
+  - `web: grouped sidebar navigation with sections that expand to sub-pages and an account switcher at the bottom`
+  - `ios: bottom tab bar with four tabs and a More tab opening a grid of every section`
+  - `ios: account switcher listing several profiles with avatars and the active one marked`
+  - `web: locked feature screen explaining a missing permission with one grant button`
+- **Flow queries:** `web: first-run choice of which sections to show in navigation`.
+- **Mobbin won't help with:** EVE Permissions and scopes, Corp Access rules.
+
 ## Routes (`src/app/App.tsx`)
 
 - `/` -> `Root` (`:229`): Character count unresolved or active-store not hydrated -> `BootScreen gate="root"`; 0 Characters -> `/login`; Characters but none active -> `/characters`; else `/overview`. Waits on the active-character store as well as the count, so a returning user is not bounced to `/characters` (comment above `Root`).

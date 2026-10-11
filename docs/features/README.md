@@ -1,6 +1,6 @@
 # Neocom Desk feature inventory
 
-Goal: know what exists so we know what to improve. Written from code, not memory. Each file has a summary table, controls, persistence/sync, scopes, states, formulas, Interview Q&A, Observed gaps, Improvement ideas.
+Goal: know what exists so we know what to improve. Written from code, not memory. Each file has a summary table, Purpose and user goal (with a Mobbin brief for redesign reference), controls, persistence/sync, scopes, states, formulas, Interview Q&A, Observed gaps, Improvement ideas.
 
 Part indexes: [A](README-A.md) · [B](README-B.md) · [C](README-C.md).
 
@@ -18,6 +18,47 @@ Part indexes: [A](README-A.md) · [B](README-B.md) · [C](README-C.md).
 | Support        | help-faq, styleguide-notfound                                                         |
 
 alerts.md (A) and notifications.md (C) overlap. share-links.md (A) and entities-share.md (C) overlap. Read both.
+
+## Page goals and Mobbin fit
+
+Each file's "Purpose and user goal" section ranks the pilot's top jobs, names what belongs above the fold, and ends with a Mobbin brief: analog apps, screen queries and what Mobbin can't cover. Start a redesign there. Claims without a source sit under each section's **Unconfirmed** line for the owner to correct. Phone evidence is `DEFAULT_MOBILE_TABS` (`src/lib/mobileTabs.ts`) plus phone decisions and issues; `mobileTab: true` alone proves little, since nearly every page has it.
+
+Mobbin fit: **high** = mostly generic patterns; **low** = mostly EVE-specific views, take reference from EVE tools and the client instead. planetary-industry has no section: its overhaul has its own spec in `docs/design/pi-tabs/`.
+
+| File                      | Top job                                                       | Device, cadence                              | Mobbin fit                   |
+| ------------------------- | ------------------------------------------------------------- | -------------------------------------------- | ---------------------------- |
+| overview                  | What is on a clock, and what runs out first                   | both; landing page, every session            | high                         |
+| alerts                    | What fired while I was away, worst first                      | both; when the bell shows a count            | high                         |
+| notifications             | Will I be told before things run out, for every Character     | both, push lands on phone; set once          | high                         |
+| calendar                  | What happens next for this Character, and when                | both; before a session                       | medium-high                  |
+| command-palette           | Take me to X                                                  | mostly desk keyboard                         | high                         |
+| app-shell                 | Go to a page, as the right Character                          | both; every session                          | high                         |
+| auth-login                | What will this do for me, and is it safe to log in            | both; once per Character                     | high                         |
+| characters                | Which alt needs attention; switch to it                       | both; per session                            | medium                       |
+| settings                  | Set my defaults once for every device                         | both; occasional                             | high                         |
+| sync-backup               | Is my work synced; move to or wipe a device                   | both; rare                                   | medium                       |
+| share-links               | Sender: copy a link; recipient: what did they send me         | at the moment of sharing or opening          | medium                       |
+| entities-share            | Who or what is this name (Show Info)                          | mid-task, often                              | medium                       |
+| clones                    | Which clone should I wear for this queue                      | both; when the queue changes                 | low-medium                   |
+| employment-history        | Which corps has this Character been in, and for how long      | occasional                                   | high                         |
+| skills                    | When does my plan finish, and how do I get there faster       | phone glance at queue, desk for plan editing | medium                       |
+| ships                     | Can I fly hull X, and how long until I can                    | desk; occasional                             | low                          |
+| fittings                  | Can I fly this fit, and how does it perform                   | desk to edit, phone to look up; occasional   | low-medium                   |
+| mining                    | What did I mine and what's it worth; what does each Payee owe | desk bookkeeping; after mining or billing    | high (Tax), medium           |
+| mining-survey             | How much of the field is left, and the ETA                    | both; during an op                           | medium                       |
+| contacts                  | What standing do I have with this name; do my alts agree      | desk; occasional                             | medium-high                  |
+| mail                      | What's unread, on which Character                             | both; when mail arrives                      | high                         |
+| wallet                    | Net worth and its trend; then where the ISK went              | both; wallet alert opens Journal             | high                         |
+| assets                    | Where is item X, on which Character                           | both; on demand                              | medium                       |
+| contracts                 | Cheapest public listing of an item; courier pay per jump      | both; contract alerts open History           | medium                       |
+| market                    | Which of my orders need me; price one item or a pile          | both; default phone tab, alert-driven        | medium                       |
+| corp                      | Next corp deadline or fuel running out                        | likely desk; fuel alert opens `/corp`        | medium                       |
+| industry-plans            | Is this build profitable: build or buy                        | both; default phone tab                      | low                          |
+| industry-records-sourcing | Which jobs are done; what to build next                       | both; job-complete alert opens Industry      | medium                       |
+| travel                    | What happened along my route in the last hour                 | both; per trip                               | medium                       |
+| pilot-lookup              | Am I in danger (D-Scan), who is in Local                      | both; several times a play session           | low-medium                   |
+| help-faq                  | Which keys and pastes work; what do you store                 | both; occasional                             | high                         |
+| styleguide-notfound       | Developer: check a token or cue; pilot: leave a dead URL      | desk (styleguide); any device (404)          | low (styleguide), high (404) |
 
 ## Cross-cutting gaps (from all three passes)
 

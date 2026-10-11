@@ -111,6 +111,24 @@ Shared with `PublicInfoModal`'s Character tab (`src/components/PublicInfoModal.t
 
 Answer "who is this pilot and what have they done" from facts: identity (public ESI) plus all-time and recent killboard figures (zKillboard). Typical goals: check a stranger before a contract, trade or fleet invite; share a link to a pilot. It never labels a pilot (decision `20260912-172628`; asserted by `PilotLookupPanel.test.tsx:210`).
 
+- **Top jobs (ranked):** 1. "Am I in danger, and what should I watch?" (a pasted D-Scan opens with the Danger read, `20261009-111531`). 2. "Who is in Local, and which of them kill in this kind of space?" (pasted Local list, `20261007-224716`, #2863). 3. "Who is this one pilot?" (name lookup, profile, #2331).
+- **Device and cadence:** both, several times in a play session (inferred: Scan age turns to a warning after 2 minutes, `20261009-111531`). Pasting from the game client suggests the desk; not in the default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts`).
+- **Above the fold:** the search and paste box; then, for a D-Scan, the Danger read (level, sentence, Watch these); for a Local list, the grouped rows with Threat badges; for one pilot, identity and the Threat band.
+- **Not for:** route conditions (Route Safety, `travel.md`); a corporation or alliance (Show Info).
+- **Sources:** #2331, #2332, #2863, #2943; decisions `20260929-234357`, `20261007-224716`, `20261009-111531`, `20261008-181210`, `20261008-222917`; CONTEXT.md Threat, Danger read.
+- **Unconfirmed:** the sentence above ("never labels a pilot") predates the Threat badge, which CONTEXT.md calls a verdict badge (`20261008-181210`); the owner should say which holds. Also: the job ranking, and whether pilots use it on a phone beside the game.
+
+### Mobbin brief
+
+- **Fit:** low to medium. A player profile with stats and a match list is generic; the Danger read, Local grouping and D-Scan Fleet board are EVE-specific.
+- **Analog apps:** Truecaller, Steam, Chess.com, Strava.
+- **Screen queries:**
+  - `web: player profile with avatar, team, an all-time stats line, ratio meters and a recent matches list that expands per match`
+  - `ios: caller lookup result with a risk level badge and a one-line reason`
+  - `web: pasted list of names checked into grouped rows, each with a risk badge and counts`
+- **Flow queries:** none.
+- **Mobbin won't help with:** the Danger read, Fleet board and victim fits. Reference zKillboard, dscan.info and the EVE client's D-Scan and Local windows.
+
 ## Where it lives
 
 | Layer            | Path                                                                                              |

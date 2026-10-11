@@ -22,6 +22,23 @@ Route `/characters` (`src/routes/Characters.tsx`). The roster of every Character
 
 See which alts need attention (queue idle/ending, PI stopped, free job slots, alerts) and jump to one; manage the roster. Decisions: `20260907-092320-starred-characters-on-the-characters-page.md`, `20260909-130638-characters-table-view-mobile-scroll-roster-overview-split.md`, `20260925-230353-character-cards-gain-a-non-zero-attention-chip.md`, `20260927-071415-characters-table-gets-a-group-column-and-remove.md`, `20261005-202754-characters-table-remove-folds-into-the-row-menu.md`, `20260926-220722-character-removal-leaves-remote-data-to-the-inactivity.md`, `20260829-094708-multi-character-from-day-one.md`.
 
+- **Top jobs (ranked):** 1. "Which alt needs attention?" (queue idle or ending, PI stopped, free job slots, alerts). 2. "Switch to that Character and land back where I was" (#1764). 3. "Manage the roster": add, group, star, remove.
+- **Device and cadence:** both. #1764 names "every multi-boxer on a phone" and made Characters a tab-bar choice; the table view scrolls sideways on a phone at the owner's request (`20260909-130638`). Characters answers "how is my whole roster doing", Overview the single Character (same decision). Cadence: likely per session, to pick a Character.
+- **Above the fold:** cards with attention chips (queue, alerts, PI), starred first, active Character marked; search and Add in the header.
+- **Sources:** decisions above; #1764, #2318.
+- **Unconfirmed:** per-session cadence; whether the attention scan or the switch is the more common reason to open the page.
+
+### Mobbin brief
+
+- **Fit:** medium: an account roster with status chips, grouping and a switcher is generic; the attention signals are EVE-specific.
+- **Analog apps:** Vercel (projects dashboard), Netflix (profile picker), Slack (workspace switcher), Google (account switcher).
+- **Screen queries:**
+  - `web: grid of account cards each with avatar, name, organisation and status chips, starred cards first, with search and filter chips above`
+  - `web: dense table of accounts with a sticky name column, sortable numeric columns and status columns with countdowns`
+  - `ios: account switcher list that returns the user to the screen they came from after picking one`
+- **Flow queries:** `web: create a group and move items into it from each card's dropdown`
+- **Mobbin won't help with:** nothing notable.
+
 ## Controls
 
 Header: Refresh all icon (tooltip "Pulls live data for every character. This may take a moment for a large roster."; `aria-disabled` + spinner while running, guard in handler); Add split button: "Add" (icon only below `sm`) -> `beginAddCharacterLogin()` (whole Base Grant, not unioned with the active Character, #295); caret menu "Add with specific permissions..." -> `CustomizePermissionsDialog` (`auth-login.md`).

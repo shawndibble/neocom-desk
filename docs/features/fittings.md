@@ -18,6 +18,28 @@ Fitting = one hull + modules, charges, drones, fighters, cargo, under a name (CO
 
 Scope gating: `/ships` and `/ships/fittings/compare` are UNGATED (`src/app/routeScopes.ts:104-111`); only In-game Fittings panel and Save to EVE gate on scope.
 
+## Purpose and user goal
+
+"Can my Character fly this fit, and how does it perform?" A full fitter whose numbers follow the active Character, with missing skills one step from a Skill Plan and the URL as the working state (`20260924-150509`). On a desktop the Start screen is the pilot's own fittings with a preview, not a hull picker (`20260925-152418`).
+
+- **Top jobs (ranked):** 1. "Can I fly this saved or In-game Fitting, and what is missing?" 2. "If I change this module, what happens to DPS, tank, capacitor and CPU/powergrid?" 3. "Get a fit in or out: paste EFT, Share Link, Save to EVE, multibuy."
+- **Device and cadence:** desk session for editing (drag and drop is off on touch, `Fittings.tsx:137`; list-and-preview is desktop only). On a phone the Start screen is tabs and a tap opens the Fitting (`20260925-152418`, `20261001-210222`), suggesting look-up use. Cadence: occasional, around a new ship or a doctrine.
+- **Above the fold:** Start screen: search, fittings grouped by hull, preview with can-fly, DPS, EHP, CPU and powergrid. Editor: name and hull, over-budget CPU/powergrid, can-fly / missing-skills chip, then slots and stats.
+- **Not for:** which hulls the Character can fly overall (Ship Tree); building the hull (Industry, via the Manufacture Plan export).
+- **Sources:** `20260924-150509`, `20260925-152418`, `20261001-210222`, `20260924-183346`, ADR 0016; #1547, #2830, #2954.
+- **Unconfirmed:** cadence; that phone use is mainly look-up; the ranking of job 3 against Compare.
+
+### Mobbin brief
+
+- **Fit:** low to medium: library list with preview, import dialog and the compare table are generic; the slot Ring and dogma stats are EVE-specific.
+- **Analog apps:** PCPartPicker, Notion, Apple Notes, Linear.
+- **Screen queries:**
+  - `web: searchable list grouped by category with a preview panel beside it showing key numbers and an open button`
+  - `web: side-by-side comparison of up to three items with rows of numbers and the best value in each row highlighted`
+  - `web: builder where parts are added from a searchable side panel and a budget meter shows used versus available`
+- **Flow queries:** `web: import content by pasting text or a link into a dialog and preview it before opening`
+- **Mobbin won't help with:** the fitting Ring, slot layout and stat sections; reference the in-game fitting window, Pyfa and eveship.fit.
+
 ## Routes and URL state
 
 - `src/features/fittings/shipsTabs.ts`: tabs `fittings`, `tree`, standalone `fittings/edit`. Editor and library are one mounted `<Fittings />` (`src/routes/Ships.tsx`) so workspace state carries across navigation.

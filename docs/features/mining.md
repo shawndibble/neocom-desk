@@ -19,6 +19,28 @@ User goals: Overview = "what did I mine, what is it worth, ISK/day". Tax = "neve
 
 Paths below are under `src/features/miningTax/` unless stated.
 
+## Purpose and user goal
+
+"What did I mine, and what do I owe each landlord?" Overview is the default tab (`20260924-202220`); Tax exists because a renter mines several corporations' moons, owes each a different percent, and had no way to see what is owed to whom or whether it is paid (#523, `20260905-170644`).
+
+- **Top jobs (ranked):** 1. "What did my Characters mine, and what is it worth per day?" (Overview). 2. "What do I owe each Payee, and what still needs assigning or review?" (Tax). 3. "This payment arrived or went out: which entries does it settle?" (Settle up, link payment).
+- **Device and cadence:** Tax bookkeeping is a desk session (multi-select, Split, Combine, link dialogs). Phone use of the Tax table is planned for (#2148 adds a phone sort). Overview cadence: after a mining session; Tax: when billing or paying a landlord.
+- **Above the fold:** Overview: ISK, ISK/day and m³ tiles, then the chart. Tax: Owed balances per Payee and the attention strip (needs review, unassigned), then the ledger.
+- **Not for:** field progress during an op (Survey tab, `mining-survey.md`); per-moon observer data (needs the moon owner's Accountant role, `20260905-170644`).
+- **Sources:** `20260905-170644`, `20260924-202220`, `20260906-132251`, `20260909-204328`, `20260922-204846`; #523, #2148, #3121.
+- **Unconfirmed:** cadence for both tabs; how often Tax is used on a phone; that Overview, not Tax, is the more visited tab.
+
+### Mobbin brief
+
+- **Fit:** high for Tax (balances, ledger, settle up), medium for Overview (earnings dashboard); ore pricing and refining are EVE-specific.
+- **Analog apps:** Splitwise, Copilot Money, QuickBooks, Robinhood.
+- **Screen queries:**
+  - `web: balances owed to several people as cards with a settle-up button, above a ledger table of dated entries with paid and unpaid status`
+  - `web: earnings dashboard with total, per-day rate and volume tiles above a bar chart by day and a table of entries`
+  - `web: table with row checkboxes and a sticky bulk-action toolbar for assigning selected rows to a person`
+- **Flow queries:** `web: settle up a balance by entering an amount and confirming which outstanding items it pays`
+- **Mobbin won't help with:** ore refining value, price-source tags, splitting one ESI ledger entry by quantity.
+
 ## 1. Route, URL, gating
 
 - Tab = path segment (ADR 0015, `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`): `/mining` -> Overview (first tab = default), `/mining/overview`, `/mining/tax` (`MINING_TABS`, `src/app/pageTabs.ts:78`). Mining opens on Overview (decision `20260924-202220`). Old path `/moon-mining` renamed twice (`20260905-215631`, `20260922-231132`).

@@ -10,6 +10,28 @@ Command palette (`src/features/commandPalette`) is covered elsewhere; here only 
 | FAQ       | `src/features/faq/FaqPanel.tsx` (+ `whatWeStore.ts`) | 8 collapsible questions; "what we store" commitments                   |
 | Support   | `src/features/help/HelpPanel.tsx`                    | Discord, source, say thanks                                            |
 
+## Purpose and user goal
+
+"How do I do this faster, and what do you do with my data?" A pilot comes here for the keys and paste tricks, the "What we store" commitments, or how to report a bug. Help is not a setting (`20261002-145653-lp-store-under-market-pilot-lookup-its-own`).
+
+- **Top jobs (ranked):** 1. "Which keys and pastes does the app answer to?" (Shortcuts, the default tab). 2. "What syncs, what stays here, and what do you change in EVE?" (FAQ, `20260907-205018`). 3. "Where do I report a bug or idea?" (Support: Discord).
+- **Device and cadence:** both, occasional. Footer page with `mobileTab: false`; on a phone it is a More sheet row.
+- **Above the fold:** tab bar (Shortcuts, FAQ, Support) and the first panel of the open tab.
+- **Not for:** changing anything (Settings); per-page help (InfoTooltips on each surface).
+- **Sources:** decisions `20261002-145653-lp-store-under-market-pilot-lookup-its-own`, `20261002-165816`, `20260907-205018`.
+- **Unconfirmed:** the job ranking; whether Shortcuts suits a phone as the default tab (phones rarely have a keyboard).
+
+### Mobbin brief
+
+- **Fit:** high. Shortcut references, FAQs and support pages are generic.
+- **Analog apps:** Linear, Notion, Signal, Stripe.
+- **Screen queries:**
+  - `web: keyboard shortcuts reference listing actions with key chips in two columns`
+  - `web: FAQ page with collapsible questions and a link to the privacy policy`
+  - `web: support page with a community chat link and a source code link`
+- **Flow queries:** none.
+- **Mobbin won't help with:** nothing notable.
+
 ## Shortcuts tab
 
 Three panels, definition lists (two columns from `md`, one on phone), each row = description + `<kbd>`.

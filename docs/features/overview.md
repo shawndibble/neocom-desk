@@ -18,6 +18,24 @@ Route `/overview` (`src/routes/Overview.tsx`). Landing page for a signed-in Char
 
 Scope: active Character, except Alerts (device-wide feed), Structures and Moon extractions (the Character's corp via roles), and Mining tax (all Characters, see gaps).
 
+- **Top jobs (ranked):** 1. "What is on a clock, and what runs out first?" (Next deadline leads the summary strip). 2. "Which of my things need attention now?" (card severity: undercut orders, finished jobs, colony resets, overdue couriers). 3. "Is my skill queue training, and what is my wallet?" (summary strip).
+- **Device and cadence:** both; every session, as the landing page (`App.tsx` `Root`, `Callback.tsx`). Phone: first of the default tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts`), with a phone-only layout (two full cards in pilot order, the rest folded, `PHONE_FULL_COUNT`).
+- **Above the fold:** Character header, summary strip (next deadline, training, wallet, Data Age, Refresh), then the first cards in pilot order; the Alerts column from `xl`.
+- **Not for:** fixing things (each card links to the page that does); the history of what fired (`/alerts`); other Characters' boards (per active Character, except the cards noted above).
+- **Sources:** decisions `20260907-153621`, `20260929-114130`, `20260929-145533`, `20261010-235829`, `20260929-140431`, `20260925-203743`; #1731.
+- **Unconfirmed:** the ranking of jobs 2 and 3; whether pilots glance at it on a phone between sessions or only at the desk at log-off.
+
+### Mobbin brief
+
+- **Fit:** high. A summary strip over a grid of status cards the user can hide and reorder is a common dashboard pattern.
+- **Analog apps:** Copilot Money, Robinhood, Apple Health (Summary), GitHub (home).
+- **Screen queries:**
+  - `web: personal dashboard with a strip of key figures above a grid of cards, each with counts and a link to its page`
+  - `ios: home summary with two cards shown in full and the rest folded into one list`
+  - `web: customize dashboard popover with checkboxes and drag handles to hide and reorder cards`
+- **Flow queries:** none.
+- **Mobbin won't help with:** card contents (PI reset runs, structure fuel and reinforcement, moon chunks, SP extraction). Reference the EVE client's own windows for these.
+
 ## Controls
 
 Layout order: `CharacterHeader`, `OverviewSubNav`, `SummaryStrip`, "all cards hidden" notice, card grid (+ alerts column from `xl`). Grid `sm:grid-cols-2`; from `xl` a `2fr/1fr` split; below `xl` alerts stack under cards (`Overview.tsx:812`).

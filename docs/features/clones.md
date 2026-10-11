@@ -19,6 +19,22 @@ Route `/clones` (`src/routes/Clones.tsx`). Second tab of the Character overview 
 
 See where the active Character's home clone and jump clones are, what is fitted in each, and when the next jump is allowed.
 
+- **Top jobs (ranked):** 1. "Which clone should I wear for this training queue?" (the verdict: "the answer the page exists for", #3487; #3003). 2. "Can I jump yet?" (shared Jump Cooldown). 3. "Where are my clones, what is in them, how far away?"
+- **Device and cadence:** both; #3487 reorders the phone layout so the verdict is the first block at 390px. Cadence: when a queue changes or before a jump.
+- **Above the fold:** the verdict card (Worth a jump with the Route button, or Stay put), then cooldown, You are in, Respawn, then the clone list.
+- **Sources:** `20261008-085439`; #3001, #3002, #3003, #3487, #1236.
+- **Unconfirmed:** cadence; the ranking of jobs 2 and 3.
+
+### Mobbin brief
+
+- **Fit:** low to medium: a recommendation card over option cards with a sort is generic; implant attributes and clone jump rules are EVE-specific.
+- **Analog apps:** Google Maps, Citymapper, Kayak, Rome2Rio.
+- **Screen queries:**
+  - `web: recommendation card naming the best option and the time it saves with a primary route button, above a list of option cards each with a time and a best badge`
+  - `web: two horizontal stacked bars on the same scale comparing two options, with a legend naming the segments`
+  - `ios: list of saved places with distance and value, and a segmented sort for best, nearest and value`
+- **Mobbin won't help with:** attribute implants, Jump Cooldown rules.
+
 ## Controls
 
 - Refresh icon (disabled while loading), data-age badge, table actions menu (Download CSV, Download Excel, Copy for Sheets/Excel).
