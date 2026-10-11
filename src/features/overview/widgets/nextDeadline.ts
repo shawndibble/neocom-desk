@@ -3,7 +3,15 @@
  * chip is. The chip's tone is its own ladder (amber under 3 h, red under
  * 30 min), separate from the per-card `severityForRemaining`.
  */
-import type { BoardDeadline } from '../boardLayout';
+import type { DeadlineSeverity } from '@/engine/severity';
+
+/** One clock a widget offers the header chip: when, what it is, how loud, and where it leads. */
+export interface BoardDeadline {
+  at: number;
+  note: string;
+  severity: DeadlineSeverity;
+  to: string;
+}
 
 export type ChipTone = 'neutral' | 'warning' | 'danger';
 
