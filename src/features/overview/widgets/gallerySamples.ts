@@ -342,6 +342,24 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Veldspar', 0.19, '1.2K'],
       ]),
     },
+    routeSafety: {
+      value: '2',
+      unit: t('overview.widgets.data.routeSafety.unit', { count: 2 }),
+      note: t('overview.gallery.samples.routeSafety.note'),
+      rows: [
+        ['Niarja', '', '9'],
+        ['Uedama', '', '6'],
+        ['Sivala', '', '2'],
+      ],
+      chart: {
+        kind: 'bars',
+        summary: '',
+        values: [1, 0, 2, 1, 3, 2, 0, 1, 4, 3, 2, 5, 3, 2, 1, 0, 2, 3, 4, 6, 3, 2, 1, 2],
+        max: t('overview.widgets.chart.routeSafety.max', { count: 6 }),
+        xStart: t('overview.widgets.chart.routeSafety.xStart'),
+        xEnd: t('overview.widgets.chart.routeSafety.xEnd'),
+      },
+    },
     planetary: {
       value: '4',
       unit: t('overview.gallery.samples.planetary.unit'),

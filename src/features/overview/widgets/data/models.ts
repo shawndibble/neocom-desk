@@ -127,6 +127,8 @@ const SUMS_ACROSS = new Set([
   'orders',
   'netWorth',
   'miningYield',
+  // One route on this device, whichever Character is the header's.
+  'routeSafety',
 ]);
 
 export function kindSumsAcrossCharacters(kind: string): boolean {

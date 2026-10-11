@@ -30,7 +30,7 @@ describe('feedsFor', () => {
   });
 
   it('is empty for kinds with no data yet', () => {
-    expect(feedsFor(['routeSafety', 'unknownKindFromANewerBuild'])).toEqual([]);
+    expect(feedsFor(['hauling', 'unknownKindFromANewerBuild'])).toEqual([]);
   });
 
   it('gives every built kind at least one feed', () => {
@@ -50,6 +50,7 @@ describe('kindSumsAcrossCharacters', () => {
       'orders',
       'netWorth',
       'miningYield',
+      'routeSafety',
     ]) {
       expect(kindSumsAcrossCharacters(kind), kind).toBe(true);
     }
@@ -103,7 +104,7 @@ describe('buildView status', () => {
 
 describe('placeholder kinds', () => {
   it('render empty, never loading, for kinds the catalogue marks coming soon', () => {
-    for (const kind of ['routeSafety', 'hauling', 'kills', 'jumpTimers']) {
+    for (const kind of ['hauling', 'kills', 'jumpTimers']) {
       expect(stateOf(buildView(kind, {}, ctx())), kind).toBe('empty');
     }
   });
@@ -236,7 +237,7 @@ describe('stock', () => {
   });
 
   it('gives a kind with no page of its own no title link target', () => {
-    expect(buildView('routeSafety', {}, ctx()).to).toBeNull();
+    expect(buildView('hauling', {}, ctx()).to).toBeNull();
   });
 
   it('counts out and low, tabling every market with its own state', () => {

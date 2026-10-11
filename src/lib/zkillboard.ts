@@ -551,14 +551,17 @@ export type RegionRecentKillsResult =
   { ok: true; bySystem: ReadonlyMap<number, RecentKill[]> } | { ok: false };
 
 /**
- * A region's player kills from the last hour, grouped by system, for Route
+ * A region's player kills from the last hour (or `pastSeconds`), grouped by system, for Route
  * Safety: one request covers every route system in the region, where the
  * system API needs one each (zKillboard no longer takes comma-separated ids).
  * Follows `/page/n/` while a page is full, so a busy region is never cut at
  * 1,000 kills; any page failing, or the page cap being hit, fails the whole answer. A browser fetch with
  * no custom headers, as `fetchKillmailHash`.
  */
-export async function fetchRegionRecentKills(regionId: number): Promise<RegionRecentKillsResult> {
+export async function fetchRegionRecentKills(
+  regionId: number,
+  pastSeconds: number = 3600
+): Promise<RegionRecentKillsResult> {
   const bySystem = new Map<number, RecentKill[]>();
   // New kills shift the pages while they are read, so one can show on two.
   const seen = new Set<number>();
@@ -566,7 +569,7 @@ export async function fetchRegionRecentKills(regionId: number): Promise<RegionRe
     for (let pageNumber = 1; pageNumber <= REGION_MAX_PAGES; pageNumber += 1) {
       const suffix = pageNumber === 1 ? '' : `page/${pageNumber}/`;
       const response = await fetch(
-        `https://zkillboard.com/api/kills/regionID/${regionId}/pastSeconds/3600/${suffix}`
+        `https://zkillboard.com/api/kills/regionID/${regionId}/pastSeconds/${pastSeconds}/${suffix}`
       );
       if (!response.ok) return { ok: false };
       const body: unknown = await response.json();

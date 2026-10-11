@@ -36,6 +36,7 @@ import type {
   MiningYieldWidgetData,
   NetWorthWidgetData,
   ProfitWidgetData,
+  RouteSafetyWidgetData,
 } from './kindLoaders';
 
 /** The narrow slice of i18next's `t` the adapters need. */
@@ -195,6 +196,7 @@ export interface FeedMap {
   survey: SurveyWidgetData;
   clones: ClonesWidgetData;
   location: LocationWidgetData;
+  routeSafety: RouteSafetyWidgetData;
 }
 
 export type FeedId = keyof FeedMap;

@@ -115,3 +115,13 @@ export function routeToHref(
   params.set('stops', ROUTE_PARAMS.stops.serialize([systemId]) ?? '');
   return `${tabPath(TRAVEL_TABS, 'route')}?${params.toString()}`;
 }
+
+/** Route Safety from `fromId` through `stops` in order: the saved route the Overview widget links back to. */
+export function routeStopsHref(fromId: number | null, stops: readonly number[]): string {
+  const params = new URLSearchParams();
+  if (fromId !== null) params.set('from', String(fromId));
+  const serialized = ROUTE_PARAMS.stops.serialize([...stops]);
+  if (serialized !== null) params.set('stops', serialized);
+  const query = params.toString();
+  return query === '' ? tabPath(TRAVEL_TABS, 'route') : `${tabPath(TRAVEL_TABS, 'route')}?${query}`;
+}

@@ -3758,6 +3758,16 @@
         },
         "survey": {
           "note": "ISK per m³ by ore, best first"
+        },
+        "routeSafety": {
+          "note": "Player kills per hour across the route",
+          "max": "max {{count}} per hour",
+          "xStart": "24 h ago",
+          "xEnd": "now",
+          "summary_one": "{{count}} player kill in the last 24 hours across {{systems}} systems on the saved route, {{busy}} of them busy (5 or more kills). Busiest hour: {{peak}}. Kills per hour, oldest first: {{hours}}.",
+          "summary_other": "{{count}} player kills in the last 24 hours across {{systems}} systems on the saved route, {{busy}} of them busy (5 or more kills). Busiest hour: {{peak}}. Kills per hour, oldest first: {{hours}}.",
+          "unread_one": "{{count}} system could not be read and is not counted.",
+          "unread_other": "{{count}} systems could not be read and are not counted."
         }
       },
       "data": {
@@ -3808,6 +3818,14 @@
         "survey": {
           "unit": "ISK/m³",
           "secondary": "{{ore}} at {{place}}"
+        },
+        "routeSafety": {
+          "unit_one": "busy system",
+          "unit_other": "busy systems",
+          "secondary_one": "{{count}} kill in 24 h",
+          "secondary_other": "{{count}} kills in 24 h",
+          "secondaryUnread_one": "{{count}} kill in 24 h · {{unread}} unread",
+          "secondaryUnread_other": "{{count}} kills in 24 h · {{unread}} unread"
         }
       },
       "training": {
@@ -4110,8 +4128,19 @@
       },
       "routeSafety": {
         "title": "Route safety",
-        "description": "How dangerous your saved route is",
-        "empty": "There is no saved route."
+        "description": "Player kills along your saved route over the last 24 hours",
+        "empty": "No saved route",
+        "emptyLink": "Open Route Safety",
+        "col": {
+          "system": "System",
+          "kills": "Kills (24 h)",
+          "level": "Activity"
+        },
+        "level": {
+          "quiet": "Quiet",
+          "some": "Some kills",
+          "busy": "Busy"
+        }
       },
       "hauling": {
         "title": "Hauling",
@@ -4407,6 +4436,9 @@
         },
         "survey": {
           "note": "Veldspar Prime at Efa IV"
+        },
+        "routeSafety": {
+          "note": "Efa to Amarr, 14 systems"
         }
       }
     },
