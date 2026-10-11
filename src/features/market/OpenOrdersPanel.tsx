@@ -220,7 +220,7 @@ export function OpenOrdersPanel() {
         }
         const characterIds = patch['orders.characters'] as readonly number[] | undefined;
         if (characterIds) {
-          rememberCharacterPick(
+          void rememberCharacterPick(
             characterIds.length === 1 && characterIds[0] === activeCharacterId ? 'current' : 'all'
           );
         }

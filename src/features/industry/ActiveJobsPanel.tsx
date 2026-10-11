@@ -105,11 +105,12 @@ type JobRow = ActiveJob & {
 /** The two derived job states this panel's Status filter offers — not ESI's raw `status` enum, just what the list already highlights. */
 type JobStatusFilter = 'completingSoon' | 'done';
 
+const JOBS_CHARACTER_PARAMS = { 'jobs.chars': characterFilterParam('current') };
+
 /**
  * The Activity and Status filters in the URL (ADR 0015). Both start empty —
  * "no filter" — so the empty set is the default and never written.
  */
-const JOBS_CHARACTER_PARAMS = { 'jobs.chars': characterFilterParam('current') };
 const JOB_FILTER_PARAMS = {
   'jobs.activity': idListParam(),
   'jobs.status': enumSetParam<JobStatusFilter>(['completingSoon', 'done'], []),

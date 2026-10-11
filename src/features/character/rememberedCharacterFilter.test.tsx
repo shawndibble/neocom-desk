@@ -49,11 +49,22 @@ describe('remembered character filter precedence', () => {
     expect(useCharacterFilterPicks.getState().value).toEqual({ assets: 'current' });
   });
 
+  it("a change before hydration keeps the other pages' picks", async () => {
+    await db.settings.put({ key: 'characterFilterPicks', value: { wallet: 'all' } });
+    const { result } = renderHook(() => useFilter('assets'), { wrapper: wrapper('/') });
+    act(() => result.current.set('all'));
+    await waitFor(() =>
+      expect(useCharacterFilterPicks.getState().value).toEqual({ wallet: 'all', assets: 'all' })
+    );
+  });
+
   it('a change is remembered for its own page only', async () => {
     const assets = renderHook(() => useFilter('assets'), { wrapper: wrapper('/') });
     await waitFor(() => expect(useCharacterFilterPicks.getState().hydrated).toBe(true));
     act(() => assets.result.current.set('all'));
-    expect(useCharacterFilterPicks.getState().value).toEqual({ assets: 'all' });
+    await waitFor(() =>
+      expect(useCharacterFilterPicks.getState().value).toEqual({ assets: 'all' })
+    );
 
     const wallet = renderHook(() => useFilter('wallet'), { wrapper: wrapper('/') });
     await waitFor(() => expect(wallet.result.current.value).toBe('current'));

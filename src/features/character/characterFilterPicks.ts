@@ -12,8 +12,7 @@
  */
 import { useCallback, useEffect, useMemo } from 'react';
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import type { RememberedDefaults } from '@/lib/useUrlState';
-import type { UrlParamSchema, UrlParamValues } from '@/lib/useUrlState';
+import type { RememberedDefaults, UrlParamSchema, UrlParamValues } from '@/lib/useUrlState';
 import { useDefaultCharacterFilter } from './defaultCharacterFilter';
 import { fromStoredCharacterFilterValue, type CharacterFilterValue } from './characterFilterValue';
 
@@ -65,7 +64,7 @@ export const useCharacterFilterPicks = createLocalSetting<CharacterFilterPicks>(
 /** The value `page` opens on when the URL names none, and how to remember an edit. */
 export function useCharacterFilterPick(page: CharacterFilterPage): {
   pick: CharacterFilterValue;
-  remember: (value: CharacterFilterValue) => void;
+  remember: (value: CharacterFilterValue) => Promise<void>;
 } {
   const picks = useCharacterFilterPicks((state) => state.value);
   const hydratePicks = useCharacterFilterPicks((state) => state.hydrate);
@@ -78,9 +77,13 @@ export function useCharacterFilterPick(page: CharacterFilterPage): {
 
   const pick = pickedCharacterFilter(picks, page, fromStoredCharacterFilterValue(storedDefault));
   const remember = useCallback(
-    (value: CharacterFilterValue) => {
+    async (value: CharacterFilterValue) => {
+      // Hydrate first: writing before the stored row is read would replace
+      // every other page's pick with this one.
       const store = useCharacterFilterPicks.getState();
-      void store.setValue(withCharacterFilterPick(store.value, page, value));
+      await store.hydrate();
+      const { value: picks, setValue } = useCharacterFilterPicks.getState();
+      void setValue(withCharacterFilterPick(picks, page, value));
     },
     [page]
   );
@@ -101,7 +104,7 @@ export function useRememberedCharacterFilter<S extends UrlParamSchema>(
       values: { [key]: pick } as Partial<UrlParamValues<S>>,
       remember: (patch) => {
         const next = (patch as Record<string, unknown>)[key];
-        if (next === 'current' || next === 'all') remember(next);
+        if (next === 'current' || next === 'all') void remember(next);
       },
     }),
     [key, pick, remember]
