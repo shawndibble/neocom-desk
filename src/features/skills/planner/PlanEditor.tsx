@@ -720,16 +720,40 @@ export function PlanEditor({
     [plan.milestones]
   );
   const fitGoalData = useFitGoalNeeds(characterId, trackedFittingIds, fitGoalOpen);
-  const goneFittingIds = useMemo(
+  // Needs the plan can't schedule (catalog-unknown skills) are left out, so a
+  // Fitting using one still resolves instead of staying "missing" forever.
+  const fitNeeds = useMemo(
     () =>
-      new Set(
-        fitGoalData.savedIds ? trackedFittingIds.filter((id) => !fitGoalData.savedIds?.has(id)) : []
+      new Map(
+        [...fitGoalData.needs].map(([id, need]) => [
+          id,
+          {
+            ...need,
+            needed: need.needed.filter((entry) => catalog.engineSkills.has(entry.skillTypeID)),
+          },
+        ])
       ),
-    [fitGoalData.savedIds, trackedFittingIds]
+    [fitGoalData.needs, catalog.engineSkills]
   );
   const trainedLevels = useMemo(
     () => new Map([...trainedSkills].map(([id, skill]) => [id, skill.level])),
     [trainedSkills]
+  );
+  // A fit goal reads orphaned once its Fitting is deleted, or once the plan no
+  // longer covers what the Fitting needs (an edit added a module, an entry went).
+  const goneFittingIds = useMemo(
+    () =>
+      new Set(
+        trackedFittingIds.filter((id) => {
+          if (fitGoalData.savedIds && !fitGoalData.savedIds.has(id)) return true;
+          const need = fitNeeds.get(id);
+          return (
+            need !== undefined &&
+            evaluateFitGoal(need.needed, trainedLevels, scheduled).state === 'missing'
+          );
+        })
+      ),
+    [trackedFittingIds, fitGoalData.savedIds, fitNeeds, trainedLevels, scheduled]
   );
   const milestoneStatuses = useMemo(
     () =>
@@ -1504,42 +1528,32 @@ export function PlanEditor({
       fitGoalOpen
         ? fitGoalOptions(
             fitGoalData.records,
-            fitGoalData.needs,
+            fitNeeds,
             trainedLevels,
             scheduled,
             stepByKey,
             startDate
           )
         : [],
-    [
-      fitGoalOpen,
-      fitGoalData.records,
-      fitGoalData.needs,
-      trainedLevels,
-      scheduled,
-      stepByKey,
-      startDate,
-    ]
+    [fitGoalOpen, fitGoalData.records, fitNeeds, trainedLevels, scheduled, stepByKey, startDate]
   );
 
   // Keeps each fit goal on the latest step its Fitting needs: follows a
   // Fitting edit, a rename and a reorder. Only writes when something moved.
   useEffect(() => {
     if (!plan.milestones?.some((m) => m.fittingId !== undefined)) return;
-    const next = reanchorFitGoals(plan.milestones, fitGoalData.needs, trainedLevels, scheduled);
+    const next = reanchorFitGoals(plan.milestones, fitNeeds, trainedLevels, scheduled);
     if (next !== plan.milestones) void onUpdate({ milestones: [...(next ?? [])] });
-  }, [plan.milestones, fitGoalData.needs, trainedLevels, scheduled, onUpdate]);
+  }, [plan.milestones, fitNeeds, trainedLevels, scheduled, onUpdate]);
 
   /** FitGoalModal's pick: add the Fitting's missing skills (prerequisites follow), then anchor its goal. */
   function pickFitGoal(option: FitGoalOption) {
-    const need = fitGoalData.needs.get(option.id);
+    const need = fitNeeds.get(option.id);
     if (!need || option.state === 'flyable-now' || option.state === 'loading') return;
-    const patch =
-      option.state === 'missing' ? appendImport(editable, option.toAdd) : { entries: plan.entries };
-    const known = (patch.entries ?? plan.entries).filter((e) =>
-      catalog.engineSkills.has(e.skillTypeID)
-    );
-    let steps;
+    const entries =
+      option.state === 'missing' ? (appendImport(editable, option.toAdd).entries ?? []) : null;
+    const known = (entries ?? plan.entries).filter((e) => catalog.engineSkills.has(e.skillTypeID));
+    let steps: PlanStep[];
     try {
       steps = normalizePlanWithBoundaries(known, catalog.engineSkills, trainedSkills).steps;
     } catch {
@@ -1548,7 +1562,7 @@ export function PlanEditor({
     const goal = evaluateFitGoal(need.needed, trainedLevels, steps);
     if (!goal.anchor) return;
     onUpdate({
-      ...patch,
+      ...(entries ? { entries } : {}),
       milestones: upsertFitGoal(plan.milestones, { id: option.id, name: need.name }, goal.anchor),
     });
   }

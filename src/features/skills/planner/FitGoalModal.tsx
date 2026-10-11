@@ -41,12 +41,13 @@ export function FitGoalModal({ open, options, onClose, onPick }: FitGoalModalPro
   }
 
   function pick(option: FitGoalOption) {
-    if (option.state === 'missing' && confirming?.id !== option.id) {
-      setConfirming(option);
-      return;
-    }
     onPick(option);
     onClose();
+  }
+
+  function choose(option: FitGoalOption) {
+    if (option.state === 'missing') setConfirming(option);
+    else pick(option);
   }
 
   return (
@@ -61,7 +62,7 @@ export function FitGoalModal({ open, options, onClose, onPick }: FitGoalModalPro
                 <button
                   type="button"
                   disabled={option.state === 'loading' || option.state === 'flyable-now'}
-                  onClick={() => pick(option)}
+                  onClick={() => choose(option)}
                   className="flex w-full items-center justify-between gap-3 rounded-xs px-2 py-1.5 text-left hover:bg-panel-2 disabled:cursor-default disabled:hover:bg-transparent"
                 >
                   <span className="truncate">{option.name}</span>

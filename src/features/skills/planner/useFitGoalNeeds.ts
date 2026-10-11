@@ -56,37 +56,35 @@ export function useFitGoalNeeds(
     () => (records ?? []).filter((r) => all || trackedKey.split('|').includes(r.id)),
     [records, all, trackedKey]
   );
-  const [loaded, setLoaded] = useState<{ source: FittingRecord[]; needs: FitGoalNeed[] } | null>(
-    null
-  );
+  const [loaded, setLoaded] = useState<FitGoalNeed[]>([]);
+  // Dexie hands back a new array on every emission; re-fetching requirements
+  // is keyed on what a Fitting needs from them: its id and code.
+  const wantedKey = wanted.map((r) => `${r.id}:${r.code}:${r.name}`).join('|');
 
   useEffect(() => {
-    if (wanted.length === 0) return;
     let cancelled = false;
     void (async () => {
-      try {
-        const needs = (await Promise.all(wanted.map(loadNeed))).filter(
-          (need): need is FitGoalNeed => need !== null
-        );
-        if (!cancelled) setLoaded({ source: wanted, needs });
-      } catch {
-        // Leaves the goals as they were; the next change retries.
-      }
+      const needs = (
+        await Promise.all(wanted.map((record) => loadNeed(record).catch(() => null)))
+      ).filter((need): need is FitGoalNeed => need !== null);
+      if (!cancelled) setLoaded(needs);
     })();
     return () => {
       cancelled = true;
     };
-  }, [wanted]);
+    // `wanted` is covered by `wantedKey`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantedKey]);
 
-  const needs = useMemo(
-    () => new Map((loaded?.needs ?? []).map((need) => [need.id, need])),
-    [loaded]
-  );
+  const needs = useMemo(() => new Map(loaded.map((need) => [need.id, need])), [loaded]);
   return {
     needs,
     /** Every saved Fitting's id; null until the list has loaded. A tracked id missing from it was deleted. */
-    savedIds: useMemo(() => (records ? new Set(records.map((r) => r.id)) : null), [records]),
-    /** The saved Fittings, name order, for the picker. */
+    savedIds: useMemo(
+      () => (records && characterId !== null ? new Set(records.map((r) => r.id)) : null),
+      [records, characterId]
+    ),
+    /** The saved Fittings, for the picker. */
     records: records ?? [],
   };
 }

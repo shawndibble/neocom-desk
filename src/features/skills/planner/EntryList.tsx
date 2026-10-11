@@ -521,11 +521,13 @@ const EntryRow = memo(function EntryRow({
     <>
       {milestoneStatus ? (
         <>
-          <MenuItem
-            onSelect={() => menu.run(() => onRenameMilestone(milestoneStatus.milestone.id))}
-          >
-            {t('plans.milestone.rename')}
-          </MenuItem>
+          {milestoneStatus.milestone.fittingId === undefined && (
+            <MenuItem
+              onSelect={() => menu.run(() => onRenameMilestone(milestoneStatus.milestone.id))}
+            >
+              {t('plans.milestone.rename')}
+            </MenuItem>
+          )}
           <MenuItem onSelect={() => onRemoveMilestone(milestoneStatus.milestone.id)}>
             {t('plans.milestone.remove')}
           </MenuItem>

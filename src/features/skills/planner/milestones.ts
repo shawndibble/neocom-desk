@@ -121,7 +121,7 @@ export function upsertFitGoal(
  * current order, and renames it after the Fitting. Returns `milestones`
  * itself when nothing moved. A fit goal whose Fitting isn't in `fits`
  * (deleted, still loading, undecodable) or whose needs the plan no longer
- * covers is left alone — the status lookup shows it orphaned.
+ * covers is left alone; PlanEditor marks the uncovered ones orphaned.
  */
 export function reanchorFitGoals(
   milestones: readonly PlanMilestone[] | undefined,
