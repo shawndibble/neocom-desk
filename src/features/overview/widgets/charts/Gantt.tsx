@@ -31,14 +31,16 @@ export function Gantt({ model, maxRows }: { model: GanttChartModel; maxRows: num
                 }}
               />
               {bar.clippedStart && (
-                <b className="absolute left-0.5 -translate-y-px text-[0.5rem] leading-3 text-text-dim">
-                  ◂
-                </b>
+                <i
+                  className="absolute top-1/2 left-0.5 block -translate-y-1/2 border-y-[3px] border-r-[4px] border-y-transparent border-r-text"
+                  data-overflow="start"
+                />
               )}
               {bar.clippedEnd && (
-                <b className="absolute right-0.5 -translate-y-px text-[0.5rem] leading-3 text-text-dim">
-                  ▸
-                </b>
+                <i
+                  className="absolute top-1/2 right-0.5 block -translate-y-1/2 border-y-[3px] border-l-[4px] border-y-transparent border-l-text"
+                  data-overflow="end"
+                />
               )}
               <i
                 className="absolute -inset-y-0.5 block border-l border-dashed border-text"

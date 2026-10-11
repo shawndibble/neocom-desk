@@ -141,7 +141,8 @@ describe('Chart', () => {
     expect(container.textContent).toContain('Now');
     expect(container.textContent).toContain('in 7h');
     expect(container.textContent).toContain('Ready');
-    expect(container.textContent).toContain('▸');
+    expect(container.querySelector('[data-overflow="end"]')).not.toBeNull();
+    expect(container.querySelector('[data-overflow="start"]')).toBeNull();
     expect(container.querySelectorAll('.border-dashed')).toHaveLength(2);
   });
 
