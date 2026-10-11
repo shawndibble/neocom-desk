@@ -21,10 +21,9 @@ describe('PageHeader', () => {
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 
-  it('omits the actions cluster entirely when a route has no controls', () => {
-    const { container } = render(<PageHeader title="Settings" />);
-    // Only the heading: no empty actions wrapper.
-    expect(container.querySelector('header')?.querySelectorAll('div')).toHaveLength(1);
-    expect(container.querySelector('header')?.textContent).toBe('Settings');
+  it('always draws the alerts bell in the actions cluster, even with no controls', () => {
+    render(<PageHeader title="Settings" />);
+    // Dim at zero, but there: the corner does not shift when the first alert arrives.
+    expect(screen.getByRole('button', { name: 'Alerts, none waiting' })).toBeInTheDocument();
   });
 });

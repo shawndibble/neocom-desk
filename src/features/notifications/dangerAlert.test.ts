@@ -8,6 +8,7 @@ import {
   isDangerEntry,
   isSnoozable,
   markAllReadTargets,
+  alertViewPath,
   selectDangerBanner,
   typeChipOfGroupKey,
 } from './dangerAlert';
@@ -119,5 +120,21 @@ describe('isSnoozable', () => {
     const byKey = new Map(groups.map((g) => [g.key, g]));
     expect(isSnoozable(byKey.get('event:priceAlertTriggered')!)).toBe(true);
     expect(isSnoozable(byKey.get('event:newMail')!)).toBe(false);
+  });
+});
+
+describe('alertViewPath', () => {
+  it('sends an event to its own page', () => {
+    expect(alertViewPath('event:newMail')).toBe('/mail');
+    expect(alertViewPath('event:industryJobComplete')).toBe('/industry');
+  });
+
+  it('sends structure notifications to the corp page and the rest to the Overview', () => {
+    expect(alertViewPath('eveType:StructureUnderAttack')).toBe('/corp');
+    expect(alertViewPath('eveType:CorpAllBillMsg')).toBe('/overview');
+  });
+
+  it('never points back at the retired Alerts page', () => {
+    expect(alertViewPath('event:eveNotification')).toBe('/overview');
   });
 });

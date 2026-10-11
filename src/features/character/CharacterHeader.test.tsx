@@ -75,6 +75,9 @@ describe('CharacterHeader', () => {
     render(<CharacterHeader characterId={CHARACTER_ID} totalSp={1} unallocatedSp={2} />);
     await screen.findByRole('heading', { level: 1, name: 'Mero Otichoda' });
 
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    // The alerts bell is in every page header, so it is the one button.
+    expect(
+      screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+    ).toEqual(['Alerts, none waiting']);
   });
 });

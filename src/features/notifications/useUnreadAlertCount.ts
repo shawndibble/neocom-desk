@@ -11,8 +11,11 @@
  * Device-wide, matching the page: the poller runs for every Character, and a
  * badge that hid an alt's alerts would be a badge you learn to distrust.
  */
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import type { NotificationFeedRecord } from '@/db';
+import type { AlertBadge } from '@/components/ui/unreadAlertsContext';
+import { bellBadge } from './dangerAlert';
 import { readFeed } from './feed';
 import { visibleFeedEntries } from './feedSelection';
 import {
@@ -20,9 +23,17 @@ import {
   isFeedChannelEnabled,
   useNotificationPreferences,
 } from './preferences';
+import { useSnoozeStore, withoutSnoozed } from './snooze';
 
-export function useUnreadAlertCount(): number {
+/**
+ * The alerts the bell, panel and Danger banner all work from: the feed as the
+ * Alerts rule shows it (undismissed, not muted, feed channel on), minus any
+ * type snoozed on this device. Each caller opens its own live query, so only
+ * the shell's badge hook runs it on every route.
+ */
+export function useVisibleAlertEntries(): NotificationFeedRecord[] {
   const prefs = useNotificationPreferences((state) => state.value);
+  const snoozed = useSnoozeStore((state) => state.value);
 
   /*
    * Hydrated here rather than relied on from elsewhere. The Overview's old
@@ -34,9 +45,26 @@ export function useUnreadAlertCount(): number {
    */
   useEffect(() => {
     void hydrateNotificationPreferences();
+    void useSnoozeStore.getState().hydrate();
   }, []);
 
   const entries = useLiveQuery(() => readFeed(), [], []);
-  if (!prefs.masterEnabled || !isFeedChannelEnabled(prefs)) return 0;
-  return visibleFeedEntries(entries, prefs).length;
+  return useMemo(
+    () =>
+      !prefs.masterEnabled || !isFeedChannelEnabled(prefs)
+        ? []
+        : // eslint-disable-next-line react-hooks/purity -- a snooze ends by the wall clock; re-reading it on a feed, preference or snooze change is as fresh as the bell needs, and a minute ticker would re-render the whole shell
+          withoutSnoozed(visibleFeedEntries(entries, prefs), snoozed, Date.now()),
+    [entries, prefs, snoozed]
+  );
+}
+
+/** The bell's badge: how many alerts wait, and whether one is danger. */
+export function useAlertBadge(): AlertBadge {
+  const entries = useVisibleAlertEntries();
+  return useMemo(() => bellBadge(entries), [entries]);
+}
+
+export function useUnreadAlertCount(): number {
+  return useAlertBadge().count;
 }

@@ -14,6 +14,7 @@
 import type { NotificationFeedRecord } from '@/db';
 import { alertGroupKey, alertSeverity, type AlertTypeGroup } from './alertGroups';
 import { entryChannelTarget } from './feedSelection';
+import { notificationUrlFor } from './notificationOptions';
 
 export function isDangerEntry(entry: Pick<NotificationFeedRecord, 'eventId' | 'eveType'>): boolean {
   return alertSeverity(entryChannelTarget(entry)) === 'critical';
@@ -111,4 +112,18 @@ export function filterByChip<G extends Pick<AlertTypeGroup, 'key' | 'severity'>>
 /** Price alerts are the one type where "not now, ask again later" is honest. */
 export function isSnoozable(group: Pick<AlertTypeGroup, 'key'>): boolean {
   return group.key === alertGroupKey({ eventId: 'priceAlertTriggered' });
+}
+
+/**
+ * Where View goes for a group. An event uses its notification route; an EVE
+ * notification has no page of its own, so structure types go to the corp page
+ * and the rest stay on the Overview. Never `/alerts`, which now just opens
+ * the panel this was clicked in.
+ */
+export function alertViewPath(groupKey: string): string {
+  if (groupKey.startsWith('eveType:')) {
+    return typeChipOfGroupKey(groupKey) === 'structures' ? '/corp' : '/overview';
+  }
+  const path = notificationUrlFor(groupKey.slice('event:'.length));
+  return path === '/alerts' ? '/overview' : path;
 }

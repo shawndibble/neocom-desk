@@ -37,7 +37,7 @@ vi.mock('dexie-react-hooks', () => ({
   useLiveQuery: (_query: unknown, _deps?: unknown, defaultResult?: unknown) => defaultResult,
 }));
 vi.mock('@/features/notifications/useUnreadAlertCount', () => ({
-  useUnreadAlertCount: () => 0,
+  useAlertBadge: () => ({ count: 0, danger: false }),
 }));
 const NO_LOCKED_ROUTES = vi.hoisted(() => new Set());
 vi.mock('./useGrantedScopes', () => ({
