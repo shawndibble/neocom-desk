@@ -9,7 +9,9 @@ import * as preview from '../.storybook/preview';
 // `test` shards pick it up and no new required check appears.
 setProjectAnnotations(preview.default);
 
-const modules = import.meta.glob<Record<string, unknown>>('./**/*.stories.tsx', { eager: true });
+const modules = import.meta.glob<Record<string, unknown>>('./**/*.stories.{ts,tsx}', {
+  eager: true,
+});
 
 describe.each(Object.entries(modules))('%s', (_file, mod) => {
   const stories = composeStories(mod as Parameters<typeof composeStories>[0]) as Record<
