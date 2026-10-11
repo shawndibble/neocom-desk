@@ -3512,7 +3512,7 @@
     "timeLeft": "{{duration}} left",
     "board": {
       "open": "Open",
-      "refresh": "Refresh the board",
+      "refresh": "Refresh",
       "editCards": "Choose and arrange cards",
       "editCardsTitle": "Cards",
       "showAllCards": "Show all cards",
@@ -3918,13 +3918,126 @@
       "switchLabel": "Character: {{name}}",
       "next": "Next",
       "updated": "Updated",
-      "customize": "Customize",
-      "done": "Done"
+      "customize": "Customize"
     },
-    "firstRun": {
-      "title": "Set up your Overview",
-      "body": "Your Overview is a grid of widgets you choose. Start with Wallet, Training, Coming up and Mail.",
-      "basics": "Just the basics"
+    "customize": {
+      "title": "Customizing",
+      "barLabel": "Customize the Overview",
+      "count": "{{count}} of {{max}} widgets",
+      "add": "Add widget",
+      "roles": "Start from a role",
+      "reset": "Reset",
+      "resetAsk": "Reset the layout?",
+      "resetConfirm": "Reset",
+      "resetKeep": "Keep",
+      "cancel": "Cancel",
+      "done": "Done",
+      "sizeGroup": "Size of {{title}}",
+      "size": {
+        "S": "S",
+        "M": "M",
+        "L": "L",
+        "F": "Full"
+      },
+      "sizeName": {
+        "S": "Small",
+        "M": "Medium",
+        "L": "Large",
+        "F": "Full width"
+      },
+      "moveEarlier": "Move {{title}} earlier",
+      "moveLater": "Move {{title}} later",
+      "remove": "Remove {{title}}",
+      "dragHandle": "Move {{title}}",
+      "dragInstructions": "Press space to pick up a widget. Use the arrow keys to move it, space again to drop it, or escape to cancel.",
+      "dragStart": "Picked up {{name}}.",
+      "dragOver": "{{name}} is at position {{position}} of {{total}}.",
+      "dragEnd": "{{name}} dropped at position {{position}} of {{total}}.",
+      "dragCancel": "Moving {{name}} cancelled.",
+      "emptyTitle": "Your Overview is empty",
+      "emptyBody": "Add widgets, or start from a role.",
+      "undo": {
+        "action": "Undo",
+        "added": "Widget added",
+        "removed": "Widget removed",
+        "resized": "Widget resized",
+        "duplicated": "Widget duplicated",
+        "reset": "Layout reset",
+        "roles": "Layout replaced"
+      },
+      "phone": {
+        "note": "Sizes, views and ranges are set on a larger screen.",
+        "hidden": "Hidden on phone",
+        "moveUp": "Move {{title}} up",
+        "moveDown": "Move {{title}} down",
+        "remove": "Remove {{title}}"
+      }
+    },
+    "gallery": {
+      "title": "Add a widget",
+      "search": "Search widgets",
+      "categoriesLabel": "Categories",
+      "noMatch": "No widget matches \"{{query}}\".",
+      "categories": {
+        "all": "All",
+        "recent": "Recently added",
+        "character": "Character",
+        "money": "Money and market",
+        "industry": "Industry and mining",
+        "planets": "Planets and structures",
+        "space": "Space and travel",
+        "messages": "Messages and schedule"
+      },
+      "add": "Add",
+      "addAnother": "Add another",
+      "addLabel": "Add {{title}}",
+      "addAnotherLabel": "Add another {{title}}",
+      "limit": "Limit reached",
+      "comingSoon": "Coming soon",
+      "new": "New"
+    },
+    "roles": {
+      "title": "What do you do in EVE?",
+      "titleLater": "Start from a role",
+      "body": "Pick everything that applies. We build your Overview from it, and you can change every widget afterwards.",
+      "group": "Roles",
+      "always": "Always included: Wallet, Training, Coming up and Mail.",
+      "build": "Build my Overview",
+      "basics": "Just the basics",
+      "cancel": "Cancel",
+      "names": {
+        "trader": "Trader",
+        "industrialist": "Industrialist",
+        "planetaryIndustry": "Planetary industry",
+        "miner": "Miner",
+        "fighter": "Fighter",
+        "explorerHauler": "Explorer and hauler"
+      }
+    },
+    "menu": {
+      "view": "View",
+      "views": {
+        "number": "Number",
+        "chart": "Chart",
+        "list": "List"
+      },
+      "character": "Character",
+      "header": "Header",
+      "all": "All",
+      "nameOnly": "This widget shows the header Character only.",
+      "range": "Range",
+      "rangeDays": "{{days}}d",
+      "rename": "Rename",
+      "renameTitle": "Rename {{title}}",
+      "renameLabel": "Name",
+      "renameHint": "Leave it empty to use \"{{title}}\".",
+      "renameSave": "Save",
+      "renameCancel": "Cancel",
+      "duplicate": "Duplicate",
+      "top": "Move to top",
+      "bottom": "Move to bottom",
+      "phone": "Show on phone",
+      "remove": "Remove from Overview"
     }
   },
   "alerts": {

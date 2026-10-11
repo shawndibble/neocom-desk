@@ -104,7 +104,7 @@ export function OverviewHeader({ widgets }: { widgets: readonly Widget[] }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const { refresh } = useOverviewRefresh();
-  const { editing, startEditing, done } = useOverviewEdit();
+  const { editing, startEditing } = useOverviewEdit();
   const now = useTicker(CLOCK_TICK_MS);
 
   const shown = useMemo(() => visibleWidgets(widgets, isPhone), [widgets, isPhone]);
@@ -158,11 +158,8 @@ export function OverviewHeader({ widgets }: { widgets: readonly Widget[] }) {
           busy={refreshing}
         />
       </span>
-      {editing ? (
-        <Button size="sm" variant="primary" onClick={done}>
-          {t('overview.header.done')}
-        </Button>
-      ) : (
+      {/* While customizing, the edit bar owns Cancel and Done: two Done buttons would be one too many. */}
+      {!editing && (
         <Button size="sm" onClick={startEditing}>
           <Icon.EditBoard size={Icon.ICON_SIZE.md} aria-hidden="true" />
           {t('overview.header.customize')}

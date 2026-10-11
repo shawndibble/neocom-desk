@@ -213,17 +213,19 @@ describe('Widget header', () => {
     expect(screen.getByRole('region', { name: 'My targets' })).toBeInTheDocument();
   });
 
-  it('has a settings button that is inert until the next stage gives it a handler', async () => {
-    const user = userEvent.setup();
+  it('draws the menu, header start and edit controls it is handed, and only those', () => {
     renderWidget(model({ kind: 'priceWatch' }), ready);
-    expect(screen.getByRole('button', { name: 'Settings for Price watch' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /settings for/i })).not.toBeInTheDocument();
 
-    const onOpenSettings = vi.fn();
     renderWidget(model({ id: 'w2', kind: 'priceWatch', title: 'Second' }), ready, {
-      onOpenSettings,
+      menu: <button type="button">Menu here</button>,
+      headerStart: <span>Handle here</span>,
+      editControls: <div>Controls here</div>,
     });
-    await user.click(screen.getByRole('button', { name: 'Settings for Second' }));
-    expect(onOpenSettings).toHaveBeenCalledWith('w2');
+    const region = screen.getByRole('region', { name: 'Second' });
+    expect(within(region).getByText('Menu here')).toBeInTheDocument();
+    expect(within(region).getByText('Handle here')).toBeInTheDocument();
+    expect(within(region).getByText('Controls here')).toBeInTheDocument();
   });
 
   it('draws nothing for a kind from a newer build', () => {
@@ -257,10 +259,35 @@ describe('WidgetGrid', () => {
     ]);
   });
 
-  it('says so when there is nothing to draw', () => {
+  it('offers Add widget and Start from a role on an empty Overview', () => {
+    const onAdd = vi.fn();
     render(
       <MemoryRouter>
-        <WidgetGrid widgets={[]} showNew={false} headerAll={false} onRemove={() => undefined} />
+        <WidgetGrid
+          widgets={[]}
+          showNew={false}
+          headerAll={false}
+          onRemove={() => undefined}
+          onAdd={onAdd}
+          onRoles={() => undefined}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Your Overview is empty')).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Add widget' }).click();
+    expect(onAdd).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Start from a role' })).toBeInTheDocument();
+  });
+
+  it('says so when none of the stored widgets can be drawn', () => {
+    render(
+      <MemoryRouter>
+        <WidgetGrid
+          widgets={[model({ kind: 'fromTheFuture' })]}
+          showNew={false}
+          headerAll={false}
+          onRemove={() => undefined}
+        />
       </MemoryRouter>
     );
     expect(screen.getByText('There are no widgets to show on this Overview.')).toBeInTheDocument();

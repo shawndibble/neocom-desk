@@ -253,7 +253,7 @@ describe('Overview widget grid', () => {
     const user = userEvent.setup();
     render(<App />);
     expect(
-      await screen.findByRole('heading', { name: /set up your overview/i })
+      await screen.findByRole('heading', { name: /what do you do in eve/i })
     ).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Wallet' })).not.toBeInTheDocument();
 
@@ -265,6 +265,34 @@ describe('Overview widget grid', () => {
     await waitFor(async () =>
       expect(await storedKinds()).toEqual(['wallet', 'training', 'comingUp', 'mail'])
     );
+  });
+
+  it('builds from the chosen roles', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { name: /what do you do in eve/i });
+    await user.click(screen.getByRole('button', { name: 'Planetary industry' }));
+    await user.click(screen.getByRole('button', { name: 'Build my Overview' }));
+    expect(await widgetCard('Planetary')).toBeInTheDocument();
+    await waitFor(async () =>
+      expect(await storedKinds()).toEqual(['wallet', 'training', 'comingUp', 'mail', 'planetary'])
+    );
+  });
+
+  it('customizes from the header: the edit bar takes over Done, and Cancel restores', async () => {
+    await seedLayout(widget('a', 'wallet', { size: 'S' }), widget('b', 'training', { size: 'S' }));
+    const user = userEvent.setup();
+    render(<App />);
+    await widgetCard('Wallet');
+    await user.click(
+      await within(screen.getByRole('main')).findByRole('button', { name: 'Customize' })
+    );
+    expect(screen.getByRole('region', { name: 'Customize the Overview' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Done' })).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Remove Training' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await widgetCard('Training')).toBeInTheDocument();
+    await waitFor(async () => expect(await storedKinds()).toEqual(['wallet', 'training']));
   });
 
   it('draws the saved layout: the wallet figure, and the skill training now', async () => {

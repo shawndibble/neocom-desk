@@ -12,6 +12,7 @@
  * No view-cyclers in the header: view switching lives in the settings menu
  * (next stage), so a stray click changes nothing.
  */
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -19,7 +20,6 @@ import { db } from '@/db';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   Button,
-  IconButton,
   IskAmount,
   RowCaret,
   SEVERITY_TEXT,
@@ -49,10 +49,16 @@ export interface WidgetProps {
   showNew: boolean;
   /** The header switcher is on All characters. */
   headerAll: boolean;
-  /** The pilot is customizing: a dashed edge, the rest is the next stage's. */
+  /** The pilot is customizing: a dashed edge; the controls arrive as `headerStart` and `editControls`. */
   editing?: boolean;
-  /** Opens the widget's settings menu; wired in the next stage. */
-  onOpenSettings?: (id: string) => void;
+  /** The settings menu (its own trigger, so Radix owns focus and Esc); absent in the Gallery's preview. */
+  menu?: ReactNode;
+  /** Before the title in the header: the drag handle while customizing on desktop. */
+  headerStart?: ReactNode;
+  /** A strip under the body while customizing: size, move and remove. */
+  editControls?: ReactNode;
+  /** Draw this sample instead of the live read: the Gallery's inert preview. */
+  previewView?: KindView;
   /** The empty state's Remove widget. */
   onRemove: (id: string) => void;
 }
@@ -181,7 +187,10 @@ export function Widget({
   showNew,
   headerAll,
   editing = false,
-  onOpenSettings,
+  menu,
+  headerStart,
+  editControls,
+  previewView,
   onRemove,
 }: WidgetProps) {
   const { t } = useTranslation();
@@ -190,7 +199,8 @@ export function Widget({
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(TICK_MS);
   const scope = scopePresentation(widget.kind, widget.scope, headerAll);
-  const view = useWidgetView(widget.kind, scope.scopeAll);
+  const liveView = useWidgetView(widget.kind, scope.scopeAll);
+  const view = previewView ?? liveView;
   const { state, showLastGood } = resolveWidget(view.status);
 
   // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.
@@ -276,6 +286,7 @@ export function Widget({
       )}
     >
       <div className="flex min-h-11 items-center gap-1.5 border-b border-line py-1 pr-1.5 pl-2.5 md:min-h-9">
+        {headerStart}
         <h2 className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
           {title}
         </h2>
@@ -298,16 +309,10 @@ export function Widget({
             <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
           </Link>
         )}
-        <IconButton
-          size="sm"
-          variant="plain"
-          icon={<Icon.More />}
-          label={t('overview.widgets.settingsFor', { title })}
-          disabled={onOpenSettings === undefined}
-          onClick={() => onOpenSettings?.(widget.id)}
-        />
+        {menu}
       </div>
       <div className="flex-1">{body}</div>
+      {editControls}
       {scope.fallbackNote && state === 'ok' && characterId !== null && (
         <div className="border-t border-line px-3 py-1.5">
           <HeaderCharacterReadout characterId={characterId} />

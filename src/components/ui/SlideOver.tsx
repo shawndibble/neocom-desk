@@ -19,6 +19,8 @@ interface SlideOverProps {
   className?: string;
   /** A panel holding a table: up to 64rem wide instead of the 25rem default. */
   wide?: boolean;
+  /** Replaces the 25rem default max width (ignored with `wide`): the Overview Gallery's 460px. */
+  maxWidthClassName?: string;
   /** As `Modal`'s: `false` only for a panel a URL already backs, or Back is pushed twice. */
   closeOnBack?: boolean;
   /** Where focus goes on close when the opener is gone (e.g. a panel a URL opened). */
@@ -51,6 +53,7 @@ export function SlideOver({
   side = 'right',
   className,
   wide = false,
+  maxWidthClassName,
   closeOnBack = true,
   returnFocusFallback,
 }: SlideOverProps) {
@@ -97,7 +100,7 @@ export function SlideOver({
           }}
           className={cx(
             'outline-none fixed top-0 bottom-0 z-40 flex w-full flex-col pb-[env(safe-area-inset-bottom)] border-line-bright bg-panel shadow-lg shadow-black/50',
-            wide ? 'max-w-5xl' : 'max-w-[25rem]',
+            wide ? 'max-w-5xl' : (maxWidthClassName ?? 'max-w-[25rem]'),
             SIDE_CLASS[side],
             className
           )}

@@ -21,6 +21,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
@@ -28,9 +29,10 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, Spinner } from '@/components/ui';
+import { Spinner } from '@/components/ui';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
+import { DangerBanner } from '@/features/notifications/DangerBanner';
 import { getLastKnownSpSummary } from '@/stores/characterSp';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -40,13 +42,17 @@ import { useOverviewHiddenCards } from '@/features/overview/hiddenCards';
 import { useFeedStore } from '@/features/overview/widgets/data/feedStoreContext';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
 import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
+import { CustomizeBar } from '@/features/overview/widgets/CustomizeBar';
 import { useOverviewEdit } from '@/features/overview/widgets/editContext';
+import { Gallery } from '@/features/overview/widgets/Gallery';
 import { makeWidgetId } from '@/features/overview/widgets/ids';
-import { removeWidget, type OverviewLayout } from '@/features/overview/widgets/layout';
+import type { OverviewLayout } from '@/features/overview/widgets/layout';
 import { useOverviewLayout } from '@/features/overview/widgets/layoutStore';
 import { isReturningPilot, migrateFromCards } from '@/features/overview/widgets/migrate';
 import { OverviewEditProvider } from '@/features/overview/widgets/OverviewEditProvider';
-import { basicsLayout } from '@/features/overview/widgets/roles';
+import { PhoneCustomizeList } from '@/features/overview/widgets/PhoneCustomizeList';
+import { RoleChooser, RoleChooserDialog } from '@/features/overview/widgets/RoleChooser';
+import { useFirstRunReady } from '@/features/overview/widgets/useFirstRunReady';
 import { useOverviewScopeAll } from '@/features/overview/widgets/scope';
 import { distinctKinds, visibleWidgets } from '@/features/overview/widgets/visibility';
 import { WidgetGrid } from '@/features/overview/widgets/WidgetGrid';
@@ -58,34 +64,14 @@ function Centered({ children }: { children: ReactNode }) {
   return <div className="flex justify-center py-16">{children}</div>;
 }
 
-/**
- * Until the Role chooser lands, a first visit offers the one answer that needs
- * no question: the four base widgets.
- */
-function FirstRun({ onBasics }: { onBasics: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <section className="grid max-w-xl gap-3 rounded-xs border border-line bg-panel p-4">
-      <h2 className="text-sm font-semibold">{t('overview.firstRun.title')}</h2>
-      <p className="text-xs text-text-dim">{t('overview.firstRun.body')}</p>
-      <span>
-        <Button variant="primary" onClick={onBasics}>
-          {t('overview.firstRun.basics')}
-        </Button>
-      </span>
-    </section>
-  );
-}
-
 interface BoardProps {
   characterId: number;
   layout: OverviewLayout;
   showNew: boolean;
-  onLayoutChange: (next: OverviewLayout) => void;
 }
 
 /** Everything below the providers: the header, sub-nav and grid. */
-function Board({ characterId, layout, showNew, onLayoutChange }: BoardProps) {
+function Board({ characterId, layout, showNew }: BoardProps) {
   const store = useFeedStore();
   const feeds = useSyncExternalStore(store.subscribe, store.get);
   const scopeAll = useOverviewScopeAll((state) => state.value);
@@ -93,15 +79,14 @@ function Board({ characterId, layout, showNew, onLayoutChange }: BoardProps) {
   // (with notes the pilot cannot clear) after an alt is removed.
   const characterCount = useLiveQuery(() => db.characters.count(), []);
   const headerAll = scopeAll && (characterCount ?? 0) >= 2;
-  const { editing } = useOverviewEdit();
+  const edit = useOverviewEdit();
+  const { editing } = edit;
+  const isPhone = useIsPhone();
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [rolesOpen, setRolesOpen] = useState(false);
 
   const skills = feeds.skills?.data ?? null;
   const lastKnownSp = getLastKnownSpSummary(characterId);
-
-  const onRemove = useCallback(
-    (id: string) => onLayoutChange(removeWidget(layout, id)),
-    [layout, onLayoutChange]
-  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -112,12 +97,31 @@ function Board({ characterId, layout, showNew, onLayoutChange }: BoardProps) {
         actions={<OverviewHeader widgets={layout.widgets} />}
       />
       <OverviewSubNav />
-      <WidgetGrid
-        widgets={layout.widgets}
-        showNew={showNew}
-        headerAll={headerAll}
-        editing={editing}
-        onRemove={onRemove}
+      <DangerBanner />
+      {editing && (
+        <CustomizeBar onAdd={() => setGalleryOpen(true)} onRoles={() => setRolesOpen(true)} />
+      )}
+      {editing && isPhone && layout.widgets.length > 0 ? (
+        <PhoneCustomizeList />
+      ) : (
+        <WidgetGrid
+          widgets={layout.widgets}
+          showNew={showNew}
+          headerAll={headerAll}
+          editing={editing}
+          onRemove={edit.remove}
+          onAdd={() => setGalleryOpen(true)}
+          onRoles={() => setRolesOpen(true)}
+        />
+      )}
+      <Gallery open={galleryOpen} onClose={() => setGalleryOpen(false)} showNew={showNew} />
+      <RoleChooserDialog
+        open={rolesOpen}
+        onClose={() => setRolesOpen(false)}
+        onChoose={(next) => {
+          edit.replace(next);
+          setRolesOpen(false);
+        }}
       />
     </div>
   );
@@ -153,15 +157,17 @@ export function Overview() {
   const hydrated =
     activeHydrated && layoutHydrated && hiddenHydrated && orderHydrated && scopeHydrated;
   const returning = isReturningPilot(hidden, order);
+  // An absent layout is a first run only once a second device's pull has had its say.
+  const firstRunReady = useFirstRunReady(hydrated);
 
   // A returning pilot with no saved layout gets their old board, as widgets,
   // drawn at once and saved once.
   const migrated = useMemo(
     () =>
-      hydrated && stored === null && returning
+      hydrated && firstRunReady && stored === null && returning
         ? migrateFromCards({ hidden, order }, makeWidgetId)
         : null,
-    [hydrated, stored, returning, hidden, order]
+    [hydrated, firstRunReady, stored, returning, hidden, order]
   );
   const layout = stored ?? migrated;
   const saved = useRef(false);
@@ -188,6 +194,14 @@ export function Overview() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  // No layout yet and not sure there is none: wait for the first pull rather than ask.
+  if (layout === null && !firstRunReady) {
+    return (
+      <Centered>
+        <Spinner label={t('common.loading')} />
+      </Centered>
+    );
+  }
   if (layout === null) {
     return (
       <div className="mx-auto max-w-6xl space-y-4">
@@ -197,21 +211,17 @@ export function Overview() {
           unallocatedSp={getLastKnownSpSummary(activeCharacterId).unallocatedSp}
         />
         <OverviewSubNav />
-        <FirstRun onBasics={() => onLayoutChange(basicsLayout(makeWidgetId))} />
+        <DangerBanner />
+        <RoleChooser firstRun onChoose={onLayoutChange} />
       </div>
     );
   }
 
   return (
     <OverviewRefreshProvider>
-      <OverviewEditProvider>
+      <OverviewEditProvider layout={layout} onLayoutChange={onLayoutChange}>
         <WidgetDataProvider kinds={kinds} always={ALWAYS_FEEDS}>
-          <Board
-            characterId={activeCharacterId}
-            layout={layout}
-            showNew={returning}
-            onLayoutChange={onLayoutChange}
-          />
+          <Board characterId={activeCharacterId} layout={layout} showNew={returning} />
         </WidgetDataProvider>
       </OverviewEditProvider>
     </OverviewRefreshProvider>
