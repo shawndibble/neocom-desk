@@ -8,11 +8,15 @@
 import type { DeadlineSeverity } from '@/engine/severity';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
+import type { WalletJournalEntry } from '@/esi/endpoints';
+import { humanizeRefType } from '@/features/character/format';
+import { formatAge } from '@/lib/age';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown } from '@/lib/duration';
+import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { StackChartModel, StackPart } from '../charts/types';
 import { UNKNOWN } from './builderKit';
-import type { TableModel, TableRowModel, Translate } from './types';
+import type { NumberSecondary, TableModel, TableRowModel, Translate } from './types';
 
 const W = 'overview.widgets';
 
@@ -140,5 +144,64 @@ export function ordersStateChart(
       open: rows.length,
       parts: parts.map((part) => `${part.label} ${part.text}`).join(', '),
     }),
+  };
+}
+
+// --- Wallet --------------------------------------------------------------------------
+
+/**
+ * How far a balance moved over the days a series covers, as the Number's one
+ * secondary line: the text carries the signed figure and the span, the shell
+ * draws the direction glyph. More ISK is good; the tone follows that, not the
+ * sign. `keyPrefix` picks the kind's own wording (`change` and `unchanged`).
+ */
+export function balanceChange(
+  t: Translate,
+  values: readonly number[],
+  keyPrefix = `${W}.wallet`
+): NumberSecondary | undefined {
+  if (values.length < 2) return undefined;
+  const delta = values[values.length - 1]! - values[0]!;
+  const isk = formatIskCompactSigned(delta);
+  if (isk === '0') {
+    return { text: t(`${keyPrefix}.unchanged`, { count: values.length }), direction: 'flat' };
+  }
+  return {
+    text: t(`${keyPrefix}.change`, { isk, count: values.length }),
+    direction: delta > 0 ? 'up' : 'down',
+    tone: delta > 0 ? 'good' : 'bad',
+  };
+}
+
+const JOURNAL_ROWS = 6;
+
+/** The newest journal entries that moved ISK: what it was, how much, how long ago, and the balance after. */
+export function journalTable(
+  t: Translate,
+  entries: readonly WalletJournalEntry[],
+  now: number
+): TableModel {
+  const newest = entries
+    .filter((entry) => typeof entry.amount === 'number')
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+    .slice(0, JOURNAL_ROWS);
+  return {
+    columns: [
+      { key: 'type', label: t(`${W}.wallet.col.type`), priority: 0 },
+      { key: 'amount', label: t(`${W}.wallet.col.amount`), align: 'end', priority: 1 },
+      { key: 'when', label: t(`${W}.wallet.col.when`), align: 'end', priority: 2 },
+      { key: 'balance', label: t(`${W}.wallet.col.balance`), align: 'end', priority: 3 },
+    ],
+    rows: newest.map((entry) => ({
+      key: String(entry.id),
+      cells: [
+        humanizeRefType(entry.ref_type),
+        formatIskCompactSigned(entry.amount ?? 0),
+        formatAge(Math.max(0, now - Date.parse(entry.date)), t),
+        typeof entry.balance === 'number'
+          ? { text: formatIskCompact(entry.balance), iskAmount: entry.balance }
+          : UNKNOWN,
+      ],
+    })),
   };
 }

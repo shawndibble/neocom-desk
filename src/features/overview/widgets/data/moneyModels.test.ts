@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
-import { ordersListed, ordersStateChart, ordersTable } from './moneyModels';
+import type { WalletJournalEntry } from '@/esi/endpoints';
+import {
+  balanceChange,
+  journalTable,
+  ordersListed,
+  ordersStateChart,
+  ordersTable,
+} from './moneyModels';
 
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
@@ -166,5 +173,66 @@ describe('ordersStateChart', () => {
     const model = ordersStateChart(t, [healthy, undercut])!;
     expect(model.summary).toContain('"open":2');
     expect(model.parts.map((p) => p.color)).not.toContain('iskNeg');
+  });
+});
+
+describe('balanceChange', () => {
+  it('is the rise or fall over the days the series covers, with the direction and whether it is good', () => {
+    expect(balanceChange(t, [100, 130, 150])).toEqual({
+      text: 'overview.widgets.wallet.change{"isk":"+50","count":3}',
+      direction: 'up',
+      tone: 'good',
+    });
+    expect(balanceChange(t, [150, 100])).toMatchObject({ direction: 'down', tone: 'bad' });
+  });
+
+  it('is flat, not signed, when the balance did not move, and absent under two days', () => {
+    expect(balanceChange(t, [100, 90, 100])).toMatchObject({ direction: 'flat' });
+    expect(balanceChange(t, [100])).toBeUndefined();
+    expect(balanceChange(t, [])).toBeUndefined();
+  });
+});
+
+describe('journalTable', () => {
+  const entry = (id: number, hoursAgo: number, amount: number | undefined, balance?: number) =>
+    ({
+      id,
+      date: new Date(NOW - hoursAgo * HOUR).toISOString(),
+      ref_type: 'bounty_prizes',
+      description: '',
+      amount,
+      balance,
+    }) as WalletJournalEntry;
+
+  it('is the newest entries first, at most six, skipping any with no amount', () => {
+    const entries = [
+      entry(1, 9, 5),
+      entry(2, 1, 10, 1000),
+      entry(3, 2, undefined),
+      entry(4, 3, -20),
+      entry(5, 4, 1),
+      entry(6, 5, 1),
+      entry(7, 6, 1),
+      entry(8, 7, 1),
+    ];
+    const table = journalTable(t, entries, NOW);
+    expect(table.rows.map((r) => r.key)).toEqual(['2', '4', '5', '6', '7', '8']);
+  });
+
+  it('reads type, signed amount, age and the balance after it', () => {
+    const table = journalTable(t, [entry(2, 1, 1_500_000, 4_800_000_000)], NOW);
+    expect(table.columns.map((c) => c.key)).toEqual(['type', 'amount', 'when', 'balance']);
+    expect(table.rows[0]!.cells).toEqual([
+      'Bounty prizes',
+      '+1.5M',
+      'common.age.hours{"count":1}',
+      { text: '4.8B', iskAmount: 4_800_000_000 },
+    ]);
+  });
+
+  it('writes a missing balance as a dash and an outflow with its own sign', () => {
+    const table = journalTable(t, [entry(4, 3, -2_000_000)], NOW);
+    expect(table.rows[0]!.cells[1]).toBe('-2M');
+    expect(table.rows[0]!.cells[3]).toBe('—');
   });
 });

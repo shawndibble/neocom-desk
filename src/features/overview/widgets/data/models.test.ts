@@ -114,7 +114,7 @@ describe('placeholder kinds', () => {
 });
 
 describe('wallet', () => {
-  it('shows the balance as an ISK figure with a one-row list', () => {
+  it('shows the balance as an ISK figure and no table without a journal', () => {
     const feeds: Feeds = {
       wallet: ok({
         result: {
@@ -130,10 +130,43 @@ describe('wallet', () => {
     expect(stateOf(view)).toBe('ok');
     expect(view.number.iskAmount).toBe(3_820_000_000);
     expect(view.number.unit).toBe('overview.isk');
-    expect(view.rows).toHaveLength(1);
+    expect(view.rows).toEqual([]);
+    expect(view.table).toBeUndefined();
+    expect(view.number.secondary).toBeUndefined();
+    expect(view.chart).toBeUndefined();
     expect(view.fetchedAt?.getTime()).toBe(NOW - HOUR);
     expect(view.fromCache).toBe(true);
     expect(view.to).toBe('/wallet');
+  });
+
+  it('says how far the balance moved over the journal, and tables its newest entries', () => {
+    const day = (n: number, balance: number, amount: number) => ({
+      id: n,
+      date: new Date(NOW - (30 - n) * 86_400_000).toISOString(),
+      ref_type: 'bounty_prizes',
+      description: '',
+      amount,
+      balance,
+    });
+    const feeds: Feeds = {
+      wallet: ok({
+        result: { data: 400, fetchedAt: new Date(NOW), fromCache: false, truncated: false },
+        needsReauth: false,
+      }),
+      journal: ok({
+        result: {
+          data: [day(1, 100, 10), day(15, 250, 150), day(29, 400, 150)],
+          fetchedAt: new Date(NOW),
+          fromCache: false,
+          truncated: false,
+        },
+        needsReauth: false,
+      }),
+    };
+    const view = buildView('wallet', feeds, ctx());
+    expect(view.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
+    expect(view.table!.rows.map((r) => r.key)).toEqual(['29', '15', '1']);
+    expect(view.chart?.kind).toBe('area');
   });
 });
 

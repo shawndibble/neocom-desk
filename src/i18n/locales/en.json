@@ -3817,7 +3817,16 @@
         "title": "Wallet",
         "description": "Your balance",
         "empty": "Your wallet has not loaded yet.",
-        "balance": "Balance"
+        "change_one": "{{isk}} in {{count}} day",
+        "change_other": "{{isk}} in {{count}} days",
+        "unchanged_one": "No change in {{count}} day",
+        "unchanged_other": "No change in {{count}} days",
+        "col": {
+          "type": "Type",
+          "amount": "Amount",
+          "when": "When",
+          "balance": "Balance"
+        }
       },
       "walletFlow": {
         "title": "Wallet flow",

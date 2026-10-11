@@ -81,7 +81,13 @@ import {
   walletArea,
 } from './chartBuilders';
 import { dailyBalanceSeries } from './chartSeries';
-import { ordersListed, ordersStateChart, ordersTable } from './moneyModels';
+import {
+  balanceChange,
+  journalTable,
+  ordersListed,
+  ordersStateChart,
+  ordersTable,
+} from './moneyModels';
 import { KIND_BUILDERS, KIND_FEED_LISTS } from './kindModels';
 import type {
   BuildContext,
@@ -151,21 +157,14 @@ function ageText(t: Translate, nowMs: number, atMs: number | null): string {
 // --- Builders ---------------------------------------------------------------
 
 /** The journal-derived daily balance, over the widget's range (ESI keeps about 30 days of journal). */
-function walletChart(
-  feeds: Feeds,
-  t: Translate,
-  now: number,
-  range: number,
-  balance: number | null
-): KindView['chart'] {
+function walletSeries(feeds: Feeds, now: number, range: number, balance: number | null) {
   const journal = feeds.journal?.data?.result?.data;
-  if (!journal || balance === null) return undefined;
-  const series = dailyBalanceSeries(
+  if (!journal || balance === null) return null;
+  return dailyBalanceSeries(
     dailyWalletFromJournal(journal),
     new Date(now).toISOString().slice(0, 10),
     range
   );
-  return walletArea(t, series, formatIskCompact) ?? undefined;
 }
 
 const wallet: Builder = (feeds, { t, now, range }) => {
@@ -173,6 +172,8 @@ const wallet: Builder = (feeds, { t, now, range }) => {
   const data = feed?.data ?? null;
   if (!data) return blank('/wallet', statusOf(feed));
   const balance = data.result?.data ?? null;
+  const series = walletSeries(feeds, now, range, balance);
+  const journal = feeds.journal?.data?.result?.data;
   return {
     ...blank('/wallet', statusOf(feed, { needsPermission: data.needsReauth })),
     fetchedAt: data.result?.fetchedAt ?? null,
@@ -184,23 +185,16 @@ const wallet: Builder = (feeds, { t, now, range }) => {
             value: formatIskCompact(balance),
             iskAmount: balance,
             unit: t('overview.isk'),
+            // How far it moved is the fact the balance lacks; no journal, no line.
+            secondary: series ? balanceChange(t, series.values) : undefined,
             tone: 'clear',
           },
-    rows:
-      balance === null
-        ? []
-        : [
-            {
-              key: 'balance',
-              title: t('overview.widgets.wallet.balance'),
-              value: formatIsk(balance, 2),
-              iskAmount: balance,
-              tone: 'clear',
-            },
-          ],
+    // The Table is the journal's newest entries, never the balance again.
+    rows: [],
+    table: balance !== null && journal ? journalTable(t, journal, now) : undefined,
     summary: balance === null ? UNKNOWN : `${formatIsk(balance, 2)} ${t('overview.isk')}`,
     // A secondary read: while the journal loads or fails the Number stays ok and the chart is just absent.
-    chart: walletChart(feeds, t, now, range, balance),
+    chart: series ? (walletArea(t, series, formatIskCompact) ?? undefined) : undefined,
   };
 };
 
