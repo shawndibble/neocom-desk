@@ -4,8 +4,7 @@
  * there is nothing honest to draw, so the Chart view falls back to the
  * Number rather than drawing an empty frame).
  *
- * Honesty rules from the design record: Orders is Not undercut against
- * Undercut with expiring a separate count; bars carry their max and their time
+ * Honesty rules from the design record: bars carry their max and their time
  * range; every model carries a hidden text summary; no series is red.
  */
 import type { DeadlineSeverity } from '@/engine/severity';
@@ -14,7 +13,6 @@ import type {
   AreaChartModel,
   BarsChartModel,
   ChartColor,
-  DonutChartModel,
   HBarRow,
   HBarsChartModel,
 } from '../charts/types';
@@ -30,29 +28,6 @@ export const INDUSTRY_CHART_HOURS = 12;
 /** A status colour for a row whose length is itself an urgency (time left to act). */
 export function severityColor(severity: DeadlineSeverity): ChartColor {
   return severity === 'warning' || severity === 'critical' ? 'warning' : 'accent';
-}
-
-export function ordersDonut(
-  t: Translate,
-  input: { open: number; undercut: number; expiring: number }
-): DonutChartModel {
-  const { open, undercut, expiring } = input;
-  return {
-    kind: 'donut',
-    parts: [
-      {
-        key: 'notUndercut',
-        label: t(`${K}.orders.notUndercut`),
-        value: Math.max(0, open - undercut),
-        color: 'neutral',
-      },
-      { key: 'undercut', label: t(`${K}.orders.undercut`), value: undercut, color: 'warning' },
-    ],
-    centre: String(open),
-    centreNote: t(`${K}.orders.open`),
-    note: expiring > 0 ? t(`${K}.orders.note`, { count: expiring }) : undefined,
-    summary: t(`${K}.orders.summary`, { undercut, open, expiring }),
-  };
 }
 
 /** Jobs finishing in each of the next hours, those already done counted in the first. Null with no jobs. */

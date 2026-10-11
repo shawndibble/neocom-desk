@@ -13,7 +13,6 @@
 import { severityForRemaining, type DeadlineSeverity } from '@/engine/severity';
 import { soonestCalendarDeadline, upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
-import { UNDERCUT_PROBLEMS } from '@/engine/market/orderProblems';
 import type { CorpBoardItem } from '@/engine/corp/board';
 import {
   activityI18nKey,
@@ -23,7 +22,6 @@ import {
   summarizeJobs,
 } from '@/features/industry/jobs';
 import { buildOpenOrderRows, openOrderProblemCounts } from '@/features/market/openOrdersModel';
-import { openOrdersHref } from '@/features/market/openOrdersFilter';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import { stockBoardSeverity } from '@/features/stockTargets/stockBoard';
 import { routeToHref } from '@/features/travel/routeSafetyLink';
@@ -78,12 +76,12 @@ import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from '.
 import {
   hbarsFromRows,
   industryBars,
-  ordersDonut,
   queueSegments,
   severityColor,
   walletArea,
 } from './chartBuilders';
 import { dailyBalanceSeries } from './chartSeries';
+import { ordersListed, ordersStateChart, ordersTable } from './moneyModels';
 import { KIND_BUILDERS, KIND_FEED_LISTS } from './kindModels';
 import type {
   BuildContext,
@@ -439,7 +437,7 @@ const mail: Builder = (feeds, { t, now }) => {
   };
 };
 
-const orders: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
+const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const feed = feeds.orders;
   const snapshot = feed?.data ?? null;
   const to = '/market/orders';
@@ -471,56 +469,29 @@ const orders: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
   const counts = openOrderProblemCounts(rows);
   const undercut = counts.undercutStation + counts.undercutSystem + counts.undercutRegion;
   const maxOrders = feeds.skills?.data?.maxOrders ?? null;
-  const href = (problems: Parameters<typeof openOrdersHref>[0]['problems']) =>
-    openOrdersHref({
-      problems,
-      characterIds: everyone ? undefined : [activeCharacterId as number],
-    });
-  const row = (
-    key: string,
-    title: string,
-    n: number,
-    tone: DeadlineSeverity,
-    problems: Parameters<typeof openOrdersHref>[0]['problems']
-  ): ListRow => ({
-    key,
-    title,
-    value: count(n),
-    tone: n === 0 ? 'clear' : tone,
-    // A zero is never a link: behind it is a page filtered down to nothing.
-    to: n === 0 ? undefined : href(problems),
-  });
-  const list: ListRow[] = [
-    row('undercut', t('overview.board.undercut'), undercut, 'warning', UNDERCUT_PROBLEMS),
-    row('outbid', t('overview.board.outbid'), counts.outbid, 'warning', ['outbid']),
-    row('relist', t('overview.board.relist'), counts.expiringOrStale, 'watch', ['expiringOrStale']),
-  ];
-  if (counts.belowFloor > 0) {
-    list.push({
-      key: 'belowFloor',
-      title: t('overview.board.belowFloor', { count: counts.belowFloor }),
-      value: count(counts.belowFloor),
-      tone: 'critical',
-    });
-  }
+  const listed = ordersListed(rows);
   const severity = ordersSeverity(rows, needsReauth);
   return {
     ...blank(to, statusOf(feed, { needsPermission: needsReauth, isEmpty: rows.length === 0 })),
     number: {
       value: count(undercut),
       unit: t('overview.board.undercut'),
+      // What is on the market is the fact the undercut count lacks; the slots sit under the table.
       secondary:
-        maxOrders !== null
-          ? { text: t('overview.board.slotsUsed', { used: rows.length, total: maxOrders }) }
+        listed > 0
+          ? { text: t('overview.widgets.orders.listed', { isk: formatIskCompact(listed) }) }
           : undefined,
       tone: undercut === 0 && severity !== 'critical' ? 'clear' : (severity ?? 'clear'),
     },
-    rows: list,
+    rows: [],
+    table: ordersTable(
+      t,
+      rows,
+      now,
+      maxOrders !== null ? { used: rows.length, total: maxOrders } : null
+    ),
     summary: ordersSummary(t, rows, needsReauth),
-    chart:
-      rows.length === 0
-        ? undefined
-        : ordersDonut(t, { open: rows.length, undercut, expiring: counts.expiringOrStale }),
+    chart: ordersStateChart(t, rows) ?? undefined,
   };
 };
 

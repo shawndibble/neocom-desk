@@ -3685,13 +3685,13 @@
         "high": "high {{value}}",
         "max": "max {{value}}",
         "listSummary": "{{note}}: {{items}}. Switch to Table for the figures.",
-        "orders": {
-          "notUndercut": "Not undercut",
+        "ordersStates": {
+          "healthy": "Healthy",
           "undercut": "Undercut",
-          "open": "open",
-          "note_one": "{{count}} order is expiring or stale, counted separately",
-          "note_other": "{{count}} orders are expiring or stale, counted separately",
-          "summary": "{{undercut}} of {{open}} open orders are undercut. {{expiring}} more are expiring or stale."
+          "outbid": "Outbid",
+          "expiring": "Expiring",
+          "belowFloor": "Below floor",
+          "summary": "{{open}} open orders: {{parts}}. Switch to Table for each order."
         },
         "industry": {
           "max_one": "max {{count}} job in an hour",
@@ -3832,7 +3832,21 @@
       "orders": {
         "title": "Open orders",
         "description": "How many of your orders have been undercut",
-        "empty": "You have no open orders."
+        "empty": "You have no open orders.",
+        "listed": "{{isk}} ISK listed",
+        "expired": "Expired",
+        "stationUnknown": "Structure",
+        "sideBuy": "Buy",
+        "sideSell": "Sell",
+        "slots": "{{used}} of {{total}} order slots used",
+        "col": {
+          "item": "Item",
+          "side": "Side",
+          "price": "Price",
+          "vsBest": "vs best",
+          "expires": "Expires",
+          "station": "Station"
+        }
       },
       "priceWatch": {
         "title": "Price watch",

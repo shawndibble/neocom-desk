@@ -166,6 +166,11 @@ export function TableBody({ table, columnsFor, rowLimit, className }: TableBodyP
           {t('overview.widgets.moreRows', { count: more })}
         </p>
       )}
+      {table.footer && (
+        <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
+          {table.footer}
+        </p>
+      )}
     </div>
   );
 }

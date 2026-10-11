@@ -148,13 +148,13 @@ const SAMPLES: Record<string, Sample> = {
       ['Nocxium', 'Jita', '1.9K'],
     ],
     chart: {
-      kind: 'donut',
+      kind: 'stack',
       summary: '',
-      centre: '38',
-      centreNote: 'open',
       parts: [
-        { key: 'ok', label: 'Fine', value: 17, color: 'neutral' },
-        { key: 'under', label: 'Undercut', value: 21, color: 'warning' },
+        { key: 'healthy', label: 'Healthy', value: 12, text: '12', color: 'neutral' },
+        { key: 'undercut', label: 'Undercut', value: 21, text: '21', color: 'warning' },
+        { key: 'outbid', label: 'Outbid', value: 3, text: '3', color: 's1' },
+        { key: 'expiring', label: 'Expiring', value: 2, text: '2', color: 's2' },
       ],
     },
   },
