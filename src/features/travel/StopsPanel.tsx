@@ -225,7 +225,11 @@ export function StopsPanel({
             }}
           >
             <SortableContext items={[...stops]} strategy={verticalListSortingStrategy}>
-              <ol aria-label={t('travel.stops.listLabel')}>
+              <ol
+                aria-label={t('travel.stops.listLabel')}
+                data-stops-list
+                className="focus:outline-none"
+              >
                 {stops.map((systemId, index) => (
                   <StopRow
                     key={systemId}

@@ -22,6 +22,7 @@ import {
   useDefaultRoutePreference,
 } from '@/features/route/routeRules';
 import { clearEveScoutCache, EVE_SCOUT_SIGNATURES_URL } from '@/lib/eveScout';
+import { useIncursionsPanelOpen } from '@/features/travel/incursionsData';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -49,6 +50,18 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 let lawlessSystems: ReadonlySet<number> = new Set();
+/** ESI `/incursions`; empty unless a test sets it. `null` answers 503. */
+let incursions: unknown[] | null = [];
+const incursion = (constellation_id: number, staging_solar_system_id: number, state: string) => ({
+  constellation_id,
+  staging_solar_system_id,
+  state,
+  influence: 0.4,
+  has_boss: false,
+  faction_id: 500019,
+  type: 'Incursion',
+  infested_solar_systems: [staging_solar_system_id],
+});
 vi.mock('@/features/travel/useLawlessSystems', () => ({
   useLawlessSystems: () => lawlessSystems,
 }));
@@ -184,6 +197,9 @@ const server = setupServer(
       destination: { stargate_id: 50001000, system_id: PERIMETER },
     })
   ),
+  http.get(`${ESI}/incursions`, () =>
+    incursions === null ? new HttpResponse(null, { status: 503 }) : HttpResponse.json(incursions)
+  ),
   http.get(`${ESI}/universe/system_kills`, () =>
     HttpResponse.json([{ system_id: UEDAMA, ship_kills: 12, pod_kills: 4, npc_kills: 2 }])
   ),
@@ -219,6 +235,7 @@ afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(() => {
   lawlessSystems = new Set();
+  incursions = [];
   return resetState();
 });
 
@@ -442,6 +459,72 @@ describe('Travel › Route Safety', () => {
     expect(window.location.pathname).toBe('/travel/pilot');
     expect(window.location.search).toBe('?pilot=42');
     expect(await screen.findByText('No kills or losses on zKillboard')).toBeInTheDocument();
+  });
+});
+
+describe('Travel › Route Safety › Incursions near you', () => {
+  const stopsInLink = () => new URLSearchParams(window.location.search).get('stops');
+  // The fold is remembered per device: each test starts folded.
+  beforeEach(() => useIncursionsPanelOpen.setState({ value: false, hydrated: false }));
+
+  it('is folded by default but still names the nearest incursion', async () => {
+    incursions = [incursion(20000020, UEDAMA, 'established')];
+    visit(`?from=${JITA}`);
+
+    expect(await screen.findByText(/^Nearest: Uedama, \d+ jumps?$/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show incursions' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  it('lists each incursion with its state as a word and its jumps from the current system', async () => {
+    const user = userEvent.setup();
+    incursions = [
+      incursion(20000021, THERA, 'withdrawing'),
+      incursion(20000020, UEDAMA, 'mobilizing'),
+    ];
+    visit(`?from=${JITA}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Show incursions' }));
+    const list = await screen.findByRole('list', { name: 'Active incursions' });
+    const rows = within(list).getAllByRole('listitem');
+    // Thera has no stargate route: it sorts last and says so, never "0 jumps".
+    expect(within(rows[0]).getByText('Uedama')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('Mobilizing')).toBeInTheDocument();
+    expect(await within(rows[0]).findByText(/^\d+ jumps?$/)).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Withdrawing')).toBeInTheDocument();
+    expect(await within(rows[1]).findByText('No route with your route rules')).toBeInTheDocument();
+  });
+
+  it('adds the staging system as a stop and moves focus to the stops', async () => {
+    const user = userEvent.setup();
+    incursions = [incursion(20000020, UEDAMA, 'established')];
+    visit(`?from=${JITA}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Show incursions' }));
+    await user.click(await screen.findByRole('button', { name: 'Route to Uedama' }));
+
+    expect(stopsInLink()).toBe(String(UEDAMA));
+    await waitFor(() =>
+      expect(screen.getByRole('list', { name: 'Stops, in the order typed' })).toHaveFocus()
+    );
+    expect(screen.getByText('On route')).toBeInTheDocument();
+  });
+
+  it('says the feed could not be read, with a retry, rather than claiming none are active', async () => {
+    const user = userEvent.setup();
+    incursions = null;
+    visit(`?from=${JITA}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Show incursions' }));
+    expect(
+      (await screen.findAllByText('The incursion feed could not be read. Try again in a moment.'))
+        .length
+    ).toBeGreaterThan(0);
+    incursions = [incursion(20000020, UEDAMA, 'established')];
+    await user.click(screen.getByRole('button', { name: en.common.retry }));
+    expect(await screen.findByRole('list', { name: 'Active incursions' })).toBeInTheDocument();
   });
 });
 
