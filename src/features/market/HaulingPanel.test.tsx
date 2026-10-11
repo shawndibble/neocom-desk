@@ -103,7 +103,7 @@ const { HaulingPanel } = await import('./HaulingPanel');
 function renderPanel(query = 'from=jita&to=amarr') {
   const actions = fakeItemActions();
   render(
-    <MemoryRouter initialEntries={[`/market/hauling?${query}`]}>
+    <MemoryRouter initialEntries={[`/travel/hauling?${query}`]}>
       <FakeItemActions actions={actions}>
         <HaulingPanel />
       </FakeItemActions>
@@ -299,6 +299,43 @@ describe('HaulingPanel, a Cargo Space of several holds', () => {
     );
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       '300 m³ · in Cargo hold · limited by space'
+    );
+  });
+});
+
+describe('HaulingPanel data age (#3534)', () => {
+  beforeEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: null });
+  });
+
+  it('hands the ready scan’s fetchedAt up to the page header instead of badging its own filter bar', () => {
+    const onRefreshInfoChange = vi.fn();
+    const { container } = render(
+      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=amarr']}>
+        <FakeItemActions actions={fakeItemActions()}>
+          <HaulingPanel onRefreshInfoChange={onRefreshInfoChange} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+
+    expect(onRefreshInfoChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ disabled: false, fetchedAt: 0 })
+    );
+    expect(container.querySelector('time')).toBeNull();
+  });
+
+  it('hands up no fetchedAt while no scan is ready', () => {
+    const onRefreshInfoChange = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=jita']}>
+        <FakeItemActions actions={fakeItemActions()}>
+          <HaulingPanel onRefreshInfoChange={onRefreshInfoChange} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+
+    expect(onRefreshInfoChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ disabled: true, fetchedAt: null })
     );
   });
 });

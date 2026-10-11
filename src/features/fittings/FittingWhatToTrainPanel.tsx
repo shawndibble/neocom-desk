@@ -67,7 +67,6 @@ import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
 import type { SkillPlanRecord } from '@/db';
 import { StatField, StatFields, StatNote } from './StatFacts';
 import { STAT_DETAIL, STAT_FIELD_WIDTH, joinDetail, statRowClassName } from './statKit';
-import { useTimedToast } from '@/components/ui/useTimedToast';
 
 interface WhatToTrainRow extends SkillGain {
   name: string;
@@ -124,7 +123,6 @@ function WhatToTrainRanking({
     entries: readonly PlanEntry[];
   } | null>(null);
   const target = useTargetPlan(characterId);
-  useTimedToast(added, () => setAdded(null));
   const { gains, loading, failed } = useSkillGains(evaluator);
   const { catalog, trainedSkills, trainedSkillsKnown, attributes, implants } =
     usePlanEditorData(characterId);
@@ -305,6 +303,7 @@ function WhatToTrainRanking({
               setAdded(null);
             },
           }}
+          onClose={() => setAdded(null)}
         />
       )}
     </div>

@@ -16,21 +16,19 @@ import { useDoneAtClock, useDoneAtOverride } from './surveyPref';
 
 // Accent says it's pressable; no underline, since that reads as a link to
 // somewhere. The tooltip names what a press does.
-const toggleClassName = `text-accent rounded-xs ${interactiveClassName} ${focusRingClassName}`;
+const toggleClassName = `text-accent text-left whitespace-normal rounded-xs ${interactiveClassName} ${focusRingClassName}`;
 
 function Tile({
   label,
   children,
   emphasis,
-  className = 'grow basis-[4.5rem]',
 }: {
   label: string;
   children: ReactNode;
   emphasis?: boolean;
-  className?: string;
 }) {
   return (
-    <div className={`min-w-0 border-l-2 border-line pl-3 ${className}`}>
+    <div className="min-w-0 border-l-2 border-line pl-3">
       <div className="text-[0.6875rem] font-semibold tracking-wider text-text-dim uppercase">
         {label}
       </div>
@@ -66,46 +64,52 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
   // Once the field is cleared, the time it was marked cleared; until then, the estimate.
   const doneAt = summary.finished ? summary.finishedAt : summary.etaAt;
+  // One row when the board is wide enough, else rows of three: never 4 + 2 or
+  // 5 + 1. A finished survey has three tiles, so it is a single row at any width.
+  const tileCount = summary.finished ? 3 : summary.iskLeft === null ? 5 : 6;
+  const wideColumns =
+    tileCount === 6 ? '@4xl:grid-cols-6' : tileCount === 5 ? '@4xl:grid-cols-5' : '';
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-3">
-      {!summary.finished && (
-        <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
-      )}
-      <Tile label={t('survey.statPace')}>{summary.pace === null ? '–' : n(summary.pace, 1)}</Tile>
-      {/* Sizes to its clock ("12:44 AM CST") so it never stacks; the other tiles give way. */}
-      <Tile label={t('survey.statDone')} emphasis className="shrink-0 grow-[2] whitespace-nowrap">
-        {doneAt === null || clock === null ? (
-          '–'
-        ) : (
-          <Tooltip content={t(local ? 'survey.showEveTime' : 'survey.showLocalTime')}>
-            <button
-              type="button"
-              className={toggleClassName}
-              onClick={() => void setClock(local ? 'eve' : 'local')}
-            >
-              {local
-                ? formatLocalClock(doneAt)
-                : t('survey.eveTime', { time: formatEveClock(doneAt) })}
-            </button>
-          </Tooltip>
+    <div className="@container">
+      <div className={`grid grid-cols-3 gap-x-2 gap-y-3 @md:gap-x-4 ${wideColumns}`}>
+        {!summary.finished && (
+          <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
         )}
-      </Tile>
-      {summary.finished ? (
-        // "1d 14h 36m", "12h 5m" or "55m": a unit shows only once it took that long.
-        <Tile label={t('survey.statTotalTime')}>{formatTotalTime(summary.elapsedMs / 1000)}</Tile>
-      ) : (
-        <>
-          <Tile label={t('survey.statTimeLeft')}>
-            {summary.etaAt === null ? '–' : formatDuration(summary.etaAt - summary.lastAt)}
-          </Tile>
-          <Tile label={t('survey.statRocks')}>{summary.rocksLeft}</Tile>
-          {summary.iskLeft !== null && (
-            <Tile label={t('survey.statIsk')}>
-              <IskAmount value={summary.iskLeft} decimals={0} />
-            </Tile>
+        <Tile label={t('survey.statPace')}>{summary.pace === null ? '–' : n(summary.pace, 1)}</Tile>
+        <Tile label={t('survey.statDone')} emphasis>
+          {doneAt === null || clock === null ? (
+            '–'
+          ) : (
+            <Tooltip content={t(local ? 'survey.showEveTime' : 'survey.showLocalTime')}>
+              <button
+                type="button"
+                className={toggleClassName}
+                onClick={() => void setClock(local ? 'eve' : 'local')}
+              >
+                {local
+                  ? formatLocalClock(doneAt)
+                  : t('survey.eveTime', { time: formatEveClock(doneAt) })}
+              </button>
+            </Tooltip>
           )}
-        </>
-      )}
+        </Tile>
+        {summary.finished ? (
+          // "1d 14h 36m", "12h 5m" or "55m": a unit shows only once it took that long.
+          <Tile label={t('survey.statTotalTime')}>{formatTotalTime(summary.elapsedMs / 1000)}</Tile>
+        ) : (
+          <>
+            <Tile label={t('survey.statTimeLeft')}>
+              {summary.etaAt === null ? '–' : formatDuration(summary.etaAt - summary.lastAt)}
+            </Tile>
+            <Tile label={t('survey.statRocks')}>{summary.rocksLeft}</Tile>
+            {summary.iskLeft !== null && (
+              <Tile label={t('survey.statIsk')}>
+                <IskAmount value={summary.iskLeft} decimals={0} />
+              </Tile>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

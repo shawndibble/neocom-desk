@@ -73,9 +73,18 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 vi.mock('@/features/market/PriceHistoryChart', () => ({
-  default: ({ points, itemName }: { points: { date: string }[]; itemName: string }) => (
+  default: ({
+    points,
+    itemName,
+    comparisons,
+  }: {
+    points: { date: string }[];
+    itemName: string;
+    comparisons?: { name: string; status: string }[];
+  }) => (
     <div data-testid="price-history-chart">
       {itemName}: {points.length} points
+      {(comparisons ?? []).map((c) => ` [${c.name}:${c.status}]`).join('')}
     </div>
   ),
 }));
@@ -821,6 +830,36 @@ describe('Price History tab (issue #11)', () => {
 
     expect(await screen.findByText('No price history')).toBeInTheDocument();
     expect(screen.queryByTestId('price-history-chart')).not.toBeInTheDocument();
+  });
+
+  it('reads compared regions from the URL and fetches each one, so a shared link compares the same regions', async () => {
+    const forgeHits = { count: 0 };
+    const domainHits = { count: 0 };
+    const day = [
+      { date: RECENT_DATE, average: 5, highest: 5.5, lowest: 4.5, order_count: 2, volume: 100 },
+    ];
+    server.use(
+      ordersHandler({ count: 0 }),
+      historyHandler(forgeHits, RIFTER_REGION_ID, { 587: day }),
+      historyHandler(domainHits, 10000043, { 587: day })
+    );
+    window.history.pushState(
+      {},
+      '',
+      '/market?type=587&browser.itemTab=history&browser.compare=10000043'
+    );
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('price-history-chart')).toHaveTextContent(
+        'Rifter: 1 points [Domain:ready]'
+      )
+    );
+    expect(forgeHits.count).toBe(1);
+    expect(domainHits.count).toBe(1);
+    expect(
+      screen.getByRole('button', { name: 'Compare regions, 1 of 4 picked' })
+    ).toBeInTheDocument();
   });
 });
 
@@ -1734,6 +1773,61 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     expect(
       within(finder()).getByRole('button', { name: 'Filters (2 active)' })
     ).toBeInTheDocument();
+  });
+
+  it('Hide bait sells drops the flagged sell, says how many it hid, and remembers the choice', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${RIFTER_REGION_ID}/orders`, () =>
+        HttpResponse.json(
+          [1_000_000, 50_000_000].map((price, i) => ({
+            order_id: 100 + i,
+            type_id: 587,
+            is_buy_order: false,
+            price,
+            location_id: 60003760,
+            system_id: 30000142,
+            volume_remain: 1,
+            volume_total: 1,
+            min_volume: 1,
+            duration: 90,
+            issued: '2026-08-01T00:00:00Z',
+            range: 'region',
+          })),
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/market/browser?type=587&region=10000002');
+    render(<App />);
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    // Off by default: the bait row shows, flagged.
+    expect(within(sellTable).getByText('50,000,000')).toBeInTheDocument();
+    expect(screen.queryByText(/bait sells? hidden/)).not.toBeInTheDocument();
+
+    await user.click(within(finder()).getByRole('button', { name: 'Filters' }));
+    await user.click(within(finder()).getByRole('button', { name: 'Hide bait sells' }));
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('table', { name: 'Sell Orders' })).queryByText('50,000,000')
+      ).not.toBeInTheDocument()
+    );
+    expect(
+      within(screen.getByRole('table', { name: 'Sell Orders' })).getByText('1,000,000')
+    ).toBeInTheDocument();
+    expect(screen.getByText('1 bait sell hidden')).toBeInTheDocument();
+    expect(
+      within(finder()).getByRole('button', { name: 'Filters (1 active)' })
+    ).toBeInTheDocument();
+    await waitFor(() => expect(useBrowserFilterSetting.getState().value.hideBait).toBe(true));
+
+    await user.click(within(finder()).getByRole('button', { name: 'Hide bait sells' }));
+    expect(
+      await within(screen.getByRole('table', { name: 'Sell Orders' })).findByText('50,000,000')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/bait sells? hidden/)).not.toBeInTheDocument();
   });
 
   it('Region mode shows every station in the region, including ones Trade Hub mode hides', async () => {

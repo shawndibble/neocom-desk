@@ -22,7 +22,7 @@ describe('currentPagePath', () => {
   it('names the page a sub-view belongs to, even where the path does not nest under it', () => {
     expect(currentPagePath('/clones')).toBe('/overview');
     expect(currentPagePath('/employment-history')).toBe('/overview');
-    expect(currentPagePath('/market/lp-store/1000125')).toBe('/market');
+    expect(currentPagePath('/wallet/lp-store/1000125')).toBe('/wallet');
     expect(currentPagePath('/skills/certificates')).toBe('/skills');
   });
 
@@ -41,7 +41,7 @@ describe('currentPagePath', () => {
 describe('viewPathFor', () => {
   it('is the deepest destination a path falls under', () => {
     expect(viewPathFor('/market/orders')).toBe('/market/orders');
-    expect(viewPathFor('/market/lp-store/1000125')).toBe('/market/lp-store');
+    expect(viewPathFor('/wallet/lp-store/1000125')).toBe('/wallet/lp-store');
     expect(viewPathFor('/industry/plans/7')).toBe('/industry/plans');
     expect(viewPathFor('/alerts')).toBe('/alerts');
   });

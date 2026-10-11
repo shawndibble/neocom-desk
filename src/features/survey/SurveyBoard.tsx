@@ -34,6 +34,7 @@ import { useNow } from '@/lib/useNow';
 import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { SurveyLegend } from './SurveyLegend';
 import { SurveyOres } from './SurveyOres';
+import { SurveyHowTo } from './SurveyHowTo';
 import { SurveyScanList } from './SurveyScanList';
 import { SurveyStats } from './SurveyStats';
 import { useOrePrices } from './useOrePrices';
@@ -68,8 +69,11 @@ interface SurveyBoardProps {
   viewerLine?: (summary: SurveySummary) => ReactNode;
   /** A section under the panel, before the ores, e.g. the moon tax; gets the same summary. */
   afterPanel?: (summary: SurveySummary) => ReactNode;
-  /** The panel's title; the public page sets one that doesn't repeat its page heading. */
-  panelTitle?: string;
+  /**
+   * The panel's title; the public page sets one that doesn't repeat its page
+   * heading, and the Survey tab passes the pilot's own name for it.
+   */
+  panelTitle?: ReactNode;
 }
 
 /** What the copy button last copied, shown on it for two seconds. */
@@ -161,6 +165,7 @@ export function SurveyBoard({
     return (
       <div className="space-y-4">
         <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
+        <SurveyHowTo />
         {footerActions}
         {scanList}
       </div>

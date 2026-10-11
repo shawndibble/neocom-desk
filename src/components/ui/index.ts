@@ -21,6 +21,7 @@ export { PageViewPicker } from './PageViewPicker';
 export { usesViewPicker, VIEW_PICKER_MIN_TABS } from './viewPicker';
 export type { PageViews } from './viewPicker';
 export { LiveStatus } from './LiveStatus';
+export { EveSsoButton } from './EveSsoButton';
 export { Spinner } from './Spinner';
 export type { SpinnerSize } from './Spinner';
 export { Tooltip, InfoTooltip } from './Tooltip';

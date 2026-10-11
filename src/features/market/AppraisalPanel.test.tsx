@@ -805,7 +805,7 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: lpOutcome() }) });
       const asteroRow = screen.getByRole('row', { name: /Astero/ });
       const link = within(asteroRow).getByRole('link', { name: /Sisters of EVE/ });
-      expect(link).toHaveAttribute('href', '/market/lp-store/1000125');
+      expect(link).toHaveAttribute('href', '/wallet/lp-store/1000125');
       expect(screen.getAllByText('Cheapest total').length).toBeGreaterThan(0);
     });
 

@@ -3201,45 +3201,61 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, the ship you are flying, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
-    "writeExceptions": "It also asks for five permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client; saving a Fitting to EVE creates or replaces your in-game fitting there, the same as fitting it in the client; and setting a route's waypoints in game replaces your autopilot waypoints in the EVE client. Nothing else in the app writes to EVE.",
+    "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, the ship you are flying, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
     "eyebrow": "Free · Open source · Runs on your device",
     "heading": "Answers, not API dumps.",
     "previewLabel": "Example — logged-in view",
     "previewCorp": "Deep Space Transport",
     "answersHeading": "The questions it exists to answer",
-    "answersLead": "Each of these is a page you open after logging in, with the number you would have worked out by hand already worked out.",
+    "answersLead": "Each of these is a screen from the app, filled with sample data. Select a picture to enlarge it.",
     "answers": {
       "attention": {
         "question": "Which character needs my attention?",
-        "answer": "The character list shows every pilot’s training queue at a glance: training, paused, ending soon or sitting idle. Alerts gathers what fired for every character on this device, not just the one you are looking at: skills finished, jobs ready to deliver, colonies stopped, orders undercut, mail waiting. Open a character and its board leads with the nearest deadline."
+        "answer": "Every pilot’s training queue at a glance, and one Alerts feed for what fired on any character: skills finished, jobs ready to deliver, orders undercut, mail waiting."
       },
       "orders": {
         "question": "Which of my orders is quietly losing ISK?",
-        "answer": "Open Orders is a worklist, not a list. Every order is filed under the worst thing wrong with it — undercut at your station, system or region, sitting under the price where relisting stops paying, or about to expire — worst first, across every character you fly. Open one and it prices the ways out: hold, undercut the station, dump into a standing buy order, or reprocess it and sell the materials, each net of the fee that exit actually pays, plus the trade hubs bidding more and how many jumps away they are."
+        "answer": "Open Orders files each order under the worst thing wrong with it, worst first, across every character. Open one to see what holding, undercutting, dumping into a buy order or reprocessing would net after fees."
       },
       "build": {
         "question": "Is this blueprint worth building today?",
-        "answer": "A Build Plan costs the materials, total job cost and taxes at live hub prices and answers two different questions instead of blurring them: is it cheaper than buying outright, and does it still profit once sales tax and broker fees come off. Sub-builds recurse into the same plan, owned stock is checked against what it would fetch if you sold it instead, and every figure on screen opens the rule it came from with your own values substituted in."
+        "answer": "A Build Plan costs materials, job cost and taxes at live hub prices, then says whether building beats buying and whether it still profits after sales tax and broker fees."
       },
-      "training": {
-        "question": "What is this training plan really going to cost me?",
-        "answer": "Drag skills into a plan and it schedules against the character’s real attributes, implants and queue. The optimizer places remaps for you — or at markers you drop yourself — and re-costs the plan under what-if implants and an accelerator before you spend anything. Put your characters side by side to see which of them should be training it."
+      "journal": {
+        "question": "Where did this ISK come from?",
+        "answer": "Each Wallet journal line links to the contract or item behind it, so a payment can be followed back to its source."
       },
-      "colonies": {
-        "question": "Are my colonies earning what they could?",
-        "answer": "The PI Colonies tab reads every colony and lists what is not working — idle facilities, storage that fills before you are back — then prices what is being left on the table: the ISK/hr you would add by tuning what is already built, and, as a separate figure, by rebuilding from scratch. Every rate is net of export customs and sales tax at your own Accounting level."
+      "marketJumps": {
+        "question": "What is for sale within 15 jumps?",
+        "answer": "Market shows every order for an item with its jump count from the system you pick, so you can see what a trip is worth before you make it."
       },
-      "appraisal": {
-        "question": "What is this pile of loot actually worth?",
-        "answer": "Paste straight from your inventory, a multibuy or a fitting. The appraisal prices it at the trade hub you pick three ways — sold into buy orders now or listed one step under the cheapest seller, each net of the sales tax and broker fee that route pays, and reprocessed with your own skills. Copy a ready-made sell list, or share the result as a link."
+      "routeSafety": {
+        "question": "Is this route safe right now?",
+        "answer": "Route Safety checks the route between two systems and flags the chokepoints on the way."
+      },
+      "pilot": {
+        "question": "Who is this pilot?",
+        "answer": "Pilot Lookup reads a character’s killboard history: a threat rating, kill and loss ratios, and kills per month."
+      },
+      "flyNext": {
+        "question": "Which ship can I fly next?",
+        "answer": "The Ship Tree maps every hull by faction and marks each one “can fly” or the training time it still needs. Open a hull to see its Mastery tiers and the skills you are missing."
+      },
+      "fitting": {
+        "question": "Will this fit hold up?",
+        "answer": "Build a fit on the ring and see its DPS against a target profile."
+      },
+      "survey": {
+        "question": "How long until this belt is mined out?",
+        "answer": "Survey tracks a belt’s scans: how much is mined, a chart of it, and when it will finish."
       }
     },
-    "screenshotsHeading": "See it in action",
-    "screenshotsLead": "Real screens from a real pilot. The same app runs on a desktop or installed on your phone.",
-    "screenshotsPhoneHeading": "On your phone",
     "screenshotEnlarge": "Enlarge: {{alt}}",
     "screenshots": {
+      "overview": {
+        "alt": "A character’s Overview board on a desktop: next deadline, training, wallet, open orders, mining tax, contracts, industry jobs and what is coming up, beside the alerts column.",
+        "caption": "One board for what needs you next"
+      },
       "orderDetail": {
         "alt": "An open sell order: who is cheaper at the station, system and region, and whether there is a better exit.",
         "caption": "Every order explains what it is losing to"
@@ -3248,33 +3264,33 @@
         "alt": "A Build Plan for an Orca: profit after fees, materials with sub-builds, and costs and revenue.",
         "caption": "Build plans with profit after fees"
       },
-      "lpStore": {
-        "alt": "The CONCORD loyalty store ranked by ISK per LP, with one offer’s net profit broken down.",
-        "caption": "LP offers ranked by ISK per LP"
+      "survey": {
+        "alt": "A Mining Survey: percent of the field mined, volume left over time by ore, mining pace and an estimated finish time.",
+        "caption": "Mining surveys that tell you when the belt is gone"
       },
-      "calendar": {
-        "alt": "The in-game calendar by month, beside a list of upcoming events and their RSVP state.",
-        "caption": "The in-game calendar, outside the game"
+      "fitting": {
+        "alt": "A ship fitting on the ring: modules around a Caracal, with offense, applied DPS against a target profile, powergrid and CPU.",
+        "caption": "Fittings with DPS against a target"
       },
-      "contracts": {
-        "alt": "Contract history with one item exchange contract opened to show what it held.",
-        "caption": "Every contract, and what was in it"
+      "shipTree": {
+        "alt": "The Ship Tree map for Caldari State with the Caracal selected and its Skills & Mastery panel open: the skills the hull needs, its Mastery tiers, and the training time still missing for each.",
+        "caption": "A hull’s skills and Mastery tiers, and what you still need to train"
       },
-      "phoneOverview": {
-        "alt": "A character’s Overview board on a phone: next deadline, training, wallet, open orders and mining tax.",
-        "caption": "Overview"
+      "walletJournal": {
+        "alt": "The wallet journal with links from each line to its contract and the item that was traded.",
+        "caption": "A journal that links to what each line was"
       },
-      "phoneAlerts": {
-        "alt": "Alerts on a phone, grouped by type across every character.",
-        "caption": "Alerts"
+      "phoneMarketJumps": {
+        "alt": "The market order book on a phone, limited to stations within 15 jumps of a chosen system, with jump counts per order.",
+        "caption": "Market within 15 jumps"
       },
-      "phoneWallet": {
-        "alt": "A wallet balance chart and loyalty point totals on a phone.",
-        "caption": "Wallet"
+      "phoneRouteSafety": {
+        "alt": "Route Safety on a phone: every system on a route with its security, ship kills and jumps in the last hour, and gank chokepoints flagged.",
+        "caption": "Route safety"
       },
-      "phonePriceHistory": {
-        "alt": "A market price history chart on a phone, with daily range, average and volume.",
-        "caption": "Price history"
+      "phonePilotLookup": {
+        "alt": "Pilot Lookup on a phone: a pilot’s corporation, threat reading, danger and fleet-size ratios and kills per month by kind of space.",
+        "caption": "Pilot lookup"
       }
     },
     "featuresHeading": "Everything outside the client",
@@ -3286,84 +3302,55 @@
     },
     "features": {
       "corp": {
-        "name": "Corporation",
-        "desc": "Ops board, wallet divisions, corp industry jobs, division-grouped assets and a member roster that flags who has gone dark. Gated on your in-game roles.",
-        "tag": "Role-gated"
+        "name": "Corporation"
       },
       "alerts": {
-        "name": "Alerts",
-        "desc": "Every alert this device has fired, grouped by type — including the ones belonging to a character you were not looking at. Search it, filter by character, mute a type, or dismiss a whole group from its row.",
-        "tag": "Every character"
+        "name": "Alerts"
       },
       "notifications": {
-        "name": "Notifications",
-        "desc": "Per character, per event. Skills, industry jobs, extractors, calendar events and — with the corporation grant — structure fuel carry a timestamp, so those arrive with the app closed; order fills, mail, contracts and price alerts fire while it is open.",
-        "tag": "Push"
+        "name": "Notifications"
       },
       "skills": {
-        "name": "Skills",
-        "desc": "Drag-and-drop skill plans, a remap-, implant- and accelerator-aware optimizer, live queue import, ship mastery and fit checks, and a side-by-side character comparison.",
-        "tag": "Planning"
+        "name": "Skills"
       },
       "clones": {
-        "name": "Clones",
-        "desc": "Your jump clones with where they are, how far, and what each wears, the one jump cooldown they all share, what you are wearing now, and which clone finishes your training queue soonest.",
-        "tag": "Read-only"
+        "name": "Clones"
       },
       "industry": {
-        "name": "Industry",
-        "desc": "Build plans for manufacturing and reactions: materials, total job costs, facility rigs and taxes at live hub prices. A production log tracks what each run really made, Opportunities ranks the blueprints you own and scans the market for what is profitable to build, and BPC Search covers every public blueprint-copy contract by ME/TE, runs, price and jumps.",
-        "tag": "Manufacturing"
+        "name": "Industry"
       },
       "ships": {
-        "name": "Ships",
-        "desc": "Build a Fitting against a ship's actual skills and implants, with DPS, tank and cap against a target profile you set, save it to My Fittings with a share code, and compare fits side by side. The Ship Tree maps every hull by faction and race, ladder or map view, showing which you can already fly.",
-        "tag": "Fitting & Ship Tree"
+        "name": "Ships"
       },
       "miningTax": {
-        "name": "Mining",
-        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus a tax ledger for moons you mine in someone else’s space: each day’s ore in each system assigned to the payee you owe, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
-        "tag": "Ledger"
+        "name": "Mining"
       },
       "planetary": {
-        "name": "Planetary Industry",
-        "desc": "Colonies, extraction timers and idle warnings, a chain planner that fits pins against CPU and powergrid, and a planner that shows what each colony could earn by tuning or rebuilding it.",
-        "tag": "Planning"
+        "name": "Planetary Industry"
+      },
+      "travel": {
+        "name": "Travel"
       },
       "market": {
-        "name": "Market",
-        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, an appraisal of pasted items or fits net of fees, and Hauling Opportunities ranking routes by expected profit. Built on public price data, so it works whatever you did or didn't grant.",
-        "tag": "No scope needed"
+        "name": "Market"
       },
       "orders": {
-        "name": "Market Orders",
-        "desc": "Your open orders grouped by what is wrong with them, with the relist floor, the undercut that caused it, and the better exits — for every character at once.",
-        "tag": "Trading"
+        "name": "Open Orders"
       },
       "walletOrders": {
-        "name": "Wallet & LP",
-        "desc": "Balance, journal and transaction history, plus a loyalty store that ranks offers by what they are worth at your hub.",
-        "tag": "Read-only"
+        "name": "Wallet"
       },
       "assets": {
-        "name": "Assets",
-        "desc": "Every hangar, station and structure your characters hold, searchable, with player structures resolved to real names.",
-        "tag": "Read-only"
+        "name": "Assets"
       },
       "contracts": {
-        "name": "Contracts",
-        "desc": "Your contract history and what each one held, plus a search of public item exchange and courier contracts by jump range, with ISK per jump for couriers.",
-        "tag": "Yours + public"
+        "name": "Contracts"
       },
       "social": {
-        "name": "Mail & Calendar",
-        "desc": "In-game mail with reply and forward, and a calendar you can RSVP from, without launching the client.",
-        "tag": "Out of game"
+        "name": "Mail & Calendar"
       },
       "contacts": {
-        "name": "Contacts & Standings",
-        "desc": "Contacts and the standings you set on them, for one character or across all of them at once, flagging where your characters disagree.",
-        "tag": "Every character"
+        "name": "Contacts & Standings"
       }
     },
     "trustHeading": "It reads. It writes only when you act.",
@@ -3387,11 +3374,11 @@
     },
     "bottomCtaHeading": "Undock into your dashboard.",
     "bottomCtaBody": "One EVE SSO login to start. Add as many characters as you fly — they all sit side by side.",
-    "footerOffline": "Installable PWA",
     "footerOpenSource": "Free & open source",
     "footerPrivacy": "Privacy policy",
     "footerDataCredit": "Data credit",
-    "footerDiscord": "Discord"
+    "footerDiscord": "Discord",
+    "permissionsPrivacy": "How your data is stored and deleted:"
   },
   "callback": {
     "completing": "Completing login…",
@@ -4016,6 +4003,9 @@
     "historyPlaceholder": "Switch survey",
     "historyEntry": "{{ore}} · {{percent}}% mined · {{time}}",
     "historyEmpty": "No scans yet · {{time}}",
+    "historyNamed": "{{name}} · {{time}}",
+    "nameLabel": "Survey name",
+    "nameEdit": "{{name}}, rename",
     "historyRemove": "Remove {{name}} from your surveys",
     "historyRemoveShort": "Remove",
     "historyRemoveKeyHint": "Press Delete to remove from this list",
@@ -4026,6 +4016,17 @@
     "loadFailed": "Couldn't load this survey. It will retry.",
     "emptyTitle": "No survey yet",
     "emptyHint": "Paste a Survey Scanner copy or press Ctrl+V anywhere in the app, to start tracking this field. Paste a newer one later to update it.",
+    "howTo": {
+      "title": "How to copy a scan",
+      "menuAlt": "The Mining Surveyor icon and its right-click menu, with Open Scan Results Window highlighted.",
+      "resultsAlt": "The Mining Survey Results window: the Scan button below a list of ores, each expanded.",
+      "openMenu": "Right-click the Mining Surveyor icon.",
+      "openResults": "Choose Open Scan Results Window.",
+      "scan": "Click Scan in the new window.",
+      "expand": "Expand every ore, so all its rocks are listed.",
+      "copy": "Click in the list, press Ctrl+A to select everything, then Ctrl+C to copy.",
+      "paste": "Come back here and press Ctrl+V."
+    },
     "minedPercent": "{{percent}}% mined",
     "seenOf": "of {{volume}} m³ seen",
     "statLeft": "m³ left",
@@ -7251,6 +7252,8 @@
     "filterMinQuantity": "Min quantity",
     "filterSecurity": "Security",
     "filterNpcOnly": "NPC stations only",
+    "filterHideBait": "Hide bait sells",
+    "filterHideBaitHint": "Hides sell orders asking {{times}} times the best sell or more, the ones flagged as likely bait. Depth, best prices and CSV export still count them.",
     "globalMarketNote": "Reading from {{regionName}} — this item trades in a market region of its own, not the one picked above.",
     "refresh": "Refresh",
     "searchLabel": "Search items",
@@ -7372,10 +7375,10 @@
       "historyViewsTooltipLabel": "About ended orders and transactions",
       "historyViewsTooltip": "Ended orders are the orders you placed that were cancelled or expired. Transactions are the fills that moved ISK. One order can make many fills, and an order nobody took makes none.",
       "transactions": "Transactions",
-      "appraisal": "Appraisal",
-      "hauling": "Hauling"
+      "appraisal": "Appraisal"
     },
     "hauling": {
+      "dataAgeNote": "Prices come from ESI's regional market orders, which EVE refreshes about every 5 minutes.",
       "title": "Hauling",
       "from": "From",
       "to": "To",
@@ -7718,7 +7721,20 @@
       "summaryVolume": "Volume",
       "summaryOrdersPerDay": "Orders / day",
       "summaryNone": "No data in this range",
-      "movingAverage": "Moving average"
+      "movingAverage": "Moving average",
+      "regionAverage": "{{region}} average",
+      "regionAverageColumn": "Average Price ({{region}})",
+      "noTrades": "No trades",
+      "compareRegions": "Compare regions",
+      "compareButton": "Compare regions, {{count}} of {{max}} picked",
+      "compareHubsGroup": "Trade hubs",
+      "compareAllGroup": "All regions",
+      "compareHubOption": "{{region}} ({{hub}})",
+      "compareLimit": "Up to {{max}} regions",
+      "compareClear": "Clear",
+      "compareLoading": "{{region}} · loading…",
+      "compareFailed": "{{region}} · couldn't load",
+      "compareEmpty": "{{region}} · no trades in this range"
     },
     "compare": {
       "unitColumn": "Unit",
@@ -8118,7 +8134,9 @@
       "sell_one": "{{count}} order · lowest {{price}}",
       "sell_other": "{{count}} orders · lowest {{price}}",
       "buy_one": "{{count}} order · highest {{price}}",
-      "buy_other": "{{count}} orders · highest {{price}}"
+      "buy_other": "{{count}} orders · highest {{price}}",
+      "baitHidden_one": "{{count}} bait sell hidden",
+      "baitHidden_other": "{{count}} bait sells hidden"
     },
     "itemSkills": {
       "trained": "{{trained}} of {{count}} trained",
@@ -8434,7 +8452,7 @@
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
-            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Mining Survey: the survey links you created or opened.",
+            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Mining Survey: the survey links you created or opened, and the names you gave them.",
             "layout": "Layout: hidden and reordered Overview cards, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }
@@ -8898,6 +8916,7 @@
       "leftName": "Left ·"
     },
     "members": {
+      "darkState": ", dark",
       "title": "Corp members",
       "refresh": "Refresh member list",
       "tableLabel": "Corporation members",
@@ -8991,8 +9010,6 @@
       "strip": {
         "title": "Deadlines per day — next {{days}} days",
         "today": "Today",
-        "footnote_one": "{{count}} clock falls due on or before {{until}}.",
-        "footnote_other": "{{count}} clocks fall due on or before {{until}}.",
         "describe": "Deadlines per day for the next {{days}} days: {{detail}}.",
         "describeEmpty": "Nothing falls due in the next {{days}} days.",
         "describeDay": "{{day}}, {{count}} due, worst {{severity}}"
@@ -9331,6 +9348,7 @@
     },
     "title": "Travel",
     "routeTab": "Route Safety",
+    "haulingTab": "Hauling",
     "pilotTab": "Pilot Lookup",
     "pilot": {
       "pickTitle": "Look up a pilot by name",

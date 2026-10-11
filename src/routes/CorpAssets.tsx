@@ -40,6 +40,7 @@ import {
   DataAgeBadge,
   EmptyState,
   IconButton,
+  LiveStatus,
   PageHeader,
   Panel,
   SearchInput,
@@ -607,6 +608,13 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                 {t('corp.assets.fetchTruncatedNotice', { shown: data.assetsShown })}
               </p>
             )}
+            <LiveStatus>
+              {selectMode && selectedIds.size > 0
+                ? t('assets.select.selectedCount', { count: selectedIds.size })
+                : searchActive
+                  ? t('assets.search.resultCount', { count: searchMatches.length })
+                  : null}
+            </LiveStatus>
             <SearchInput
               ref={searchRef}
               value={search}
@@ -617,7 +625,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
             {selectMode && (
               <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
                 {selectedIds.size > 0 && (
-                  <span className="text-[0.6875rem] text-text-dim tabular-nums">
+                  <span aria-hidden="true" className="text-[0.6875rem] text-text-dim tabular-nums">
                     {t('assets.select.selectedCount', { count: selectedIds.size })}
                   </span>
                 )}

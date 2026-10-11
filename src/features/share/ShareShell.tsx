@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
-import { Button, buttonClassName, LogoMark, plainTextActionClassName } from '@/components/ui';
+import { buttonClassName, EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 
 /** Where "Open Neocom Desk" lands: the page the share came from, with its content filled in. */
@@ -68,9 +68,12 @@ export function ShareShell({ title, hideTitle, actions, openInApp, children }: S
         </Link>
         {signedOut ? (
           <div className="flex flex-col items-end gap-1">
-            <Button variant="accent" size="sm" loading={loggingIn} onClick={logIn}>
-              {t('share.logIn')}
-            </Button>
+            <EveSsoButton
+              size="small"
+              pending={loggingIn}
+              onClick={logIn}
+              label={t('share.logIn')}
+            />
             <button
               type="button"
               className={plainTextActionClassName()}

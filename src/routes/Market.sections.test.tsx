@@ -145,6 +145,8 @@ describe('Market top-level tabs', () => {
       'true'
     );
     expect(screen.queryByRole('link', { name: 'Orders' })).not.toBeInTheDocument();
+    // Hauling is a Travel tab now (#3526).
+    expect(screen.queryByRole('tab', { name: 'Hauling' })).not.toBeInTheDocument();
   });
 
   it('switches to Open Orders, History and Transactions via the tab bar', async () => {

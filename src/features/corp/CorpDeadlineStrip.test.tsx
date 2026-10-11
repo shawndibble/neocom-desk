@@ -32,25 +32,23 @@ describe('CorpDeadlineStrip day labels', () => {
     expect(screen.getByRole('img', { name: /Today, 2 due/ })).toBeInTheDocument();
   });
 
-  it('names the month on the first column and where a new month starts', () => {
-    render(<CorpDeadlineStrip days={fortnight()} />);
-    const columns = screen.getByRole('img').querySelectorAll(':scope > div');
-    const months = Array.from(columns, (c) => c.lastElementChild?.textContent ?? '');
-    expect(months[0]).toBe('Oct');
-    expect(months[3]).toBe('Nov');
-    expect(months.filter(Boolean)).toHaveLength(2);
+  it('draws a severity glyph on days with something due and none on empty days', () => {
+    const { container } = render(<CorpDeadlineStrip days={fortnight()} />);
+    const columns = container.querySelectorAll('[role="img"] > div');
+    expect(columns[0].querySelectorAll('svg')).toHaveLength(1);
+    expect(columns[1].querySelectorAll('svg')).toHaveLength(0);
   });
 
-  it('skips the first month label when the next column opens a new month', () => {
-    const days = Array.from({ length: 14 }, (_, i) => ({
-      startMs: new Date(2026, 9, 31 + i).getTime(),
-      count: 0,
-      severity: null,
-    }));
-    render(<CorpDeadlineStrip days={days} />);
-    const columns = screen.getByRole('img').querySelectorAll(':scope > div');
-    const months = Array.from(columns, (c) => c.lastElementChild?.textContent ?? '');
-    expect(months[0]).toBe('');
-    expect(months[1]).toBe('Nov');
+  it('shows the glyph in the legend instead of a colour swatch', () => {
+    const { container } = render(<CorpDeadlineStrip days={fortnight()} />);
+    expect(screen.getByText('Critical').querySelector('svg')).not.toBeNull();
+    expect(container.querySelector('.size-2')).toBeNull();
+  });
+
+  it('has no month row or footnote', () => {
+    const { container } = render(<CorpDeadlineStrip days={fortnight()} />);
+    expect(container.querySelector('h3')).toBeNull();
+    expect(container.textContent).not.toMatch(/fall(s)? due on or before/);
+    expect(container.textContent).not.toContain('Nov');
   });
 });

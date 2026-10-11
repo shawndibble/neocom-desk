@@ -47,6 +47,7 @@ import { HUB_OPTIONS, SIZE_OPTIONS } from './theraOptions';
 import { routeViaHref } from './routeSafetyLink';
 import { TheraTable } from './TheraTable';
 import { useTheraConnections, type TheraConnectionsState } from './useTheraConnections';
+import type { TravelTabProps } from './travelTab';
 
 /** What Reset filters goes back to: origin and Route Preference filter nothing, so they stay. */
 const DEFAULT_FILTERS = { hub: 'all', space: 'kspace', size: 'any' } as const;
@@ -60,7 +61,7 @@ const THERA_PARAMS = {
   size: enumParam(SIZE_OPTIONS, DEFAULT_FILTERS.size),
 };
 
-export function TheraTab({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: string }) {
+export function TheraTab({ tabBar, tabsId, views }: TravelTabProps) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(THERA_PARAMS);
   const current = useCurrentSystem();
@@ -90,6 +91,7 @@ export function TheraTab({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: string
     <div className="space-y-4">
       <PageHeader
         title={t('travel.title')}
+        views={views}
         meta={
           state.kind === 'ready' ? (
             <DataAgeBadge date={state.fetchedAt} note={t('travel.thera.dataAgeNote')} />

@@ -234,6 +234,7 @@ function KillmailRow({
   const other =
     detail === null ? null : entry.side === 'kill' ? detail.victimParty : detail.finalBlow;
   const time = detail?.time ? new Date(detail.time) : null;
+  const showLossSummary = entry.side === 'loss' && detail !== null;
 
   return (
     <li>
@@ -284,10 +285,16 @@ function KillmailRow({
         </span>
       </button>
       {isOpen && (
-        <div id={panelId} className="border-t border-line bg-panel-2 px-3 py-2">
+        <div
+          id={panelId}
+          className={cx(
+            'border-t border-line bg-panel-2 px-3 py-2',
+            showLossSummary && 'grid gap-x-4 gap-y-2 md:grid-cols-2'
+          )}
+        >
           <KillmailFit read={read} typeLabel={typeLabel} />
-          {entry.side === 'loss' && detail !== null && (
-            <div className="mt-2 border-t border-line pt-2">
+          {showLossSummary && (
+            <div className="min-w-0 border-t border-line pt-2 md:border-t-0 md:pt-0">
               <LossSummary detail={detail} zkbValue={entry.value} />
             </div>
           )}

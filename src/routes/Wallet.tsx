@@ -51,6 +51,7 @@ import { usePageTab } from '@/lib/usePageTab';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { WALLET_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -387,7 +388,7 @@ export function Wallet() {
         // is on the LP Store page header.
         render: (entry) => (
           <Link
-            to={`/market/lp-store/${entry.corporation_id}`}
+            to={`/wallet/lp-store/${entry.corporation_id}`}
             className={entityLinkClassName('group')}
           >
             {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
@@ -560,10 +561,16 @@ export function Wallet() {
         tabsId={tabsId}
         label={t('wallet.title')}
         value={tab}
-        onChange={(id) => setTab(id as typeof tab)}
+        // LP Store is its own route: Wallet's query (`?char=`, journal filters) stays behind,
+        // as it does on the way back.
+        onChange={(id) =>
+          id === 'lp-store' ? navigate(tabPath(WALLET_TABS, 'lp-store')) : setTab(id as typeof tab)
+        }
         tabs={[
           { id: 'balance', label: t('wallet.balanceTab') },
           { id: 'journal', label: t('wallet.journalTab') },
+          // Its own route draws this same bar (`LoyaltyStore`).
+          { id: 'lp-store', label: t('loyaltyStore.title') },
         ]}
       />
 
@@ -736,7 +743,7 @@ export function Wallet() {
                     onSortChange={loyaltySortProps.onSortChange}
                     responsive="table"
                     rowClassName={() => 'group'}
-                    onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
+                    onRowClick={(entry) => navigate(`/wallet/lp-store/${entry.corporation_id}`)}
                   />
                 )}
               </Panel>

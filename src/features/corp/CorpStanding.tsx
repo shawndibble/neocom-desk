@@ -1,6 +1,6 @@
 /**
  * The Standing panel: the two or three figures a corp manager acts on, with the
- * Deadline Strip beside them (issue #566).
+ * Deadline Strip in its own panel below (issues #566, #3451).
  *
  * Answer first, list second. The old overview made you read thirteen rows to
  * learn "there is a lot due soon"; this states it, and the strip says when.
@@ -78,18 +78,8 @@ export function CorpStanding({ clocks, money }: CorpStandingProps) {
   if (clocks === null && money === null) return null;
 
   return (
-    <Panel title={t('corp.standing.title')}>
-      {/*
-        Stacked below `xl`, side by side at and above it: the strip's `flex-1
-        min-w-0` columns never force a wrap on their own (a flex item's wrap
-        contribution is its max-content width, and truncated 14-day labels
-        are narrow enough to "fit" shrunk to nothing) — so relying on
-        `flex-wrap` let the strip share a row with the figures from `lg`
-        (1024px) up, squeezing all fourteen columns to ~11px each and
-        clipping every label (issue #2201). `xl` (1280px) is the first width
-        with room for both the figures and fourteen readable columns.
-      */}
-      <div className="flex flex-col items-stretch gap-x-6 gap-y-4 xl:flex-row xl:flex-wrap">
+    <>
+      <Panel title={t('corp.standing.title')}>
         {/*
           No `shrink-0` here: it sizes this row to its own max-content width, so
           `flex-wrap` never gets a reason to wrap and three figures overflow a
@@ -144,13 +134,8 @@ export function CorpStanding({ clocks, money }: CorpStandingProps) {
             </>
           )}
         </div>
-        {clocks && (
-          <>
-            <span aria-hidden="true" className="hidden w-px shrink-0 bg-line xl:block" />
-            <CorpDeadlineStrip days={clocks.days} />
-          </>
-        )}
-      </div>
-    </Panel>
+      </Panel>
+      {clocks && <CorpDeadlineStrip days={clocks.days} />}
+    </>
   );
 }

@@ -1949,7 +1949,9 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
 
-    expect(await screen.findByText('1 item selected')).toBeInTheDocument();
+    expect(
+      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"]' })
+    ).toBeInTheDocument();
   });
 
   it('turning off select mode clears the current selection', async () => {
@@ -1960,7 +1962,9 @@ describe('multi-select and bulk actions (issue #90)', () => {
 
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
-    expect(await screen.findByText('1 item selected')).toBeInTheDocument();
+    expect(
+      await screen.findByText('1 item selected', { selector: '[aria-hidden="true"]' })
+    ).toBeInTheDocument();
 
     await clickTool(user, 'Select');
     await clickTool(user, 'Select');
@@ -2070,7 +2074,9 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
 
-    expect(await screen.findByText('2 items selected')).toBeInTheDocument();
+    expect(
+      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"]' })
+    ).toBeInTheDocument();
     for (const checkbox of screen.getAllByRole('checkbox')) {
       expect(checkbox).toBeChecked();
     }
@@ -2096,7 +2102,9 @@ describe('multi-select and bulk actions (issue #90)', () => {
 
     await clickTool(user, 'Select');
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
-    expect(await screen.findByText('2 items selected')).toBeInTheDocument();
+    expect(
+      await screen.findByText('2 items selected', { selector: '[aria-hidden="true"]' })
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Deselect all' }));
 

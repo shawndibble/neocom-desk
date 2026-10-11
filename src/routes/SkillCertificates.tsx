@@ -35,7 +35,6 @@ import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { GrantNote } from '@/app/GrantNote';
-import { useTimedToast } from '@/components/ui/useTimedToast';
 
 const SORTS: readonly CertificateSort[] = ['grade', 'name', 'time'];
 /** The group select's "every group" value — Radix Select reserves the empty string. */
@@ -67,7 +66,6 @@ export function SkillCertificates() {
   const [sort, setSort] = useState<CertificateSort>('grade');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [added, setAdded] = useState<Added | null>(null);
-  useTimedToast(added, () => setAdded(null));
 
   const { catalog, trainedSkills, attributes, implants, cloneState, skillsKnown } = data;
   const certificates = data.load.status === 'ready' ? data.load.certificates : null;
@@ -303,6 +301,7 @@ export function SkillCertificates() {
               setAdded(null);
             },
           }}
+          onClose={() => setAdded(null)}
         />
       )}
     </div>

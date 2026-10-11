@@ -72,7 +72,19 @@ vi.mock('@/sde/loadMarketSde', async (importOriginal) => ({
   loadSolarSystemJumps: () => loadSolarSystemJumps(),
   loadSolarSystems: async () => SYSTEMS,
   loadMarketRegions: async () => [{ id: 10000002, name: 'The Forge' }],
+  loadMarketGroups: async () => [],
 }));
+
+// Hauling's scan reads every hub's order books; the tab's own tests live with
+// `HaulingPanel`. Here it only has to mount, so a failed scan is the cheapest
+// state with a line to find.
+// One result object, so `refresh` keeps its identity across renders as the
+// real hook's does (the panel hands it up to the title bar on every change).
+vi.mock('@/features/market/useHaulingScan', () => {
+  const scan = { state: { status: 'error' }, refresh: () => {} };
+  const fees = { accountingLevel: 5, brokerRelationsLevel: 4, at: () => null };
+  return { useHaulingScan: () => scan, useHaulingFees: () => fees };
+});
 
 const CHAR_ID = 91;
 const ESI = 'https://esi.evetech.net';
@@ -1357,6 +1369,73 @@ describe('Travel › Thera / Turnur', () => {
       const jspace = await screen.findByRole('table', { name: JSPACE_TABLE });
       expect(holesIn(jspace)).toEqual(['jspace']);
       expect(window.location.search).toContain('space=wormhole');
+    } finally {
+      matchMedia.mockRestore();
+    }
+  });
+});
+
+describe('Travel › Hauling (moved from Market, #3526)', () => {
+  const HAULING_FAILED = "Couldn't scan the market";
+
+  function phoneScreen() {
+    return vi.spyOn(window, 'matchMedia').mockImplementation(
+      (media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList
+    );
+  }
+
+  it('is Travel’s last tab, after Route Safety, Thera / Turnur and Pilot Lookup', async () => {
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+    const strip = await screen.findByRole('tablist', { name: 'Travel' });
+    expect(
+      within(strip)
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent)
+    ).toEqual([en.travel.routeTab, en.travel.thera.tab, en.nav.pilotLookup, en.travel.haulingTab]);
+  });
+
+  it('opens straight from its own URL', async () => {
+    window.history.pushState({}, '', '/travel/hauling?from=amarr&to=jita');
+    render(<App />);
+    expect(await screen.findByText(HAULING_FAILED)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Hauling' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.location.pathname).toBe('/travel/hauling');
+  });
+
+  it('moves an old Market Hauling link here, keeping its query and hash', async () => {
+    window.history.pushState({}, '', '/market/hauling?from=amarr&to=jita#x');
+    render(<App />);
+    expect(await screen.findByText(HAULING_FAILED)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/travel/hauling');
+    expect(window.location.search).toBe('?from=amarr&to=jita');
+    expect(window.location.hash).toBe('#x');
+  });
+
+  it('leaves Route Safety’s systems behind on the way in, since its From/To are hubs', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+    await user.click(await screen.findByRole('tab', { name: 'Hauling' }));
+    expect(await screen.findByText(HAULING_FAILED)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/travel/hauling');
+    expect(window.location.search).toBe('');
+  });
+
+  it('trades the strip for the title’s view picker on a phone', async () => {
+    const matchMedia = phoneScreen();
+    try {
+      window.history.pushState({}, '', '/travel/hauling');
+      render(<App />);
+      expect(await screen.findByText(HAULING_FAILED)).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Travel, Hauling. Change view' })
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('tablist', { name: 'Travel' })).not.toBeInTheDocument();
     } finally {
       matchMedia.mockRestore();
     }

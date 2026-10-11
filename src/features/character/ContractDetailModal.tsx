@@ -40,7 +40,9 @@ import { ItemInfoLink } from '@/features/entities';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { CharacterLink, CorporationLink } from '@/features/entities';
+import { CharacterLink, CorporationLink, SystemLink } from '@/features/entities';
+import { resolvePlaceSystemId } from '@/features/travel/placeSystem';
+import { loadSystemName } from './systemSecurity';
 import { StandingTag } from './StandingTag';
 import { ContractReceiverLink } from './ContractReceiverLink';
 import { contractIssuer, type ContractReceiver } from './contractCounterparty';
@@ -67,6 +69,35 @@ export interface ContractDetailModalProps {
 interface LocationState {
   start: string | null;
   end: string | null;
+}
+
+interface SystemRef {
+  id: number;
+  name: string;
+}
+
+/** `end` only for a courier: every other contract type's two ends are the same system. */
+interface SystemsState {
+  start: SystemRef | null;
+  end: SystemRef | null;
+}
+
+/**
+ * The solar system a contract location sits in, for its Route Safety link;
+ * `null` hides the row (no `#id` stand-in). A location whose name did not
+ * resolve is one this character cannot see, or ESI is unreachable, so asking
+ * again for its system would only repeat the failed lookup.
+ */
+async function loadLocationSystem(
+  characterId: number,
+  locationId: number | undefined,
+  locationName: string | null
+): Promise<SystemRef | null> {
+  if (!locationId || locationName === null) return null;
+  const id = await resolvePlaceSystemId(locationId, characterId).catch(() => null);
+  if (id === null) return null;
+  const name = await loadSystemName(id).catch(() => null);
+  return name === null ? null : { id, name };
 }
 
 interface ItemsState {
@@ -98,6 +129,8 @@ export function ContractDetailModal({
   const hubId = useMarketHub((s) => s.value);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const [location, setLocation] = useState<LocationState | undefined>(undefined);
+  /** `undefined` until resolved; the System rows stay hidden meanwhile rather than spinning. */
+  const [systems, setSystems] = useState<SystemsState | undefined>(undefined);
   /** Stays `undefined` forever for a courier/loan contract — `HAS_ITEMS` gates both the fetch and the render, so it's never inspected there. */
   const [items, setItems] = useState<ItemsState | undefined>(undefined);
   /** Only computed for an outstanding contract — see the `Market value` render gate below. */
@@ -107,6 +140,7 @@ export function ContractDetailModal({
     let cancelled = false;
     void (async () => {
       setLocation(undefined);
+      setSystems(undefined);
       const [start, end] = await Promise.all([
         contract.start_location_id
           ? loadContractLocationName(characterId, contract.start_location_id)
@@ -115,12 +149,22 @@ export function ContractDetailModal({
           ? loadContractLocationName(characterId, contract.end_location_id)
           : Promise.resolve(null),
       ]);
-      if (!cancelled) setLocation({ start, end });
+      if (cancelled) return;
+      setLocation({ start, end });
+      // After the names, not alongside them: the system id comes off the same
+      // station/structure row, which the name lookup has just cached.
+      const [startSystem, endSystem] = await Promise.all([
+        loadLocationSystem(characterId, contract.start_location_id, start),
+        contract.type === 'courier'
+          ? loadLocationSystem(characterId, contract.end_location_id, end)
+          : Promise.resolve(null),
+      ]);
+      if (!cancelled) setSystems({ start: startSystem, end: endSystem });
     })();
     return () => {
       cancelled = true;
     };
-  }, [characterId, contract.start_location_id, contract.end_location_id]);
+  }, [characterId, contract.type, contract.start_location_id, contract.end_location_id]);
 
   useEffect(() => {
     if (!HAS_ITEMS.has(contract.type)) return;
@@ -258,6 +302,8 @@ export function ContractDetailModal({
               </>
             )}
 
+            {systems?.start && <SystemRow system={systems.start} />}
+
             {contract.end_location_id && (
               <>
                 <dt className="text-text-dim uppercase">{t('contracts.detailDestination')}</dt>
@@ -270,6 +316,8 @@ export function ContractDetailModal({
                 </dd>
               </>
             )}
+
+            {systems?.end && <SystemRow system={systems.end} />}
 
             <dt className="text-text-dim uppercase">{t('contracts.detailDateIssued')}</dt>
             <dd>{formatTimestamp(new Date(contract.date_issued), timeZone)}</dd>
@@ -443,6 +491,23 @@ function ItemSection({
       </div>
       {marketValue && <ContractMarketValueRow value={marketValue} hubName={hubName} />}
     </div>
+  );
+}
+
+/**
+ * The system under a Location/Destination row, linked to Route Safety the way
+ * `PublicContractDetailModal`'s System row is. The station name above it stays
+ * plain: §6c makes a station not clickable.
+ */
+function SystemRow({ system }: { system: SystemRef }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <dt className="text-text-dim uppercase">{t('contractDetail.systemLabel')}</dt>
+      <dd>
+        <SystemLink systemId={system.id}>{system.name}</SystemLink>
+      </dd>
+    </>
   );
 }
 

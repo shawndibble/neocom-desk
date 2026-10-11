@@ -149,7 +149,7 @@ describe('Wallet', () => {
     // reaches the LP Store without the row. Not a Show Info link any more.
     expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
       'href',
-      '/market/lp-store/1000167'
+      '/wallet/lp-store/1000167'
     );
     expect(screen.queryByRole('columnheader', { name: 'LP Store' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Open LP Store/ })).not.toBeInTheDocument();
@@ -274,6 +274,50 @@ describe('Wallet', () => {
     render(<App />);
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Journal' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('shows Balance, Journal and LP Store tabs (issue #3527)', async () => {
+    render(<App />);
+    const tabs = within(await screen.findByRole('tablist', { name: 'Wallet' })).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Balance', 'Journal', 'LP Store']);
+  });
+
+  it("opens the LP Store from Wallet's tab, leaving Wallet's query behind (issue #3527)", async () => {
+    window.history.pushState({}, '', '/wallet/journal?journal.q=bounty');
+    render(<App />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'LP Store' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store'));
+    expect(window.location.search).toBe('');
+    expect(
+      await screen.findByRole('tab', { name: 'LP Store', selected: true })
+    ).toBeInTheDocument();
+  });
+
+  it('opens a store from its URL as the LP Store tab, under the Wallet tab bar (issue #3527)', async () => {
+    window.history.pushState({}, '', '/wallet/lp-store/1000167');
+    render(<App />);
+    expect(
+      await screen.findByRole('tab', { name: 'LP Store', selected: true })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Balance' })).toBeInTheDocument();
+  });
+
+  it('moves an old Market LP Store link to Wallet, keeping the corporation and query (issue #3527)', async () => {
+    window.history.pushState({}, '', '/market/lp-store/1000167?affordableOnly=0#x');
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store/1000167'));
+    expect(window.location.search).toBe('?affordableOnly=0');
+    expect(window.location.hash).toBe('#x');
+    expect(
+      await screen.findByRole('tab', { name: 'LP Store', selected: true })
+    ).toBeInTheDocument();
+  });
+
+  it('moves the old Market LP Store landing to Wallet with its search (issue #3527)', async () => {
+    window.history.pushState({}, '', '/market/lp-store?q=tritanium');
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store'));
+    expect(window.location.search).toBe('?q=tritanium');
   });
 
   it('redirects /wallet/transactions to Market › History (issue #1749)', async () => {
@@ -480,11 +524,11 @@ describe('Wallet', () => {
       .map((header) => header.textContent);
     expect(headers).toEqual(['Ref type', 'Net']);
     const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
-    expect(bountyRow).toHaveTextContent('+1,000.00');
+    expect(bountyRow).toHaveTextContent('+1,000');
     // Single-sided ref types carry no second in/out line.
     expect(breakdown).not.toHaveTextContent(/in S+ · out/);
     // The In / Out / Net summary is a ledger: full figures, not shorthand.
-    expect(screen.getAllByText('+500.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('+500').length).toBeGreaterThan(0);
   });
 
   it('tones the filtered net total by sign (issue #1961)', async () => {
@@ -497,11 +541,11 @@ describe('Wallet', () => {
     await user.click(screen.getByRole('combobox', { name: 'Ref type' }));
     await user.click(await screen.findByRole('option', { name: 'Bounty prize' }));
 
-    const net = (await screen.findAllByText('+1,000.00')).find((el) =>
+    const net = (await screen.findAllByText('+1,000')).find((el) =>
       el.parentElement?.textContent?.includes('1 entry')
     ) as HTMLElement;
     expect(net).toHaveClass('text-isk-pos');
-    expect(net.parentElement).toHaveTextContent('1 entry · net +1,000.00');
+    expect(net.parentElement).toHaveTextContent('1 entry · net +1,000');
   });
 
   it('narrows the journal by free text against the description (issue #413)', async () => {
@@ -536,8 +580,8 @@ describe('Wallet', () => {
 
     // The sr-only live region repeats the line as plain text; the visible one is the <p>.
     const summary = (await screen.findAllByText(/1 entry/)).find((el) => el.tagName === 'P')!;
-    expect(summary).toHaveTextContent('1 entry · net -500.00');
-    expect(within(summary).getByText('-500.00')).toHaveClass('text-isk-neg');
+    expect(summary).toHaveTextContent('1 entry · net -500');
+    expect(within(summary).getByText('-500')).toHaveClass('text-isk-neg');
   });
 
   it('shows a filtered-empty message, not the no-data empty state, when the filter matches nothing (issue #413)', async () => {

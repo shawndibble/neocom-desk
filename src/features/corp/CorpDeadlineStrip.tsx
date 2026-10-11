@@ -19,11 +19,17 @@
  * The counts sit on the bars, which is what lets the y-axis go away entirely —
  * a fortnight whose tallest day is 7 does not need a scale, it needs the
  * numbers.
+ *
+ * Each day with something on it also carries its severity's glyph above the count
+ * (issue #3451): the bars differ only by fill otherwise, which fails "colour is
+ * never the only signal" (DESIGN.md §7). The strip owns its own full-width Panel.
  */
 import { useTranslation } from 'react-i18next';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import type { DeadlineDay } from '@/engine/corp/deadlines';
 import { DEADLINE_SEVERITIES } from '@/engine/severity';
+import { Panel } from '@/components/ui';
+import { SeverityIcon } from '@/components/ui/SeverityIcon';
 import { SEVERITY_FILL, SEVERITY_LABEL } from '@/components/ui/severityTone';
 
 interface CorpDeadlineStripProps {
@@ -66,11 +72,10 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
   const busiest = days.reduce((max, day) => Math.max(max, day.count), 0);
   const total = days.reduce((sum, day) => sum + day.count, 0);
 
-  // One letter and a day number fit a 20px column at `xl`, where the strip shares
-  // a row with the hero figures; the month is named only where it begins.
+  // One letter and a day number fit a narrow column; the date range is in the
+  // accessible description.
   const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: 'narrow' });
   const dayOfMonth = new Intl.DateTimeFormat(i18n.language, { day: 'numeric' });
-  const month = new Intl.DateTimeFormat(i18n.language, { month: 'short' });
   const dayMonth = new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short' });
 
   /**
@@ -93,16 +98,12 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
     .join('; ');
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('corp.standing.strip.title', { days: days.length })}
-        </h3>
+    <Panel title={t('corp.standing.strip.title', { days: days.length })}>
+      <div className="flex min-w-0 flex-col gap-2">
         {/*
-          A legend for the four severities, not for a series: the strip draws one
-          measure, so nothing here identifies a line. It exists because colour is
-          never the only signal (DESIGN.md §7) — the same four words appear on
-          the card rows below, and this is where the bar colours get named.
+          A legend for the four severities, not for a series. Colour is never the
+          only signal (DESIGN.md §7): each entry shows the same glyph the day
+          columns carry, plus the word.
         */}
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           {DEADLINE_SEVERITIES.map((severity) => (
@@ -110,90 +111,73 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
               key={severity}
               className="inline-flex items-center gap-1.5 text-[0.6875rem] text-text-dim"
             >
-              <span
-                aria-hidden="true"
-                className={`size-2 shrink-0 rounded-[1px] ${SEVERITY_FILL[severity]}`}
-              />
+              <SeverityIcon severity={severity} size="0.75rem" />
               {t(SEVERITY_LABEL[severity])}
             </span>
           ))}
         </div>
-      </div>
 
-      <div
-        role="img"
-        aria-label={
-          total === 0
-            ? t('corp.standing.strip.describeEmpty', { days: days.length })
-            : t('corp.standing.strip.describe', { days: days.length, detail: described })
-        }
-        className="flex items-end gap-0.5"
-      >
-        {days.map((day, index) => {
-          const isToday = index === 0;
-          // The first column names its month, and so does every column that opens a new one.
-          // A label is skipped when the next column opens a month: two would collide.
-          const opensMonth = (i: number) =>
-            i === 0 ||
-            new Date(days[i].startMs).getMonth() !== new Date(days[i - 1].startMs).getMonth();
-          const isLast = index === days.length - 1;
-          const showMonth = opensMonth(index) && (isLast || !opensMonth(index + 1));
-          const percent =
-            day.count === 0 ? 0 : Math.max(MIN_BAR_PERCENT, (day.count / busiest) * 100);
-          return (
-            <div
-              key={day.startMs}
-              data-today={isToday || undefined}
-              className="flex min-w-0 flex-1 flex-col items-center gap-1"
-            >
-              {/* Reserved whether or not there is a count, so every baseline lines up. */}
-              <span className="h-4 text-xs leading-4 font-semibold tabular-nums">
-                {day.count > 0 ? day.count : ''}
-              </span>
-              <div className="flex h-[5.25rem] w-full items-end border-b border-line">
-                {day.count > 0 && (
-                  <div
-                    className={`w-full rounded-t-[4px] ${SEVERITY_FILL[day.severity ?? 'clear']}`}
-                    style={{ height: `${percent}%` }}
-                  />
-                )}
+        <div
+          role="img"
+          aria-label={
+            total === 0
+              ? t('corp.standing.strip.describeEmpty', { days: days.length })
+              : t('corp.standing.strip.describe', { days: days.length, detail: described })
+          }
+          className="flex items-end gap-0.5"
+        >
+          {days.map((day, index) => {
+            const isToday = index === 0;
+            const severity = day.severity ?? 'clear';
+            const percent =
+              day.count === 0 ? 0 : Math.max(MIN_BAR_PERCENT, (day.count / busiest) * 100);
+            return (
+              <div
+                key={day.startMs}
+                data-today={isToday || undefined}
+                className="flex min-w-0 flex-1 flex-col items-center gap-1"
+              >
+                {/* Reserved whether or not there is a count, so every baseline lines up. */}
+                <div className="flex h-8 flex-col items-center justify-end">
+                  {day.count > 0 && (
+                    <>
+                      <SeverityIcon severity={severity} size="0.75rem" />
+                      <span className="text-xs leading-4 font-semibold tabular-nums">
+                        {day.count}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div className="flex h-16 w-full items-end border-b border-line">
+                  {day.count > 0 && (
+                    <div
+                      className={`w-full rounded-t-[4px] ${SEVERITY_FILL[severity]}`}
+                      style={{ height: `${percent}%` }}
+                    />
+                  )}
+                </div>
+                {/* `truncate` in a `min-w-0` column: even a one-letter label clips rather than overflows. */}
+                <span
+                  className={`w-full truncate text-center text-[0.6875rem] ${
+                    isToday ? 'font-semibold text-text' : 'text-text-dim'
+                  }`}
+                >
+                  {weekday.format(day.startMs)}
+                </span>
+                <span
+                  className={`w-full truncate text-center text-[0.6875rem] tabular-nums ${
+                    isToday
+                      ? 'font-semibold text-text underline decoration-2 underline-offset-2'
+                      : 'text-text-dim'
+                  }`}
+                >
+                  {dayOfMonth.format(day.startMs)}
+                </span>
               </div>
-              {/* `truncate` in a `min-w-0` column: even a one-letter label clips rather than overflows. */}
-              <span
-                className={`w-full truncate text-center text-[0.6875rem] ${
-                  isToday ? 'font-semibold text-text' : 'text-text-dim'
-                }`}
-              >
-                {weekday.format(day.startMs)}
-              </span>
-              <span
-                className={`w-full truncate text-center text-[0.6875rem] tabular-nums ${
-                  isToday
-                    ? 'font-semibold text-text underline decoration-2 underline-offset-2'
-                    : 'text-text-dim'
-                }`}
-              >
-                {dayOfMonth.format(day.startMs)}
-              </span>
-              {/* Reserved on every column so baselines match; it may spill into the empty cells beside it. */}
-              <span
-                className={`h-3.5 w-full text-[0.6875rem] leading-3.5 whitespace-nowrap text-text-dim ${
-                  isLast ? 'text-right' : 'text-left'
-                }`}
-              >
-                {showMonth ? month.format(day.startMs) : ''}
-              </span>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-
-      <p className="text-xs text-text-dim">
-        {t('corp.standing.strip.footnote', {
-          count: total,
-          until: dayMonth.format(days[days.length - 1].startMs),
-        })}
-      </p>
-    </div>
+    </Panel>
   );
 }

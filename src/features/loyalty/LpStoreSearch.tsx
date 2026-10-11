@@ -2,7 +2,7 @@
  * The LP Store page's item-first search (issue #2873): one box for an item or a
  * corporation, results as stacked Panels grouped by item with the nearest
  * store first. A row opens that store with the offer selected
- * (`/market/lp-store/:corporationId?offer=`), carrying the query so the store
+ * (`/wallet/lp-store/:corporationId?offer=`), carrying the query so the store
  * view can offer a crumb back here.
  */
 import { Link, useNavigate } from 'react-router-dom';

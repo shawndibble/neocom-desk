@@ -502,6 +502,18 @@ describe('search (issue #779)', () => {
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
 
+  it('announces the result count in a status region mounted before the search', async () => {
+    renderAssets();
+    await screen.findByRole('link', { name: /Division 1/ });
+    expect(document.querySelector('[role="status"].sr-only')).toBeInTheDocument();
+
+    await userEvent.setup().type(screen.getByPlaceholderText('Search items…'), 'tri');
+
+    expect(
+      await screen.findByText(/\d+ match/, { selector: '[role="status"].sr-only' })
+    ).toBeInTheDocument();
+  });
+
   it('clearing the search returns to the division root', async () => {
     const user = userEvent.setup();
     renderAssets();

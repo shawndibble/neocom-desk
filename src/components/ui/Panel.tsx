@@ -1,7 +1,8 @@
 import { forwardRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 interface PanelProps {
-  title?: string;
+  /** Usually text; a title the pilot can edit in place (a Survey's name) passes its own control. */
+  title?: ReactNode;
   /**
    * Exposes the title's own `<h2>` node (tabbable via `tabIndex={-1}` whenever
    * this is set), for a caller that needs to move focus onto it — e.g.

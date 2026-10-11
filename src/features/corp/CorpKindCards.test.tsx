@@ -41,6 +41,9 @@ describe('CorpKindCards', () => {
     expect(screen.queryByText('Structure 4')).not.toBeInTheDocument();
     // The header carries the total because the card is over the cap.
     expect(screen.getByText('5')).toBeInTheDocument();
+    // Read out as text, not as an `aria-label` on a generic span.
+    expect(screen.getByText('5 total')).toHaveClass('sr-only');
+    expect(document.querySelector('span[aria-label]')).toBeNull();
     const toggle = screen.getByRole('button', { name: 'Show 2 more' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
 

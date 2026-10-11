@@ -47,15 +47,15 @@ describe('summarizeSurvey', () => {
     expect(s.etaAt).toBe(T0 + 10 * MIN + 400 * 1000);
   });
 
-  it('pace is volume-weighted over the last three intervals only', () => {
+  it('pace is volume-weighted over the last two intervals only (three scans)', () => {
     const s = summarizeSurvey([
       scan(0, ['A', 10_000]),
-      scan(10, ['A', 4_000]), // fast first interval, outside the last three
+      scan(10, ['A', 4_000]), // fast first interval, outside the last two
       scan(11, ['A', 3_940]), // 60 m3 in 60 s
       scan(12, ['A', 3_880]), // 60 m3 in 60 s
       scan(14, ['A', 3_640]), // 240 m3 in 120 s
     ])!;
-    expect(s.pace).toBeCloseTo((60 + 60 + 240) / 240, 6);
+    expect(s.pace).toBeCloseTo((60 + 240) / 180, 6);
   });
 
   it('sorts scans by time and ignores a repeat of the same instant', () => {

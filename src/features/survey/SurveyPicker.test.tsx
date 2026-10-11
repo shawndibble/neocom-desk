@@ -9,7 +9,7 @@ const { loadSurvey } = vi.hoisted(() => ({ loadSurvey: vi.fn() }));
 vi.mock('./surveyStore', () => ({ loadSurvey }));
 
 import { SurveyPicker } from './SurveyPicker';
-import { noteSurvey, useSurveyHistory } from './surveyHistory';
+import { noteSurvey, renameSurvey, useSurveyHistory } from './surveyHistory';
 
 const SCAN =
   'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km\nClear Icicle\t55\t55,000 m3\t11,300,000.00 ISK\t10 km';
@@ -112,5 +112,22 @@ describe('SurveyPicker', () => {
       expect(useSurveyHistory.getState().value.map((entry) => entry.id)).toEqual([A])
     );
     expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it('leads with the pilot’s name, then the time, and relabels on a rename without reloading', async () => {
+    await noteSurvey(A);
+    await noteSurvey(B);
+    render(<SurveyPicker currentId={A} onPick={() => undefined} />);
+    const trigger = await screen.findByRole('combobox', { name: 'Your surveys' });
+    await waitFor(() => expect(trigger.textContent).toContain('Clear Icicle · 0% mined'));
+
+    await renameSurvey(A, 'Belt 3');
+    await waitFor(() => expect(trigger.textContent).toMatch(/^Belt 3 · Oct\s8,\s18:00\sEVE$/));
+
+    await userEvent.click(trigger);
+    const options = await screen.findAllByRole('option');
+    await waitFor(() => expect(options[1].textContent).toMatch(/Belt 3 · Oct\s8,\s18:00\sEVE/));
+    await waitFor(() => expect(options[0].textContent).toContain('Clear Icicle · 0% mined'));
+    expect(loadSurvey).toHaveBeenCalledTimes(2);
   });
 });

@@ -2113,7 +2113,7 @@ export function BpcSourcingPanel() {
                     // The store, with this offer picked; `affordableOnly=0` so an
                     // offer the pilot can't yet afford is not filtered out of view.
                     navigate(
-                      `/market/lp-store/${row.corporationId}?${new URLSearchParams({ offer: String(row.offerId), affordableOnly: '0' })}`
+                      `/wallet/lp-store/${row.corporationId}?${new URLSearchParams({ offer: String(row.offerId), affordableOnly: '0' })}`
                     );
                     return;
                   }

@@ -72,7 +72,6 @@ import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
-import { HaulingPanel, type HaulingRefreshInfo } from '@/features/market/HaulingPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { tradeHubStanding, useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import {
@@ -109,7 +108,6 @@ import {
   type MarketOrderColumnId,
   useVisibleMarketOrderColumns,
 } from '@/features/market/marketOrderColumns';
-import { useTimedToast } from '@/components/ui/useTimedToast';
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
@@ -326,10 +324,6 @@ export function Market() {
   // Appraisal" action, so the panel mounts with its Compare Hubs section
   // already open instead of collapsed.
   const [expandCompareOnAppraisal, setExpandCompareOnAppraisal] = useState(false);
-  // Hauling's own reload lives in this page's title bar rather than its
-  // Panel header (round: hauling header tweaks) — the tab hands the button
-  // its click handler and disabled state up through this callback.
-  const [haulingRefresh, setHaulingRefresh] = useState<HaulingRefreshInfo | null>(null);
   // `expandCompare` defaults false so every ordinary tab switch clears it —
   // only `handleViewQuickbarInAppraisal` passes `true`, and only that call's
   // own value should reach the next `AppraisalPanel` mount.
@@ -354,8 +348,6 @@ export function Market() {
       { id: 'orders', label: t('market.sections.openOrders') },
       { id: 'history', label: t('market.sections.history') },
       { id: 'appraisal', label: t('market.sections.appraisal') },
-      { id: 'hauling', label: t('market.sections.hauling') },
-      { id: 'lp-store', label: t('loyaltyStore.title') },
     ],
   };
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -438,7 +430,6 @@ export function Market() {
     count: number;
     itemName: string;
   } | null>(null);
-  useTimedToast(compareUndo, () => setCompareUndo(null));
   function handleCompareVariations() {
     if (!variationsResult || !selectedItem || selectedTypeId === null) return;
     const added = addManyToCompare([
@@ -504,6 +495,8 @@ export function Market() {
     handleToggle,
     itemTab,
     setItemTab,
+    compareRegionIds,
+    setCompareRegionIds,
   } = useMarketBrowser({ groups, types, marketRegions, groupsById });
 
   // Spoken summary of the finder's result: the visible notes and the swap to
@@ -605,6 +598,8 @@ export function Market() {
     loadedView,
     sortedSell,
     sortedBuy,
+    shownSell,
+    hiddenBaitCount,
     depthByOrder,
     sellShowAll,
     setSellShowAll,
@@ -655,7 +650,9 @@ export function Market() {
     selectedTypeId !== null &&
     (itemActions.actions.blueprints?.byBlueprintTypeID.has(selectedTypeId) ?? false);
 
-  const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
+  // Hide bait sells trims what the table shows (`shownSell`); export, depth
+  // and best prices keep the real book (`sortedSell`).
+  const sellRows = sellShowAll ? shownSell : shownSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
 
   // Every row, not the ROW_CAP the tables mount before "Show all" — hence
@@ -937,13 +934,6 @@ export function Market() {
                   }
                 />
               </>
-            ) : tab === 'hauling' && haulingRefresh ? (
-              <IconButton
-                icon={<Icon.Refresh />}
-                label={t('market.refresh')}
-                onClick={haulingRefresh.refresh}
-                disabled={haulingRefresh.disabled}
-              />
             ) : undefined
           }
         />
@@ -998,8 +988,6 @@ export function Market() {
               defaultCompareExpanded={expandCompareOnAppraisal}
             />
           )}
-
-          {tab === 'hauling' && <HaulingPanel onRefreshInfoChange={setHaulingRefresh} />}
 
           {tab === 'browser' && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
@@ -1201,6 +1189,17 @@ export function Market() {
                             regionId={resolvedRegion.regionId}
                             typeId={selectedTypeId}
                             itemName={selectedItem?.name ?? ''}
+                            compare={
+                              // A Global Market Region item trades nowhere
+                              // else, so there is no other region to compare.
+                              resolvedRegion.override || !marketRegions
+                                ? undefined
+                                : {
+                                    regionIds: compareRegionIds,
+                                    onChange: setCompareRegionIds,
+                                    regions: marketRegions,
+                                  }
+                            }
                           />
                         )
                       ) : itemTab === 'variations' ? (
@@ -1314,7 +1313,7 @@ export function Market() {
                           <BookSideToggle
                             side={phoneSide}
                             onChange={setPhoneSide}
-                            sellCount={sortedSell.length}
+                            sellCount={shownSell.length}
                             buyCount={sortedBuy.length}
                             bestSell={loadedView?.summary.bestSell ?? null}
                             bestBuy={loadedView?.summary.bestBuy ?? null}
@@ -1322,7 +1321,8 @@ export function Market() {
                           <OrderSideCard
                             side="sell"
                             rows={sellRows}
-                            total={sortedSell.length}
+                            total={shownSell.length}
+                            hiddenBaitCount={hiddenBaitCount}
                             best={loadedView?.summary.bestSell ?? null}
                             columns={baseColumns}
                             availableColumns={pickableColumns(SELL_ORDER_COLUMN_IDS)}
@@ -1334,7 +1334,7 @@ export function Market() {
                             cards={orderCards}
                             headingRef={sellHeadingRef}
                             onShowAll={
-                              !sellShowAll && sortedSell.length > ROW_CAP
+                              !sellShowAll && shownSell.length > ROW_CAP
                                 ? () => {
                                     focusAfterCommit(sellHeadingRef);
                                     setSellShowAll(true);
@@ -1464,6 +1464,7 @@ export function Market() {
               name: compareUndo.itemName,
             })}
             undo={{ label: t('market.compareUndo.undo'), onUndo: handleUndoCompareVariations }}
+            onClose={() => setCompareUndo(null)}
           />
         )}
       </div>
