@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@/i18n';
 import { summarizeSurvey } from '@/engine/survey/series';
@@ -67,5 +67,17 @@ describe('SurveyStats cleared field', () => {
   it('adds hours past an hour and days past a day', () => {
     render(<SurveyStats summary={clearedAfter(26 * 3_600_000 + 5 * 60_000)} />);
     expect(screen.getByText('1d 2h 5m')).toBeTruthy();
+  });
+});
+
+describe('SurveyStats Time left', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('counts down from the estimated finish to now, not from the last scan', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // The last scan was at T0 + 10m and the estimate is T0 + 20m.
+    vi.setSystemTime(T0 + 15 * 60_000);
+    render(<SurveyStats summary={summary} />);
+    expect(screen.getByText('5m')).toBeTruthy();
   });
 });

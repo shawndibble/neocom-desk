@@ -237,7 +237,9 @@ function box(
 export function surveyChatMessage(
   summary: SurveySummary,
   url: string,
-  labels: SurveyMessageLabels
+  labels: SurveyMessageLabels,
+  // The time "left" counts from here: the same clock the page shows, so a copy matches the screen.
+  now: number = summary.lastAt
 ): string {
   // Chat puts the speaker's name before the first line, so a heading line takes that
   // spot and the box starts underneath it instead of beside the name.
@@ -253,7 +255,7 @@ export function surveyChatMessage(
       ? labels.waiting
       : fill(labels.done, {
           time: formatEveClock(summary.etaAt),
-          left: formatDuration(summary.etaAt - summary.lastAt),
+          left: formatDuration(Math.max(0, summary.etaAt - now)),
         });
 
   // Dearest unit first, as the page lists them.
