@@ -71,6 +71,7 @@ export function SurveyNameTitle({ id }: { id: string }) {
     <button
       ref={button}
       type="button"
+      aria-label={t('survey.nameEdit', { name: entry.name ?? fallback })}
       onClick={() => {
         settled.current = false;
         setEditing(true);
@@ -78,7 +79,6 @@ export function SurveyNameTitle({ id }: { id: string }) {
       className={cx(editableTitleClassName, named ? 'text-accent' : 'text-text-dim')}
     >
       <span className="min-w-0 truncate">{entry.name ?? fallback}</span>
-      <span className="sr-only">, {t('survey.nameEdit')}</span>
       <Icon.Rename
         size={Icon.ICON_SIZE.sm}
         aria-hidden="true"

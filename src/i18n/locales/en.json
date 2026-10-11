@@ -4062,7 +4062,7 @@
     "historyEmpty": "No scans yet · {{time}}",
     "historyNamed": "{{name}} · {{time}}",
     "nameLabel": "Survey name",
-    "nameEdit": "rename",
+    "nameEdit": "{{name}}, rename",
     "historyRemove": "Remove {{name}} from your surveys",
     "historyRemoveShort": "Remove",
     "historyRemoveKeyHint": "Press Delete to remove from this list",
