@@ -51,7 +51,10 @@ import { useRowStartPlan } from './rowStartPlan';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
+import {
+  useResolvedCharacterFilter,
+  type CharacterFilterValue,
+} from '@/features/character/characterFilterValue';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
@@ -81,8 +84,9 @@ import { opportunitiesCsvColumns } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 import { useColumnVisibility } from '@/lib/columnVisibility';
-import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { enumParam } from '@/lib/urlState';
 import { OwnedBlueprintsPanel } from './OwnedBlueprintsPanel';
 import {
@@ -116,8 +120,7 @@ interface OpportunitiesPanelProps {
   onDataAgeChange?: (date: Date | null) => void;
 }
 
-/** `'current'`, not the synced default: this panel has always opened on the active pilot. */
-const CHARACTER_FILTER = characterFilterParam('current');
+const OPPORTUNITIES_CHARACTER_PARAMS = { 'opps.chars': characterFilterParam('current') };
 
 /**
  * The columns' sort keys, at module scope: the columns themselves close over
@@ -140,7 +143,6 @@ const SORT_VALUE = {
   iskPerHour: (row: OpportunityRow) => row.result.iskPerHour ?? undefined,
   orderDepth: (row: OpportunityRow) => ORDER_DEPTH_RANK[row.orderDepth],
 };
-const OPPORTUNITIES_CHARACTERS_KEY = 'opps.chars';
 /**
  * Ranked (the default) or "All owned" (issue #2335): the same owned
  * blueprints and Character filter, either priced and ranked or listed whole.
@@ -179,10 +181,17 @@ export function OpportunitiesPanel({
 
   const [view, setView] = useUrlParam('opps.view', VIEW_PARAM);
   const [stockFilter, setStockFilter] = useUrlParam('opps.stock', STOCK_PARAM);
-  const [characterFilter, setCharacterFilter] = useUrlParam(
-    OPPORTUNITIES_CHARACTERS_KEY,
-    CHARACTER_FILTER
+  // Absent from the URL: this page's remembered pick, then the synced Settings default.
+  const rememberedCharacterFilter = useRememberedCharacterFilter<
+    typeof OPPORTUNITIES_CHARACTER_PARAMS
+  >('opportunities', 'opps.chars');
+  const [characterParams, setCharacterParams] = useRememberedUrlParams(
+    OPPORTUNITIES_CHARACTER_PARAMS,
+    rememberedCharacterFilter
   );
+  const characterFilter = characterParams['opps.chars'];
+  const setCharacterFilter = (next: CharacterFilterValue) =>
+    setCharacterParams({ 'opps.chars': next });
   // `useResolvedCharacterFilter`, not the raw `resolveCharacterFilter`: this
   // panel's resolved filter feeds `characterIds` and through it the
   // blueprint-loading effect's dep array below, and the raw function

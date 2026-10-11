@@ -42,6 +42,7 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'assetsStationSort',
   'calendarHiddenKinds',
   'calendarView',
+  'characterFilterPicks',
   'corp.assetsExpanded',
   'industryLastOpenedPlan',
   'loyaltyStorePriceBasis',

@@ -1,0 +1,109 @@
+/**
+ * The This character / All characters pick each page last held, remembered
+ * across visits and app restarts. Device-local view state, like column and
+ * sort prefs: one row, one entry per page, because "All characters" is a
+ * deliberate, heavier view on Assets that must not carry over to the others.
+ *
+ * Order on opening a page: a filter in the URL, then this page's pick, then
+ * the synced Settings default (`defaultCharacterFilter.ts`), which only seeds
+ * a page that has no pick yet. Pages hand `useCharacterFilterPick` to
+ * `useRememberedUrlParams`, which owns the URL-wins rule: a pick is written
+ * only from a change to the control, never from a link.
+ */
+import { useCallback, useEffect, useMemo } from 'react';
+import { createLocalSetting } from '@/lib/useLocalSetting';
+import type { RememberedDefaults } from '@/lib/useUrlState';
+import type { UrlParamSchema, UrlParamValues } from '@/lib/useUrlState';
+import { useDefaultCharacterFilter } from './defaultCharacterFilter';
+import { fromStoredCharacterFilterValue, type CharacterFilterValue } from './characterFilterValue';
+
+export const CHARACTER_FILTER_PICKS_SETTING_KEY = 'characterFilterPicks';
+
+export const CHARACTER_FILTER_PAGES = [
+  'assets',
+  'wallet',
+  'jobs',
+  'opportunities',
+  'orders',
+] as const;
+export type CharacterFilterPage = (typeof CHARACTER_FILTER_PAGES)[number];
+
+export type CharacterFilterPicks = Partial<Record<CharacterFilterPage, CharacterFilterValue>>;
+
+export function parseCharacterFilterPicks(raw: unknown): CharacterFilterPicks | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const picks: CharacterFilterPicks = {};
+  for (const page of CHARACTER_FILTER_PAGES) {
+    const value = (raw as Record<string, unknown>)[page];
+    if (value === 'current' || value === 'all') picks[page] = value;
+  }
+  return picks;
+}
+
+export function pickedCharacterFilter(
+  picks: CharacterFilterPicks,
+  page: CharacterFilterPage,
+  settingsDefault: CharacterFilterValue
+): CharacterFilterValue {
+  return picks[page] ?? settingsDefault;
+}
+
+export function withCharacterFilterPick(
+  picks: CharacterFilterPicks,
+  page: CharacterFilterPage,
+  value: CharacterFilterValue
+): CharacterFilterPicks {
+  return { ...picks, [page]: value };
+}
+
+export const useCharacterFilterPicks = createLocalSetting<CharacterFilterPicks>({
+  key: CHARACTER_FILTER_PICKS_SETTING_KEY,
+  defaultValue: {},
+  parse: parseCharacterFilterPicks,
+});
+
+/** The value `page` opens on when the URL names none, and how to remember an edit. */
+export function useCharacterFilterPick(page: CharacterFilterPage): {
+  pick: CharacterFilterValue;
+  remember: (value: CharacterFilterValue) => void;
+} {
+  const picks = useCharacterFilterPicks((state) => state.value);
+  const hydratePicks = useCharacterFilterPicks((state) => state.hydrate);
+  const storedDefault = useDefaultCharacterFilter((state) => state.value);
+  const hydrateDefault = useDefaultCharacterFilter((state) => state.hydrate);
+  useEffect(() => {
+    void hydratePicks();
+    void hydrateDefault();
+  }, [hydratePicks, hydrateDefault]);
+
+  const pick = pickedCharacterFilter(picks, page, fromStoredCharacterFilterValue(storedDefault));
+  const remember = useCallback(
+    (value: CharacterFilterValue) => {
+      const store = useCharacterFilterPicks.getState();
+      void store.setValue(withCharacterFilterPick(store.value, page, value));
+    },
+    [page]
+  );
+  return { pick, remember };
+}
+
+/**
+ * `useRememberedUrlParams`' stored side for a group whose `key` field is a
+ * `characterFilterParam`.
+ */
+export function useRememberedCharacterFilter<S extends UrlParamSchema>(
+  page: CharacterFilterPage,
+  key: keyof S & string
+): RememberedDefaults<S> {
+  const { pick, remember } = useCharacterFilterPick(page);
+  return useMemo(
+    () => ({
+      values: { [key]: pick } as Partial<UrlParamValues<S>>,
+      remember: (patch) => {
+        const next = (patch as Record<string, unknown>)[key];
+        if (next === 'current' || next === 'all') remember(next);
+      },
+    }),
+    [key, pick, remember]
+  );
+}

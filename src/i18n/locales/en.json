@@ -8749,7 +8749,7 @@
     "piExpiringLabel": "Warn me an extractor is expiring",
     "piExpiringHint": "How far ahead the Colonies list flags an extractor — and sorts it to the top.",
     "defaultCharacterFilterLabel": "Default characters shown",
-    "defaultCharacterFilterHint": "Which character(s) Wallet Balance and Industry's Active Jobs open on by default.",
+    "defaultCharacterFilterHint": "The starting choice for the This character / All characters filter. Each page then remembers the last pick you made on it.",
     "spExtractionEnabledLabel": "SP extraction monitoring",
     "spExtractionEnabledHint": "Flags a character on the Characters table, and alerts you, once they've banked enough spare skill points to safely use a Skill Extractor. Off by default.",
     "spExtractionThresholdLabel": "SP extraction threshold",

@@ -83,14 +83,11 @@ import {
 } from '@/engine/industry/jobSlots';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { CharacterLink } from '@/features/entities';
-import {
-  useResolvedCharacterFilter,
-  fromStoredCharacterFilterValue,
-} from '@/features/character/characterFilterValue';
+import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { enumParam, enumSetParam, idListParam } from '@/lib/urlState';
-import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 
 /**
  * A row on the table, tagged with its Character even in the single-character
@@ -112,6 +109,7 @@ type JobStatusFilter = 'completingSoon' | 'done';
  * The Activity and Status filters in the URL (ADR 0015). Both start empty —
  * "no filter" — so the empty set is the default and never written.
  */
+const JOBS_CHARACTER_PARAMS = { 'jobs.chars': characterFilterParam('current') };
 const JOB_FILTER_PARAMS = {
   'jobs.activity': idListParam(),
   'jobs.status': enumSetParam<JobStatusFilter>(['completingSoon', 'done'], []),
@@ -277,22 +275,18 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
    * (`useResolvedCharacterFilter` re-resolves it whenever the active
    * Character changes) — or `'all'` once the pilot asks.
    *
-   * Kept in the URL (`jobs.chars`); absent, it is the synced default
-   * (Settings' Defaults panel), which reads as `'current'` until it hydrates.
-   * The URL never writes back to that setting.
+   * Kept in the URL (`jobs.chars`); absent, it is this page's remembered
+   * pick, then the synced Settings default. A link's value is never
+   * remembered; only a change to the control is.
    */
-  const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
-  const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateDefaultCharacterFilter();
-  }, [hydrateDefaultCharacterFilter]);
-  const jobsCharacterParams = useMemo(
-    () => ({
-      'jobs.chars': characterFilterParam(fromStoredCharacterFilterValue(defaultCharacterFilter)),
-    }),
-    [defaultCharacterFilter]
+  const rememberedCharacterFilter = useRememberedCharacterFilter<typeof JOBS_CHARACTER_PARAMS>(
+    'jobs',
+    'jobs.chars'
   );
-  const [jobsCharacterValues, setJobsCharacterValues] = useUrlParams(jobsCharacterParams);
+  const [jobsCharacterValues, setJobsCharacterValues] = useRememberedUrlParams(
+    JOBS_CHARACTER_PARAMS,
+    rememberedCharacterFilter
+  );
   const jobsCharacterFilter = jobsCharacterValues['jobs.chars'];
 
   const resolvedJobsFilter = useResolvedCharacterFilter(jobsCharacterFilter, characterId);
