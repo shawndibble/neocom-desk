@@ -14,9 +14,6 @@ import {
   Panel,
   plainTextActionClassName,
   SEVERITY_TEXT,
-  SeverityIcon,
-  StatChip,
-  StatChips,
 } from '@/components/ui';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
@@ -240,7 +237,7 @@ const TRUST: LandingRow[] = [
  *
  * The figures are the first tile's Overview capture (`desktop-overview`), so
  * the hero and the tiles tell one story: an industry job finishing in
- * 1h 59m as the next deadline, 26 orders needing work, 13 unread alerts.
+ * 1h 59m as the next deadline, three jobs running, the 84.2M SP total.
  */
 const PREVIEW = {
   name: 'Aurelia Vex',
@@ -255,13 +252,8 @@ const PREVIEW = {
   deadlineSeconds: 3600 + 59 * 60,
   trainingSeconds: 86_400 + 4 * 3600 + 20 * 60,
   queued: 6,
-  orders: {
-    needWork: 26,
-    used: 24,
-    slots: 41,
-  },
   alerts: 13,
-  jobsReady: 2,
+  jobsRunning: 3,
 };
 
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
@@ -370,10 +362,6 @@ export function Login() {
                 </p>
                 <p className="truncate text-xs text-text-dim">{t('login.previewCorp')}</p>
               </div>
-              <StatChips>
-                <StatChip label={t('skills.totalSp')} value={PREVIEW.totalSp} />
-                <StatChip label={t('skills.unallocatedSp')} value={PREVIEW.unallocatedSp} />
-              </StatChips>
             </div>
 
             <div className={`${tabScrollerClassName} mt-3`}>
@@ -409,7 +397,9 @@ export function Login() {
                 <span className="shrink-0 tracking-widest text-text-dim uppercase">
                   {t('overview.header.next')}
                 </span>
-                <span className={`font-medium tabular-nums ${SEVERITY_TEXT.warning}`}>
+                <span
+                  className={`shrink-0 font-medium whitespace-nowrap tabular-nums ${SEVERITY_TEXT.warning}`}
+                >
                   {formatCountdown(PREVIEW.deadlineSeconds)}
                 </span>
                 <span className="truncate text-text-dim">{t('overview.board.nextJob')}</span>
@@ -431,7 +421,7 @@ export function Login() {
               </span>
             </div>
 
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-2">
               <PreviewWidget title={t('overview.widgets.wallet.title')}>
                 <p className="text-xl font-medium tabular-nums text-isk-pos">
                   {formatIsk(PREVIEW.wallet, 2)}{' '}
@@ -448,25 +438,22 @@ export function Login() {
                 </p>
               </PreviewWidget>
 
-              <PreviewWidget title={t('overview.widgets.orders.title')}>
-                <p className="flex items-center gap-1.5 text-xl font-medium tabular-nums">
-                  <SeverityIcon severity="warning" size="1rem" />
-                  <span className={SEVERITY_TEXT.warning}>{PREVIEW.orders.needWork}</span>
+              <PreviewWidget title={t('overview.widgets.sp.title')}>
+                <p className="text-xl font-medium tabular-nums">
+                  {PREVIEW.totalSp}{' '}
+                  <small className="text-xs font-normal text-text-dim">
+                    {t('overview.widgets.sp.unit')}
+                  </small>
                 </p>
                 <p className="truncate text-xs text-text-dim">
-                  {t('overview.board.ordersMeta', { count: PREVIEW.orders.needWork })}
-                  {' · '}
-                  {t('overview.board.slotsUsed', {
-                    used: PREVIEW.orders.used,
-                    total: PREVIEW.orders.slots,
-                  })}
+                  {t('overview.widgets.sp.unallocated', { sp: PREVIEW.unallocatedSp })}
                 </p>
               </PreviewWidget>
 
               <PreviewWidget title={t('overview.widgets.industry.title')}>
-                <p className="text-xl font-medium tabular-nums">{PREVIEW.jobsReady}</p>
+                <p className="text-xl font-medium tabular-nums">{PREVIEW.jobsRunning}</p>
                 <p className="truncate text-xs text-text-dim">
-                  {t('overview.widgets.industry.ready')}
+                  {t('overview.widgets.industry.running')}
                   {' · '}
                   {formatCountdown(PREVIEW.deadlineSeconds)}
                 </p>

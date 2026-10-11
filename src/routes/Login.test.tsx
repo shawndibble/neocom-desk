@@ -242,11 +242,11 @@ describe('Login', () => {
     expect(preview.getByRole('img', { name: /13/ })).toBeInTheDocument();
 
     // The grid: one Widget per tile, each titled as the real Widget is.
-    for (const title of ['Wallet', 'Training', 'Open orders', 'Industry']) {
+    for (const title of ['Wallet', 'Training', 'Skill points', 'Industry']) {
       expect(preview.getByRole('region', { name: title })).toBeInTheDocument();
     }
     expect(preview.getByText('Gunnery')).toBeInTheDocument();
-    expect(preview.getByText(/26 need work/)).toBeInTheDocument();
+    expect(preview.getByText(/12,500 unallocated/)).toBeInTheDocument();
 
     // The fixed board is gone: no summary strip cells, no folded alerts row.
     expect(preview.queryByText('Training now')).not.toBeInTheDocument();
