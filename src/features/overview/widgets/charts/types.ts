@@ -147,11 +147,35 @@ export interface SparkChartModel extends ChartBase {
   rows: SparkRow[];
 }
 
+export interface GanttRow {
+  key: string;
+  label: string;
+  /** ms since the epoch. */
+  startMs: number;
+  endMs: number;
+  /** The figure at the row's end ("5h 2m", "Ready"). */
+  text: string;
+  color: ChartColor;
+}
+
+export interface GanttChartModel extends ChartBase {
+  kind: 'gantt';
+  /** In row order, as drawn. */
+  rows: GanttRow[];
+  /** The shared time axis, ms since the epoch. */
+  axis: { from: number; to: number; now: number };
+  /** The axis's three labels, already formatted; `from` is empty when the axis starts at now. */
+  labels: { from: string; now: string; to: string };
+  /** What Small draws instead: a Gantt needs width. */
+  fallback: HBarsChartModel;
+}
+
 export type ChartModel =
   | AreaChartModel
   | BarsChartModel
   | DivergingChartModel
   | HBarsChartModel
+  | GanttChartModel
   | DonutChartModel
   | StackChartModel
   | StackedAreaChartModel

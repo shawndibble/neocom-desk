@@ -292,11 +292,39 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ],
         ['Hurricane', t('overview.gallery.samples.industry.manufacturing'), '5h 02m'],
       ],
-      chart: hbars([
-        ['Rifter', 1, t('overview.gallery.samples.industry.ready')],
-        ['Gila', 1, t('overview.gallery.samples.industry.ready')],
-        ['Hurricane', 0.4, '5h 02m'],
-      ]),
+      chart: ((): ChartModel => {
+        const ready = t('overview.gallery.samples.industry.ready');
+        const fallback = hbars([
+          ['Rifter', 1, ready],
+          ['Gila', 1, ready],
+          ['Hurricane', 0.4, '5h 02m'],
+        ]);
+        const note = t('overview.widgets.chart.industry.ganttNote');
+        return {
+          kind: 'gantt',
+          rows: [
+            { key: 'a', label: 'Rifter', startMs: 0, endMs: 5, text: ready, color: 'warning' },
+            { key: 'b', label: 'Gila', startMs: 1, endMs: 6, text: ready, color: 'warning' },
+            {
+              key: 'c',
+              label: 'Hurricane',
+              startMs: 4,
+              endMs: 12,
+              text: '5h 02m',
+              color: 'accent',
+            },
+          ],
+          axis: { from: 0, to: 14, now: 7 },
+          labels: {
+            from: t('overview.widgets.chart.industry.ganttAgo', { duration: '7h' }),
+            now: t('overview.widgets.chart.industry.ganttNow'),
+            to: t('overview.widgets.chart.industry.ganttIn', { duration: '7h' }),
+          },
+          note,
+          summary: note,
+          fallback: fallback as Extract<ChartModel, { kind: 'hbars' }>,
+        };
+      })(),
     },
     profit: {
       value: '1.12B',

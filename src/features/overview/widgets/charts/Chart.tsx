@@ -13,12 +13,13 @@ import { AreaChart } from './AreaChart';
 import { Bars } from './Bars';
 import { DivergingBars } from './DivergingBars';
 import { Donut } from './Donut';
+import { Gantt } from './Gantt';
 import { HBars } from './HBars';
 import { Sparklines } from './Sparklines';
 import { StackBar } from './StackBar';
 import { StackedArea } from './StackedArea';
 import { StackRows } from './StackRows';
-import { donutSize, hbarRows, sparkRows } from './sizing';
+import { donutSize, ganttRows, hbarRows, sparkRows } from './sizing';
 import type { ChartModel } from './types';
 
 function Drawing({ model, size }: { model: ChartModel; size: WidgetSize }) {
@@ -32,6 +33,12 @@ function Drawing({ model, size }: { model: ChartModel; size: WidgetSize }) {
       return <DivergingBars model={model} height={height} />;
     case 'hbars':
       return <HBars model={model} maxRows={hbarRows(size)} />;
+    case 'gantt':
+      return size === 'S' ? (
+        <HBars model={model.fallback} maxRows={hbarRows(size)} />
+      ) : (
+        <Gantt model={model} maxRows={ganttRows(size)} />
+      );
     case 'donut':
       return <Donut model={model} size={donutSize(size)} />;
     case 'stack':

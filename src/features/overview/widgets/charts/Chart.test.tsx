@@ -39,6 +39,22 @@ const MODELS: Record<string, ChartModel> = {
     ],
     summary: 'Income 292M against spending 60M.',
   },
+  gantt: {
+    kind: 'gantt',
+    rows: [
+      { key: 'a', label: 'Rifter', startMs: 0, endMs: 5, text: 'Ready', color: 'warning' },
+      { key: 'b', label: 'Hurricane', startMs: 4, endMs: 40, text: '5h 2m', color: 'accent' },
+    ],
+    axis: { from: 0, to: 14, now: 7 },
+    labels: { from: '7h ago', now: 'Now', to: 'in 7h' },
+    note: 'Jobs on a time axis',
+    summary: 'Rifter ready; Hurricane 5h 2m left.',
+    fallback: {
+      kind: 'hbars',
+      rows: [{ key: 'a', label: 'Rifter', share: 1, text: 'Ready', color: 'warning' }],
+      summary: 'unused',
+    },
+  },
   donut: {
     kind: 'donut',
     parts: [
@@ -118,6 +134,38 @@ describe('Chart', () => {
       expect(summary?.closest('[aria-hidden="true"]')).toBeNull();
     }
   );
+
+  it('draws a Gantt with its axis labels, a now marker and overflow arrows from Medium up', () => {
+    const { container } = render(<Chart model={MODELS.gantt!} size="M" />);
+    expect(container.textContent).toContain('7h ago');
+    expect(container.textContent).toContain('Now');
+    expect(container.textContent).toContain('in 7h');
+    expect(container.textContent).toContain('Ready');
+    expect(container.querySelector('[data-overflow="end"]')).not.toBeNull();
+    expect(container.querySelector('[data-overflow="start"]')).toBeNull();
+    expect(container.querySelectorAll('.border-dashed')).toHaveLength(2);
+  });
+
+  it('falls back to progress bars at Small, where a Gantt has no width', () => {
+    const { container } = render(<Chart model={MODELS.gantt!} size="S" />);
+    expect(container.textContent).not.toContain('Now');
+    expect(container.textContent).toContain('Rifter');
+    expect(container.textContent).toContain('Ready');
+  });
+
+  it('shows at most five Gantt rows at Medium', () => {
+    const rows = Array.from({ length: 9 }, (_, i) => ({
+      key: String(i),
+      label: 'Job ' + i,
+      startMs: 0,
+      endMs: 5,
+      text: 'x',
+      color: 'accent' as const,
+    }));
+    const model = { ...(MODELS.gantt as Extract<ChartModel, { kind: 'gantt' }>), rows };
+    expect(render(<Chart model={model} size="M" />).container.textContent).not.toContain('Job 5');
+    expect(render(<Chart model={model} size="L" />).container.textContent).toContain('Job 7');
+  });
 
   it('prints the figures and labels a legend needs so colour is never the only signal', () => {
     const { container } = render(<Chart model={MODELS.donut!} size="M" />);
