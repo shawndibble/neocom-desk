@@ -303,10 +303,9 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               onSetIgnored={
                 owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined
               }
-              // Marking the field cleared is the owner's, like the controls beside it.
-              onFinish={
-                owned && currentId !== null && state.status === 'ready' ? finish : undefined
-              }
+              // Who may mark it cleared (owner any time, anyone once it is nearly done) is
+              // `canFinishSurvey`'s call, inside the board.
+              onFinish={currentId !== null && state.status === 'ready' ? finish : undefined}
               owned={owned}
               panelTitle={currentId !== null ? <SurveyNameTitle id={currentId} /> : undefined}
               viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
