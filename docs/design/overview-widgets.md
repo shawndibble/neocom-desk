@@ -249,8 +249,8 @@ across Characters · whether other alert types than danger raise the banner.
 ## 12. Implementation decisions (settled after reading the code)
 
 - **Unavailable in v1** (shown in the Gallery marked "Coming soon", not addable):
-  kills, jumpTimers (no jump-fatigue ESI endpoint). routeSafety and hauling
-  shipped in #3578 and #3579.
+  kills. routeSafety, hauling and jumpTimers
+  shipped in #3578, #3579 and #3581.
   Each needs a follow-up ticket; listed in the PR.
 - **Reduced kinds:** `sp` is Number/Table only (no SP history store); `priceWatch`
   is Number/Table only (the poller keeps no price history, so no sparkline);
