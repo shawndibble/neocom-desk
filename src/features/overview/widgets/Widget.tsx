@@ -1,6 +1,6 @@
 /**
  * One tile on the Overview: a header (the title, which is the link to the
- * widget's page, a New tag, a character scope chip, a settings button) over a body that is one of the five Widget
+ * widget's page, a character scope chip, a settings button) over a body that is one of the five Widget
  * States.
  *
  * The body is a Number, a Chart or a Table, and **the headline number is always
@@ -49,8 +49,6 @@ import { TABLE_ROWS, tableOf } from './tableModel';
 
 export interface WidgetProps {
   widget: WidgetModel;
-  /** Draw the New tag on kinds that are new: only for a pilot who had the old board. */
-  showNew: boolean;
   /** The pilot is customizing: a dashed edge; the controls arrive as `headerStart` and `editControls`. */
   editing?: boolean;
   /** The settings menu (its own trigger, so Radix owns focus and Esc); absent in the Gallery's preview. */
@@ -246,7 +244,6 @@ function LiveWidget(props: WidgetProps) {
 
 function WidgetFrame({
   widget,
-  showNew,
   editing = false,
   menu,
   headerStart,
@@ -376,11 +373,6 @@ function WidgetFrame({
               <span className="block truncate text-text">{title}</span>
             )}
           </h2>
-          {showNew && kind.isNew && (
-            <span className="rounded-xs bg-accent px-1.5 text-[0.5625rem] font-bold tracking-widest text-accent-contrast uppercase">
-              {t('overview.widgets.new')}
-            </span>
-          )}
           {scope.chip && <AllCharactersReadout compact={widget.size === 'S'} />}
           <span className="flex-1" />
           {menu}

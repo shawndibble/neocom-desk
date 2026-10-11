@@ -49,7 +49,6 @@ import { WidgetMenu } from './WidgetMenu';
 
 export interface WidgetGridProps {
   widgets: readonly WidgetModel[];
-  showNew: boolean;
   editing?: boolean;
   onRemove: (id: string) => void;
   /** The empty board's Add widget; absent where there is no Gallery to open. */
@@ -128,7 +127,6 @@ function EditControls({
 interface CellProps {
   widget: WidgetModel;
   title: string;
-  showNew: boolean;
   editing: boolean;
   first: boolean;
   last: boolean;
@@ -142,7 +140,6 @@ interface CellProps {
 function Cell({
   widget,
   title,
-  showNew,
   editing,
   first,
   last,
@@ -209,7 +206,6 @@ function Cell({
     >
       <Widget
         widget={widget}
-        showNew={showNew}
         editing={editing}
         onRemove={onRemove}
         menu={<WidgetMenu widget={widget} />}
@@ -243,7 +239,6 @@ function EmptyBoard({ onAdd, onRoles }: Pick<WidgetGridProps, 'onAdd' | 'onRoles
 
 export function WidgetGrid({
   widgets,
-  showNew,
   editing = false,
   onRemove,
   onAdd,
@@ -307,7 +302,6 @@ export function WidgetGrid({
       key={widget.id}
       widget={widget}
       title={titleOf(widget)}
-      showNew={showNew}
       editing={editing}
       first={index === 0}
       last={index === shown.length - 1}

@@ -28,7 +28,7 @@ const START: OverviewLayout = {
   widgets: [w('a', 'wallet'), w('b', 'training'), w('c', 'mail')],
 };
 
-function Host({ initial, showNew }: { initial: OverviewLayout; showNew: boolean }) {
+function Host({ initial }: { initial: OverviewLayout }) {
   const [layout, setLayout] = useState(initial);
   const [open, setOpen] = useState(false);
   const store = useMemo(() => createFeedStore(), []);
@@ -39,7 +39,7 @@ function Host({ initial, showNew }: { initial: OverviewLayout; showNew: boolean 
           <button type="button" onClick={() => setOpen(true)}>
             Add widget
           </button>
-          <Gallery open={open} onClose={() => setOpen(false)} showNew={showNew} />
+          <Gallery open={open} onClose={() => setOpen(false)} />
         </OverviewEditProvider>
       </FeedStoreContext.Provider>
     </MemoryRouter>
@@ -48,12 +48,11 @@ function Host({ initial, showNew }: { initial: OverviewLayout; showNew: boolean 
 
 async function openGallery({
   initial = START,
-  showNew = false,
   isPhone = false,
-}: { initial?: OverviewLayout; showNew?: boolean; isPhone?: boolean } = {}) {
+}: { initial?: OverviewLayout; isPhone?: boolean } = {}) {
   phone.value = isPhone;
   const user = userEvent.setup();
-  render(<Host initial={initial} showNew={showNew} />);
+  render(<Host initial={initial} />);
   await user.click(screen.getByRole('button', { name: 'Add widget' }));
   const dialog = await screen.findByRole('dialog', { name: 'Add a widget' });
   return { user, dialog };
@@ -174,17 +173,10 @@ describe('Gallery', () => {
     expect(within(dialog).getAllByText('Limit reached').length).toBeGreaterThan(0);
   });
 
-  it('shows no New tags or Recently added to a first-run pilot', async () => {
-    const { dialog } = await openGallery({ showNew: false });
+  it('has no New tags or Recently added filter: every widget is new', async () => {
+    const { dialog } = await openGallery();
     expect(within(dialog).queryByRole('button', { name: /^Recently added/ })).toBeNull();
     expect(within(dialog).queryByText('New')).toBeNull();
-  });
-
-  it('filters to Recently added for a returning pilot', async () => {
-    const { user, dialog } = await openGallery({ showNew: true });
-    await user.click(within(dialog).getByRole('button', { name: /^Recently added/ }));
-    expect(within(dialog).getAllByText('New').length).toBeGreaterThan(0);
-    expect(within(dialog).queryByText('Wallet', { selector: 'div' })).toBeNull();
   });
 
   it('previews the widget body, inert, without repeating its title', async () => {

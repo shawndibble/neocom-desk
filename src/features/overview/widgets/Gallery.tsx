@@ -14,9 +14,6 @@
  * Adding on a desktop keeps the drawer open and the card says "Added" for a
  * moment, so the click has feedback; on a phone the sheet covers the page, so
  * it closes and lets the pilot see what they added.
- *
- * "Recently added" and the New tags are for a returning pilot only: on a
- * first-run layout every kind is new, so the tag would say nothing.
  */
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,13 +35,11 @@ import {
 import { MAX_WIDGETS, newWidget } from './layout';
 import { Widget } from './Widget';
 
-type CategoryFilter = 'all' | 'recent' | KindCategory;
+type CategoryFilter = 'all' | KindCategory;
 
 export interface GalleryProps {
   open: boolean;
   onClose: () => void;
-  /** A returning pilot: Recently added and the New tags apply. */
-  showNew: boolean;
 }
 
 /** How long the "Added" confirmation stays on a card. */
@@ -84,7 +79,7 @@ function Preview({ kind }: { kind: WidgetKindDef }) {
       className="pointer-events-none relative max-h-44 overflow-hidden rounded-xs border border-line bg-bg p-2.5 select-none"
     >
       <div className={cx('mx-auto max-w-full', PREVIEW_WIDTH[kind.defaultSize])}>
-        <Widget widget={widget} showNew={false} onRemove={noop} previewView={view} hideHeader />
+        <Widget widget={widget} onRemove={noop} previewView={view} hideHeader />
       </div>
       <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-bg to-transparent" />
     </div>
@@ -103,7 +98,6 @@ function GalleryItem({
   kind,
   count,
   full,
-  showNew,
   isPhone,
   justAdded,
   onAdd,
@@ -111,7 +105,6 @@ function GalleryItem({
   kind: WidgetKindDef;
   count: number;
   full: boolean;
-  showNew: boolean;
   isPhone: boolean;
   justAdded: boolean;
   onAdd: (kind: string) => void;
@@ -156,11 +149,6 @@ function GalleryItem({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
             {title}
-            {showNew && kind.isNew && (
-              <span className="rounded-xs bg-accent px-1.5 text-[0.5625rem] font-bold tracking-widest text-accent-contrast uppercase">
-                {t('overview.gallery.new')}
-              </span>
-            )}
             {soon && (
               <span className="rounded-xs border border-line-bright px-1.5 text-[0.5625rem] font-bold tracking-widest text-text-dim uppercase">
                 {t('overview.gallery.comingSoon')}
@@ -202,13 +190,11 @@ function GalleryItem({
 }
 
 function GalleryBody({
-  showNew,
   isPhone,
   onAdded,
   searchRef,
   subtitle,
 }: {
-  showNew: boolean;
   isPhone: boolean;
   onAdded: () => void;
   searchRef: RefObject<HTMLInputElement | null>;
@@ -240,21 +226,10 @@ function GalleryBody({
   const matching = WIDGET_KINDS.filter(
     (kind) => !needle || `${t(kind.titleKey)} ${t(kind.descKey)}`.toLowerCase().includes(needle)
   );
-  const items = matching.filter((kind) =>
-    category === 'recent' ? kind.isNew : category === 'all' || kind.category === category
-  );
+  const items = matching.filter((kind) => category === 'all' || kind.category === category);
 
   const chips: { id: CategoryFilter; label: string; count: number }[] = [
     { id: 'all', label: t('overview.gallery.categories.all'), count: matching.length },
-    ...(showNew
-      ? [
-          {
-            id: 'recent' as const,
-            label: t('overview.gallery.categories.recent'),
-            count: matching.filter((kind) => kind.isNew).length,
-          },
-        ]
-      : []),
     ...KIND_CATEGORIES.map((id) => ({
       id,
       label: t(`overview.gallery.categories.${id}`),
@@ -277,7 +252,6 @@ function GalleryBody({
       kind={kind}
       count={counts.get(kind.id) ?? 0}
       full={full}
-      showNew={showNew}
       isPhone={isPhone}
       justAdded={justAdded === kind.id}
       onAdd={add}
@@ -364,7 +338,7 @@ function GalleryBody({
   );
 }
 
-export function Gallery({ open, onClose, showNew }: GalleryProps) {
+export function Gallery({ open, onClose }: GalleryProps) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
   const isPhone = useIsPhone();
@@ -380,13 +354,7 @@ export function Gallery({ open, onClose, showNew }: GalleryProps) {
     // behind it: closing on Add lets the pilot see what they added.
     return (
       <Modal open={open} onClose={onClose} title={title} placement="sheet-full">
-        <GalleryBody
-          showNew={showNew}
-          isPhone
-          onAdded={onClose}
-          searchRef={searchRef}
-          subtitle={subtitle}
-        />
+        <GalleryBody isPhone onAdded={onClose} searchRef={searchRef} subtitle={subtitle} />
       </Modal>
     );
   }
@@ -400,13 +368,7 @@ export function Gallery({ open, onClose, showNew }: GalleryProps) {
       initialFocusRef={searchRef}
       maxWidthClassName="max-w-[460px]"
     >
-      <GalleryBody
-        showNew={showNew}
-        isPhone={false}
-        onAdded={noop}
-        searchRef={searchRef}
-        subtitle={subtitle}
-      />
+      <GalleryBody isPhone={false} onAdded={noop} searchRef={searchRef} subtitle={subtitle} />
     </SlideOver>
   );
 }
