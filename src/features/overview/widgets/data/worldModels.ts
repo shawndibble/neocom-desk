@@ -42,11 +42,11 @@ import {
 import { incursionJumpsWhen, incursionsSeverity, incursionsSummary } from '../../incursionsBoard';
 import type { IncursionsBoardData } from '../../incursionsBoard';
 import type { IndustryBoardData, PlanetaryBoardData } from '../../boardData';
+import { ganttAxis } from '../charts/geometry';
+import type { ChartModel } from '../charts/types';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { fractionBar, signedCell } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
-import { ganttAxis } from '../charts/geometry';
-import type { ChartModel } from '../charts/types';
 import { backwardBucketSums } from './chartSeries';
 import type {
   NumberModel,

@@ -18,7 +18,7 @@ export function Gantt({ model, maxRows }: { model: GanttChartModel; maxRows: num
         return (
           <div
             key={row.key}
-            className="grid grid-cols-[minmax(0,5rem)_1fr_auto] items-center gap-2"
+            className="grid grid-cols-[minmax(0,5rem)_1fr_4.5rem] items-center gap-2"
           >
             <span className="truncate text-text-dim">{row.label}</span>
             <span className="relative block h-2.5 rounded-[1px] bg-panel-2">
@@ -31,12 +31,12 @@ export function Gantt({ model, maxRows }: { model: GanttChartModel; maxRows: num
                 }}
               />
               {bar.clippedStart && (
-                <b className="absolute -left-2 -translate-y-px text-[0.5rem] leading-3 text-text-dim">
+                <b className="absolute left-0.5 -translate-y-px text-[0.5rem] leading-3 text-text-dim">
                   ◂
                 </b>
               )}
               {bar.clippedEnd && (
-                <b className="absolute -right-2 -translate-y-px text-[0.5rem] leading-3 text-text-dim">
+                <b className="absolute right-0.5 -translate-y-px text-[0.5rem] leading-3 text-text-dim">
                   ▸
                 </b>
               )}
@@ -45,11 +45,11 @@ export function Gantt({ model, maxRows }: { model: GanttChartModel; maxRows: num
                 style={{ left: `${now}%` }}
               />
             </span>
-            <span className="tabular-nums">{row.text}</span>
+            <span className="text-right tabular-nums">{row.text}</span>
           </div>
         );
       })}
-      <div className="grid grid-cols-[minmax(0,5rem)_1fr_auto] gap-2 text-[0.6875rem] text-text-dim">
+      <div className="grid grid-cols-[minmax(0,5rem)_1fr_4.5rem] gap-2 text-[0.6875rem] text-text-dim">
         <span />
         <span className="relative block h-4">
           <span className="absolute left-0">{model.labels.from}</span>
@@ -61,9 +61,7 @@ export function Gantt({ model, maxRows }: { model: GanttChartModel; maxRows: num
           </span>
           <span className="absolute right-0">{model.labels.to}</span>
         </span>
-        <span aria-hidden="true" className="invisible tabular-nums">
-          {model.rows[0]?.text}
-        </span>
+        <span />
       </div>
     </div>
   );
