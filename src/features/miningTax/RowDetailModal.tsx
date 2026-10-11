@@ -68,6 +68,8 @@ interface RowDetailModalProps {
   onEdit: () => void;
   onDismiss: () => void;
   onMarkPaid: () => void;
+  /** Takes a Paid row back to owed, dropping its payment record. */
+  onUnmarkPaid?: () => void;
   onResolve: () => void;
   /** Deletes the Assignment outright — "Undo" on a Dismissed row, "Unassign" on any other assigned one, so a wrong Payee or a mis-split can always be taken back to Unassigned. */
   onUndo: () => void;
@@ -139,6 +141,7 @@ export function RowDetailModal({
   onEdit,
   onDismiss,
   onMarkPaid,
+  onUnmarkPaid,
   onResolve,
   onUndo,
   onJoin,
@@ -194,6 +197,11 @@ export function RowDetailModal({
     status === 'outstanding' && (
       <DropdownMenuItem key="mark-paid" onSelect={onMarkPaid}>
         {t('miningTax.markPaidAction')}
+      </DropdownMenuItem>
+    ),
+    onUnmarkPaid && status === 'paid' && (
+      <DropdownMenuItem key="unmark-paid" onSelect={onUnmarkPaid}>
+        {t('miningTax.unmarkPaidAction')}
       </DropdownMenuItem>
     ),
     onJoin && status === 'outstanding' && (

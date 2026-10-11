@@ -97,6 +97,7 @@ import {
   linkRecordedPayment,
   linkTransaction,
   settle,
+  unsettle,
   unassign,
   uncombine,
   undoContinue,
@@ -1122,6 +1123,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     void runAndClose(() => settle([assignment]));
   }
 
+  function handleUnmarkPaidFromDetail() {
+    const assignment = detailTarget?.assignment;
+    if (!assignment) return;
+    void runAndClose(() => unsettle([assignment]));
+  }
+
   function handleResolveFromDetail() {
     const target = detailTarget;
     if (!target?.assignment) return;
@@ -2117,6 +2124,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             onAssigned={handleAssignedFromDetail}
             onDismiss={handleDismissFromDetail}
             onMarkPaid={handleMarkPaidFromDetail}
+            onUnmarkPaid={handleUnmarkPaidFromDetail}
             onResolve={handleResolveFromDetail}
             onUndo={handleUndoFromDetail}
             onEdit={() => {

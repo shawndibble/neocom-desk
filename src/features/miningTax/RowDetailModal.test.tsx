@@ -321,6 +321,28 @@ describe('RowDetailModal owed entry', () => {
     expect(screen.queryByRole('menuitem', { name: 'Mark as paid' })).not.toBeInTheDocument();
   });
 
+  it('marks a paid entry unpaid from the More menu, and not an outstanding one', async () => {
+    const onUnmarkPaid = vi.fn();
+    renderModal(
+      'paid',
+      { ...owed, status: 'paid' } as MiningTaxAssignmentRecord,
+      undefined,
+      undefined,
+      {
+        onUnmarkPaid,
+      }
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Mark as unpaid' }));
+    expect(onUnmarkPaid).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not offer Mark as unpaid for an outstanding entry', async () => {
+    renderModal('outstanding', owed, undefined, undefined, { onUnmarkPaid: vi.fn() });
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
+    expect(screen.queryByRole('menuitem', { name: 'Mark as unpaid' })).not.toBeInTheDocument();
+  });
+
   it('offers linking a wallet payment from the More menu', async () => {
     const onLinkWalletPayment = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onLinkWalletPayment });
