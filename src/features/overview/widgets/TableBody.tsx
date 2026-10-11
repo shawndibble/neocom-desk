@@ -76,6 +76,9 @@ function cellTone(cell: TableCell): CellTone | undefined {
 
 const cellPad = 'pl-3 last:pr-3';
 
+/** A `wide` column is hidden until its widget is 28rem across (see `TableColumn.wide`). */
+const WIDE_ONLY = 'hidden @md:table-cell';
+
 function Row({
   row,
   columns,
@@ -123,12 +126,13 @@ function Row({
             key={column.key}
             className={cx(
               cellPad,
+              column.wide && WIDE_ONLY,
               'py-0.5 text-[0.8125rem] tabular-nums',
               column.key === growKey
                 ? 'w-full max-w-0 truncate whitespace-nowrap'
                 : first
                   ? growKey === undefined
-                    ? 'w-full max-w-0'
+                    ? 'w-full max-w-0 min-w-28'
                     : 'max-w-40'
                   : 'whitespace-nowrap',
               column.align === 'end' && 'text-right',
@@ -197,7 +201,7 @@ export function TableBody({ table, columnsFor, rowLimit, ariaLabel, className }:
   const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
   const caret = shown.some((row) => row.to !== undefined);
   return (
-    <div className={className}>
+    <div className={cx('@container', className)}>
       <table aria-label={ariaLabel} className="w-full border-collapse">
         {hasHeader && (
           <thead>
@@ -208,6 +212,7 @@ export function TableBody({ table, columnsFor, rowLimit, ariaLabel, className }:
                   scope="col"
                   className={cx(
                     cellPad,
+                    column.wide && WIDE_ONLY,
                     'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',
                     i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left'
                   )}

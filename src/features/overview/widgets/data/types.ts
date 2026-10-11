@@ -118,6 +118,12 @@ export interface TableColumn {
    * what its text needs, up to a cap.
    */
   grow?: boolean;
+  /**
+   * Drawn only when the widget itself is at least 28rem wide (a container query, so it
+   * follows the widget, not the viewport). A column the row reads fine without, such as an
+   * order's side or station, so a phone keeps the first column's text instead of squeezing it.
+   */
+  wide?: boolean;
 }
 
 export interface TableRowModel {

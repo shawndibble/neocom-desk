@@ -110,6 +110,10 @@ describe('ordersTable', () => {
     expect(byPriority[1]!.key).toBe('vsBest');
   });
 
+  it('drops the side and station on a narrow widget so the item name keeps its width', () => {
+    expect(table.columns.filter((c) => c.wide).map((c) => c.key)).toEqual(['side', 'station']);
+  });
+
   it('sorts the worst problem first, then by ISK tied up', () => {
     expect(table.rows.map((r) => r.key)).toEqual(['4', '2', '5', '3', '1']);
   });
