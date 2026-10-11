@@ -3225,7 +3225,7 @@
     "answers": {
       "attention": {
         "question": "Which character needs my attention?",
-        "answer": "Every pilot’s training queue at a glance, and one Alerts feed for what fired on any character: skills finished, jobs ready to deliver, orders undercut, mail waiting."
+        "answer": "An Overview of widgets you choose and arrange, with every pilot’s training queue at a glance and one alerts bell for what fired on any character: skills finished, jobs ready to deliver, orders undercut, mail waiting."
       },
       "orders": {
         "question": "Which of my orders is quietly losing ISK?",

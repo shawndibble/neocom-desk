@@ -37,6 +37,7 @@ import {
   Market,
   MoonMining,
   NavTravel,
+  NavAlerts,
   Notifications,
   Offline,
   OpenSource,
@@ -64,7 +65,6 @@ import { formatCountdown } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 import { isPlayStoreApp } from '@/lib/playStoreApp';
-import type { DeadlineSeverity } from '@/engine/severity';
 
 /**
  * One illustrated row of landing copy: a glyph, and the `login.*` sub-key its
@@ -257,14 +257,11 @@ const PREVIEW = {
   queued: 6,
   orders: {
     needWork: 26,
-    undercut: 19,
-    outbid: 5,
-    relist: 2,
-    belowFloor: 1,
     used: 24,
     slots: 41,
   },
   alerts: 13,
+  jobsReady: 2,
 };
 
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
@@ -394,107 +391,86 @@ export function Login() {
             </div>
 
             {/*
-            The board at the width this column has: the summary strip, one full
-            card, and alerts folded to a single line. That is the phone board's
-            own shape rather than an invention — `Overview.tsx` folds the alerts
-            row and keeps the cards when it is narrow — so the preview shows a
-            layout the app really renders instead of a desktop board squeezed
-            until it stops being one.
+            The Overview at the width this column has: a header row (the Next
+            deadline button and the alerts bell, as in the real page header),
+            then a grid of Widgets. Since the widget-grid redesign (scope
+            decision `20261011-064822-overview-is-a-widget-grid-the-pilot-builds`)
+            the page is no longer a fixed board with a summary strip, an Orders
+            card and an Alerts column: alerts live behind the bell, and every
+            tile is a Widget the pilot chose, drawn here as the Number view.
 
-            Every label is read from `overview.board.*`, the same keys the real
-            board renders. The three panels this replaced still called
-            `overview.queue`, `overview.notifications`, `overview.training` and
-            `overview.finishes`, all four deleted when the Overview became a
-            triage board, so a signed-out visitor was being shown the literal
-            string `overview.queue`. Sharing the board's keys is what makes that
-            failure impossible rather than merely fixed once.
+            Every label is read from the keys the real Widgets render
+            (`overview.widgets.*`, `overview.board.*`, `overview.header.*`), so a
+            retired key shows up as a failing test instead of the literal key
+            printed at a signed-out visitor — it has happened once already.
           */}
-            <div className="mt-3 flex flex-col gap-2">
-              <div className="rounded-xs border border-line bg-panel-2/50 p-3">
-                <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-                  <PreviewCell label={t('overview.board.nextDeadline')}>
-                    <p
-                      className={`text-3xl leading-tight font-medium tabular-nums ${SEVERITY_TEXT.warning}`}
-                    >
-                      {formatCountdown(PREVIEW.deadlineSeconds)}
-                    </p>
-                    <p className="truncate text-xs text-text-dim">{t('overview.board.nextJob')}</p>
-                  </PreviewCell>
-
-                  <PreviewCell label={t('overview.board.trainingNow')}>
-                    <p className="text-sm font-medium">{PREVIEW.trainingSkill}</p>
-                    <p className="truncate text-xs text-text-dim">
-                      {t('overview.timeLeft', {
-                        duration: formatCountdown(PREVIEW.trainingSeconds),
-                      })}
-                      {' · '}
-                      {t('overview.board.queued', { count: PREVIEW.queued })}
-                    </p>
-                  </PreviewCell>
-
-                  <PreviewCell label={t('overview.wallet')}>
-                    <p className="text-sm font-medium tabular-nums text-isk-pos">
-                      {formatIsk(PREVIEW.wallet, 2)} {t('overview.isk')}
-                    </p>
-                  </PreviewCell>
-
-                  <span className="ml-auto shrink-0">
-                    <DataAgeBadge date={previewFetchedAt} />
-                  </span>
-                </div>
-              </div>
-
-              <Panel
-                title={t('overview.board.orders')}
-                meta={
-                  <span className="text-[0.6875rem] text-text-dim">
-                    {t('overview.board.ordersMeta', { count: PREVIEW.orders.needWork })}
-                  </span>
-                }
-                padded={false}
+            <div className="mt-3 flex items-center gap-2">
+              <span className="inline-flex min-h-9 min-w-0 items-center gap-2 rounded-xs border border-line bg-panel-2/50 px-2.5 text-xs">
+                <span className="shrink-0 tracking-widest text-text-dim uppercase">
+                  {t('overview.header.next')}
+                </span>
+                <span className={`font-medium tabular-nums ${SEVERITY_TEXT.warning}`}>
+                  {formatCountdown(PREVIEW.deadlineSeconds)}
+                </span>
+                <span className="truncate text-text-dim">{t('overview.board.nextJob')}</span>
+              </span>
+              <span className="flex-1" />
+              <DataAgeBadge date={previewFetchedAt} />
+              <span
+                role="img"
+                aria-label={t('nav.alertsWithCount', { count: PREVIEW.alerts })}
+                className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-xs border border-line text-text-dim"
               >
-                <div className="flex gap-2 p-3">
-                  <PreviewTile
-                    label={t('overview.board.undercut')}
-                    value={PREVIEW.orders.undercut}
-                    severity="warning"
-                  />
-                  <PreviewTile
-                    label={t('overview.board.outbid')}
-                    value={PREVIEW.orders.outbid}
-                    severity="warning"
-                  />
-                  <PreviewTile
-                    label={t('overview.board.relist')}
-                    value={PREVIEW.orders.relist}
-                    severity="watch"
-                  />
-                </div>
-                {/* Below-floor keeps the danger tone it carries on the real card:
-                  it is the one order problem losing ISK now rather than losing
-                  the sale. */}
-                <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                  <span className="text-danger">
-                    {t('overview.board.belowFloor', { count: PREVIEW.orders.belowFloor })}
-                  </span>
-                  {` · ${t('overview.board.slotsUsed', {
+                <NavAlerts aria-hidden="true" />
+                <span
+                  aria-hidden="true"
+                  className="absolute -top-1 -right-1 min-w-4 rounded-xs bg-accent px-1 text-center text-[0.625rem] leading-4 font-semibold text-bg tabular-nums"
+                >
+                  {PREVIEW.alerts}
+                </span>
+              </span>
+            </div>
+
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <PreviewWidget title={t('overview.widgets.wallet.title')}>
+                <p className="text-xl font-medium tabular-nums text-isk-pos">
+                  {formatIsk(PREVIEW.wallet, 2)}{' '}
+                  <small className="text-xs font-normal text-text-dim">{t('overview.isk')}</small>
+                </p>
+              </PreviewWidget>
+
+              <PreviewWidget title={t('overview.widgets.training.title')}>
+                <p className="text-xl leading-tight font-medium">{PREVIEW.trainingSkill}</p>
+                <p className="truncate text-xs text-text-dim">
+                  {t('overview.timeLeft', { duration: formatCountdown(PREVIEW.trainingSeconds) })}
+                  {' · '}
+                  {t('overview.board.queued', { count: PREVIEW.queued })}
+                </p>
+              </PreviewWidget>
+
+              <PreviewWidget title={t('overview.widgets.orders.title')}>
+                <p className="flex items-center gap-1.5 text-xl font-medium tabular-nums">
+                  <SeverityIcon severity="warning" size="1rem" />
+                  <span className={SEVERITY_TEXT.warning}>{PREVIEW.orders.needWork}</span>
+                </p>
+                <p className="truncate text-xs text-text-dim">
+                  {t('overview.board.ordersMeta', { count: PREVIEW.orders.needWork })}
+                  {' · '}
+                  {t('overview.board.slotsUsed', {
                     used: PREVIEW.orders.used,
                     total: PREVIEW.orders.slots,
-                  })}`}
+                  })}
                 </p>
-              </Panel>
+              </PreviewWidget>
 
-              <Panel padded={false}>
-                <div className="flex items-center gap-2 px-3 py-2">
-                  <SeverityIcon severity="warning" />
-                  <span className="min-w-0 flex-1 truncate text-xs">
-                    {t('overview.board.alerts')}
-                  </span>
-                  <span className="shrink-0 text-[0.6875rem] whitespace-nowrap text-text-dim">
-                    {t('overview.board.alertsUnread', { count: PREVIEW.alerts })}
-                  </span>
-                </div>
-              </Panel>
+              <PreviewWidget title={t('overview.widgets.industry.title')}>
+                <p className="text-xl font-medium tabular-nums">{PREVIEW.jobsReady}</p>
+                <p className="truncate text-xs text-text-dim">
+                  {t('overview.widgets.industry.ready')}
+                  {' · '}
+                  {formatCountdown(PREVIEW.deadlineSeconds)}
+                </p>
+              </PreviewWidget>
             </div>
           </div>
         </section>
@@ -710,46 +686,24 @@ function CustomizeLink({ onClick }: { onClick: () => void }) {
 }
 
 /**
- * One cell of the preview's summary strip.
+ * One Widget in the hero preview: the real Widget's frame (micro title in a
+ * header row over a Number body) without its page link or menu.
  *
- * A sibling of `SummaryStrip`'s own `Cell` rather than an import of it: that
- * component's cells wrap their values in router `Link`s, and every destination
- * on this board is a route a signed-out visitor cannot reach. A mockup that
- * offers live navigation into gated pages is a promise the page cannot keep.
+ * Not the live `Widget` component: that one links its title to the page that
+ * owns it, and every destination is a route a signed-out visitor cannot
+ * reach. A mockup that offers live navigation into gated pages is a promise
+ * the page cannot keep.
  */
-function PreviewCell({ label, children }: { label: string; children: ReactNode }) {
+function PreviewWidget({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <span className="flex min-w-0 flex-1 basis-36 flex-col gap-0.5">
-      <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
-      {children}
-    </span>
-  );
-}
-
-/**
- * One count on the preview's Open orders card — a static `NumberTile`.
- *
- * Same reasoning as `PreviewCell`: the real tile is a `Link` to the Orders
- * page filtered to the rows it counted. It keeps the tone-and-glyph pairing
- * through `SeverityIcon`, because DESIGN.md §7 holds here too — colour is
- * never the only signal, on a mockup as much as on the board.
- */
-function PreviewTile({
-  label,
-  value,
-  severity,
-}: {
-  label: string;
-  value: number;
-  severity: DeadlineSeverity;
-}) {
-  return (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2">
-      <span className="flex items-center gap-1.5 text-xl font-medium tabular-nums">
-        <SeverityIcon severity={severity} />
-        <span className={SEVERITY_TEXT[severity]}>{value}</span>
-      </span>
-      <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
-    </span>
+    <section
+      aria-label={title}
+      className="flex min-w-0 flex-col rounded-xs border border-line bg-panel"
+    >
+      <h2 className="truncate border-b border-line px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase">
+        {title}
+      </h2>
+      <div className="grid gap-0.5 px-3 py-2.5">{children}</div>
+    </section>
   );
 }
