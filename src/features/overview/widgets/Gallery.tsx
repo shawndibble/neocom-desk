@@ -20,6 +20,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Button, EmptyState, FilterChip, Modal, SearchInput, SlideOver } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -59,18 +60,20 @@ const PREVIEW_WIDTH: Record<WidgetSize, string> = {
 
 const noop = () => undefined;
 
-function previewView(kind: WidgetKindDef): WidgetView {
-  if (kind.defaultView === 'chart' && sampleHasChart(kind.id)) return 'chart';
+function previewView(kind: WidgetKindDef, t: TFunction): WidgetView {
+  const hasChart = sampleHasChart(kind.id, t);
+  if (kind.defaultView === 'chart' && hasChart) return 'chart';
   if (kind.defaultView === 'table') return 'table';
-  return kind.views.includes('chart') && sampleHasChart(kind.id) ? 'chart' : 'number';
+  return kind.views.includes('chart') && hasChart ? 'chart' : 'number';
 }
 
 function Preview({ kind }: { kind: WidgetKindDef }) {
-  const view = sampleView(kind.id);
+  const { t } = useTranslation();
+  const view = useMemo(() => sampleView(kind.id, t), [kind.id, t]);
   const widget = useMemo(() => {
     const base = newWidget(kind.id, `preview-${kind.id}`);
-    return base ? { ...base, view: previewView(kind) } : null;
-  }, [kind]);
+    return base ? { ...base, view: previewView(kind, t) } : null;
+  }, [kind, t]);
   if (!view || !widget) return null;
   return (
     // Inert: a picture of the widget, not one. Nothing in it takes focus or a click.

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import '@/i18n';
+import i18n from '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { createFeedStore, type FeedStore } from './data/feedStore';
@@ -381,7 +381,7 @@ describe('Widget preview', () => {
   it('draws a previewView without starting a live read', () => {
     const spy = vi.mocked(widgetView.useWidgetView);
     spy.mockClear();
-    const sample = sampleView('mail');
+    const sample = sampleView('mail', i18n.t.bind(i18n));
     expect(sample).toBeDefined();
     renderWidget(model(), () => undefined, { previewView: sample });
     expect(screen.getByRole('region', { name: 'Mail' })).toBeInTheDocument();

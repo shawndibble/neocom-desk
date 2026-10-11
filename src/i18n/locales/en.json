@@ -4263,7 +4263,131 @@
       "onBoard": "On your Overview ×{{count}}",
       "added": "Added",
       "noMatchHint": "Try another word, or clear the search to see every widget.",
-      "clearSearch": "Clear search"
+      "clearSearch": "Clear search",
+      "samples": {
+        "training": {
+          "note": "Advanced Industry V · 4 skills queued",
+          "then": "Then"
+        },
+        "sp": {
+          "note": "+0.9M this week",
+          "total": "Total",
+          "unallocated": "Unallocated",
+          "week": "This week"
+        },
+        "location": {
+          "note": "Muninn · docked",
+          "status": "Status",
+          "docked": "Docked"
+        },
+        "clones": {
+          "note": "Finishes your queue 3d sooner",
+          "first": "Finishes your queue first"
+        },
+        "wallet": {
+          "note": "+212M this week",
+          "balance": "Balance"
+        },
+        "walletFlow": {
+          "unit": "ISK net",
+          "note": "Income 292M · spending 60M",
+          "income": "Income",
+          "spending": "Spending",
+          "net": "Net"
+        },
+        "netWorth": {
+          "note": "+0.8B this month",
+          "wallet": "Wallet",
+          "assets": "Assets",
+          "orders": "Sell orders"
+        },
+        "orders": {
+          "unit": "undercut",
+          "note": "of 38 open · 2 expire in 6h",
+          "jitaUndercut": "Jita · undercut",
+          "amarrUndercut": "Amarr · undercut"
+        },
+        "priceWatch": {
+          "unit": "alert triggered",
+          "note": "2 armed",
+          "below": "Below target",
+          "armed": "Armed"
+        },
+        "stock": {
+          "value": "2 out",
+          "unit": "5 low",
+          "note": "Across 3 hubs",
+          "of50": "0 of 50",
+          "of10M": "8M of 10M",
+          "of40": "2 of 40",
+          "out2": "2 out",
+          "low3": "3 low"
+        },
+        "miningTax": {
+          "unit": "ISK owed",
+          "note": "6 mining days not yet billed",
+          "hangar": "Corp hangar",
+          "days_one": "{{count}} day",
+          "days_other": "{{count}} days"
+        },
+        "industry": {
+          "unit": "jobs ready",
+          "note": "2 more finish in 5h",
+          "manufacturing": "Manufacturing",
+          "ready": "Ready"
+        },
+        "profit": {
+          "note": "This month · +18%"
+        },
+        "miningYield": {
+          "note": "Average over the range"
+        },
+        "planetary": {
+          "unit": "colonies run dry",
+          "note": "in 2h 10m",
+          "runsDry": "Extractor runs dry"
+        },
+        "structures": {
+          "unit": "low on fuel",
+          "note": "Lowest 3d 4h",
+          "fuel": "Fuel"
+        },
+        "moonChunks": {
+          "unit": "to next chunk",
+          "note": "2 drills",
+          "arrives": "Chunk arrives",
+          "drilling": "Drilling"
+        },
+        "incursions": {
+          "unit": "jumps away",
+          "established": "Established",
+          "mobilizing": "Mobilizing",
+          "jumps_one": "{{count}} jump",
+          "jumps_other": "{{count}} jumps"
+        },
+        "comingUp": {
+          "note": "Stratop fleet forms · 2 events ahead",
+          "fleet": "Stratop fleet",
+          "forms": "Forms",
+          "meeting": "Alliance meeting"
+        },
+        "contracts": {
+          "unit": "couriers due",
+          "note": "in 9h 05m",
+          "route": "Efa to Amarr",
+          "courier": "Courier",
+          "exchange": "Item exchange",
+          "outstanding": "Outstanding"
+        },
+        "mail": {
+          "unit": "unread",
+          "note": "Aria Nox and 2 more",
+          "doctrine": "Fleet doctrine update",
+          "payday": "Payday",
+          "corp": "Corp",
+          "contract": "Re: contract"
+        }
+      }
     },
     "roles": {
       "title": "What do you do in EVE?",
