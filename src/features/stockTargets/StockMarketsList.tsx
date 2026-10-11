@@ -72,8 +72,12 @@ export function StockMarketsList({
       ? t('stockTargets.need.stocked')
       : t(`stockTargets.need.${need}`, { count: market[need] });
   };
-  const count = (value: number) =>
-    value > 0 ? value.toLocaleString() : <span className="text-text-dim">0</span>;
+  // Left off a phone card: the need pill already says the market is fine there.
+  const zero = (
+    <span data-dense-omit className="text-text-dim">
+      0
+    </span>
+  );
 
   const columns: DataTableColumn<StockMarketRow>[] = [
     {
@@ -108,8 +112,15 @@ export function StockMarketsList({
       align: 'right',
       headerCellClassName: 'sm:w-20',
       className: 'tabular-nums',
-      stackAffix: { after: ` ${t('stockTargets.markets.items').toLowerCase()}` },
-      render: (market) => market.items.toLocaleString(),
+      // A phone card reads the count as words ("1 item"); the header says it on desktop.
+      render: (market) => (
+        <>
+          <span className="sm:hidden">
+            {t('stockTargets.summary.items', { count: market.items })}
+          </span>
+          <span className="hidden sm:inline">{market.items.toLocaleString()}</span>
+        </>
+      ),
       sortValue: (market) => market.items,
     },
     {
@@ -118,7 +129,8 @@ export function StockMarketsList({
       align: 'right',
       headerCellClassName: 'sm:w-16',
       className: 'tabular-nums',
-      render: (market) => (market.out > 0 ? <b className="text-danger">{market.out}</b> : count(0)),
+      stackAffix: { after: ` ${t('stockTargets.markets.out').toLowerCase()}` },
+      render: (market) => (market.out > 0 ? <b className="text-danger">{market.out}</b> : zero),
       sortValue: (market) => market.out,
     },
     {
@@ -127,8 +139,8 @@ export function StockMarketsList({
       align: 'right',
       headerCellClassName: 'sm:w-16',
       className: 'tabular-nums',
-      render: (market) =>
-        market.low > 0 ? <b className="text-warning">{market.low}</b> : count(0),
+      stackAffix: { after: ` ${t('stockTargets.markets.low').toLowerCase()}` },
+      render: (market) => (market.low > 0 ? <b className="text-warning">{market.low}</b> : zero),
       sortValue: (market) => market.low,
     },
     {

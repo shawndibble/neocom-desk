@@ -162,7 +162,7 @@ export function StockManagerTable({
       id: 'target',
       header: t('stockTargets.table.target'),
       align: 'right',
-      headerCellClassName: 'sm:w-32',
+      headerCellClassName: 'sm:w-24',
       stackAffix: { before: `${t('stockTargets.table.targetAffix')} ` },
       render: (row) => <TargetCell row={row} name={nameOf(row.typeId)} onSetTarget={onSetTarget} />,
       sortValue: (row) => row.target,
@@ -233,14 +233,16 @@ export function StockManagerTable({
             —
           </span>
         ) : (
-          <span className="flex flex-col">
+          // Two lines on desktop; one run of text on a phone card, where a block breaks the line (§4a).
+          <span className="sm:flex sm:flex-col">
             {row.fromHangar > 0 && (
-              <span className="text-accent">
+              <span className="text-accent sm:whitespace-nowrap">
                 {t('stockTargets.table.fromHangar', { n: row.fromHangar.toLocaleString() })}
               </span>
             )}
+            {row.fromHangar > 0 && row.toSource > 0 && <span className="sm:hidden"> · </span>}
             {row.toSource > 0 && (
-              <span className="text-text-dim">
+              <span className="text-text-dim sm:whitespace-nowrap">
                 {t('stockTargets.table.toSource', { n: row.toSource.toLocaleString() })}
               </span>
             )}
