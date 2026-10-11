@@ -17,14 +17,15 @@
  * the link sees it.
  */
 import { useEffect, useId, useRef, useState, type FocusEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, buttonClassName, TextInput } from '@/components/ui';
+import { Button, Modal, TextInput } from '@/components/ui';
 import { InfoRow } from './InfoRow';
-import { setLoginReturnTo } from '@/auth/loginReturnTo';
+import { blockedButtonClassName, blockedReasonClassName } from './blockedActionStyles';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
-import { loadPayees } from '@/features/miningTax/payees';
+import { createPayee, loadPayees } from '@/features/miningTax/payees';
 import {
   ensurePayee,
   findPayeeByName,
@@ -180,27 +181,136 @@ export function MoonTaxRow({
   );
 }
 
-/** The read-only line: the rate and who gets it, as the owner set them, and a way into the Tax tab. */
+/**
+ * The read-only line, for everyone but the owner (in the app or on the public
+ * page): the rate and who gets it, as the owner set them, and Manage Taxes into
+ * the Tax tab. Logged out it is disabled with "Log in to access" right under it, like
+ * Set waypoint. Logged in, a Payee of the viewer's by that name (any case) is
+ * handed to the tab as is, keeping the viewer's own rate; without one, the
+ * viewer is asked whether to add it at the owner's rate first. Declining still
+ * opens the tab; closing the dialog stays here.
+ */
 export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
+  const [addPayeeOpen, setAddPayeeOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const inFlight = useRef(false);
+  const hintId = useId();
+  const loggedOut = characterId === null;
+
+  /** One step at a time; a failure shows the alert. Resolves to the step's result, undefined when it didn't run or failed. */
+  async function run<T>(step: (id: number) => Promise<T>): Promise<T | undefined> {
+    if (characterId === null || inFlight.current) return undefined;
+    inFlight.current = true;
+    setBusy(true);
+    setFailed(false);
+    try {
+      return await step(characterId);
+    } catch {
+      setFailed(true);
+      return undefined;
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function openTab(payeeId: string | null) {
+    if (payeeId !== null) await useSurveyPayeeId.getState().setValue(payeeId);
+    navigate(MINING_TAX_HREF);
+  }
+
+  async function open() {
+    const missing = await run(async (id) => {
+      const known = findPayeeByName(await loadPayees(id), tax.name);
+      if (known) await openTab(known.id);
+      return known === undefined;
+    });
+    // Opened once the lookup is done, so the dialog never starts out busy.
+    if (missing) setAddPayeeOpen(true);
+  }
+
+  const addPayee = () =>
+    run(async (id) => {
+      // Looked up again: the Payee may have been added elsewhere while the dialog was open.
+      const payee =
+        findPayeeByName(await loadPayees(id), tax.name) ??
+        (await createPayee(id, { name: tax.name.trim(), defaultTaxPct: tax.pct }));
+      await openTab(payee.id);
+    });
+
+  const skip = () => run(() => openTab(null));
+
   return (
     <InfoRow label={t('survey.moonTax.label')}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
         <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xl font-semibold">
           <span className="tabular-nums">{tax.pct}%</span>
           <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
           <span className="min-w-0 [overflow-wrap:anywhere]">{tax.name}</span>
         </p>
-        {/* The Tax tab sits behind the login gate, so a logged-out visitor is sent to log in first. */}
-        <Link
-          to={MINING_TAX_HREF}
-          // Stashed so a logged-out visitor, sent to log in by the gate, lands back on the Tax tab.
-          onClick={() => setLoginReturnTo(MINING_TAX_HREF)}
-          className={buttonClassName({ size: 'sm', className: 'touch:min-h-11 sm:ml-auto' })}
-        >
-          {t('survey.moonTax.manage')}
-        </Link>
+        <div className={blockedButtonClassName}>
+          <Button
+            size="sm"
+            className="touch:min-h-11"
+            // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
+            aria-disabled={loggedOut || undefined}
+            aria-describedby={loggedOut ? hintId : undefined}
+            loading={busy && !addPayeeOpen}
+            onClick={() => void open()}
+          >
+            {t('survey.moonTax.manage')}
+          </Button>
+          {loggedOut && (
+            <span id={hintId} className={blockedReasonClassName}>
+              {t('survey.moonTax.needLogin')}
+            </span>
+          )}
+        </div>
+        {failed && !addPayeeOpen && (
+          <span role="alert" className="w-full text-xs text-danger">
+            {t('survey.moonTax.failed')}
+          </span>
+        )}
       </div>
+      <Modal
+        open={addPayeeOpen}
+        onClose={() => {
+          setAddPayeeOpen(false);
+          setFailed(false);
+        }}
+        title={t('survey.moonTax.addPayee.title')}
+      >
+        <div className="flex flex-col gap-3">
+          <p className="font-semibold">
+            {t('survey.moonTax.addPayee.confirm', { name: tax.name, pct: tax.pct })}
+          </p>
+          <p className="text-sm text-text-dim">
+            {t('survey.moonTax.addPayee.body', { name: tax.name })}
+          </p>
+          {failed && (
+            <p role="alert" className="text-sm text-danger">
+              {t('survey.moonTax.failed')}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-disabled={busy || undefined}
+              onClick={() => void skip()}
+            >
+              {t('survey.moonTax.addPayee.skip')}
+            </Button>
+            <Button variant="primary" size="sm" loading={busy} onClick={() => void addPayee()}>
+              {t('survey.moonTax.addPayee.submit')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </InfoRow>
   );
 }

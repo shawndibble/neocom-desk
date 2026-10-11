@@ -150,7 +150,7 @@ export function SurveyInfoEditor({
           </p>
         )}
         <InfoRow label={t('survey.info.location')}>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
             <SurveyLocationPicker
               value={location}
               characterId={characterId}
@@ -223,7 +223,7 @@ export function SurveyInfoReadout({
       <div className="flex flex-col gap-4">
         {location !== null && (
           <InfoRow label={t('survey.info.location')}>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
               <p className="min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">
                 {location.name}
               </p>
