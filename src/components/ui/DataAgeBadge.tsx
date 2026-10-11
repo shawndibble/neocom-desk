@@ -13,7 +13,7 @@ import { Tooltip } from './Tooltip';
 const TICK_MS = 30_000;
 
 interface DataAgeBadgeProps {
-  /** When the data was last fetched. */
+  /** @summary When the data was last fetched. */
   date: Date;
   /**
    * A sentence about *this* view's refresh cadence, appended to the tooltip
@@ -64,6 +64,8 @@ function toneFor(ms: number): string {
  * the title and actions, and Settings' Data Age tab carries the same
  * information for every view at once, so mobile loses nothing by dropping it
  * here (see docs/context/decisions for the write-up).
+ *
+ * @summary Relative age of ESI-backed data ("12m ago"), toned amber after an hour and red after a day; hidden below `md`.
  */
 export function DataAgeBadge({
   date,

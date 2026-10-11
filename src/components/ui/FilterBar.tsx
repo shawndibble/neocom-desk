@@ -29,6 +29,8 @@ interface FilterFieldProps {
  * caption above every select would double its height for nothing. In the sheet
  * the controls are stacked full-width with no neighbours to give them context,
  * so each gets its caption there.
+ *
+ * @summary One labelled control inside a `FilterBar`; the caption shows in the phone sheet only.
  */
 export function FilterField({ label, children, stretch = true, className = '' }: FilterFieldProps) {
   const surface = useFilterSurface();
@@ -63,9 +65,9 @@ export function FilterField({ label, children, stretch = true, className = '' }:
 }
 
 interface FilterBarProps<T> {
-  /** The committed filter state. In the pointer-width box, edits land here immediately. */
+  /** @summary The committed filter state. On desktop edits land here at once. */
   value: T;
-  /** Commit: every edit in the pointer-width box, only Apply in the sheet. */
+  /** @summary Commit: every edit on desktop, only Apply in the phone sheet. */
   onChange: (next: T) => void;
   /**
    * The search box. Stays in the row at every width — it is the page's primary
@@ -152,6 +154,8 @@ interface FilterBarProps<T> {
  * bound to different state than the row's. `children` is still written once,
  * as a function of the draft, so neither surface can drift from the other and
  * no control is ever mounted twice.
+ *
+ * @summary A page's one filter row: search, view actions and a funnel that opens the filters (a box on desktop, a bottom sheet on a phone).
  */
 export function FilterBar<T>({
   value,
