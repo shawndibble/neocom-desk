@@ -1,7 +1,6 @@
-import { useContext, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import { AlertsBell } from './AlertsBell';
-import { UnreadAlertsContext } from './unreadAlertsContext';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { PageViewPicker } from './PageViewPicker';
 import { usesViewPicker, type PageViews } from './viewPicker';
@@ -76,9 +75,6 @@ export function PageHeader({
 }: PageHeaderProps) {
   const isPhone = useIsPhone();
   const picker = views && usesViewPicker(views.tabs.length, isPhone) ? views : null;
-  // The bell joins the cluster only while it has something to say, so a route
-  // with no actions still draws no empty wrapper.
-  const hasAlerts = useContext(UnreadAlertsContext) > 0;
   return (
     <header
       className={cx(
@@ -99,18 +95,16 @@ export function PageHeader({
           {picker ? <PageViewPicker title={title} {...picker} /> : title}
         </h1>
         {meta}
-        {(actions || hasAlerts) && (
-          // `md:order-1`: after the sub-nav, which sits between meta and actions at `md`.
-          <div
-            className={cx(
-              'ml-auto flex flex-wrap items-center justify-end gap-1.5 md:order-1',
-              subNav ? 'md:pb-1' : undefined
-            )}
-          >
-            {actions}
-            <AlertsBell />
-          </div>
-        )}
+        {/* `md:order-1`: after the sub-nav, which sits between meta and actions at `md`. The bell is always there (dim at zero), so the cluster never collapses. */}
+        <div
+          className={cx(
+            'ml-auto flex flex-wrap items-center justify-end gap-1.5 md:order-1',
+            subNav ? 'md:pb-1' : undefined
+          )}
+        >
+          {actions}
+          <AlertsBell />
+        </div>
       </div>
       {subNav && (
         <div className="order-last w-full min-w-0 md:order-none md:w-auto md:flex-1">{subNav}</div>
