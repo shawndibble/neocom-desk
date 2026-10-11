@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { db } from '@/db';
+import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
+import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -163,6 +165,8 @@ function renderPanelWithLocation(initialEntry: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useCharacterFilterPicks.setState({ value: {}, hydrated: false });
+  useDefaultCharacterFilter.setState({ value: 'all', hydrated: true });
   useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
   mockedTypeNames.mockResolvedValue(TYPE_NAMES);
   mockedNpcStations.mockResolvedValue([
@@ -438,6 +442,44 @@ describe('OpenOrdersPanel', () => {
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.queryByText('Mexallon')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
+  });
+
+  it('opens on the Settings default when nothing is remembered, then on the last pick', async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+        {
+          characterId: 2,
+          characterName: 'Bravo',
+          orders: [EXPIRING_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    useDefaultCharacterFilter.setState({ value: 'current', hydrated: true });
+    const user = userEvent.setup();
+    const first = renderPanel();
+
+    // First visit: the Settings default seeds the page.
+    expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'This character' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'All characters' }));
+    expect(await screen.findByText('Mexallon')).toBeInTheDocument();
+    first.unmount();
+
+    // A fresh visit (no query string) reopens the last pick, not the default.
+    renderPanel();
+    expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+    expect(await screen.findByText('Mexallon')).toBeInTheDocument();
   });
 
   it('folds the healthy group (header and count, no table) until "Show healthy orders" is pressed', async () => {

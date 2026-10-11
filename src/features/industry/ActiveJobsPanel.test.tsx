@@ -9,6 +9,7 @@ import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db, type BuildPlanRecord } from '@/db';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
 import * as corpJobsModule from './corpJobs';
@@ -59,10 +60,12 @@ beforeEach(async () => {
   await db.esiCache.clear();
   await db.industryJobHistory.clear();
   await db.productionRuns.clear();
+  await db.settings.delete('characterFilterPicks');
   // Module-scope singleton: a value left over from a previous test would
   // make the cross-character block's assertions pass or fail for the wrong
   // reason (`Settings.test.tsx`'s precedent).
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
+  useCharacterFilterPicks.setState({ value: {}, hydrated: false });
   server.use(http.get(skillsUrl(), () => HttpResponse.json({ skills: [], total_sp: 0 })));
 });
 afterEach(() => {
@@ -848,6 +851,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
       setActiveCharacter: realSetActiveCharacter,
     });
     useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
+    useCharacterFilterPicks.setState({ value: {}, hydrated: false });
   });
 
   it('shows a "Log production…" button for a done manufacturing job with a product', async () => {
