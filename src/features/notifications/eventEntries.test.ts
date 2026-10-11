@@ -47,6 +47,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       skillQueueEndingLeadHours: ['skillQueueEnding'],
       courierDeliveryDueLeadHours: ['courierDeliveryDue'],
       walletBalanceChangedThresholdIsk: ['walletBalanceChanged'],
+      incursionNearbyJumps: ['incursionNearby'],
       structureFuelLowDays: ['structureFuelLow'],
       corpWalletBalanceFloorIsk: ['corpWalletThreshold'],
       corpWalletTransactionCeilingIsk: ['corpWalletThreshold'],

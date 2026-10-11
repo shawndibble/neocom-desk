@@ -109,6 +109,8 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   marketOrderUndercut: 'warning',
   // A shelf running empty (issue #3521): a standing fault, not yet a loss.
   stockBelowTarget: 'warning',
+  // Something to fly to, not a fault.
+  incursionNearby: 'watch',
   // Waiting on you, but nothing is burning.
   spExtractionReady: 'watch',
   industryJobComplete: 'watch',

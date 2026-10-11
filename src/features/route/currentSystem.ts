@@ -104,6 +104,20 @@ export function useCurrentSystem(): CurrentSystemState {
 }
 
 /**
+ * A Character's Current System read once, outside React (the notification
+ * poller): the game location or a pick, as `useCurrentSystem` resolves them.
+ * `null` when neither is known.
+ */
+export async function loadCurrentSystemId(characterId: number): Promise<number | null> {
+  const [gameSystemId] = await Promise.all([
+    loadCharacterSolarSystemId(characterId).catch(() => null),
+    usePickedSystems.getState().hydrate(),
+  ]);
+  const picked = usePickedSystems.getState().value[String(characterId)] ?? null;
+  return effectiveCurrentSystem(gameSystemId, picked).systemId;
+}
+
+/**
  * What a Jump Range filter can do right now:
  * - `off`: range is Any, nothing to filter;
  * - `no-origin`: no Current System to measure from;

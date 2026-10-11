@@ -188,6 +188,57 @@ function usePodKills(enabled: boolean): ReadonlyMap<number, number> | null | und
   return enabled ? kills : null;
 }
 
+interface AvoidSettings {
+  avoidList: readonly number[];
+  avoidListEnabled: boolean;
+  avoidEdencom: boolean;
+  avoidTriglavian: boolean;
+  avoidPodKills: boolean;
+  podKillThreshold: number;
+}
+
+/** The avoid list the Travel Settings name: shared by the hook and `loadRouteRules`, so the two cannot drift. */
+function travelAvoid(
+  settings: AvoidSettings,
+  podKills: ReadonlyMap<number, number> | null
+): number[] {
+  return effectiveAvoid({
+    ...settings,
+    edencomSystems: EDENCOM_SYSTEMS,
+    triglavianSystems: TRIGLAVIAN_MINOR_VICTORY_SYSTEMS,
+    podKillsBySystem: podKills,
+  });
+}
+
+/**
+ * The Travel Settings read once, outside React — for a caller with no
+ * component to mount, such as the notification poller. Waits for every
+ * setting and, with pod-kill avoidance on, the shared kill-feed read, so the
+ * rules match the ones `useRouteRules` settles on.
+ */
+export async function loadRouteRules(): Promise<RouteRules> {
+  await Promise.all(ROUTE_RULE_STORES.map((store) => store.getState().hydrate()));
+  const avoidPodKills = useAvoidPodKills.getState().value;
+  const podKills = avoidPodKills
+    ? await podKillsFor(Math.floor(Date.now() / POD_KILL_REFRESH_MS))
+    : null;
+  return {
+    preference: useDefaultRoutePreference.getState().value,
+    securityPenalty: useSecurityPenalty.getState().value,
+    avoid: travelAvoid(
+      {
+        avoidList: useAvoidedSystems.getState().value,
+        avoidListEnabled: useAvoidedSystemsEnabled.getState().value,
+        avoidEdencom: useAvoidEdencom.getState().value,
+        avoidTriglavian: useAvoidTriglavian.getState().value,
+        avoidPodKills,
+        podKillThreshold: usePodKillThreshold.getState().value,
+      },
+      podKills
+    ),
+  };
+}
+
 /**
  * The Travel Settings as one value, stable while none of them change — so a
  * caller can key an effect or a cache on `avoid` directly.
@@ -206,17 +257,17 @@ export function useRouteRules(): TravelSettingsState {
 
   const avoidKey = useMemo(
     () =>
-      effectiveAvoid({
-        avoidList,
-        avoidListEnabled,
-        avoidEdencom,
-        edencomSystems: EDENCOM_SYSTEMS,
-        avoidTriglavian,
-        triglavianSystems: TRIGLAVIAN_MINOR_VICTORY_SYSTEMS,
-        avoidPodKills,
-        podKillThreshold,
-        podKillsBySystem: podKills ?? null,
-      }).join(','),
+      travelAvoid(
+        {
+          avoidList,
+          avoidListEnabled,
+          avoidEdencom,
+          avoidTriglavian,
+          avoidPodKills,
+          podKillThreshold,
+        },
+        podKills ?? null
+      ).join(','),
     [
       avoidList,
       avoidListEnabled,

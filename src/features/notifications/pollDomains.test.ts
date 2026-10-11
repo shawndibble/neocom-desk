@@ -198,6 +198,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       corpWallet: ['corpWalletThreshold'],
       priceAlert: ['priceAlertTriggered'],
       stockTargets: ['stockBelowTarget'],
+      incursions: ['incursionNearby'],
     });
   });
 
@@ -1399,6 +1400,7 @@ describe('copy wiring', () => {
           orderId: 1,
           division: 1,
           locationId: 1,
+          stagingSystemId: 1,
         } as never) !== undefined
     );
     expect([...routed].sort()).toEqual([...SUBJECT_ROUTED_EVENT_IDS].sort());

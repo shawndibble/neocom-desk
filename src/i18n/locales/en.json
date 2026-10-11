@@ -7100,6 +7100,12 @@
         "title": "Skill queue ending soon",
         "body": "{{character}}'s skill queue will run dry in under {{hours}} hours."
       },
+      "incursionNearby": {
+        "title_one": "Incursion {{count}} jump away",
+        "title_other": "Incursion {{count}} jumps away",
+        "body_one": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jump from your current system.",
+        "body_other": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jumps from your current system."
+      },
       "stockBelowTarget": {
         "lowTitle": "{{item}} is running low",
         "outTitle": "{{item}} sold out",
@@ -8595,6 +8601,7 @@
         "corpMemberLeft": "Member Left",
         "corpWalletThreshold": "Corp Wallet Threshold",
         "stockBelowTarget": "Stock target running low",
+        "incursionNearby": "Incursion nearby",
         "priceAlertTriggered": "Quickbar Price Alert"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
@@ -8611,6 +8618,10 @@
       "skillQueueEndingLeadTimeLabel": "Warn this far before the skill queue runs dry:",
       "skillQueueEndingLeadTimeOption_one": "{{count}} hour",
       "skillQueueEndingLeadTimeOption_other": "{{count}} hours",
+      "incursionNearbyJumpsLabel": "Alert when an Incursion is within:",
+      "incursionNearbyJumpsOption_one": "{{count}} jump",
+      "incursionNearbyJumpsOption_other": "{{count}} jumps",
+      "incursionNearbyRouteRulesHint": "Jumps are counted from your current system with Route Safety's route rules: your route preference, avoided systems, and its wormhole and jump bridge settings. Fires once per Incursion, and only while the app is open.",
       "structureFuelLowThresholdLabel": "Warn when fuel remaining drops below:",
       "structureFuelLowThresholdOption_one": "{{count}} day",
       "structureFuelLowThresholdOption_other": "{{count}} days",

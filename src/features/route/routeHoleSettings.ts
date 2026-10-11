@@ -98,6 +98,20 @@ export interface RouteHoleQuery {
   hydrated: boolean;
 }
 
+/** The saved wormhole settings read once, outside React (the notification poller). */
+export async function loadRouteHoleQuery(): Promise<RouteHoleQuery> {
+  await Promise.all(ROUTE_HOLE_STORES.map((store) => store.getState().hydrate()));
+  return {
+    enabled: useRouteHolesEnabled.getState().value,
+    settings: {
+      shipSize: useRouteHoleShipSize.getState().value,
+      minLifeHours: useRouteHoleMinLife.getState().value,
+      hubs: useRouteHoleHubs.getState().value,
+    },
+    hydrated: true,
+  };
+}
+
 /** The wormhole settings a Route Safety route is planned under: the link's, else the saved defaults. */
 export function useRouteHoleQuery(overrides: RouteHoleOverrides): RouteHoleQuery {
   const enabled = useRouteHolesEnabled((state) => state.value);

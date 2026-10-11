@@ -28,6 +28,7 @@ import {
   DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+  DEFAULT_INCURSION_NEARBY_JUMPS,
   updateNotificationPrefs,
   toggleEventChannelPref,
   toggleAllEventsChannelPref,
@@ -308,6 +309,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+      incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
     });
   });
 
@@ -326,6 +328,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+      incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
     });
   });
 
@@ -345,6 +348,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       corpWalletBalanceFloorIsk: 10_000_000,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+      incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
     });
   });
 
@@ -373,6 +377,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: 10_500_000,
+      incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
     });
   });
 

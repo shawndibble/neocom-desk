@@ -99,6 +99,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // load rather than pulsing a table row.
   priceAlertTriggered: '/market/browser',
   stockBelowTarget: '/market/stock',
+  incursionNearby: '/travel/route',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';
@@ -187,6 +188,9 @@ const SUBJECT_URLS: Partial<Record<NotificationEventId, SubjectUrl>> = {
   // The market the item ran low at, by its station or structure: the Stock
   // tab's `?market=` opens the list kept there.
   stockBelowTarget: (base, subjectId) => withParam(base, 'market', String(subjectId)),
+  // The staging system as Route Safety's one Stop (`?stops=`): the route
+  // starts from the Current System, as the Incursions panel's own link does.
+  incursionNearby: (base, subjectId) => withParam(base, 'stops', String(subjectId)),
   // The wallet division the threshold tripped on, selected via Corp Wallet's
   // own `?division=` param — the balance or journal it is about is that
   // division's.
