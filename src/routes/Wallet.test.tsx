@@ -282,6 +282,17 @@ describe('Wallet', () => {
     expect(tabs.map((tab) => tab.textContent)).toEqual(['Balance', 'Journal', 'LP Store']);
   });
 
+  it("opens the LP Store from Wallet's tab, leaving Wallet's query behind (issue #3527)", async () => {
+    window.history.pushState({}, '', '/wallet/journal?journal.q=bounty');
+    render(<App />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'LP Store' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store'));
+    expect(window.location.search).toBe('');
+    expect(
+      await screen.findByRole('tab', { name: 'LP Store', selected: true })
+    ).toBeInTheDocument();
+  });
+
   it('opens a store from its URL as the LP Store tab, under the Wallet tab bar (issue #3527)', async () => {
     window.history.pushState({}, '', '/wallet/lp-store/1000167');
     render(<App />);
@@ -292,10 +303,11 @@ describe('Wallet', () => {
   });
 
   it('moves an old Market LP Store link to Wallet, keeping the corporation and query (issue #3527)', async () => {
-    window.history.pushState({}, '', '/market/lp-store/1000167?affordableOnly=0');
+    window.history.pushState({}, '', '/market/lp-store/1000167?affordableOnly=0#x');
     render(<App />);
     await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store/1000167'));
     expect(window.location.search).toBe('?affordableOnly=0');
+    expect(window.location.hash).toBe('#x');
     expect(
       await screen.findByRole('tab', { name: 'LP Store', selected: true })
     ).toBeInTheDocument();

@@ -1,7 +1,7 @@
 /**
  * Old paths of views that moved to a page a pilot would guess (scope decision
- * `20261002-145653-lp-store-under-market-pilot-lookup-its-own`, and the one
- * moving LP Store on to Wallet). Each old
+ * `20261002-145653-lp-store-under-market-pilot-lookup-its-own`, then
+ * `20261010-200446-lp-store-moves-from-market-to-wallet`). Each old
  * prefix maps to its new one; whatever followed the prefix — a corporation id —
  * and the query (less any retired params a move lists) and hash ride along, so
  * no bookmark or shared link breaks.
