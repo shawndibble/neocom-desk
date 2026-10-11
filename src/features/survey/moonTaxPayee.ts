@@ -16,6 +16,17 @@ export function findPayeeByName(
   return payees.find((p) => p.name.trim().toLowerCase() === wanted);
 }
 
+/** The name and rate as typed in the Survey's moon tax row, before they are checked. */
+export interface TaxDraft {
+  name: string;
+  pct: string;
+}
+
+/** What a survey already stored, as the draft that shows it. */
+export function initialTaxDraft(published?: { name: string; pct: number } | null): TaxDraft {
+  return { name: published?.name ?? '', pct: published ? String(published.pct) : '' };
+}
+
 /** A tax percent as typed, or null when it isn't a number from 0 to 100. */
 export function parseTaxPct(text: string): number | null {
   const trimmed = text.trim().replace(',', '.');

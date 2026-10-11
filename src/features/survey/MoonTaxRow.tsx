@@ -26,7 +26,14 @@ import { blockedButtonClassName, blockedReasonClassName } from './blockedActionS
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import { createPayee, loadPayees } from '@/features/miningTax/payees';
-import { ensurePayee, findPayeeByName, MINING_TAX_HREF, parseTaxPct } from './moonTaxPayee';
+import {
+  ensurePayee,
+  findPayeeByName,
+  initialTaxDraft,
+  MINING_TAX_HREF,
+  parseTaxPct,
+  type TaxDraft,
+} from './moonTaxPayee';
 import { setSurveyTax, type SurveyTaxShare } from './surveyStore';
 
 /** The stored survey this row publishes its tax to, and what is already stored there. */
@@ -36,16 +43,29 @@ export interface TaxSurvey {
   published: SurveyTaxShare | null;
 }
 
-export function MoonTaxRow({ characterId, survey }: { characterId: number; survey?: TaxSurvey }) {
+export function MoonTaxRow({
+  characterId,
+  survey,
+  draft,
+  onDraftChange,
+}: {
+  characterId: number;
+  survey?: TaxSurvey;
+  /**
+   * The draft, when the panel holds it, so a template can fill it. Without
+   * these the row keeps its own.
+   */
+  draft?: TaxDraft;
+  onDraftChange?: (draft: TaxDraft) => void;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const listId = useId();
   // Starts blank unless this survey already stored a tax: nothing carries over
   // from the last survey, so the pilot sets it for each field they want it on.
-  const [saved, setSaved] = useState(() => ({
-    name: survey?.published?.name ?? '',
-    pct: survey?.published ? String(survey.published.pct) : '',
-  }));
+  const [own, setOwn] = useState(() => initialTaxDraft(survey?.published));
+  const saved = draft ?? own;
+  const setSaved = onDraftChange ?? setOwn;
   const payees = useLiveQuery(() => loadPayees(characterId), [characterId]) ?? [];
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);

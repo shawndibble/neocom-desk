@@ -10,14 +10,27 @@
  * whole panel is left out when the starter set none of them. Both start blank
  * for each survey; only what the survey itself stored comes back.
  *
- * Notes are plain text on purpose (`whitespace-pre-line`, never markup): anyone
- * holding the link reads them.
+ * The editor's box is plain text; readers get the notes as a small, safe slice
+ * of Markdown (`SurveyNotes`), since anyone holding the link reads them.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel, TextArea } from '@/components/ui';
+import { Button, Panel, TextArea } from '@/components/ui';
 import { InfoRow } from './InfoRow';
+import { SurveyNotes } from './SurveyNotes';
+import {
+  applyTemplate,
+  heldInclude,
+  isEdited,
+  templateFields,
+  type InfoFields,
+  type InfoTemplate,
+} from '@/engine/survey/infoTemplate';
 import { MoonTaxReadout, MoonTaxRow, type TaxSurvey } from './MoonTaxRow';
+import { initialTaxDraft, parseTaxPct } from './moonTaxPayee';
+import { ManageTemplatesDialog, SaveTemplateDialog } from './SurveyTemplateDialogs';
+import { SurveyTemplateMenu } from './SurveyTemplateMenu';
+import { saveSurveyTemplate, useSurveyTemplates } from './surveyTemplates';
 import { SurveyLocationPicker } from './SurveyLocationPicker';
 import { SurveyWaypointButton } from './SurveyWaypointButton';
 import {
@@ -47,6 +60,16 @@ export function SurveyInfoEditor({
   const { t } = useTranslation();
   const [location, setLocation] = useState<Location | null>(survey?.info?.location ?? null);
   const [notes, setNotes] = useState(survey?.info?.notes ?? '');
+  const [tax, setTax] = useState(() => initialTaxDraft(survey?.published));
+  const templates = useSurveyTemplates((state) => state.value);
+  const hydrateTemplates = useSurveyTemplates((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateTemplates();
+  }, [hydrateTemplates]);
+  // The template last picked or saved here, for the strip that says so; it is not
+  // remembered between visits, since each survey starts from what it stored.
+  const [appliedId, setAppliedId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<'save' | 'manage' | null>(null);
   // What was last stored, so a blur with nothing new (or a retry after a failed
   // write) doesn't add a doc.
   const sent = useRef(JSON.stringify([survey?.info?.location ?? null, survey?.info?.notes ?? '']));
@@ -69,9 +92,63 @@ export function SurveyInfoEditor({
     });
   }
 
+  const taxPct = parseTaxPct(tax.pct);
+  const fields: InfoFields = {
+    location,
+    tax: tax.name.trim() !== '' && taxPct !== null ? { name: tax.name.trim(), pct: taxPct } : null,
+    notes,
+  };
+  const applied = templates.find((template) => template.id === appliedId);
+  const edited = applied !== undefined && isEdited(applied, fields, { moon });
+
+  function apply(template: InfoTemplate) {
+    const next = applyTemplate(template, fields, { moon });
+    setLocation(next.location);
+    setNotes(next.notes);
+    if (moon && template.tax) setTax({ name: template.tax.name, pct: String(template.tax.pct) });
+    setAppliedId(template.id);
+    // The tax goes up on its own once the row settles, as when it is typed.
+    store(next.location, next.notes);
+  }
+
+  function updateApplied(template: InfoTemplate) {
+    void saveSurveyTemplate({
+      id: template.id,
+      name: template.name,
+      fields: templateFields(fields, heldInclude(template, { moon })),
+    }).catch(() => undefined);
+  }
+
   return (
-    <Panel title={t('survey.info.title')}>
+    <Panel
+      title={t('survey.info.title')}
+      actions={
+        <SurveyTemplateMenu
+          templates={templates}
+          appliedId={applied?.id ?? null}
+          onApply={apply}
+          onSave={() => setDialog('save')}
+          onManage={() => setDialog('manage')}
+        />
+      }
+    >
       <div className="flex flex-col gap-4">
+        {applied !== undefined && (
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span>{t('survey.templates.applied', { name: applied.name })}</span>
+            {edited && (
+              <>
+                <span className="text-text-dim">{t('survey.templates.edited')}</span>
+                <Button size="sm" onClick={() => updateApplied(applied)}>
+                  {t('survey.templates.update')}
+                </Button>
+                <Button size="sm" onClick={() => setDialog('save')}>
+                  {t('survey.templates.saveAsNew')}
+                </Button>
+              </>
+            )}
+          </p>
+        )}
         <InfoRow label={t('survey.info.location')}>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
             <SurveyLocationPicker
@@ -88,12 +165,19 @@ export function SurveyInfoEditor({
             )}
           </div>
         </InfoRow>
-        {moon && <MoonTaxRow characterId={characterId} survey={survey} />}
-        <InfoRow label={t('survey.info.notes')}>
+        {moon && (
+          <MoonTaxRow
+            characterId={characterId}
+            survey={survey}
+            draft={tax}
+            onDraftChange={setTax}
+          />
+        )}
+        <InfoRow label={t('survey.info.notesEditor')}>
           <TextArea
             rows={3}
             maxLength={MAX_SURVEY_NOTES}
-            aria-label={t('survey.info.notes')}
+            aria-label={t('survey.info.notesEditor')}
             placeholder={t('survey.info.notesPlaceholder')}
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
@@ -101,6 +185,23 @@ export function SurveyInfoEditor({
           />
         </InfoRow>
       </div>
+      {dialog === 'save' && (
+        <SaveTemplateDialog
+          fields={fields}
+          moon={moon}
+          templates={templates}
+          onClose={() => setDialog(null)}
+          onSaved={setAppliedId}
+        />
+      )}
+      {dialog === 'manage' && (
+        <ManageTemplatesDialog
+          fields={fields}
+          moon={moon}
+          templates={templates}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </Panel>
   );
 }
@@ -135,7 +236,7 @@ export function SurveyInfoReadout({
         {tax !== null && <MoonTaxReadout tax={tax} />}
         {notes !== '' && (
           <InfoRow label={t('survey.info.notes')}>
-            <p className="whitespace-pre-line [overflow-wrap:anywhere]">{notes}</p>
+            <SurveyNotes notes={notes} />
           </InfoRow>
         )}
       </div>

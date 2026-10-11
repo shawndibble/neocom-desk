@@ -1036,6 +1036,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   Personal: kept with the pilot's recent-Surveys list, never on the Survey, so
   no one else sees it. Scope decision
   `20261010-203712-survey-a-surveys-name-is-the-pilots-own`.
+- **Survey info template**: A name for a saved set of a Survey's Additional
+  information (location, moon tax payee and rate, notes), picked to fill the panel
+  in one step and used to start a Survey from the empty page. Personal and synced
+  across the pilot's devices: kept with the pilot's own settings, never on the
+  Survey or its link. Scope decision
+  `20261011-124133-survey-info-templates`.
 - **Cleared marker** (also: mark field cleared): The scan with no rocks that ends a
   Survey, stored by a button because the scanner has nothing to copy once the last
   rock is gone. Who may press it: scope decision `20261009-233623-survey-the-field-is-marked-cleared-by-a`.

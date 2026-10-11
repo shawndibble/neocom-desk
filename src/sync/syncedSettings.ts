@@ -258,6 +258,15 @@
 // pruned list is written back, so the tombstone-expiry edge does not bite. No
 // `legacyKey`: new.
 //
+// sync.surveyInfoTemplates: the pilot's saved Mining Survey info templates, as
+// {id, name, location?, tax?, notes?} entries (at most 30, names capped at 40
+// characters, notes at 1000, so the list stays a few tens of KB at most): a
+// name and whichever of the location, moon tax payee and rate, and notes the
+// pilot chose to save, so a second device can start a field from the same
+// pick. See features/survey/surveyTemplates.ts, whose parse drops malformed
+// entries. Never deleted via deleteSyncedSetting: deleting a template rewrites
+// the array, so the tombstone-expiry edge does not bite. No `legacyKey`: new.
+//
 // Route Safety's own wormhole defaults (features/route/routeHoleSettings.ts),
 // beside but deliberately not part of the Travel Settings: sync.routeHoles
 // (route through the open Thera / Turnur holes), sync.routeHoleShipSize,
@@ -311,6 +320,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.structureBrokerFees',
   'sync.stockLists',
   'sync.surveyHistory',
+  'sync.surveyInfoTemplates',
   'sync.targetSkillPlan',
 ];
 
