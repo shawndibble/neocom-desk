@@ -17,7 +17,13 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { RefTypeBreakdownRow } from '@/features/character/walletJournalFilter';
-import type { DivergingChartModel, StackChartModel, StackPart } from '../charts/types';
+import type { StockBoardMarket } from '@/features/stockTargets/stockBoard';
+import type {
+  DivergingChartModel,
+  StackChartModel,
+  StackPart,
+  StackRowsChartModel,
+} from '../charts/types';
 import { backwardBucketSums } from './chartSeries';
 import type { NetWorthCharacter } from './kindLoaders';
 import { UNKNOWN } from './builderKit';
@@ -424,6 +430,102 @@ export function netWorthTable(
           values.length >= 2 ? formatIskCompactSigned(value - values[0]!) : UNKNOWN,
         ],
       };
+    }),
+  };
+}
+
+// --- Market stock --------------------------------------------------------------------
+
+const STOCK_PATH = '/market/stock';
+
+/** "Amarr VIII (Oris) - Emperor Family Academy" reads as its first part on a widget. */
+const marketName = (name: string): string => name.split(' - ')[0] ?? name;
+
+/** Worst first: most out, then most low, then by name. */
+function worstFirst(markets: readonly StockBoardMarket[]): StockBoardMarket[] {
+  return [...markets].sort(
+    (a, b) =>
+      b.summary.out - a.summary.out || b.summary.low - a.summary.low || a.name.localeCompare(b.name)
+  );
+}
+
+/** Every market, healthy ones too: how many items are out and low, what is ready to list, what restocking costs. */
+export function stockTable(t: Translate, markets: readonly StockBoardMarket[]): TableModel {
+  return {
+    columns: [
+      { key: 'market', label: t(`${W}.stock.col.market`), priority: 0 },
+      { key: 'out', label: t(`${W}.stock.col.out`), align: 'end', priority: 1 },
+      { key: 'low', label: t(`${W}.stock.col.low`), align: 'end', priority: 2 },
+      { key: 'restock', label: t(`${W}.stock.col.restock`), align: 'end', priority: 3 },
+      { key: 'ready', label: t(`${W}.stock.col.ready`), align: 'end', priority: 4 },
+    ],
+    rows: worstFirst(markets).map((market) => {
+      const { out, low, readyToList, costToFill } = market.summary;
+      return {
+        key: market.listId,
+        cells: [
+          marketName(market.name),
+          String(out),
+          String(low),
+          costToFill > 0 ? { text: formatIskCompact(costToFill), iskAmount: costToFill } : UNKNOWN,
+          String(readyToList),
+        ],
+        tone: out > 0 ? 'critical' : low > 0 ? 'warning' : 'clear',
+        to: `${STOCK_PATH}/${encodeURIComponent(market.listId)}`,
+      };
+    }),
+  };
+}
+
+const STOCK_STATES = [
+  { key: 'out', color: 'warning' },
+  { key: 'low', color: 's4' },
+  { key: 'ok', color: 'accent' },
+  { key: 'over', color: 'neutral' },
+] as const;
+
+/**
+ * One stacked bar per market, split Out / Low / OK / Over, so which side of
+ * the target each market sits on is visible (a "% at target" hides it). A
+ * market with no items is left out; null when none has any.
+ */
+export function stockChart(
+  t: Translate,
+  markets: readonly StockBoardMarket[]
+): StackRowsChartModel | null {
+  const stocked = worstFirst(markets).filter((market) => {
+    const { out, low, ok, over } = market.summary;
+    return out + low + ok + over > 0;
+  });
+  if (stocked.length === 0) return null;
+  const legend: StackPart[] = STOCK_STATES.map(({ key, color }) => {
+    const value = stocked.reduce((sum, market) => sum + market.summary[key], 0);
+    return { key, label: t(`${W}.chart.stock.${key}`), value, text: String(value), color };
+  });
+  return {
+    kind: 'stackRows',
+    rows: stocked.map((market) => {
+      const short = market.summary.out + market.summary.low;
+      return {
+        key: market.listId,
+        label: marketName(market.name),
+        parts: STOCK_STATES.map(({ key, color }) => ({
+          key,
+          value: market.summary[key],
+          color,
+        })),
+        text: short > 0 ? t(`${W}.stock.rowShort`, { count: short }) : t(`${W}.stock.rowOk`),
+      };
+    }),
+    legend,
+    note: t(`${W}.chart.stock.note`),
+    summary: t(`${W}.chart.stock.summary`, {
+      markets: stocked
+        .map((market) => {
+          const { out, low, ok, over } = market.summary;
+          return `${marketName(market.name)}: ${out} out, ${low} low, ${ok} ok, ${over} over`;
+        })
+        .join('; '),
     }),
   };
 }

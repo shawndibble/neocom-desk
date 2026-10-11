@@ -87,6 +87,8 @@ import {
   ordersListed,
   ordersStateChart,
   ordersTable,
+  stockChart,
+  stockTable,
 } from './moneyModels';
 import { KIND_BUILDERS, KIND_FEED_LISTS } from './kindModels';
 import type {
@@ -922,19 +924,8 @@ const stock: Builder = (feeds, { t }) => {
       summary: stockBoardSummary(t, board),
     };
   }
-  const needing = board.markets.filter(
-    (market) => market.summary.out > 0 || market.summary.low > 0
-  );
   const shortfall = board.totals.out + board.totals.low;
   const cost = board.markets.reduce((sum, market) => sum + market.summary.costToFill, 0);
-  const detail = (summary: (typeof board.markets)[number]['summary']) =>
-    [
-      summary.readyToList > 0 && t('overview.board.stockReady', { count: summary.readyToList }),
-      summary.costToFill > 0 &&
-        t('overview.board.stockToSource', { isk: formatIskCompact(summary.costToFill) }),
-    ]
-      .filter(Boolean)
-      .join(' · ');
   return {
     ...blank(to, statusOf(feed)),
     // The shortfall (out plus low) is the count to act on; "0 out" beside "2 low" hid it.
@@ -947,41 +938,11 @@ const stock: Builder = (feeds, { t }) => {
           : undefined,
       tone: shortfall > 0 ? (stockBoardSeverity(board) ?? 'clear') : 'clear',
     },
-    rows: needing.map((market) => {
-      const out = market.summary.out > 0;
-      return {
-        key: market.listId,
-        // "Amarr VIII (Oris) - Emperor Family Academy" reads as its first part on a widget.
-        title: market.name.split(' - ')[0],
-        detail: detail(market.summary) || undefined,
-        value: out
-          ? t('stockTargets.need.out', { count: market.summary.out })
-          : t('stockTargets.need.low', { count: market.summary.low }),
-        tone: out ? 'critical' : 'warning',
-        to: `${STOCK_PATH}/${encodeURIComponent(market.listId)}`,
-      };
-    }),
+    rows: [],
+    // Every market, not only those short: the healthy ones are the answer to "am I fine".
+    table: stockTable(t, board.markets),
     summary: stockBoardSummary(t, board),
-    chart:
-      hbarsFromRows(
-        t,
-        board.markets
-          .map((market) => {
-            const { out, low, ok, over } = market.summary;
-            const total = out + low + ok + over;
-            return { market, stocked: ok + over, total };
-          })
-          .filter(({ total }) => total > 0)
-          .map(({ market, stocked, total }) => ({
-            key: market.listId,
-            label: market.name.split(' - ')[0],
-            value: stocked,
-            share: stocked / total,
-            text: `${Math.round((stocked / total) * 100)}%`,
-            color: stocked / total < 0.5 ? ('warning' as const) : ('accent' as const),
-          })),
-        t('overview.widgets.chart.stock.note')
-      ) ?? undefined,
+    chart: stockChart(t, board.markets) ?? undefined,
   };
 };
 

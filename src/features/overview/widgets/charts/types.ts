@@ -114,6 +114,22 @@ export interface StackedAreaChartModel extends ChartBase {
   xEnd?: string;
 }
 
+export interface StackRow {
+  key: string;
+  label: string;
+  /** In bar order; zero parts draw nothing but keep the order. */
+  parts: { key: string; value: number; color: ChartColor }[];
+  /** The figure at the row's end ("3 short"). */
+  text?: string;
+}
+
+export interface StackRowsChartModel extends ChartBase {
+  kind: 'stackRows';
+  rows: StackRow[];
+  /** One entry per part key, with its total across the rows, in bar order. */
+  legend: StackPart[];
+}
+
 export interface SparkRow {
   key: string;
   label: string;
@@ -135,6 +151,7 @@ export type ChartModel =
   | DonutChartModel
   | StackChartModel
   | StackedAreaChartModel
+  | StackRowsChartModel
   | SparkChartModel;
 
 export type ChartKind = ChartModel['kind'];

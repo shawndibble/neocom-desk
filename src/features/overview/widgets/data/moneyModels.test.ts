@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { WalletJournalEntry } from '@/esi/endpoints';
+import type { StockBoardMarket } from '@/features/stockTargets/stockBoard';
 import type { NetWorthCharacter } from './kindLoaders';
 import {
   balanceChange,
@@ -10,6 +11,8 @@ import {
   flowTable,
   netWorthSeries,
   netWorthTable,
+  stockChart,
+  stockTable,
   journalTable,
   ordersListed,
   ordersStateChart,
@@ -437,6 +440,103 @@ describe('net worth', () => {
     it('has no change to give from a single day', () => {
       const one = netWorthSeries([char(1, [{ day: '2026-10-10', layers: layers(1, 1) }])]);
       expect(netWorthTable(t, layers(1, 1), one, ['isk']).rows[0]!.cells[3]).toBe('—');
+    });
+  });
+});
+
+describe('stock', () => {
+  const market = (
+    listId: string,
+    name: string,
+    s: Partial<StockBoardMarket['summary']> = {}
+  ): StockBoardMarket => ({
+    listId,
+    name,
+    summary: {
+      out: 0,
+      low: 0,
+      ok: 0,
+      over: 0,
+      readyToList: 0,
+      costToFill: 0,
+      unpricedShort: 0,
+      ...s,
+    },
+  });
+  const markets = [
+    market('a', 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', {
+      out: 1,
+      low: 2,
+      ok: 7,
+      readyToList: 2,
+      costToFill: 35_000_000,
+    }),
+    market('b', 'Amarr VIII (Oris) - Emperor Family Academy', { ok: 5, over: 3 }),
+    market('c', 'Dodixie IX - Moon 20', { low: 1, ok: 2 }),
+  ];
+
+  describe('stockTable', () => {
+    const table = stockTable(t, markets);
+
+    it('lists every market, the worst first, healthy ones included', () => {
+      expect(table.rows.map((r) => r.key)).toEqual(['a', 'c', 'b']);
+    });
+
+    it('is Market, Out, Low, To restock, Ready with the shortfall columns kept longest', () => {
+      expect(table.columns.map((c) => c.key)).toEqual(['market', 'out', 'low', 'restock', 'ready']);
+      const byPriority = [...table.columns].sort((a, b) => a.priority! - b.priority!);
+      expect(byPriority.map((c) => c.key)).toEqual(['market', 'out', 'low', 'restock', 'ready']);
+    });
+
+    it('reads the short name, the counts, and the ISK to restock as an ISK cell or a dash', () => {
+      expect(table.rows[0]!.cells).toEqual([
+        'Jita IV',
+        '1',
+        '2',
+        { text: '35M', iskAmount: 35_000_000 },
+        '2',
+      ]);
+      expect(table.rows[2]!.cells).toEqual(['Amarr VIII (Oris)', '0', '0', '—', '0']);
+    });
+
+    it('tones a market by how short it is and links to its list', () => {
+      expect(table.rows.map((r) => r.tone)).toEqual(['critical', 'warning', 'clear']);
+      expect(table.rows[0]!.to).toBe('/market/stock/a');
+    });
+  });
+
+  describe('stockChart', () => {
+    it('is null with nothing stocked in any market', () => {
+      expect(stockChart(t, [market('x', 'Empty')])).toBeNull();
+    });
+
+    it('is a stacked row per market in Out, Low, OK, Over order, skipping markets with no items', () => {
+      const m = stockChart(t, [...markets, market('x', 'Empty')])!;
+      expect(m.kind).toBe('stackRows');
+      expect(m.rows.map((r) => r.key)).toEqual(['a', 'c', 'b']);
+      expect(m.rows[0]!.parts.map((p) => [p.key, p.value])).toEqual([
+        ['out', 1],
+        ['low', 2],
+        ['ok', 7],
+        ['over', 0],
+      ]);
+      expect(m.rows[0]!.text).toBe('overview.widgets.stock.rowShort{"count":3}');
+      expect(m.rows[2]!.text).toBe('overview.widgets.stock.rowOk');
+    });
+
+    it('totals each state across the markets for the legend, with counts in the text', () => {
+      const m = stockChart(t, markets)!;
+      expect(m.legend.map((l) => [l.key, l.text])).toEqual([
+        ['out', '1'],
+        ['low', '3'],
+        ['ok', '14'],
+        ['over', '3'],
+      ]);
+    });
+
+    it('never draws a series in the loss red', () => {
+      const m = stockChart(t, markets)!;
+      expect(m.legend.map((l) => l.color)).not.toContain('iskNeg');
     });
   });
 });

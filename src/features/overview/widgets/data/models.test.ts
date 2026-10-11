@@ -270,8 +270,8 @@ describe('stock', () => {
     expect(buildView('survey', {}, ctx()).to).toBeNull();
   });
 
-  it('counts out and low, listing the markets that need restocking', () => {
-    const summary = { out: 2, low: 1, readyToList: 0, costToFill: 0 };
+  it('counts out and low, tabling every market with its own state', () => {
+    const summary = { out: 2, low: 1, ok: 4, over: 0, readyToList: 0, costToFill: 0 };
     const feeds: Feeds = {
       stock: ok({
         board: {
@@ -284,9 +284,10 @@ describe('stock', () => {
     const view = buildView('stock', feeds, ctx());
     expect(view.number.value).toBe('3');
     expect(view.number.tone).toBe('warning');
-    expect(view.rows).toHaveLength(1);
-    expect(view.rows[0].title).toBe('Jita IV');
-    expect(view.rows[0].to).toBe('/market/stock/a');
+    expect(view.table?.rows).toHaveLength(1);
+    expect(view.table?.rows[0]!.cells[0]).toBe('Jita IV');
+    expect(view.table?.rows[0]!.to).toBe('/market/stock/a');
+    expect(view.chart?.kind).toBe('stackRows');
   });
 });
 

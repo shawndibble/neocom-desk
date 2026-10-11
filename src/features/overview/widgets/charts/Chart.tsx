@@ -17,6 +17,7 @@ import { HBars } from './HBars';
 import { Sparklines } from './Sparklines';
 import { StackBar } from './StackBar';
 import { StackedArea } from './StackedArea';
+import { StackRows } from './StackRows';
 import { donutSize, hbarRows, sparkRows } from './sizing';
 import type { ChartModel } from './types';
 
@@ -37,6 +38,8 @@ function Drawing({ model, size }: { model: ChartModel; size: WidgetSize }) {
       return <StackBar model={model} />;
     case 'stackedArea':
       return <StackedArea model={model} height={height} compact={size === 'S'} />;
+    case 'stackRows':
+      return <StackRows model={model} maxRows={hbarRows(size)} />;
     case 'spark':
       return <Sparklines model={model} maxRows={sparkRows(size)} />;
   }

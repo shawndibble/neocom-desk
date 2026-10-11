@@ -72,6 +72,31 @@ const MODELS: Record<string, ChartModel> = {
     xEnd: 'today',
     summary: 'Net worth rose to 34B.',
   },
+  stackRows: {
+    kind: 'stackRows',
+    rows: [
+      {
+        key: 'jita',
+        label: 'Jita IV',
+        parts: [
+          { key: 'out', value: 1, color: 'warning' },
+          { key: 'ok', value: 3, color: 'accent' },
+        ],
+        text: '1 short',
+      },
+      {
+        key: 'amarr',
+        label: 'Amarr',
+        parts: [{ key: 'ok', value: 2, color: 'accent' }],
+        text: 'OK',
+      },
+    ],
+    legend: [
+      { key: 'out', label: 'Out', value: 1, text: '1', color: 'warning' },
+      { key: 'ok', label: 'OK', value: 5, text: '5', color: 'accent' },
+    ],
+    summary: 'Jita IV: 1 out, 3 ok.',
+  },
   spark: {
     kind: 'spark',
     rows: [{ key: 'trit', label: 'Tritanium', values: [4, 5, 3], text: '4.18' }],
@@ -146,6 +171,17 @@ describe('Chart', () => {
     expect([...small.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
       'Assets 30B',
       'Wallet 4B',
+    ]);
+  });
+
+  it('splits each row by its own total, leaving a zero part out, with the legend totals below', () => {
+    const { container } = render(<Chart model={MODELS.stackRows!} size="M" />);
+    const bars = [...container.querySelectorAll<HTMLElement>('span.flex > i')];
+    expect(bars.map((bar) => bar.style.width)).toEqual(['25%', '75%', '100%']);
+    expect(container.textContent).toContain('1 short');
+    expect([...container.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'Out 1',
+      'OK 5',
     ]);
   });
 

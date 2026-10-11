@@ -3709,7 +3709,12 @@
           "note": "Time of fuel left"
         },
         "stock": {
-          "note": "Share of items at or above their target"
+          "out": "Out",
+          "low": "Low",
+          "ok": "OK",
+          "over": "Over",
+          "note": "Items by state in each market",
+          "summary": "Items by state, per market. {{markets}}."
         },
         "lp": {
           "note": "Loyalty points by corporation"
@@ -3883,7 +3888,16 @@
         "title": "Market stock",
         "description": "How well stocked your markets are",
         "empty": "You do not keep a Stock List yet.",
-        "short": "short"
+        "short": "short",
+        "rowShort": "{{count}} short",
+        "rowOk": "OK",
+        "col": {
+          "market": "Market",
+          "out": "Out",
+          "low": "Low",
+          "restock": "To restock",
+          "ready": "Ready"
+        }
       },
       "lp": {
         "title": "LP balances",
