@@ -100,6 +100,9 @@ export const WALLET_TABS = definePageTabs('/wallet', [
   { id: 'balance', labelKey: 'wallet.balanceTab' },
   { id: 'journal', labelKey: 'wallet.journalTab' },
   { id: 'transactions', labelKey: 'market.sections.transactions' },
+  // Its own route (`/wallet/lp-store[/:corporationId]`) outranks Wallet's, so
+  // `LoyaltyStore` draws the tab bar itself; the entry is what makes the path a Wallet tab.
+  { id: 'lp-store', labelKey: 'loyaltyStore.title' },
 ]);
 
 /**
@@ -137,9 +140,6 @@ export const MARKET_TABS = definePageTabs('/market', [
   { id: 'history', labelKey: 'market.sections.history' },
   { id: 'history/transactions', labelKey: 'market.sections.transactions' },
   { id: 'appraisal', labelKey: 'market.sections.appraisal' },
-  // Its own route (`/market/lp-store[/:corporationId]`) outranks Market's, so
-  // `LoyaltyStore` draws the tab bar itself; the entry is what makes the path a Market tab.
-  { id: 'lp-store', labelKey: 'loyaltyStore.title' },
 ]);
 
 /**
@@ -180,12 +180,25 @@ export const PAGE_LEGACY_LOCATIONS: Partial<
   >
 > = {
   '/assets': legacyAssetsLocation,
-  // Hauling was a Market tab until #3526; it is a Travel tab now.
-  '/market': (pathname, search) =>
-    pathname === '/market/hauling' || pathname.startsWith('/market/hauling/')
-      ? { pathname: tabPath(TRAVEL_TABS, 'hauling'), search }
-      : null,
+  '/market': legacyMarketLocation,
 };
+
+/**
+ * Hauling was a Market tab until #3526; it is a Travel tab now. LP Store was
+ * one until #3527; it is a Wallet tab now, and a store's corporation id rides along.
+ */
+function legacyMarketLocation(
+  pathname: string,
+  search: string
+): { pathname: string; search: string } | null {
+  if (pathname === '/market/hauling' || pathname.startsWith('/market/hauling/')) {
+    return { pathname: tabPath(TRAVEL_TABS, 'hauling'), search };
+  }
+  if (pathname === '/market/lp-store' || pathname.startsWith('/market/lp-store/')) {
+    return { pathname: `/wallet${pathname.slice('/market'.length)}`, search };
+  }
+  return null;
+}
 
 const TABBED_PAGES = Object.values(PAGE_TABS);
 

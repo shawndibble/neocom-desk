@@ -791,10 +791,15 @@ describe('LoyaltyStore switching stores through the search', () => {
     expect(useLoyaltyStoreOffers).not.toHaveBeenCalled();
   });
 
-  it('is a Market tab: the bar shows LP Store selected beside the other tabs', () => {
+  it('is a Wallet tab: the bar shows LP Store selected beside Balance and Journal', () => {
     renderAt('/loyalty');
+    expect(
+      within(screen.getByRole('tablist', { name: 'Wallet' }))
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent)
+    ).toEqual(['Balance', 'Journal', 'LP Store']);
     expect(screen.getByRole('tab', { name: 'LP Store', selected: true })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Market' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Appraisal' })).not.toBeInTheDocument();
   });
 
   it('offers a crumb back to the search only when a result opened the store', () => {
@@ -815,7 +820,7 @@ describe('LoyaltyStore switching stores through the search', () => {
     );
     expect(screen.getByRole('link', { name: /LP Store search/ })).toHaveAttribute(
       'href',
-      '/market/lp-store?q=tritanium'
+      '/wallet/lp-store?q=tritanium'
     );
   });
 
@@ -824,7 +829,7 @@ describe('LoyaltyStore switching stores through the search', () => {
     expect(screen.queryByRole('button', { name: /LP Store corporation/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Change store/ })).toHaveAttribute(
       'href',
-      '/market/lp-store'
+      '/wallet/lp-store'
     );
   });
 

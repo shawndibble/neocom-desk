@@ -70,6 +70,17 @@ beforeEach(async () => {
 });
 
 describe('the rail', () => {
+  it("lists LP Store among Wallet's views, current on a store's page (#3527)", () => {
+    renderAt('/wallet/lp-store/1000125');
+
+    const views = within(rail()).getByRole('list', { name: 'Wallet' });
+    expect(within(views).getByRole('link', { name: 'LP Store' })).toHaveAttribute(
+      'href',
+      '/wallet/lp-store'
+    );
+    expect(within(views).getByRole('link', { name: 'Balance' })).toBeInTheDocument();
+  });
+
   it("opens the current page's views and leaves the others closed", () => {
     renderAt('/market/appraisal');
 
@@ -78,10 +89,7 @@ describe('the rail', () => {
       'aria-current',
       'page'
     );
-    expect(within(views).getByRole('link', { name: 'LP Store' })).toHaveAttribute(
-      'href',
-      '/market/lp-store'
-    );
+    expect(within(views).queryByRole('link', { name: 'LP Store' })).not.toBeInTheDocument();
     expect(within(rail()).queryByRole('list', { name: 'Industry' })).not.toBeInTheDocument();
     expect(within(rail()).getByRole('button', { name: /^Industry views/ })).toHaveAttribute(
       'aria-expanded',

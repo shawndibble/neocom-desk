@@ -196,6 +196,6 @@ export interface LpSearchCrumbState {
 }
 
 export function lpStorePath(corporationId: number, offerId?: number): string {
-  const base = `/market/lp-store/${corporationId}`;
+  const base = `/wallet/lp-store/${corporationId}`;
   return offerId === undefined ? base : `${base}?offer=${offerId}`;
 }

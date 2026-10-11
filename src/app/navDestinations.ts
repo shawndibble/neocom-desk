@@ -201,9 +201,6 @@ export const NAV_PAGES = [
     group: 'economy',
     gating: 'scope',
     mobileTab: true,
-    // LP Store is a Market tab (`MARKET_TABS`); the balances stay on Wallet
-    // (scope decisions `20261002-145653-lp-store-under-market-pilot-lookup-its-own`
-    // and the one making it a tab).
   },
   {
     path: '/wallet',
@@ -211,7 +208,8 @@ export const NAV_PAGES = [
     group: 'economy',
     gating: 'scope',
     mobileTab: true,
-    // Sends an old link on to Market › Transactions (`WALLET_TABS`).
+    // Sends an old link on to Market › Transactions (`WALLET_TABS`). LP Store is
+    // a Wallet tab beside the balances it spends (#3527; it was a Market tab).
     aliasTabs: ['transactions'],
   },
   { path: '/assets', labelKey: 'nav.assets', group: 'economy', gating: 'scope', mobileTab: true },
