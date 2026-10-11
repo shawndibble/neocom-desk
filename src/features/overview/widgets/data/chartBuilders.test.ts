@@ -4,6 +4,7 @@ import {
   industryBars,
   ordersDonut,
   queueSegments,
+  queueStack,
   severityColor,
   walletArea,
 } from './chartBuilders';
@@ -152,5 +153,40 @@ describe('queueSegments', () => {
       NOW
     );
     expect(segments.map((s) => s.entry.queue_position)).toEqual([2]);
+  });
+});
+
+describe('queueStack', () => {
+  const items = [
+    { key: 'a', label: 'Gunnery V', seconds: 4 * 3600 },
+    { key: 'b', label: 'Hull Upgrades IV', seconds: 20 * 3600 },
+    { key: 'c', label: 'Mechanics V', seconds: 2 * 86_400 },
+    { key: 'd', label: 'Navigation IV', seconds: 3600 },
+  ];
+
+  const stack = () => {
+    const model = queueStack(t, items, (seconds) => `${seconds}s`);
+    if (!model) throw new Error('no stack');
+    return model;
+  };
+
+  it('is one bar, a part per skill sized by training time', () => {
+    const model = stack();
+    expect(model.kind).toBe('stack');
+    expect(model.parts.map((p) => p.value)).toEqual(items.map((i) => i.seconds));
+  });
+
+  it('names only the first two skills in the legend, and the caption gives the queue end', () => {
+    const model = stack();
+    expect(model.parts.map((p) => p.unlabelled === true)).toEqual([false, false, true, true]);
+    expect(model.parts[0]!.text).toBe('14400s');
+    expect(model.note).toContain('"duration":"');
+    expect(model.note).toContain(String(4 * 3600 + 20 * 3600 + 2 * 86_400 + 3600));
+    expect(model.summary).toContain('Gunnery V');
+    expect(model.summary).toContain('Navigation IV');
+  });
+
+  it('is null with an empty queue', () => {
+    expect(queueStack(t, [], String)).toBeNull();
   });
 });

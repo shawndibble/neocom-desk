@@ -11,12 +11,13 @@ import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
 import { journalRefTypeBreakdown } from '@/features/character/walletJournalFilter';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { LayerId } from '@/engine/netWorth/series';
 import type { ChartColor, StackPart } from '../charts/types';
 import { blank, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { hbarsFromRows } from './chartBuilders';
+import { clonesTable, locationTable } from './characterTables';
 import { backwardBucketSums, journalCoverageDays, withinRange } from './chartSeries';
 import type { FeedId, ListRow, NumberModel } from './types';
 
@@ -404,6 +405,18 @@ const lp: Builder = (feeds, { t }) => {
 
 // --- Best clone ---------------------------------------------------------------------
 
+/** The nearest jump clone and how much later it would finish: the one fact "Stay put" does not carry. */
+function nextBest(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  rows: readonly { id: string | number; deltaSeconds: number | null }[]
+): NumberModel['secondary'] {
+  const later = rows
+    .filter((row) => row.id !== 'worn' && row.deltaSeconds !== null && row.deltaSeconds > 60)
+    .map((row) => row.deltaSeconds as number);
+  if (later.length === 0) return undefined;
+  return { text: t(`${D}.clones.nextBest`, { duration: formatCountdown(Math.min(...later)) }) };
+}
+
 const clones: Builder = (feeds, { t }) => {
   const feed = feeds.clones;
   const data = feed?.data ?? null;
@@ -446,7 +459,11 @@ const clones: Builder = (feeds, { t }) => {
           },
           tone: 'clear',
         }
-      : { value: t(`${D}.clones.stay`), tone: 'clear' };
+      : {
+          value: t(`${D}.clones.stay`),
+          secondary: nextBest(t, data.rows),
+          tone: 'clear',
+        };
   const rows: ListRow[] = data.rows.map((row) => {
     const delta = row.deltaSeconds;
     return {
@@ -468,6 +485,17 @@ const clones: Builder = (feeds, { t }) => {
     ...base,
     number,
     rows,
+    table: clonesTable(
+      t,
+      data.rows.map((row) => ({
+        id: row.id,
+        label: labelOf(row),
+        location: row.location ?? null,
+        implantCount: row.implantCount ?? null,
+        totalSeconds: row.totalSeconds,
+        deltaSeconds: row.deltaSeconds,
+      }))
+    ),
     summary: [number.value, number.secondary?.text].filter(Boolean).join('. '),
   };
 };
@@ -512,6 +540,9 @@ const location: Builder = (feeds, { t }) => {
         isEmpty: !data.needsReauth && system === null,
       })
     ),
+    table: system
+      ? locationTable(t, { system: systemName, security: system.security, ship: data.shipName })
+      : undefined,
     number: system
       ? {
           value: systemName,

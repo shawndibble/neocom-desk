@@ -20,17 +20,19 @@ export function StackBar({ model }: { model: StackChartModel }) {
         ))}
       </div>
       <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-dim">
-        {model.parts.map((part) => (
-          <li key={part.key} className="flex items-center gap-1.5">
-            <i
-              className="inline-block size-2 flex-none rounded-[1px]"
-              style={{ backgroundColor: CHART_COLOR[part.color] }}
-            />
-            <span>
-              {part.label} <span className="tabular-nums">{part.text}</span>
-            </span>
-          </li>
-        ))}
+        {model.parts
+          .filter((part) => !part.unlabelled)
+          .map((part) => (
+            <li key={part.key} className="flex items-center gap-1.5">
+              <i
+                className="inline-block size-2 flex-none rounded-[1px]"
+                style={{ backgroundColor: CHART_COLOR[part.color] }}
+              />
+              <span>
+                {part.label} <span className="tabular-nums">{part.text}</span>
+              </span>
+            </li>
+          ))}
       </ul>
     </div>
   );

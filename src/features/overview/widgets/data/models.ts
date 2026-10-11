@@ -80,10 +80,18 @@ import {
   industryBars,
   ordersDonut,
   queueSegments,
+  queueStack,
   severityColor,
   walletArea,
 } from './chartBuilders';
 import { dailyBalanceSeries } from './chartSeries';
+import {
+  comingUpTable,
+  contractsTable,
+  mailTable,
+  spTable,
+  trainingTable,
+} from './characterTables';
 import { KIND_BUILDERS, KIND_FEED_LISTS } from './kindModels';
 import type {
   BuildContext,
@@ -99,6 +107,7 @@ import type {
 /** The Contracts History table filtered to accepted contracts, the courier hauls the widget counts. */
 export const CONTRACTS_IN_PROGRESS_HREF = '/contracts/history?history.status=in_progress';
 const STOCK_PATH = '/market/stock';
+const DAY_MS = 86_400_000;
 
 // --- Which reads a kind needs ------------------------------------------------
 
@@ -261,7 +270,7 @@ const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
   return {
     ...base,
     chart:
-      hbarsFromRows(
+      queueStack(
         t,
         segments.map(({ entry, seconds }) => ({
           key: `${entry.skill_id}:${entry.queue_position}`,
@@ -269,11 +278,11 @@ const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
             name: nameOf(entry.skill_id),
             level: entry.finished_level,
           }),
-          value: seconds,
-          text: formatDuration(seconds),
+          seconds,
         })),
-        t('overview.widgets.chart.training.note')
+        (seconds) => formatCountdown(seconds)
       ) ?? undefined,
+    table: trainingTable(t, sorted, now, nameOf),
     number: {
       value: finish === null ? UNKNOWN : formatCountdown(Math.max(0, finish - now) / 1000),
       secondary: {
@@ -352,10 +361,20 @@ const sp: Builder = (feeds, { t }) => {
         : {
             value: formatCompactNumber(total),
             unit: t('overview.widgets.sp.unit'),
-            secondary: { text: spExtractionSummary(t, extraction) },
+            // Unallocated SP is the pilot's to spend; it leads, the extraction summary is the fallback.
+            secondary: {
+              text:
+                unallocated !== null && unallocated > 0
+                  ? t('overview.widgets.sp.unallocated', { sp: formatCompactNumber(unallocated) })
+                  : spExtractionSummary(t, extraction),
+            },
             tone: spExtractionSeverity(extraction) ?? 'clear',
           },
     rows,
+    table:
+      total === null
+        ? undefined
+        : spTable(t, { totalSp: total, unallocatedSp: unallocated, extras }),
     summary: spExtractionSummary(t, extraction),
   };
 };
@@ -368,6 +387,9 @@ const comingUp: Builder = (feeds, { t, now }) => {
   const upcoming = upcomingCommittedEvents(data.events, now);
   const next = upcoming[0];
   const soonest = soonestCalendarDeadline(data.events, now);
+  const laterToday = upcoming.filter(
+    (event) => event !== next && event.atMs <= now + DAY_MS
+  ).length;
   return {
     ...blank(
       to,
@@ -377,6 +399,9 @@ const comingUp: Builder = (feeds, { t, now }) => {
     number: next
       ? {
           value: formatCountdown((next.atMs - now) / 1000),
+          // The others within a day: the one fact the headline event does not carry.
+          unit:
+            laterToday > 0 ? t('overview.widgets.comingUp.more', { count: laterToday }) : undefined,
           secondary: { text: next.title },
           tone: comingUpSeverity(data, now) ?? 'clear',
         }
@@ -388,6 +413,7 @@ const comingUp: Builder = (feeds, { t, now }) => {
       value: formatDuration((event.atMs - now) / 1000),
       tone: comingUpEventSeverity(event.atMs, now),
     })),
+    table: comingUpTable(t, upcoming, now, comingUpEventSeverity),
     deadlines: soonest
       ? [
           {
@@ -435,6 +461,7 @@ const mail: Builder = (feeds, { t, now }) => {
       value: ageText(t, now, item.atMs),
       tone: 'watch',
     })),
+    table: mailTable(t, data.inbox ?? data.recent, (atMs) => ageText(t, now, atMs)),
     summary: mailSummary(t, data),
   };
 };
@@ -552,16 +579,31 @@ const contracts: Builder = (feeds, { t, now }) => {
       tone: summary.overdue > 0 ? 'critical' : 'clear',
     },
   ];
+  const tone = contractsSeverity(data) ?? 'clear';
+  // The soonest clock leads; the hauls in flight are the one other fact. With no clock, the count itself leads.
+  const number: NumberModel = soonest
+    ? {
+        value: soonest.overdue
+          ? t('overview.widgets.contracts.overdue')
+          : formatCountdown((soonest.atMs - now) / 1000),
+        secondary:
+          summary.inProgress > 0
+            ? { text: t('overview.widgets.contracts.inProgress', { count: summary.inProgress }) }
+            : { text: note ?? t('overview.board.contractsNothingDue') },
+        tone,
+      }
+    : {
+        value: count(summary.inProgress),
+        unit: t('overview.widgets.contracts.unit'),
+        secondary: { text: t('overview.board.contractsNothingDue') },
+        tone,
+      };
   return {
     ...blank(to, statusOf(feed, { needsPermission: data.needsReauth })),
     fetchedAt: data.fetchedAt,
-    number: {
-      value: count(summary.inProgress),
-      unit: t('overview.widgets.contracts.unit'),
-      secondary: { text: note ?? t('overview.board.contractsNothingDue') },
-      tone: contractsSeverity(data) ?? 'clear',
-    },
+    number,
     rows: list,
+    table: contractsTable(t, summary.items, data.routes, now),
     deadlines:
       soonest && note !== null
         ? [

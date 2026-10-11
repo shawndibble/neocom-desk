@@ -17,6 +17,7 @@ import type {
   DonutChartModel,
   HBarRow,
   HBarsChartModel,
+  StackChartModel,
 } from '../charts/types';
 import { sharesOfMax } from '../charts/geometry';
 import { forwardBucketCounts } from './chartSeries';
@@ -169,4 +170,41 @@ export function queueSegments(entries: readonly SkillQueueEntry[], now: number):
     previousFinish = finish;
   }
   return out;
+}
+
+export interface QueueStackInput {
+  key: string;
+  label: string;
+  seconds: number;
+}
+
+/**
+ * The whole skill queue as one bar: a part per skill, each as long as it trains,
+ * the running one in the accent. The legend names the first two (a long queue
+ * would drown the widget); the caption says when the queue ends. Null when empty.
+ */
+export function queueStack(
+  t: Translate,
+  items: readonly QueueStackInput[],
+  format: (seconds: number) => string
+): StackChartModel | null {
+  if (items.length === 0) return null;
+  const total = items.reduce((sum, item) => sum + item.seconds, 0);
+  const note = t(`${K}.training.note`, { duration: format(total) });
+  return {
+    kind: 'stack',
+    parts: items.map((item, i) => ({
+      key: item.key,
+      label: item.label,
+      value: item.seconds,
+      text: format(item.seconds),
+      color: i === 0 ? 'accent' : i === 1 ? 's1' : 'neutral',
+      unlabelled: i >= 2 || undefined,
+    })),
+    note,
+    summary: t(`${K}.listSummary`, {
+      note,
+      items: items.map((item) => `${item.label} ${format(item.seconds)}`).join(', '),
+    }),
+  };
 }

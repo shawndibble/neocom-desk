@@ -82,6 +82,8 @@ export interface StackPart {
   /** The legend figure ("29.3B"). */
   text: string;
   color: ChartColor;
+  /** Drawn in the bar but left out of the legend (a long queue names only its first parts). */
+  unlabelled?: boolean;
 }
 
 export interface StackChartModel extends ChartBase {

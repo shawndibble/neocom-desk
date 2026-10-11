@@ -33,9 +33,28 @@ function cellText(cell: TableCell): string {
   return typeof cell === 'string' ? cell : cell.text;
 }
 
+const CELL_TONE = { good: 'text-isk-pos', caution: 'text-warning', bad: 'text-danger' } as const;
+
 function CellValue({ cell }: { cell: TableCell }) {
   if (typeof cell === 'string') return <>{cell}</>;
-  return <IskAmount value={cell.iskAmount} decimals={0} />;
+  if ('iskAmount' in cell) return <IskAmount value={cell.iskAmount} decimals={0} />;
+  if (cell.bar === undefined) return <>{cell.text}</>;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span aria-hidden="true" className="h-1.5 w-12 overflow-hidden rounded-xs bg-line">
+        <span
+          className="block h-full bg-accent"
+          style={{ width: `${Math.round(Math.min(1, Math.max(0, cell.bar)) * 100)}%` }}
+        />
+      </span>
+      {cell.text}
+    </span>
+  );
+}
+
+function cellToneClass(cell: TableCell): string | undefined {
+  if (typeof cell === 'string' || !('tone' in cell) || cell.tone === undefined) return undefined;
+  return CELL_TONE[cell.tone];
 }
 
 const cellPad = 'pl-3 first:pl-3 last:pr-3';
@@ -69,6 +88,7 @@ function Row({
         if (cell === undefined) return <td key={column.key} className={cellPad} />;
         const first = i === 0;
         const text = cellText(cell);
+        const cellTone = cellToneClass(cell);
         return (
           <td
             key={column.key}
@@ -78,10 +98,12 @@ function Row({
               first ? 'w-full max-w-0' : 'whitespace-nowrap',
               column.align === 'end' && 'text-right',
               first && 'font-semibold',
-              !first && column.align !== 'end' && 'text-text-dim',
+              !first && column.align !== 'end' && !cellTone && 'text-text-dim',
               !first &&
                 column.align === 'end' &&
-                (toned && row.tone ? SEVERITY_TEXT[row.tone] : 'text-text')
+                !cellTone &&
+                (toned && row.tone ? SEVERITY_TEXT[row.tone] : 'text-text'),
+              !first && cellTone
             )}
           >
             {first ? (
