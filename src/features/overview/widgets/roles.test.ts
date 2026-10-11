@@ -47,10 +47,10 @@ describe('buildLayoutFromRoles', () => {
     expect(kindsOf(l).filter((k) => k === 'stock')).toHaveLength(1);
   });
 
-  it('leaves out coming-soon kinds', () => {
+  it('leaves out coming-soon kinds and keeps built ones', () => {
     const l = buildLayoutFromRoles(['miner', 'fighter', 'explorerHauler'], ids());
     for (const k of kindsOf(l)) expect(isAddable(k), k).toBe(true);
-    expect(kindsOf(l)).not.toContain('survey');
+    expect(kindsOf(l)).toContain('survey');
     expect(kindsOf(l)).toContain('miningYield');
     expect(kindsOf(l)).toContain('incursions');
   });

@@ -327,6 +327,21 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         xEnd: t('overview.widgets.chart.today'),
       },
     },
+    survey: {
+      value: '6.4K',
+      unit: t('overview.widgets.data.survey.unit'),
+      note: t('overview.gallery.samples.survey.note'),
+      rows: [
+        ['Arkonor', '', '6.4K'],
+        ['Bistot', '', '4.1K'],
+        ['Veldspar', '', '1.2K'],
+      ],
+      chart: hbars([
+        ['Arkonor', 1, '6.4K'],
+        ['Bistot', 0.64, '4.1K'],
+        ['Veldspar', 0.19, '1.2K'],
+      ]),
+    },
     planetary: {
       value: '4',
       unit: t('overview.gallery.samples.planetary.unit'),

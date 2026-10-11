@@ -133,11 +133,11 @@ describe('widget kind catalogue', () => {
     }
   });
 
-  it('marks the five unbuilt kinds as coming soon and the rest as available', () => {
+  it('marks the four unbuilt kinds as coming soon and the rest as available', () => {
     const soon = WIDGET_KINDS.filter((k) => k.availability === 'comingSoon').map((k) => k.id);
-    expect(soon.sort()).toEqual(['hauling', 'jumpTimers', 'kills', 'routeSafety', 'survey']);
+    expect(soon.sort()).toEqual(['hauling', 'jumpTimers', 'kills', 'routeSafety']);
     expect(isAddable('wallet')).toBe(true);
-    expect(isAddable('survey')).toBe(false);
+    expect(isAddable('routeSafety')).toBe(false);
     expect(isAddable('nope')).toBe(false);
   });
 
