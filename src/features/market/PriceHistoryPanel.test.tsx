@@ -25,13 +25,19 @@ vi.mock('./PriceHistoryChart', () => ({
     points,
     itemName,
     movingAverage,
+    comparisons,
+    primaryRegionName,
   }: {
     points: unknown[];
     itemName: string;
     movingAverage?: unknown[];
+    comparisons?: { name: string; status: string; points: unknown[] }[];
+    primaryRegionName?: string;
   }) => (
     <div data-testid="chart">
       {itemName}: {points.length} points, {movingAverage?.length ?? 0} ma points
+      {primaryRegionName ? ` primary=${primaryRegionName}` : ''}
+      {(comparisons ?? []).map((c) => ` [${c.name}:${c.status}:${c.points.length}]`).join('')}
     </div>
   ),
 }));
@@ -311,5 +317,92 @@ describe('PriceHistoryPanel', () => {
     await user.click(screen.getByRole('combobox', { name: 'Range' }));
     await user.click(await screen.findByRole('option', { name: '7 days' }));
     expect(screen.getByTestId('chart')).toHaveTextContent('5 ma points');
+  });
+
+  describe('comparing regions', () => {
+    const REGIONS = [
+      { id: 10000002, name: 'The Forge' },
+      { id: 10000043, name: 'Domain' },
+      { id: 10000032, name: 'Sinq Laison' },
+    ];
+    const ONE_DAY = { points: [historyPoint({ date: '2026-08-01' })], fetchedAt: 1 };
+
+    function renderCompared(regionIds: number[], onChange = vi.fn()) {
+      return render(
+        <PriceHistoryPanel
+          regionId={10000002}
+          typeId={34}
+          itemName="Tritanium"
+          now={FIXED_NOW}
+          compare={{ regionIds, onChange, regions: REGIONS }}
+        />
+      );
+    }
+
+    it('fetches nothing beyond the primary region until a region is picked', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      renderCompared([]);
+      await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+      expect(mockedLoad).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('chart')).not.toHaveTextContent('[');
+    });
+
+    it('fetches each picked region once and hands its line to the chart', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      renderCompared([10000043, 10000032]);
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent(
+          'primary=The Forge [Domain:ready:1] [Sinq Laison:ready:1]'
+        )
+      );
+      expect(mockedLoad).toHaveBeenCalledWith(10000043, 34);
+      expect(mockedLoad).toHaveBeenCalledWith(10000032, 34);
+      expect(mockedLoad).toHaveBeenCalledTimes(3);
+    });
+
+    it('never compares the primary region against itself', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      renderCompared([10000002, 10000043]);
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent('[Domain:ready:1]')
+      );
+      expect(screen.getByTestId('chart')).not.toHaveTextContent('[The Forge');
+      expect(mockedLoad).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the chart drawn while one region fails and another is still loading', async () => {
+      mockedLoad.mockImplementation((regionId) => {
+        if (regionId === 10000043) return Promise.reject(new Error('down'));
+        if (regionId === 10000032) return new Promise(() => {});
+        return Promise.resolve(ONE_DAY);
+      });
+      renderCompared([10000043, 10000032]);
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent(
+          'Tritanium: 1 points, 0 ma points primary=The Forge [Domain:error:0] [Sinq Laison:loading:0]'
+        )
+      );
+    });
+
+    it('adds a picked region through the Compare regions control', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      const onChange = vi.fn();
+      const user = userEvent.setup();
+      renderCompared([10000043], onChange);
+      await user.click(
+        await screen.findByRole('button', { name: 'Compare regions, 1 of 4 picked' })
+      );
+      await user.click(await screen.findByRole('option', { name: /Sinq Laison/ }));
+      expect(onChange).toHaveBeenCalledWith([10000043, 10000032]);
+    });
+
+    it('shows no Compare control when the caller offers no comparison', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      render(
+        <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+      );
+      await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: /Compare regions/ })).not.toBeInTheDocument();
+    });
   });
 });

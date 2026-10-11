@@ -8,4 +8,8 @@ describe('plainTextActionClassName', () => {
     expect(cls).toContain('underline');
     expect(cls).not.toContain('text-accent');
   });
+
+  it('adds no minimum height, so it hugs the control above it', () => {
+    expect(plainTextActionClassName()).not.toMatch(/min-h-/);
+  });
 });

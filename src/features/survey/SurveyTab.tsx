@@ -27,6 +27,7 @@ import { ExpandedCheck } from './ExpandedCheck';
 import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
 import { SurveyBoard } from './SurveyBoard';
+import { SurveyNameTitle } from './SurveyNameTitle';
 import { SurveyPicker } from './SurveyPicker';
 import { SurveyOwnerChange } from './SurveyOwnerChange';
 import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
@@ -307,6 +308,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
                 owned && currentId !== null && state.status === 'ready' ? finish : undefined
               }
               owned={owned}
+              panelTitle={currentId !== null ? <SurveyNameTitle id={currentId} /> : undefined}
               viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
               afterPanel={(summary) =>
                 characterId !== null && (

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,8 +22,12 @@ import {
   type MarketHistoryPoint,
   type PriceHistoryRange,
 } from '@/engine/market/priceHistory';
+import { normalizeCompareRegions } from '@/engine/market/priceHistoryCompare';
 import { usePriceHistoryRange } from './priceHistoryRangePref';
 import { marketIskDecimals } from '@/lib/isk';
+import type { MarketRegionEntry } from '@/sde/marketTypes';
+import type { ComparedRegionSeries } from './PriceHistoryChart';
+import { CompareRegionsPicker } from './CompareRegionsPicker';
 
 const MOVING_AVERAGE_WINDOW_DAYS = 7;
 const MOVING_AVERAGE_WINDOW_DAYS_7D_RANGE = 3;
@@ -45,12 +49,72 @@ function movingAverageWindowDays(range: PriceHistoryRange): number {
  */
 const LazyPriceHistoryChart = lazy(() => guarded(() => import('./PriceHistoryChart')));
 
+/** The Browser's "Compare regions" state, held in its URL (`browser.compare`). */
+export interface PriceHistoryCompare {
+  /** As read from the URL; the panel drops the primary region, repeats and anything past the cap. */
+  regionIds: readonly number[];
+  onChange: (next: number[]) => void;
+  /** Every market region, for the picker and for naming each line. */
+  regions: readonly MarketRegionEntry[];
+}
+
 interface PriceHistoryPanelProps {
   regionId: number;
   typeId: number;
   itemName: string;
   /** Injectable for tests, like `getOrderBook`'s `Clock` — the range filter is otherwise wall-clock-relative. */
   now?: Date;
+  /**
+   * Absent outside the Browser (the Opportunities modals) and for an item in
+   * its own Global Market Region, where no other region holds its orders —
+   * no Compare control then, and nothing extra is ever fetched.
+   */
+  compare?: PriceHistoryCompare;
+}
+
+type RegionHistoryState =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'ready'; points: readonly MarketHistoryPoint[] };
+
+const NO_REGIONS: readonly number[] = [];
+
+function regionNameOf(regions: readonly MarketRegionEntry[] | undefined, id: number): string {
+  return regions?.find((region) => region.id === id)?.name ?? String(id);
+}
+
+/**
+ * Each compared region's full daily history, fetched only once that region is
+ * picked — one `loadPriceHistory` per region, through the same cache (until
+ * ESI's `Expires`) the primary region uses. A region that has no entry yet is
+ * still loading; a failed one is retried the next time the picks change.
+ */
+function useComparedHistories(typeId: number, regionIds: readonly number[]) {
+  const [byKey, setByKey] = useState<ReadonlyMap<string, RegionHistoryState>>(new Map());
+  const requested = useRef(new Set<string>());
+  useEffect(() => {
+    for (const regionId of regionIds) {
+      const key = `${regionId}:${typeId}`;
+      if (requested.current.has(key)) continue;
+      requested.current.add(key);
+      loadPriceHistory(regionId, typeId).then(
+        (result) =>
+          setByKey((prev) => new Map(prev).set(key, { status: 'ready', points: result.points })),
+        () => {
+          requested.current.delete(key);
+          setByKey((prev) => new Map(prev).set(key, { status: 'error' }));
+        }
+      );
+    }
+  }, [typeId, regionIds]);
+  return useMemo(
+    () =>
+      regionIds.map(
+        (regionId): RegionHistoryState =>
+          byKey.get(`${regionId}:${typeId}`) ?? { status: 'loading' }
+      ),
+    [byKey, regionIds, typeId]
+  );
 }
 
 function ChartFallback({ label }: { label: string }) {
@@ -62,10 +126,27 @@ function ChartFallback({ label }: { label: string }) {
 }
 
 /** Price History tab body: fetches the region's daily history for the item, then hands it to the lazy chart. */
-export function PriceHistoryPanel({ regionId, typeId, itemName, now }: PriceHistoryPanelProps) {
+export function PriceHistoryPanel({
+  regionId,
+  typeId,
+  itemName,
+  now,
+  compare,
+}: PriceHistoryPanelProps) {
   const { t } = useTranslation();
+  const compareIds = useMemo(
+    () => normalizeCompareRegions(compare?.regionIds ?? NO_REGIONS, regionId),
+    [compare?.regionIds, regionId]
+  );
   const [points, setPoints] = useState<MarketHistoryPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
+  // Nothing is fetched for a compared region until the primary one has days
+  // to draw: an empty or failed primary shows its own state, with no chart
+  // for a comparison line to sit on.
+  const comparedHistories = useComparedHistories(
+    typeId,
+    points && points.length > 0 ? compareIds : NO_REGIONS
+  );
   // The window a trader reads in is a habit, not a property of the item, and
   // this panel remounts per item — so it comes from disk. Ungated on
   // `hydrated`, and hydrated above the early returns below so a loading or
@@ -132,6 +213,10 @@ export function PriceHistoryPanel({ regionId, typeId, itemName, now }: PriceHist
       onRangeChange={(next) => void setRange(next)}
       itemName={itemName}
       now={now}
+      primaryRegionId={regionId}
+      compare={compare}
+      compareIds={compareIds}
+      comparedHistories={comparedHistories}
     />
   );
 }
@@ -164,11 +249,42 @@ interface RangedHistoryProps {
   onRangeChange: (range: PriceHistoryRange) => void;
   itemName: string;
   now?: Date;
+  primaryRegionId: number;
+  compare: PriceHistoryCompare | undefined;
+  /** Normalized picks, parallel to `comparedHistories`. */
+  compareIds: readonly number[];
+  comparedHistories: readonly RegionHistoryState[];
 }
 
 /** Range control + hi/lo/median summary, both derived from the already-fetched points — neither needs the lazy chart loaded. */
-function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHistoryProps) {
+function RangedHistory({
+  points,
+  range,
+  onRangeChange,
+  itemName,
+  now,
+  primaryRegionId,
+  compare,
+  compareIds,
+  comparedHistories,
+}: RangedHistoryProps) {
   const { t } = useTranslation();
+  const regions = compare?.regions;
+  // The summary strip stays the primary region's; compared regions only add
+  // their average line, cut to the same range.
+  const comparisons = useMemo<ComparedRegionSeries[]>(
+    () =>
+      compareIds.map((regionId, i) => {
+        const state = comparedHistories[i] ?? { status: 'loading' };
+        return {
+          regionId,
+          name: regionNameOf(regions, regionId),
+          status: state.status,
+          points: state.status === 'ready' ? filterPriceHistoryRange(state.points, range, now) : [],
+        };
+      }),
+    [compareIds, comparedHistories, regions, range, now]
+  );
   const filtered = useMemo(
     () =>
       now ? filterPriceHistoryRange(points, range, now) : filterPriceHistoryRange(points, range),
@@ -238,36 +354,53 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
             <span className="text-text-dim">{t('market.priceHistory.summaryNone')}</span>
           )}
         </div>
-        <Select value={range} onValueChange={(value) => onRangeChange(value as PriceHistoryRange)}>
-          {/*
-           * `md`, not the `sm` this was: DESIGN.md §3's touch tier is the
-           * reason — `sm` resolves to 36px on a phone, a mouse-pointer size,
-           * and this control now owns a full-width row there rather than
-           * sharing a dense one. `md` gives the 44px thumb target on a phone
-           * and the default 36px to a pointer. Nothing else sits in this row,
-           * so no toolbar loses its alignment to the extra 8px.
-           */}
-          <SelectTrigger
-            size="md"
-            aria-label={t('market.priceHistory.range')}
-            className="w-full sm:w-28"
+        {/* Each control a full-width row of its own on a phone, side by side above `sm`. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {compare && (
+            <CompareRegionsPicker
+              primaryRegionId={primaryRegionId}
+              selected={compareIds}
+              onChange={compare.onChange}
+              regions={compare.regions}
+              className="w-full sm:w-auto"
+            />
+          )}
+          <Select
+            value={range}
+            onValueChange={(value) => onRangeChange(value as PriceHistoryRange)}
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PRICE_HISTORY_RANGES.map((r) => (
-              <SelectItem key={r} value={r}>
-                {t(`market.priceHistory.range${r}`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            {/*
+             * `md`, not the `sm` this was: DESIGN.md §3's touch tier is the
+             * reason — `sm` resolves to 36px on a phone, a mouse-pointer size,
+             * and this control now owns a full-width row there rather than
+             * sharing a dense one. `md` gives the 44px thumb target on a phone
+             * and the default 36px to a pointer. Nothing else sits in this row,
+             * so no toolbar loses its alignment to the extra 8px.
+             */}
+            <SelectTrigger
+              size="md"
+              aria-label={t('market.priceHistory.range')}
+              className="w-full sm:w-28"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PRICE_HISTORY_RANGES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {t(`market.priceHistory.range${r}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <Suspense fallback={<ChartFallback label={t('common.loading')} />}>
         <LazyPriceHistoryChart
           points={filtered}
           itemName={itemName}
           movingAverage={filteredMovingAverage}
+          comparisons={comparisons}
+          primaryRegionName={regions ? regionNameOf(regions, primaryRegionId) : undefined}
         />
       </Suspense>
     </div>

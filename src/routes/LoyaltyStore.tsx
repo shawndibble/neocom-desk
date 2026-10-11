@@ -1,5 +1,5 @@
 /**
- * One corporation's LP store (Wallet's Loyalty Points table links here by
+ * Wallet's LP Store tab: one corporation's LP store (Wallet's Loyalty Points table links here by
  * `corporation_id`): every offer ranked by ISK/LP — profit divided by the LP
  * each offer costs, since LP (not ISK) is the resource a character can't
  * just make more of. A ranked list on the left, a full profit breakdown for
@@ -9,7 +9,7 @@
  * assembled.
  *
  * The landing search opens any NPC corporation's store, LP or not; an open
- * store's "Change store" link returns to it (`/market/lp-store` with no
+ * store's "Change store" link returns to it (`/wallet/lp-store` with no
  * corporation is the landing state).
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -86,7 +86,7 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useLoyaltyStoreOffers } from '@/features/loyalty/useLoyaltyStoreOffers';
 import { LpStoreSearch } from '@/features/loyalty/LpStoreSearch';
 import type { LpSearchCrumbState } from '@/features/loyalty/itemSearch';
-import { MARKET_TABS } from '@/app/pageTabs';
+import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -430,45 +430,48 @@ function LpStoreActions() {
 }
 
 /**
- * LP Store is a Market tab, but its own route outranks Market's, so the page
- * draws Market's tab bar itself. Every other tab is a path under `/market`.
+ * LP Store is a Wallet tab, but its own route outranks Wallet's, so the page
+ * draws Wallet's tab bar itself. Every other tab is a path under `/wallet`;
+ * `transactions` is no tab Wallet shows (it redirects to Market).
  */
-function useMarketViews(): PageViews {
+function useWalletViews(): PageViews {
   const { t } = useTranslation();
   const navigate = useNavigate();
   return {
     value: 'lp-store',
-    onChange: (id) => navigate(tabPath(MARKET_TABS, id as (typeof MARKET_TABS.tabs)[number]['id'])),
-    tabs: MARKET_TABS.tabs
-      .filter((tab) => tab.id !== 'history/transactions')
+    onChange: (id) => navigate(tabPath(WALLET_TABS, id as (typeof WALLET_TABS.tabs)[number]['id'])),
+    tabs: WALLET_TABS.tabs
+      .filter((tab) => tab.id !== 'transactions')
       .map((tab) => ({ id: tab.id, label: t(tab.labelKey) })),
   };
 }
 
-/** The strip on desktop; a phone gets the title-row picker (`PageHeader`'s `views`) instead. */
-function MarketTabBar({ tabsId, views }: { tabsId: string; views: PageViews }) {
+/** The strip; a page with enough tabs gets the title-row picker (`PageHeader`'s `views`) on a phone instead. */
+function WalletTabBar({ tabsId, views }: { tabsId: string; views: PageViews }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   if (usesViewPicker(views.tabs.length, isPhone)) return null;
-  return <Tabs tabsId={tabsId} label={t('market.title')} {...views} tabs={[...views.tabs]} />;
+  return <Tabs tabsId={tabsId} label={t('wallet.title')} {...views} tabs={[...views.tabs]} />;
 }
 
-/** `/market/lp-store` with no corporation chosen yet: the item-first search. */
+/** `/wallet/lp-store` with no corporation chosen yet: the item-first search. */
 function LoyaltyStoreLanding() {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(LANDING_PARAMS);
   const tabsId = useTabsId();
-  const views = useMarketViews();
+  const views = useWalletViews();
   const isPhone = useIsPhone();
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3">
-      {/* The phone's picker reads "<page> <view>": "Market  LP Store", not "LP Store  LP Store". */}
+      {/* A phone's picker reads "<page> <view>": "Wallet  LP Store", not "LP Store  LP Store". */}
       <PageHeader
-        title={isPhone ? t('market.title') : t('loyaltyStore.title')}
+        title={
+          usesViewPicker(views.tabs.length, isPhone) ? t('wallet.title') : t('loyaltyStore.title')
+        }
         views={views}
         actions={<LpStoreActions />}
       />
-      <MarketTabBar tabsId={tabsId} views={views} />
+      <WalletTabBar tabsId={tabsId} views={views} />
       <TabPanel tabsId={tabsId} tabId="lp-store">
         <LpStoreSearch query={params.q} onQueryChange={(q) => setParams({ q })} />
       </TabPanel>
@@ -495,12 +498,12 @@ function StoreCrumbs() {
   return (
     <div className="flex flex-wrap items-center gap-x-2 self-start">
       {q !== null && (
-        <Link to={`/market/lp-store?q=${encodeURIComponent(q)}`} className={CRUMB_CLASS}>
+        <Link to={`/wallet/lp-store?q=${encodeURIComponent(q)}`} className={CRUMB_CLASS}>
           <span aria-hidden="true">‹</span>
           {t('loyaltyStore.search.crumb')}
         </Link>
       )}
-      <Link to="/market/lp-store" className={CRUMB_CLASS}>
+      <Link to="/wallet/lp-store" className={CRUMB_CLASS}>
         <span aria-hidden="true">‹</span>
         {t('loyaltyStore.search.changeStore')}
       </Link>
@@ -509,7 +512,7 @@ function StoreCrumbs() {
 }
 
 /**
- * The route: `/market/lp-store` (landing) or `/market/lp-store/:corporationId`.
+ * The route: `/wallet/lp-store` (landing) or `/wallet/lp-store/:corporationId`.
  * Keyed on the corporation so switching stores remounts the
  * page — no previous store's offers, selection or loaded state carried over
  * under the new store's URL.
@@ -528,7 +531,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const tabsId = useTabsId();
-  const views = useMarketViews();
+  const views = useWalletViews();
 
   const hydrateHub = useMarketHub((s) => s.hydrate);
   const hubId = useMarketHub((s) => s.value);
@@ -922,7 +925,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           views={views}
           actions={<LpStoreActions />}
         />
-        <MarketTabBar tabsId={tabsId} views={views} />
+        <WalletTabBar tabsId={tabsId} views={views} />
 
         <TabPanel tabsId={tabsId} tabId="lp-store" className="flex flex-col gap-3">
           <FilterBar

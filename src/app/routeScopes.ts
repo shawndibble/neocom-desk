@@ -233,7 +233,7 @@ export const ROUTE_REQUIREMENTS = {
   // being replaced whole (scope decision 20260912-200442, same shape as
   // /contracts and /wallet).
   '/planetary-industry': UNGATED,
-  // Reached from Wallet's Loyalty Points panel (a store row, or the LP
+  // A Wallet tab (#3527), reached from Wallet's Loyalty Points panel (a store row, or the LP
   // Store picker for any store — issue #2321), from item LP links, and directly.
   // getLoyaltyStoreOffers is PUBLIC, so this one scope is what the route
   // actually needs a grant for: the character's own LP balance decides
@@ -241,10 +241,11 @@ export const ROUTE_REQUIREMENTS = {
   // hold no LP with still works — no LP is a balance of 0, not a missing
   // grant (docs/context/decisions/, "LP Store browsing keeps the loyalty
   // scope gate"). Same reauth copy as `/wallet`'s loyalty panel — it is the
-  // same grant. `/market/lp-store` is the same page with no store picked yet.
-  '/market/lp-store': LP_STORE_REQUIREMENT,
-  '/market/lp-store/:corporationId': LP_STORE_REQUIREMENT,
-  // Its old home under Wallet: a redirect, so it needs nothing.
+  // same grant. `/wallet/lp-store` is the same page with no store picked yet.
+  '/wallet/lp-store': LP_STORE_REQUIREMENT,
+  '/wallet/lp-store/:corporationId': LP_STORE_REQUIREMENT,
+  // Its oldest home, `/wallet/loyalty`: a redirect, so it needs nothing. (Its
+  // Market home, `/market/lp-store`, is no route: Market's tab redirect moves it.)
   '/wallet/loyalty': UNGATED,
   // The retired PI Advisor tab: a redirect, so it needs nothing.
   '/planetary-industry/advisor': UNGATED,

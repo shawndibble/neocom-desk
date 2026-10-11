@@ -11,16 +11,11 @@ import en from './locales/en.json';
 const WRITE_MARKERS = ['read in EVE', 'calendar invite', 'through your', 'Fitting to EVE'];
 
 const FAQ_DESCRIPTION = en.settings.faq.store.notes.writes;
-const LOGIN_WRITE_EXCEPTIONS = en.login.writeExceptions;
 const LOGIN_TRUST_DESC = en.login.trust.readOnly.desc;
 
 describe('write-exception copy names the same writes everywhere', () => {
   it.each(WRITE_MARKERS)('FAQ writes answer mentions "%s"', (marker) => {
     expect(FAQ_DESCRIPTION).toContain(marker);
-  });
-
-  it.each(WRITE_MARKERS)('login writeExceptions mentions "%s"', (marker) => {
-    expect(LOGIN_WRITE_EXCEPTIONS).toContain(marker);
   });
 
   it.each(WRITE_MARKERS)('login trust.readOnly.desc mentions "%s"', (marker) => {

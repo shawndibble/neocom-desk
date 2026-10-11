@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   isTabRedirectPath,
+  MARKET_TABS,
   pageKeyFor,
   PAGE_LEGACY_LOCATIONS,
   routePatternFor,
   tabbedPagePathFor,
+  TRAVEL_TABS,
+  WALLET_TABS,
 } from './pageTabs';
 
 describe('routePatternFor', () => {
@@ -119,10 +122,10 @@ describe('a tabbed page with its own nested detail routes (Industry)', () => {
 });
 
 describe('a tabbed page with its own nested detail route (Wallet’s Loyalty Store)', () => {
-  it('leaves /market/lp-store/:corporationId out of the tabbed page', () => {
-    expect(pageKeyFor('/market/lp-store/98000001')).toBe('/market/lp-store/98000001');
-    expect(isTabRedirectPath('/market/lp-store/98000001')).toBe(false);
-    expect(tabbedPagePathFor('/market/lp-store/98000001')).toBeNull();
+  it('leaves /wallet/lp-store/:corporationId out of the tabbed page', () => {
+    expect(pageKeyFor('/wallet/lp-store/98000001')).toBe('/wallet/lp-store/98000001');
+    expect(isTabRedirectPath('/wallet/lp-store/98000001')).toBe(false);
+    expect(tabbedPagePathFor('/wallet/lp-store/98000001')).toBeNull();
   });
 });
 
@@ -158,5 +161,58 @@ describe('Assets (Items, Ships, Move)', () => {
       pathname: '/assets/items/60003760',
       search: '',
     });
+  });
+});
+
+describe('LP Store, a Wallet tab (issue #3527)', () => {
+  it('sits last on Wallet and is gone from Market', () => {
+    expect(WALLET_TABS.tabs.map((tab) => tab.id)).toEqual([
+      'balance',
+      'journal',
+      'transactions',
+      'lp-store',
+    ]);
+    expect(MARKET_TABS.tabs.map((tab) => tab.id)).not.toContain('lp-store');
+  });
+
+  it('moves an old Market LP Store link to Wallet, keeping the corporation and query', () => {
+    const moved = PAGE_LEGACY_LOCATIONS['/market'];
+    expect(moved?.('/market/lp-store', '?q=tritanium')).toEqual({
+      pathname: '/wallet/lp-store',
+      search: '?q=tritanium',
+    });
+    expect(moved?.('/market/lp-store/1000125', '?offer=42&affordableOnly=0')).toEqual({
+      pathname: '/wallet/lp-store/1000125',
+      search: '?offer=42&affordableOnly=0',
+    });
+    expect(moved?.('/market/lp-storex', '')).toBeNull();
+  });
+
+  it('reports the old paths as redirects', () => {
+    expect(isTabRedirectPath('/market/lp-store')).toBe(true);
+    expect(isTabRedirectPath('/market/lp-store/1000125')).toBe(true);
+  });
+});
+
+describe('Hauling, a Travel tab (issue #3526)', () => {
+  it('sits last on Travel and is gone from Market', () => {
+    expect(TRAVEL_TABS.tabs.map((tab) => tab.id)).toEqual(['route', 'thera', 'pilot', 'hauling']);
+    expect(MARKET_TABS.tabs.map((tab) => tab.id)).not.toContain('hauling');
+  });
+
+  it('moves an old Market Hauling link to Travel with its query intact', () => {
+    const moved = PAGE_LEGACY_LOCATIONS['/market'];
+    expect(moved?.('/market/hauling', '?from=amarr&to=jita')).toEqual({
+      pathname: '/travel/hauling',
+      search: '?from=amarr&to=jita',
+    });
+    expect(moved?.('/market/browser', '')).toBeNull();
+    expect(moved?.('/market/haulingx', '')).toBeNull();
+  });
+
+  it('reports the old path as a redirect and the new one as a Travel tab', () => {
+    expect(isTabRedirectPath('/market/hauling')).toBe(true);
+    expect(pageKeyFor('/travel/hauling')).toBe('/travel');
+    expect(tabbedPagePathFor('/travel/hauling')).toBe('/travel/hauling');
   });
 });

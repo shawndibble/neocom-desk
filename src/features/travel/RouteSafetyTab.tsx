@@ -51,7 +51,7 @@
  * pins, which belong to legs by position — except the first stop added to a
  * Route via link, which is the leg its pin was made for.
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
@@ -102,6 +102,7 @@ import { TripLegs } from './TripLegs';
 import { useRouteHoles, type RouteHolesState } from './useRouteHoles';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
 import { useRouteSafety, type RouteSafetyLeg } from './useRouteSafety';
+import type { TravelTabProps } from './travelTab';
 
 /** The link parameter overriding each wormhole setting. */
 const HOLE_PARAM = {
@@ -221,7 +222,7 @@ function RouteFacts({
   );
 }
 
-export function RouteSafetyTab({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: string }) {
+export function RouteSafetyTab({ tabBar, tabsId, views }: TravelTabProps) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(ROUTE_PARAMS);
   const current = useCurrentSystem();
@@ -327,6 +328,7 @@ export function RouteSafetyTab({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: 
     <div className="space-y-4">
       <PageHeader
         title={t('travel.title')}
+        views={views}
         meta={
           state.kind === 'route' && state.fetchedAt !== null ? (
             <DataAgeBadge date={state.fetchedAt} note={t('travel.dataAgeNote')} />

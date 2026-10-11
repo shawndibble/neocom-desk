@@ -1736,7 +1736,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       const lpCell = await within(table).findByText('Sisters of EVE');
       await user.click(lpCell);
 
-      await waitFor(() => expect(window.location.pathname).toBe('/market/lp-store/1000125'));
+      await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store/1000125'));
       expect(window.location.search).toContain('offer=4321');
     });
 

@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { legacyLocation } from './legacyPaths';
 
 describe('legacyLocation', () => {
-  it('moves the LP Store landing and a picked store under Market, keeping the corporation', () => {
+  it('moves the LP Store landing and a picked store under Wallet, keeping the corporation', () => {
     expect(legacyLocation('/wallet/loyalty', '', '')).toEqual({
-      pathname: '/market/lp-store',
+      pathname: '/wallet/lp-store',
       search: '',
       hash: '',
     });
     expect(legacyLocation('/wallet/loyalty/1000125', '?sort=lp', '#top')).toEqual({
-      pathname: '/market/lp-store/1000125',
+      pathname: '/wallet/lp-store/1000125',
       search: '?sort=lp',
       hash: '#top',
     });

@@ -250,10 +250,11 @@
 // See features/stockTargets/stockListsStore.ts.
 //
 // sync.surveyHistory: the Mining Survey short links the pilot created or opened
-// in the app, as {id, addedAt} entries — just the link ids, so a second device
-// can list and reopen them; the surveys themselves stay in their Share Links.
-// See features/survey/surveyHistory.ts, whose parse drops malformed entries and
-// ones past the 7-day link life. Never deleted via deleteSyncedSetting: a
+// in the app, as {id, addedAt, name?} entries — the link ids and the pilot's
+// own name for each (capped at 40 characters, so 30 entries stay a few KB), so
+// a second device can list, name and reopen them; the surveys themselves stay
+// in their Share Links. See features/survey/surveyHistory.ts, whose parse drops
+// malformed entries and ones past the 7-day link life. Never deleted via deleteSyncedSetting: a
 // pruned list is written back, so the tombstone-expiry edge does not bite. No
 // `legacyKey`: new.
 //

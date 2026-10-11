@@ -831,6 +831,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Price History**: The Market Browser item tab charting one item's daily
   history in a Region: **Daily Range**, average price and its moving average
   above, **Traded Volume** and **Order Count** below, on one shared date axis.
+  Up to four other Regions can be compared by their average line alone.
   Every figure comes from ESI's own daily rows — nothing here is derived from
   the live **Order Book**.
 - **Price Aggregate**: One best-bid/best-ask summary per station (Fuzzwork).
@@ -1027,6 +1028,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   ore as of the newest scan that had it; no new ore, none with more m³) is an
   update of the Survey, even if an ore dropped out of the latest scan; any other scan is a different
   field. Shown on the Mining › Survey tab and on the public page of its link.
+- **Survey name**: The pilot's own short label for a Survey in their recents,
+  shown as the Survey card's title and leading its entry in the Survey picker.
+  Personal: kept with the pilot's recent-Surveys list, never on the Survey, so
+  no one else sees it. Scope decision
+  `20261010-203712-survey-a-surveys-name-is-the-pilots-own`.
 - **Cleared marker** (also: mark field cleared): The scan with no rocks that ends a
   Survey, stored by a button because the scanner has nothing to copy once the last
   rock is gone. Who may press it: scope decision `20261009-233623-survey-the-field-is-marked-cleared-by-a`.
@@ -1208,7 +1214,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   the same question for a corporation and shares the severity ladder but not
   the layout.
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
-- **Hauling Opportunities**: The Market page's Hauling tab (`/market/hauling`): items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list — see `docs/context/decisions/` (Hauling Opportunities v1 scope).
+- **Hauling Opportunities**: The Travel page's Hauling tab (`/travel/hauling`; moved from Market, where `/market/hauling` now redirects): items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list — see `docs/context/decisions/` (Hauling Opportunities v1 scope).
 - **Selling into buy orders**: (`instant` mode in code.) The **Hauling Opportunities** mode that sells the cargo instantly into the destination hub station's standing buy orders instead of listing it: priced at what those orders actually pay, after sales tax only, sized to the depth both books stay profitable to, with no **Days to Sell** or demand. `walkInstant` in `src/engine/market/haulingMarket.ts`.
 - **Expected Sell Price**: What a hauler should expect per unit at the destination hub if they list to sell: the lower of one tick under the cheapest listing and the volume-weighted median price the item sold at recently. Never above today's cheapest listing, and never the cheapest listing that every other user of a price-gap tool sees too. `estimateSale` in `src/engine/market/haulingMarket.ts`.
 - **Days to Sell**: How long the units listed within 1% of the **Expected Sell Price** (they will relist below the hauler), plus about one day's worth of the hauler's own, take to sell at the region's recent sales rate. Not **Traded Volume** (units sold), and not a promise for the whole load.

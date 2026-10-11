@@ -138,4 +138,73 @@ describe('PriceHistoryChart', () => {
       })
     ).toBeInTheDocument();
   });
+
+  describe('with compared regions', () => {
+    const DOMAIN = {
+      regionId: 10000043,
+      name: 'Domain',
+      status: 'ready' as const,
+      points: [{ date: '2026-08-01', average: 11 }],
+    };
+
+    it('names the primary and each compared region in the legend', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          comparisons={[DOMAIN]}
+          primaryRegionName="The Forge"
+        />
+      );
+      const legend = screen.getByRole('list');
+      expect(within(legend).getByText('The Forge average')).toBeInTheDocument();
+      expect(within(legend).getByText('Domain average')).toBeInTheDocument();
+    });
+
+    it('states a region that failed, is loading, or has no trades in the range', () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          primaryRegionName="The Forge"
+          comparisons={[
+            { ...DOMAIN, status: 'error', points: [] },
+            { regionId: 10000032, name: 'Sinq Laison', status: 'loading', points: [] },
+            { regionId: 10000030, name: 'Heimatar', status: 'ready', points: [] },
+          ]}
+        />
+      );
+      expect(screen.getByText("Domain · couldn't load")).toBeInTheDocument();
+      expect(screen.getByText('Sinq Laison · loading…')).toBeInTheDocument();
+      expect(screen.getByText('Heimatar · no trades in this range')).toBeInTheDocument();
+    });
+
+    it("adds each compared region's average to the day table, on the primary region's days", () => {
+      render(
+        <PriceHistoryChart
+          points={POINTS}
+          itemName="Tritanium"
+          comparisons={[
+            { ...DOMAIN, points: [...DOMAIN.points, { date: '2026-07-30', average: 9 }] },
+          ]}
+          primaryRegionName="The Forge"
+        />
+      );
+      const table = screen.getByRole('table');
+      expect(
+        within(table).getByRole('columnheader', { name: /Domain average/ })
+      ).toBeInTheDocument();
+      // Two primary days, plus the header — Domain's extra day is drawn, not tabled.
+      expect(within(table).getAllByRole('row')).toHaveLength(3);
+      expect(within(table).getByText('No trades')).toBeInTheDocument();
+    });
+
+    it('draws the single-region legend unchanged when nothing is compared', () => {
+      render(
+        <PriceHistoryChart points={POINTS} itemName="Tritanium" primaryRegionName="The Forge" />
+      );
+      expect(screen.getByText('Average Price', { selector: 'span' })).toBeInTheDocument();
+      expect(screen.queryByText('The Forge average')).not.toBeInTheDocument();
+    });
+  });
 });

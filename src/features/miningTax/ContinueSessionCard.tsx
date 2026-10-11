@@ -2,6 +2,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Panel } from '@/components/ui';
+import { SystemLink } from '@/features/entities';
 import type { SessionContinuation } from './sessionContinuation';
 
 interface ContinueSessionCardProps {
@@ -46,7 +47,8 @@ export function ContinueSessionCard({
           {t('miningTax.continue.eyebrow')}
         </p>
         <p className="text-sm font-semibold">
-          {next.row.entry.date} · {systemName}
+          {next.row.entry.date} ·{' '}
+          <SystemLink systemId={next.row.entry.solarSystemId}>{systemName}</SystemLink>
           {next.row.unassignedOreLines.map((line, i) => (
             <span key={line.typeId} className="font-normal text-text-dim">
               {i === 0 ? ' · ' : ', '}

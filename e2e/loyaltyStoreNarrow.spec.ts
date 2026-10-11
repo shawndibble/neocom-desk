@@ -45,7 +45,7 @@ test('a phone sort control changes the Offers table order at 390px (issue #2174)
   await mockLoyaltyOffers(page);
   // `affordableOnly` defaults true and the fixture pilot has 0 LP, which
   // would otherwise filter both fixture offers out of `filteredRows`.
-  await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+  await signInAndGoto(page, `./wallet/lp-store/${CORPORATION_ID}?affordableOnly=0`);
   await page.setViewportSize(PHONE);
 
   const itemCells = page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ });
@@ -72,7 +72,7 @@ test('the phone sort control stays hidden at and above md (768px) (issue #2174)'
   page,
 }) => {
   await mockLoyaltyOffers(page);
-  await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+  await signInAndGoto(page, `./wallet/lp-store/${CORPORATION_ID}?affordableOnly=0`);
   await page.setViewportSize(DESKTOP);
 
   const itemCells = page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ });
@@ -91,11 +91,11 @@ test('the headers carry no corporation select and fit a 390px phone (issue #3265
     expect(overflow).toBeLessThanOrEqual(0);
   }
 
-  await signInAndGoto(page, './market/lp-store');
+  await signInAndGoto(page, './wallet/lp-store');
   await page.setViewportSize(PHONE);
   await expectNoPicker();
 
-  await page.goto(`./market/lp-store/${CORPORATION_ID}`);
+  await page.goto(`./wallet/lp-store/${CORPORATION_ID}`);
   await expect(page.getByRole('link', { name: 'Change store' })).toBeVisible();
   await expectNoPicker();
 });
@@ -105,7 +105,7 @@ for (const width of [390, 1024, 1280]) {
     page,
   }) => {
     await mockLoyaltyOffers(page);
-    await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+    await signInAndGoto(page, `./wallet/lp-store/${CORPORATION_ID}?affordableOnly=0`);
     await page.setViewportSize({ width, height: 844 });
     await expect(page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ })).toHaveCount(2);
 
@@ -162,7 +162,7 @@ for (const width of [390, 1024, 1280]) {
     page,
   }) => {
     await mockLoyaltyOffers(page);
-    await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+    await signInAndGoto(page, `./wallet/lp-store/${CORPORATION_ID}?affordableOnly=0`);
     await page.setViewportSize({ width, height: 844 });
     await expect(page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ })).toHaveCount(2);
 
@@ -201,7 +201,7 @@ for (const width of [1024, 1280, 1440]) {
     page,
   }) => {
     await mockLoyaltyOffers(page);
-    await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+    await signInAndGoto(page, `./wallet/lp-store/${CORPORATION_ID}?affordableOnly=0`);
     await page.setViewportSize({ width, height: 900 });
     const cells = page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ });
     await expect(cells).toHaveCount(2);

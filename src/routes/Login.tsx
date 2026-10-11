@@ -7,12 +7,12 @@ import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
 import {
-  Button,
   EveSsoButton,
   DataAgeBadge,
   LogoMark,
   Modal,
   Panel,
+  plainTextActionClassName,
   SEVERITY_TEXT,
   SeverityIcon,
   StatChip,
@@ -20,26 +20,30 @@ import {
 } from '@/components/ui';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
-import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  inlineLinkClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import {
-  AllCharacters,
   Clones,
   Container,
   Contracts,
   Corporation,
   ICON_SIZE,
-  ImportClipboard,
   Industry,
   MailInbox,
   Market,
   MoonMining,
+  NavTravel,
   Notifications,
   Offline,
   OpenSource,
   Orders,
   Planetary,
   ReadOnly,
+  Search,
   ScheduledPush,
   Ships,
   Skills,
@@ -73,24 +77,7 @@ interface LandingRow {
 }
 
 /**
- * The questions the page leads with. Each one names a surface a signed-in
- * pilot actually opens, so the claim under it can be checked against the app
- * rather than admired — no benefit here is broader than what ships. The first
- * is the multi-character one on purpose: it is the claim the tagline makes,
- * and a question is where a reader checks a claim. Keep the count even — the
- * grid is two columns wide.
- */
-const ANSWERS: LandingRow[] = [
-  { icon: AllCharacters, key: 'attention' },
-  { icon: Orders, key: 'orders' },
-  { icon: Industry, key: 'build' },
-  { icon: Skills, key: 'training' },
-  { icon: Planetary, key: 'colonies' },
-  { icon: ImportClipboard, key: 'appraisal' },
-];
-
-/**
- * The feature catalog under the answers, grouped the way the app's own nav
+ * The feature catalog under the question tiles, shown as name chips, grouped the way the app's own nav
  * groups its routes (`Layout.tsx`: Progression / Economy / Social) so the page
  * and the signed-in shell describe the same product in the same order. The
  * nav's ungrouped head — Alerts and Corporation beside Overview — has no label
@@ -120,6 +107,7 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
       { icon: Ships, key: 'ships' },
       { icon: MoonMining, key: 'miningTax' },
       { icon: Planetary, key: 'planetary' },
+      { icon: NavTravel, key: 'travel' },
     ],
   },
   {
@@ -142,12 +130,12 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
 ];
 
 /**
- * One captured screen in the "See it in action" gallery: the file under
+ * One captured screen behind a question tile: the file under
  * `public/screenshots/` and the `login.screenshots.*` key its alt text and
- * caption live under. Real captures (the Play Store listing's), not mockups —
- * the hero preview already covers "what it would look like"; this answers
- * "what does it actually look like". WebP sits outside the PWA precache glob,
- * so a signed-in user never downloads them.
+ * enlarged-view caption live under. Real captures filled with sample data, not
+ * mockups — the hero preview already covers "what it would look like"; these
+ * answer "what does it actually look like". WebP sits outside the PWA precache
+ * glob, so a signed-in user never downloads them.
  */
 interface Screenshot {
   file: string;
@@ -163,19 +151,76 @@ function screenshotSrc(shot: Screenshot): string {
   return `/screenshots/${shot.file}.webp`;
 }
 
-const DESKTOP_SCREENSHOTS: Screenshot[] = [
-  { file: 'desktop-order-detail', key: 'orderDetail', size: DESKTOP_SIZE },
-  { file: 'desktop-build-plan', key: 'buildPlan', size: DESKTOP_SIZE },
-  { file: 'desktop-lp-store', key: 'lpStore', size: DESKTOP_SIZE },
-  { file: 'desktop-calendar', key: 'calendar', size: DESKTOP_SIZE },
-  { file: 'desktop-contracts', key: 'contracts', size: DESKTOP_SIZE },
-];
+/**
+ * One tile of the questions grid: the question, the capture that answers it,
+ * and the `login.answers.*` key its words live under. `span` is a literal
+ * Tailwind class (never built from a number, which the compiler would not see)
+ * and the six-column grid is arranged so every row sums to six.
+ */
+interface Tile {
+  key: string;
+  shot: Screenshot;
+  span: string;
+}
 
-const PHONE_SCREENSHOTS: Screenshot[] = [
-  { file: 'phone-overview', key: 'phoneOverview', size: PHONE_SIZE },
-  { file: 'phone-alerts', key: 'phoneAlerts', size: PHONE_SIZE },
-  { file: 'phone-wallet', key: 'phoneWallet', size: PHONE_SIZE },
-  { file: 'phone-price-history', key: 'phonePriceHistory', size: PHONE_SIZE },
+/**
+ * The questions the page leads with. Each names a surface a signed-in pilot
+ * actually opens, so the claim under it can be checked against the app rather
+ * than admired — no benefit here is broader than what ships. The first is the
+ * multi-character one on purpose: it is the claim the tagline makes, and a
+ * question is where a reader checks a claim.
+ */
+const TILES: Tile[] = [
+  {
+    key: 'attention',
+    shot: { file: 'desktop-overview', key: 'overview', size: DESKTOP_SIZE },
+    span: 'lg:col-span-4',
+  },
+  {
+    key: 'orders',
+    shot: { file: 'desktop-order-detail', key: 'orderDetail', size: DESKTOP_SIZE },
+    span: 'lg:col-span-2',
+  },
+  {
+    key: 'build',
+    shot: { file: 'desktop-build-plan', key: 'buildPlan', size: DESKTOP_SIZE },
+    span: 'lg:col-span-2',
+  },
+  {
+    key: 'journal',
+    shot: { file: 'desktop-wallet-journal', key: 'walletJournal', size: DESKTOP_SIZE },
+    span: 'lg:col-span-4',
+  },
+  {
+    key: 'marketJumps',
+    shot: { file: 'phone-market-jumps', key: 'phoneMarketJumps', size: PHONE_SIZE },
+    span: 'lg:col-span-2',
+  },
+  {
+    key: 'routeSafety',
+    shot: { file: 'phone-route-safety', key: 'phoneRouteSafety', size: PHONE_SIZE },
+    span: 'lg:col-span-2',
+  },
+  {
+    key: 'pilot',
+    shot: { file: 'phone-pilot-lookup', key: 'phonePilotLookup', size: PHONE_SIZE },
+    span: 'lg:col-span-2',
+  },
+  {
+    key: 'flyNext',
+    shot: { file: 'desktop-ship-tree', key: 'shipTree', size: DESKTOP_SIZE },
+    span: 'lg:col-span-2',
+  },
+  {
+    key: 'fitting',
+    shot: { file: 'desktop-fitting', key: 'fitting', size: DESKTOP_SIZE },
+    span: 'lg:col-span-2',
+  },
+  {
+    key: 'survey',
+    shot: { file: 'desktop-survey', key: 'survey', size: DESKTOP_SIZE },
+    span: 'lg:col-span-2',
+  },
 ];
 
 /**
@@ -193,9 +238,9 @@ const TRUST: LandingRow[] = [
 /**
  * Sample values for the hero preview only — never real character data.
  *
- * The figures are the approved board mockup's own (`design/overview-triage`,
- * tagged), so the landing page and the design that shipped tell one story: a
- * reset run as the next deadline, 27 orders needing work, 70 unread alerts.
+ * The figures are the first tile's Overview capture (`desktop-overview`), so
+ * the hero and the tiles tell one story: an industry job finishing in
+ * 1h 59m as the next deadline, 26 orders needing work, 13 unread alerts.
  */
 const PREVIEW = {
   name: 'Aurelia Vex',
@@ -206,21 +251,20 @@ const PREVIEW = {
   // line names the skill alone (Overview.tsx reads catalog skill names,
   // never a level-suffixed one) — matching that exactly, not just its shape.
   trainingSkill: 'Gunnery',
-  /** The soonest clock on the board. A colony reset run, as on the mockup. */
-  deadlineSeconds: 3 * 3600 + 12 * 60,
-  deadlineColonies: 4,
+  /** The soonest clock on the board: the next industry job to finish, as in the capture. */
+  deadlineSeconds: 3600 + 59 * 60,
   trainingSeconds: 86_400 + 4 * 3600 + 20 * 60,
   queued: 6,
   orders: {
-    needWork: 27,
-    undercut: 21,
-    outbid: 4,
+    needWork: 26,
+    undercut: 19,
+    outbid: 5,
     relist: 2,
-    belowFloor: 2,
+    belowFloor: 1,
     used: 24,
     slots: 41,
   },
-  alerts: 70,
+  alerts: 13,
 };
 
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
@@ -236,8 +280,8 @@ export function Login() {
   // initializers run once on mount rather than every render.
   const [previewFetchedAt] = useState(() => new Date(Date.now() - 2 * MINUTE_MS));
 
-  // The gallery capture shown enlarged, or null. One modal for the page
-  // rather than one per figure: only one can be open at a time anyway.
+  // The tile capture shown enlarged, or null. One modal for the page
+  // rather than one per tile: only one can be open at a time anyway.
   const [zoomed, setZoomed] = useState<Screenshot | null>(null);
 
   // One Customize permissions dialog for the whole page, opened from either
@@ -280,16 +324,22 @@ export function Login() {
       </header>
 
       <main>
-        <section className="mx-auto grid max-w-6xl gap-12 px-6 py-16 lg:grid-cols-2 lg:items-center">
-          <div>
+        {/*
+          A funnel, not two columns: the heading is the widest line, the tagline
+          narrower, the login button narrower still, so the eye lands on the
+          button. The live preview sits under it as the proof, rather than
+          beside it competing for the first look.
+        */}
+        <section className="mx-auto flex max-w-6xl flex-col items-center gap-12 px-6 py-16 text-center">
+          <div className="flex flex-col items-center">
             <p className="text-[0.6875rem] font-bold tracking-[0.14em] text-accent uppercase">
               {t('login.eyebrow')}
             </p>
-            <h1 className="mt-3 text-3xl leading-tight font-semibold text-balance sm:text-4xl">
+            <h1 className="mt-3 max-w-3xl text-4xl leading-tight font-semibold text-balance sm:text-5xl">
               {t('login.heading')}
             </h1>
-            <p className="mt-4 max-w-md text-text-dim">{t('app.tagline')}</p>
-            <div className="mt-7 flex flex-col items-start gap-3">
+            <p className="mt-4 max-w-xl text-text-dim text-balance">{t('app.tagline')}</p>
+            <div className="mt-7 flex flex-col items-center gap-3">
               <EveSsoButton
                 size="large"
                 pending={pending}
@@ -303,7 +353,7 @@ export function Login() {
           <div
             role="group"
             aria-labelledby="login-preview-label"
-            className="relative rounded-xs border border-line bg-panel/85 p-4 shadow-[0_0_60px_-20px_rgba(87,199,244,0.25)] backdrop-blur-sm"
+            className="relative w-full max-w-3xl rounded-xs border border-line bg-panel/85 p-4 text-left shadow-[0_0_60px_-20px_rgba(87,199,244,0.25)] backdrop-blur-sm"
           >
             <span
               id="login-preview-label"
@@ -368,9 +418,7 @@ export function Login() {
                     >
                       {formatCountdown(PREVIEW.deadlineSeconds)}
                     </p>
-                    <p className="truncate text-xs text-text-dim">
-                      {t('overview.board.batch.running', { count: PREVIEW.deadlineColonies })}
-                    </p>
+                    <p className="truncate text-xs text-text-dim">{t('overview.board.nextJob')}</p>
                   </PreviewCell>
 
                   <PreviewCell label={t('overview.board.trainingNow')}>
@@ -453,50 +501,17 @@ export function Login() {
 
         <LandingSection id="login-answers" heading={t('login.answersHeading')}>
           <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
-          <div className="mt-6 grid gap-3 md:grid-cols-2">
-            {ANSWERS.map(({ icon: Icon, key }) => (
-              // Untitled Panels: `Panel`'s own `title` is the uppercase
-              // micro-heading, and a question is the one heading on this page
-              // that has to read at body size to be worth asking.
-              <Panel key={key}>
-                <div className="flex items-start gap-3">
-                  <Icon
-                    size={ICON_SIZE.lg}
-                    aria-hidden="true"
-                    className="mt-0.5 shrink-0 text-accent"
-                  />
-                  <h3 className="text-base font-semibold text-balance">
-                    {t(`login.answers.${key}.question`)}
-                  </h3>
-                </div>
-                <p className="mt-3 text-sm text-text-dim">{t(`login.answers.${key}.answer`)}</p>
-              </Panel>
-            ))}
-          </div>
-        </LandingSection>
-
-        <LandingSection id="login-screenshots" heading={t('login.screenshotsHeading')}>
-          <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.screenshotsLead')}</p>
           {/*
-          A scroll-snap strip rather than a grid: five 16:9 captures side by
-          side would each be too small to read, and stacked they would be the
-          longest section on the page. The strip scrolls inside itself, so the
-          page never scrolls sideways at phone width.
+          One grid, not a questions list over a separate gallery: each tile is a
+          question, the screen that answers it, and one line of why. Selecting
+          the picture enlarges it. The picture is a crop (top-aligned, fixed
+          height), so the enlarged view is where the table text becomes
+          readable.
         */}
-          <ul className="mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3">
-            {DESKTOP_SCREENSHOTS.map((shot) => (
-              <li key={shot.key} className="w-[85%] shrink-0 snap-start md:w-[70%]">
-                <ScreenshotFigure shot={shot} onOpen={() => setZoomed(shot)} />
-              </li>
-            ))}
-          </ul>
-          <h3 className="mt-10 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('login.screenshotsPhoneHeading')}
-          </h3>
-          <ul className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
-            {PHONE_SCREENSHOTS.map((shot) => (
-              <li key={shot.key}>
-                <ScreenshotFigure shot={shot} onOpen={() => setZoomed(shot)} />
+          <ul className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-6">
+            {TILES.map((tile) => (
+              <li key={tile.key} className={cx('flex', tile.span)}>
+                <QuestionTile tile={tile} onOpen={() => setZoomed(tile.shot)} />
               </li>
             ))}
           </ul>
@@ -517,36 +532,26 @@ export function Login() {
             )}
           </Modal>
         </LandingSection>
-
         <LandingSection id="login-features" heading={t('login.featuresHeading')}>
           {FEATURE_GROUPS.map(({ group, items }) => (
             <div key={group} className="mt-6">
               <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t(`login.featureGroups.${group}`)}
               </h3>
-              <div className="mt-2 border-t border-line">
+              <ul className="mt-2 flex flex-wrap gap-2">
                 {items.map(({ icon: Icon, key }) => (
-                  <div
+                  <li
                     key={key}
-                    className="flex flex-wrap items-center gap-4 border-b border-line py-4"
+                    className="flex items-center gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-sm"
                   >
-                    <Icon size={ICON_SIZE.lg} aria-hidden="true" className="shrink-0 text-accent" />
-                    <span className="w-44 shrink-0 text-sm font-semibold">
-                      {t(`login.features.${key}.name`)}
-                    </span>
-                    <span className="flex-1 basis-64 text-sm text-text-dim">
-                      {t(`login.features.${key}.desc`)}
-                    </span>
-                    <span className="rounded-xs bg-panel-2 px-2 py-0.5 text-[0.6875rem] text-text-dim">
-                      {t(`login.features.${key}.tag`)}
-                    </span>
-                  </div>
+                    <Icon size={ICON_SIZE.md} aria-hidden="true" className="shrink-0 text-accent" />
+                    {t(`login.features.${key}.name`)}
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           ))}
         </LandingSection>
-
         <LandingSection id="login-trust" heading={t('login.trustHeading')}>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {TRUST.map(({ icon: Icon, key }) => (
@@ -564,7 +569,12 @@ export function Login() {
           wall of 11px text nobody read.
         */}
           <p className="mt-6 max-w-3xl text-sm text-text-dim">{t('login.permissionsHint')}</p>
-          <p className="mt-2 max-w-3xl text-sm text-text-dim">{t('login.writeExceptions')}</p>
+          <p className="mt-2 max-w-3xl text-sm text-text-dim">
+            {t('login.permissionsPrivacy')}{' '}
+            <a href="/privacy.html" className={inlineLinkClassName}>
+              {t('login.footerPrivacy')}
+            </a>
+          </p>
         </LandingSection>
 
         <section className="border-t border-line px-6 py-14 text-center">
@@ -585,7 +595,6 @@ export function Login() {
       </main>
 
       <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
-        <span>{t('login.footerOffline')}</span>
         <ExternalLink href={REPO_URL} variant="quiet">
           {t('login.footerOpenSource')}
         </ExternalLink>
@@ -632,25 +641,29 @@ function LandingSection({
 }
 
 /**
- * One gallery capture, as a button that opens it enlarged — at strip size a
- * desktop screen's table text is too small to read. The button's label carries
- * the image's alt — a button's children are presentational, so the alt alone
- * would never be read — plus what clicking does, and not the caption the
- * `<figcaption>` already reads. Explicit `width`/`height` reserve the box
- * before the lazy image arrives, so the page does not jump as a visitor
- * scrolls into it.
+ * One question tile: a capture that opens enlarged, then the question and one
+ * line of answer. The button's label carries the image's alt plus what
+ * selecting does — a button's children are presentational, so the alt alone
+ * would never be read. Explicit `width`/`height` reserve the image's box before
+ * the lazy image arrives, so the grid does not jump as a visitor scrolls into
+ * it; the fixed height and `object-top` crop every capture to the same strip
+ * whatever its shape (a phone capture is far taller than a desktop one).
  */
-function ScreenshotFigure({ shot, onOpen }: { shot: Screenshot; onOpen: () => void }) {
+function QuestionTile({ tile, onOpen }: { tile: Tile; onOpen: () => void }) {
   const { t } = useTranslation();
-  const caption = t(`login.screenshots.${shot.key}.caption`);
+  const { shot } = tile;
   const alt = t(`login.screenshots.${shot.key}.alt`);
   return (
-    <figure>
+    <Panel padded={false} className="h-full w-full">
       <button
         type="button"
         onClick={onOpen}
         aria-label={t('login.screenshotEnlarge', { alt })}
-        className={cx('block w-full cursor-zoom-in rounded-xs', focusRingClassName)}
+        className={cx(
+          'relative block h-48 w-full cursor-zoom-in overflow-hidden sm:h-56',
+          // Inset: the button clips its own overflow, so an outset ring would be cut off.
+          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent'
+        )}
       >
         <img
           src={screenshotSrc(shot)}
@@ -659,14 +672,23 @@ function ScreenshotFigure({ shot, onOpen }: { shot: Screenshot; onOpen: () => vo
           height={shot.size.height}
           loading="lazy"
           decoding="async"
-          className={cx(
-            'h-auto w-full rounded-xs border border-line hover:border-accent',
-            interactiveClassName
-          )}
+          className={cx('h-full w-full object-cover object-top', interactiveClassName)}
         />
+        {/* DESIGN.md §6c "Magnifier badge": the at-rest cue that the picture opens, since a phone has no cursor. */}
+        <span
+          aria-hidden="true"
+          className="absolute right-2 bottom-2 rounded-xs border border-line bg-bg/80 p-1 text-text"
+        >
+          <Search size={ICON_SIZE.sm} aria-hidden="true" />
+        </span>
       </button>
-      <figcaption className="mt-2 text-sm text-text-dim">{caption}</figcaption>
-    </figure>
+      <div className="border-t border-line p-4">
+        <h3 className="text-base font-semibold text-balance">
+          {t(`login.answers.${tile.key}.question`)}
+        </h3>
+        <p className="mt-2 text-sm text-text-dim">{t(`login.answers.${tile.key}.answer`)}</p>
+      </div>
+    </Panel>
   );
 }
 
@@ -681,9 +703,9 @@ const FOOTER_LINK = cx(
 function CustomizeLink({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
   return (
-    <Button size="sm" onClick={onClick}>
+    <button type="button" className={plainTextActionClassName()} onClick={onClick}>
       {t('permissions.customize.linkLabel')}
-    </Button>
+    </button>
   );
 }
 
