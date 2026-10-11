@@ -405,6 +405,76 @@ export async function fetchPilotKillmails(characterId: number): Promise<PilotKil
   }
 }
 
+/** zKillboard's page size for a `kills/` or `losses/` list: a full page means older ones exist. */
+export const PILOT_LIST_PAGE_SIZE = 200;
+
+export type PilotKillmailHistoryResult =
+  | {
+      ok: true;
+      /** Every kill and loss on the first page of each list, newest first; only entries that state a time. */
+      entries: PilotKillmail[];
+      /**
+       * How far back the lists are known to reach, in ms: the newest of the
+       * oldest dates among lists that came back full. Null when no list was
+       * full, so the whole record is held.
+       */
+      reachesBackTo: number | null;
+    }
+  | { ok: false };
+
+function timeOf(entry: PilotKillmail): number {
+  const at = entry.detail?.time ? Date.parse(entry.detail.time) : Number.NaN;
+  return Number.isFinite(at) ? at : Number.NaN;
+}
+
+/**
+ * A pilot's kills and losses as far back as zKillboard's first page of each
+ * list reaches (200 each), for the Overview's Kills and losses widget. Both
+ * lists come through `fetchPilotList`, so the request is shared with Pilot
+ * Lookup and cached for `PILOT_STATS_CACHE_MS`, which is also the rate limit:
+ * a refresh inside that window asks zKillboard nothing. Either list failing,
+ * or lists that hold only hash-only entries (no time to count by), fail the
+ * whole answer rather than read as "none".
+ */
+export async function fetchPilotKillmailHistory(
+  characterId: number
+): Promise<PilotKillmailHistoryResult> {
+  try {
+    const [killBody, lossBody] = await Promise.all([
+      fetchPilotList(characterId, 'kills'),
+      fetchPilotList(characterId, 'losses'),
+    ]);
+    if (killBody === null || lossBody === null) return { ok: false };
+    const parsed = [
+      ...parsePilotKillmails(killBody, 'kill'),
+      ...parsePilotKillmails(lossBody, 'loss'),
+    ];
+    const entries = parsed.filter((entry) => Number.isFinite(timeOf(entry)));
+    if (killBody.length + lossBody.length > 0 && entries.length === 0) {
+      forgetPilotList(characterId, 'kills');
+      forgetPilotList(characterId, 'losses');
+      return { ok: false };
+    }
+    let reachesBackTo: number | null = null;
+    for (const [body, side] of [
+      [killBody, 'kill'],
+      [lossBody, 'loss'],
+    ] as const) {
+      if (body.length < PILOT_LIST_PAGE_SIZE) continue;
+      const oldest = Math.min(
+        ...entries.filter((entry) => entry.side === side).map((entry) => timeOf(entry))
+      );
+      if (Number.isFinite(oldest)) {
+        reachesBackTo = reachesBackTo === null ? oldest : Math.max(reachesBackTo, oldest);
+      }
+    }
+    entries.sort((a, b) => timeOf(b) - timeOf(a));
+    return { ok: true, entries, reachesBackTo };
+  } catch {
+    return { ok: false };
+  }
+}
+
 const SPACE_BY_LABEL: Record<string, KillSpace> = {
   'loc:highsec': 'highsec',
   'loc:lowsec': 'lowsec',

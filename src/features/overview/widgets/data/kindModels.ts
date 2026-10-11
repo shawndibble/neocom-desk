@@ -9,6 +9,7 @@ import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
 import { journalRefTypeBreakdown } from '@/features/character/walletJournalFilter';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { eveToday, rangeDates, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { longestRemainingSeconds, secondsLeft } from '@/engine/jumpTimers';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
@@ -28,7 +29,7 @@ import {
   netWorthTable,
 } from './moneyModels';
 import { journalCoverageDays, withinRange } from './chartSeries';
-import type { FeedId, ListRow, NumberModel } from './types';
+import type { FeedId, ListRow, NumberModel, TableCell } from './types';
 
 const D = 'overview.widgets.data';
 const C = 'overview.widgets.chart';
@@ -47,6 +48,7 @@ export const KIND_FEED_LISTS: Readonly<Record<string, readonly FeedId[]>> = {
   survey: ['survey'],
   hauling: ['hauling'],
   routeSafety: ['routeSafety'],
+  kills: ['kills'],
 };
 
 /** Where each net worth layer sits in the bar and which series hue it keeps (the Net Worth page's). */
@@ -642,6 +644,129 @@ const routeSafety: Builder = (feeds, { t, now }) => {
   };
 };
 
+// --- Kills and losses -----------------------------------------------------------
+
+const KILLS_PATH = '/travel/pilot';
+/** Newest killmails the table lists. */
+const KILLS_TABLE_ROWS = 25;
+const KILLS_DAY_MS = 86_400_000;
+
+const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) => {
+  const feed = feeds.kills;
+  const data = feed?.data ?? null;
+  if (!data) return blank(KILLS_PATH, statusOf(feed));
+  const everyone = scopeAll || activeCharacterId === null;
+  const failedHere = !everyone && data.failedIds.includes(activeCharacterId);
+  const tracked = everyone || data.trackedIds.includes(activeCharacterId);
+  const window = `${range}d` as MiningYieldRange;
+  const today = eveToday(new Date(now));
+  const days = rangeDates(window, today);
+  // The same calendar days the chart draws, so the bars add up to the headline.
+  const since = Date.parse(`${days[0]}T00:00:00Z`);
+  // Two of your Characters on one killmail is one kill: count the killmail once.
+  const seen = new Set<number>();
+  const inRange = data.entries.filter((entry) => {
+    if (!everyone && entry.characterId !== activeCharacterId) return false;
+    if (entry.timeMs < since || entry.timeMs > now || seen.has(entry.killmailId)) return false;
+    seen.add(entry.killmailId);
+    return true;
+  });
+  const base = {
+    ...blank(
+      KILLS_PATH,
+      statusOf(failedHere ? { data, loading: false, error: true } : feed, {
+        isEmpty: !failedHere && (!tracked || inRange.length === 0),
+      })
+    ),
+    fetchedAt: data.fetchedAt,
+  };
+  if (inRange.length === 0) return base;
+
+  const killCount = inRange.filter((entry) => entry.side === 'kill').length;
+  const lossCount = inRange.length - killCount;
+  const perDay = new Map<string, number>();
+  for (const entry of inRange) {
+    const day = new Date(entry.timeMs).toISOString().slice(0, 10);
+    perDay.set(day, (perDay.get(day) ?? 0) + 1);
+  }
+  const values = days.map((date) => perDay.get(date) ?? 0);
+  const peak = Math.max(...values);
+
+  // zKillboard's first page holds 200 per list: a busy pilot's 90 days can reach further back than that.
+  const reaches = (everyone ? data.trackedIds : [activeCharacterId]).flatMap((id) => {
+    const value = data.reach[id];
+    return value === undefined || value === null ? [] : [value];
+  });
+  const reachesBackTo = reaches.length === 0 ? null : Math.max(...reaches);
+  const covered =
+    reachesBackTo !== null && reachesBackTo > since
+      ? Math.max(1, Math.ceil((now - reachesBackTo) / KILLS_DAY_MS))
+      : null;
+
+  const summary = t(`${C}.kills.summary`, {
+    count: inRange.length,
+    kills: killCount,
+    losses: lossCount,
+    range,
+    peak,
+    days: values.join(', '),
+  });
+  const shipName = (id: number | null) =>
+    id === null ? UNKNOWN : (data.typeNames.get(id) ?? `#${id}`);
+  const systemName = (id: number | null) =>
+    id === null ? UNKNOWN : (data.systemNames.get(id) ?? `#${id}`);
+  return {
+    ...base,
+    number: {
+      value: count(inRange.length),
+      unit: t(`${D}.kills.unit`, { count: inRange.length }),
+      secondary: { text: t(`${D}.kills.secondary`, { kills: killCount, losses: lossCount }) },
+      tone: 'clear',
+    },
+    rows: [],
+    table: {
+      columns: [
+        { key: 'ship', label: t(`${W}.kills.col.ship`), priority: 0 },
+        { key: 'system', label: t(`${W}.kills.col.system`), priority: 2 },
+        { key: 'value', label: t(`${W}.kills.col.value`), align: 'end', priority: 3 },
+        { key: 'side', label: t(`${W}.kills.col.side`), priority: 1 },
+      ],
+      rows: inRange.slice(0, KILLS_TABLE_ROWS).map((entry) => {
+        const cells: TableCell[] = [
+          shipName(entry.shipTypeId),
+          systemName(entry.systemId),
+          entry.value === null
+            ? UNKNOWN
+            : { text: formatIskCompact(entry.value), iskAmount: entry.value },
+          entry.side === 'loss'
+            ? { text: t(`${W}.kills.side.loss`), tone: 'bad' }
+            : { text: t(`${W}.kills.side.kill`), tone: 'good' },
+        ];
+        return { key: String(entry.killmailId), cells };
+      }),
+    },
+    summary,
+    chart: {
+      kind: 'bars',
+      values,
+      max: t(`${C}.kills.max`, { count: peak }),
+      xStart: t(`${C}.kills.xStart`, { count: range }),
+      xEnd: t(`${C}.kills.xEnd`),
+      note: [
+        covered === null
+          ? t(`${C}.kills.note`, { count: range })
+          : t(`${C}.kills.noteCovered`, { count: range, covered }),
+        everyone && data.failedIds.length > 0
+          ? t(`${C}.kills.unread`, { count: data.failedIds.length })
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+      summary,
+    },
+  };
+};
+
 export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   walletFlow,
   netWorth,
@@ -652,4 +777,5 @@ export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   hauling,
   jumpTimers,
   routeSafety,
+  kills,
 };

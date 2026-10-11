@@ -129,6 +129,8 @@ const SUMS_ACROSS = new Set([
   'miningYield',
   // One route on this device, whichever Character is the header's.
   'routeSafety',
+  // Reads every tracked Character's killboard; the builder narrows to the header Character.
+  'kills',
 ]);
 
 export function kindSumsAcrossCharacters(kind: string): boolean {

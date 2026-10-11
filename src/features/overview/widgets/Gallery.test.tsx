@@ -155,14 +155,6 @@ describe('Gallery', () => {
     });
   });
 
-  it('marks kinds that are not built as Coming soon, dimmed, with no action', async () => {
-    const { dialog } = await openGallery();
-    const item = itemOf(dialog, 'Kills and losses');
-    expect(within(item).getByText('Coming soon')).toBeInTheDocument();
-    expect(within(item).queryByRole('button')).toBeNull();
-    expect(item.className).toContain('opacity-60');
-  });
-
   it('says Limit reached at 30 widgets', async () => {
     const full: OverviewLayout = {
       version: 1,

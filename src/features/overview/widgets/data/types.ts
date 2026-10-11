@@ -40,6 +40,7 @@ import type {
   NetWorthWidgetData,
   ProfitWidgetData,
   RouteSafetyWidgetData,
+  KillsWidgetData,
 } from './kindLoaders';
 
 /** The narrow slice of i18next's `t` the adapters need. */
@@ -210,6 +211,7 @@ export interface FeedMap {
   jumpTimers: JumpTimersWidgetData;
   location: LocationWidgetData;
   routeSafety: RouteSafetyWidgetData;
+  kills: KillsWidgetData;
 }
 
 export type FeedId = keyof FeedMap;

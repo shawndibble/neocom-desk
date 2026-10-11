@@ -491,3 +491,98 @@ export async function loadRouteSafetyWidget(): Promise<RouteSafetyWidgetData> {
     fetchedAt: new Date(),
   };
 }
+
+// --- Kills and losses ------------------------------------------------------------
+
+/** One kill or loss of a tracked Character, dated and placed. */
+export interface KillsEntry {
+  characterId: number;
+  killmailId: number;
+  side: 'kill' | 'loss';
+  timeMs: number;
+  systemId: number | null;
+  /** The hull that died. */
+  shipTypeId: number | null;
+  /** zKillboard's total value; null when it states none. */
+  value: number | null;
+}
+
+export interface KillsWidgetData {
+  entries: KillsEntry[];
+  /** Per Character: how far back the read reaches (ms), null when the whole record is held. */
+  reach: Record<number, number | null>;
+  /** Characters whose killboard could not be read this time. */
+  failedIds: number[];
+  trackedIds: number[];
+  systemNames: Map<number, string>;
+  typeNames: Map<number, string>;
+  fetchedAt: Date;
+}
+
+/** Newest entries whose ship and system names are resolved; the table lists no more. */
+const KILLS_NAMED_ENTRIES = 40;
+/** Characters read at once: zKillboard asks callers to go gently. */
+const KILLS_FANOUT = 2;
+
+/**
+ * Every tracked Character's kills and losses off zKillboard (public: no scope).
+ * Reads go through the pilot-list cache, so a refresh inside ten minutes asks
+ * zKillboard nothing. A Character that fails is listed in `failedIds`; when
+ * every one fails this throws, which keeps the last good figure and shows
+ * Retry. zKillboard, the SDE and the type names stay behind `import()`.
+ */
+export async function loadKillsWidget(): Promise<KillsWidgetData> {
+  const trackedIds = (await db.tokens.toArray()).map((token) => token.characterId);
+  const { fetchPilotKillmailHistory } = await import('@/lib/zkillboard');
+  const { mapWithConcurrencyLimit } = await import('@/lib/concurrency');
+  const entries: KillsEntry[] = [];
+  const reach: Record<number, number | null> = {};
+  const failedIds: number[] = [];
+  await mapWithConcurrencyLimit(trackedIds, KILLS_FANOUT, async (characterId) => {
+    const result = await fetchPilotKillmailHistory(characterId);
+    if (!result.ok) {
+      failedIds.push(characterId);
+      return;
+    }
+    reach[characterId] = result.reachesBackTo;
+    for (const entry of result.entries) {
+      entries.push({
+        characterId,
+        killmailId: entry.killmailId,
+        side: entry.side,
+        timeMs: Date.parse(entry.detail?.time ?? ''),
+        systemId: entry.detail?.systemId ?? null,
+        shipTypeId: entry.detail?.victim.ship_type_id ?? null,
+        value: entry.value,
+      });
+    }
+  });
+  if (trackedIds.length > 0 && failedIds.length === trackedIds.length) {
+    throw new Error('Kills and losses could not be read');
+  }
+  entries.sort((a, b) => b.timeMs - a.timeMs);
+  const named = entries.slice(0, KILLS_NAMED_ENTRIES);
+  const typeIds = [...new Set(named.flatMap((e) => (e.shipTypeId === null ? [] : [e.shipTypeId])))];
+  const [typeNames, systems] = await Promise.all([
+    typeIds.length === 0
+      ? new Map<number, string>()
+      : import('@/features/character/typeNames')
+          .then((m) => m.loadTypeNames(typeIds))
+          .catch(() => new Map<number, string>()),
+    import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
+  ]);
+  const systemNames = new Map<number, string>();
+  for (const entry of named) {
+    const name = entry.systemId === null ? undefined : systems?.get(entry.systemId)?.name;
+    if (entry.systemId !== null && name !== undefined) systemNames.set(entry.systemId, name);
+  }
+  return {
+    entries,
+    reach,
+    failedIds,
+    trackedIds,
+    systemNames,
+    typeNames,
+    fetchedAt: new Date(),
+  };
+}
