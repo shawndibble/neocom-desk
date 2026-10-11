@@ -4118,7 +4118,7 @@
       "rate": "Tax rate, percent",
       "open": "Manage Taxes",
       "manage": "Manage Taxes",
-      "needLogin": "Login to access",
+      "needLogin": "Log in to access",
       "failed": "Couldn't save that Payee. Try again.",
       "addPayee": {
         "title": "Add Payee",
@@ -4134,7 +4134,7 @@
       "locationPlaceholder": "System, station or structure",
       "setWaypoint": "Set waypoint",
       "setWaypointTo": "Set waypoint to {{placeName}}",
-      "needLogin": "Login to set waypoint",
+      "needLogin": "Log in to set waypoint",
       "notes": "Notes",
       "notesPlaceholder": "Anything the fleet should know, such as where to dock",
       "kind": {
