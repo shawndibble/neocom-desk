@@ -31,7 +31,7 @@ Sync is **configured** only when `VITE_FIREBASE_API_KEY` is set and `MODE !== 't
 - **Device and cadence:** both; rare. Backup and delete are one-off moments (inferred). The phone shows no sync dot (see gaps).
 - **Above the fold:** n/a. Moment of use: a glance at the dot; in Settings › Data & storage, the action cards.
 - **Not for:** how fresh EVE data is (Data Age, and the Characters page's "Last synced", which is ESI age).
-- **Sources:** ADR 0001, ADR 0014; decisions `20260829-094708`, `20260926-223948`, `20260926-214853`, `20260910-164633`; `settings.md` (backup solves 20+ alt re-login).
+- **Sources:** ADR 0001, ADR 0014; decisions `20260829-094708-sync-backend`, `20260926-223948`, `20260926-214853`, `20260910-164633`; `settings.md` (backup solves 20+ alt re-login).
 - **Unconfirmed:** that pilots check sync state at all; how often backup is used.
 
 ### Mobbin brief
@@ -43,7 +43,7 @@ Sync is **configured** only when `VITE_FIREBASE_API_KEY` is set and `MODE !== 't
   - `web: sync status indicator in a sidebar with a tooltip for synced, syncing, offline and error`
   - `web: delete account confirmation dialog listing what will be removed`
 - **Flow queries:** `web: export a password-protected backup file, then import it on another device`.
-- **Mobbin won't help with:** nothing notable.
+- **Mobbin won't help with:** per-Character sync: which Editable Data follows the pilot across devices while EVE data stays on each one, and a backup that carries every Character so 20+ alts need not log in again.
 
 ## What syncs vs stays local
 

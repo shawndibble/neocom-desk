@@ -1,6 +1,6 @@
 # Share links
 
-User goal: send someone a short URL to an appraisal or a fitting; the recipient (account or not) sees it read-only and can open it in the app.
+User goal: send someone a short URL to an appraisal, a fitting, a D-Scan or a Survey; the recipient (account or not) sees it read-only (a Survey also takes new scans) and can open it in the app.
 
 | Route / piece                                                     | What                                                   | Where                                                     |
 | ----------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
@@ -8,8 +8,12 @@ User goal: send someone a short URL to an appraisal or a fitting; the recipient 
 | `/share/fitting?f=<code>`                                         | Permanent Fitting Share Code URL, no storage or expiry | `src/routes/FittingShared.tsx`                            |
 | Create: Appraisal "Copy Share Link"                               | `createShareLink`                                      | `src/features/market/AppraisalPanel.tsx:191`              |
 | Create: Fittings Export "Copy Share Link" / "Copy permanent link" |                                                        | `src/features/fittings/useFittingExport.ts:64`            |
+| Create: D-Scan share button (`dscan`)                             | raw scan text, max 50,000 chars                        | `src/features/travel/PilotListView.tsx:508`               |
+| Create: Survey start (`survey`)                                   | `startSurvey`, payload owner name                      | `src/features/survey/surveyStore.ts:71`                   |
 | Shared Appraisal screen                                           | read-only table, totals, export                        | `src/features/market/AppraisalShareScreen.tsx`            |
 | Shared Fitting view                                               | stats at all skills V, modules, Copy Fitting           | `FittingShared.tsx FittingShareView`                      |
+| Shared D-Scan screen                                              | Fleet board; Open Neocom Desk re-pastes it             | `src/features/travel/DscanShareScreen.tsx`                |
+| Shared Survey screen                                              | live board; anyone with the link can add a scan        | `src/features/survey/SurveyShareScreen.tsx`               |
 | Frame + "Open Neocom Desk"                                        |                                                        | `src/features/share/ShareShell.tsx`                       |
 | Store                                                             | Firestore `shares/{id}`                                | `src/features/share/shareStore.ts`, `firestore.rules:243` |
 
@@ -26,7 +30,7 @@ See also: `entities-share.md` (another author; key format, 7-day TTL and in-memo
 - **Above the fold:** recipient view: brand and the one way in, title, expiry and key figures (stat chips), then the content.
 - **Not for:** Show Info on a name (`entities-share.md`); a permanent fit link (that is a Fitting Share Code, not a Share Link).
 - **Sources:** decisions `20261002-125432`, `20261009-113400`; CONTEXT.md Share Link (four types); `src/features/share/shareStore.ts:27` (`appraisal`, `fitting`, `dscan`, `survey`); #2943, #3225, #3497.
-- **Unconfirmed:** the inventory above lists two share types while code and CONTEXT.md have four (Shared D-Scan, Survey); where recipients open links (Discord, in-game chat, phone or desk).
+- **Unconfirmed:** where recipients open links (Discord, in-game chat, phone or desk).
 
 ### Mobbin brief
 

@@ -23,7 +23,7 @@ Scope gating: `/ships` and `/ships/fittings/compare` are UNGATED (`src/app/route
 "Can my Character fly this fit, and how does it perform?" A full fitter whose numbers follow the active Character, with missing skills one step from a Skill Plan and the URL as the working state (`20260924-150509`). On a desktop the Start screen is the pilot's own fittings with a preview, not a hull picker (`20260925-152418`).
 
 - **Top jobs (ranked):** 1. "Can I fly this saved or In-game Fitting, and what is missing?" 2. "If I change this module, what happens to DPS, tank, capacitor and CPU/powergrid?" 3. "Get a fit in or out: paste EFT, Share Link, Save to EVE, multibuy."
-- **Device and cadence:** desk session for editing (drag and drop is off on touch, `Fittings.tsx:137`; list-and-preview is desktop only). On a phone the Start screen is tabs and a tap opens the Fitting (`20260925-152418`, `20261001-210222`), suggesting look-up use. Cadence: occasional, around a new ship or a doctrine.
+- **Device and cadence:** desk session for editing (drag and drop is off on touch, `Fittings.tsx:141-143`; list-and-preview is desktop only). On a phone the Start screen is tabs and a tap opens the Fitting (`20260925-152418`, `20261001-210222`), suggesting look-up use. Cadence: occasional, around a new ship or a doctrine.
 - **Above the fold:** Start screen: search, fittings grouped by hull, preview with can-fly, DPS, EHP, CPU and powergrid. Editor: name and hull, over-budget CPU/powergrid, can-fly / missing-skills chip, then slots and stats.
 - **Not for:** which hulls the Character can fly overall (Ship Tree); building the hull (Industry, via the Manufacture Plan export).
 - **Sources:** `20260924-150509`, `20260925-152418`, `20261001-210222`, `20260924-183346`, ADR 0016; #1547, #2830, #2954.
@@ -303,7 +303,7 @@ Verified against code in this pass:
 - Applied DPS is the app's own model; Projected effects assume all skills V; heat is overload-only, no burnout.
 - What to train disabled while skill overrides are active; evaluation failures for single skills are silently skipped (`skillGains.ts:398-401`).
 - No bulk actions on the library (no multi-select, bulk delete/export); CSV only in Compare and Variations.
-- Drag and drop off on coarse pointers (`useMediaQuery(COARSE_POINTER_QUERY)` in `Fittings.tsx:137`); the row menu is the touch path.
+- Drag and drop off on coarse pointers (`useMediaQuery(COARSE_POINTER_QUERY)` in `Fittings.tsx:141-143`); the row menu is the touch path.
 - Popular fits: `getPopularFits` returns `{ok:false}` on any zKillboard/ESI failure (`popularFits.ts:77,85`); the panel renders one plain note `fittings.popular.failed` (`PopularFitsPanel.tsx:106`) with no retry control (re-verified; the workbench tab has its own `failed` note, :207). Switching source tab is the only re-trigger.
 - Compare picker Loads open drones in the bay (verified by absence: no launch logic in `FittingComparePicker.tsx`/`FittingCompare.tsx`; decision `20260925-113331` says the launch rule lives only in the editor workspace; `launchDrones` exists only in editor item actions `useEditorItemActions.ts:26`).
 - Saved-Fitting hull names require decoding every record on list load (`useHullNames`); an undecodable code shows an unreadable row.

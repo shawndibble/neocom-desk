@@ -38,7 +38,7 @@ Everything around the feature pages: router and route table, the signed-in `Layo
 - **Device and cadence:** both, every session. Phone: a bar of the pilot's four pages (`20260913-095527`; default `DEFAULT_MOBILE_TABS` in `src/lib/mobileTabs.ts`: Overview, Skills, Industry, Market) plus More; desktop: the grouped rail.
 - **Above the fold:** n/a. Always visible: rail or tab bar, the Character portrait, the bell with its count.
 - **Not for:** page content; finding an item or asset (command palette, `command-palette.md`).
-- **Sources:** decisions `20260913-095527`, `20261002-145653-rail-opens-the-current-page-icons-hiding-and`, `20261009-163837`.
+- **Sources:** decisions `20260913-095527`, `20261002-145653-rail-opens-the-current-page-icons-hiding-and`, `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`.
 - **Unconfirmed:** ranking of switching Character against navigating; how many pilots use hide-pages.
 
 ### Mobbin brief

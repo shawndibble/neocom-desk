@@ -26,13 +26,13 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref
 
 ## Purpose and user goal
 
-"Did anything come in that I need to read or answer?" A two-pane EVE mail client (`20260901-172427`). Replies, not compose-new, because answering a received mail is what pilots asked for (`20260921-014556`); one inbox over every Character is the headline ask from other tools (#2867).
+"Did anything come in that I need to read or answer?" A two-pane EVE mail client (`20260901-172427-mail-page-rebuild`). Replies, not compose-new, because answering a received mail is what pilots asked for (`20260921-014556`); one inbox over every Character is the headline ask from other tools (#2867).
 
 - **Top jobs (ranked):** 1. "What is unread, on which Character?" 2. "Read it." 3. "Reply or forward."
 - **Device and cadence:** both. The `newMail` Notification Event routes here (`notifications.md`), so a phone tap from an alert is a likely entry; reading at length is a desk session. Cadence: when new mail arrives.
 - **Above the fold:** folder chips with unread counts and search, then the list newest first with unread dots; on desktop the reader beside it.
 - **Not for:** writing new mail, mailing lists, labels (in game).
-- **Sources:** `20260901-172427`, `20260907-125125` (both files), `20260921-014556`, `20260910-103051`; #155, #2867.
+- **Sources:** `20260901-172427-mail-page-rebuild`, `20260907-125125` (both files), `20260921-014556`, `20260910-103051`; #155, #2867.
 - **Unconfirmed:** device split; that most visits come from a notification.
 
 ### Mobbin brief

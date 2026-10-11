@@ -11,7 +11,7 @@ Route `/employment-history` (`src/routes/EmploymentHistory.tsx`). Third tab of t
 | Default sort Joined desc, mobile sort | `DataTable defaultSort`, `mobileSort`      |
 | Data age, Refresh, Export             | `Panel actions`, `employmentHistoryCsv.ts` |
 
-## Purpose / user goal
+## Purpose and user goal
 
 See the active Character's corporation history and time spent in each.
 
@@ -29,6 +29,7 @@ See the active Character's corporation history and time spent in each.
 - **Screen queries:**
   - `web: work history list of organisations newest first with start date, tenure and a current badge`
   - `ios: profile experience section with organisation logos, dates and time spent at each`
+- **Flow queries:** none.
 - **Mobbin won't help with:** nothing notable.
 
 ## Controls

@@ -33,7 +33,7 @@ Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,cale
 - **Device and cadence:** both; the phone gets its own 14-day Day Ticker (`Calendar.tsx:102`), and the `newCalendarEvent` and `calendarEventStarting` events route here. Cadence: a check before planning a session.
 - **Above the fold:** the Coming Up Rail's Today and Tomorrow items, the Calendar Map with today marked; on a phone the Day Ticker then the rail.
 - **Not for:** a source's full state (Overview tiles, or that source's page); past events (ESI returns upcoming only).
-- **Sources:** `20260907-123312`, `20260927-070249`, `20260923-213632`, `20260925-142253`; #157, #1715, #1762.
+- **Sources:** `20260907-123312`, `20260927-070249`, `20260923-213632`, `20260925-142253`; #1715, #1762 (#157, a side-by-side list and detail layout, was declined).
 - **Unconfirmed:** cadence; that the rail, not the map, is what pilots read first.
 
 ### Mobbin brief
@@ -45,6 +45,7 @@ Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,cale
   - `ios: horizontally scrolling day strip above an agenda list of upcoming items with countdowns`
   - `web: upcoming deadlines list mixing item types, each with a type icon, and a filter menu with a checkbox per type`
   - `web: event detail dialog with time, description, accept, decline and tentative buttons and an add-to-calendar export`
+- **Flow queries:** `web: open an event invitation from an agenda list and accept, decline or mark it tentative`.
 - **Mobbin won't help with:** EVE-specific clocks (moon chunk decay, courier deadlines, extractor programs).
 
 ## Page structure and states
