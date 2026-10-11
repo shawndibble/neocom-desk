@@ -219,7 +219,7 @@ describe('Login', () => {
   });
 
   /*
-   * The hero preview is a mockup of the Overview board, and it rotted silently
+   * The hero preview is a mockup of the Overview, and it rotted silently
    * once: the triage-board redesign deleted `overview.queue`,
    * `overview.notifications`, `overview.training` and `overview.finishes`, and
    * because i18next renders a missing key as the key itself, the signed-out
@@ -232,31 +232,25 @@ describe('Login', () => {
    * page at all — that is the assertion that would have caught the original
    * failure, and it catches the next one wherever on this page it happens.
    */
-  it("previews the Overview board using the board's own labels", async () => {
+  it("previews the Overview widget grid using the widgets' own labels", async () => {
     renderLogin();
     const preview = within(await screen.findByRole('group', { name: /logged-in view/i }));
 
-    // The summary strip: the three cells the real strip carries.
-    for (const label of ['Next deadline', 'Training now', 'Wallet']) {
-      expect(preview.getByText(label)).toBeInTheDocument();
-    }
+    // The header row: the Next deadline button and the alerts bell with its count.
+    expect(preview.getByText('Next')).toBeInTheDocument();
     expect(preview.getByText('Next industry job finishes')).toBeInTheDocument();
+    expect(preview.getByRole('img', { name: /13/ })).toBeInTheDocument();
 
-    // Open orders: counts, not rows — the one rule the redesign turns on.
-    expect(preview.getByText('Open orders')).toBeInTheDocument();
-    expect(preview.getByText('26 need work')).toBeInTheDocument();
-    for (const [count, label] of [
-      ['19', 'Undercut'],
-      ['5', 'Outbid'],
-      ['2', 'Relist'],
-    ]) {
-      expect(preview.getByText(label)).toBeInTheDocument();
-      expect(preview.getAllByText(count).length).toBeGreaterThan(0);
+    // The grid: one Widget per tile, each titled as the real Widget is.
+    for (const title of ['Wallet', 'Training', 'Skill points', 'Industry']) {
+      expect(preview.getByRole('region', { name: title })).toBeInTheDocument();
     }
+    expect(preview.getByText('Gunnery')).toBeInTheDocument();
+    expect(preview.getByText(/12,500 unallocated/)).toBeInTheDocument();
 
-    // Alerts are folded to a line rather than given a card, as on a phone.
-    expect(preview.getByText('Alerts')).toBeInTheDocument();
-    expect(preview.getByText('13 unread')).toBeInTheDocument();
+    // The fixed board is gone: no summary strip cells, no folded alerts row.
+    expect(preview.queryByText('Training now')).not.toBeInTheDocument();
+    expect(preview.queryByText('13 unread')).not.toBeInTheDocument();
   });
 
   it('renders no unresolved i18n keys anywhere on the page', async () => {
