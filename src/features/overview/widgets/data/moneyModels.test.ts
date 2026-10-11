@@ -3,6 +3,10 @@ import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import {
   balanceChange,
+  flowBuckets,
+  flowDiverging,
+  flowSecondary,
+  flowTable,
   journalTable,
   ordersListed,
   ordersStateChart,
@@ -234,5 +238,104 @@ describe('journalTable', () => {
     const table = journalTable(t, [entry(4, 3, -2_000_000)], NOW);
     expect(table.rows[0]!.cells[1]).toBe('-2M');
     expect(table.rows[0]!.cells[3]).toBe('—');
+  });
+});
+
+describe('wallet flow', () => {
+  const e = (daysAgo: number, amount: number, ref = 'bounty_prizes') =>
+    ({
+      id: Math.round(daysAgo * 1000 + Math.abs(amount)),
+      date: new Date(NOW - daysAgo * DAY).toISOString(),
+      ref_type: ref,
+      description: '',
+      amount,
+    }) as WalletJournalEntry;
+
+  describe('flowBuckets', () => {
+    it('is a bar per day at a 7-day range, income and spending apart, newest last', () => {
+      const b = flowBuckets([e(0.5, 100), e(0.6, -30), e(1.5, 50), e(6.5, -10)], NOW, 7);
+      expect(b.daily).toBe(true);
+      expect(b.income).toEqual([0, 0, 0, 0, 0, 50, 100]);
+      expect(b.spending).toEqual([10, 0, 0, 0, 0, 0, 30]);
+    });
+
+    it('is a bar per week at a longer range, spending as a positive magnitude', () => {
+      const b = flowBuckets([e(1, 100), e(8, -40), e(20, 7)], NOW, 30);
+      expect(b.daily).toBe(false);
+      expect(b.income).toHaveLength(5);
+      expect(b.income[4]).toBe(100);
+      expect(b.spending[3]).toBe(40);
+      expect(b.income[2]).toBe(7);
+    });
+  });
+
+  describe('flowDiverging', () => {
+    it('is null with nothing moved', () => {
+      expect(flowDiverging(t, [], NOW, 30, 'note', 'summary')).toBeNull();
+    });
+
+    it('labels the biggest bar, the span and the note, and keeps the summary it was given', () => {
+      const m = flowDiverging(t, [e(1, 100), e(8, -250)], NOW, 30, 'a note', 'the summary')!;
+      expect(m.kind).toBe('diverging');
+      expect(m.max).toBe('overview.widgets.chart.max{"value":"250"}');
+      expect(m.xStart).toBe('overview.widgets.chart.weeksAgo{"count":5}');
+      expect(m.xEnd).toBe('overview.widgets.chart.thisWeek');
+      expect(m.note).toBe('a note');
+      expect(m.summary).toBe('the summary');
+    });
+  });
+
+  describe('flowTable', () => {
+    const rows = [
+      { refType: 'bounty_prizes', income: 900, expense: 0, net: 900, count: 3 },
+      { refType: 'market_transaction', income: 100, expense: 400, net: -300, count: 2 },
+    ];
+    const table = flowTable(t, rows);
+
+    it('is Type, Net, Income, Spending, Share with the net kept longest', () => {
+      expect(table.columns.map((c) => c.key)).toEqual([
+        'type',
+        'net',
+        'income',
+        'spending',
+        'share',
+      ]);
+      expect(table.columns.find((c) => c.priority === 1)!.key).toBe('net');
+    });
+
+    it('splits each type into what came in and went out, and its share of the movement', () => {
+      expect(table.rows[0]!.cells).toEqual(['Bounty prizes', '+900', '900', '0', '64%']);
+      expect(table.rows[1]!.cells).toEqual(['Market transaction', '-300', '100', '400', '36%']);
+    });
+  });
+
+  describe('flowSecondary', () => {
+    const rows = [
+      { refType: 'bounty_prizes', income: 900, expense: 0, net: 900, count: 3 },
+      { refType: 'market_transaction', income: 100, expense: 400, net: -300, count: 2 },
+    ];
+
+    it('compares with the previous window when the journal reaches back twice the range', () => {
+      const entries = [e(1, 500), e(8, 200)];
+      const s = flowSecondary(t, entries, NOW, 7, 14, rows)!;
+      expect(s.direction).toBe('up');
+      expect(s.tone).toBe('good');
+      expect(s.text).toBe('overview.widgets.walletFlow.change{"isk":"+300","count":7}');
+    });
+
+    it('is a fall, and bad, when the window earned less than the one before', () => {
+      const s = flowSecondary(t, [e(1, 100), e(8, 500)], NOW, 7, 14, rows)!;
+      expect(s).toMatchObject({ direction: 'down', tone: 'bad' });
+    });
+
+    it('names the biggest source instead when the journal is too short to compare', () => {
+      const s = flowSecondary(t, [e(1, 100)], NOW, 30, 30, rows)!;
+      expect(s.direction).toBeUndefined();
+      expect(s.text).toBe('overview.widgets.walletFlow.top{"name":"Bounty prizes","isk":"900"}');
+    });
+
+    it('has no line when nothing came in', () => {
+      expect(flowSecondary(t, [], NOW, 30, 30, [])).toBeUndefined();
+    });
   });
 });

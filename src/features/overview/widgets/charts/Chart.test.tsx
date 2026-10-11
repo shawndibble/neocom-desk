@@ -21,6 +21,16 @@ const MODELS: Record<string, ChartModel> = {
     note: 'Jobs finishing each hour',
     summary: 'Six jobs finish in the next 12 hours.',
   },
+  diverging: {
+    kind: 'diverging',
+    up: [3, 0, 5],
+    down: [1, 4, 0],
+    max: 'max 5',
+    xStart: '3 weeks ago',
+    xEnd: 'this week',
+    note: 'Last 21 days',
+    summary: 'Income 8, spending 5.',
+  },
   hbars: {
     kind: 'hbars',
     rows: [
@@ -87,6 +97,18 @@ describe('Chart', () => {
     expect(bars[1]!.className).not.toContain('bg-accent/55');
     expect(bars[0]!.className).toContain('bg-accent/55');
     expect(container.textContent).toContain('Jobs finishing each hour');
+  });
+
+  it('draws income above the axis and spending below it, one pair per period', () => {
+    const { container } = render(<Chart model={MODELS.diverging!} size="M" />);
+    const pairs = container.querySelectorAll('.grid-rows-2');
+    expect(pairs).toHaveLength(3);
+    const bars = pairs[0]!.querySelectorAll('i');
+    expect(bars).toHaveLength(2);
+    expect(bars[0]!.style.height).toBe('60%');
+    expect(bars[1]!.style.height).toBe('25%');
+    expect(container.textContent).toContain('max 5');
+    expect(container.textContent).toContain('3 weeks ago');
   });
 
   it('draws the height the size asks for', () => {

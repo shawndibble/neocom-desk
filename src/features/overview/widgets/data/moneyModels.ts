@@ -14,7 +14,9 @@ import { formatAge } from '@/lib/age';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
-import type { StackChartModel, StackPart } from '../charts/types';
+import type { RefTypeBreakdownRow } from '@/features/character/walletJournalFilter';
+import type { DivergingChartModel, StackChartModel, StackPart } from '../charts/types';
+import { backwardBucketSums } from './chartSeries';
 import { UNKNOWN } from './builderKit';
 import type { NumberSecondary, TableModel, TableRowModel, Translate } from './types';
 
@@ -203,5 +205,137 @@ export function journalTable(
           : UNKNOWN,
       ],
     })),
+  };
+}
+
+// --- Wallet flow ---------------------------------------------------------------------
+
+const DAY_MS = 86_400_000;
+
+export interface FlowBuckets {
+  /** A bar per day (a 7-day range) rather than per week. */
+  daily: boolean;
+  income: number[];
+  /** Positive magnitudes. */
+  spending: number[];
+}
+
+/** Income and spending per period over the range, newest last: days up to a week, weeks beyond. */
+export function flowBuckets(
+  entries: readonly WalletJournalEntry[],
+  now: number,
+  range: number
+): FlowBuckets {
+  const daily = range <= 7;
+  const bucketMs = daily ? DAY_MS : 7 * DAY_MS;
+  const count = daily ? range : Math.ceil(range / 7);
+  const at = (entry: WalletJournalEntry) => Date.parse(entry.date);
+  const income = backwardBucketSums(
+    entries,
+    at,
+    (entry) => Math.max(0, entry.amount ?? 0),
+    now,
+    bucketMs,
+    count
+  );
+  const spending = backwardBucketSums(
+    entries,
+    at,
+    (entry) => Math.max(0, -(entry.amount ?? 0)),
+    now,
+    bucketMs,
+    count
+  );
+  return { daily, income, spending };
+}
+
+/** Paired bars of income above the axis and spending below it; null when ISK never moved. */
+export function flowDiverging(
+  t: Translate,
+  entries: readonly WalletJournalEntry[],
+  now: number,
+  range: number,
+  note: string,
+  summary: string
+): DivergingChartModel | null {
+  if (entries.length === 0) return null;
+  const { daily, income, spending } = flowBuckets(entries, now, range);
+  const tallest = Math.max(...income, ...spending);
+  if (tallest <= 0) return null;
+  const C = `${W}.chart`;
+  return {
+    kind: 'diverging',
+    up: income,
+    down: spending,
+    max: t(`${C}.max`, { value: formatIskCompact(tallest) }),
+    xStart: t(daily ? `${C}.daysAgo` : `${C}.weeksAgo`, { count: income.length }),
+    xEnd: t(daily ? `${C}.today` : `${C}.thisWeek`),
+    note,
+    summary,
+  };
+}
+
+/** Per ref type: net, what came in, what went out, and its share of all the ISK that moved. */
+export function flowTable(t: Translate, rows: readonly RefTypeBreakdownRow[]): TableModel {
+  const moved = rows.reduce((sum, row) => sum + row.income + row.expense, 0);
+  return {
+    columns: [
+      { key: 'type', label: t(`${W}.walletFlow.col.type`), priority: 0 },
+      { key: 'net', label: t(`${W}.walletFlow.col.net`), align: 'end', priority: 1 },
+      { key: 'income', label: t(`${W}.walletFlow.col.income`), align: 'end', priority: 2 },
+      { key: 'spending', label: t(`${W}.walletFlow.col.spending`), align: 'end', priority: 3 },
+      { key: 'share', label: t(`${W}.walletFlow.col.share`), align: 'end', priority: 4 },
+    ],
+    rows: rows.map((row) => ({
+      key: row.refType,
+      cells: [
+        humanizeRefType(row.refType),
+        formatIskCompactSigned(row.net),
+        formatIskCompact(row.income),
+        formatIskCompact(row.expense),
+        `${moved > 0 ? Math.round(((row.income + row.expense) / moved) * 100) : 0}%`,
+      ],
+    })),
+  };
+}
+
+/**
+ * The Number's one line. Against the previous window when the journal reaches
+ * back far enough to hold one (twice the range): the net's rise or fall, with
+ * its direction and whether it is good. Otherwise the biggest source of
+ * income, so the line still says something the net does not.
+ */
+export function flowSecondary(
+  t: Translate,
+  entries: readonly WalletJournalEntry[],
+  now: number,
+  range: number,
+  coveredDays: number,
+  rows: readonly RefTypeBreakdownRow[]
+): NumberSecondary | undefined {
+  if (coveredDays >= 2 * range) {
+    const net = (from: number, to: number) =>
+      entries.reduce((sum, entry) => {
+        const at = Date.parse(entry.date);
+        return at > from && at <= to ? sum + (entry.amount ?? 0) : sum;
+      }, 0);
+    const delta =
+      net(now - range * DAY_MS, now) - net(now - 2 * range * DAY_MS, now - range * DAY_MS);
+    const isk = formatIskCompactSigned(delta);
+    if (isk === '0')
+      return { text: t(`${W}.walletFlow.unchanged`, { count: range }), direction: 'flat' };
+    return {
+      text: t(`${W}.walletFlow.change`, { isk, count: range }),
+      direction: delta > 0 ? 'up' : 'down',
+      tone: delta > 0 ? 'good' : 'bad',
+    };
+  }
+  const top = rows.filter((row) => row.income > 0).sort((a, b) => b.income - a.income)[0];
+  if (!top) return undefined;
+  return {
+    text: t(`${W}.walletFlow.top`, {
+      name: humanizeRefType(top.refType),
+      isk: formatIskCompact(top.income),
+    }),
   };
 }

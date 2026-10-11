@@ -45,6 +45,18 @@ export interface BarsChartModel extends ChartBase {
   xEnd?: string;
 }
 
+export interface DivergingChartModel extends ChartBase {
+  kind: 'diverging';
+  /** What came in per period, oldest first; drawn above the axis. */
+  up: number[];
+  /** What went out per period as positive magnitudes, same length as up; drawn below the axis. */
+  down: number[];
+  /** "max 250": the largest bar's value, already formatted. */
+  max: string;
+  xStart?: string;
+  xEnd?: string;
+}
+
 export interface HBarRow {
   key: string;
   label: string;
@@ -106,6 +118,7 @@ export interface SparkChartModel extends ChartBase {
 export type ChartModel =
   | AreaChartModel
   | BarsChartModel
+  | DivergingChartModel
   | HBarsChartModel
   | DonutChartModel
   | StackChartModel

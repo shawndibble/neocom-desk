@@ -54,7 +54,7 @@ describe('walletFlow', () => {
     }),
   });
 
-  it('nets income against spending over the range, with Income and Spending bars', () => {
+  it('nets income against spending over the range, as paired weekly bars and a table by type', () => {
     const view = buildView(
       'walletFlow',
       journal([
@@ -66,15 +66,26 @@ describe('walletFlow', () => {
     );
     expect(stateOf(view)).toBe('ok');
     expect(view.number.iskAmount).toBe(200);
-    expect(view.chart?.kind).toBe('hbars');
-    if (view.chart?.kind !== 'hbars') return;
-    expect(view.chart.rows.map((r) => [r.key, r.share])).toEqual([
-      ['income', 1],
-      ['spending', 1 / 3],
-    ]);
-    expect(view.chart.rows.map((r) => r.color)).toEqual(['iskPos', 'iskNeg']);
+    expect(view.chart?.kind).toBe('diverging');
+    if (view.chart?.kind !== 'diverging') return;
+    // Seven daily bars: 300 came in yesterday, 100 went out the day before.
+    expect(view.chart.up).toEqual([0, 0, 0, 0, 0, 300, 0]);
+    expect(view.chart.down).toEqual([0, 0, 0, 0, 100, 0, 0]);
     // The 20-day-old entry is outside a 7-day range.
-    expect(view.rows.map((r) => r.key)).toEqual(['bounty_prize', 'market_fee']);
+    expect(view.table?.rows.map((r) => r.key)).toEqual(['bounty_prize', 'market_fee']);
+    expect(view.rows).toEqual([]);
+  });
+
+  it('compares with the previous window when the journal is long enough, else names the top source', () => {
+    const long = buildView(
+      'walletFlow',
+      journal([entry(1, DAY, 300, 'a'), entry(2, 9 * DAY, 100, 'a'), entry(3, 20 * DAY, 1, 'a')]),
+      ctx({ range: 7 })
+    );
+    expect(long.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
+    const short = buildView('walletFlow', journal([entry(1, DAY, 300, 'a')]), ctx({ range: 30 }));
+    expect(short.number.secondary?.direction).toBeUndefined();
+    expect(short.number.secondary?.text).toContain('walletFlow.top');
   });
 
   it('applies the widget range over the same data, not in the loader', () => {

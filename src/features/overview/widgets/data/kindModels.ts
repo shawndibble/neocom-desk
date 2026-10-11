@@ -17,6 +17,7 @@ import type { LayerId } from '@/engine/netWorth/series';
 import type { ChartColor, StackPart } from '../charts/types';
 import { blank, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { hbarsFromRows } from './chartBuilders';
+import { flowDiverging, flowSecondary, flowTable } from './moneyModels';
 import { backwardBucketSums, journalCoverageDays, withinRange } from './chartSeries';
 import type { FeedId, ListRow, NumberModel } from './types';
 
@@ -67,14 +68,12 @@ const walletFlow: Builder = (feeds, { t, now, range }) => {
       : t(`${C}.walletFlow.note`, { count: range });
   const income = formatIskCompact(flow.totalIn);
   const spending = formatIskCompact(flow.totalOut);
-  const rows: ListRow[] = flow.rows.map((row) => ({
-    key: row.refType,
-    title: humanizeRefType(row.refType),
-    detail: t(row.net >= 0 ? `${D}.walletFlow.income` : `${D}.walletFlow.spending`),
-    value: formatIskCompactSigned(row.net),
-    iskAmount: row.net,
-    tone: 'clear',
-  }));
+  const summary = t(`${C}.walletFlow.summary`, {
+    income,
+    spending,
+    net: formatIskCompactSigned(flow.net),
+    count: range,
+  });
   return {
     ...blank(
       to,
@@ -86,36 +85,14 @@ const walletFlow: Builder = (feeds, { t, now, range }) => {
       value: formatIskCompactSigned(flow.net),
       iskAmount: flow.net,
       unit: t('overview.isk'),
+      // Income and spending are the chart's and the table's: the line says how the net moved.
+      secondary: flowSecondary(t, all, now, range, covered, flow.rows),
       tone: 'clear',
     },
-    rows,
-    summary: t(`${C}.walletFlow.summary`, {
-      income,
-      spending,
-      net: formatIskCompactSigned(flow.net),
-      count: range,
-    }),
-    chart:
-      hbarsFromRows(
-        t,
-        [
-          {
-            key: 'income',
-            label: t(`${D}.walletFlow.incomeLabel`),
-            value: flow.totalIn,
-            text: income,
-            color: 'iskPos',
-          },
-          {
-            key: 'spending',
-            label: t(`${D}.walletFlow.spendingLabel`),
-            value: flow.totalOut,
-            text: spending,
-            color: 'iskNeg',
-          },
-        ],
-        note
-      ) ?? undefined,
+    rows: [],
+    table: flowTable(t, flow.rows),
+    summary,
+    chart: flowDiverging(t, entries, now, range, note, summary) ?? undefined,
   };
 };
 

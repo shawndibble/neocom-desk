@@ -3741,12 +3741,6 @@
         }
       },
       "data": {
-        "walletFlow": {
-          "incomeLabel": "Income",
-          "spendingLabel": "Spending",
-          "income": "Income",
-          "spending": "Spending"
-        },
         "netWorth": {
           "none": "No net worth has been recorded yet."
         },
@@ -3831,7 +3825,19 @@
       "walletFlow": {
         "title": "Wallet flow",
         "description": "Income against spending over a range",
-        "empty": "There is no wallet activity in this range."
+        "empty": "There is no wallet activity in this range.",
+        "change_one": "{{isk}} vs previous {{count}} day",
+        "change_other": "{{isk}} vs previous {{count}} days",
+        "unchanged_one": "Same as previous {{count}} day",
+        "unchanged_other": "Same as previous {{count}} days",
+        "top": "Top: {{name}} {{isk}}",
+        "col": {
+          "type": "Type",
+          "net": "Net",
+          "income": "Income",
+          "spending": "Spending",
+          "share": "Share"
+        }
       },
       "netWorth": {
         "title": "Net worth",

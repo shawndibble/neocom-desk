@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   areaPoints,
   barHeights,
+  divergingHeights,
   donutSegments,
   hbarPercent,
   sharesOfMax,
@@ -100,5 +101,34 @@ describe('donutSegments', () => {
       { dash: 0, gap: 100, offset: 0 },
       { dash: 100, gap: 0, offset: 0 },
     ]);
+  });
+});
+
+describe('divergingHeights', () => {
+  it('splits the height evenly when both sides peak alike', () => {
+    expect(divergingHeights([100, 0], [50, 100])).toEqual({
+      up: [100, 0],
+      down: [50, 100],
+      split: 0.5,
+    });
+  });
+
+  it('gives the bigger side more room so both read at one scale', () => {
+    const { up, down, split } = divergingHeights([100], [25]);
+    expect(split).toBe(0.8);
+    expect(up).toEqual([100]);
+    expect(down).toEqual([100]);
+  });
+
+  it('never squeezes a side below a fifth, and keeps a small non-zero bar visible', () => {
+    const { up, down, split } = divergingHeights([1000, 0], [1, 0]);
+    expect(split).toBe(0.8);
+    expect(down[0]).toBe(100);
+    expect(up[1]).toBe(0);
+    expect(divergingHeights([1000, 1], [5, 0]).up[1]).toBe(3);
+  });
+
+  it('is all zero and even when nothing moved', () => {
+    expect(divergingHeights([0], [0])).toEqual({ up: [0], down: [0], split: 0.5 });
   });
 });
