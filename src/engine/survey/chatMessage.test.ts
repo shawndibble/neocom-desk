@@ -82,6 +82,14 @@ function expectRailsOverBar(box: string[]): void {
 }
 
 describe('surveyChatMessage', () => {
+  it('counts the time left from the given clock, not from the last scan', () => {
+    // Last scan at +10 m, finish estimated at +20 m (1000 m3 left at 1.667 m3/s).
+    const summary = summarizeSurvey([scan(0, ['Veldspar', 2000]), scan(10, ['Veldspar', 1000])])!;
+    const text = (now?: number) => surveyChatMessage(summary, URL, labels, now);
+    expect(text()).toContain('(~10m)');
+    expect(text(T0 + 15 * MIN)).toContain('(~5m)');
+  });
+
   it('opens with a heading line, then an ETA rail, the bar, the ore line and a link rail', () => {
     // 930 m3 mined in 900 s, 70 left at 1.0333 m3/s: about 68 s to go
     const { heading, box } = message([

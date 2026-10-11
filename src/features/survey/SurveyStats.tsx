@@ -8,6 +8,7 @@ import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import { formatDuration as formatTotalTime } from '@/lib/duration';
+import { useNow } from '@/lib/useNow';
 import type { SurveySummary } from '@/engine/survey/series';
 import { IskAmount, Tooltip } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -53,6 +54,7 @@ function shortVolume(value: number, locale: string): string {
 
 export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const { t, i18n } = useTranslation();
+  const now = useNow();
   const clock = useDoneAtClock();
   const local = clock === 'local';
   const hydrateClock = useDoneAtOverride((state) => state.hydrate);
@@ -99,7 +101,7 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
         ) : (
           <>
             <Tile label={t('survey.statTimeLeft')}>
-              {summary.etaAt === null ? '–' : formatDuration(summary.etaAt - summary.lastAt)}
+              {summary.etaAt === null ? '–' : formatDuration(Math.max(0, summary.etaAt - now))}
             </Tile>
             <Tile label={t('survey.statRocks')}>{summary.rocksLeft}</Tile>
             {summary.iskLeft !== null && (
