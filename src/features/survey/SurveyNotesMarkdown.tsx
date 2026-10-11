@@ -11,14 +11,14 @@ import Markdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 
-const ALLOWED = ['p', 'strong', 'em', 'del', 'ul', 'ol', 'li', 'a', 'code', 'br'];
+const ALLOWED_ELEMENTS = ['p', 'strong', 'em', 'del', 'ul', 'ol', 'li', 'a', 'code', 'br'];
 
 export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
   return (
     <div className="flex flex-col gap-2 [overflow-wrap:anywhere]">
       <Markdown
         remarkPlugins={[remarkBreaks]}
-        allowedElements={ALLOWED}
+        allowedElements={ALLOWED_ELEMENTS}
         unwrapDisallowed
         components={{
           a: ({ href, children }) =>
@@ -27,7 +27,6 @@ export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
             ) : (
               <>{children}</>
             ),
-          p: ({ children }) => <p>{children}</p>,
           ul: ({ children }) => <ul className="list-disc pl-5">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal pl-5">{children}</ol>,
           code: ({ children }) => (

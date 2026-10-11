@@ -47,24 +47,25 @@ export function SurveyTemplateMenu({
         {templates.length === 0 ? (
           <DropdownMenuLabel>{t('survey.templates.none')}</DropdownMenuLabel>
         ) : (
-          templates.map((template) => (
-            <DropdownMenuItem
-              key={template.id}
-              onSelect={() => onApply(template)}
-              className="items-start"
-            >
-              <span aria-hidden className="mt-0.5 inline-block w-4 shrink-0">
-                {template.id === appliedId && <Select className="text-accent" />}
-              </span>
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate font-semibold">{template.name}</span>
-                <span className="truncate text-xs text-text-dim">{summary(template)}</span>
-              </span>
-              {template.id === appliedId && (
-                <span className="sr-only">{t('survey.templates.inUse')}</span>
-              )}
-            </DropdownMenuItem>
-          ))
+          templates.map((template) => {
+            const inUse = template.id === appliedId;
+            return (
+              <DropdownMenuItem
+                key={template.id}
+                onSelect={() => onApply(template)}
+                className="items-start"
+              >
+                <span aria-hidden className="mt-0.5 inline-block w-4 shrink-0">
+                  {inUse && <Select className="text-accent" />}
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate font-semibold">{template.name}</span>
+                  <span className="truncate text-xs text-text-dim">{summary(template)}</span>
+                </span>
+                {inUse && <span className="sr-only">{t('survey.templates.inUse')}</span>}
+              </DropdownMenuItem>
+            );
+          })
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onSave}>{t('survey.templates.saveCurrent')}</DropdownMenuItem>
