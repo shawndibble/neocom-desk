@@ -219,8 +219,9 @@ across Characters · whether other alert types than danger raise the banner.
 - **Undo toast is persistent** (the existing `Toast` with an `undo` action closes
   on its close button, Esc, the next toast or a route change — WCAG 2.2.1), not 8 s.
 - **Old Alerts page features** (per-Character filter, search, muted-type chips)
-  move to the panel footer: "Notify me about…" and "Older alerts" link to
-  Settings > Notifications; recorded in the PR.
+  move to the panel footer: "Notify me about…" links to Settings >
+  Notifications. "Older alerts (N)" is not built: dismissed alerts have no
+  history view, so the link would only repeat the first one.
 - **Charts are hand-built inline SVG/CSS.** recharts is never imported statically
   into the Overview graph; Firebase-backed loaders are `import()`ed (the boot
   import graph test enforces it).

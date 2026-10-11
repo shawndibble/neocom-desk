@@ -18,8 +18,14 @@
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { Button, EmptyState, FilterChip, Tooltip, plainTextActionClassName } from '@/components/ui';
-import { textActionClassName } from '@/components/ui/textActionClassName';
+import {
+  Button,
+  EmptyState,
+  FilterChip,
+  Tooltip,
+  plainTextActionClassName,
+  textActionClassName,
+} from '@/components/ui';
 import type { AlertsPanelRenderProps } from '@/components/ui/alertsPanelContext';
 import { SETTINGS_TABS } from '@/app/pageTabs';
 import { cx } from '@/lib/cx';
@@ -216,13 +222,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
       )}
 
       <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 px-3.5 pt-2.5">
-        <Link
-          to={NOTIFICATION_SETTINGS_PATH}
-          className={plainTextActionClassName('min-h-11 md:min-h-0')}
-          onClick={onClose}
-        >
-          {t('alerts.panel.olderAlerts')}
-        </Link>
+        {/* One link: dismissed alerts have no history view to open, so an "Older alerts" link would only repeat this one. */}
         <Link
           to={NOTIFICATION_SETTINGS_PATH}
           className={plainTextActionClassName('min-h-11 md:min-h-0')}

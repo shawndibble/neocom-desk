@@ -172,10 +172,7 @@ describe('AlertsPanel', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalled();
 
-    expect(screen.getByRole('link', { name: 'Older alerts' })).toHaveAttribute(
-      'href',
-      '/settings/notifications'
-    );
+    expect(screen.queryByRole('link', { name: /Older alerts/ })).toBeNull();
     expect(screen.getByRole('link', { name: 'Notify me about…' })).toHaveAttribute(
       'href',
       '/settings/notifications'
