@@ -27,9 +27,13 @@ interface SegmentedControlOption<T extends string> {
 
 interface SegmentedControlProps<T extends string> {
   /** Already-translated accessible name for the group. */
+  /** @summary Already-translated accessible name for the group. */
   label: string;
+  /** @summary The 2–4 choices, each with a value and label. */
   options: readonly SegmentedControlOption<T>[];
+  /** @summary The selected option's value. */
   value: T;
+  /** @summary Called with the value the user picked. */
   onChange: (value: T) => void;
   /** Height from the shared control scale; `md` (default) is 44px on a phone, 36px for a pointer. */
   size?: ControlSize;
@@ -50,6 +54,8 @@ interface SegmentedControlProps<T extends string> {
  *
  * Not a `FilterChip` either: a chip toggles a filter on and off independently,
  * while exactly one segment here is always on and picking it again is a no-op.
+ *
+ * @summary Pick exactly one of 2–4 views in one joined group of buttons; not tabs and not a filter toggle.
  */
 export function SegmentedControl<T extends string>({
   label,

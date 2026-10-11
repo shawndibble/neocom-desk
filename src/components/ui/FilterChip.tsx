@@ -11,13 +11,15 @@ import {
 import { Tooltip } from './Tooltip';
 
 interface FilterChipProps {
-  /** Already-translated label. */
+  /** @summary Already-translated label. */
   label: string;
   /** A decorative glyph or image before the label (the planet-type chips). */
   icon?: ReactNode;
+  /** @summary Whether the filter is on. */
   selected: boolean;
+  /** @summary Called when the pill is clicked. */
   onToggle: () => void;
-  /** Optional match count, shown after the label. */
+  /** @summary Optional match count, shown after the label. */
   count?: number;
   /**
    * Screen-reader gloss for `count`, e.g. "3 unread". It *replaces* the bare
@@ -69,6 +71,8 @@ interface FilterChipProps {
  * the chip box `StatChip` dropped: accent when on, and sized from the shared control scale so it lines up with the `Button` and
  * `Select` it shares a toolbar with — including the touch tier, which a
  * readout chip does not get.
+ *
+ * @summary A toggleable filter pill with an optional match count; accent when on.
  */
 export function FilterChip({
   label,
