@@ -3882,7 +3882,17 @@
         "title": "Price watch",
         "description": "Prices you track and the alerts that fired",
         "empty": "No Quickbar item has a price target. Set one from the Market page.",
-        "nearest": "Nearest: {{name}}, {{pct}}% away"
+        "nearest": "Nearest: {{name}}, {{pct}}% away",
+        "target": {
+          "above": "≥ {{isk}}",
+          "below": "≤ {{isk}}"
+        },
+        "col": {
+          "item": "Item",
+          "gap": "Gap",
+          "now": "Now",
+          "target": "Target"
+        }
       },
       "stock": {
         "title": "Market stock",
@@ -3902,14 +3912,28 @@
       "lp": {
         "title": "LP balances",
         "description": "Loyalty points by corporation",
-        "empty": "You have no loyalty points."
+        "empty": "You have no loyalty points.",
+        "col": {
+          "corporation": "Corporation",
+          "lp": "LP",
+          "share": "Share"
+        }
       },
       "miningTax": {
         "title": "Mining tax",
         "description": "Mining tax you owe and have not paid",
         "empty": "Nothing is owed.",
-        "payees": "Payees",
-        "oldest": "Oldest unpaid {{days}}d"
+        "oldest": "Oldest unpaid {{days}}d",
+        "noPayee": "No payee",
+        "days": "{{count}}d",
+        "unassigned_one": "{{count}} entry has no assignment yet",
+        "unassigned_other": "{{count}} entries have no assignment yet",
+        "col": {
+          "payee": "Payee",
+          "unpaid": "Unpaid",
+          "oldest": "Oldest",
+          "entries": "Entries"
+        }
       },
       "industry": {
         "title": "Industry",

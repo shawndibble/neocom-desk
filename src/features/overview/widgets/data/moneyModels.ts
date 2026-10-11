@@ -18,6 +18,7 @@ import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { RefTypeBreakdownRow } from '@/features/character/walletJournalFilter';
 import type { StockBoardMarket } from '@/features/stockTargets/stockBoard';
+import type { PayeeOwed } from '../../miningTaxPayees';
 import type {
   DivergingChartModel,
   StackChartModel,
@@ -454,9 +455,9 @@ export function stockTable(t: Translate, markets: readonly StockBoardMarket[]): 
   return {
     columns: [
       { key: 'market', label: t(`${W}.stock.col.market`), priority: 0 },
-      { key: 'out', label: t(`${W}.stock.col.out`), align: 'end', priority: 1 },
-      { key: 'low', label: t(`${W}.stock.col.low`), align: 'end', priority: 2 },
-      { key: 'restock', label: t(`${W}.stock.col.restock`), align: 'end', priority: 3 },
+      { key: 'out', label: t(`${W}.stock.col.out`), align: 'end', priority: 2 },
+      { key: 'low', label: t(`${W}.stock.col.low`), align: 'end', priority: 3 },
+      { key: 'restock', label: t(`${W}.stock.col.restock`), align: 'end', priority: 1 },
       { key: 'ready', label: t(`${W}.stock.col.ready`), align: 'end', priority: 4 },
     ],
     rows: worstFirst(markets).map((market) => {
@@ -527,5 +528,126 @@ export function stockChart(
         })
         .join('; '),
     }),
+  };
+}
+
+// --- Price watch ---------------------------------------------------------------------
+
+interface WatchedPrice {
+  typeId: number;
+  name: string;
+  direction: 'above' | 'below';
+  targetPrice: number;
+  /** The poller's last hub price; null when it has none for this target yet. */
+  price: number | null;
+  crossed: boolean;
+}
+
+/** `+5%`, `-0.8%`, `0%`: a distance is read to a tenth of a percent below ten, whole above. */
+function signedPercentOf(ratio: number): string {
+  const pct = ratio * 100;
+  const rounded = Math.abs(pct) < 10 ? Math.round(pct * 10) / 10 : Math.round(pct);
+  if (rounded === 0) return '0%';
+  return `${rounded > 0 ? '+' : '-'}${Math.abs(rounded)}%`;
+}
+
+/**
+ * Each target against the price now: how far the price sits from it. Targets
+ * that were hit first, then the nearest to being hit, those with no price yet
+ * last.
+ */
+export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): TableModel {
+  const distance = (alert: WatchedPrice) =>
+    alert.price === null || alert.targetPrice <= 0
+      ? Number.POSITIVE_INFINITY
+      : Math.abs(alert.price - alert.targetPrice) / alert.targetPrice;
+  const sorted = [...alerts].sort(
+    (a, b) => Number(b.crossed) - Number(a.crossed) || distance(a) - distance(b)
+  );
+  return {
+    columns: [
+      { key: 'item', label: t(`${W}.priceWatch.col.item`), priority: 0 },
+      { key: 'gap', label: t(`${W}.priceWatch.col.gap`), align: 'end', priority: 1 },
+      { key: 'now', label: t(`${W}.priceWatch.col.now`), align: 'end', priority: 2 },
+      { key: 'target', label: t(`${W}.priceWatch.col.target`), align: 'end', priority: 3 },
+    ],
+    rows: sorted.map((alert) => {
+      const priced = alert.price !== null && alert.targetPrice > 0;
+      return {
+        key: `${alert.typeId}:${alert.direction}:${alert.targetPrice}`,
+        cells: [
+          alert.name,
+          priced
+            ? signedPercentOf((alert.price! - alert.targetPrice) / alert.targetPrice)
+            : UNKNOWN,
+          alert.price === null
+            ? UNKNOWN
+            : { text: formatCompactNumber(alert.price), iskAmount: alert.price },
+          t(`${W}.priceWatch.target.${alert.direction}`, {
+            isk: formatCompactNumber(alert.targetPrice),
+          }),
+        ],
+        tone: alert.crossed ? 'warning' : 'clear',
+      };
+    }),
+  };
+}
+
+// --- Loyalty points ------------------------------------------------------------------
+
+/** Each corporation's points and its share of all of them (a sliver reads `<1%`, never `0%`). */
+export function lpTable(
+  t: Translate,
+  entries: readonly { corporationId: number; name: string | null; points: number }[]
+): TableModel {
+  const total = entries.reduce((sum, entry) => sum + entry.points, 0);
+  const share = (points: number) => {
+    if (total <= 0) return '0%';
+    const pct = Math.round((points / total) * 100);
+    return pct === 0 && points > 0 ? '<1%' : `${pct}%`;
+  };
+  return {
+    columns: [
+      { key: 'corporation', label: t(`${W}.lp.col.corporation`), priority: 0 },
+      { key: 'lp', label: t(`${W}.lp.col.lp`), align: 'end', priority: 1 },
+      { key: 'share', label: t(`${W}.lp.col.share`), align: 'end', priority: 2 },
+    ],
+    rows: entries.map((entry) => ({
+      key: String(entry.corporationId),
+      cells: [
+        entry.name ?? t(`${W}.data.lp.corporation`, { id: entry.corporationId }),
+        formatCompactNumber(entry.points),
+        share(entry.points),
+      ],
+    })),
+  };
+}
+
+// --- Mining tax ----------------------------------------------------------------------
+
+/** What each payee is owed, how long the oldest of it has waited and over how many entries. */
+export function miningTaxTable(
+  t: Translate,
+  payees: readonly PayeeOwed[],
+  unassignedCount: number
+): TableModel {
+  return {
+    columns: [
+      { key: 'payee', label: t(`${W}.miningTax.col.payee`), priority: 0 },
+      { key: 'unpaid', label: t(`${W}.miningTax.col.unpaid`), align: 'end', priority: 1 },
+      { key: 'oldest', label: t(`${W}.miningTax.col.oldest`), align: 'end', priority: 2 },
+      { key: 'entries', label: t(`${W}.miningTax.col.entries`), align: 'end', priority: 3 },
+    ],
+    rows: payees.map((payee) => ({
+      key: payee.payeeId || 'none',
+      cells: [
+        payee.name || t(`${W}.miningTax.noPayee`),
+        { text: formatIskCompact(payee.unpaidIsk), iskAmount: payee.unpaidIsk },
+        payee.oldestDays === null ? UNKNOWN : t(`${W}.miningTax.days`, { count: payee.oldestDays }),
+        String(payee.entries),
+      ],
+    })),
+    footer:
+      unassignedCount > 0 ? t(`${W}.miningTax.unassigned`, { count: unassignedCount }) : undefined,
   };
 }

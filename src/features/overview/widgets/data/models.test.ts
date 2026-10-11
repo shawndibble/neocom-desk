@@ -392,7 +392,8 @@ describe('priceWatch', () => {
     const view = buildView('priceWatch', feeds, ctx());
     expect(view.number.value).toBe('1');
     expect(view.number.tone).toBe('warning');
-    expect(view.rows.map((r) => r.title)).toEqual(['Tritanium', 'PLEX']);
+    expect(view.rows).toEqual([]);
+    expect(view.table?.rows.map((r) => r.cells[0])).toEqual(['Tritanium', 'PLEX']);
   });
 });
 
@@ -523,6 +524,25 @@ describe('the Number view says one new thing', () => {
     const view = buildView('miningTax', { mining: ok(data) as never }, ctx());
     expect(view.number.secondary?.text).toContain('"days":13');
     expect(view.number.secondary?.text).not.toContain('miningUnpaid');
+  });
+
+  it('mining tax tables who is owed what, and has no table from a cache older than the payee list', () => {
+    const data = {
+      unpaidIsk: 10_900_000,
+      oldestUnpaidDays: 13,
+      payeeCount: 1,
+      unassignedCount: 2,
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    };
+    const payees = [
+      { payeeId: 'p1', name: 'Corp Tax', unpaidIsk: 10_900_000, oldestDays: 13, entries: 4 },
+    ];
+    const withPayees = buildView('miningTax', { mining: ok({ ...data, payees }) as never }, ctx());
+    expect(withPayees.rows).toEqual([]);
+    expect(withPayees.table?.rows[0]!.cells[0]).toBe('Corp Tax');
+    expect(withPayees.table?.footer).toContain('"count":2');
+    expect(buildView('miningTax', { mining: ok(data) as never }, ctx()).table).toBeUndefined();
   });
 
   it('price watch names the nearest target that has not been hit', () => {

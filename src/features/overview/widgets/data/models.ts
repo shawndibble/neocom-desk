@@ -86,7 +86,9 @@ import {
   journalTable,
   ordersListed,
   ordersStateChart,
+  miningTaxTable,
   ordersTable,
+  priceWatchTable,
   stockChart,
   stockTable,
 } from './moneyModels';
@@ -708,31 +710,8 @@ const miningTax: Builder = (feeds, { t }) => {
       secondary: miningTaxSecondary(t, data),
       tone: miningTaxSeverity(data) ?? 'clear',
     },
-    rows: [
-      {
-        key: 'unpaid',
-        title: t('overview.board.iskUnpaid'),
-        value: formatIskCompact(data.unpaidIsk),
-        iskAmount: data.unpaidIsk,
-        tone: data.unpaidIsk > 0 ? 'watch' : 'clear',
-      },
-      {
-        key: 'payees',
-        title: t('overview.widgets.miningTax.payees'),
-        detail:
-          data.oldestUnpaidDays === null
-            ? undefined
-            : t('overview.widgets.miningTax.oldest', { days: data.oldestUnpaidDays }),
-        value: count(data.payeeCount),
-        tone: 'clear',
-      },
-      {
-        key: 'unassigned',
-        title: t('overview.board.unassigned'),
-        value: count(data.unassignedCount),
-        tone: data.unassignedCount > 0 ? 'watch' : 'clear',
-      },
-    ],
+    rows: [],
+    table: data.payees ? miningTaxTable(t, data.payees, data.unassignedCount) : undefined,
     summary: miningTaxSummary(t, data),
   };
 };
@@ -977,16 +956,8 @@ const priceWatch: Builder = (feeds, { t }) => {
       secondary: nearestAlert(t, data),
       tone: priceAlertsSeverity(data) ?? 'clear',
     },
-    rows: data.alerts.map((alert) => ({
-      key: String(alert.typeId),
-      title: alert.name,
-      detail: t(`overview.board.priceAlertTargetLabel.${alert.direction}`, {
-        isk: formatIskCompact(alert.targetPrice),
-      }),
-      value: alert.price === null ? UNKNOWN : formatIskCompact(alert.price),
-      iskAmount: alert.price ?? undefined,
-      tone: alert.crossed ? 'warning' : 'clear',
-    })),
+    rows: [],
+    table: priceWatchTable(t, data.alerts),
     summary: priceAlertsSummary(t, data),
   };
 };

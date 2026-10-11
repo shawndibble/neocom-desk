@@ -363,9 +363,10 @@ describe('lp', () => {
       ctx()
     );
     expect(view.number.value).toBe('1.2K');
-    expect(view.rows.map((r) => r.title)).toEqual([
-      'Sisters of EVE',
-      expect.stringContaining('lp.corporation'),
+    expect(view.rows).toEqual([]);
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      ['Sisters of EVE', '800', '67%'],
+      [expect.stringContaining('lp.corporation'), '400', '33%'],
     ]);
     if (view.chart?.kind !== 'hbars') throw new Error('hbars');
     expect(view.chart.rows.map((r) => r.share)).toEqual([1, 0.5]);
@@ -563,20 +564,20 @@ describe('charts on the existing kinds', () => {
     expect(view.chart.rows[1]!.share).toBe(1);
   });
 
-  it('charts how stocked each market is, as a share of its items', () => {
+  it('charts each market as a bar split Out, Low, OK, Over, worst market first', () => {
     const feeds: Feeds = {
       stock: ok({
         board: {
           markets: [
             {
-              listId: 'a',
-              name: 'Jita IV - Moon 4',
-              summary: { out: 1, low: 1, ok: 2, over: 0 } as never,
-            },
-            {
               listId: 'b',
               name: 'Amarr VIII',
               summary: { out: 0, low: 0, ok: 3, over: 1 } as never,
+            },
+            {
+              listId: 'a',
+              name: 'Jita IV - Moon 4',
+              summary: { out: 1, low: 1, ok: 2, over: 0 } as never,
             },
           ],
           totals: { out: 1, low: 1 },
@@ -585,10 +586,11 @@ describe('charts on the existing kinds', () => {
       }),
     };
     const view = buildView('stock', feeds, ctx());
-    if (view.chart?.kind !== 'hbars') throw new Error('hbars');
-    expect(view.chart.rows.map((r) => [r.label, r.text, r.share])).toEqual([
-      ['Jita IV', '50%', 0.5],
-      ['Amarr VIII', '100%', 1],
+    if (view.chart?.kind !== 'stackRows') throw new Error('stackRows');
+    expect(view.chart.rows.map((r) => [r.label, r.parts.map((p) => p.value)])).toEqual([
+      ['Jita IV', [1, 1, 2, 0]],
+      ['Amarr VIII', [0, 0, 3, 1]],
     ]);
+    expect(view.table?.rows.map((r) => r.key)).toEqual(['a', 'b']);
   });
 });

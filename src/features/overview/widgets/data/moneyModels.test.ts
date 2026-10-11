@@ -9,8 +9,11 @@ import {
   flowDiverging,
   flowSecondary,
   flowTable,
+  lpTable,
+  miningTaxTable,
   netWorthSeries,
   netWorthTable,
+  priceWatchTable,
   stockChart,
   stockTable,
   journalTable,
@@ -482,10 +485,10 @@ describe('stock', () => {
       expect(table.rows.map((r) => r.key)).toEqual(['a', 'c', 'b']);
     });
 
-    it('is Market, Out, Low, To restock, Ready with the shortfall columns kept longest', () => {
+    it('is Market, Out, Low, To restock, Ready with what restocking costs kept longest', () => {
       expect(table.columns.map((c) => c.key)).toEqual(['market', 'out', 'low', 'restock', 'ready']);
       const byPriority = [...table.columns].sort((a, b) => a.priority! - b.priority!);
-      expect(byPriority.map((c) => c.key)).toEqual(['market', 'out', 'low', 'restock', 'ready']);
+      expect(byPriority.map((c) => c.key)).toEqual(['market', 'restock', 'out', 'low', 'ready']);
     });
 
     it('reads the short name, the counts, and the ISK to restock as an ISK cell or a dash', () => {
@@ -538,5 +541,109 @@ describe('stock', () => {
       const m = stockChart(t, markets)!;
       expect(m.legend.map((l) => l.color)).not.toContain('iskNeg');
     });
+  });
+});
+
+describe('price watch', () => {
+  const alert = (
+    name: string,
+    direction: 'above' | 'below',
+    targetPrice: number,
+    price: number | null,
+    crossed = false
+  ) => ({ typeId: name.length, name, direction, targetPrice, price, crossed });
+
+  it('is Item, Gap, Now, Target with the gap kept longest', () => {
+    const table = priceWatchTable(t, []);
+    expect(table.columns.map((c) => c.key)).toEqual(['item', 'gap', 'now', 'target']);
+    expect(table.columns.find((c) => c.priority === 1)!.key).toBe('gap');
+  });
+
+  it('puts the hit targets first, then the nearest, the unpriced last', () => {
+    const table = priceWatchTable(t, [
+      alert('Far', 'above', 100, 50),
+      alert('Hit', 'above', 100, 130, true),
+      alert('Unpriced', 'below', 100, null),
+      alert('Near', 'below', 100, 105),
+    ]);
+    expect(table.rows.map((r) => r.cells[0])).toEqual(['Hit', 'Near', 'Far', 'Unpriced']);
+  });
+
+  it('writes the price against its target as a signed percent, and the target by direction', () => {
+    const [near] = priceWatchTable(t, [alert('Near', 'below', 100, 105)]).rows;
+    expect(near!.cells).toEqual([
+      'Near',
+      '+5%',
+      { text: '105', iskAmount: 105 },
+      'overview.widgets.priceWatch.target.below{"isk":"100"}',
+    ]);
+    const [far] = priceWatchTable(t, [alert('Far', 'above', 100, 50)]).rows;
+    expect(far!.cells[1]).toBe('-50%');
+    expect(far!.cells[3]).toBe('overview.widgets.priceWatch.target.above{"isk":"100"}');
+  });
+
+  it('shows a dash for a target the poller has not priced, and tones a hit target', () => {
+    const rows = priceWatchTable(t, [
+      alert('Hit', 'above', 100, 130, true),
+      alert('Unpriced', 'below', 100, null),
+    ]).rows;
+    expect(rows[1]!.cells.slice(1, 3)).toEqual(['—', '—']);
+    expect(rows.map((r) => r.tone)).toEqual(['warning', 'clear']);
+  });
+});
+
+describe('loyalty points', () => {
+  it('is Corporation, LP, Share with each corporation as a share of the total', () => {
+    const table = lpTable(t, [
+      { name: 'Caldari Navy', corporationId: 1, points: 750 },
+      { name: null, corporationId: 2, points: 250 },
+    ]);
+    expect(table.columns.map((c) => c.key)).toEqual(['corporation', 'lp', 'share']);
+    expect(table.rows.map((r) => r.cells)).toEqual([
+      ['Caldari Navy', '750', '75%'],
+      ['overview.widgets.data.lp.corporation{"id":2}', '250', '25%'],
+    ]);
+  });
+
+  it('gives a sliver a share of at least 1% rather than a zero that says nothing', () => {
+    const table = lpTable(t, [
+      { name: 'Big', corporationId: 1, points: 100_000 },
+      { name: 'Tiny', corporationId: 2, points: 1 },
+    ]);
+    expect(table.rows[1]!.cells[2]).toBe('<1%');
+  });
+});
+
+describe('mining tax', () => {
+  it('is Payee, Unpaid, Oldest, Entries with the ISK owed kept longest', () => {
+    const table = miningTaxTable(t, [], 0);
+    expect(table.columns.map((c) => c.key)).toEqual(['payee', 'unpaid', 'oldest', 'entries']);
+    expect(table.columns.find((c) => c.priority === 1)!.key).toBe('unpaid');
+  });
+
+  it('lists each payee with what is owed, the age of the oldest entry and how many entries', () => {
+    const table = miningTaxTable(
+      t,
+      [
+        { payeeId: 'p1', name: 'Corp Tax', unpaidIsk: 10_900_000, oldestDays: 13, entries: 4 },
+        { payeeId: '', name: '', unpaidIsk: 5, oldestDays: null, entries: 1 },
+      ],
+      0
+    );
+    expect(table.rows[0]!.cells).toEqual([
+      'Corp Tax',
+      { text: '10.9M', iskAmount: 10_900_000 },
+      'overview.widgets.miningTax.days{"count":13}',
+      '4',
+    ]);
+    expect(table.rows[1]!.cells[0]).toBe('overview.widgets.miningTax.noPayee');
+    expect(table.rows[1]!.cells[2]).toBe('—');
+  });
+
+  it('notes the entries no assignment covers yet as the footer, only when there are some', () => {
+    expect(miningTaxTable(t, [], 0).footer).toBeUndefined();
+    expect(miningTaxTable(t, [], 3).footer).toBe(
+      'overview.widgets.miningTax.unassigned{"count":3}'
+    );
   });
 });

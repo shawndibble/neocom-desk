@@ -22,6 +22,7 @@ import {
   flowDiverging,
   flowSecondary,
   flowTable,
+  lpTable,
   netWorthSeries,
   netWorthTable,
 } from './moneyModels';
@@ -385,12 +386,8 @@ const lp: Builder = (feeds, { t }) => {
           : undefined,
       tone: 'clear',
     },
-    rows: data.entries.map((entry) => ({
-      key: String(entry.corporationId),
-      title: nameOf(entry),
-      value: formatCompactNumber(entry.points),
-      tone: 'clear' as const,
-    })),
+    rows: [],
+    table: lpTable(t, data.entries),
     summary: note,
     chart:
       hbarsFromRows(
