@@ -155,6 +155,7 @@ describe('netWorth', () => {
     day,
     covered,
     layers: { isk: 1000, assets: 9000, escrow: 0, sellOrders: 2000 },
+    history: [],
   });
 
   it('stacks the recorded layers in bar order with a legend, and no contracts layer', () => {
@@ -169,6 +170,36 @@ describe('netWorth', () => {
       ['isk', 's3'],
     ]);
     expect(view.chart.parts.some((p) => p.color === 'iskNeg' || p.color === 'warning')).toBe(false);
+  });
+
+  it('draws the layers over time and says how the total moved when there is a history', () => {
+    const history = [
+      { day: '2026-10-09', layers: { isk: 500, assets: 8000, escrow: 0, sellOrders: 1500 } },
+      { day: '2026-10-10', layers: { isk: 1000, assets: 9000, escrow: 0, sellOrders: 2000 } },
+    ];
+    const view = buildView(
+      'netWorth',
+      { netWorth: ok({ characters: [{ ...char(91), history }] }) },
+      ctx()
+    );
+    expect(view.chart?.kind).toBe('stackedArea');
+    if (view.chart?.kind !== 'stackedArea') return;
+    expect(view.chart.layers.map((l) => [l.key, l.values])).toEqual([
+      ['assets', [8000, 9000]],
+      ['sellOrders', [1500, 2000]],
+      ['isk', [500, 1000]],
+    ]);
+    expect(view.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
+    expect(view.table?.rows.map((r) => r.key)).toEqual(['assets', 'sellOrders', 'isk']);
+    expect(view.table?.rows[0]!.cells[3]).toBe('+1K');
+    expect(view.rows).toEqual([]);
+  });
+
+  it('falls back to one bar of the latest layers with no history, and offers no change', () => {
+    const view = buildView('netWorth', { netWorth: ok({ characters: [char(91)] }) }, ctx());
+    expect(view.chart?.kind).toBe('stack');
+    expect(view.number.secondary).toBeUndefined();
+    expect(view.table?.rows[0]!.cells[3]).toBe('—');
   });
 
   it('sums every Character only when scoped to all, and counts only those with every permission', () => {

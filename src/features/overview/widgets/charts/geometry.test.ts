@@ -6,6 +6,7 @@ import {
   donutSegments,
   hbarPercent,
   sharesOfMax,
+  stackedAreaBands,
   stackPercents,
 } from './geometry';
 
@@ -130,5 +131,35 @@ describe('divergingHeights', () => {
 
   it('is all zero and even when nothing moved', () => {
     expect(divergingHeights([0], [0])).toEqual({ up: [0], down: [0], split: 0.5 });
+  });
+});
+
+describe('stackedAreaBands', () => {
+  it('stacks each layer on the one below, scaled from zero to the tallest total', () => {
+    const bands = stackedAreaBands(
+      [
+        [1, 1],
+        [1, 1],
+      ],
+      100
+    );
+    expect(bands).toEqual(['0,52.0 100,52.0 100,100.0 0,100.0', '0,4.0 100,4.0 100,52.0 0,52.0']);
+  });
+
+  it('draws nothing under two points or with nothing above zero', () => {
+    expect(stackedAreaBands([[1]], 100)).toEqual([]);
+    expect(stackedAreaBands([[0, 0]], 100)).toEqual([]);
+    expect(stackedAreaBands([], 100)).toEqual([]);
+  });
+
+  it('treats a negative value as nothing rather than folding the stack back', () => {
+    const bands = stackedAreaBands(
+      [
+        [1, 1],
+        [-5, -5],
+      ],
+      100
+    );
+    expect(bands[1]).toBe('0,4.0 100,4.0 100,4.0 0,4.0');
   });
 });

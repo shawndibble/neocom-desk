@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { WalletJournalEntry } from '@/esi/endpoints';
+import type { NetWorthCharacter } from './kindLoaders';
 import {
   balanceChange,
   flowBuckets,
   flowDiverging,
   flowSecondary,
   flowTable,
+  netWorthSeries,
+  netWorthTable,
   journalTable,
   ordersListed,
   ordersStateChart,
@@ -336,6 +339,104 @@ describe('wallet flow', () => {
 
     it('has no line when nothing came in', () => {
       expect(flowSecondary(t, [], NOW, 30, 30, [])).toBeUndefined();
+    });
+  });
+});
+
+describe('net worth', () => {
+  const layers = (isk: number, assets: number, escrow = 0, sellOrders = 0) => ({
+    isk,
+    assets,
+    escrow,
+    sellOrders,
+  });
+  const char = (
+    id: number,
+    history: { day: string; layers: ReturnType<typeof layers> }[]
+  ): NetWorthCharacter => ({
+    characterId: id,
+    day: history[history.length - 1]?.day ?? '',
+    covered: true,
+    layers: history[history.length - 1]?.layers ?? layers(0, 0),
+    history,
+  });
+
+  describe('netWorthSeries', () => {
+    it('is each day one total per layer, oldest first', () => {
+      const series = netWorthSeries([
+        char(1, [
+          { day: '2026-10-09', layers: layers(10, 100) },
+          { day: '2026-10-10', layers: layers(20, 110) },
+        ]),
+      ]);
+      expect(series.days).toEqual(['2026-10-09', '2026-10-10']);
+      expect(series.layers.isk).toEqual([10, 20]);
+      expect(series.layers.assets).toEqual([100, 110]);
+      expect(series.totals).toEqual([110, 130]);
+    });
+
+    it('sums Characters, carrying a missing day forward from the last snapshot', () => {
+      const series = netWorthSeries([
+        char(1, [
+          { day: '2026-10-09', layers: layers(10, 100) },
+          { day: '2026-10-10', layers: layers(10, 100) },
+        ]),
+        char(2, [{ day: '2026-10-09', layers: layers(1, 1) }]),
+      ]);
+      expect(series.totals).toEqual([112, 112]);
+    });
+
+    it('starts only once every Character has a snapshot, so a late alt draws no fake jump', () => {
+      const series = netWorthSeries([
+        char(1, [
+          { day: '2026-10-08', layers: layers(0, 100) },
+          { day: '2026-10-09', layers: layers(0, 100) },
+          { day: '2026-10-10', layers: layers(0, 100) },
+        ]),
+        char(2, [{ day: '2026-10-10', layers: layers(0, 50) }]),
+      ]);
+      expect(series.days).toEqual(['2026-10-10']);
+      expect(series.totals).toEqual([150]);
+    });
+
+    it('is empty with no Characters', () => {
+      expect(netWorthSeries([])).toEqual({
+        days: [],
+        layers: { isk: [], assets: [], escrow: [], sellOrders: [] },
+        totals: [],
+      });
+    });
+  });
+
+  describe('netWorthTable', () => {
+    const series = netWorthSeries([
+      char(1, [
+        { day: '2026-10-09', layers: layers(10, 100, 0, 40) },
+        { day: '2026-10-10', layers: layers(30, 100, 0, 20) },
+      ]),
+    ]);
+    const table = netWorthTable(t, layers(30, 100, 0, 20), series, ['assets', 'sellOrders', 'isk']);
+
+    it('is Layer, Value, Share, Change with the value kept longest', () => {
+      expect(table.columns.map((c) => c.key)).toEqual(['layer', 'value', 'share', 'change']);
+      expect(table.columns.find((c) => c.priority === 1)!.key).toBe('value');
+    });
+
+    it('gives each layer its value, share of the total, and change over the series', () => {
+      expect(table.rows.map((r) => r.key)).toEqual(['assets', 'sellOrders', 'isk']);
+      expect(table.rows[0]!.cells).toEqual([
+        'wallet.netWorth.layers.assets',
+        { text: '100', iskAmount: 100 },
+        '67%',
+        '0',
+      ]);
+      expect(table.rows[1]!.cells[3]).toBe('-20');
+      expect(table.rows[2]!.cells[3]).toBe('+20');
+    });
+
+    it('has no change to give from a single day', () => {
+      const one = netWorthSeries([char(1, [{ day: '2026-10-10', layers: layers(1, 1) }])]);
+      expect(netWorthTable(t, layers(1, 1), one, ['isk']).rows[0]!.cells[3]).toBe('—');
     });
   });
 });

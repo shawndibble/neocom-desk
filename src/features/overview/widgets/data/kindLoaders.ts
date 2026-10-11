@@ -42,6 +42,15 @@ export async function loadJournalPanel(characterId: number): Promise<JournalData
 
 // --- Net worth -----------------------------------------------------------------
 
+export interface NetWorthDay {
+  /** The UTC day of the snapshot. */
+  day: string;
+  layers: LayerValues;
+}
+
+/** The days (the newest included) of a Character's snapshots the widget reads: what its change and chart cover. */
+export const NET_WORTH_HISTORY_DAYS = 30;
+
 export interface NetWorthCharacter {
   characterId: number;
   /** The UTC day of the Character's newest snapshot. */
@@ -49,6 +58,8 @@ export interface NetWorthCharacter {
   layers: LayerValues;
   /** Holds every permission a snapshot needs, so its figure counts toward a total. */
   covered: boolean;
+  /** The snapshots of the last `NET_WORTH_HISTORY_DAYS` days, oldest first (the newest is `day` and `layers`). */
+  history: NetWorthDay[];
 }
 
 export interface NetWorthWidgetData {
@@ -75,18 +86,29 @@ export async function loadNetWorthWidget(): Promise<NetWorthWidgetData> {
       .filter((token) => required.every((scope) => token.scopes.includes(scope)))
       .map((token) => token.characterId)
   );
-  const latest = new Map<number, NetWorthSnapshotRow>();
+  const byCharacter = new Map<number, NetWorthSnapshotRow[]>();
   for (const row of rows) {
-    const current = latest.get(row.characterId);
-    if (!current || row.day > current.day) latest.set(row.characterId, row);
+    const list = byCharacter.get(row.characterId);
+    if (list) list.push(row);
+    else byCharacter.set(row.characterId, [row]);
   }
   return {
-    characters: [...latest.values()].map((row) => ({
-      characterId: row.characterId,
-      day: row.day,
-      layers: layerValues(row),
-      covered: covered.has(row.characterId),
-    })),
+    characters: [...byCharacter.entries()].map(([characterId, list]) => {
+      const sorted = list.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+      const latest = sorted[sorted.length - 1]!;
+      const since = new Date(Date.parse(latest.day) - (NET_WORTH_HISTORY_DAYS - 1) * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      return {
+        characterId,
+        day: latest.day,
+        layers: layerValues(latest),
+        covered: covered.has(characterId),
+        history: sorted
+          .filter((row) => row.day >= since)
+          .map((row) => ({ day: row.day, layers: layerValues(row) })),
+      };
+    }),
   };
 }
 

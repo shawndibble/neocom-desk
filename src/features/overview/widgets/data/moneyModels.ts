@@ -9,7 +9,9 @@ import type { DeadlineSeverity } from '@/engine/severity';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { WalletJournalEntry } from '@/esi/endpoints';
+import { LAYER_IDS, type LayerId, type LayerValues } from '@/engine/netWorth/series';
 import { humanizeRefType } from '@/features/character/format';
+import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { formatAge } from '@/lib/age';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown } from '@/lib/duration';
@@ -17,6 +19,7 @@ import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { RefTypeBreakdownRow } from '@/features/character/walletJournalFilter';
 import type { DivergingChartModel, StackChartModel, StackPart } from '../charts/types';
 import { backwardBucketSums } from './chartSeries';
+import type { NetWorthCharacter } from './kindLoaders';
 import { UNKNOWN } from './builderKit';
 import type { NumberSecondary, TableModel, TableRowModel, Translate } from './types';
 
@@ -336,6 +339,91 @@ export function flowSecondary(
     text: t(`${W}.walletFlow.top`, {
       name: humanizeRefType(top.refType),
       isk: formatIskCompact(top.income),
+    }),
+  };
+}
+
+// --- Net worth -----------------------------------------------------------------------
+
+export interface NetWorthSeries {
+  /** One UTC day per point, oldest first. */
+  days: string[];
+  layers: Record<LayerId, number[]>;
+  totals: number[];
+}
+
+/**
+ * The days the included Characters were all being recorded, with each layer
+ * summed across them. A Character with no snapshot on a day carries its last
+ * one forward; a day before every Character has a first snapshot is left out,
+ * because unknown is not zero and a late-added alt would draw a jump.
+ */
+export function netWorthSeries(characters: readonly NetWorthCharacter[]): NetWorthSeries {
+  const out: NetWorthSeries = {
+    days: [],
+    layers: { isk: [], assets: [], escrow: [], sellOrders: [] },
+    totals: [],
+  };
+  if (characters.length === 0) return out;
+  const days = [...new Set(characters.flatMap((c) => c.history.map((row) => row.day)))].sort();
+  const cursors = characters.map(() => ({ at: -1 }));
+  for (const day of days) {
+    const sum: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0 };
+    let everyoneStarted = true;
+    characters.forEach((character, i) => {
+      const cursor = cursors[i]!;
+      while (
+        cursor.at + 1 < character.history.length &&
+        character.history[cursor.at + 1]!.day <= day
+      ) {
+        cursor.at += 1;
+      }
+      const row = character.history[cursor.at];
+      if (!row) {
+        everyoneStarted = false;
+        return;
+      }
+      for (const id of LAYER_IDS) sum[id] += row.layers[id];
+    });
+    if (!everyoneStarted) continue;
+    out.days.push(day);
+    let total = 0;
+    for (const id of LAYER_IDS) {
+      out.layers[id].push(sum[id]);
+      total += sum[id];
+    }
+    out.totals.push(total);
+  }
+  return out;
+}
+
+/** Each layer's value now (the latest snapshots), its share of the total, and how it changed over the series. */
+export function netWorthTable(
+  t: Translate,
+  now: LayerValues,
+  series: NetWorthSeries,
+  layers: readonly LayerId[]
+): TableModel {
+  const total = LAYER_IDS.reduce((sum, id) => sum + now[id], 0);
+  return {
+    columns: [
+      { key: 'layer', label: t(`${W}.netWorth.col.layer`), priority: 0 },
+      { key: 'value', label: t(`${W}.netWorth.col.value`), align: 'end', priority: 1 },
+      { key: 'share', label: t(`${W}.netWorth.col.share`), align: 'end', priority: 2 },
+      { key: 'change', label: t(`${W}.netWorth.col.change`), align: 'end', priority: 3 },
+    ],
+    rows: layers.map((id) => {
+      const values = series.layers[id];
+      const value = now[id];
+      return {
+        key: id,
+        cells: [
+          t(LAYER_LABEL_KEYS[id]),
+          { text: formatIskCompact(value), iskAmount: value },
+          `${total > 0 ? Math.round((Math.max(0, value) / total) * 100) : 0}%`,
+          values.length >= 2 ? formatIskCompactSigned(value - values[0]!) : UNKNOWN,
+        ],
+      };
     }),
   };
 }

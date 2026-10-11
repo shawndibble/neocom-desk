@@ -102,6 +102,18 @@ export interface StackChartModel extends ChartBase {
   parts: StackPart[];
 }
 
+export interface StackedAreaChartModel extends ChartBase {
+  kind: 'stackedArea';
+  /** Bottom layer first; every layer has the same number of points, oldest first. */
+  layers: { key: string; values: number[]; color: ChartColor }[];
+  /** The latest day as legend parts, in layer order; also what Small draws as one bar. */
+  parts: StackPart[];
+  /** The tallest total, already formatted. */
+  max: string;
+  xStart?: string;
+  xEnd?: string;
+}
+
 export interface SparkRow {
   key: string;
   label: string;
@@ -122,6 +134,7 @@ export type ChartModel =
   | HBarsChartModel
   | DonutChartModel
   | StackChartModel
+  | StackedAreaChartModel
   | SparkChartModel;
 
 export type ChartKind = ChartModel['kind'];

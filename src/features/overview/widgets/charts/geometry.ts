@@ -115,3 +115,30 @@ export function divergingHeights(
     max <= 0 || v <= 0 ? 0 : Math.max(MIN_BAR_PERCENT, (v / max) * 100);
   return { up: up.map(scale(maxUp)), down: down.map(scale(maxDown)), split };
 }
+
+/**
+ * Closed polygons (`x,y` pairs in a `100 x height` viewBox) for a stacked area,
+ * bottom layer first. The scale runs from zero to the tallest total, so a
+ * layer's thickness is its real share; a negative value stacks as nothing.
+ * Fewer than two points, or nothing above zero, draw nothing.
+ */
+export function stackedAreaBands(layers: readonly (readonly number[])[], height: number): string[] {
+  const points = layers[0]?.length ?? 0;
+  if (points < 2) return [];
+  const totals = Array.from({ length: points }, (_, i) =>
+    layers.reduce((sum, layer) => sum + Math.max(0, layer[i] ?? 0), 0)
+  );
+  const max = Math.max(...totals);
+  if (max <= 0) return [];
+  const y = (value: number) => (height - (value / max) * (height - 4)).toFixed(1);
+  const x = (i: number) => ((i / (points - 1)) * 100).toFixed(0);
+  const below = Array<number>(points).fill(0);
+  return layers.map((layer) => {
+    const upper = layer.map((_, i) => below[i]! + Math.max(0, layer[i] ?? 0));
+    const lower = [...below];
+    upper.forEach((value, i) => (below[i] = value));
+    const top = upper.map((value, i) => `${x(i)},${y(value)}`);
+    const bottom = lower.map((value, i) => `${x(i)},${y(value)}`).reverse();
+    return [...top, ...bottom].join(' ');
+  });
+}

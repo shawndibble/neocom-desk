@@ -57,6 +57,21 @@ const MODELS: Record<string, ChartModel> = {
     ],
     summary: 'Assets 29B, wallet 4B.',
   },
+  stackedArea: {
+    kind: 'stackedArea',
+    layers: [
+      { key: 'assets', values: [29, 30], color: 's1' },
+      { key: 'isk', values: [3, 4], color: 's3' },
+    ],
+    parts: [
+      { key: 'assets', label: 'Assets', value: 30, text: '30B', color: 's1' },
+      { key: 'isk', label: 'Wallet', value: 4, text: '4B', color: 's3' },
+    ],
+    max: 'max 34B',
+    xStart: '30 days ago',
+    xEnd: 'today',
+    summary: 'Net worth rose to 34B.',
+  },
   spark: {
     kind: 'spark',
     rows: [{ key: 'trit', label: 'Tritanium', values: [4, 5, 3], text: '4.18' }],
@@ -116,6 +131,22 @@ describe('Chart', () => {
     const large = render(<Chart model={MODELS.bars!} size="L" />);
     expect(small.container.querySelector<HTMLElement>('.border-b')?.style.height).toBe('44px');
     expect(large.container.querySelector<HTMLElement>('.border-b')?.style.height).toBe('100px');
+  });
+
+  it('draws layers over time at Medium and only the latest day as one bar at Small', () => {
+    const medium = render(<Chart model={MODELS.stackedArea!} size="M" />).container;
+    expect(medium.querySelectorAll('polygon')).toHaveLength(2);
+    expect(medium.textContent).toContain('max 34B');
+    expect([...medium.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'Assets 30B',
+      'Wallet 4B',
+    ]);
+    const small = render(<Chart model={MODELS.stackedArea!} size="S" />).container;
+    expect(small.querySelectorAll('polygon')).toHaveLength(0);
+    expect([...small.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'Assets 30B',
+      'Wallet 4B',
+    ]);
   });
 
   it('keeps stack segments in legend order', () => {

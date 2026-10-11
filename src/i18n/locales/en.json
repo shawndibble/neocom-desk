@@ -3842,7 +3842,17 @@
       "netWorth": {
         "title": "Net worth",
         "description": "Everything you own, by layer",
-        "empty": "No net worth has been recorded yet."
+        "empty": "No net worth has been recorded yet.",
+        "change_one": "{{isk}} in {{count}} day",
+        "change_other": "{{isk}} in {{count}} days",
+        "unchanged_one": "No change in {{count}} day",
+        "unchanged_other": "No change in {{count}} days",
+        "col": {
+          "layer": "Layer",
+          "value": "Value",
+          "share": "Share",
+          "change": "Change"
+        }
       },
       "orders": {
         "title": "Open orders",
