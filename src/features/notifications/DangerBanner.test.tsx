@@ -34,6 +34,7 @@ function LocationProbe() {
 function renderBanner() {
   return render(
     <MemoryRouter initialEntries={['/overview']}>
+      <h1>Pilot</h1>
       <DangerBanner />
       <LocationProbe />
     </MemoryRouter>
@@ -95,5 +96,26 @@ describe('DangerBanner', () => {
       (row) => row.dismissedAt === undefined
     );
     expect(live).toEqual([]);
+  });
+
+  it('moves focus to the page heading when Acknowledge removes the strip', async () => {
+    await db.notificationFeed.put(attack('focus-1', Date.now()));
+    renderBanner();
+    await userEvent.click(await screen.findByRole('button', { name: /^Acknowledge/ }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Pilot' })).toHaveFocus());
+  });
+
+  it('announces a danger entry once: a later mount renders it as a status', async () => {
+    await db.notificationFeed.put(attack('once-1', Date.now()));
+    const first = renderBanner();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Structure Under Attack');
+    first.unmount();
+
+    renderBanner();
+    const strip = await screen.findByText('Danger').then((el) => el.parentElement!);
+    expect(strip).toHaveAttribute('role', 'status');
+    expect(strip).toHaveTextContent('Structure Under Attack');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

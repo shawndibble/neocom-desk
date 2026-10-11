@@ -6,17 +6,28 @@
  * Acknowledge is Dismiss for the whole danger type (the panel's rule, so the
  * strip and the panel never disagree about what is still outstanding), which
  * lets the next-newest danger type, if any, take the strip.
+ *
+ * Acknowledge unmounts the button that ran it, so focus is moved to the page
+ * heading once the strip is gone (WCAG 2.4.3). The strip is an alert only the
+ * first time this session shows a given danger entry; coming back to the
+ * Overview later renders it as a plain status so a screen reader is not told
+ * the same news again on every mount.
  */
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui';
 import { formatAge } from '@/lib/age';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useNow } from '@/lib/useNow';
 import { alertGroupKey } from './alertGroups';
 import { alertViewPath, isDangerEntry, selectDangerBanner } from './dangerAlert';
 import { dismissFeedEntriesAndSync } from './feedSync';
 import { useVisibleAlertEntries } from './useUnreadAlertCount';
+
+/** Which banner instance announced each danger entry this session (module-level: it outlives a route change). */
+const announcedBy = new Map<string, symbol>();
 
 export function DangerBanner() {
   const { t } = useTranslation();
@@ -25,13 +36,21 @@ export function DangerBanner() {
   const now = useNow();
   const entries = useVisibleAlertEntries();
   const entry = selectDangerBanner(entries);
+  const focusAfterCommit = useFocusAfterCommit();
+  const entryId = entry?.id;
+  const [self] = useState(() => Symbol('DangerBanner'));
+  // An entry is an alert only for the instance that first showed it; a later mount sees a status.
+  const fresh = entryId !== undefined && (announcedBy.get(entryId) ?? self) === self;
+  useEffect(() => {
+    if (entryId !== undefined && !announcedBy.has(entryId)) announcedBy.set(entryId, self);
+  }, [entryId, self]);
   if (entry === null) return null;
 
   const key = alertGroupKey(entry);
   const size = phone ? 'md' : 'sm';
   return (
     <div
-      role="alert"
+      role={fresh ? 'alert' : 'status'}
       className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xs border border-danger bg-danger/10 px-3 py-2"
     >
       <span className="text-[0.6875rem] font-semibold tracking-widest text-danger uppercase">
@@ -53,11 +72,13 @@ export function DangerBanner() {
         <Button
           size={size}
           aria-label={t('alerts.panel.acknowledgeLabel', { title: entry.title })}
-          onClick={() =>
+          onClick={() => {
+            // The strip may hand over to the next danger type (button stays) or vanish (heading).
+            focusAfterCommit(() => document.querySelector<HTMLElement>('h1'));
             void dismissFeedEntriesAndSync(
               entries.filter((row) => isDangerEntry(row) && alertGroupKey(row) === key)
-            )
-          }
+            );
+          }}
         >
           {t('alerts.panel.acknowledge')}
         </Button>
