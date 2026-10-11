@@ -197,6 +197,31 @@ describe('SurveyInfoReadout', () => {
     expect(container.textContent).toContain('<h1>raw</h1>');
   });
 
+  it('renders the rest of a Markdown cheatsheet: strikethrough, tables, quotes, code blocks, task lists, bare links', async () => {
+    const notes = [
+      '~~old~~ and **new**',
+      '> quoted',
+      '```\nblock\n```',
+      '| Ore | Qty |\n|---|---|\n| Veldspar | 5 |',
+      '- [x] done\n- [ ] todo',
+      'see https://example.com/x now',
+      '![pic](https://example.com/p.png)',
+    ].join('\n\n');
+    const { container } = render(<SurveyInfoReadout info={{ location: null, notes }} tax={null} />);
+    expect((await screen.findByText('old')).tagName).toBe('DEL');
+    expect(container.querySelector('blockquote')).not.toBeNull();
+    expect(container.querySelector('pre')).not.toBeNull();
+    expect(container.querySelectorAll('table th')).toHaveLength(2);
+    expect(screen.getByRole('cell', { name: 'Veldspar' })).toBeTruthy();
+    const boxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    expect([...boxes].map((box) => [box.checked, box.disabled])).toEqual([
+      [true, true],
+      [false, true],
+    ]);
+    expect(screen.getByRole('link', { name: /example\.com\/x/ })).toBeTruthy();
+    expect(container.querySelector('img')).toBeNull();
+  });
+
   it('shows only the rows that were set', () => {
     render(<SurveyInfoReadout info={{ location: null, notes: 'Just notes' }} tax={null} />);
     expect(screen.queryByText('Location')).toBeNull();

@@ -1,15 +1,19 @@
 /**
- * The starter's notes as a reader sees them: a small slice of Markdown (headings,
- * bold, italic, strikethrough, lists, rules, inline code, links). Anyone holding the Survey
- * link reads these, so nothing else gets through: raw HTML stays text, images
- * flatten to their text, headings never outrank the panel's own title, and a link opens only if it is http(s).
- * A single newline stays a line break, as the plain-text notes always had it.
- * Loaded lazily by `SurveyNotes`, so the Markdown parser costs nothing until a
- * Survey has notes.
+ * The starter's notes as a reader sees them: standard Markdown (the CommonMark
+ * and GitHub flavours a cheatsheet lists): headings, bold, italic,
+ * strikethrough, lists, task lists, quotes, code, tables, rules, links and bare
+ * URLs. Anyone holding the Survey link reads these, so some things stay inert:
+ * raw HTML shows as text, images flatten to their alt text (nothing loads from a
+ * stranger's URL), headings never outrank the panel's own title, and a link
+ * opens only if it is http(s). A single newline stays a line break, as the
+ * plain-text notes always had it. Loaded lazily by `SurveyNotes`, so the
+ * Markdown parser costs nothing until a Survey has notes.
  */
 import type { ReactNode } from 'react';
 import Markdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
+import { Checkbox } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 
 const ALLOWED_ELEMENTS = [
@@ -30,13 +34,22 @@ const ALLOWED_ELEMENTS = [
   'a',
   'code',
   'br',
+  'pre',
+  'blockquote',
+  'table',
+  'thead',
+  'tbody',
+  'tr',
+  'th',
+  'td',
+  'input',
 ];
 
 export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
   return (
     <div className="flex flex-col gap-2 [overflow-wrap:anywhere]">
       <Markdown
-        remarkPlugins={[remarkBreaks]}
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         allowedElements={ALLOWED_ELEMENTS}
         unwrapDisallowed
         components={{
@@ -55,6 +68,30 @@ export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
           h5: Heading4,
           h6: Heading4,
           hr: () => <hr className="border-line" />,
+          li: ({ children }) => <li className="has-[input]:list-none">{children}</li>,
+          // Task-list boxes are shown, never togglable: a reader can't change a stored note.
+          input: ({ checked }) => (
+            <Checkbox checked={checked === true} disabled readOnly className="mr-2 align-middle" />
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 border-line-bright pl-3 text-text-dim">
+              {children}
+            </blockquote>
+          ),
+          pre: ({ children }) => (
+            <pre className="overflow-x-auto rounded-xs bg-panel-2 p-2 font-mono text-[0.9em]">
+              {children}
+            </pre>
+          ),
+          table: ({ children }) => (
+            <div className="overflow-x-auto">
+              <table className="border-collapse text-left">{children}</table>
+            </div>
+          ),
+          th: ({ children }) => (
+            <th className="border border-line px-2 py-1 font-semibold">{children}</th>
+          ),
+          td: ({ children }) => <td className="border border-line px-2 py-1">{children}</td>,
           ul: ({ children }) => <ul className="list-disc pl-5">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal pl-5">{children}</ol>,
           code: ({ children }) => (
