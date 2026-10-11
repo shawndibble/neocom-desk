@@ -16,6 +16,24 @@ Route `/alerts` (`src/routes/Alerts.tsx`): the record of every alert this device
 
 See everything that fired, including for Characters you were not looking at (`Alerts.tsx:11-15`), and un-mute a type without going to Settings. Overview shows a summarised column (`overview.md`).
 
+- **Top jobs (ranked):** 1. "What fired while I was away, across all my Characters, worst first?" (CONTEXT.md Alert: a device back from a week away holds hundreds of fires across a dozen-odd types). 2. "Take me to the thing it is about, as that Character" (an alert lands on its row, `20260908-123516`; `?character=` switch). 3. "Clear or silence the noise" (dismiss a fire, a type or all; mute a type).
+- **Device and cadence:** both. The bell with its unread count sits in every page header (#3267, `20261009-163837`); `/alerts` has no rail row or phone tab. Visited when the bell shows a count (inferred).
+- **Above the fold:** header with Dismiss all and Notification settings; the filter bar with severity chips and counts; groups worst severity first, each with count and age of the newest fire (#3328 asks for that age on collapsed rows from md).
+- **Not for:** choosing which events fire, or on which channel (Settings › Notifications, `notifications.md`); the before-logoff check of what is on a clock (Overview).
+- **Sources:** `Alerts.tsx:11-17`; CONTEXT.md Alert; decisions `20260908-123516`, `20261009-163837`; #3267, #3328, #2887.
+- **Unconfirmed:** visit cadence; whether pilots reach this list mostly from the bell or from a tapped push (a tapped push opens the linked page, not `/alerts`).
+
+### Mobbin brief
+
+- **Fit:** high. A grouped notification inbox with counts, filters and mute is a common pattern.
+- **Analog apps:** GitHub (notifications inbox), Linear (inbox), Sentry (issues list), Slack (activity).
+- **Screen queries:**
+  - `web: notification inbox grouped by type with a count per group, expandable to single events, and severity filter chips above`
+  - `ios: notification list grouped by category with an unread badge and a clear all action in the header`
+  - `web: error tracking list grouping repeated events by type with event count, last seen time and a mute action`
+- **Flow queries:** none.
+- **Mobbin won't help with:** the severity of each EVE notification type and the switch to the alt an alert is about.
+
 ## Controls
 
 - Header: "Notification settings" link (to Settings notifications tab), "Dismiss all" icon (only when unmuted entries exist; focus then goes to a surviving muted row or the panel heading).

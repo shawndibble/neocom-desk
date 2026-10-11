@@ -21,6 +21,29 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 | Refresh                                  | `Wallet.tsx:530`                      | PageHeader icon button                                                                                          |
 | Corp wallet                              | pointer only                          | `/corp/wallet` (`routes/CorpWallet.tsx`), see Pointers                                                          |
 
+## Purpose and user goal
+
+"How much am I worth, and where did my ISK go?" Wallet holds the active Character's money: Balance shows the Worth panel (net worth over time by layer, EverMarks) and LP per corporation; Journal is the ledger. Since `20261010-200446` (#3527) the LP Store is a Wallet tab too, because the store is where LP balances are spent; the LP Store section below still describes it as Market's. Personal fills live on Market › History › Transactions (`20261001-113143`).
+
+- **Top jobs (ranked):** 1. "What is my net worth across ISK, assets and orders, and is it going up?" (Balance, #2935, #3004) 2. "Where did the ISK go / what was this payment?" (Journal: filters, ref-type breakdown, #2995) 3. "What can I buy with my LP?" (LP Store). Order is inferred, see Unconfirmed.
+- **Device and cadence:** both. Wallet is not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); the phone evidence is specific: pilots arrive from the `walletBalanceChanged` alert, which pulses one Journal row (`20260905-195857`); phone Journal fixes (#2992, #3501) show it is read on a phone.
+- **Above the fold:** Balance: Net worth and EverMarks figures, then the Worth chart with its series picker (#3004). Journal: filter bar with filtered count and net total, then newest entries.
+- **Not for:** individual market fills (Market › History › Transactions); corp divisions (`/corp/wallet`, `20260929-131220`); pricing one item (Market).
+- **Sources:** #2935, #2936, #3004, #2995, #2992, #3501, #3527; `20261010-200446`, `20261001-113143`, `20260905-195857`, `20260929-131220`, `20261007-184320`.
+- **Unconfirmed:** the job ranking; that pilots check net worth often enough to want the trend at the top; how much LP Store use starts from Wallet vs search/palette; whether the All-Characters total matters more than the active Character's.
+
+### Mobbin brief
+
+- **Fit:** high. A net-worth chart with stacked layers, a filterable transaction ledger and a spending catalog are standard finance patterns; only LP offer profit (ISK/LP) is EVE-specific.
+- **Analog apps:** Copilot Money, Monarch, Revolut, Robinhood (portfolio).
+- **Screen queries:**
+  - `web: net worth summary with a total figure above a stacked area chart by account type and a series selector in the panel header`
+  - `web: transaction ledger table with date-range and category filters and a net-total summary above`
+  - `ios: transaction list grouped by day with amount and running balance per row`
+  - `web: rewards catalog ranked by value per point with an item detail panel beside the list`
+- **Flow queries:** none.
+- **Mobbin won't help with:** journal ref types (bounties, broker fees, escrow) and LP Store profit per LP net of fees; reference the EVE client wallet and LP Store windows.
+
 ## Route, nav, redirects
 
 - `/wallet` nav item: `src/app/navDestinations.ts:197-204` (`group: 'economy'`, `gating: 'scope'`, `mobileTab: true`, `aliasTabs: ['transactions']`).
@@ -177,10 +200,6 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
 - No income/expense breakdown by ref type for a date range; only the filtered net total (`WalletJournalTable.tsx:151`) (#2858).
 - Journal tab and the balance chart are the active Character's, unless the URL names another with `?char=<id>` (alias `?chars=<id>`): then the whole page follows that Character, the readout says "Name only", a ‹ Wallet crumb shows when arriving from the Wallet chart, and the active Character is not switched. Otherwise the `?char=current|all` filter only affects the Balance panel.
-- Journal tab and the balance chart are always the active Character's; the `?char=` filter only affects the Balance panel.
-
-> > > > > > > origin/main
-
 - Journal tab never shows a re-login banner: `loadWalletJournal` exposes no `needsReauth`; a revoked wallet scope shows the generic cached-empty state (Balance tab does show the grant banner).
 - Item names on journal lines come from at most 5 pages of transactions (`MAX_TRANSACTION_PAGES`); older journal lines stay unlinked (documented in `journalTransactionLink.ts`).
 - `CharacterFilterControl` offers only This/All (partial subsets removed); `Wallet.tsx` still handles an arbitrary id Set.

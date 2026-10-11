@@ -17,6 +17,28 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 | Paste routing                               | `survey` detector in `src/engine/import/pasteDestination.ts`                          |
 | Rules and TTL                               | `firestore.rules` (`shares/{id}/surveyScans`), `firestore.indexes.json`               |
 
+## Purpose and user goal
+
+"How much of this field is left, and when will it be gone?" A mining op's shared board: the pilot pastes Survey Scanner results, posts the state to fleet chat, and anyone with the link keeps it updated with no login, because whoever keeps a Survey going after its starter leaves may have no account (`20261008-175716`).
+
+- **Top jobs (ranked):** 1. "How much is mined, how fast, and when is it done?" 2. "Tell the fleet" (Copy chat message, Copy link). 3. "How much of it did I mine, and who taxes this moon ore?" (Your share, Moon tax).
+- **Device and cadence:** both, during an op. The owner pastes from the EVE client at a desk (Ctrl+V anywhere); the public page re-reads every 60 s and has a phone layout (Copy button full width under the chart). Cadence: repeated pastes within one op, ops occasional.
+- **Above the fold:** percent mined and Done at (ETA), the volume chart, Copy chat message; empty state: the "How to copy a scan" guide.
+- **Not for:** tax bookkeeping (Tax tab, `mining.md`); long-term yield (Overview tab).
+- **Sources:** `20261008-175716`, `20261008-221334`, `20261009-114933`, `20261009-112001`, `20261010-075213`; #3254, #3460, #3530, #3282.
+- **Unconfirmed:** that fleet mates open the public link on phones; op frequency; the ranking of job 3.
+
+### Mobbin brief
+
+- **Fit:** medium: a live progress dashboard and a public share page are generic; scan parsing and the chat-font message are EVE-specific.
+- **Analog apps:** Strava, Uber, Google Maps (shared ETA), Life360.
+- **Screen queries:**
+  - `web: live progress dashboard with a large percent complete, an estimated finish time and a burndown chart over time`
+  - `ios: public page opened from a link without signing in, showing a live progress bar, ETA and last update time`
+  - `web: list of categories each with a horizontal bar of amount left, its value and percent`
+- **Flow queries:** `web: share a live status link and copy a preformatted message to paste into a group chat`
+- **Mobbin won't help with:** the Survey Scanner paste format, the pixel-padded EVE chat message, the ore value ramp; reference RockRadar and the in-game scanner.
+
 ## Behaviour
 
 - A Survey Scanner copy is one row per rock, `ore  units  volume m3  ISK  distance`, tab separated (runs of spaces also read), with an ore-name header line above each group. The scanner prints a header for every grade even when it has no rocks, so a bare line is a header when a row of the same ore follows, or when it names a grade or an ore the scan has rows for and another bare line or the end follows. A bare line anywhere else, or a header with no rows at all, is not a scan. Anything else is not a scan: the parser needs every line to be one.

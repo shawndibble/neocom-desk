@@ -25,6 +25,27 @@ Code: `src/routes/Contacts.tsx`, `src/routes/contactsColumns.ts`, `src/features/
 | Refresh + Data Age   | Header                                                                                               | `Contacts.tsx:1077,1104`                 |
 | Reauth banner        | Contacts scope missing/revoked                                                                       | `GrantBanner`                            |
 
+## Purpose and user goal
+
+"What standing do I have with this pilot or corp, and do my alts agree?" A read-only mirror of the in-game contact list plus the cross-Character comparison; a row shows every distinct standing because which alt is right is the reader's call (`20260912-211914`). The Standings tab adds NPC standings that set broker fees (`20261007-224449`).
+
+- **Top jobs (ranked):** 1. "Look up a name: what standing, blocked or watched?" 2. "Where do my Characters' lists disagree?" (Only disagreements). 3. "Which NPC standings lower my broker fees?" (Standings tab).
+- **Device and cadence:** desk: the list is "actually worked through" above `sm` (`20260912-210929`); phone stacks rows. Cadence: occasional.
+- **Above the fold:** search and type/standing chips, then rows with standing icon, name and affiliation; Across view: Only disagreements chip and Fetch all characters.
+- **Not for:** editing standings (in game only); pilot intel and kills (Pilot Lookup / Public Info, `20260930-104922`).
+- **Sources:** `20260912-211914`, `20260912-210929`, `20261002-145207`, `20261007-224449`; #36, #1976, #2164.
+- **Unconfirmed:** cadence; that look-up outranks the alt comparison.
+
+### Mobbin brief
+
+- **Fit:** medium to high: a filtered contact directory is generic; standing tiers and fee effects are EVE-specific.
+- **Analog apps:** iOS Contacts, HubSpot, LinkedIn, Slack.
+- **Screen queries:**
+  - `web: contacts table with avatar, name, organisation and a status tag column, with a search field and filter chips with counts above`
+  - `web: table where each row lists the values several accounts hold for the same contact, with a filter showing only rows that differ`
+  - `ios: contact list stacked as cards with avatar, name, organisation and a coloured status icon`
+- **Mobbin won't help with:** EVE standing tiers and colours, NPC standings' effect on fees.
+
 ## Routing and view selection
 
 - `/contacts` -> This character; `/contacts/across` -> All characters. Registered via `CONTACTS_TABS` (ADR 0015 path-segment tabs). The switch maps `current`/`all` onto the path (`setTab`), no `chars` param (decision `20261002-145207-contacts-rows-open-show-info-npcs-by-id`).

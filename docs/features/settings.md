@@ -212,6 +212,24 @@ Layout: 2-up grid from `xl`: Clear cache, App updates, Export, Import; then This
 | Data & storage                                           | Fix stale data, update, move to a new device, leave                                      | Clear cache is blunt (ESI is re-derivable); backup solves 20+ alt re-login (ADR 0014); delete-all is the only client-side remote delete (`20260926-223948`)                                                                                                                                                                              |
 | Activity Log                                             | See what the app fetched and how it went (support aid)                                   | Session-only so no token, id or body can persist (`stores/activityLog.ts`)                                                                                                                                                                                                                                                               |
 
+- **Top jobs (ranked):** 1. "Set the assumptions my pages start from, once, for every device" (Defaults, `20260907-221425`). 2. "Choose which events reach me, and how" (Notifications). 3. "Fix, move or leave" (clear cache, backup, delete all data).
+- **Device and cadence:** both, occasional. Phone has its own list-then-drill layout with value summaries (`20260925-120313`); footer page with `mobileTab: false`.
+- **Above the fold:** desktop: the grouped section rail and Display; phone: the grouped list with each section's current value.
+- **Not for:** a page's own settings mid-task (the page settings modal opens the same form, `20261004-155006`); shortcuts, FAQ and support (`/help`).
+- **Sources:** decisions listed under "Decisions and ADRs" below, chiefly `20260907-221425`, `20260925-084119`, `20260925-120313`, `20261004-155006`; ADR 0014.
+- **Unconfirmed:** the job ranking and visit cadence.
+
+### Mobbin brief
+
+- **Fit:** high. A sectioned settings page and a phone list with current values are standard.
+- **Analog apps:** Linear, GitHub, Slack, iOS Settings.
+- **Screen queries:**
+  - `web: settings page with a grouped section sidebar on the left and form panels on the right`
+  - `ios: grouped settings list where each row shows its current value and a chevron`
+  - `web: settings form panel with a note that values are kept across devices`
+- **Flow queries:** none.
+- **Mobbin won't help with:** route rule controls (security penalty, Avoided Systems, holes), ME/TE and the per-Character notification matrix's EVE events.
+
 ## Formulas, ranges and edge cases
 
 | Item                  | Exact behavior                                                                                                                                                                                                                                                                                                                                                                                                                                    | Source                                                                                              |

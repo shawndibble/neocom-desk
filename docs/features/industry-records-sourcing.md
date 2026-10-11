@@ -34,6 +34,29 @@ Where brief items actually live (code differs from the obvious guess):
 | Phone card lists                           | `MobileOpportunityList`, `MobileOwnedBlueprintList`, `MobileMarketWideList`, `MobileSortToolbar`                      | Cards, sort menu, identical-copy folding                                                                      |
 | Blueprint Acquisition modal                | mounted by `BuildPlanDetail.tsx`; logic in `BlueprintAcquisitionModal.tsx`                                            | Link-up only; shared row builders with BPC Sourcing                                                           |
 
+## Purpose and user goal
+
+"What is running, what did I make, and what should I build next?" This doc covers the Industry jobs around Build Plans (`industry-plans.md`): the **Jobs panel** answers "what is running and what is done" on every tab; **Records** answers "what did my builds actually earn" (Production Log, `20260905-181537`); **BPC Sourcing** answers "where can I buy a copy of this blueprint" (ADR 0013); **Opportunities** answers "what should I build next", from owned blueprints (Ranked, All owned) or the whole market (Market-Wide, `20260911-081120`).
+
+- **Top jobs (ranked):** 1. "Which jobs are done and need delivering or logging?" (Jobs panel; `industryJobComplete` alert → `/industry`; #2866) 2. "What is the most profitable thing I can build with what I own?" (Opportunities Ranked; #3071 calls the owned panel the one that answers the pilot's question and flags it as buried under the scan) 3. "Did my last builds make money?" (Records). BPC Sourcing is task-driven, often reached from a plan's Blueprint Acquisition.
+- **Device and cadence:** both. Industry is a default phone tab (`DEFAULT_MOBILE_TABS`); Opportunities and the Jobs panel have phone layouts (#3070, #2923). The `industryJobComplete` alert brings pilots to the Jobs panel.
+- **Above the fold:** the Jobs strip (running, done, next to finish, `20260906-091110`) above every tab. Opportunities: owned Ranked builds by ISK/hour with a start-plan action (#3071). Records: realized-profit totals and chart. BPC Sourcing: blueprint search box.
+- **Not for:** costing one build in detail (plan page, `industry-plans.md`); buying non-blueprint items on contract (Contracts › Item search); corp industry beyond listing jobs by installer (`20260929-102524`).
+- **Sources:** `20260906-091110`, `20260905-181537`, `20260911-081120`, `20260926-222310`, `20261003-112230`, `20261007-164750`, `20260929-102524`, ADR 0013; #2866, #2923, #3070, #3071.
+- **Unconfirmed:** cadence (Jobs per session or on alert; Opportunities and Records occasional desk sessions); that job pickup outranks finding what to build; the Opportunities vs Records order; how often pilots open Records; whether Market-Wide scanning is used by more than a few pilots.
+
+### Mobbin brief
+
+- **Fit:** medium. A job queue with progress, a ranked opportunity list, a profit log with chart and a catalog search are generic; blueprint copy runs, ME/TE and job slots are EVE-specific.
+- **Analog apps:** GitHub Actions (runs), Shopify (orders and analytics), Etsy (shop stats), Finviz (screener).
+- **Screen queries:**
+  - `web: running jobs strip with a count of active and finished jobs, a next-to-finish time and one progress bar per job`
+  - `web: ranked list of opportunities sorted by return per hour with a start button on each row and filters above`
+  - `web: sales log with profit totals and a profit-over-time chart above a per-item table`
+  - `web: search results table of listings with price per unit, quantity and location and a source filter`
+- **Flow queries:** none.
+- **Mobbin won't help with:** job slots per activity pool, BPO vs BPC economics, order depth and the liquidity floor, linking wallet sales to Production Runs; reference the EVE client Industry window, Eve Deep Industry and EVE Console.
+
 ## 2. Industry shell (`src/routes/Industry.tsx`)
 
 - Route `/industry/*`; `INDUSTRY_TABS` = plans (default), records, sourcing, opportunities. Labels: Build Plans, Records, BPC Sourcing, Opportunities (`en.json` `industry.buildPlansTab` etc.). `usePageTab` reads path segment; switch = history push; unknown segment -> `TabRoute` replaces with default. `/bpc-contracts` redirects to `/industry/sourcing` (`src/app/App.tsx:201`). Nav: one entry `/industry`, `mobileTab: true`, `gating: 'scope'` (`src/app/navDestinations.ts`); tabs come from `PAGE_TABS` (`src/app/pageTabs.ts`).

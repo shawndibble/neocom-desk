@@ -17,6 +17,28 @@ Both routes sit outside `RequireCharacter`/`ScopeGate` (`src/app/App.tsx:360-370
 
 See also: `entities-share.md` (another author; key format, 7-day TTL and in-memory reuse agree).
 
+## Purpose and user goal
+
+"Send them exactly what I am looking at." Two people: the sender copies a short link from an Appraisal, a Fitting, a D-Scan or a Survey; the recipient, often signed out, opens it read-only and can carry it into the app. This doc owns Share Links; `entities-share.md` owns Show Info and only points here for sharing. Since `20261002-125432` a Shared Appraisal is frozen at its prices, so the recipient sees the sender's numbers.
+
+- **Top jobs (ranked):** 1. Sender: "Copy a link to this in one click." 2. Recipient: "What did they send me, and is it still valid?" (frozen figures, expiry). 3. Recipient: "Open it in my own app" (Open Neocom Desk, or Log in).
+- **Device and cadence:** n/a as a page. Moment of use: the sender right after building an appraisal, fit, scan or survey; the recipient opening a pasted link, possibly on a phone (ShareShell wraps its header on a phone).
+- **Above the fold:** recipient view: brand and the one way in, title, expiry and key figures (stat chips), then the content.
+- **Not for:** Show Info on a name (`entities-share.md`); a permanent fit link (that is a Fitting Share Code, not a Share Link).
+- **Sources:** decisions `20261002-125432`, `20261009-113400`; CONTEXT.md Share Link (four types); `src/features/share/shareStore.ts:27` (`appraisal`, `fitting`, `dscan`, `survey`); #2943, #3225, #3497.
+- **Unconfirmed:** the inventory above lists two share types while code and CONTEXT.md have four (Shared D-Scan, Survey); where recipients open links (Discord, in-game chat, phone or desk).
+
+### Mobbin brief
+
+- **Fit:** medium. Copy-link and a public read-only page with a sign-up entry are generic; the shared content (fit ring, fleet board, priced items) is EVE-specific.
+- **Analog apps:** Figma, Notion, Google Docs, Loom.
+- **Screen queries:**
+  - `web: public read-only shared page with the app brand and a sign-up button in the header and an expiry note above the content`
+  - `web: copy link button that confirms copied in a tooltip, next to an export menu`
+  - `web: expired link page with a short message and one button into the app`
+- **Flow queries:** `web: open a shared link while signed out, sign in, and land on the shared item inside the app`.
+- **Mobbin won't help with:** the fitting ring and stats, the Fleet board, hub pricing. Reference the EVE client and the app's own pages.
+
 ## Controls and behavior
 
 **Creating**
