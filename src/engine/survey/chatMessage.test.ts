@@ -84,10 +84,7 @@ function expectRailsOverBar(box: string[]): void {
 describe('surveyChatMessage', () => {
   it('counts the time left from the given clock, not from the last scan', () => {
     // Last scan at +10 m, finish estimated at +20 m (1000 m3 left at 1.667 m3/s).
-    const summary = summarizeSurvey([
-      scan(0, ['Veldspar', 2000]),
-      scan(10, ['Veldspar', 1000]),
-    ])!;
+    const summary = summarizeSurvey([scan(0, ['Veldspar', 2000]), scan(10, ['Veldspar', 1000])])!;
     const text = (now?: number) => surveyChatMessage(summary, URL, labels, now);
     expect(text()).toContain('(~10m)');
     expect(text(T0 + 15 * MIN)).toContain('(~5m)');
