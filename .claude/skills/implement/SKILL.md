@@ -19,7 +19,8 @@ Implement the work described in the spec or ticket you were given. Do not reopen
    (name them if the ticket doesn't), the acceptance criteria, relevant
    glossary/scope-decision/ADR excerpts, and existing patterns/files to reuse. Don't
    re-read what the report already gives you.
-2. Drive `/tdd` at the seams from that report — one red → green slice at a
+2. UI work: before writing any, run `npm run ui:catalog <Name>` for each primitive you might need; never re-implement one. A new `src/components/ui` primitive gets a `<Component>.stories.tsx` (JSDoc `@summary` on component, props, stories).
+   Drive `/tdd` at the seams from that report — one red → green slice at a
    time. Calculation/logic modules (`src/engine`, `src/auth`, industry math)
    are TDD-mandatory per `CLAUDE.md`: failing test first, then code. This is
    the iterative core of the phase and stays inline — each cycle depends on

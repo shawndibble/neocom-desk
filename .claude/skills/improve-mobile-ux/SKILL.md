@@ -200,15 +200,16 @@ A finding that **changes a layout** — stacks a table, moves a control, adds a
 sheet, reorders a card's lines — gets a mockup before it gets a ticket. A
 finding that only resizes a target or recolors a number skips this step.
 
-Use the `design` skill, constrained to the tokens and components in
-`docs/DESIGN.md` and the primitives in `src/components/ui/` — a mockup
-inventing its own visual language is not an integration plan. Draw the artboard
-at **390px wide**. Show the surface as it is today beside what it becomes, plus
-the empty state. Publish it and link the artifact URL from the ticket.
+Build the mockup as a Storybook story, not HTML or another design skill:
+follow `docs/design/mockups/README.md`. Look primitives up first with
+`npm run ui:catalog <Name>`; wrap anything new in `<NewComponent>`. Use the
+phone-variant story and shoot it with `npm run ui:shot -- mockups-<page>--<story>`
+(390 wide). Show today beside what it becomes, plus the empty state. Link the
+published PNG README from the ticket.
 
 **Also describe the layout in words in the ticket body.** The link can rot and
 an unattended run can fail to publish; a ticket whose mockup exists only as a
-URL is a ticket that may arrive empty.
+link is a ticket that may arrive empty.
 
 ## 8. File the tickets
 
@@ -266,7 +267,7 @@ placement)
 **Hostile review:** verdict, the objections raised, and how the finding answers
 them — including any objection overruled by evidence
 
-**Mockups:** artifact URL, plus the layout described in words
+**Mockups:** link to the PNG README in `docs/design/mockups/`, plus the layout described in words
 ```
 
 ## 9. Update the ledger — curate, don't append
