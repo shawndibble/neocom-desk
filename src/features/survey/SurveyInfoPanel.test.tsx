@@ -213,11 +213,8 @@ describe('SurveyInfoReadout', () => {
     expect(container.querySelector('pre')).not.toBeNull();
     expect(container.querySelectorAll('table th')).toHaveLength(2);
     expect(screen.getByRole('cell', { name: 'Veldspar' })).toBeTruthy();
-    const boxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
-    expect([...boxes].map((box) => [box.checked, box.disabled])).toEqual([
-      [true, true],
-      [false, true],
-    ]);
+    expect(screen.getByRole('img', { name: 'Done' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Not done' })).toBeTruthy();
     expect(screen.getByRole('link', { name: /example\.com\/x/ })).toBeTruthy();
     expect(container.querySelector('img')).toBeNull();
     expect(container.textContent).toContain('pic');

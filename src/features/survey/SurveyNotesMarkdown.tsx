@@ -13,7 +13,7 @@ import type { ReactNode } from 'react';
 import Markdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
-import { Checkbox } from '@/components/ui';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 
 const ALLOWED_ELEMENTS = [
@@ -46,6 +46,20 @@ const ALLOWED_ELEMENTS = [
   'img',
 ];
 
+/** A task-list box as a static glyph: it isn't a control, so it gets no checkbox look or touch target. */
+function TaskBox({ done }: { done: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      role="img"
+      aria-label={t(done ? 'survey.info.taskDone' : 'survey.info.taskOpen')}
+      className="mr-2"
+    >
+      {done ? '☑' : '☐'}
+    </span>
+  );
+}
+
 export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
   return (
     <div className="flex flex-col gap-2 [overflow-wrap:anywhere]">
@@ -73,9 +87,7 @@ export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
           hr: () => <hr className="border-line" />,
           li: ({ children }) => <li className="has-[input]:list-none">{children}</li>,
           // Task-list boxes are shown, never togglable: a reader can't change a stored note.
-          input: ({ checked }) => (
-            <Checkbox checked={checked === true} disabled readOnly className="mr-2 align-middle" />
-          ),
+          input: ({ checked }) => <TaskBox done={checked === true} />,
           blockquote: ({ children }) => (
             <blockquote className="border-l-2 border-line-bright pl-3 text-text-dim">
               {children}
