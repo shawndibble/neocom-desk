@@ -3239,7 +3239,7 @@
       },
       "flyNext": {
         "question": "Which ship can I fly next?",
-        "answer": "The Ship Tree lays hulls out by faction and marks each one “can fly” or the training time it still needs."
+        "answer": "The Ship Tree maps every hull by faction and marks each one “can fly” or the training time it still needs. Open a hull to see its Mastery tiers and the skills you are missing."
       },
       "fitting": {
         "question": "Will this fit hold up?",
@@ -3273,8 +3273,8 @@
         "caption": "Fittings with DPS against a target"
       },
       "shipTree": {
-        "alt": "The Ship Tree ladder for one faction, listing each hull with whether you can fly it or how long until you can.",
-        "caption": "Which hulls you can fly, and how long until the rest"
+        "alt": "The Ship Tree map for Caldari State with the Caracal selected and its Skills & Mastery panel open: the skills the hull needs, its Mastery tiers, and the training time still missing for each.",
+        "caption": "A hull’s skills and Mastery tiers, and what you still need to train"
       },
       "walletJournal": {
         "alt": "The wallet journal with links from each line to its contract and the item that was traded.",
