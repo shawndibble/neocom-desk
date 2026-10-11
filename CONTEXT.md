@@ -14,11 +14,14 @@ here — they go one per file in `docs/context/decisions/`.
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
 - **Alert**: One fired Notification Event as it appears in the Notification
-  Feed and on `/alerts`. Grouped there by _type_ — the `eveType` for an EVE
+  Feed and in the bell panel (`/alerts` redirects to the Overview with the
+  panel open). Grouped there by _type_ — the `eveType` for an EVE
   notification, the event id otherwise — because a device back from a week
   away holds hundreds of fires across a dozen-odd types, and the type is the
-  unit a reader mutes, dismisses or acts on. Distinct from the browser
-  notification the same fire may also raise: two delivery channels, one event.
+  unit a reader mutes, dismisses, acknowledges or acts on. A danger type that
+  nobody has acknowledged also raises the **Danger banner**. Distinct from the
+  browser notification the same fire may also raise: two delivery channels,
+  one event.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
 - **Appraisal**: A Market page tab that prices a pasted pile of items — loot,
   a haul, a shopping list, or a whole EFT ship fit (issue #1026), whose hull
@@ -278,6 +281,12 @@ here — they go one per file in `docs/context/decisions/`.
   forward): a rejected send surfaces ESI's own error text and points the
   pilot at the in-game client instead.
 - **Damage Profile**: The mix of EM, Thermal, Kinetic and Explosive damage a **Fitting**'s tank is measured against — uniform, one pure type, a common NPC faction's average, or one the pilot defines. Changes EHP, never raw HP or resists — except that a running Reactive Armor Hardener adapts its own (and so the armor layer's) resists to it, shown labelled as adapted. Distinct from a **Target Profile**, which is about what the Fitting shoots at.
+- **Danger banner**: The red strip under the Overview's sub-nav while an unacknowledged danger
+  **Alert** exists (a structure under attack, a Corp kick): "Danger", the
+  title, the detail and its age, with View and Acknowledge. Acknowledge is
+  Dismiss for the whole danger type (a synced `dismissedAt`), so the strip
+  and the bell panel never disagree about what is outstanding. Also drawn
+  on a phone. Nothing else raises it.
 - **Dark**: A member with no login for the corp's inactivity span or more —
   the pilot's own setting (14/30/60/90 days), defaulting to
   `DARK_AFTER_DAYS` (30). `engine/corp/members.ts` still owns the default and
@@ -367,6 +376,13 @@ here — they go one per file in `docs/context/decisions/`.
   the Notification Feed already shows as delivered (Occurrence Key, round
   44/#360).
 - **Freshness Window** (round 25): how long a cached row is served without asking ESI again. Ten minutes for a Character's own data, a day for game constants. Distinct from **Data Age**, which reports how old the shown data is; the window decides whether to go and get newer.
+- **Gallery**: The Overview's "Add a widget" drawer (a bottom sheet on a phone): search
+  and category chips over the **Widget Kind** catalogue, each kind with its
+  description, an Add (or Add another, the same kind may appear more than
+  once) button and, on a desktop, an inert Medium-size preview of the real
+  **Widget** on sample figures. A kind not built yet reads "Coming soon" and
+  cannot be added; at 30 **Widgets** every kind reads "Limit reached". New
+  tags and "Recently added" are for a returning pilot only.
 - **Gank Chokepoint**: one of the named systems haulers are most often killed in — Uedama, Sivala, Aufay, Balle, Tama, Rancer, Ahbazon. A property of _traffic_, not of security status: these are what every profitable route funnels through, and Uedama and Balle both show as ordinary 0.5 systems. An explicit list rather than a derived rule, because the map does not imply it. An endpoint in one is marked on the row; a route _through_ one is named in the haul detail, which is the only place the path is worked out. States where a haul goes, never that anything will happen to the hauler there.
 - **Goal Plan**: the PI Plan tab's answer to "here are my colonies and the products I want per day — what does each colony do?". Goals (products at a units/day rate) are expanded into demand, and a greedy solver assigns each enabled colony a role — extract one or two P0 types and refine them to P1 on the spot, host the P2+ factories, or sit idle — fitted against that colony's own CPU/Powergrid. Measured against the **Baseline**: every colony selling the best P1 it can make by itself. The plan's **Lift** is its net ISK minus the Baseline, so extracted P0 is never priced at zero and a plan that earns less than doing nothing clever says so. What it cannot cover is a **Shortfall**, of one of two kinds that call for different fixes: a **Type gap** (no enabled colony's planet type yields that P0 — add a planet of a listed type) and a **Budget gap** (colonies that could yield it are full — re-target one, or buy). Its output is a change list against what each colony runs today (keep / re-target / convert to factory), never a fresh layout.
 - **Chain estimate**: a P3 or P4's ISK a day as a whole multi-planet chain: the Goal Plan's solver run on new planets the pilot would add, at the one-planet ranking's own assumptions (rate, Command Center level, link cost, customs, sell market). Always labelled "multi-planet, needs hauling" and an estimate, and never ranked against one-planet figures, picks or totals, except in Plan's opt-in **Bigger chain** section, which compares it with the one-planet pick on as many free slots. See decisions 20261006-095530 and 20261006-154532.
@@ -753,6 +769,13 @@ here — they go one per file in `docs/context/decisions/`.
   this ceiling, so it is derived from trained skills
   (`src/engine/market/orderSlots.ts`) and shown as the denominator of the
   Overview's Open orders tile.
+- **Overview Layout**: The ordered list of **Widgets** on the Overview, with each one's size,
+  view, rename, character scope, range and whether it shows on a phone. One
+  per pilot, not per Character, synced as a whole (last write wins) like the
+  other account preferences; **absent** means first run, so the Role chooser
+  asks. Customize snapshots it: Done keeps the edits, Cancel puts the
+  snapshot back exactly. A returning pilot's first layout is migrated from
+  the old hidden-card and card-order settings.
 - **Owned-Stock Offer**: A materials row's "Use assets" offer — the
   owned quantity it would write (detected stock in the owned-stock scope,
   capped at what the row needs), or none: a Blueprint Acquisition row, no
@@ -989,6 +1012,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   the list, so the Triage Board groups them into one row rather than one per
   colony (`engine/pi/colonyBatches.ts`). A colony is what the Colonies table
   lists; a Reset Run is what a pilot actually goes and does.
+- **Role**: A first-run answer to "What do you do in EVE?" (Trader, Industrialist,
+  Planetary industry, Miner, Fighter, Explorer and hauler) that maps to a
+  set of **Widget Kinds**. Several can be picked; the union, plus Wallet,
+  Training, Coming up and Mail which are always in, becomes the first
+  **Overview Layout**. Reachable later as Customize > Start from a role.
+  Not a **Corp Role**, which is a permission in the game.
 - **Roster Baseline**: The member list one observer last saw, per Character,
   device-local and never synced. Each observer keeps its own; the baseline
   records what _that_ observer has already reported.
@@ -1142,6 +1171,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `docs/context/decisions/20260923-230312-skill-queue-ending-notification.md`
   for why no separate "Skill Plan step completed" event exists alongside it
   (issue #1410).
+- **Size**: A **Widget**'s width on the Overview: S, M, L or Full, a share of one row
+  (a quarter, a third, a half, the whole: four Small, three Medium,
+  two Large or one Full across a desktop row), not a height: its content sets
+  that. Size also sets how much a **View** shows (table rows, chart height).
+  On a phone Small sits two across and every other size takes the row.
 - **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Signalled for a **Published Snapshot**, where a long window encodes a publish cadence, so a mounted view re-reads the fresher rows. Silent for a game constant: its long window asserts the value cannot change, so the lapsed row is shown at once and the refresh lands for the next read without re-rendering anything. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
   manager acts on — clocks due inside a day, Runway, 30-day net — beside the
@@ -1216,13 +1250,14 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   a CPU optimisation, is what drove EVE University's worked "one extractor
   feeds three Basic Facilities" ratio: it is storage-overflow-driven. A layout
   can clear the Pin Budget and still stall.
-- **Triage Board**: What `/overview` is — not a dashboard of figures but an
-  answer to "is there anything I have to do before I log off", one card per
-  domain, each linking to the page that fixes it. Its organising rule: numbers
-  where the items are interchangeable, rows only where each item is genuinely
-  its own thing. Distinct from the **Corp Ops Board** (`/corp`), which answers
-  the same question for a corporation and shares the severity ladder but not
-  the layout.
+- **Triage Board**: The Overview as it was before the widget grid: a fixed
+  board with one card per domain and an Alerts column, answering "is there
+  anything I have to do before I log off". Retired. The question is now
+  answered by the header's Next deadline chip, the **Danger banner** and the
+  tone of each **Widget**; the Overview is an **Overview Layout** the pilot
+  builds. Distinct from the **Corp Ops Board** (`/corp`), which answers the
+  same question for a corporation and shares the severity ladder but not the
+  layout.
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
 - **Hauling Opportunities**: The Travel page's Hauling tab (`/travel/hauling`; moved from Market, where `/market/hauling` now redirects): items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list — see `docs/context/decisions/` (Hauling Opportunities v1 scope).
 - **Selling into buy orders**: (`instant` mode in code.) The **Hauling Opportunities** mode that sells the cargo instantly into the destination hub station's standing buy orders instead of listing it: priced at what those orders actually pay, after sales tax only, sized to the depth both books stay profitable to, with no **Days to Sell** or demand. `walkInstant` in `src/engine/market/haulingMarket.ts`.
@@ -1267,6 +1302,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   signed "vs <item>" sell delta, the item's own prices above it — for price
   comparison; falls back to its Market Group siblings when it has no
   variation data.
+- **View**: How a **Widget** draws its data: Number, Chart or Table, whichever its
+  **Widget Kind** has, and each kind opens in the one that answers its question
+  best. The headline number is on screen in every view; Number is a figure and at
+  most one secondary line (never a chart); Table is also the text equivalent of a
+  Chart, and sits beside it at Large and Full. Chosen in the widget's settings
+  menu, never by a glyph in its header.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in
   their own words, what leaves their device. Not documentation — a
   **commitment**: the **Synced Collection** registry's `REMOTE_COLLECTIONS` is
@@ -1277,3 +1318,17 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   section a reader can catch overclaiming is worth less than none. Deep-linkable
   at `/settings#faq`.
 - **What-If Implants**: Optimizer override that assumes a hypothetical implant set instead of the clone's current implants. Five independent per-attribute bonuses (+0..+5 each), since EVE's attribute hardwirings are per slot — a clone can run +4 PER / +5 INT / +3 MEM and nothing in WIL or CHA. The matched sets (+1..+5 in every slot) remain one-click **presets** over those five values; see round 28. Stored on the Skill Plan and synced with it (round 33).
+- **Widget**: One tile on the Overview: an instance of a **Widget Kind** with its own
+  **Size**, **View**, optional rename, character scope and range. The same
+  kind may appear more than once. Always in one of five **Widget States**.
+- **Widget Kind**: An entry in the catalogue of what the Overview can show (Wallet, Orders,
+  Planetary...): its title and description, category, which **Views** it
+  has, default **Size**, whether it has a range, the ESI permission it needs
+  and its empty message. `src/features/overview/widgets/kinds.ts`. A kind
+  that is not built yet is "coming soon": listed in the **Gallery**, not
+  addable.
+- **Widget State**: Which of five things a **Widget** is showing: loading (a skeleton),
+  needs permission (the ESI permission by name, with Grant access), failed
+  (Could not load, the last good value dimmed, Retry), empty (the kind's
+  own message, with Remove widget) or ok. `resolveWidgetState` in
+  `src/features/overview/widgets/state.ts`.

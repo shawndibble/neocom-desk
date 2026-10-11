@@ -29,6 +29,7 @@ import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
 import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
 import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
+import { payeesOwed, type PayeeOwed } from './miningTaxPayees';
 import type { BoardStructureSource, CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { CalendarEventSummary } from '@/esi/endpoints';
@@ -57,6 +58,8 @@ export interface BoardColony {
   /** Null until the public planet-name read lands; the row falls back to the id. */
   name: string | null;
   status: ColonyStatus;
+  /** Extractor programs on the colony; absent on data built before the widget read it. */
+  programCount?: number;
 }
 
 export interface PlanetaryBoardData {
@@ -121,6 +124,7 @@ export async function loadPlanetaryBoard(
       planetId: planet.planet_id,
       name: names[i],
       status: colonyStatus(programs, loadedAt),
+      programCount: programs.length,
     };
   });
 
@@ -144,6 +148,8 @@ export interface MiningTaxBoardData {
   oldestUnpaidDays: number | null;
   needsReauth: boolean;
   fetchedAt: Date | null;
+  /** Who is owed what, the most owed first. Absent in a snapshot cached before this field existed. */
+  payees?: PayeeOwed[];
   /** Every Character on the account. */
   characterCount: number;
   /** Characters whose ledger could not be read (re-auth), so the figures leave them out. */
@@ -181,6 +187,13 @@ export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
       oldestUnpaidMs === null ? null : Math.floor((now - oldestUnpaidMs) / 86_400_000),
     needsReauth: snapshot.reauthCharacters.length > 0,
     fetchedAt: snapshot.fetchedAt,
+    payees: payeesOwed(
+      snapshot.rows,
+      new Map(
+        [...snapshot.payeesByCharacter.values()].flat().map((payee) => [payee.id, payee.name])
+      ),
+      now
+    ),
     characterCount: await db.characters.count(),
     missingCharacterNames: snapshot.reauthCharacters.map((character) => character.characterName),
   };
@@ -196,9 +209,18 @@ export interface IndustryBoardData {
    * is what the Industry page's own rows lead with.
    */
   productNames: Map<number, string>;
+  /**
+   * Where each job sits (its `station_id`), by that id. Best effort: a
+   * location that does not resolve is simply absent, and the Table view drops
+   * its Location column when none resolved.
+   */
+  locationNames?: Map<number, string>;
   needsReauth: boolean;
   fetchedAt: Date | null;
 }
+
+/** A pilot's jobs sit in a handful of places; naming more than this is not worth the reads. */
+const MAX_JOB_LOCATIONS = 6;
 
 export async function loadIndustryBoard(characterId: number): Promise<IndustryBoardData> {
   const { cached, needsReauth } = await loadCharacterIndustryJobs(characterId);
@@ -214,9 +236,22 @@ export async function loadIndustryBoard(characterId: number): Promise<IndustryBo
     if (name !== undefined) productNames.set(job.job_id, name);
   }
 
+  const locationIds = [...new Set(jobs.map((job) => job.station_id))]
+    .filter((id) => id > 0)
+    .slice(0, MAX_JOB_LOCATIONS);
+  const located = await Promise.all(
+    locationIds.map((id) => loadContractLocationName(characterId, id).catch(() => null))
+  );
+  const locationNames = new Map<number, string>();
+  locationIds.forEach((id, i) => {
+    const name = located[i];
+    if (name) locationNames.set(id, name);
+  });
+
   return {
     jobs,
     productNames,
+    locationNames,
     needsReauth,
     fetchedAt: cached ? cached.fetchedAt : null,
   };
@@ -228,6 +263,8 @@ export interface ContractsBoardData {
   summary: ContractsBoardSummary;
   /** "Jita → Amarr" for the soonest courier, or null when it is not a courier or the names did not resolve. */
   route: string | null;
+  /** The same for every courier in `summary.items`, by contract id: `[from, to]` full location names. */
+  routes?: Record<number, readonly [string, string]>;
   needsReauth: boolean;
   fetchedAt: Date | null;
 }
@@ -241,19 +278,29 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
   const loadedAt = Date.now();
   const summary = summarizeContractsBoard(cached?.data ?? [], characterId, loadedAt);
   const { soonest } = summary;
-  let route: string | null = null;
-  if (soonest?.kind === 'courier' && soonest.startLocationId && soonest.endLocationId) {
-    try {
-      const [from, to] = await Promise.all([
-        loadContractLocationName(characterId, soonest.startLocationId),
-        loadContractLocationName(characterId, soonest.endLocationId),
-      ]);
-      if (from && to) route = `${from} → ${to}`;
-    } catch {
-      route = null;
-    }
-  }
-  return { summary, route, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
+  // Names are cached lookups; a failed one leaves that row without a route, never the board.
+  const routes: Record<number, readonly [string, string]> = {};
+  await Promise.all(
+    summary.items
+      .filter((item) => item.kind === 'courier')
+      .slice(0, 12)
+      .map(async (item) => {
+        const { startLocationId, endLocationId } = item;
+        if (!startLocationId || !endLocationId) return;
+        try {
+          const [from, to] = await Promise.all([
+            loadContractLocationName(characterId, startLocationId),
+            loadContractLocationName(characterId, endLocationId),
+          ]);
+          if (from && to) routes[item.contractId] = [from, to];
+        } catch {
+          // A courtesy: the row names the contract without a route.
+        }
+      })
+  );
+  const soonestRoute = soonest ? routes[soonest.contractId] : undefined;
+  const route = soonestRoute ? `${soonestRoute[0]} → ${soonestRoute[1]}` : null;
+  return { summary, route, routes, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
 }
 
 // --- Calendar ---------------------------------------------------------------
@@ -295,12 +342,17 @@ export interface SpExtractionBoardData {
 
 // --- Mail -------------------------------------------------------------------
 
+/** Mail rows the Table view can show at its tallest size. */
+const INBOX_ROWS = 12;
+
 export interface BoardMail {
   mailId: number;
   subject: string;
   /** Null when the sender's name did not resolve; the row leaves it out. */
   from: string | null;
   atMs: number | null;
+  /** Set on `inbox` rows: false for mail already read. */
+  unread?: boolean;
 }
 
 export interface MailBoardData {
@@ -308,6 +360,8 @@ export interface MailBoardData {
   unread: number;
   /** The newest unread mails, newest first — a few rows, not the inbox. */
   recent: BoardMail[];
+  /** The newest mail, read or not, newest first: the Table view's rows. */
+  inbox?: BoardMail[];
   needsReauth: boolean;
   fetchedAt: Date | null;
 }
@@ -322,15 +376,15 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
     loadMailLabels(characterId),
     loadMailHeaders(characterId),
   ]);
-  const unreadHeaders = (headers.cached?.data ?? [])
-    .filter((header) => header.is_read === false)
+  const newestFirst = (headers.cached?.data ?? [])
     .map((header) => ({
       header,
       atMs: header.timestamp ? Date.parse(header.timestamp) : Number.NaN,
     }))
-    .sort((a, b) => (Number.isNaN(b.atMs) ? -1 : b.atMs) - (Number.isNaN(a.atMs) ? -1 : a.atMs))
-    .slice(0, 4);
-  const senderIds = unreadHeaders.flatMap(({ header }) =>
+    .sort((a, b) => (Number.isNaN(b.atMs) ? -1 : b.atMs) - (Number.isNaN(a.atMs) ? -1 : a.atMs));
+  const unreadHeaders = newestFirst.filter(({ header }) => header.is_read === false).slice(0, 4);
+  const inboxHeaders = newestFirst.slice(0, INBOX_ROWS);
+  const senderIds = [...new Set([...unreadHeaders, ...inboxHeaders])].flatMap(({ header }) =>
     header.from === undefined ? [] : [header.from]
   );
   let names = new Map<number, string>();
@@ -341,16 +395,19 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
       // A courtesy: a row without a sender still names the mail.
     }
   }
+  const boardMail = ({ header, atMs }: (typeof newestFirst)[number]): BoardMail => ({
+    mailId: header.mail_id,
+    subject: header.subject ?? '',
+    from: header.from === undefined ? null : (names.get(header.from) ?? null),
+    atMs: Number.isNaN(atMs) ? null : atMs,
+    unread: header.is_read === false,
+  });
   return {
     unread:
       labels.cached?.data.total_unread_count ??
       (headers.cached?.data ?? []).filter((header) => header.is_read === false).length,
-    recent: unreadHeaders.map(({ header, atMs }) => ({
-      mailId: header.mail_id,
-      subject: header.subject ?? '',
-      from: header.from === undefined ? null : (names.get(header.from) ?? null),
-      atMs: Number.isNaN(atMs) ? null : atMs,
-    })),
+    recent: unreadHeaders.map(boardMail),
+    inbox: inboxHeaders.map(boardMail),
     needsReauth: headers.needsReauth || labels.needsReauth,
     // The older of the two reads: the count is only as fresh as the labels.
     fetchedAt:

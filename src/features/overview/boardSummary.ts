@@ -1,19 +1,17 @@
 /**
- * What each domain says in one line, for the phone's folded rows.
+ * What each domain says in one line: a widget's note, and its list rows.
  *
- * Below `sm` only the two worst cards keep their full shape and the rest
- * collapse into "Everything else" (`Overview.tsx`), where a domain gets a
- * single line to state its case. That line is not a shortened card: a card can
- * afford three counts and let the reader weigh them, a row has to pick the one
- * fact that decides whether to tap it. So each function here ranks the same
+ * A domain gets a single line to state its case. That line is not a shortened
+ * card: a card can afford three counts and let the reader weigh them, a line
+ * has to pick the one fact that decides whether to tap it. So each function here ranks the same
  * way its `boardSeverity.ts` sibling does and prints the worst true thing —
  * the ISK you owe over the entries nobody has assigned, the jobs waiting to be
  * delivered over the ones still running.
  *
  * **Three states, never two.** A read that has not landed, a grant that has
  * lapsed, and a genuinely quiet domain all arrive here as an empty list, and
- * printing "Nothing running" for the first two is exactly the silence this
- * board was rebuilt to remove. Every function takes its domain's nullable
+ * printing "Nothing running" for the first two is exactly the silence the
+ * old card board was rebuilt to remove. Every function takes its domain's nullable
  * snapshot rather than the array inside it, so it can tell them apart at all.
  *
  * Strings, not keys: resolved through the caller's `t` the way

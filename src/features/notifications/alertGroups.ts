@@ -3,8 +3,7 @@
  *
  * `groupFires.ts` already groups identical fires — same event, same rendered
  * copy — which is the right unit for a burst of toasts. This is the other
- * axis, and the one the Alerts page and the Overview's alerts column are
- * built on: a device that has been away for a week comes back to hundreds of
+ * axis, and the one the bell's alerts panel is built on: a device that has been away for a week comes back to hundreds of
  * rows across a dozen-odd types, and a list that prints a row per fire is
  * unusable on exactly the days it matters. Three hundred alerts across
  * seventeen types is a dozen rows here.
@@ -158,7 +157,7 @@ const EVENT_LABEL_KEY = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, ev
  * notification's own `type` (`notifications.eveTypeName.*`, with
  * `humanizeEveType` underneath it) or an app event id
  * (`settings.notifications.event.*`). Neither belongs inline at a call site —
- * the board's alerts column and the Alerts page name the same groups, and two
+ * the bell panel and the Danger strip name the same groups, and two
  * copies of this would eventually name them differently.
  *
  * Not a field on `AlertTypeGroup`: resolving it needs a translator, and the

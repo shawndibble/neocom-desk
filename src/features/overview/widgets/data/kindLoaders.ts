@@ -1,0 +1,314 @@
+/**
+ * Reads for the Widget Kinds that came after the old board: net worth, profit,
+ * mining yield, loyalty points, best clone, wallet journal and location.
+ *
+ * Like `loaders.ts`, each closes over nothing but its arguments (a
+ * `useRouteSnapshot` contract). Overview is in the signed-in shell chunk, so
+ * anything heavy (the mining price snapshot, the clone attribute sheet, SDE
+ * names) is behind `import()`: only the types come in statically, and
+ * `app/bootImportGraph.test.ts` fails the build if a static import reaches
+ * `@/sync`, Firebase or recharts from here.
+ */
+import { db } from '@/db';
+import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
+import { layerValues, type LayerValues } from '@/engine/netWorth/series';
+import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
+import type { WalletJournalEntry } from '@/esi/endpoints';
+import type { CachedResult } from '@/esi/cache';
+import { summarizeProductionRun } from '@/features/industry/productionRunSummary';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
+import { hasWalletScope, loadWalletJournalWithStatus } from '@/features/character/wallet';
+
+export type { ClonesWidgetData } from '@/features/character/cloneVerdictLoad';
+
+// --- Wallet journal ------------------------------------------------------------
+
+export interface JournalData {
+  result: CachedResult<WalletJournalEntry[]> | null;
+  needsReauth: boolean;
+}
+
+/**
+ * The wallet journal (about 30 days at most: that is all ESI keeps). The grant
+ * is checked first so a missing permission never provokes a live 403 and the
+ * app-wide re-auth banner.
+ */
+export async function loadJournalPanel(characterId: number): Promise<JournalData> {
+  if (!(await hasWalletScope(characterId))) return { result: null, needsReauth: true };
+  const { cached, needsReauth } = await loadWalletJournalWithStatus(characterId);
+  return { result: cached, needsReauth };
+}
+
+// --- Net worth -----------------------------------------------------------------
+
+export interface NetWorthDay {
+  /** The UTC day of the snapshot. */
+  day: string;
+  layers: LayerValues;
+}
+
+/** The days (the newest included) of a Character's snapshots the widget reads: what its change and chart cover. */
+export const NET_WORTH_HISTORY_DAYS = 30;
+
+export interface NetWorthCharacter {
+  characterId: number;
+  /** The UTC day of the Character's newest snapshot. */
+  day: string;
+  layers: LayerValues;
+  /** Holds every permission a snapshot needs, so its figure counts toward a total. */
+  covered: boolean;
+  /** The snapshots of the last `NET_WORTH_HISTORY_DAYS` days, oldest first (the newest is `day` and `layers`). */
+  history: NetWorthDay[];
+}
+
+export interface NetWorthWidgetData {
+  /** Each Character's latest snapshot; Characters never snapshotted are absent. */
+  characters: NetWorthCharacter[];
+}
+
+const NET_WORTH_ENDPOINTS = [
+  'getCharacterWallet',
+  'getCharacterAssets',
+  'getCharacterOrders',
+] as const;
+
+/**
+ * Each Character's newest daily snapshot, straight from Dexie (local, cheap).
+ * Deliberately not `useNetWorthData`: that hook's module chain reaches the
+ * snapshot recorder, which pulls `@/sync` into whatever imports it.
+ */
+export async function loadNetWorthWidget(): Promise<NetWorthWidgetData> {
+  const [rows, tokens] = await Promise.all([db.netWorthSnapshots.toArray(), db.tokens.toArray()]);
+  const required = requiredScopesForEndpoints(NET_WORTH_ENDPOINTS);
+  const covered = new Set(
+    tokens
+      .filter((token) => required.every((scope) => token.scopes.includes(scope)))
+      .map((token) => token.characterId)
+  );
+  const byCharacter = new Map<number, NetWorthSnapshotRow[]>();
+  for (const row of rows) {
+    const list = byCharacter.get(row.characterId);
+    if (list) list.push(row);
+    else byCharacter.set(row.characterId, [row]);
+  }
+  return {
+    characters: [...byCharacter.entries()].map(([characterId, list]) => {
+      const sorted = list.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+      const latest = sorted[sorted.length - 1]!;
+      const since = new Date(Date.parse(latest.day) - (NET_WORTH_HISTORY_DAYS - 1) * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      return {
+        characterId,
+        day: latest.day,
+        layers: layerValues(latest),
+        covered: covered.has(characterId),
+        history: sorted
+          .filter((row) => row.day >= since)
+          .map((row) => ({ day: row.day, layers: layerValues(row) })),
+      };
+    }),
+  };
+}
+
+// --- Realized profit -----------------------------------------------------------
+
+export interface ProfitRunRow {
+  runId: string;
+  productTypeID: number;
+  /** Units the run produced. */
+  quantity: number;
+  /** Epoch ms the run was logged: the bucket its profit lands in, as the Production Log filters by it. */
+  loggedAt: number;
+  profit: number;
+  status: 'new' | 'open' | 'closed';
+}
+
+export interface ProfitWidgetData {
+  runs: ProfitRunRow[];
+  /** Product names, keyed by type id. */
+  names: Map<number, string>;
+}
+
+/**
+ * The Character's logged runs with their realized profit so far, from the
+ * Dexie Production Log. The Trade Hub standing a run's plan would apply is
+ * assumed 0 here (the log page resolves it per plan), so a pilot with
+ * standings sees slightly less profit than the page, never more.
+ */
+export async function loadProfitWidget(characterId: number): Promise<ProfitWidgetData> {
+  const [runs, saleLinks, orderWatches, losses, corrected] = await Promise.all([
+    db.productionRuns.where('characterId').equals(characterId).toArray(),
+    db.productionSaleLinks.where('characterId').equals(characterId).toArray(),
+    db.productionOrderWatches.where('characterId').equals(characterId).toArray(),
+    db.productionLosses.where('characterId').equals(characterId).toArray(),
+    loadCorrectedSkills(characterId, Date.now(), { skipQueueWithoutScope: true }).catch(() => null),
+  ]);
+  const skills = Object.fromEntries(corrected?.effective ?? []);
+  const rows = runs.map((run): ProfitRunRow => {
+    const summary = summarizeProductionRun(run, saleLinks, orderWatches, skills, undefined, losses);
+    return {
+      runId: run.id,
+      productTypeID: run.productTypeID,
+      quantity: run.quantity,
+      loggedAt: run.loggedAt,
+      profit: summary.profit.profit,
+      status: summary.status,
+    };
+  });
+  const typeIds = [...new Set(rows.map((row) => row.productTypeID))];
+  const names =
+    typeIds.length === 0
+      ? new Map<number, string>()
+      : await import('@/features/character/typeNames').then((m) => m.loadTypeNames(typeIds));
+  return { runs: rows, names };
+}
+
+// --- Mining yield --------------------------------------------------------------
+
+export interface MiningYieldDay {
+  characterId: number;
+  /** EVE/UTC calendar date. */
+  date: string;
+  /** The day's ore, valued raw at that day's price. */
+  isk: number;
+  ores: { typeId: number; isk: number; /** Units mined. */ units?: number }[];
+}
+
+export interface MiningYieldWidgetData {
+  rows: MiningYieldDay[];
+  typeNames: Map<number, string>;
+  /** Characters whose ledger was read. */
+  trackedIds: number[];
+  /** Characters whose mining grant lapsed. */
+  reauthIds: number[];
+  /** The oldest day held at all, in or out of range. */
+  oldestSaved: string | null;
+  fetchedAt: Date | null;
+}
+
+/** Every tracked Character's mining ledger, valued; heavy (prices, SDE), so it loads on demand. */
+export async function loadMiningYieldWidget(): Promise<MiningYieldWidgetData> {
+  const { loadMiningYieldSnapshot } = await import('@/features/miningTax/yieldSnapshot');
+  // No refining data: the widget counts what was mined, and skipping it spares the reprocessing reads.
+  const snapshot = await loadMiningYieldSnapshot(false, true);
+  const rows = snapshot.rows.map((row) => ({
+    characterId: row.characterId,
+    date: row.entry.date,
+    isk: row.valuation.rawValue,
+    ores: row.valuation.lines.map((line) => ({
+      typeId: line.typeId,
+      isk: line.rawValue,
+      units: line.quantity,
+    })),
+  }));
+  return {
+    rows,
+    typeNames: snapshot.typeNames,
+    trackedIds: snapshot.characters.map((c) => c.characterId),
+    reauthIds: snapshot.reauthCharacters.map((c) => c.characterId),
+    oldestSaved: rows.reduce<string | null>(
+      (oldest, row) => (oldest === null || row.date < oldest ? row.date : oldest),
+      null
+    ),
+    fetchedAt: snapshot.fetchedAt,
+  };
+}
+
+// --- Loyalty points ------------------------------------------------------------
+
+export interface LpWidgetData {
+  entries: { corporationId: number; name: string | null; points: number }[];
+  /** Paragon's balance, which reads as its own currency and is not counted as LP. */
+  everMarks: number;
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+}
+
+/** Names are only resolved for the largest balances: the widget never draws more. */
+const LP_NAMED_ENTRIES = 12;
+
+export async function loadLpWidget(characterId: number): Promise<LpWidgetData> {
+  const { cached, needsReauth } = await loadCharacterLoyaltyPoints(characterId);
+  const { everMarks, otherLoyalty } = splitEverMarks(cached?.data ?? []);
+  const sorted = [...otherLoyalty]
+    .filter((entry) => entry.loyalty_points > 0)
+    .sort((a, b) => b.loyalty_points - a.loyalty_points);
+  const { loadCorporationName } = await import('@/features/loyalty/store');
+  const names = await Promise.all(
+    sorted
+      .slice(0, LP_NAMED_ENTRIES)
+      .map((entry) => loadCorporationName(entry.corporation_id).catch(() => null))
+  );
+  return {
+    entries: sorted.map((entry, i) => ({
+      corporationId: entry.corporation_id,
+      name: names[i] ?? null,
+      points: entry.loyalty_points,
+    })),
+    everMarks,
+    needsReauth,
+    fetchedAt: cached?.fetchedAt ?? null,
+  };
+}
+
+// --- Best clone ----------------------------------------------------------------
+
+export function loadClonesWidget(characterId: number) {
+  return import('@/features/character/cloneVerdictLoad').then((m) =>
+    m.loadCloneVerdictWidget(characterId)
+  );
+}
+
+// --- Location and ship ---------------------------------------------------------
+
+export interface LocationWidgetData {
+  /** The location grant is missing. */
+  needsReauth: boolean;
+  /** Null when the location could not be read (offline, or not resolvable). */
+  system: { id: number; name: string | null; security: number | null } | null;
+  shipTypeId: number | null;
+  shipName: string | null;
+}
+
+export async function loadLocationWidget(characterId: number): Promise<LocationWidgetData> {
+  const token = await db.tokens.get(characterId);
+  const scopes = token?.scopes ?? [];
+  if (!scopes.includes(ESI_REGISTRY.getCharacterLocation.scope)) {
+    return { needsReauth: true, system: null, shipTypeId: null, shipName: null };
+  }
+  const [
+    { loadCharacterSolarSystemId },
+    { loadCharacterShipTypeId },
+    { loadSystemNameAndSecurity },
+  ] = await Promise.all([
+    import('@/features/character/location'),
+    import('@/features/character/ship'),
+    import('@/features/character/systemSecurity'),
+  ]);
+  const [systemId, shipTypeId] = await Promise.all([
+    loadCharacterSolarSystemId(characterId),
+    scopes.includes(ESI_REGISTRY.getCharacterShip.scope)
+      ? loadCharacterShipTypeId(characterId)
+      : Promise.resolve(null),
+  ]);
+  const [system, shipName] = await Promise.all([
+    systemId === null ? null : loadSystemNameAndSecurity(systemId).catch(() => null),
+    shipTypeId === null
+      ? null
+      : import('@/features/character/typeNames')
+          .then((m) => m.loadTypeNames([shipTypeId]))
+          .then((names) => names.get(shipTypeId) ?? null)
+          .catch(() => null),
+  ]);
+  return {
+    needsReauth: false,
+    system:
+      systemId === null
+        ? null
+        : { id: systemId, name: system?.name ?? null, security: system?.security ?? null },
+    shipTypeId,
+    shipName,
+  };
+}

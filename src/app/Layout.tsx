@@ -37,7 +37,8 @@ import { GlobalPasteRouter } from './GlobalPasteRouter';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
 import { NetWorthSnapshotRecorder } from '@/features/netWorth/NetWorthSnapshotRecorder';
-import { useUnreadAlertCount } from '@/features/notifications/useUnreadAlertCount';
+import { AlertsPanelProvider } from '@/features/notifications/AlertsPanelContext';
+import { useAlertBadge } from '@/features/notifications/useUnreadAlertCount';
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
 import { CommandPaletteHost } from '@/features/commandPalette/CommandPaletteHost';
@@ -328,7 +329,7 @@ export const Layout = memo(function Layout() {
   // Read once, not per rendering: the header bell (via context), the tab bar and
   // the sheet are all mounted on every route, so a hook inside each would open
   // several Dexie live queries over the same feed.
-  const unreadAlerts = useUnreadAlertCount();
+  const alertBadge = useAlertBadge();
   const tabs = barTabs(useMobileTabs((state) => state.value));
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -352,121 +353,123 @@ export const Layout = memo(function Layout() {
   }, []);
 
   return (
-    <UnreadAlertsContext.Provider value={unreadAlerts}>
-      <div className="flex min-h-screen bg-bg text-text">
-        {/* Only where the rail shows: below `md` there is nothing to skip. */}
-        {isDesktop && <SkipLink />}
-        {/* Desktop left rail */}
-        <aside className="sticky top-0 hidden h-screen w-52 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
-          <div className="flex items-center gap-2 border-b border-line px-3 py-3">
-            {/* Logo and wordmark navigate together, as one unit: a site name
+    <UnreadAlertsContext.Provider value={alertBadge}>
+      <AlertsPanelProvider>
+        <div className="flex min-h-screen bg-bg text-text">
+          {/* Only where the rail shows: below `md` there is nothing to skip. */}
+          {isDesktop && <SkipLink />}
+          {/* Desktop left rail */}
+          <aside className="sticky top-0 hidden h-screen w-52 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
+            <div className="flex items-center gap-2 border-b border-line px-3 py-3">
+              {/* Logo and wordmark navigate together, as one unit: a site name
               that goes home beside an inert logo is the odd half-measure.
               The two status indicators stay outside the link — a sync dot
               that navigates is nobody's expectation. */}
-            <Link
-              to="/overview"
-              className={cx(
-                'flex min-w-0 flex-1 items-center gap-2 rounded-xs text-text hover:text-accent',
-                interactiveClassName,
-                focusRingClassName
-              )}
-            >
-              <LogoMark className="size-7 shrink-0" />
-              <span className="min-w-0 truncate text-xs font-semibold tracking-widest uppercase">
-                {t('app.name')}
-              </span>
-            </Link>
-            <PrefetchIndicator />
-            {isSyncConfigured() && <SyncStatusIndicator />}
-          </div>
-          {/* The pages scroll (`RailNav`'s `overflow-y-auto`), which is what keeps
+              <Link
+                to="/overview"
+                className={cx(
+                  'flex min-w-0 flex-1 items-center gap-2 rounded-xs text-text hover:text-accent',
+                  interactiveClassName,
+                  focusRingClassName
+                )}
+              >
+                <LogoMark className="size-7 shrink-0" />
+                <span className="min-w-0 truncate text-xs font-semibold tracking-widest uppercase">
+                  {t('app.name')}
+                </span>
+              </Link>
+              <PrefetchIndicator />
+              {isSyncConfigured() && <SyncStatusIndicator />}
+            </div>
+            {/* The pages scroll (`RailNav`'s `overflow-y-auto`), which is what keeps
             the footer below pinned: the rail is `h-screen`, so a tall list
             (large text scale) would otherwise push it off the bottom. */}
-          <RailNav />
-          {/* Footer: Help, Settings, then Character (very bottom). `border-t`: at short
+            <RailNav />
+            {/* Footer: Help, Settings, then Character (very bottom). `border-t`: at short
             heights the scrolling nav's last row is cut by this edge; the rule makes
             that read as scroll, not overlap. */}
-          <div className="flex shrink-0 flex-col gap-0.5 border-t border-b border-line p-2">
-            {FOOTER_PAGES.map((page) => (
-              <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
-            ))}
-          </div>
-          <CharacterFooterLink activeCharacter={activeCharacter} />
-        </aside>
+            <div className="flex shrink-0 flex-col gap-0.5 border-t border-b border-line p-2">
+              {FOOTER_PAGES.map((page) => (
+                <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
+              ))}
+            </div>
+            <CharacterFooterLink activeCharacter={activeCharacter} />
+          </aside>
 
-        <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px))]">
-          <AlertCharacterSwitch />
-          <AuthFailureNotice />
-          <StandingsScopeNotice />
-          <SyncErrorBanner />
-          <RouteOutlet />
-        </main>
+          <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px))]">
+            <AlertCharacterSwitch />
+            <AuthFailureNotice />
+            <StandingsScopeNotice />
+            <SyncErrorBanner />
+            <RouteOutlet />
+          </main>
 
-        {/* Mobile bottom tab bar: the pilot's four destinations (`lib/mobileTabs.ts`,
+          {/* Mobile bottom tab bar: the pilot's four destinations (`lib/mobileTabs.ts`,
           set in Settings) + More. The count is fixed, which is what keeps
           MOBILE_NAV_ITEM's equal-share split honest.
           `env(safe-area-inset-bottom)` keeps the bar clear of the
           home-indicator gesture area on notched phones. */}
-        <nav
-          aria-label={t('nav.mobileLabel')}
-          className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
-        >
-          {tabs.map((path) => (
-            <NavItem
-              key={path}
-              to={path}
-              label={t(NAV_LABEL_KEYS[path])}
-              locked={locked.has(path)}
-              presentation="tab"
-            />
-          ))}
-          <button
-            type="button"
-            ref={moreButtonRef}
-            aria-haspopup="dialog"
-            aria-expanded={moreOpen}
-            aria-controls={MORE_SHEET_ID}
-            onClick={() => setMoreOpen((open) => !open)}
-            className={`${MOBILE_NAV_ITEM} ${moreOpen ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
+          <nav
+            aria-label={t('nav.mobileLabel')}
+            className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
           >
-            <Icon.NavMore aria-hidden="true" size={Icon.ICON_SIZE.md} />
-            <span className="truncate">{t('nav.more')}</span>
-          </button>
-        </nav>
+            {tabs.map((path) => (
+              <NavItem
+                key={path}
+                to={path}
+                label={t(NAV_LABEL_KEYS[path])}
+                locked={locked.has(path)}
+                presentation="tab"
+              />
+            ))}
+            <button
+              type="button"
+              ref={moreButtonRef}
+              aria-haspopup="dialog"
+              aria-expanded={moreOpen}
+              aria-controls={MORE_SHEET_ID}
+              onClick={() => setMoreOpen((open) => !open)}
+              className={`${MOBILE_NAV_ITEM} ${moreOpen ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
+            >
+              <Icon.NavMore aria-hidden="true" size={Icon.ICON_SIZE.md} />
+              <span className="truncate">{t('nav.more')}</span>
+            </button>
+          </nav>
 
-        <KeyboardShortcuts />
-        <GlobalPasteRouter />
-        <CommandPaletteHost />
-        <NotificationPermissionPrompt />
-        {/*
+          <KeyboardShortcuts />
+          <GlobalPasteRouter />
+          <CommandPaletteHost />
+          <NotificationPermissionPrompt />
+          {/*
         In the shell rather than in `App`, unlike the install and reload
         prompts: it is about the *active Character*, so it belongs inside
         `RequireCharacter`, where there is always one.
       */}
-        <CorpGrantPrompt />
-        <ForegroundNotificationPoller />
-        <NetWorthSnapshotRecorder />
+          <CorpGrantPrompt />
+          <ForegroundNotificationPoller />
+          <NetWorthSnapshotRecorder />
 
-        <RecentNavRecorder />
+          <RecentNavRecorder />
 
-        {!isDesktop && (
-          <MobileMoreSheet
-            open={moreOpen}
-            onClose={() => setMoreOpen(false)}
-            locked={locked}
-            tabs={tabs}
-            renderCharacterLink={(originPath) => (
-              <CharacterFooterLink
-                activeCharacter={activeCharacter}
-                size="sm"
-                className="min-h-11 rounded-xs"
-                onClick={() => setMoreOpen(false)}
-                originPath={originPath}
-              />
-            )}
-          />
-        )}
-      </div>
+          {!isDesktop && (
+            <MobileMoreSheet
+              open={moreOpen}
+              onClose={() => setMoreOpen(false)}
+              locked={locked}
+              tabs={tabs}
+              renderCharacterLink={(originPath) => (
+                <CharacterFooterLink
+                  activeCharacter={activeCharacter}
+                  size="sm"
+                  className="min-h-11 rounded-xs"
+                  onClick={() => setMoreOpen(false)}
+                  originPath={originPath}
+                />
+              )}
+            />
+          )}
+        </div>
+      </AlertsPanelProvider>
     </UnreadAlertsContext.Provider>
   );
 });

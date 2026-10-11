@@ -1,0 +1,412 @@
+/**
+ * The Gallery: "Add a widget". A 460px drawer on the right on a desktop, a
+ * bottom sheet on a phone.
+ *
+ * The header stays put (title, a one-line count, search and ONE scrolling row
+ * of category chips) while the list scrolls under it. Under All the list is
+ * grouped by category in catalogue order; under a single category, or a
+ * search, it is one flat list. Each item is a card: the kind's name and its
+ * action, one line of description, small badges for the views it supports and
+ * its default size, and, on a desktop, a preview: the widget's body (no
+ * repeated title) at its default size and view, drawing sample figures, made
+ * inert (no focus, no clicks, hidden from assistive tech, no network).
+ *
+ * Adding on a desktop keeps the drawer open and the card says "Added" for a
+ * moment, so the click has feedback; on a phone the sheet covers the page, so
+ * it closes and lets the pilot see what they added.
+ *
+ * "Recently added" and the New tags are for a returning pilot only: on a
+ * first-run layout every kind is new, so the tag would say nothing.
+ */
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { Button, EmptyState, FilterChip, Modal, SearchInput, SlideOver } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { useOverviewEdit } from './editContext';
+import { sampleHasChart, sampleView } from './gallerySamples';
+import {
+  KIND_CATEGORIES,
+  WIDGET_KINDS,
+  type KindCategory,
+  type WidgetKindDef,
+  type WidgetSize,
+  type WidgetView,
+} from './kinds';
+import { MAX_WIDGETS, newWidget } from './layout';
+import { Widget } from './Widget';
+
+type CategoryFilter = 'all' | 'recent' | KindCategory;
+
+export interface GalleryProps {
+  open: boolean;
+  onClose: () => void;
+  /** A returning pilot: Recently added and the New tags apply. */
+  showNew: boolean;
+}
+
+/** How long the "Added" confirmation stays on a card. */
+const ADDED_MS = 2200;
+
+/** How wide the preview draws a kind's default size inside its frame: a share of a row would be a sliver at drawer width. */
+const PREVIEW_WIDTH: Record<WidgetSize, string> = {
+  S: 'w-[13.75rem]',
+  M: 'w-[19rem]',
+  L: 'w-full',
+  F: 'w-full',
+};
+
+const noop = () => undefined;
+
+function previewView(kind: WidgetKindDef, t: TFunction): WidgetView {
+  const hasChart = sampleHasChart(kind.id, t);
+  if (kind.defaultView === 'chart' && hasChart) return 'chart';
+  if (kind.defaultView === 'table') return 'table';
+  return kind.views.includes('chart') && hasChart ? 'chart' : 'number';
+}
+
+function Preview({ kind }: { kind: WidgetKindDef }) {
+  const { t } = useTranslation();
+  const view = useMemo(() => sampleView(kind.id, t), [kind.id, t]);
+  const widget = useMemo(() => {
+    const base = newWidget(kind.id, `preview-${kind.id}`);
+    return base ? { ...base, view: previewView(kind, t) } : null;
+  }, [kind, t]);
+  if (!view || !widget) return null;
+  return (
+    // Inert: a picture of the widget, not one. Nothing in it takes focus or a click.
+    <div
+      aria-hidden="true"
+      inert
+      data-testid="gallery-preview"
+      className="pointer-events-none relative max-h-44 overflow-hidden rounded-xs border border-line bg-bg p-2.5 select-none"
+    >
+      <div className={cx('mx-auto max-w-full', PREVIEW_WIDTH[kind.defaultSize])}>
+        <Widget widget={widget} showNew={false} onRemove={noop} previewView={view} hideHeader />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-bg to-transparent" />
+    </div>
+  );
+}
+
+function Badge({ children }: { children: string }) {
+  return (
+    <li className="rounded-xs border border-line px-1.5 py-px text-[0.6875rem] text-text-dim">
+      {children}
+    </li>
+  );
+}
+
+function GalleryItem({
+  kind,
+  count,
+  full,
+  showNew,
+  isPhone,
+  justAdded,
+  onAdd,
+}: {
+  kind: WidgetKindDef;
+  count: number;
+  full: boolean;
+  showNew: boolean;
+  isPhone: boolean;
+  justAdded: boolean;
+  onAdd: (kind: string) => void;
+}) {
+  const { t } = useTranslation();
+  const title = t(kind.titleKey);
+  const soon = kind.availability === 'comingSoon';
+  // The status line is always mounted so a screen reader hears its text change.
+  let status = '';
+  if (justAdded) status = t('overview.gallery.added');
+  else if (count > 0) status = t('overview.gallery.onBoard', { count });
+  let action = null;
+  if (soon) {
+    // Nothing to press: the badge beside the name says why.
+  } else if (full) {
+    action = <span className="text-xs text-text-dim">{t('overview.gallery.limit')}</span>;
+  } else {
+    action = (
+      <Button
+        variant={count > 0 ? 'ghost' : 'primary'}
+        size={isPhone ? 'md' : 'sm'}
+        className={isPhone ? 'min-h-11 min-w-20' : undefined}
+        aria-label={
+          count > 0
+            ? t('overview.gallery.addAnotherLabel', { title })
+            : t('overview.gallery.addLabel', { title })
+        }
+        onClick={() => onAdd(kind.id)}
+      >
+        {count > 0 ? t('overview.gallery.addAnother') : t('overview.gallery.add')}
+      </Button>
+    );
+  }
+  return (
+    <li
+      className={cx(
+        'grid gap-2 rounded-xs border border-line bg-panel-2 p-3',
+        soon && 'opacity-60'
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
+            {title}
+            {showNew && kind.isNew && (
+              <span className="rounded-xs bg-accent px-1.5 text-[0.5625rem] font-bold tracking-widest text-accent-contrast uppercase">
+                {t('overview.gallery.new')}
+              </span>
+            )}
+            {soon && (
+              <span className="rounded-xs border border-line-bright px-1.5 text-[0.5625rem] font-bold tracking-widest text-text-dim uppercase">
+                {t('overview.gallery.comingSoon')}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-[0.8125rem] text-text-dim">{t(kind.descKey)}</p>
+        </div>
+        <div className="shrink-0">{action}</div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <ul
+          aria-label={t('overview.gallery.facts')}
+          className="flex flex-wrap items-center gap-1.5"
+        >
+          {kind.views.map((view) => (
+            <Badge key={view}>{t(`overview.menu.views.${view}`)}</Badge>
+          ))}
+          <Badge>
+            {t('overview.gallery.sizeBadge', {
+              size: t(`overview.customize.size.${kind.defaultSize}`),
+            })}
+          </Badge>
+        </ul>
+        <span
+          role="status"
+          className={cx(
+            'ml-auto flex items-center gap-1 text-xs whitespace-nowrap',
+            justAdded ? 'font-semibold text-success' : 'text-text-dim'
+          )}
+        >
+          {justAdded && <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
+          {status}
+        </span>
+      </div>
+      {!isPhone && !soon && <Preview kind={kind} />}
+    </li>
+  );
+}
+
+function GalleryBody({
+  showNew,
+  isPhone,
+  onAdded,
+  searchRef,
+  subtitle,
+}: {
+  showNew: boolean;
+  isPhone: boolean;
+  onAdded: () => void;
+  searchRef: RefObject<HTMLInputElement | null>;
+  /** The count line: the drawer carries it in its title bar, so only the sheet draws it here. */
+  subtitle: string;
+}) {
+  const { t } = useTranslation();
+  const edit = useOverviewEdit();
+  const searchId = useId();
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<CategoryFilter>('all');
+  const [justAdded, setJustAdded] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    []
+  );
+
+  const counts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const w of edit.layout.widgets) map.set(w.kind, (map.get(w.kind) ?? 0) + 1);
+    return map;
+  }, [edit.layout.widgets]);
+  const full = edit.layout.widgets.length >= MAX_WIDGETS;
+
+  const needle = query.trim().toLowerCase();
+  const matching = WIDGET_KINDS.filter(
+    (kind) => !needle || `${t(kind.titleKey)} ${t(kind.descKey)}`.toLowerCase().includes(needle)
+  );
+  const items = matching.filter((kind) =>
+    category === 'recent' ? kind.isNew : category === 'all' || kind.category === category
+  );
+
+  const chips: { id: CategoryFilter; label: string; count: number }[] = [
+    { id: 'all', label: t('overview.gallery.categories.all'), count: matching.length },
+    ...(showNew
+      ? [
+          {
+            id: 'recent' as const,
+            label: t('overview.gallery.categories.recent'),
+            count: matching.filter((kind) => kind.isNew).length,
+          },
+        ]
+      : []),
+    ...KIND_CATEGORIES.map((id) => ({
+      id,
+      label: t(`overview.gallery.categories.${id}`),
+      count: matching.filter((kind) => kind.category === id).length,
+    })),
+  ];
+
+  const add = (id: string) => {
+    edit.add(id);
+    onAdded();
+    if (isPhone) return;
+    setJustAdded(id);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setJustAdded(null), ADDED_MS);
+  };
+
+  const renderItem = (kind: WidgetKindDef) => (
+    <GalleryItem
+      key={kind.id}
+      kind={kind}
+      count={counts.get(kind.id) ?? 0}
+      full={full}
+      showNew={showNew}
+      isPhone={isPhone}
+      justAdded={justAdded === kind.id}
+      onAdd={add}
+    />
+  );
+
+  let list;
+  if (items.length === 0) {
+    list = (
+      <EmptyState
+        title={t('overview.gallery.noMatch', { query: query.trim() })}
+        hint={t('overview.gallery.noMatchHint')}
+        action={
+          <Button size={isPhone ? 'md' : 'sm'} onClick={() => setQuery('')}>
+            {t('overview.gallery.clearSearch')}
+          </Button>
+        }
+      />
+    );
+  } else if (category === 'all') {
+    list = (
+      <div className="grid gap-5">
+        {KIND_CATEGORIES.map((id) => {
+          const group = items.filter((kind) => kind.category === id);
+          if (group.length === 0) return null;
+          return (
+            <section key={id} aria-labelledby={`gallery-group-${id}`} className="grid gap-2">
+              <h3
+                id={`gallery-group-${id}`}
+                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+              >
+                {t(`overview.gallery.categories.${id}`)}
+              </h3>
+              <ul className="grid gap-2">{group.map(renderItem)}</ul>
+            </section>
+          );
+        })}
+      </div>
+    );
+  } else {
+    list = <ul className="grid gap-2">{items.map(renderItem)}</ul>;
+  }
+
+  return (
+    <>
+      {/* Pinned: the sheet's scroller pads its edges (hence the negative margins), the drawer's does not. */}
+      <div
+        className={cx(
+          'sticky z-10 grid grid-cols-[minmax(0,1fr)] gap-2.5 border-b border-line bg-panel px-3 pb-2.5',
+          isPhone ? '-top-3 -mx-3 -mt-3 pt-3' : 'top-0 pt-3'
+        )}
+      >
+        {isPhone && <p className="text-xs text-text-dim">{subtitle}</p>}
+        <SearchInput
+          ref={searchRef}
+          id={searchId}
+          aria-label={t('overview.gallery.search')}
+          placeholder={t('overview.gallery.search')}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        {/* One row that scrolls sideways: a wrapped block of chips is three ragged lines. */}
+        <div
+          role="group"
+          aria-label={t('overview.gallery.categoriesLabel')}
+          className="relative -mx-3 flex min-w-0 gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:thin]"
+        >
+          {chips.map((chip) => (
+            <FilterChip
+              key={chip.id}
+              label={chip.label}
+              count={chip.count}
+              countLabel={t('overview.gallery.chipCount', { count: chip.count })}
+              size={isPhone ? 'md' : 'sm'}
+              className="shrink-0"
+              selected={category === chip.id}
+              onToggle={() => setCategory(chip.id)}
+            />
+          ))}
+        </div>
+      </div>
+      <div className={isPhone ? 'pt-3' : 'p-3'}>{list}</div>
+    </>
+  );
+}
+
+export function Gallery({ open, onClose, showNew }: GalleryProps) {
+  const { t } = useTranslation();
+  const edit = useOverviewEdit();
+  const isPhone = useIsPhone();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const title = t('overview.gallery.title');
+  const subtitle = t('overview.gallery.subtitle', {
+    total: WIDGET_KINDS.length,
+    onBoard: edit.layout.widgets.length,
+  });
+  if (isPhone) {
+    // No auto-focus on the search box here: on a phone it would raise the keyboard over the sheet.
+    // The sheet covers the page, so the Undo toast and the new widget's flash would sit
+    // behind it: closing on Add lets the pilot see what they added.
+    return (
+      <Modal open={open} onClose={onClose} title={title} placement="sheet-full">
+        <GalleryBody
+          showNew={showNew}
+          isPhone
+          onAdded={onClose}
+          searchRef={searchRef}
+          subtitle={subtitle}
+        />
+      </Modal>
+    );
+  }
+  return (
+    <SlideOver
+      open={open}
+      onClose={onClose}
+      title={title}
+      subtitle={subtitle}
+      flush
+      initialFocusRef={searchRef}
+      maxWidthClassName="max-w-[460px]"
+    >
+      <GalleryBody
+        showNew={showNew}
+        isPhone={false}
+        onAdded={noop}
+        searchRef={searchRef}
+        subtitle={subtitle}
+      />
+    </SlideOver>
+  );
+}
