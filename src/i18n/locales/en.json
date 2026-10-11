@@ -3808,6 +3808,11 @@
         "survey": {
           "unit": "ISK/m³",
           "secondary": "{{ore}} at {{place}}"
+        },
+        "hauling": {
+          "unit": "ISK profit",
+          "secondary": "{{item}}, {{lane}} ({{jumps}} jumps)",
+          "summary": "Best haul on each route from your last Hauling scan; run a new scan on the Hauling tab to refresh it."
         }
       },
       "training": {
@@ -4116,7 +4121,14 @@
       "hauling": {
         "title": "Hauling",
         "description": "Profitable hauls near you",
-        "empty": "There are no hauls to show."
+        "empty": "No scan yet",
+        "emptyLink": "Open Hauling",
+        "col": {
+          "route": "Route",
+          "profit": "Profit",
+          "jumps": "Jumps",
+          "perJump": "ISK/jump"
+        }
       },
       "kills": {
         "title": "Kills and losses",
@@ -4407,6 +4419,9 @@
         },
         "survey": {
           "note": "Veldspar Prime at Efa IV"
+        },
+        "hauling": {
+          "note": "Best haul from your last scan"
         }
       }
     },

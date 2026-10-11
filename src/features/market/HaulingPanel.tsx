@@ -102,6 +102,7 @@ import {
   pickHaulingHub,
   type HaulingHubChoice,
 } from './haulingHubs';
+import { rememberHaulingSummary, summarizeHaulingRows } from './haulingSummary';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 import {
   HAUL_MODES,
@@ -360,6 +361,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       }),
     [viewRows, params.days, params.margin, params.demand]
   );
+
+  // The Overview's Hauling widget reads this instead of scanning (#3579).
+  const scanFetchedAt = state.status === 'ready' ? state.scan.fetchedAt : null;
+  useEffect(() => {
+    if (scanFetchedAt === null || sameHub || bothAny) return;
+    const summary = summarizeHaulingRows(shown, scanFetchedAt);
+    if (summary) rememberHaulingSummary(summary);
+  }, [shown, scanFetchedAt, sameHub, bothAny]);
 
   // The user's edits belong to one scan: a new route, category or mode starts a fresh plan.
   const [overrides, setOverrides] = useState<ReadonlyMap<number, TripOverride>>(new Map());

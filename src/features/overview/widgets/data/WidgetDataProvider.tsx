@@ -48,6 +48,7 @@ import {
   loadMiningYieldWidget,
   loadNetWorthWidget,
   loadProfitWidget,
+  loadHaulingWidget,
   loadSurveyWidget,
 } from './kindLoaders';
 import { feedsFor } from './models';
@@ -196,6 +197,8 @@ function Source({ feed }: { feed: FeedId }) {
           cacheKey="overview:moon-chunks"
         />
       );
+    case 'hauling':
+      return <SnapshotSource feed="hauling" load={loadHaulingWidget} cacheKey="overview:hauling" />;
     case 'survey':
       return <SnapshotSource feed="survey" load={loadSurveyWidget} cacheKey="overview:survey" />;
     case 'journal':

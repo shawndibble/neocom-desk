@@ -184,6 +184,22 @@ describe('Widget states', () => {
     );
   });
 
+  it('links the Hauling empty state to the Hauling tab', () => {
+    renderWidget(model({ kind: 'hauling' }), (store) =>
+      store.set('hauling', {
+        data: { hasScan: false, routes: [], fetchedAt: null },
+        error: false,
+        loading: false,
+      })
+    );
+    const region = screen.getByRole('region', { name: 'Hauling' });
+    expect(within(region).getByText('No scan yet')).toBeInTheDocument();
+    expect(within(region).getByRole('link', { name: 'Open Hauling' })).toHaveAttribute(
+      'href',
+      '/travel/hauling'
+    );
+  });
+
   it('draws a kind that is coming soon as empty, never a spinner', () => {
     renderWidget(model({ kind: 'routeSafety' }), () => undefined);
     const region = screen.getByRole('region', { name: 'Route safety' });

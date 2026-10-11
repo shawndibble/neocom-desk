@@ -32,6 +32,7 @@ import type {
   JournalData,
   LocationWidgetData,
   LpWidgetData,
+  HaulingWidgetData,
   SurveyWidgetData,
   MiningYieldWidgetData,
   NetWorthWidgetData,
@@ -193,6 +194,7 @@ export interface FeedMap {
   miningYield: MiningYieldWidgetData;
   lp: LpWidgetData;
   survey: SurveyWidgetData;
+  hauling: HaulingWidgetData;
   clones: ClonesWidgetData;
   location: LocationWidgetData;
 }

@@ -103,7 +103,7 @@ describe('buildView status', () => {
 
 describe('placeholder kinds', () => {
   it('render empty, never loading, for kinds the catalogue marks coming soon', () => {
-    for (const kind of ['routeSafety', 'hauling', 'kills', 'jumpTimers']) {
+    for (const kind of ['routeSafety', 'kills', 'jumpTimers']) {
       expect(stateOf(buildView(kind, {}, ctx())), kind).toBe('empty');
     }
   });
