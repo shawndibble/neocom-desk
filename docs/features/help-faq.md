@@ -15,11 +15,11 @@ Command palette (`src/features/commandPalette`) is covered elsewhere; here only 
 "How do I do this faster, and what do you do with my data?" A pilot comes here for the keys and paste tricks, the "What we store" commitments, or how to report a bug. Help is not a setting (`20261002-145653-lp-store-under-market-pilot-lookup-its-own`).
 
 - **Top jobs (ranked):** 1. "Which keys and pastes does the app answer to?" (Shortcuts, the default tab). 2. "What syncs, what stays here, and what do you change in EVE?" (FAQ, `20260907-205018`). 3. "Where do I report a bug or idea?" (Support: Discord).
-- **Device and cadence:** both, occasional. Footer page with `mobileTab: false`; on a phone it is a More sheet row.
+- **Device and cadence:** desktop primary (owner, 2026-10-11), occasional; the keyboard and the client paste routes it documents are desk tools. Phone parity: footer page with `mobileTab: false`; on a phone it is a More sheet row.
 - **Above the fold:** tab bar (Shortcuts, FAQ, Support) and the first panel of the open tab.
 - **Not for:** changing anything (Settings); per-page help (InfoTooltips on each surface).
-- **Sources:** decisions `20261002-145653-lp-store-under-market-pilot-lookup-its-own`, `20261002-165816`, `20260907-205018`.
-- **Unconfirmed:** the job ranking; whether Shortcuts suits a phone as the default tab (phones rarely have a keyboard).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); decisions `20261002-145653-lp-store-under-market-pilot-lookup-its-own`, `20261002-165816`, `20260907-205018`.
+- **Unconfirmed:** the job ranking.
 
 ### Mobbin brief
 

@@ -20,11 +20,11 @@ Routes `/login` (`src/routes/Login.tsx`), `/callback` (`src/routes/Callback.tsx`
 Sign in with EVE SSO (first Character, or add an alt), choose how much to grant, recover from failures, and understand what the app asks for before consenting.
 
 - **Top jobs (ranked):** 1. "What will this do for me, and is it safe to give it my EVE login?" (the page sells the shipped product, `20260907-010343`; trust cards list the five writes, `20260924-165646`; the fifth, Autopilot waypoints, is `20261003-175151`). 2. "Log in, or add an alt." 3. "Grant only what I am comfortable with" (Customize permissions, `20260924-143410`).
-- **Device and cadence:** both; once per Character. The Play Store variant is a bare phone screen (`isPlayStoreApp`). New visitors land here from `/`.
+- **Device and cadence:** desktop primary, since the app is used mainly at the desk beside the EVE client (owner, 2026-10-11); once per Character. Phone parity: the Play Store variant is a bare phone screen (`isPlayStoreApp`). New visitors land here from `/`.
 - **Above the fold:** heading, tagline, Log in with EVE Online, the custom-permissions link, then the preview board.
 - **Not for:** changing grants later (Settings › Permissions); logging out (Settings › Data & storage).
-- **Sources:** decisions `20260907-010343`, `20260924-165646`, `20260924-143410`, `20260925-182747`, `20260909-101500`, `20261003-175151`; ADR 0001; #295, #649, #1522, #1771.
-- **Unconfirmed:** whether most new pilots arrive on a phone or a desk.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); decisions `20260907-010343`, `20260924-165646`, `20260924-143410`, `20260925-182747`, `20260909-101500`, `20261003-175151`; ADR 0001; #295, #649, #1522, #1771.
+- **Unconfirmed:** none.
 
 ### Mobbin brief
 

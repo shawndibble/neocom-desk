@@ -32,10 +32,10 @@ Section order/grouping: `src/features/settings/sections.ts:15`. A section added 
 | Activity Log                                             | See what the app fetched and how it went (support aid)                                   | Session-only so no token, id or body can persist (`stores/activityLog.ts`)                                                                                                                                                                                                                                                               |
 
 - **Top jobs (ranked):** 1. "Set the assumptions my pages start from, once, for every device" (Defaults, `20260907-221425`). 2. "Choose which events reach me, and how" (Notifications). 3. "Fix, move or leave" (clear cache, backup, delete all data).
-- **Device and cadence:** both, occasional. Phone has its own list-then-drill layout with value summaries (`20260925-120313`); footer page with `mobileTab: false`.
+- **Device and cadence:** desktop primary (owner, 2026-10-11), occasional. Phone parity: its own list-then-drill layout with value summaries (`20260925-120313`); footer page with `mobileTab: false`.
 - **Above the fold:** desktop: the grouped section rail and Display; phone: the grouped list with each section's current value.
 - **Not for:** a page's own settings mid-task (the page settings modal opens the same form, `20261004-155006`); shortcuts, FAQ and support (`/help`).
-- **Sources:** decisions listed under "Decisions and ADRs" below, chiefly `20260907-221425`, `20260925-084119`, `20260925-120313`, `20261004-155006`; ADR 0014.
+- **Sources:** owner, 2026-10-11 (desktop primary); decisions listed under "Decisions and ADRs" below, chiefly `20260907-221425`, `20260925-084119`, `20260925-120313`, `20261004-155006`; ADR 0014.
 - **Unconfirmed:** the job ranking and visit cadence.
 
 ### Mobbin brief
@@ -141,11 +141,11 @@ Same form lives in the Tax tab's settings modal; there the auto-continue toggle 
 
 ### Characters (`/settings/characters`)
 
-| Setting                                                             | Control                                                       | Default   | Key                                                              | Sync |
-| ------------------------------------------------------------------- | ------------------------------------------------------------- | --------- | ---------------------------------------------------------------- | ---- |
-| Default character filter (Wallet Balance, Industry Active Jobs)     | `CharacterFilterControl` field: current / all / pick          | `current` | `sync.defaultCharacterFilter` (legacy `number[]` still readable) | Yes  |
-| SP extraction monitoring (Characters table SP-ready column + alert) | checkbox                                                      | off       | `sync.spExtractionMonitoringEnabled`                             | Yes  |
-| Spare-SP threshold (only when enabled)                              | number, step 500,000, min 500,000, rounds to int, ignores <=0 | 500,000   | `sync.spExtractionThresholdSp`                                   | Yes  |
+| Setting                                                                 | Control                                                                                                              | Default   | Key                                                                              | Sync |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------- | ---- |
+| Default character filter (Wallet Balance, Industry Active Jobs, Assets) | `CharacterFilterControl` field: This character / All characters (`'current' \| 'all'`, `characterFilterValue.ts:21`) | `current` | `sync.defaultCharacterFilter` (legacy `number[]` still readable, reads as `all`) | Yes  |
+| SP extraction monitoring (Characters table SP-ready column + alert)     | checkbox                                                                                                             | off       | `sync.spExtractionMonitoringEnabled`                                             | Yes  |
+| Spare-SP threshold (only when enabled)                                  | number, step 500,000, min 500,000, rounds to int, ignores <=0                                                        | 500,000   | `sync.spExtractionThresholdSp`                                                   | Yes  |
 
 Hint: SP above the 5,000,000 floor counts; one extractor = 500,000 SP.
 
@@ -349,6 +349,7 @@ Rate limits: Settings makes no ESI calls except corp roles (cached 1 h) and Upda
 - Corp pages ignore the time-format preference in places (Members "Joined" uses `toLocaleDateString`; Deadline Strip buckets local days).
 - Foreground poller cadence in code is 5 min (`foregroundPoller.ts:59`) vs the "ten-minute cadence" quoted in decision `20260903-155950` (stale text).
 - No test exercises a cross-device pull re-rendering an already-open Settings form (only store-level pull test in `useSyncedSetting.test.ts`).
+- The default Character filter is the only memory the Character filter has: a pick on Assets, Wallet or Industry Jobs lives in that page's URL and is never written back (`characterFilterUrlParam.ts:10-13`), so the next visit reopens on this default, not the last pick. Opportunities ignores the default (`OpportunitiesPanel.tsx:120`). The owner wants the last pick remembered (owner, 2026-10-11; see `assets.md`).
 
 ## Improvement ideas
 

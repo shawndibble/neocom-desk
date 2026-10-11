@@ -24,11 +24,11 @@ Paths below are under `src/features/miningTax/` unless stated.
 "What did I mine, and what do I owe each landlord?" Overview is the default tab (`20260924-202220`); Tax exists because a renter mines several corporations' moons, owes each a different percent, and had no way to see what is owed to whom or whether it is paid (#523, `20260905-170644`).
 
 - **Top jobs (ranked):** 1. "What did my Characters mine, and what is it worth per day?" (Overview). 2. "What do I owe each Payee, and what still needs assigning or review?" (Tax). 3. "This payment arrived or went out: which entries does it settle?" (Settle up, link payment).
-- **Device and cadence:** Tax bookkeeping is a desk session (multi-select, Split, Combine, link dialogs). Phone use of the Tax table is planned for (#2148 adds a phone sort). Overview cadence: after a mining session; Tax: when billing or paying a landlord.
+- **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11): Tax bookkeeping is a desk session (multi-select, Split, Combine, link dialogs), and the payment copy buttons (amount, "to" name, reason) and "How this was priced" Copy as text go into the client. Phone parity: #2148 adds a phone sort to the Tax table. Overview cadence: after a mining session; Tax: when billing or paying a landlord.
 - **Above the fold:** Overview: ISK, ISK/day and m³ tiles, then the chart. Tax: Owed balances per Payee and the attention strip (needs review, unassigned), then the ledger.
 - **Not for:** field progress during an op (Survey tab, `mining-survey.md`); per-moon observer data (needs the moon owner's Accountant role, `20260905-170644`).
-- **Sources:** `20260905-170644`, `20260924-202220`, `20260906-132251`, `20260909-204328`, `20260922-204846`; #523, #2148, #3121.
-- **Unconfirmed:** cadence for both tabs; how often Tax is used on a phone; that Overview, not Tax, is the more visited tab.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `20260905-170644`, `20260924-202220`, `20260906-132251`, `20260909-204328`, `20260922-204846`; #523, #2148, #3121.
+- **Unconfirmed:** cadence for both tabs; that Overview, not Tax, is the more visited tab.
 
 ### Mobbin brief
 

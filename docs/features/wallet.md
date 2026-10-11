@@ -25,20 +25,20 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 
 "How much am I worth, and where did my ISK go?" Wallet holds the active Character's money: Balance shows the Worth panel (net worth over time by layer, EverMarks) and LP per corporation; Journal is the ledger. Since `20261010-200446` (#3527) the LP Store is a Wallet tab too, because the store is where LP balances are spent; the LP Store section below still describes it as Market's. Personal fills live on Market › History › Transactions (`20261001-113143`).
 
-- **Top jobs (ranked):** 1. "What is my net worth across ISK, assets and orders, and is it going up?" (Balance, #2935, #3004) 2. "Where did the ISK go / what was this payment?" (Journal: filters, ref-type breakdown, #2995) 3. "What can I buy with my LP?" (LP Store). Order is inferred, see Unconfirmed.
-- **Device and cadence:** both. Wallet is not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); the phone evidence is specific: pilots arrive from the `walletBalanceChanged` alert, which pulses one Journal row (`20260905-195857`); phone Journal fixes (#2992, #3501) show it is read on a phone.
-- **Above the fold:** Balance: Net worth and EverMarks figures, then the Worth chart with its series picker (#3004). Journal: filter bar with filtered count and net total, then newest entries.
+- **Top jobs (ranked):** 1. "Where did the ISK go / what was this payment?" (Journal: filters, ref-type breakdown, #2995). The Journal is the main reason to open Wallet (owner, 2026-10-11). 2. "Is my net worth going up?" (Balance: a nice overview of wallet progress, secondary; owner, 2026-10-11; #2935, #3004) 3. "What can I buy with my LP?" (LP Store).
+- **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11). Phone parity: Wallet is not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); pilots arrive from the `walletBalanceChanged` alert, which pulses one Journal row (`20260905-195857`); phone Journal fixes (#2992, #3501).
+- **Above the fold:** Journal: filter bar with filtered count and net total, then newest entries. Balance: Net worth and EverMarks figures, then the Worth chart with its series picker (#3004). Today `/wallet` opens on Balance (`WALLET_TABS`, `src/app/pageTabs.ts:99-106`), a tab away from the main job (see Observed gaps).
 - **Not for:** individual market fills (Market › History › Transactions); corp divisions (`/corp/wallet`, `20260929-131220`); pricing one item (Market).
-- **Sources:** #2935, #2936, #3004, #2995, #2992, #3501, #3527; `20261010-200446`, `20261001-113143`, `20260905-195857`, `20260929-131220`, `20261007-184320`.
-- **Unconfirmed:** the job ranking; that pilots check net worth often enough to want the trend at the top; how much LP Store use starts from Wallet vs search/palette; whether the All-Characters total matters more than the active Character's.
+- **Sources:** owner, 2026-10-11 (Journal first, net worth secondary, desktop use); #2935, #2936, #3004, #2995, #2992, #3501, #3527; `20261010-200446`, `20261001-113143`, `20260905-195857`, `20260929-131220`, `20261007-184320`.
+- **Unconfirmed:** how much LP Store use starts from Wallet vs search/palette; whether the All-Characters total matters more than the active Character's.
 
 ### Mobbin brief
 
 - **Fit:** high. A net-worth chart with stacked layers, a filterable transaction ledger and a spending catalog are standard finance patterns; only LP offer profit (ISK/LP) is EVE-specific.
 - **Analog apps:** Copilot Money, Monarch, Revolut, Robinhood (portfolio).
 - **Screen queries:**
-  - `web: net worth summary with a total figure above a stacked area chart by account type and a series selector in the panel header`
   - `web: transaction ledger table with date-range and category filters and a net-total summary above`
+  - `web: net worth summary with a total figure above a stacked area chart by account type and a series selector in the panel header`
   - `ios: transaction list grouped by day with amount and running balance per row`
   - `web: rewards catalog ranked by value per point with an item detail panel beside the list`
 - **Flow queries:** none.
@@ -207,6 +207,8 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - Journal has no per-row context menu or More-actions (only the table-wide export menu).
 - No page-specific keyboard shortcuts; only global `W`.
 - Help/FAQ (`features/help`, `features/faq`) say nothing about the Wallet page beyond the "what we store" list (wallet is among API-derived data cached locally, `settings.faq.store.local.esi`).
+- `/wallet` opens on Balance (first `WALLET_TABS` entry, `src/app/pageTabs.ts:99-106`), though the Journal is the main reason to open Wallet (owner, 2026-10-11).
+- The Character filter does not remember the last pick: it lives only in `?char=` and falls back to the Settings default on the next visit; nothing writes the pick back (`Wallet.tsx:200-216`, `characterFilterUrlParam.ts:10-13`). Same on Assets and Industry Jobs.
 
 ## Persistence and sync
 
@@ -267,6 +269,8 @@ Default Balance; EverMarks + other LP table; LP row link + caret, no row menu; p
 - Search/filter on the Loyalty table, and a "value in ISK" estimate per corp (LP value engine exists under `features/loyalty/lpValue.ts`).
 - Row menu on journal lines (copy ref id, open counterparty).
 - Mention Wallet scope and data handling in Help/FAQ.
+- Open `/wallet` on the Journal, or remember the last Wallet tab per device (owner, 2026-10-11: Journal is the main job).
+- Remember the last This character / All characters pick and reopen with it (owner wish, 2026-10-11; see `assets.md`).
 
 ## LP Store: wallet-side hooks (page spec lives in `docs/features/market.md` section 5)
 
