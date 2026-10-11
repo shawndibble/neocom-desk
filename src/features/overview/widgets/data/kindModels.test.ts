@@ -912,6 +912,16 @@ describe('kills', () => {
     expect(view.chart.note).toContain('"covered":20');
   });
 
+  it('says so when some Characters could not be read in All scope', () => {
+    const view = buildView(
+      'kills',
+      { kills: ok(data({ failedIds: [92] })) },
+      ctx({ scopeAll: true, range: 7 })
+    );
+    if (view.chart?.kind !== 'bars') throw new Error('bars');
+    expect(view.chart.note).toContain('overview.widgets.chart.kills.unread');
+  });
+
   it('is empty with no kills in range, and when the header Character is not tracked', () => {
     expect(stateOf(buildView('kills', { kills: ok(data({ entries: [] })) }, ctx()))).toBe('empty');
     expect(stateOf(buildView('kills', { kills: ok(data()) }, ctx({ activeCharacterId: 7 })))).toBe(

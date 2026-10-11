@@ -3772,6 +3772,8 @@
         "kills": {
           "note": "Kills and losses per day, last {{count}} days",
           "noteCovered": "Kills and losses per day. zKillboard's latest page reaches back {{covered}} of {{count}} days.",
+          "unread_one": "{{count}} Character could not be read and is not counted.",
+          "unread_other": "{{count}} Characters could not be read and are not counted.",
           "max": "max {{count}} per day",
           "xStart": "{{count}} days ago",
           "xEnd": "today",
@@ -3839,7 +3841,7 @@
         "kills": {
           "unit_one": "kill or loss",
           "unit_other": "kills and losses",
-          "secondary": "{{kills}} kills · {{losses}} losses"
+          "secondary": "Kills {{kills}} · Losses {{losses}}"
         }
       },
       "training": {

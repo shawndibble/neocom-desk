@@ -547,7 +547,11 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
   const everyone = scopeAll || activeCharacterId === null;
   const failedHere = !everyone && data.failedIds.includes(activeCharacterId);
   const tracked = everyone || data.trackedIds.includes(activeCharacterId);
-  const since = now - range * KILLS_DAY_MS;
+  const window = `${range}d` as MiningYieldRange;
+  const today = eveToday(new Date(now));
+  const days = rangeDates(window, today);
+  // The same calendar days the chart draws, so the bars add up to the headline.
+  const since = Date.parse(`${days[0]}T00:00:00Z`);
   // Two of your Characters on one killmail is one kill: count the killmail once.
   const seen = new Set<number>();
   const inRange = data.entries.filter((entry) => {
@@ -569,14 +573,12 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
 
   const killCount = inRange.filter((entry) => entry.side === 'kill').length;
   const lossCount = inRange.length - killCount;
-  const window = `${range}d` as MiningYieldRange;
-  const today = eveToday(new Date(now));
   const perDay = new Map<string, number>();
   for (const entry of inRange) {
     const day = new Date(entry.timeMs).toISOString().slice(0, 10);
     perDay.set(day, (perDay.get(day) ?? 0) + 1);
   }
-  const values = rangeDates(window, today).map((date) => perDay.get(date) ?? 0);
+  const values = days.map((date) => perDay.get(date) ?? 0);
   const peak = Math.max(...values);
 
   // zKillboard's first page holds 200 per list: a busy pilot's 90 days can reach further back than that.
@@ -639,10 +641,16 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
       max: t(`${C}.kills.max`, { count: peak }),
       xStart: t(`${C}.kills.xStart`, { count: range }),
       xEnd: t(`${C}.kills.xEnd`),
-      note:
+      note: [
         covered === null
           ? t(`${C}.kills.note`, { count: range })
           : t(`${C}.kills.noteCovered`, { count: range, covered }),
+        everyone && data.failedIds.length > 0
+          ? t(`${C}.kills.unread`, { count: data.failedIds.length })
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
       summary,
     },
   };
