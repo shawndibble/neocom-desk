@@ -67,6 +67,8 @@ interface SurveyBoardProps {
   footerActions?: ReactNode;
   /** A section under the panel, before the ores, e.g. the moon tax; gets the same summary. */
   afterPanel?: (summary: SurveySummary) => ReactNode;
+  /** Under the empty state's hint, before any scan is pasted: where a template is picked to start from. */
+  emptyExtra?: ReactNode;
   /**
    * The panel's title; the public page sets one that doesn't repeat its page
    * heading, and the Survey tab passes the pilot's own name for it.
@@ -99,6 +101,7 @@ export function SurveyBoard({
   expiresAt,
   footerActions,
   afterPanel,
+  emptyExtra,
   panelTitle,
 }: SurveyBoardProps) {
   const { t, i18n } = useTranslation();
@@ -162,6 +165,7 @@ export function SurveyBoard({
     return (
       <div className="space-y-4">
         <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
+        {emptyExtra}
         <SurveyHowTo />
         {footerActions}
         {scanList}

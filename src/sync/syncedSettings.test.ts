@@ -54,6 +54,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.structureBrokerFees',
   'sync.stockLists',
   'sync.surveyHistory',
+  'sync.surveyInfoTemplates',
   'sync.targetSkillPlan',
 ];
 
