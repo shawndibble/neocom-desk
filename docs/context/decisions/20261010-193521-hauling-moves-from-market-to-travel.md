@@ -14,7 +14,9 @@ _Recorded 2026-10-10 · issue #3526._
   the old path are dropped, not migrated, as with Pilot Lookup.
 - **Travel gets no hub control.** Hauling never used Market's header hub
   picker: it has its own From/To hub pickers, defaulting from the saved Trade
-  Hub. Its reload stays in the page title bar.
+  Hub. Its reload stays in the page title bar. A row's Show info now opens the
+  app-wide item info, as on Assets, instead of Market's in-page Item Detail
+  priced at Market's header hub: Travel has no header hub to price it at.
 - **Switching into or out of Hauling starts the other tab with a clean query
   string.** Hauling's `from`/`to` name Trade Hubs and Route Safety's name
   systems; carrying one tab's over would hand the other the wrong kind. The

@@ -7385,8 +7385,7 @@
       "historyViewsTooltipLabel": "About ended orders and transactions",
       "historyViewsTooltip": "Ended orders are the orders you placed that were cancelled or expired. Transactions are the fills that moved ISK. One order can make many fills, and an order nobody took makes none.",
       "transactions": "Transactions",
-      "appraisal": "Appraisal",
-      "hauling": "Hauling"
+      "appraisal": "Appraisal"
     },
     "hauling": {
       "title": "Hauling",

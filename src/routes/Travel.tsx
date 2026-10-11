@@ -58,7 +58,7 @@ export function Travel() {
   };
   const tabs = TRAVEL_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }));
   const views: PageViews = { tabs, value: tab, onChange };
-  // Four tabs: on a phone the title's view picker replaces the strip (DESIGN.md §6c).
+  // 4+ tabs: on a phone the title's view picker replaces the strip (DESIGN.md §6c).
   const tabBar = usesViewPicker(tabs.length, isPhone) ? null : (
     <Tabs tabsId={tabsId} label={t('travel.title')} value={tab} onChange={onChange} tabs={tabs} />
   );
