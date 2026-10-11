@@ -9,7 +9,7 @@
 import type { WidgetSize } from './kinds';
 import { SIZE_LAYOUT } from './sizes';
 
-/** The gap between widgets, px. The basis subtracts it so three Smalls fit one row. */
+/** The gap between widgets, px. The basis subtracts it so four Smalls fit one row. */
 export const GRID_GAP = 12;
 export const PHONE_GRID_GAP = 10;
 
@@ -30,8 +30,7 @@ export function flexRule(size: WidgetSize, phone: boolean): FlexRule {
   const { basis, minWidth } = SIZE_LAYOUT[size];
   if (basis >= 1) return { flexGrow: 1, flexShrink: 1, flexBasis: '100%', minWidth };
   return {
-    // A Large takes twice a Small's share of the row's leftover.
-    flexGrow: basis > 0.5 ? 2 : 1,
+    flexGrow: 1,
     flexShrink: 1,
     flexBasis: `calc(${(basis * 100).toFixed(3)}% - ${GRID_GAP}px)`,
     minWidth,

@@ -98,7 +98,7 @@ table.map tr:last-child td { border-bottom: 0; }
 
 /* widgets: flex rows so reading order is screen order and rows have no holes */
 .wgrid { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
-.sz-S { flex: 1 1 calc(33.333% - 12px); min-width: 190px; } .sz-M { flex: 1 1 calc(50% - 12px); min-width: 260px; } .sz-L { flex: 2 1 calc(66.666% - 12px); min-width: 340px; } .sz-F { flex: 1 1 100%; }
+.sz-S { flex: 1 1 calc(25% - 12px); min-width: 220px; } .sz-M { flex: 1 1 calc(33.333% - 12px); min-width: 300px; } .sz-L { flex: 1 1 calc(50% - 12px); min-width: 440px; } .sz-F { flex: 1 1 100%; }
 .wgrid.ph { gap: 10px; }
 .ph .sz-S { flex: 1 1 calc(50% - 10px); min-width: 0; } .ph .sz-M, .ph .sz-L, .ph .sz-F { flex: 1 1 100%; min-width: 0; }
 .w { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; display: flex; flex-direction: column; min-width: 0; }
@@ -211,7 +211,7 @@ table.map tr:last-child td { border-bottom: 0; }
   <header class="intro">
     <span class="micro">Neocom Desk · Overview</span>
     <h1>The Overview, built by the pilot: final free grid design</h1>
-    <p class="dim">This is option A, refined after a hostile review from a first-time user. The Overview is a grid of widgets the pilot adds, sizes, renames and removes, each shown as a number, a chart or a list. The alerts bell is in the header of every page. Use Customize, the ⋯ menu on any widget, the character switcher, and the bell. Both frames share one layout. Figures are invented, and the numbers do not change when you switch character.</p>
+    <p class="dim">This is option A, refined after a hostile review from a first-time user. The Overview is a grid of widgets the pilot adds, sizes, renames and removes, each shown as a number, a chart or a list. The alerts bell is in the header of every page. Use Customize, the ⋯ menu on any widget, and the bell. Both frames share one layout. Figures are invented, and the numbers do not change when you switch character.</p>
   </header>
 
   <div class="review" aria-label="Review controls, not part of the design">
@@ -237,7 +237,7 @@ table.map tr:last-child td { border-bottom: 0; }
     </ul></div>
     <div><h2>And</h2><ul>
       <li><b>Per-widget settings</b> in ⋯: view, character, date range, rename, duplicate, hide on phone. You can add the same widget twice.</li>
-      <li><b>Character switcher</b> in the header, with All characters.</li>
+      <li><b>Character scope</b> is per widget (Header character or All characters in its ⋯ menu); the header has no switcher.</li>
       <li><b>Honest charts.</b> Orders no longer treats Expiring as exclusive. Wallet flow splits income and spending. Net worth has no red. Bars carry a max and a time range. Every chart has a text equivalent in its List view and a hidden summary.</li>
       <li><b>Gallery previews are readable.</b> Each is a real Medium widget, and "New" only shows for returning pilots.</li>
       <li><b>Phone customization is reorder, remove and add.</b> Sizes and views are set on desktop. Rows are 44px. The earlier phone bug is fixed.</li>

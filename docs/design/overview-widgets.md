@@ -28,7 +28,7 @@ point.
   settings apply (range), its ESI permission, its empty message.
 - **View** — Number / Chart / List. A Widget shows one. List is also the text
   equivalent of a Chart.
-- **Size** — S / M / L / Full: a share of one row's width (⅓, ½, ⅔, whole), not
+- **Size** — S / M / L / Full: a share of one row's width (¼, ⅓, ½, whole), not
   a height. Content sets height.
 - **Overview Layout** — the ordered list of Widgets and their settings. One per
   pilot (not per Character), synced like the hidden-card setting.
@@ -41,9 +41,16 @@ point.
 
 ## 3. Page structure
 
-1. Page header (existing `CharacterHeader`): character switcher (Kara Voss ▾ /
-   other Characters / **All characters**), **Next deadline chip**, "Updated N
-   ago", Refresh, **Customize** button, **bell**.
+1. Page header (existing `CharacterHeader`, with the Overview's `overview`
+   layout): the Character's name with "Updated N ago" and Refresh beside it,
+   the corporation line, the **Unallocated SP** chip with the **bell** at the
+   top right of the same line, and a controls row under it: the **Next
+   deadline** button (a link to the page that owns the clock) and
+   **Customize**. There is no Character switcher in the header (the rail
+   footer and the command palette switch the active Character; a widget's own
+   menu chooses Header character or All characters) and no Total SP chip (a
+   Skill points widget carries it). Every control in the row is one `md`
+   control height (44px on a phone, 36px on a pointer).
 2. Sub-nav: Overview / Clones / Employment history. **Unchanged — those pages
    stay.** Only the Overview tab's content changes.
 3. **Danger banner** (when an unacknowledged danger Alert exists).
@@ -51,14 +58,17 @@ point.
 5. **The grid.**
 
 The old summary strip (Next deadline / Training / Wallet cells) is gone: Training
-and Wallet are Widgets; Next deadline is only the header chip. The old Alerts
+and Wallet are Widgets; Next deadline is only the header button. The old Alerts
 column and the "Everything else" phone fold are gone.
 
 ## 4. The grid
 
 - Flex-wrap rows, **no gap-filling**: reading order = screen order = ↑/↓ order.
   A row's leftover width is shared (flex-grow), so no holes.
-- Size → flex-basis: S ⅓ (min 190px), M ½ (min 260px), L ⅔ (min 340px), Full 100%.
+- Size → flex-basis: S ¼ (min 220px), M ⅓ (min 300px), L ½ (min 440px), Full 100%.
+  On the 1152px content column of a 1440px desktop that is **four S, three M,
+  two L or one Full per row**; a narrower window wraps to fewer across at each
+  size's minimum width, and rows share their leftover equally.
 - Size also sets how much a view shows: list rows S3 / M4 / L6 / Full10; chart
   height 44 / 70 / 100px; Number view at M+ adds a mini chart under the figure.
 - **Every Widget always shows its headline number** — a Small Chart still shows
@@ -150,7 +160,7 @@ never the only signal.
 
 Grid & widgets
 - [ ] E1 Overview renders a Widget grid from a persisted Overview Layout.
-- [ ] E2 Sizes S/M/L/Full set row width; order = screen order, no holes.
+- [ ] E2 Sizes S/M/L/Full set row width (4 / 3 / 2 / 1 per row on a 1440px desktop); order = screen order, no holes.
 - [ ] E3 Views Number/Chart/List per kind; headline number always visible.
 - [ ] E4 Widget header: title, New tag (returning only), scope chip, Open link, ⋯.
 - [ ] E5 ⋯ menu: view, character, range, rename, duplicate, top, bottom, phone, remove; Esc/outside closes.
@@ -171,7 +181,7 @@ Gallery & first run
 - [ ] E16 First run Role chooser builds the Layout; Just the basics; reachable later via Start from a role.
 
 Header & alerts
-- [ ] E17 Character switcher incl. All characters; Updated N ago + Refresh; Next deadline chip (amber < 3 h, red < 30 min); Customize.
+- [ ] E17 No header Character switcher; Updated N ago + Refresh beside the name; Next deadline button (amber < 3 h, red < 30 min) and Customize in one equal-height row; bell top right.
 - [ ] E18 Sub-nav unchanged (Overview / Clones / Employment history).
 - [ ] E19 Bell in every page header; badge red only for danger; dim at zero.
 - [ ] E20 Alerts panel (desktop popover / phone sheet) with chips, Mark all read (spares danger), View/Snooze/Dismiss/Acknowledge, empty state, footer, Esc/outside close.

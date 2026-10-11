@@ -7,11 +7,15 @@ import type { WidgetSize } from './kinds';
 
 export const SIZES: readonly WidgetSize[] = ['S', 'M', 'L', 'F'];
 
-/** `basis` is the fraction of the row; `minWidth` (px) is where it wraps. */
+/**
+ * `basis` is the fraction of the row (S four across, M three, L two, Full one);
+ * `minWidth` (px) is where it wraps: four S, three M and two L all fit the
+ * 1152 px content column of a 1440 px desktop with the rail open.
+ */
 export const SIZE_LAYOUT: Record<WidgetSize, { basis: number; minWidth: number }> = {
-  S: { basis: 1 / 3, minWidth: 190 },
-  M: { basis: 1 / 2, minWidth: 260 },
-  L: { basis: 2 / 3, minWidth: 340 },
+  S: { basis: 1 / 4, minWidth: 220 },
+  M: { basis: 1 / 3, minWidth: 300 },
+  L: { basis: 1 / 2, minWidth: 440 },
   F: { basis: 1, minWidth: 0 },
 };
 

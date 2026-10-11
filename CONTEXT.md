@@ -1163,7 +1163,8 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   for why no separate "Skill Plan step completed" event exists alongside it
   (issue #1410).
 - **Size**: A **Widget**'s width on the Overview: S, M, L or Full, a share of one row
-  (a third, a half, two thirds, the whole), not a height: its content sets
+  (a quarter, a third, a half, the whole: four Small, three Medium,
+  two Large or one Full across a desktop row), not a height: its content sets
   that. Size also sets how much a **View** shows (list rows, chart height).
   On a phone Small sits two across and every other size takes the row.
 - **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Signalled for a **Published Snapshot**, where a long window encodes a publish cadence, so a mounted view re-reads the fresher rows. Silent for a game constant: its long window asserts the value cannot change, so the lapsed row is shown at once and the refresh lands for the next read without re-rendering anything. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
