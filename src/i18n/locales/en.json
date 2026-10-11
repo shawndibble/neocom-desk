@@ -4180,7 +4180,6 @@
       },
       "emptyHint": "This widget has no data for this Character.",
       "remove": "Remove widget",
-      "new": "New",
       "opensPage": "Opens the {{title}} page",
       "settingsFor": "Settings for {{title}}",
       "tone": {
@@ -4258,7 +4257,6 @@
       "noMatch": "No widget matches \"{{query}}\".",
       "categories": {
         "all": "All",
-        "recent": "Recently added",
         "character": "Character",
         "money": "Money and market",
         "industry": "Industry and mining",
@@ -4272,7 +4270,6 @@
       "addAnotherLabel": "Add another {{title}}",
       "limit": "Limit reached",
       "comingSoon": "Coming soon",
-      "new": "New",
       "subtitle": "{{total}} widgets · {{onBoard}} on your Overview",
       "chipCount_one": "{{count}} widget",
       "chipCount_other": "{{count}} widgets",
