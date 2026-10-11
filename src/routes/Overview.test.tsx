@@ -1247,6 +1247,64 @@ describe('Price alerts', () => {
   });
 });
 
+describe('Incursions', () => {
+  const STAGING = 30002813;
+
+  beforeEach(() => {
+    server.use(
+      http.get('https://esi.evetech.net/incursions', () =>
+        HttpResponse.json([
+          {
+            constellation_id: 20000410,
+            staging_solar_system_id: STAGING,
+            state: 'mobilizing',
+            influence: 0.5,
+            has_boss: false,
+            faction_id: 500019,
+            type: 'Incursion',
+            infested_solar_systems: [STAGING],
+          },
+        ])
+      ),
+      http.post('https://esi.evetech.net/universe/names', () =>
+        HttpResponse.json([{ id: 20000410, name: 'Kimotoro', category: 'constellation' }])
+      )
+    );
+  });
+
+  it('is off until switched on, then opens each staging system in Route Safety', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await findCard(/open orders/i);
+    expect(screen.queryByRole('heading', { name: 'Incursions' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /choose and arrange cards/i }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Incursions' }));
+    await user.keyboard('{Escape}');
+
+    const card = await findCard(/^incursions$/i);
+    const row = await within(card).findByRole('link', { name: /Mobilizing · Kimotoro/ });
+    expect(row).toHaveAttribute('href', `/travel/route?stops=${STAGING}`);
+    expect(within(row).getByText('Mobilizing')).toBeInTheDocument();
+    expect(within(card).getByText('1 active in total')).toBeInTheDocument();
+    await waitFor(async () =>
+      expect((await db.settings.get(OVERVIEW_HIDDEN_CARDS_KEY))?.value).toEqual(['show:incursions'])
+    );
+  });
+
+  it('says why there are no distances without a current system, never a zero', async () => {
+    await db.settings.put({ key: OVERVIEW_HIDDEN_CARDS_KEY, value: ['show:incursions'] });
+    render(<App />);
+
+    const card = await findCard(/^incursions$/i);
+    expect(
+      await within(card).findByText('Set your current system to count jumps to each one.')
+    ).toBeInTheDocument();
+    const row = await within(card).findByRole('link', { name: /Mobilizing · Kimotoro/ });
+    expect(within(row).queryByText(/\d+ jumps?/)).not.toBeInTheDocument();
+  });
+});
+
 describe('corp cards', () => {
   const CORP = 'https://esi.evetech.net/corporations/1001';
   const corpRequests = vi.fn();

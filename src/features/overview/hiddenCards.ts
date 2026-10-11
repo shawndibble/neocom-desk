@@ -26,6 +26,7 @@ export const OVERVIEW_CARD_KEYS = [
   'spExtraction',
   'mail',
   'priceAlerts',
+  'incursions',
   'alerts',
 ] as const;
 
@@ -47,6 +48,7 @@ export const OVERVIEW_CARD_LABEL: Record<OverviewCardKey, string> = {
   spExtraction: 'overview.board.spExtraction',
   mail: 'overview.board.mail',
   priceAlerts: 'overview.board.priceAlerts',
+  incursions: 'overview.board.incursions',
   alerts: 'overview.board.alerts',
 };
 
@@ -61,12 +63,30 @@ export function parseHiddenCards(raw: unknown): string[] | null {
   return [...new Set(raw.filter((key): key is string => typeof key === 'string'))];
 }
 
+/**
+ * Cards that start switched off: an opt-in for pilots who want them, not a
+ * card everyone has to hide (Incursions, issue #3541). The list still holds
+ * *hidden* keys for every other card, so for these the pilot's "on" is stored
+ * as a `show:<key>` marker instead — a plain key already means "hidden", and
+ * the marker survives an older build the same way any unknown key does.
+ */
+export const OVERVIEW_DEFAULT_OFF_CARDS: readonly OverviewCardKey[] = ['incursions'];
+
+const shownMarker = (key: OverviewCardKey) => `show:${key}`;
+const isDefaultOff = (key: OverviewCardKey) => OVERVIEW_DEFAULT_OFF_CARDS.includes(key);
+
 export function toggleHiddenCard(hidden: readonly string[], key: OverviewCardKey): string[] {
-  return hidden.includes(key) ? hidden.filter((k) => k !== key) : [...hidden, key];
+  const entry = isDefaultOff(key) ? shownMarker(key) : key;
+  return hidden.includes(entry) ? hidden.filter((k) => k !== entry) : [...hidden, entry];
 }
 
 export function isCardShown(hidden: readonly string[], key: OverviewCardKey): boolean {
-  return !hidden.includes(key);
+  return isDefaultOff(key) ? hidden.includes(shownMarker(key)) : !hidden.includes(key);
+}
+
+/** "Show all cards": every card on, the off-by-default ones included. */
+export function showAllCards(): string[] {
+  return OVERVIEW_DEFAULT_OFF_CARDS.map(shownMarker);
 }
 
 export const useOverviewHiddenCards = createSyncedSetting<string[]>({

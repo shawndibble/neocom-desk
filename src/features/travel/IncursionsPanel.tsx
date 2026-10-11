@@ -13,11 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Button, CollapsiblePanel, LiveStatus, Tooltip } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
-import {
-  buildIncursionRows,
-  type IncursionRow,
-  type IncursionState,
-} from '@/engine/incursions/incursionRows';
+import { buildIncursionRows, type IncursionRow } from '@/engine/incursions/incursionRows';
 import { useJumpRangeFilter, type CurrentSystemState } from '@/features/route/currentSystem';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { cx } from '@/lib/cx';
@@ -28,13 +24,7 @@ import {
   useIncursionsPanelOpen,
   type IncursionsFeed,
 } from './incursionsData';
-
-/** The state as a tinted word (§6c verdict): no fill, which would read as clickable, and no accent. */
-const STATE_TONE: Record<IncursionState, string> = {
-  mobilizing: 'text-warning',
-  established: 'text-text',
-  withdrawing: 'text-text-dim',
-};
+import { INCURSION_STATE_TONE } from './incursionStateTone';
 
 /** What Route can do for a staging system: add it, or why not (already on the trip, stops full). */
 export type RouteAction = 'add' | 'on-route' | 'full';
@@ -168,7 +158,7 @@ export function IncursionsPanel({
                         <span
                           className={cx(
                             'text-[0.6875rem] font-semibold tracking-wider uppercase',
-                            STATE_TONE[row.state]
+                            INCURSION_STATE_TONE[row.state]
                           )}
                         >
                           {t(`travel.incursions.state.${row.state}`)}

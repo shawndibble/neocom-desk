@@ -28,7 +28,7 @@
  * Structures and Moon extractions cards are the Character's corporation's,
  * read through that Character's roles.
  */
-import { Fragment, useEffect, useMemo, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -85,10 +85,17 @@ import {
 import {
   isCardShown,
   OVERVIEW_CARD_LABEL,
+  showAllCards,
   toggleHiddenCard,
   useOverviewHiddenCards,
   type OverviewCardKey,
 } from '@/features/overview/hiddenCards';
+import { IncursionsBoardSource } from '@/features/overview/IncursionsBoardSource';
+import {
+  incursionsSeverity,
+  incursionsSummary,
+  type IncursionsBoardData,
+} from '@/features/overview/incursionsBoard';
 import {
   AlertsColumn,
   CONTRACTS_IN_PROGRESS_HREF,
@@ -98,6 +105,7 @@ import {
   MoonChunksCard,
   StructuresCard,
   PriceAlertsCard,
+  IncursionsCard,
   SpExtractionCard,
   EverythingElseCard,
   IndustryCard,
@@ -312,6 +320,9 @@ export function Overview() {
     cacheKey: 'overview:moon-chunks',
   });
   const corpAccess = useCorpAccess();
+  // Read by `IncursionsBoardSource`, mounted only while the card is on.
+  const [incursions, setIncursions] = useState<IncursionsBoardData | null>(null);
+  const [incursionsRefresh, setIncursionsRefresh] = useState(0);
   const { hydrated, activeCharacterId } = walletSnapshot;
 
   const queueEntries = skillsQueueSnapshot.data?.queueResult?.data ?? null;
@@ -662,6 +673,15 @@ export function Overview() {
       render: () => <PriceAlertsCard data={priceAlertsSnapshot.data} nowMs={now} />,
     },
     {
+      key: 'incursions',
+      placement: 'card',
+      to: '/travel/route',
+      severity: incursionsSeverity(incursions),
+      summary: incursionsSummary(t, incursions),
+      loading: incursions === null || incursions.status === 'loading',
+      render: () => <IncursionsCard data={incursions} />,
+    },
+    {
       key: 'alerts',
       placement: 'column',
       to: '/alerts',
@@ -782,6 +802,7 @@ export function Overview() {
           ]) {
             snapshot.refresh();
           }
+          setIncursionsRefresh((n) => n + 1);
         }}
         actions={
           <CardPicker
@@ -791,12 +812,16 @@ export function Overview() {
             orderCustomised={!isDefaultOrder(storedOrder)}
             onToggle={(key) => void setHiddenCards(toggleHiddenCard(hiddenCards, key))}
             onMove={(active, over) => void setStoredOrder(moveCard(storedOrder, active, over))}
-            onShowAll={() => void setHiddenCards([])}
+            onShowAll={() => void setHiddenCards(showAllCards())}
             onResetOrder={() => void setStoredOrder([])}
           />
         }
         refreshing={walletSnapshot.loading || visibleSpecs.some((spec) => spec.loading)}
       />
+
+      {shown('incursions') && (
+        <IncursionsBoardSource refreshKey={incursionsRefresh} onChange={setIncursions} />
+      )}
 
       {nothingShown && (
         <p className="rounded-xs border border-line bg-panel/85 px-3 py-4 text-xs text-text-dim">

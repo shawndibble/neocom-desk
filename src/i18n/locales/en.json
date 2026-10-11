@@ -3600,6 +3600,16 @@
       "priceAlertsWatched": "Watching",
       "priceAlertsChecked": "Prices checked {{age}}",
       "priceAlertsNotChecked": "Not priced yet — the alert poller checks these",
+      "incursions": "Incursions",
+      "incursionsJumps_one": "{{count}} jump",
+      "incursionsJumps_other": "{{count}} jumps",
+      "incursionsNoRoute": "No route",
+      "incursionsNearest_one": "{{count}} active · nearest {{system}}, {{jumps}}",
+      "incursionsNearest_other": "{{count}} active · nearest {{system}}, {{jumps}}",
+      "incursionsActive_one": "{{count}} active in total",
+      "incursionsActive_other": "{{count}} active in total",
+      "incursionsNone": "No incursions active",
+      "incursionsFailed": "Incursion feed unreadable",
       "priceAlertTarget": {
         "above": "Target ≥ <isk/>",
         "below": "Target ≤ <isk/>"
