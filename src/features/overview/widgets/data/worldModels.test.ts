@@ -106,17 +106,28 @@ describe('industry', () => {
     expect(text(withNames.table!.rows[0]!.cells[at])).toBe('Jita IV');
   });
 
-  it('charts one bar per job, a finished one full and flagged, a running one by progress', () => {
+  it('charts jobs on a time axis holding now, a finished one in the ready colour', () => {
     const view = buildView('industry', feeds(jobs()), ctx());
-    if (view.chart?.kind !== 'hbars') throw new Error('hbars');
+    if (view.chart?.kind !== 'gantt') throw new Error('gantt');
     expect(view.chart.rows.map((r) => r.key)).toEqual(['3', '2', '4', '1']);
-    expect(view.chart.rows[0]).toMatchObject({
-      share: 1,
-      color: 'warning',
-      text: 'overview.board.ready',
+    expect(view.chart.rows[0]).toMatchObject({ color: 'warning', text: 'overview.board.ready' });
+    expect(view.chart.rows[2]).toMatchObject({ color: 'accent' });
+    // The earliest start is job 2 (10 h job that ended 25 min ago); the latest end is job 1.
+    expect(view.chart.axis).toEqual({
+      from: NOW - 10 * HOUR - 25 * MIN,
+      to: NOW + 4 * HOUR,
+      now: NOW,
     });
-    expect(view.chart.rows[2]!.share).toBeCloseTo(0.5);
-    expect(view.chart.rows[2]!.color).toBe('accent');
+    expect(view.chart.summary).toContain('overview.widgets.chart.industry.ganttJob');
+  });
+
+  it('keeps one progress bar per job as the Small fallback', () => {
+    const view = buildView('industry', feeds(jobs()), ctx());
+    if (view.chart?.kind !== 'gantt') throw new Error('gantt');
+    const { fallback } = view.chart;
+    expect(fallback.rows.map((r) => r.key)).toEqual(['3', '2', '4', '1']);
+    expect(fallback.rows[0]).toMatchObject({ share: 1, color: 'warning' });
+    expect(fallback.rows[2]!.share).toBeCloseTo(0.5);
   });
 
   it('draws Done as a bar of the job elapsed share, the text stating the same percent', () => {

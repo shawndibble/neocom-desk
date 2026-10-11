@@ -3708,7 +3708,13 @@
           "summary": "{{open}} open orders: {{parts}}. Switch to Table for each order."
         },
         "industry": {
-          "note": "How far along each job is; time left at the end"
+          "note": "How far along each job is; time left at the end",
+          "ganttNote": "Jobs on a time axis; the dashed line is now",
+          "ganttJob": "{{job}}: {{when}}, {{percent}}% done",
+          "ganttSummary": "{{note}}. {{jobs}}.",
+          "ganttAgo": "{{duration}} ago",
+          "ganttNow": "Now",
+          "ganttIn": "in {{duration}}"
         },
         "training": {
           "note": "Queue ends in {{duration}}"

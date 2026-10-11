@@ -45,6 +45,8 @@ import type { IndustryBoardData, PlanetaryBoardData } from '../../boardData';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { fractionBar, signedCell } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
+import { ganttAxis } from '../charts/geometry';
+import type { ChartModel } from '../charts/types';
 import { backwardBucketSums } from './chartSeries';
 import type {
   NumberModel,
@@ -78,6 +80,7 @@ interface JobFacts {
   key: string;
   label: string;
   done: boolean;
+  startMs: number;
   endMs: number;
   tone: DeadlineSeverity;
   /** Time left, or "Ready". */
@@ -107,6 +110,7 @@ function jobFacts(data: IndustryBoardData, t: Translate, now: number): JobFacts[
       key: String(job.job_id),
       label: label(job),
       done,
+      startMs: Date.parse(job.start_date),
       endMs,
       tone: done ? 'warning' : jobSeverity(job, now),
       when: done ? t('overview.board.ready') : formatCountdown(secondsRemaining(job, now)),
@@ -201,22 +205,66 @@ export const industry: Builder = (feeds, { t, now }) => {
       ? []
       : [{ at: nextJobMs, note: t('overview.board.nextJob'), severity: 'watch', to }],
     summary: industrySummary(t, data, now),
-    // One bar per job, filled by how far along it is, its time left at the end: which job is the point.
-    chart:
-      hbarsFromRows(
-        t,
-        facts.map((job) => ({
-          key: job.key,
-          label: job.label.replace(' Blueprint', ' BP'),
-          value: job.progress ?? 0,
-          share: job.progress ?? 0,
-          text: job.when,
-          color: job.done ? ('warning' as const) : ('accent' as const),
-        })),
-        t(`${C}.industry.note`)
-      ) ?? undefined,
+    // Jobs on a time axis; Small falls back to one progress bar per job (the fallback is that model).
+    chart: industryChart(t, facts, now),
   };
 };
+
+/** Jobs laid on a shared time axis, with the progress-bar list as the Small fallback; undefined with no jobs. */
+function industryChart(
+  t: Translate,
+  facts: readonly JobFacts[],
+  now: number
+): ChartModel | undefined {
+  const fallback = hbarsFromRows(
+    t,
+    facts.map((job) => ({
+      key: job.key,
+      label: job.label.replace(' Blueprint', ' BP'),
+      value: job.progress ?? 0,
+      share: job.progress ?? 0,
+      text: job.when,
+      color: job.done ? ('warning' as const) : ('accent' as const),
+    })),
+    t(`${C}.industry.note`)
+  );
+  if (!fallback) return undefined;
+  const axis = ganttAxis(facts, now);
+  const rows = facts.map((job) => ({
+    key: job.key,
+    label: job.label.replace(' Blueprint', ' BP'),
+    startMs: job.startMs,
+    endMs: job.endMs,
+    text: job.when,
+    color: job.done ? ('warning' as const) : ('accent' as const),
+  }));
+  const note = t(`${C}.industry.ganttNote`);
+  const jobs = facts.map((job) =>
+    t(`${C}.industry.ganttJob`, {
+      job: job.label,
+      when: job.when,
+      percent: Math.round((job.progress ?? 0) * 100),
+    })
+  );
+  return {
+    kind: 'gantt',
+    rows,
+    axis,
+    labels: {
+      from:
+        axis.from >= now
+          ? ''
+          : t(`${C}.industry.ganttAgo`, { duration: formatCountdown((now - axis.from) / 1000) }),
+      now: t(`${C}.industry.ganttNow`),
+      to: t(`${C}.industry.ganttIn`, {
+        duration: formatCountdown(Math.max(0, axis.to - now) / 1000),
+      }),
+    },
+    note,
+    summary: t(`${C}.industry.ganttSummary`, { note, jobs: jobs.join('; ') }),
+    fallback,
+  };
+}
 
 // --- Planetary --------------------------------------------------------------------
 

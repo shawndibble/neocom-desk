@@ -142,3 +142,63 @@ export function stackedAreaBands(layers: readonly (readonly number[])[], height:
     return [...top, ...bottom].join(' ');
   });
 }
+
+/** How far before now a Gantt axis reaches at most, and how far after. */
+export const GANTT_LOOK_BACK_MS = 86_400_000;
+export const GANTT_LOOK_AHEAD_MS = 14 * 86_400_000;
+const GANTT_MIN_AHEAD_MS = 3_600_000;
+/** A Gantt bar is never thinner than this (percent of the axis), so a short job still reads as there. */
+const MIN_GANTT_BAR_PERCENT = 2;
+
+export interface GanttAxis {
+  from: number;
+  to: number;
+  now: number;
+}
+
+/**
+ * The shared time axis: from the earliest start to the latest end, but never
+ * more than a day before now or two weeks after it, and always holding now with
+ * an hour to spare so the marker has somewhere to stand.
+ */
+export function ganttAxis(
+  jobs: readonly { startMs: number; endMs: number }[],
+  now: number
+): GanttAxis {
+  const earliest = jobs.reduce((m, j) => Math.min(m, j.startMs), now);
+  const latest = jobs.reduce((m, j) => Math.max(m, j.endMs), now + GANTT_MIN_AHEAD_MS);
+  return {
+    from: Math.max(earliest, now - GANTT_LOOK_BACK_MS),
+    to: Math.min(latest, now + GANTT_LOOK_AHEAD_MS),
+    now,
+  };
+}
+
+export interface GanttBar {
+  /** Percent of the axis. */
+  left: number;
+  width: number;
+  /** The job began before the axis starts / ends after it stops: draw an overflow marker. */
+  clippedStart: boolean;
+  clippedEnd: boolean;
+}
+
+/** One job's bar on the axis, clamped to it and never thinner than a sliver. */
+export function ganttBar(startMs: number, endMs: number, axis: GanttAxis): GanttBar {
+  const span = axis.to - axis.from || 1;
+  const pct = (ms: number) => Math.min(100, Math.max(0, ((ms - axis.from) / span) * 100));
+  const left = pct(startMs);
+  const width = Math.max(MIN_GANTT_BAR_PERCENT, pct(endMs) - left);
+  return {
+    left: Math.min(left, 100 - MIN_GANTT_BAR_PERCENT),
+    width: Math.min(width, 100 - Math.min(left, 100 - MIN_GANTT_BAR_PERCENT)),
+    clippedStart: startMs < axis.from,
+    clippedEnd: endMs > axis.to,
+  };
+}
+
+/** Where the now marker stands, percent of the axis. */
+export function ganttNowPercent(axis: GanttAxis): number {
+  const span = axis.to - axis.from || 1;
+  return Math.min(100, Math.max(0, ((axis.now - axis.from) / span) * 100));
+}
