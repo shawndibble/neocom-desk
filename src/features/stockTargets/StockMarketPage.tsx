@@ -33,6 +33,7 @@ import {
   Toast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { useOpenAfterMenu } from '@/components/ui/useOpenAfterMenu';
 import { encodeStockListShare } from '@/engine/stockTargets/stockListShare';
 import {
   removeStockList,
@@ -98,6 +99,8 @@ export function StockMarketPage({
   const [dialog, setDialog] = useState<Dialog>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  // A menu item that opens a dialog hands focus back to the ⋮, not to an unmounted item (§6c).
+  const menu = useOpenAfterMenu();
 
   const [loaded, setLoaded] = useState<{ key: string; data: StockTargetsData } | null>(null);
   const [failedKey, setFailedKey] = useState<string | null>(null);
@@ -190,7 +193,9 @@ export function StockMarketPage({
           }}
           onClose={() => setDialog(null)}
           returnFocusFallback={() =>
-            document.querySelector<HTMLElement>('[data-stock-markets], [data-stock-new-market]')
+            document.querySelector<HTMLElement>(
+              '[data-stock-markets], [data-stock-market-title], [data-stock-new-market]'
+            )
           }
         />
       )}
@@ -251,7 +256,10 @@ export function StockMarketPage({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {showBack && (
-        <Link to={STOCK_PATH} className="self-start text-xs text-accent hover:underline">
+        <Link
+          to={STOCK_PATH}
+          className="inline-flex items-center self-start text-xs text-accent hover:underline touch:min-h-11"
+        >
           ‹ {t('stockTargets.markets.back')}
         </Link>
       )}
@@ -279,19 +287,21 @@ export function StockMarketPage({
               label={t('stockTargets.list.actionsLabel', { name: list.name })}
             />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" onCloseAutoFocus={menu.onCloseAutoFocus}>
             <DropdownMenuItem onSelect={() => void addListed()}>
               {t('stockTargets.list.addListed')}
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onNew}>{t('stockTargets.list.new')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => menu.run(onNew)}>
+              {t('stockTargets.list.new')}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setDialog('rename')}>
+            <DropdownMenuItem onSelect={() => menu.run(() => setDialog('rename'))}>
               {t('stockTargets.list.renameEllipsis')}
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setDialog('change')}>
+            <DropdownMenuItem onSelect={() => menu.run(() => setDialog('change'))}>
               {t('stockTargets.list.changeEllipsis')}
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setDialog('delete')}>
+            <DropdownMenuItem onSelect={() => menu.run(() => setDialog('delete'))}>
               {t('stockTargets.list.deleteEllipsis')}
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -348,58 +358,61 @@ export function StockMarketPage({
         </p>
       )}
 
-      {view === 'manager' && (
-        <div className="flex flex-wrap items-center gap-2">
-          {viewSwitch}
-          {rows.length > 0 && (
-            <div
-              role="group"
-              aria-label={t('stockTargets.filterLabel')}
-              className="flex flex-wrap items-center gap-1.5"
-            >
+      {/* The switch stays mounted in one place across views, so it keeps focus (§7). */}
+      <div className="flex flex-wrap items-center gap-2">
+        {viewSwitch}
+        {view === 'manager' && rows.length > 0 && (
+          // A phone keeps the status chips to one row that scrolls sideways (§4b), under the switch.
+          <div
+            role="group"
+            aria-label={t('stockTargets.filterLabel')}
+            className="order-last flex basis-full items-center gap-1.5 overflow-x-auto max-sm:pb-1 sm:order-none sm:basis-auto sm:flex-wrap sm:overflow-visible"
+          >
+            <FilterChip
+              label={t('stockTargets.filterAll')}
+              count={countOf(null)}
+              selected={filter === null}
+              onToggle={() => setFilter(null)}
+            />
+            {STOCK_STATUSES.map((status) => (
               <FilterChip
-                label={t('stockTargets.filterAll')}
-                count={countOf(null)}
-                selected={filter === null}
-                onToggle={() => setFilter(null)}
+                key={status}
+                label={t(`stockTargets.status.${status}`)}
+                count={countOf(status)}
+                selected={filter === status}
+                onToggle={() => setFilter(filter === status ? null : status)}
               />
-              {STOCK_STATUSES.map((status) => (
-                <FilterChip
-                  key={status}
-                  label={t(`stockTargets.status.${status}`)}
-                  count={countOf(status)}
-                  selected={filter === status}
-                  onToggle={() => setFilter(filter === status ? null : status)}
-                />
-              ))}
+            ))}
+            <FilterChip
+              label={t('stockTargets.filterReady')}
+              count={countOf('ready')}
+              selected={filter === 'ready'}
+              onToggle={() => setFilter(filter === 'ready' ? null : 'ready')}
+            />
+          </div>
+        )}
+        {view === 'manager' && groupNames.length > 1 && (
+          // Desktop only: on a phone the status chips are the one filter row.
+          <div
+            role="group"
+            aria-label={t('stockTargets.groupFilterLabel')}
+            className="hidden flex-wrap items-center gap-1.5 sm:flex"
+          >
+            {groupNames.map((group) => (
               <FilterChip
-                label={t('stockTargets.filterReady')}
-                count={countOf('ready')}
-                selected={filter === 'ready'}
-                onToggle={() => setFilter(filter === 'ready' ? null : 'ready')}
+                key={group}
+                label={group}
+                selected={groupFilter === group}
+                onToggle={() => setGroupFilter(groupFilter === group ? null : group)}
               />
-            </div>
-          )}
-          {groupNames.length > 1 && (
-            <div
-              role="group"
-              aria-label={t('stockTargets.groupFilterLabel')}
-              className="flex flex-wrap items-center gap-1.5"
-            >
-              {groupNames.map((group) => (
-                <FilterChip
-                  key={group}
-                  label={group}
-                  selected={groupFilter === group}
-                  onToggle={() => setGroupFilter(groupFilter === group ? null : group)}
-                />
-              ))}
-            </div>
-          )}
-          <span className="flex-1" />
+            ))}
+          </div>
+        )}
+        <span className="flex-1" />
+        {view === 'manager' && (
           <Button onClick={() => setDialog('paste')}>{t('stockTargets.add.pasteOpen')}</Button>
-        </div>
-      )}
+        )}
+      </div>
 
       <LiveStatus>
         {failed
@@ -475,7 +488,6 @@ export function StockMarketPage({
             nameOf={nameOf}
             listName={list.name}
             activeCharacterId={activeCharacterId}
-            viewSwitch={viewSwitch}
           />
         )}
       </div>
@@ -491,7 +503,7 @@ function BarLegend() {
   return (
     <p aria-hidden="true" className="flex flex-wrap items-center gap-4 text-xs text-text-dim">
       <span className="flex items-center gap-1.5">
-        <span className="inline-block h-1.5 w-4 rounded-xs bg-success" />
+        <span className="inline-block h-1.5 w-4 rounded-xs bg-text-dim" />
         {t('stockTargets.table.legendListed')}
       </span>
       <span className="flex items-center gap-1.5">

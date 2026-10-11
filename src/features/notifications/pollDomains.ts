@@ -1671,6 +1671,7 @@ function isStockAlertEntry(raw: unknown): raw is StockAlertEntry {
   return (
     typeof r.listId === 'string' &&
     typeof r.listName === 'string' &&
+    typeof r.locationId === 'number' &&
     typeof r.typeId === 'number' &&
     typeof r.name === 'string' &&
     typeof r.target === 'number' &&

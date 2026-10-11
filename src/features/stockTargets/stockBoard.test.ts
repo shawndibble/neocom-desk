@@ -13,6 +13,7 @@ vi.mock('@/market/prices', () => ({
 const entry = (over: Partial<StockAlertEntry>): StockAlertEntry => ({
   listId: 'a',
   listName: 'Efa',
+  locationId: 7,
   typeId: 1,
   name: 'Catalyst',
   target: 40,

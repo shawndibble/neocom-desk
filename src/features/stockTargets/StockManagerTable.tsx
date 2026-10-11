@@ -47,8 +47,11 @@ function TargetCell({
   function close() {
     closed.current = true;
     setDraft(null);
-    // The field swaps back to the button: focus follows it (DESIGN.md §7).
-    focusAfterCommit(buttonRef);
+    // The field swaps back to the button: focus follows it (DESIGN.md §7). A new
+    // target can move the row out of the status filter, so the heading backs it up.
+    focusAfterCommit(buttonRef, () =>
+      document.querySelector<HTMLElement>('[data-stock-market-title]')
+    );
   }
   if (draft !== null) {
     const commit = () => {
@@ -134,8 +137,13 @@ export function StockManagerTable({
   function remove(typeId: number) {
     const index = rows.findIndex((row) => row.typeId === typeId);
     onRemove(typeId);
-    focusAfterCommit(editButton(rows[index + 1]?.typeId), editButton(rows[index - 1]?.typeId), () =>
-      document.querySelector<HTMLElement>('[data-stock-market-title]')
+    // After the row menu has put focus back on its ⋮, or that focus cancels the request.
+    window.setTimeout(() =>
+      focusAfterCommit(
+        editButton(rows[index + 1]?.typeId),
+        editButton(rows[index - 1]?.typeId),
+        () => document.querySelector<HTMLElement>('[data-stock-market-title]')
+      )
     );
   }
 
@@ -214,9 +222,10 @@ export function StockManagerTable({
       headerCellClassName: 'sm:w-20',
       className: 'tabular-nums',
       stackAffix: { before: `${t('stockTargets.table.shortfallAffix')} ` },
+      // Off the phone card: its Restock text already says how many are short.
       render: (row) =>
         row.shortfall > 0 ? (
-          row.shortfall.toLocaleString()
+          <span data-dense-omit>{row.shortfall.toLocaleString()}</span>
         ) : (
           <span data-dense-omit className="text-text-dim">
             {t('stockTargets.table.none')}

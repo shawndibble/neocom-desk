@@ -522,9 +522,11 @@ export const stockBelowTargetCopy: DomainCopy<StockBelowTargetFire, NoNames> = {
       listed: fire.listed.toLocaleString(),
       target: fire.target.toLocaleString(),
       hangar: fire.inHangar.toLocaleString(),
+      count: fire.inHangar,
     }),
   }),
-  // No subject: the alert opens the Stock tab's market list, which puts the worst market first.
+  // The market's location id: the Stock tab opens that market (`?market=`); list ids are not numbers.
+  subjectOf: (fire) => fire.locationId,
 };
 
 /* Price alerts ------------------------------------------------------------ */

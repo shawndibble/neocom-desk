@@ -186,6 +186,12 @@ describe('StockTab', () => {
     expect(screen.getByRole('link', { name: /All markets/ })).toBeInTheDocument();
   });
 
+  it("opens the market an alert names by its station's id", async () => {
+    seed([efa, amarr]);
+    renderTab(`/market/stock?market=${EFA}`);
+    expect(await screen.findByRole('heading', { name: 'Efa Market' })).toBeInTheDocument();
+  });
+
   it('saves a copy of a shared market from its link', async () => {
     seed([]);
     const code = encodeStockListShare({

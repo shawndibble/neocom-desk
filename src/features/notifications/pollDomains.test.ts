@@ -1398,6 +1398,7 @@ describe('copy wiring', () => {
           memberCharacterId: 1,
           orderId: 1,
           division: 1,
+          locationId: 1,
         } as never) !== undefined
     );
     expect([...routed].sort()).toEqual([...SUBJECT_ROUTED_EVENT_IDS].sort());
@@ -1533,6 +1534,7 @@ describe('stockTargetDomain (issue #3521)', () => {
       {
         listId: 'efa',
         listName: 'Efa',
+        locationId: 60003760,
         typeId: 16240,
         name: 'Catalyst',
         target: 40,

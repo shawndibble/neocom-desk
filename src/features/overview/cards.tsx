@@ -787,7 +787,9 @@ export function StockCard({ data }: { data: StockBoardData | null }) {
       }
     >
       {data === null || !data.counted ? (
-        <CardEmpty>{t('overview.board.checking')}</CardEmpty>
+        <CardEmpty>
+          {t(data === null ? 'overview.board.checking' : 'overview.board.stockNotCounted')}
+        </CardEmpty>
       ) : (
         <>
           <TileRow>
@@ -817,10 +819,11 @@ export function StockCard({ data }: { data: StockBoardData | null }) {
                     severity={out ? 'critical' : 'warning'}
                     when={<StockNeedPill need={out ? 'out' : 'low'}>{word}</StockNeedPill>}
                     whenLabel={word}
-                    subject={market.name}
+                    // "Amarr VIII (Oris) - Emperor Family Academy" reads as its first part on a card.
+                    subject={market.name.split(' - ')[0]}
                     detail={detail(market.summary)}
                     detailLabel={detail(market.summary)}
-                    to={`${STOCK_PATH}/${market.listId}`}
+                    to={`${STOCK_PATH}/${encodeURIComponent(market.listId)}`}
                   />
                 );
               })}

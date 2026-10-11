@@ -14,6 +14,7 @@ import {
   EmptyState,
   LiveStatus,
   Panel,
+  RowCaret,
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
@@ -89,6 +90,8 @@ export function StockMarketsList({
           <Link
             to={hrefOf(market)}
             className="font-medium text-accent [overflow-wrap:anywhere] hover:underline"
+            // The row is the tab stop and opens the market; the link stays for a middle-click.
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
           >
             {market.name}
@@ -112,15 +115,8 @@ export function StockMarketsList({
       align: 'right',
       headerCellClassName: 'sm:w-20',
       className: 'tabular-nums',
-      // A phone card reads the count as words ("1 item"); the header says it on desktop.
-      render: (market) => (
-        <>
-          <span className="sm:hidden">
-            {t('stockTargets.summary.items', { count: market.items })}
-          </span>
-          <span className="hidden sm:inline">{market.items.toLocaleString()}</span>
-        </>
-      ),
+      // Off the phone card, which reads by its need pill and counts.
+      render: (market) => <span data-dense-omit>{market.items.toLocaleString()}</span>,
       sortValue: (market) => market.items,
     },
     {
@@ -150,10 +146,11 @@ export function StockMarketsList({
       align: 'right',
       headerCellClassName: 'sm:w-32',
       className: 'tabular-nums',
+      stackAffix: { after: ` ${t('stockTargets.markets.readyAffix')}` },
       render: (market) =>
         market.readyToList > 0 ? (
           <span className="text-accent">
-            {t('stockTargets.markets.readyCard', { count: market.readyToList })}
+            {t('stockTargets.markets.readyItems', { count: market.readyToList })}
           </span>
         ) : (
           <span data-dense-omit className="text-text-dim">
@@ -169,9 +166,10 @@ export function StockMarketsList({
       align: 'right',
       headerCellClassName: 'sm:w-36',
       className: 'tabular-nums whitespace-nowrap',
+      stackAffix: { after: ` ${t('stockTargets.markets.toSourceAffix')}` },
       render: (market) =>
         market.costToFill > 0 ? (
-          t('stockTargets.markets.toSourceCard', { isk: formatIskCompact(market.costToFill) })
+          `${formatIskCompact(market.costToFill)} ISK`
         ) : (
           <span data-dense-omit className="text-text-dim">
             —
@@ -187,6 +185,13 @@ export function StockMarketsList({
       render: (market) => (
         <StockNeedPill need={marketNeed(market)}>{needWord(market)}</StockNeedPill>
       ),
+    },
+    {
+      id: 'go',
+      header: '',
+      align: 'right',
+      headerCellClassName: 'sm:w-8',
+      render: () => <RowCaret />,
     },
   ];
 

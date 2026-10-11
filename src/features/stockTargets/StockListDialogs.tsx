@@ -1,5 +1,5 @@
 /**
- * The Targets tab's small dialogs: name a list (new or rename), delete one,
+ * The Stock tab's small dialogs: name a market (rename), delete one,
  * add items to one by searching for each, or by pasting a whole list the way
  * Appraisal takes a paste.
  */
@@ -140,12 +140,13 @@ export function AddStockItemDialog({
   const id = useId();
   const listId = `${id}-results`;
   const searchRef = useRef<HTMLInputElement>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
   const [types, setTypes] = useState<readonly MarketTypeEntry[]>([]);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
   const [picked, setPicked] = useState<MarketTypeEntry | null>(null);
   const [quantity, setQuantity] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ field: 'item' | 'quantity'; text: string } | null>(null);
   const [added, setAdded] = useState<{ name: string; quantity: number; n: number } | null>(null);
 
   useEffect(() => {
@@ -202,12 +203,13 @@ export function AddStockItemDialog({
           e.preventDefault();
           const amount = Math.floor(Number(quantity));
           if (!picked) {
-            setError(t('stockTargets.add.pickItem'));
+            setError({ field: 'item', text: t('stockTargets.add.pickItem') });
             searchRef.current?.focus();
             return;
           }
           if (!Number.isFinite(amount) || amount <= 0) {
-            setError(t('stockTargets.add.quantityRequired'));
+            setError({ field: 'quantity', text: t('stockTargets.add.quantityRequired') });
+            quantityRef.current?.focus();
             return;
           }
           onAdd(picked.typeId, amount);
@@ -233,6 +235,8 @@ export function AddStockItemDialog({
             aria-activedescendant={highlight === null ? undefined : `${listId}-${highlight}`}
             autoComplete="off"
             spellCheck={false}
+            aria-invalid={error?.field === 'item' || undefined}
+            aria-describedby={error?.field === 'item' ? `${id}-error` : undefined}
             className="w-full"
             value={query}
             placeholder={t('stockTargets.add.searchPlaceholder')}
@@ -281,8 +285,9 @@ export function AddStockItemDialog({
             min={1}
             className="w-full"
             value={quantity}
-            aria-invalid={error !== null || undefined}
-            aria-describedby={error !== null ? `${id}-error` : undefined}
+            ref={quantityRef}
+            aria-invalid={error?.field === 'quantity' || undefined}
+            aria-describedby={error?.field === 'quantity' ? `${id}-error` : undefined}
             onChange={(e) => {
               setQuantity(e.target.value);
               setError(null);
@@ -291,7 +296,7 @@ export function AddStockItemDialog({
         </div>
         {error !== null && (
           <FieldError id={`${id}-error`} className="block text-xs">
-            {error}
+            {error.text}
           </FieldError>
         )}
         <p className="text-xs text-text-dim">
@@ -311,7 +316,7 @@ export function AddStockItemDialog({
 }
 
 /**
- * "Paste a list…": one item per line with the quantity to keep on hand, in
+ * "Paste a list…": one item per line with the quantity to keep listed, in
  * any format the Appraisal reads (an inventory copy, `Name x 40`, `40 Name`).
  * A pasted item already on the list takes the new quantity.
  */

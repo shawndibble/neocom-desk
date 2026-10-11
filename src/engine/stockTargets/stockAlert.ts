@@ -14,6 +14,8 @@ import { stockStatus, type StockStatus } from './stockRows';
 export interface StockAlertEntry {
   listId: string;
   listName: string;
+  /** The market's station or structure: what the alert opens. */
+  locationId: number;
   typeId: number;
   name: string;
   target: number;
@@ -33,6 +35,7 @@ export interface StockBelowTargetFire {
   characterId: number;
   listId: string;
   listName: string;
+  locationId: number;
   typeId: number;
   name: string;
   target: number;
@@ -65,6 +68,7 @@ export function diffStockBelowTarget(
       characterId,
       listId: entry.listId,
       listName: entry.listName,
+      locationId: entry.locationId,
       typeId: entry.typeId,
       name: entry.name,
       target: entry.target,

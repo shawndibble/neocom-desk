@@ -3,18 +3,25 @@
  * lists them worst first, or opens the only one; `/market/stock/<list id>`
  * opens one. A shared market arrives as `?list=<code>` on either.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button, EmptyState, Spinner } from '@/components/ui';
 import { decodeStockListShare } from '@/engine/stockTargets/stockListShare';
 import { addStockList, type StockList } from '@/engine/stockTargets/stockLists';
 import { useMarketHub } from '@/features/market/hub';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { MarketDialog, type MarketChoice } from './MarketDialog';
 import { SHARE_PARAM, STOCK_PATH, StockMarketPage } from './StockMarketPage';
 import { StockMarketsList } from './StockMarketsList';
 import { newStockListId, useSelectedStockList, useStockLists } from './stockListsStore';
+
+const MARKET_PARAM = 'market';
+
+/** The heading of whichever view is showing: one market's title, or the market list's. */
+const heading = () =>
+  document.querySelector<HTMLElement>('[data-stock-market-title], [data-stock-markets]');
 
 /** The list id in `stock/<id>`, from the Market route's wildcard. */
 function listIdFromPath(wildcard: string): string | null {
@@ -49,15 +56,30 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
   const open = (id: string) => navigate(`${STOCK_PATH}/${encodeURIComponent(id)}`);
   const save = (next: StockList[]) => void setLists(next);
   // "Set stock target…" elsewhere defaults to the market last opened here.
+  // An alert names its market by station or structure (`?market=`): list ids are not numbers.
+  const marketParam = searchParams.get(MARKET_PARAM);
   const list =
     listId !== null
       ? lists.find((l) => l.id === listId)
-      : lists.length === 1
-        ? lists[0]
-        : undefined;
+      : marketParam !== null
+        ? lists.find((l) => String(l.locationId) === marketParam)
+        : lists.length === 1
+          ? lists[0]
+          : undefined;
   useEffect(() => {
     if (list) void setSelectedId(list.id);
   }, [list, setSelectedId]);
+
+  // The list and one market share a page key, so the route's own focus does
+  // nothing between them: focus moves to the view's heading here (§7).
+  const focusAfterCommit = useFocusAfterCommit();
+  const viewKey = list?.id ?? listId ?? '';
+  const shownKey = useRef(viewKey);
+  useEffect(() => {
+    if (shownKey.current === viewKey) return;
+    shownKey.current = viewKey;
+    focusAfterCommit(heading);
+  }, [viewKey, focusAfterCommit]);
 
   function create(choice: MarketChoice) {
     const id = newStockListId();
@@ -73,6 +95,8 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
       },
       { replace: true }
     );
+    // The banner, and the button that dismissed it, are gone.
+    focusAfterCommit(heading, () => document.querySelector<HTMLElement>('[data-stock-new-market]'));
   }
 
   if (!hydrated) return <Spinner label={t('common.loading')} />;
@@ -105,6 +129,7 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
     <MarketDialog
       mode="new"
       characterId={activeCharacterId}
+      returnFocusFallback={heading}
       onSubmit={create}
       onClose={() => setCreating(false)}
     />

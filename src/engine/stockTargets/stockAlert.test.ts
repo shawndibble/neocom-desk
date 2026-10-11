@@ -4,6 +4,7 @@ import { diffStockBelowTarget, type StockAlertEntry, type StockAlertSnapshot } f
 const entry = (over: Partial<StockAlertEntry> = {}): StockAlertEntry => ({
   listId: 'a',
   listName: 'Efa Market',
+  locationId: 7,
   typeId: 16242,
   name: 'Catalyst',
   target: 40,
@@ -26,6 +27,7 @@ describe('diffStockBelowTarget', () => {
         characterId: 1,
         listId: 'a',
         listName: 'Efa Market',
+        locationId: 7,
         typeId: 16242,
         name: 'Catalyst',
         target: 40,

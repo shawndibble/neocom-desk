@@ -7100,7 +7100,8 @@
         "lowTitle": "{{item}} is running low",
         "outTitle": "{{item}} sold out",
         "body": "{{list}}: {{listed}} of {{target}} listed.",
-        "bodyHangar": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there."
+        "bodyHangar_one": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} is in your hangar there.",
+        "bodyHangar_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there."
       },
       "priceAlertTriggered": {
         "title": "Price alert",
@@ -10347,6 +10348,8 @@
       "ready": "Ready to list",
       "readyItems_one": "{{count}} item",
       "readyItems_other": "{{count}} items",
+      "readyAffix": "ready to list",
+      "toSourceAffix": "to buy or build",
       "toSource": "To buy or build",
       "need": "Needs",
       "none": "None",
@@ -10452,7 +10455,7 @@
       "noPrice": "No price",
       "status": "Status",
       "remove": "Remove from list",
-      "legendListed": "Listed",
+      "legendListed": "Listed (coloured by status)",
       "legendHangar": "In hangar, ready to list"
     },
     "share": {

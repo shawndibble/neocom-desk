@@ -9,7 +9,7 @@
 
 export interface StockTarget {
   typeId: number;
-  /** Whole units wanted on hand. Always 1 or more. */
+  /** Whole units wanted listed at the market. Always 1 or more. */
   target: number;
 }
 

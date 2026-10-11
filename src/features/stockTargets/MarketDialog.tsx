@@ -148,10 +148,10 @@ function MarketPlacePicker({
     if (COMBOBOX_NAV_KEYS.includes(event.key)) {
       event.preventDefault();
       setOpen(true);
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, options.length));
-    } else if (event.key === 'Enter' && open && options.length > 0) {
+      setHighlight(moveHighlight(event.key as ComboboxNavKey, active, options.length));
+    } else if (event.key === 'Enter' && active !== null) {
       event.preventDefault();
-      choose(options[highlight ?? 0]);
+      choose(options[active]);
     } else if (event.key === 'Escape' && open) {
       // Closes the list, not the dialog.
       event.preventDefault();
@@ -162,12 +162,24 @@ function MarketPlacePicker({
   }
 
   const showList = open && options.length > 0;
-  const heading = (text: string) => (
-    <li
-      role="presentation"
-      className="px-3 pt-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-    >
-      {text}
+  // Enter picks what is highlighted, so something always is while the list shows.
+  const active = showList ? Math.min(highlight ?? 0, options.length - 1) : null;
+  useEffect(() => {
+    if (active === null) return;
+    document.getElementById(`${listId}-${active}`)?.scrollIntoView({ block: 'nearest' });
+  }, [active, listId]);
+  const group = (key: string, text: string, places: PlaceOption[], offset: number) => (
+    <li role="presentation">
+      <ul role="group" aria-labelledby={`${listId}-${key}`}>
+        <li
+          role="presentation"
+          id={`${listId}-${key}`}
+          className="px-3 pt-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+        >
+          {text}
+        </li>
+        {places.map((place, index) => option(place, offset + index))}
+      </ul>
     </li>
   );
   const option = (place: PlaceOption, index: number) => (
@@ -175,11 +187,11 @@ function MarketPlacePicker({
       key={place.id}
       id={`${listId}-${index}`}
       role="option"
-      aria-selected={index === highlight}
+      aria-selected={index === active}
       className={cx(
         tappableRowClassName,
         'flex cursor-pointer flex-col justify-center border-l-2 px-3 py-1 text-sm',
-        index === highlight ? 'border-accent bg-panel-2' : 'border-transparent hover:bg-panel-2'
+        index === active ? 'border-accent bg-panel-2' : 'border-transparent hover:bg-panel-2'
       )}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => choose(place)}
@@ -202,9 +214,7 @@ function MarketPlacePicker({
         aria-expanded={showList}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={
-          !showList || highlight === null ? undefined : `${listId}-${highlight}`
-        }
+        aria-activedescendant={active === null ? undefined : `${listId}-${active}`}
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
         autoComplete="off"
@@ -229,12 +239,13 @@ function MarketPlacePicker({
         role="listbox"
         aria-label={t('stockTargets.list.locationOptions')}
         hidden={!showList}
-        className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-xs border border-line-bright bg-panel py-1 shadow-lg"
+        // In flow, not a popover: the Modal body scrolls and would clip an absolute list.
+        className="mt-1 max-h-60 overflow-auto rounded-xs border border-line-bright bg-panel py-1"
       >
-        {sellingNow.length > 0 && heading(t('stockTargets.list.sellingNow'))}
-        {sellingNow.map((place, index) => option(place, index))}
-        {others.length > 0 && heading(t('stockTargets.list.otherPlaces'))}
-        {others.map((place, index) => option(place, sellingNow.length + index))}
+        {sellingNow.length > 0 &&
+          group('selling', t('stockTargets.list.sellingNow'), sellingNow, 0)}
+        {others.length > 0 &&
+          group('other', t('stockTargets.list.otherPlaces'), others, sellingNow.length)}
       </ul>
     </div>
   );
@@ -244,6 +255,7 @@ export function MarketDialog({
   mode,
   characterId,
   initial,
+  returnFocusFallback,
   onSubmit,
   onClose,
 }: {
@@ -251,12 +263,15 @@ export function MarketDialog({
   characterId: number | null;
   /** The market being changed: its place and its own name. */
   initial?: { locationId: number; placeName: string; name: string };
+  /** Where focus goes when the button that opened this is gone after Create. */
+  returnFocusFallback?: () => HTMLElement | null;
   onSubmit: (choice: MarketChoice) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const id = useId();
   const pickerRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const [picked, setPicked] = useState<PlaceOption | null>(
     initial ? { id: initial.locationId, name: initial.placeName, kind: 'station' } : null
   );
@@ -288,6 +303,7 @@ export function MarketDialog({
       onClose={onClose}
       title={t(mode === 'new' ? 'stockTargets.list.newTitle' : 'stockTargets.list.changeTitle')}
       initialFocusRef={pickerRef}
+      returnFocusFallback={returnFocusFallback}
     >
       <form
         className="space-y-3"
@@ -300,6 +316,7 @@ export function MarketDialog({
           }
           if (shownName.trim() === '') {
             setError('name');
+            nameRef.current?.focus();
             return;
           }
           onSubmit({
@@ -334,6 +351,7 @@ export function MarketDialog({
             {t('stockTargets.list.nameLabel')}
           </label>
           <TextInput
+            ref={nameRef}
             id={`${id}-name`}
             className="w-full"
             value={shownName}

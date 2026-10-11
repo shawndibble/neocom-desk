@@ -304,6 +304,7 @@ export async function loadStockAlertEntries(
     return list.items.map((item) => ({
       listId: list.id,
       listName: list.name,
+      locationId: list.locationId,
       typeId: item.typeId,
       name: names.get(item.typeId) ?? `#${item.typeId}`,
       target: item.target,
