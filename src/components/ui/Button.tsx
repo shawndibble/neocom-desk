@@ -11,7 +11,9 @@ import {
 export type { ButtonVariant, ButtonSize, ButtonAlign };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** @summary Visual weight and tone: `primary`, `ghost`, `accent`, `danger`, `success` or `warning`. */
   variant?: ButtonVariant;
+  /** @summary Control height tier; matches `IconButton` and inputs. */
   size?: ButtonSize;
   /**
    * Content alignment. `start` is for a full-width button in a vertical stack
@@ -34,7 +36,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
-/** Forwards its ref so it can be a Radix or Tooltip trigger directly, e.g. `<Tooltip><Button/></Tooltip>`. */
+/**
+ * Forwards its ref so it can be a Radix or Tooltip trigger directly, e.g. `<Tooltip><Button/></Tooltip>`.
+ *
+ * @summary The text button: one `primary` action per view, `ghost` for the rest, with loading and size tiers.
+ */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
     variant = 'ghost',
