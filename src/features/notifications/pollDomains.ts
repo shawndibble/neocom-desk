@@ -761,7 +761,11 @@ export const colonyDomain = defineDomain<
 function isMailHeaderSnapshot(raw: unknown): raw is MailHeaderSnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  return typeof r.mailId === 'number' && (r.sentMs === undefined || typeof r.sentMs === 'number');
+  return (
+    typeof r.mailId === 'number' &&
+    (r.sentMs === undefined || typeof r.sentMs === 'number') &&
+    (r.fromId === undefined || typeof r.fromId === 'number')
+  );
 }
 
 /** An ESI date string as epoch ms, or `undefined` when absent or unparseable. */
@@ -773,7 +777,11 @@ function optionalDateMs(iso: string | undefined): number | undefined {
 
 function toMailHeaderSnapshot(header: MailHeader): MailHeaderSnapshot {
   const sentMs = optionalDateMs(header.timestamp);
-  return { mailId: header.mail_id, ...(sentMs === undefined ? {} : { sentMs }) };
+  return {
+    mailId: header.mail_id,
+    ...(sentMs === undefined ? {} : { sentMs }),
+    ...(header.from === undefined ? {} : { fromId: header.from }),
+  };
 }
 
 export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificationFire>({

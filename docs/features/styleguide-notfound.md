@@ -8,6 +8,26 @@ Two routes outside `RequireCharacter`/`ScopeGate`, neither in the nav: `/stylegu
 | `*` (NotFound)                       | Dead or mistyped URL screen with one way out                                           | none                   |
 | `/error` (sibling, `ErrorProbe.tsx`) | Undisclosed Sentry probe: throws on render                                             | none                   |
 
+## Purpose and user goal
+
+Two users. `/styleguide` is for developers and agents, not pilots: "What does each token, primitive and §6c cue look like?" (DESIGN.md says to add a new cue there). NotFound is for a pilot who followed a bad link: "This address is wrong; how do I get back in?"
+
+- **Top jobs (ranked):** 1. Developer: check a token, primitive or cue before building UI. 2. Pilot: leave a dead URL with one button.
+- **Device and cadence:** styleguide at the desk, while building; NotFound mostly on the desktop, the app's primary device (owner, 2026-10-11), rarely.
+- **Above the fold:** styleguide n/a; NotFound: heading, one-line hint, Go to Neocom Desk.
+- **Not for:** the styleguide is not a pilot page (no nav entry).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `NotFound.tsx` header; DESIGN.md §6c; `docs/DESIGN.md` line 9.
+- **Unconfirmed:** none.
+
+### Mobbin brief
+
+- **Fit:** low for the styleguide (internal reference), high for NotFound.
+- **Analog apps:** GitHub, Stripe, Notion (404 pages).
+- **Screen queries:**
+  - `web: page not found screen with a short message and one button back to the home page`
+- **Flow queries:** none.
+- **Mobbin won't help with:** the styleguide; it mirrors `docs/DESIGN.md`, which is its reference.
+
 ## Styleguide (`/styleguide`)
 
 - Not linked from nav, command palette or Settings; reached by URL only. `documentTitle.ts` maps it to an empty title list (`:78`); `pagePathFor.ts` treats it as a static route for analytics. Source of truth for what it shows: `docs/DESIGN.md` (its header says so; DESIGN.md line 9: add a new 6c cue here in the same PR).

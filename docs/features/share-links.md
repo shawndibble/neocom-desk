@@ -1,6 +1,6 @@
 # Share links
 
-User goal: send someone a short URL to an appraisal or a fitting; the recipient (account or not) sees it read-only and can open it in the app.
+User goal: send someone a short URL to an appraisal, a fitting, a D-Scan or a Survey; the recipient (account or not) sees it read-only (a Survey also takes new scans) and can open it in the app.
 
 | Route / piece                                                     | What                                                   | Where                                                     |
 | ----------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
@@ -8,14 +8,40 @@ User goal: send someone a short URL to an appraisal or a fitting; the recipient 
 | `/share/fitting?f=<code>`                                         | Permanent Fitting Share Code URL, no storage or expiry | `src/routes/FittingShared.tsx`                            |
 | Create: Appraisal "Copy Share Link"                               | `createShareLink`                                      | `src/features/market/AppraisalPanel.tsx:191`              |
 | Create: Fittings Export "Copy Share Link" / "Copy permanent link" |                                                        | `src/features/fittings/useFittingExport.ts:64`            |
+| Create: D-Scan share button (`dscan`)                             | raw scan text, max 50,000 chars                        | `src/features/travel/PilotListView.tsx:508`               |
+| Create: Survey start (`survey`)                                   | `startSurvey`, payload owner name                      | `src/features/survey/surveyStore.ts:71`                   |
 | Shared Appraisal screen                                           | read-only table, totals, export                        | `src/features/market/AppraisalShareScreen.tsx`            |
 | Shared Fitting view                                               | stats at all skills V, modules, Copy Fitting           | `FittingShared.tsx FittingShareView`                      |
+| Shared D-Scan screen                                              | Fleet board; Open Neocom Desk re-pastes it             | `src/features/travel/DscanShareScreen.tsx`                |
+| Shared Survey screen                                              | live board; anyone with the link can add a scan        | `src/features/survey/SurveyShareScreen.tsx`               |
 | Frame + "Open Neocom Desk"                                        |                                                        | `src/features/share/ShareShell.tsx`                       |
 | Store                                                             | Firestore `shares/{id}`                                | `src/features/share/shareStore.ts`, `firestore.rules:243` |
 
 Both routes sit outside `RequireCharacter`/`ScopeGate` (`src/app/App.tsx:360-370`; `routeScopes.test.ts` asserts the exemption). The literal `/share/fitting` outranks `:shareId`.
 
 See also: `entities-share.md` (another author; key format, 7-day TTL and in-memory reuse agree).
+
+## Purpose and user goal
+
+"Send them exactly what I am looking at." Two people: the sender copies a short link from an Appraisal, a Fitting, a D-Scan or a Survey; the recipient, often signed out, opens it read-only and can carry it into the app. This doc owns Share Links; `entities-share.md` owns Show Info and only points here for sharing. Since `20261002-125432` a Shared Appraisal is frozen at its prices, so the recipient sees the sender's numbers.
+
+- **Top jobs (ranked):** 1. Sender: "Copy a link to this in one click." 2. Recipient: "What did they send me, and is it still valid?" (frozen figures, expiry). 3. Recipient: "Open it in my own app" (Open Neocom Desk, or Log in).
+- **Device and cadence:** n/a as a page. Moment of use: the sender right after building an appraisal, fit, scan or survey, on the desktop, the app's primary device (owner, 2026-10-11); the recipient opening a pasted link, possibly on a phone (ShareShell wraps its header on a phone).
+- **Above the fold:** recipient view: brand and the one way in, title, expiry and key figures (stat chips), then the content.
+- **Not for:** Show Info on a name (`entities-share.md`); a permanent fit link (that is a Fitting Share Code, not a Share Link).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); decisions `20261002-125432`, `20261009-113400`; CONTEXT.md Share Link (four types); `src/features/share/shareStore.ts:27` (`appraisal`, `fitting`, `dscan`, `survey`); #2943, #3225, #3497.
+- **Unconfirmed:** where recipients open links (Discord, in-game chat, phone or desk).
+
+### Mobbin brief
+
+- **Fit:** medium. Copy-link and a public read-only page with a sign-up entry are generic; the shared content (fit ring, fleet board, priced items) is EVE-specific.
+- **Analog apps:** Figma, Notion, Google Docs, Loom.
+- **Screen queries:**
+  - `web: public read-only shared page with the app brand and a sign-up button in the header and an expiry note above the content`
+  - `web: copy link button that confirms copied in a tooltip, next to an export menu`
+  - `web: expired link page with a short message and one button into the app`
+- **Flow queries:** `web: open a shared link while signed out, sign in, and land on the shared item inside the app`.
+- **Mobbin won't help with:** the fitting ring and stats, the Fleet board, hub pricing. Reference the EVE client and the app's own pages.
 
 ## Controls and behavior
 

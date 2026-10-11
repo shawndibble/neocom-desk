@@ -22,6 +22,29 @@ Data sources (all views)
 - Firestore sync (when `isSyncConfigured()`): plans via `src/sync/planSync.ts` (`scheduleSync(characterId)`; deletes write a tombstone via `markPlanDeleted`). Synced settings: `sync.skillCloneStates` (Alpha/Omega per Character, `cloneState.ts:18`), `sync.targetSkillPlan` (target plan per Character, `targetPlan.ts:10`). Saved comparisons are NOT synced (`comparisons.ts:5`). FAQ text: `settings.faq.store.synced.*`.
 - Market hub sell orders for skill injectors / skill books (`src/market/prices`, Fuzzwork-era hub aggregate via `getHubPrices`).
 
+## Purpose and user goal
+
+"When will my plan finish, and how do I get there faster?" Planning is what a pilot comes to Skills to do; the trained list is reference (decision `20260902-173029`, which is why `/skills` opens on Plans). Owner issues add the cost side: what injectors or skill books the rest of a plan would cost (#1408, #2825), and getting a plan in from CCP's Certified Plans or a paste (#2392, #2981).
+
+- **Top jobs (ranked):** 1. "How long do skills X, Y and Z take to complete, and can order, a Remap, implants or a Booster shorten it?" (Skill Plan; owner, 2026-10-11) 2. "What is my full skill list?" (Trained; owner, 2026-10-11) 3. "What would it cost to skip or buy my way through it?"
+- **Device and cadence:** desktop primary (owner, 2026-10-11): plan editing is a desk session (sidebar + Plan Tools, attributes pane desktop-only, `20260901-092551`, `20260902-173029`); plans and queues copy to and from the clipboard (Import paste, EFT fit, queue export). The quick "what is training, what is next" glance belongs on Overview, not here (owner, 2026-10-11). Phone parity: Skills is one of the four default phone tabs (`DEFAULT_MOBILE_TABS` in `src/lib/mobileTabs.ts`: Overview, Skills, Industry, Market). Cadence: a session when planning.
+- **Above the fold:** Plans list: each plan with its total time and finish date, live queue state beside them. Editor: plan summary strip (total time, finish date, next Plan Milestone, #1709), then the entry list with a Done by date per row. Trained: the full list, grouped, with search.
+- **Not for:** "what is training right now and next" at a glance (Overview summary strip); "which hulls can I fly" (Ships > Ship Tree); a Fitting's missing skills start in Fittings and land here as plan entries.
+- **Sources:** owner, 2026-10-11 (job ranking, queue glance on Overview, desktop use, milestones wish); `20260902-173029`, `20260901-092551`, `20260930-201202`, `20261008-045030`; #1408, #1709, #2392, #2825, #2981.
+- **Unconfirmed:** how much Compare and Certificates are used.
+
+### Mobbin brief
+
+- **Fit:** medium: plan list and an ordered, reorderable list with durations are generic; Remap, attribute and injector maths are EVE-specific.
+- **Analog apps:** Things, Todoist, Linear, Duolingo, Coursera.
+- **Screen queries:**
+  - `web: ordered task list with drag handles where each row shows its duration and a running finish date, with a summary bar of total time and end date above`
+  - `web: list of saved plans each with total time and finish date, beside a detail pane of the user's current stats`
+  - `web: project timeline with named milestones and a projected date for each`
+  - `web: grouped list of completed courses or skills with level badges and a search box`
+- **Flow queries:** `web: import a list by pasting text and review the parsed items before saving`
+- **Mobbin won't help with:** attribute Remap optimizer, Skill injector bracket maths, Certificate tier grids; reference EVEMon and the in-game skill queue and Certified Plans windows.
+
 ---
 
 ## 1. Plans list (`/skills/plans`)
@@ -315,3 +338,4 @@ Tests assert (concrete behaviors):
 - Suggest Alpha from live queue rate (deferred in decision `20260922-191151-...`).
 - Per-tab page titles/h1 (all four views read "Skills").
 - Surface rate-limit / retry state for the multi-character Compare fan-out instead of silently dropping a failed Character.
+- Skill milestones by fit (owner wish, 2026-10-11): show which saved Fittings (or hulls) the pilot can fly and on what date each becomes flyable, from the plan or queue. Plan Milestones (#1406, `skillPlanMilestones.ts`) cover this only by hand, one named goal pinned to one skill level; nothing derives fit-ready dates from Fittings. Related closed issues: #1366, #1754, #2325. No open issue as of 2026-10-11.

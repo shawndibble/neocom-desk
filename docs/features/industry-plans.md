@@ -52,6 +52,28 @@ Prior docs this expands: ADR 0006 (`docs/adr/0006-build-plan-dual-verdict-and-pr
 | Deep links into plans                                | `Industry.tsx:235`                                                        | `?product=`, `?material=`, seed `me/te/runs/bpPrice`                                                  |
 | Engine                                               | `computeBuildPlan` > `buildVsBuy`, `materials`, `jobCost`, `fees`, `time` | Pure; recursive sub-builds                                                                            |
 
+## Purpose and user goal
+
+"Should I build this, what will I make, and what do I still need to get?" This doc covers the Build Plans tab plus the plan and group pages; the Jobs panel, Records, BPC Sourcing and Opportunities serve the other Industry jobs (`industry-records-sourcing.md`). A Build Plan "opens on its answer, not its inputs" (`20260906-091110`), and its materials are "a shopping list" filed by errand (`20261003-144713`). Groups turn a fit or a pasted blueprint list into many plans at once (#2982).
+
+- **Top jobs (ranked):** 1. "Is this build profitable, and should I build or buy it?" (verdict hero, Acquisition Verdict vs Sale Profitability, ADR 0006) 2. "What do I buy, what do I build, what do I already have?" (Materials errands, Copy shopping list) 3. "Which of my plans is best?" (plan list Profit / ISK/h / Margin, Compare).
+- **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11): Copy shopping list goes into the client's multibuy; fits and blueprint lists are pasted in to make a group. Phone parity: Industry is a default phone tab (`DEFAULT_MOBILE_TABS`); the Materials phone ledger and folded Costs exist so "a phone reaches the materials" (`20260906-091110`). Setup is "edited once and read many times" (same decision).
+- **Above the fold:** the Jobs summary bar (`industry-records-sourcing.md`) sits above the Plans tab too: folded to one line, expanding on demand, so it never pushes the plan list down (owner, 2026-10-11). Plan page: net profit with margin, ISK/h, duration and break-even, the verdict pills, then the To buy section. Plans tab: plan list with Profit and Verdict per row, and blueprint search to start one.
+- **Not for:** finding what to build (Opportunities); finished-job profit (Records); buying copies (BPC Sourcing); refining (reprocessing lives elsewhere, Q16).
+- **Sources:** owner, 2026-10-11 (desktop use; Jobs summary bar stays out of the way); `20260906-091110`, `20261003-144713`, `20260911-150427`, `20260905-000835`, `20261008-050524`, ADR 0006; #2843, #2920, #2982.
+- **Unconfirmed:** cadence (per build session, plans re-read while shopping); the order of jobs 2 and 3; that the plan list is used to compare plans rather than only to navigate; how often pilots edit Setup after creation.
+
+### Mobbin brief
+
+- **Fit:** low. Outside the hero figure and a sectioned shopping list, the page is a recursive build tree with EVE costing rules.
+- **Analog apps:** Katana MRP, Notion (database list), Instacart (shopping list), Robinhood (position detail).
+- **Screen queries:**
+  - `web: project detail page with one large profit figure, three status pills and a collapsed setup summary of chips above a sectioned materials list`
+  - `web: list of saved projects in collapsible groups with sortable profit and margin columns and drag to regroup`
+  - `ios: shopping list grouped into sections with a count and cost per section and a folded done section`
+- **Flow queries:** `web: paste a list of items and preview the projects it will create before confirming`.
+- **Mobbin won't help with:** recursive sub-build trees with build-or-buy per node, ME/TE and rig maths, the job-fee cost index, Blueprint Acquisition tiers; reference Ravworks, EVE Tycoon and the EVE client Industry window (`docs/research/competitors.md` §2.3).
+
 ## 2. Routes, entry points, link-ups
 
 | Route                       | Component                                              | Notes                                                                                                                                      |

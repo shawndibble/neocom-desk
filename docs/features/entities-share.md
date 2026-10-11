@@ -14,6 +14,28 @@ Two cross-cutting surfaces: (1) the `?info=` entity layer — clickable names th
 | Fitting Share Code view `/share/fitting?f=<code>` (permanent)                                                                           | URL                      | `src/routes/FittingShared.tsx:47,58`                                                                             | code decoded client-side, SDE                                                                                                                 | none                                  |
 | Creating a link: "Copy Share Link" on Appraisal and on a Fitting's Export menu                                                          | button                   | `src/features/market/AppraisalPanel.tsx:201`, `src/features/fittings/useFittingExport.ts:72`                     | writes Firestore                                                                                                                              | needs a Character (Firebase session)  |
 
+## Purpose and user goal
+
+"Who or what is this?" Any pilot, character, corporation, alliance, skill or item name on any page opens Show Info over that page, and Back closes it. This doc's purpose is Show Info; for Share Links (sending a view to someone) the purpose lives in `share-links.md`, which owns them.
+
+- **Top jobs (ranked):** 1. "Who is this pilot, corporation or alliance?" (Public info with zKillboard figures, live affiliation). 2. "What is this item or skill, and what does it need?" (Item Detail, Skill Detail). 3. "Open it in a new tab or send the link" (real `?info=` links).
+- **Device and cadence:** n/a as a page; desktop primary like its host pages (owner, 2026-10-11). Moment of use: mid-task on another page, many times a session (inferred). On a phone, it serves the one-off look-up of a friend or pilot (owner, 2026-10-11).
+- **Above the fold:** n/a. In the modal: name, portrait or logo, affiliation, then key figures; tabs only for the kinds in the chain.
+- **Not for:** finding a pilot by name or reading a Local list (Pilot Lookup, `pilot-lookup.md`); sharing an appraisal, fit, scan or survey (`share-links.md`).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); DESIGN.md §6c Entities; decisions `20260930-104922`, `20261005-212941`; ADR 0015.
+- **Unconfirmed:** how often pilots open Show Info.
+
+### Mobbin brief
+
+- **Fit:** medium. A profile modal with tabs and a quick-look item sheet are common; zKillboard meters and skill trees are not.
+- **Analog apps:** GitHub, LinkedIn, Steam, Discord.
+- **Screen queries:**
+  - `web: profile modal over a page with tabs for person, organization and history`
+  - `web: company profile with logo, key stat tiles, leaders and a history timeline`
+  - `ios: user profile sheet with avatar, role and links to their group`
+- **Flow queries:** none.
+- **Mobbin won't help with:** zKillboard danger and gang meters, skill prerequisites and item market data. Reference EVE's in-game Show Info window.
+
 ## Entity links and the `?info=` URL
 
 **Grammar.** `?info=<kind>-<id>` with kind in `character|corporation|alliance|skill|type`, id a positive safe integer (`src/lib/entityInfo.ts:20,27`); anything else is ignored (modal closed). The param rides the _current_ location: `entityInfoHref` keeps pathname and every other param (`:37`). So a link is a real `<a href>`: middle-click and Ctrl/Cmd/Shift/Alt-click open a new tab with the modal open; plain click navigates in-app (`isPlainPrimaryClick`, `EntityLink.tsx:35`).

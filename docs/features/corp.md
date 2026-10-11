@@ -13,6 +13,29 @@ Terms per `CONTEXT.md`: Corp Access, Corp Capability, Corp Role, Corp Board Item
 
 Related elsewhere: Settings -> Corporation (dark threshold) and Settings -> Permissions Corporation row (`settings.md`); Notifications Corp event group (`settings.md`); one-time grant banner (`CorpGrantPrompt`, mounted `src/app/Layout.tsx:440`).
 
+## Purpose and user goal
+
+"Is anything in my corporation about to run out, come out, or go quiet?" Corp is for the few pilots who hold a Corp Role: the Overview merges fuel, structure timers, moon extractions, finished jobs and offline services into one deadline-ranked board, and "the ranking is the feature" (`20260903-155950`). Members, Wallet and Assets are the tables behind it. The grant banner shows only to role holders, to spare "the ~95% who hold no role" (Interview Q14).
+
+- **Top jobs (ranked):** 1. "What corp deadline is next, and is any structure out of fuel?" (Overview board, Deadline Strip) 2. "How much money does the corp have, and how long will it last?" (Money panel, runway; Wallet) 3. "Who has gone dark, joined or left?" (People panel, Members).
+- **Device and cadence:** desktop primary, as for the whole app (owner, 2026-10-11; the owner has no Corp-specific answer). `/corp` is `mobileTab: false` and kept out of the phone rotation (`20260913-095527`), reachable from More. The `structureFuelLow` alert lands on `/corp`; member and wallet-threshold alerts land on Members and Wallet (`notificationOptions.ts`). ESI caches corp data about an hour, so short timers belong to notifications (`20260903-155950`).
+- **Above the fold:** Standing figures (Due soon, Runway, Net over 30 days), then the Deadline Strip, then Kind Cards (Fuel, Timers, Moons, Jobs) with critical rows first (`20260907-101244`, `20261010-162048`).
+- **Not for:** live short timers (notifications); corp industry jobs (Industry Jobs panel, `20260929-102524`); corp contracts (no view exists).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `20260903-155950`, `20260907-101244`, `20260903-224842-people-beside-money-on-the-corp-overview`, `20261010-162048`, `20260903-164718`, `20260929-131220`, `20260913-095527`, `20260903-121925`; #2857, #3123, #3142.
+- **Unconfirmed:** desk-first use (the phone-bar exclusion is structural: a hidden route would leave a hole in the bar); that fuel/timers outrank money for most role holders; how often a manager opens it (daily vs on alert); whether Station Managers (no wallet role) need a different top.
+
+### Mobbin brief
+
+- **Fit:** medium. An ops dashboard of headline figures, a per-day load bar chart, grouped cards and a team roster are generic; structure fuel, reinforcement timers and moon chunks are EVE-specific.
+- **Analog apps:** PagerDuty, Datadog, Linear, Gusto (team), Ramp (cash runway).
+- **Screen queries:**
+  - `web: operations dashboard with three headline metrics above a 14-day bar chart of upcoming deadlines colored by severity`
+  - `web: grid of category cards each listing its three most urgent items with a countdown and a show-all link`
+  - `web: team member table sorted by last active with an inactive filter and joined/left counts above`
+  - `web: company cash panel with balance per account, net 30-day change and runway in days`
+- **Flow queries:** none.
+- **Mobbin won't help with:** Corp Role and scope gating, structure states and fuel semantics, moon extraction timing; reference the EVE client Structure Browser and corp management windows.
+
 ## Access model (gates every view)
 
 Two independent axes: granted scopes (offline from JWT) and in-game roles (only ESI knows).
