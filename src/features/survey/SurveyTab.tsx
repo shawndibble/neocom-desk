@@ -31,7 +31,6 @@ import { SurveyNameTitle } from './SurveyNameTitle';
 import { SurveyPicker } from './SurveyPicker';
 import { SurveyOwnerChange } from './SurveyOwnerChange';
 import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
-import { YourShareRow } from './YourShareRow';
 import { stashPendingScan, takePendingScan } from './pendingScan';
 import { hasSubmittedScan, noteSubmittedScan } from './submitted';
 import { submitterName } from './submitterName';
@@ -308,7 +307,6 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               onFinish={currentId !== null && state.status === 'ready' ? finish : undefined}
               owned={owned}
               panelTitle={currentId !== null ? <SurveyNameTitle id={currentId} /> : undefined}
-              viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
               afterPanel={(summary) =>
                 characterId !== null && (
                   <SurveyInfoLine

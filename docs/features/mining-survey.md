@@ -12,7 +12,6 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 | Public page, listens for paste itself       | `SurveyShareScreen.tsx`, case `survey` in `src/routes/SharedLink.tsx`                 |
 | Store, polling hook, current-survey pref    | `surveyStore.ts`, `useSurvey.ts`, `surveyPref.ts`                                     |
 | Parse, series maths, chat message, ticks    | `src/engine/survey/`                                                                  |
-| Your share: ledger read, system pref, line  | `yourShare.ts` (engine), `useYourShare.ts`, `surveySystemPref.ts`, `YourShareRow.tsx` |
 | Copy chat message split button              | `SurveyCopyButton.tsx`                                                                |
 | Paste routing                               | `survey` detector in `src/engine/import/pasteDestination.ts`                          |
 | Rules and TTL                               | `firestore.rules` (`shares/{id}/surveyScans`), `firestore.indexes.json`               |

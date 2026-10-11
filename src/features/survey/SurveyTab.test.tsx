@@ -38,7 +38,6 @@ vi.mock('./SurveyInfoPanel', () => ({
     tax === null ? null : <div data-testid="tax-readout">{tax.name}</div>,
 }));
 // Its own test covers the ledger read; here it would reach for ESI.
-vi.mock('./YourShareRow', () => ({ YourShareRow: () => null }));
 vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
 
 import { SurveyTab } from './SurveyTab';

@@ -65,8 +65,6 @@ interface SurveyBoardProps {
   owned?: boolean;
   /** Quiet controls at the foot of the panel, e.g. "New survey". */
   footerActions?: ReactNode;
-  /** A line under the stats about the viewer, e.g. their own share; the public page has none. */
-  viewerLine?: (summary: SurveySummary) => ReactNode;
   /** A section under the panel, before the ores, e.g. the moon tax; gets the same summary. */
   afterPanel?: (summary: SurveySummary) => ReactNode;
   /**
@@ -100,7 +98,6 @@ export function SurveyBoard({
   url,
   expiresAt,
   footerActions,
-  viewerLine,
   afterPanel,
   panelTitle,
 }: SurveyBoardProps) {
@@ -220,8 +217,6 @@ export function SurveyBoard({
           )}
 
           <SurveyStats summary={summary} />
-
-          {viewerLine?.(summary)}
 
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             {expiresAt !== null && (
