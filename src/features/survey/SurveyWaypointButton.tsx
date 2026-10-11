@@ -14,14 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useSetDestination } from '@/features/travel/useSetDestination';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-
-/**
- * A row-end button with its disabled reason right under it: on the right of a
- * wide row, left under the content on a phone. Shared with Manage Taxes.
- */
-export const blockedButtonClassName =
-  'flex max-w-full flex-col items-start gap-1 sm:ml-auto sm:items-end';
-export const blockedReasonClassName = 'text-xs text-text-dim sm:text-right';
+import { blockedButtonClassName, blockedReasonClassName } from './blockedActionStyles';
 
 export function SurveyWaypointButton({ location }: { location: { id: number; name: string } }) {
   const { t } = useTranslation();

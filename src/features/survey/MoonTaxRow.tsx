@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, Modal, TextInput } from '@/components/ui';
 import { InfoRow } from './InfoRow';
-import { blockedButtonClassName, blockedReasonClassName } from './SurveyWaypointButton';
+import { blockedButtonClassName, blockedReasonClassName } from './blockedActionStyles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import { createPayee, loadPayees } from '@/features/miningTax/payees';
@@ -226,7 +226,7 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
 
   return (
     <InfoRow label={t('survey.moonTax.label')}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
         <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xl font-semibold">
           <span className="tabular-nums">{tax.pct}%</span>
           <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
