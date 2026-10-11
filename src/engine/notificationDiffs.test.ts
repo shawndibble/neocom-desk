@@ -1214,6 +1214,15 @@ describe('diffNewMail', () => {
     ]);
   });
 
+  it('does not fire for mail the character sent itself', () => {
+    const prev = mailSnapshot([mailEntry(5)], T0);
+    const next = mailSnapshot(
+      [{ mailId: 7, fromId: 7 }, { mailId: 6, fromId: 99 }, mailEntry(5)],
+      T0 + 2000
+    );
+    expect(diffNewMail(7, prev, next)).toEqual([{ eventId: 'newMail', characterId: 7, mailId: 6 }]);
+  });
+
   it('does not fire for an id already seen', () => {
     const prev = mailSnapshot([mailEntry(5)], T0);
     const next = mailSnapshot([mailEntry(5)], T0 + 2000);

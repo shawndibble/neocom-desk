@@ -719,6 +719,12 @@ export interface MailHeaderSnapshot {
    * baseline persisted before it existed still validates.
    */
   sentMs?: number;
+  /**
+   * The header's `from` character id. A mail the Character sent itself shows
+   * up in the same list but is not "new mail". Optional so a baseline persisted
+   * before it existed still validates.
+   */
+  fromId?: number;
 }
 
 export interface MailSnapshot {
@@ -755,6 +761,7 @@ export function diffNewMail(
   const fires: MailNotificationFire[] = [];
   for (const entry of next.entries) {
     if (entry.mailId <= maxPrevId) continue;
+    if (entry.fromId === characterId) continue; // outgoing, not incoming
     fires.push({
       eventId: 'newMail',
       characterId,
