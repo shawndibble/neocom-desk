@@ -217,12 +217,11 @@ Every rework, and every tweak that moves or regroups something, gets a mockup
 before it gets a ticket. A tweak that only realigns an edge or changes one
 gap skips this step.
 
-Use the `ui-ux-pro-max:design` skill (or the Artifact tool's `design` quickstart). Constrain
-it to DESIGN.md tokens and the primitives in `src/components/ui/`; a mockup
-with its own visual language is not an integration plan. Draw the surface as
-it is today beside what it becomes, at 1440 wide, plus a 390-wide frame
-whenever the change also reaches the phone. Publish it and link the URL from
-the ticket.
+Build the mockup as a Storybook story, not HTML or another design skill:
+follow `docs/design/mockups/README.md`. Look primitives up first with
+`npm run ui:catalog <Name>`; wrap anything new in `<NewComponent>`. Shoot it
+with `npm run ui:shot -- mockups-<page>--<story>` (1440 and 390). Show today
+beside what it becomes. Link the published PNG README from the ticket.
 
 **Also describe the layout in words in the ticket body.** Links rot, and an
 unattended publish can fail.
@@ -286,7 +285,7 @@ fully specified
 answers them, including any objection overruled by evidence. On `ESCALATE`,
 the DESIGN.md rule at stake and both sides of the trade.
 
-**Mockups:** artifact URL, plus the layout described in words
+**Mockups:** link to the PNG README in `docs/design/mockups/`, plus the layout described in words
 ```
 
 ## 10. Curate the ledger

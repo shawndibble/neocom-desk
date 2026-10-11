@@ -68,7 +68,7 @@ Repo-specific hard rules to check (from `CLAUDE.md`):
 
 Each sub-agent's prompt must open with: "This is a read-only review: read the diff and cited files only — never run tests, lint, typecheck, build, or any script."
 
-**Standards axis** — report, per file/hunk: (a) every place the diff violates a documented standard (cite the standard); (b) any baseline smell (name it, quote the hunk). Distinguish hard violations from judgement calls. Skip what tooling enforces.
+**Standards axis** — report, per file/hunk: (a) every place the diff violates a documented standard (cite the standard); (b) any baseline smell (name it, quote the hunk). For UI diffs, run `npm run ui:catalog` and flag (hard) any re-implemented `src/components/ui` primitive and any new primitive without a `<Component>.stories.tsx`. Distinguish hard violations from judgement calls. Skip what tooling enforces.
 
 **Spec axis** — report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but wrong. Quote the spec line for each finding. If no spec, skip and note it.
 
