@@ -11,17 +11,21 @@ import { noteSubmittedScan } from './submitted';
 import { useSurveyHistory } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
 
-const { startSurvey, addSurveyScan, loadSurvey, setSurveyScanIgnored } = vi.hoisted(() => ({
-  startSurvey: vi.fn(),
-  addSurveyScan: vi.fn(),
-  loadSurvey: vi.fn(),
-  setSurveyScanIgnored: vi.fn(),
-}));
+const { startSurvey, addSurveyScan, loadSurvey, setSurveyScanIgnored, finishSurvey } = vi.hoisted(
+  () => ({
+    finishSurvey: vi.fn(),
+    startSurvey: vi.fn(),
+    addSurveyScan: vi.fn(),
+    loadSurvey: vi.fn(),
+    setSurveyScanIgnored: vi.fn(),
+  })
+);
 vi.mock('./surveyStore', () => ({
   startSurvey,
   addSurveyScan,
   loadSurvey,
   setSurveyScanIgnored,
+  finishSurvey,
 }));
 vi.mock('@/features/share/shareStore', () => ({
   shareUrl: (id: string) => `https://neocomdesk.test/s/${id}`,
@@ -77,6 +81,8 @@ beforeEach(async () => {
   addSurveyScan.mockReset();
   loadSurvey.mockReset();
   setSurveyScanIgnored.mockReset();
+  finishSurvey.mockReset();
+  finishSurvey.mockResolvedValue(undefined);
   setSurveyScanIgnored.mockResolvedValue(undefined);
   startSurvey.mockResolvedValue({
     id: ID,
@@ -395,6 +401,36 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
       const { container } = renderTab();
       await screen.findByText(/mined/);
       expect(container.querySelector('details')).toBeNull();
+    });
+  });
+
+  describe("marking another pilot's field cleared", () => {
+    const survey = (year: number) => ({
+      ok: true,
+      ignored: new Set(),
+      expiresAt: EXPIRES,
+      owner: 'Someone Else',
+      tax: null,
+      scans: [
+        { at: Date.UTC(year, 9, 8, 18), rocks: parseSurveyScan(SCAN)! },
+        { at: Date.UTC(year, 9, 8, 18, 5), rocks: parseSurveyScan(SHRUNK)! },
+      ],
+    });
+
+    it('offers it once the survey is past its Done at time, and stores it', async () => {
+      loadSurvey.mockResolvedValue(survey(2020));
+      await useCurrentSurveyId.getState().setValue(ID);
+      renderTab();
+      fireEvent.click(await screen.findByRole('button', { name: 'Mark field cleared' }));
+      await waitFor(() => expect(finishSurvey).toHaveBeenCalledTimes(1));
+    });
+
+    it('offers nothing while the field is still well under way', async () => {
+      loadSurvey.mockResolvedValue(survey(2099));
+      await useCurrentSurveyId.getState().setValue(ID);
+      renderTab();
+      await screen.findByText(/mined/);
+      expect(screen.queryByRole('button', { name: 'Mark field cleared' })).toBeNull();
     });
   });
 });
