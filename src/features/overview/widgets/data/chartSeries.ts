@@ -1,10 +1,9 @@
+import { DAY_MS } from '@/lib/age';
 /**
  * Time-series arithmetic for the widget charts: the daily balance a journal
  * implies, and bucketing by week or hour. Pure and independent of the clock
  * (every function is handed `now`), so each is pinned by a plain test.
  */
-
-const DAY_MS = 86_400_000;
 
 function shiftDay(day: string, days: number): string {
   return new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 10);

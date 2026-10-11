@@ -16,6 +16,7 @@ import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
 import type { BoardMail } from '../../boardData';
 import { UNKNOWN } from './builderKit';
+import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';
 import type { SpExtras, TableCell, TableModel, TableRowModel, Translate } from './types';
 
@@ -123,7 +124,7 @@ export function spTable(t: Translate, input: SpTableInput): TableModel {
     },
   ];
   if (extras.monitoring && extras.thresholdSp > 0) {
-    const share = Math.min(1, extractable / extras.thresholdSp);
+    const share = fractionBar(extractable, extras.thresholdSp) ?? 0;
     rows.push({
       key: 'threshold',
       cells: [

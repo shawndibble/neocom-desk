@@ -44,7 +44,15 @@ import {
   stockBoardSummary,
 } from '../../boardSummary';
 import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../boardData';
-import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
+import {
+  blank,
+  count,
+  NEUTRAL_NUMBER,
+  statusOf,
+  STOCK_PATH,
+  UNKNOWN,
+  type Builder,
+} from './builderKit';
 import { queueSegments, queueStack, walletArea } from './chartBuilders';
 import { dailyBalanceSeries } from './chartSeries';
 import {
@@ -80,7 +88,6 @@ import type {
 
 /** The Contracts History table filtered to accepted contracts, the courier hauls the widget counts. */
 export const CONTRACTS_IN_PROGRESS_HREF = '/contracts/history?history.status=in_progress';
-const STOCK_PATH = '/market/stock';
 
 // --- Which reads a kind needs ------------------------------------------------
 

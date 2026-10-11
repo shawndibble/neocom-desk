@@ -6,6 +6,9 @@
 import type { WidgetStateInput } from '../state';
 import type { BuildContext, FeedState, Feeds, KindView, NumberModel } from './types';
 
+/** The Stock page, where the market-stock rows and their per-market summary lead. */
+export const STOCK_PATH = '/market/stock';
+
 /** What a figure shows when the question cannot be answered at all, a lapsed grant, not a zero. */
 export const UNKNOWN = '—';
 

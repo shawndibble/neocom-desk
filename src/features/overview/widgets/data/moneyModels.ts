@@ -5,6 +5,7 @@
  * out. Kept in one file so the money kinds' redesign stays out of the shared
  * `models.ts`, `kindModels.ts` and `chartBuilders.ts`.
  */
+import { DAY_MS } from '@/lib/age';
 import type { DeadlineSeverity } from '@/engine/severity';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
@@ -27,7 +28,7 @@ import type {
 } from '../charts/types';
 import { backwardBucketSums } from './chartSeries';
 import type { NetWorthCharacter } from './kindLoaders';
-import { UNKNOWN } from './builderKit';
+import { STOCK_PATH, UNKNOWN } from './builderKit';
 import { fractionBar, signedCell } from './cellKit';
 import type { NumberSecondary, TableCell, TableModel, TableRowModel, Translate } from './types';
 
@@ -226,8 +227,6 @@ export function journalTable(
 }
 
 // --- Wallet flow ---------------------------------------------------------------------
-
-const DAY_MS = 86_400_000;
 
 export interface FlowBuckets {
   /** A bar per day (a 7-day range) rather than per week. */
@@ -456,8 +455,6 @@ export function netWorthTable(
 }
 
 // --- Market stock --------------------------------------------------------------------
-
-const STOCK_PATH = '/market/stock';
 
 /** "Amarr VIII (Oris) - Emperor Family Academy" reads as its first part on a widget. */
 const marketName = (name: string): string => name.split(' - ')[0] ?? name;
