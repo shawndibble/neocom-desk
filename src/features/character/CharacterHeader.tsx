@@ -9,10 +9,10 @@ import { usePublicInfo } from '@/stores/publicInfo';
 
 interface CharacterHeaderProps {
   characterId: number;
-  /** Corrected total SP; null while loading, or when /skills is unavailable. */
-  totalSp: number | null;
-  /** ESI's unallocated_sp; null while loading, or when unavailable. */
-  unallocatedSp: number | null;
+  /** Corrected total SP; null while loading, or when /skills is unavailable. Omitted on the Overview. */
+  totalSp?: number | null;
+  /** ESI's unallocated_sp; null while loading, or when unavailable. Omitted on the Overview. */
+  unallocatedSp?: number | null;
   /**
    * The Overview's layout: no SP chips (a Skill points widget carries them),
    * `aside` beside the name and `actions` (Next deadline, Customize) in the
@@ -41,9 +41,9 @@ interface CharacterHeaderProps {
  * and Refresh belong to the data they describe, so they sit in that view's
  * `Panel` toolbar below the tabs. The exception is the Overview (`overview`),
  * whose widgets are the page: its header carries the data age
- * beside the name (`aside`), the Unallocated SP chip with the bell at the top
- * right, and a controls row (`actions`: Next deadline, Customize). Total SP is
- * not drawn there; a Skill points widget carries it. Switching Character is the
+ * beside the name (`aside`), the bell at the top right, and a controls row
+ * (`actions`: Next deadline, Customize). No SP is drawn there; a Skill points
+ * widget carries it. Switching Character is the
  * rail footer's and the command palette's job.
  *
  *
@@ -55,8 +55,8 @@ interface CharacterHeaderProps {
  */
 export function CharacterHeader({
   characterId,
-  totalSp,
-  unallocatedSp,
+  totalSp = null,
+  unallocatedSp = null,
   overview = false,
   aside,
   actions,

@@ -16,22 +16,13 @@
  * Scoped to the active Character; each widget's own menu may widen it to All
  * characters, honoured by the kinds whose reads can sum.
  */
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { DangerBanner } from '@/features/notifications/DangerBanner';
-import { getLastKnownSpSummary } from '@/stores/characterSp';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -41,7 +32,6 @@ import {
 } from '@/features/overview/OverviewHeader';
 import { useOverviewCardOrder } from '@/features/overview/cardOrder';
 import { useOverviewHiddenCards } from '@/features/overview/hiddenCards';
-import { useFeedStore } from '@/features/overview/widgets/data/feedStoreContext';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
 import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
 import { CustomizeBar } from '@/features/overview/widgets/CustomizeBar';
@@ -58,9 +48,6 @@ import { useFirstRunReady } from '@/features/overview/widgets/useFirstRunReady';
 import { distinctKinds, visibleWidgets } from '@/features/overview/widgets/visibility';
 import { WidgetGrid } from '@/features/overview/widgets/WidgetGrid';
 
-/** The header's SP chips read the skills feed, so it is mounted whatever the layout holds. */
-const ALWAYS_FEEDS = ['skills'] as const;
-
 function Centered({ children }: { children: ReactNode }) {
   return <div className="flex justify-center py-16">{children}</div>;
 }
@@ -73,23 +60,16 @@ interface BoardProps {
 
 /** Everything below the providers: the header, sub-nav and grid. */
 function Board({ characterId, layout, showNew }: BoardProps) {
-  const store = useFeedStore();
-  const feeds = useSyncExternalStore(store.subscribe, store.get);
   const edit = useOverviewEdit();
   const { editing } = edit;
   const isPhone = useIsPhone();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
 
-  const skills = feeds.skills?.data ?? null;
-  const lastKnownSp = getLastKnownSpSummary(characterId);
-
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <CharacterHeader
         characterId={characterId}
-        totalSp={skills?.totalSp ?? lastKnownSp.totalSp}
-        unallocatedSp={skills?.skillsResult?.data?.unallocated_sp ?? lastKnownSp.unallocatedSp}
         overview
         aside={<OverviewDataAge widgets={layout.widgets} />}
         actions={
@@ -203,12 +183,7 @@ export function Overview() {
   if (layout === null) {
     return (
       <div className="mx-auto max-w-6xl space-y-4">
-        <CharacterHeader
-          characterId={activeCharacterId}
-          overview
-          totalSp={getLastKnownSpSummary(activeCharacterId).totalSp}
-          unallocatedSp={getLastKnownSpSummary(activeCharacterId).unallocatedSp}
-        />
+        <CharacterHeader characterId={activeCharacterId} overview />
         <OverviewSubNav />
         <DangerBanner />
         <RoleChooser firstRun onChoose={onLayoutChange} />
@@ -219,7 +194,7 @@ export function Overview() {
   return (
     <OverviewRefreshProvider>
       <OverviewEditProvider layout={layout} onLayoutChange={onLayoutChange}>
-        <WidgetDataProvider kinds={kinds} always={ALWAYS_FEEDS}>
+        <WidgetDataProvider kinds={kinds}>
           <Board characterId={activeCharacterId} layout={layout} showNew={returning} />
         </WidgetDataProvider>
       </OverviewEditProvider>
