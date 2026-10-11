@@ -94,7 +94,7 @@ const EMPTY_DRAFT: DraftPayee = {
  * tracked character — a landlord doesn't change depending on which alt is
  * looking — so this lists the union of all of them rather than gating on one
  * character at a time. Name, default tax %, and the trade hub the Payee's ore
- * is valued at — the moon/system tag (CONTEXT.md's Payee entry) is set from
+ * is valued at — the moon/system tag (GLOSSARY.md's Payee entry) is set from
  * `AssignDialog`'s "remember this system" checkbox instead, at the moment
  * it's actually useful, rather than asking for a system id here.
  *

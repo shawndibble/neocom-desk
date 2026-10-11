@@ -17,7 +17,7 @@
  * than two. "Loaded, and this id is not in it" and "could not read the
  * snapshot at all" are opposite conclusions, and collapsing them would send
  * every NPC station to the structure endpoint on a first offline visit — the
- * file sits outside the install precache on purpose (CONTEXT.md round 10: most
+ * file sits outside the install precache on purpose (GLOSSARY.md round 10: most
  * installs never open /market and should not pay ~1.2 MB up front), so failing
  * to read it is an ordinary outcome rather than a bug.
  *

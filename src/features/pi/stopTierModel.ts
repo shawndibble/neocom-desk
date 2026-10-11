@@ -11,7 +11,7 @@
  * can be reduced by a real number before anything is fitted into what is left.
  * An unbuilt planet has no links to measure, so the same fit would charge
  * nothing for them and overstate what fits by exactly the amount #440 was
- * filed about. CONTEXT.md round 53's "the estimate stays out of pin-fitting"
+ * filed about. GLOSSARY.md round 53's "the estimate stays out of pin-fitting"
  * therefore still holds for unbuilt cards, and this is the built-only half
  * round 51 left open.
  *
@@ -186,7 +186,7 @@ export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTier
       // Never guessed. A basic link moves 1,250 m3/hr and each upgrade level
       // doubles it, but whether that axis is the same skill as the budget
       // table is unconfirmed, so the engine answers `link-capacity-unknown`
-      // rather than picking a level (CONTEXT.md round 51).
+      // rather than picking a level (GLOSSARY.md round 51).
       linkCapacityPerHour: null,
       bufferHours: input.bufferHours,
     },

@@ -1,5 +1,5 @@
 /**
- * Remap Marker (CONTEXT.md) manual attribute editor: lets the user override
+ * Remap Marker (GLOSSARY.md) manual attribute editor: lets the user override
  * what a marker targets instead of only ever accepting the optimizer's
  * choice. EVE's remap rules (`engine/attributeBaseline.ts`) are a fixed
  * budget, not a ceiling — every legal sheet totals exactly

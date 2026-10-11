@@ -1,5 +1,5 @@
 /**
- * The one plain-English fact a row states beside its badge (CONTEXT.md's
+ * The one plain-English fact a row states beside its badge (GLOSSARY.md's
  * redesigned Market > Open Orders tab). The badge says WHICH problem; this
  * says WHAT is actually happening — the rival's own price, how far under
  * you they are, and (only when a cost basis exists) whether following them

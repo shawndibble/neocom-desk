@@ -271,7 +271,7 @@ export function colonyStorage(
     colony,
     pins,
     pi,
-    // Never guessed — CONTEXT.md round 51. The buffer half is what this row
+    // Never guessed — GLOSSARY.md round 51. The buffer half is what this row
     // is about, and it is answered.
     linkCapacityPerHour: null,
     bufferHours: haulHours,

@@ -1,6 +1,6 @@
 # Fittings (Ships > Fittings tab, Compare, Shared view)
 
-Fitting = one hull + modules, charges, drones, fighters, cargo, under a name (CONTEXT.md **Fitting**). Stats worked out for the active Character's skills by the pinned dogma engine (`@eveshipfit/dogma-engine`, `src/features/fittings/dogmaFittingEngine.ts`). Ship Tree tab is out of scope here (see ships.md).
+Fitting = one hull + modules, charges, drones, fighters, cargo, under a name (GLOSSARY.md **Fitting**). Stats worked out for the active Character's skills by the pinned dogma engine (`@eveshipfit/dogma-engine`, `src/features/fittings/dogmaFittingEngine.ts`). Ship Tree tab is out of scope here (see ships.md).
 
 ## Summary
 

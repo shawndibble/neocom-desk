@@ -9,7 +9,7 @@
  * order — ... Try \"Suggest reorder\""), which tells a user their *plan* is
  * unimprovable when the truth is that the run was a no-op:
  *
- * - Remaps Available (CONTEXT.md) is 0, so `placeRemaps` short-circuits to
+ * - Remaps Available (GLOSSARY.md) is 0, so `placeRemaps` short-circuits to
  *   the no-remap result before evaluating anything. New plans are seeded
  *   from ESI, which reports 0 for any character with no bonus remaps whose
  *   yearly remap is on cooldown — the common case, not an edge one.

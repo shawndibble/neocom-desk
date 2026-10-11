@@ -907,7 +907,7 @@ export function BuildPlanDetail({
   );
 
   /**
-   * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
+   * Make-or-buy verdict per material (GLOSSARY.md round 29), computed once for
    * the table and the CSV export rather than per row render. Covers every
    * row regardless of depth: a recipe input a build introduced is exactly as
    * eligible for advice — and for the build-here control itself — as one of
@@ -1559,7 +1559,7 @@ export function BuildPlanDetail({
                   {/* Sits under Trade hub because it names a side of that hub's
                     order book, not a separate place. Materials only — the
                     product stays on lowest sell, which is what buying it
-                    outright costs (CONTEXT.md, Acquisition Verdict). */}
+                    outright costs (GLOSSARY.md, Acquisition Verdict). */}
                   <div className="flex flex-col gap-1 text-xs">
                     <span className="flex items-center gap-1">
                       <label htmlFor="build-plan-material-price-basis">

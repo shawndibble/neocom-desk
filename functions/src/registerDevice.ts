@@ -1,5 +1,5 @@
 // registerDevice: register one device's FCM token against every Character it
-// holds, in one call. See issue #356, ADR 0010, CONTEXT.md round 44/45
+// holds, in one call. See issue #356, ADR 0010, GLOSSARY.md round 44/45
 // ("Projections and device registrations are uploaded through one callable").
 //
 // Verification is per-Character rather than all-or-nothing: a device can hold

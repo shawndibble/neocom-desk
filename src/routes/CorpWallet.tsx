@@ -336,7 +336,7 @@ function CorpJournalPanel({
         </div>
       ) : journalResult === null ? (
         // No cache and the read didn't come back — offline, or a 403 the role
-        // gate swallowed (CONTEXT.md's `/corp/assets` split, same axis here).
+        // gate swallowed (GLOSSARY.md's `/corp/assets` split, same axis here).
         <EmptyState
           title={t('common.loadFailedTitle')}
           hint={t('common.loadFailedHint')}

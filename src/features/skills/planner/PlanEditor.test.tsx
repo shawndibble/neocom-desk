@@ -2276,7 +2276,7 @@ describe('Clone State (#1233)', () => {
   });
 });
 
-describe('Plan Milestones (CONTEXT.md)', () => {
+describe('Plan Milestones (GLOSSARY.md)', () => {
   it("names a goal from a row, and shows it as the header's next milestone", async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();

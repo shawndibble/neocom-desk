@@ -22,7 +22,7 @@
  * precedent, issue #108). The Foreground Poller
  * (`features/notifications/ForegroundNotificationPoller.tsx`, issue #172)
  * reads these same toggles to decide what to fire; further Notification
- * Events land here as later tickets add their pollers (CONTEXT.md round 20).
+ * Events land here as later tickets add their pollers (GLOSSARY.md round 20).
  *
  * Issue #740: a ~50-Character roster with several sections expanded used to
  * mount every one of their ~90 checkboxes at once, and any state change
@@ -331,7 +331,7 @@ export function NotificationsPanel() {
 
   /**
    * Per-stored-character corp capability (issue #299) — a departure from
-   * `useCorpAccess`'s active-character-only scope (CONTEXT.md round 37):
+   * `useCorpAccess`'s active-character-only scope (GLOSSARY.md round 37):
    * that read backs a hot, always-mounted Settings row, while
    * `loadCharacterRoles` is documented as cheap enough to run for everyone
    * (`features/corp/roles.ts`) and this only runs once per Settings visit,

@@ -51,7 +51,7 @@ gracefully without it (see §13 "Location names").
 CCP named it `manage_planets`, but in the current ESI surface it grants **two
 GETs and no writes** (verified above; the spec does contain `post`/`put`/`delete`
 operations, none of them under this scope). Technically it does not violate
-CONTEXT.md's "Read-only: no ESI write scopes". **However** the EVE SSO consent
+GLOSSARY.md's "Read-only: no ESI write scopes". **However** the EVE SSO consent
 screen will render it as roughly "manage your planetary installations" to a user
 of an app that advertises itself as read-only. That is a trust/UX decision for
 the orchestrator, not a technical blocker — but it should be a deliberate one,
@@ -122,7 +122,7 @@ only, scope already held.
 
 ### Verified baseline (clone half)
 
-Nothing. `grep -rni "clone jump|jumpclone|infomorph" src/ docs/ CONTEXT.md`
+Nothing. `grep -rni "clone jump|jumpclone|infomorph" src/ docs/ GLOSSARY.md`
 returns **zero hits**. No endpoint wrapper, no scope, no data module, no route.
 
 ### The clones endpoint — spec-verified shape
@@ -285,7 +285,7 @@ position?}`; `name`/`solar_system_id`/`owner_id` required). **Each new wrapper m
 - `src/i18n/locales/en.json` — new `clones.*` block + `nav.clones`.
 - `e2e/support/mockEsi.ts` + `e2e/support/fixtureData.ts` — see Tests.
 - `docs/ARCHITECTURE.md` §2/§6 — new feature row (also fix the §6 staleness noted in the orchestrator baseline).
-- `CONTEXT.md` — **round-4 glossary block**. This item introduces vocabulary the ubiquitous language does not yet carry: **Jump Clone**, **Home Clone**, **Clone Jump Cooldown**. Rounds 2 and 3 each added terms as features landed (Remap Marker, Facility Preset, Market Browser, Data Age); this should follow that convention rather than drift. Orchestrator should assign one owner for a single round-4 block covering items 13/16/20.
+- `GLOSSARY.md` — **round-4 glossary block**. This item introduces vocabulary the ubiquitous language does not yet carry: **Jump Clone**, **Home Clone**, **Clone Jump Cooldown**. Rounds 2 and 3 each added terms as features landed (Remap Marker, Facility Preset, Market Browser, Data Age); this should follow that convention rather than drift. Orchestrator should assign one owner for a single round-4 block covering items 13/16/20.
 
 ### New modules
 
@@ -371,7 +371,7 @@ clones.infomorphHint         tooltip explaining the 24h − 1h/level rule
 
 ### Sync / Dexie impact
 
-**None.** Clones are API-Derived Data (CONTEXT.md glossary) — never synced. No
+**None.** Clones are API-Derived Data (GLOSSARY.md glossary) — never synced. No
 Editable Data field, no `sync.`-prefixed setting, so no `src/sync/` push/pull
 mapping (the `d90e417` pattern does not apply here). No Dexie version bump: the
 generic `esiCache` table is keyed `[characterId+key]` (`src/db/index.ts:112`) and
@@ -709,7 +709,7 @@ idle at time T" testable without fake timers.
 - `src/i18n/locales/en.json` — `pi.*` block.
 - `e2e/support/mockEsi.ts` + `fixtureData.ts` — mandatory (fail-closed, `mockEsi.ts:108-110`).
 - `docs/ARCHITECTURE.md` §2/§6.
-- `CONTEXT.md` — **round-4 glossary block** (same shared block as Item 13). New terms: **Colony**, **Pin**, **Extractor**, **Schematic**, and — if the v1 boundary is accepted — a scope-decisions line stating that PI v1 is colony health only, production-chain graph deferred.
+- `GLOSSARY.md` — **round-4 glossary block** (same shared block as Item 13). New terms: **Colony**, **Pin**, **Extractor**, **Schematic**, and — if the v1 boundary is accepted — a scope-decisions line stating that PI v1 is colony health only, production-chain graph deferred.
 
 ### New modules
 
@@ -815,7 +815,7 @@ pi.systemLabel     "System #{{id}}"
 
 ### Sync / Dexie impact
 
-**None.** PI data is API-Derived (CONTEXT.md) — never synced, no Editable Data
+**None.** PI data is API-Derived (GLOSSARY.md) — never synced, no Editable Data
 record, no `sync.`-prefixed setting, so no `src/sync/` push/pull mapping (the
 `d90e417` pattern does not apply). No Dexie bump past `db.version(3)`
 (`src/db/index.ts:107-114`): `esiCache` is keyed `[characterId+key]` and takes
@@ -877,7 +877,7 @@ are simply wrong.
 
 ### Risks / open questions
 
-1. **The `manage_planets` consent-screen wording** vs. CONTEXT.md's read-only
+1. **The `manage_planets` consent-screen wording** vs. GLOSSARY.md's read-only
    promise. Product call — see the cross-cutting section.
 2. **The staleness caveat is a support-load risk.** Users will compare our
    numbers to the in-game client and report a bug. The `last_update` chip +

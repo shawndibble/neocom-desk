@@ -12,7 +12,7 @@ _Recorded 2026-09-21._
   design, with one narrow, explicit exception" — `organize_mail` for
   mark-read. This decision adds a second exception and widens it: unlike
   `corp`'s seven scopes (opt-in because ~95% of users hold no corp role and
-  gain nothing from granting them, CONTEXT.md round 35), every character can
+  gain nothing from granting them, GLOSSARY.md round 35), every character can
   send mail, so gating it behind a feature-triggered consent screen would
   just delay the same prompt for nearly everyone who'd use it. The accepted
   cost: **every existing user is re-prompted for consent on their next

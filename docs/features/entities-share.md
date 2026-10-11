@@ -1,6 +1,6 @@
 # Entities (Show info) and Share Links
 
-Two cross-cutting surfaces: (1) the `?info=` entity layer — clickable names that open Show Info (Public info modal, Skill Detail, Item Detail) over whatever page the pilot is on; (2) stored Share Links `/s/<id>` and the permanent Fitting Share Code URL. Neither is a nav destination. Terms per `CONTEXT.md`: Show Info, Item Detail, Fitting Share Code, Share Link, Shared Appraisal, Pilot Lookup. See also `docs/features/share-links.md` (page-by-page share flow), `docs/features/pilot-lookup.md`, `docs/features/assets.md` (Item Detail).
+Two cross-cutting surfaces: (1) the `?info=` entity layer — clickable names that open Show Info (Public info modal, Skill Detail, Item Detail) over whatever page the pilot is on; (2) stored Share Links `/s/<id>` and the permanent Fitting Share Code URL. Neither is a nav destination. Terms per `GLOSSARY.md`: Show Info, Item Detail, Fitting Share Code, Share Link, Shared Appraisal, Pilot Lookup. See also `docs/features/share-links.md` (page-by-page share flow), `docs/features/pilot-lookup.md`, `docs/features/assets.md` (Item Detail).
 
 ## Feature table
 

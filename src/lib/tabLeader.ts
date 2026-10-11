@@ -1,5 +1,5 @@
 /**
- * Tab Leader election (CONTEXT.md): of every open tab of the app, the one that
+ * Tab Leader election (GLOSSARY.md): of every open tab of the app, the one that
  * runs a piece of origin-wide background work — the Foreground Poller, the
  * background sync sweep — so several open tabs do it once, not once each.
  *

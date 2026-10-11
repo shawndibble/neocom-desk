@@ -1,5 +1,5 @@
 /**
- * Foreground Poller (CONTEXT.md round 20): every `POLL_INTERVAL_MS` while the
+ * Foreground Poller (GLOSSARY.md round 20): every `POLL_INTERVAL_MS` while the
  * app is open and visible, checks each enabled Notification Event's
  * underlying ESI data and fires a browser Notification for whatever the
  * shared `engine/notificationDiffs.ts` registry says changed. The scheduling
@@ -151,7 +151,7 @@ export interface PollDependencies {
    */
   settleFillTimes: (characterId: number, scopes: ReadonlySet<string>) => Promise<void>;
   /**
-   * The Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round 45):
+   * The Scheduled Push upload (issue #358, ADR 0010, GLOSSARY.md round 45):
    * every Character mapped to its whole 72-hour Projection window, built by
    * `projectionRebuild.ts` from the saved baselines — once per poll that
    * updated anything ("every app open and every foreground poll", since
@@ -392,7 +392,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   for (const update of updates) {
     const character = charactersById.get(update.characterId);
     if (!character) continue;
-    // Notification Allow-List (CONTEXT.md round 44): a type outside the
+    // Notification Allow-List (GLOSSARY.md round 44): a type outside the
     // closed list is dropped here, before either channel and before any
     // name-resolution work (renderNotification → the domain's `names`)
     // that recordToFeed/notify would otherwise trigger for it.
@@ -427,7 +427,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     // Feed: one row per actual occurrence, never grouped — each fire's own
     // Occurrence Key (`@/engine/occurrenceKey`) is what lets the Scheduled
     // Push backend, independently observing the same occurrence, agree with
-    // the Foreground Poller on the feed row it belongs to (CONTEXT.md round
+    // the Foreground Poller on the feed row it belongs to (GLOSSARY.md round
     // 44/48). Collapsing several fires into one feed write, the way the
     // browser channel below does, would permanently lose the other
     // occurrences from the feed's history — nothing re-fires an

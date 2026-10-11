@@ -19,7 +19,7 @@
  * zero: `engine/pi/chain.ts` refuses to cost a chain with a missing price, and
  * the Goal Planner's economics turn that refusal into a "not priceable" state. Zero
  * would instead produce a confident wrong margin, which is the one outcome
- * CONTEXT.md round 29's rule exists to prevent.
+ * GLOSSARY.md round 29's rule exists to prevent.
  */
 import { loadMarketSnapshot } from '@/features/industry/marketData';
 import type { TradeHub } from '@/market/hubs';

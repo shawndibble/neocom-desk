@@ -435,7 +435,7 @@ describe('placeRemaps leading current-attributes segment', () => {
 // ---------------------------------------------------------------------------
 // Single-remap (remapCount === 1) fast path.
 //
-// remapCount === 1 is the case CONTEXT.md calls out ("train a leading segment
+// remapCount === 1 is the case GLOSSARY.md calls out ("train a leading segment
 // on current attributes, then remap at the optimizer-chosen point") and the
 // prefilled default in the UI. Only the last DP column is reachable with one
 // allocation, so the answer is an O(R) suffix scan over pair-run edges rather

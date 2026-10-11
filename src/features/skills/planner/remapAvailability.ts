@@ -1,5 +1,5 @@
 /**
- * Remaps Available (CONTEXT.md): bonus remaps (new characters get several)
+ * Remaps Available (GLOSSARY.md): bonus remaps (new characters get several)
  * plus the yearly remap when off cooldown, read from ESI's attributes
  * endpoint. `remapBudget` below is what the optimizer plans against.
  */

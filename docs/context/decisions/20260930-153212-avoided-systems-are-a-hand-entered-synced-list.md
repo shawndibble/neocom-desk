@@ -13,7 +13,7 @@ _Recorded 2026-09-30._
 - **Not a Route Preference.** Route Preference picks a _kind_ of trip
   (prefer highsec, shortest, avoid highsec); Avoided Systems is a set of
   systems. So this persisted control does not trigger the vocabulary
-  unification CONTEXT.md owes before a second persisted _preference_ ships.
+  unification GLOSSARY.md owes before a second persisted _preference_ ships.
 - **Every jump count honours it — a cost, never a wall.** Local-graph routes
   (Courier, route exposure, Jump Range, Route Safety, Thera) price entering an
   avoided system above any security penalty, so a route crosses as few as it

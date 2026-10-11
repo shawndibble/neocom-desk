@@ -39,6 +39,6 @@ _Recorded 2026-09-10._
   Sweep feature while Opportunities' own unrelated "Auto build" picker still
   existed would have meant two different things on the same page answering
   to the same word. `MAX_AUTO_BUILD_DEPTH` (the removed control's UI-sizing
-  constant) is deleted from `autoMakeOrBuy.ts` alongside it; the CONTEXT.md
+  constant) is deleted from `autoMakeOrBuy.ts` alongside it; the GLOSSARY.md
   glossary's own "Auto Build Depth" entry is replaced by the new "Auto
   Build" entry rather than kept as a second, now-stale term.

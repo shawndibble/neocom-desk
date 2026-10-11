@@ -20,7 +20,7 @@ with costs and fees totalled.
   Build Group with one Build Plan per buildable item.
 - **Group Rollup** — the aggregate view: merged materials, summed costs.
 
-"Group" alone is already twice-loaded in `CONTEXT.md` (**Market Group**, and an
+"Group" alone is already twice-loaded in `GLOSSARY.md` (**Market Group**, and an
 item's **Group**), so the bare word is never used unqualified in code or copy.
 
 ## Data model — no new table
@@ -172,7 +172,7 @@ blueprint; its absence from the skipped list is deliberate.)
 ### ME/TE must not default to 0
 
 Ten of the 13 rows are T2 and require an invented BPC — and invention is out of
-scope per `CONTEXT.md`'s Build Plan entry. `newBuildPlan` sets
+scope per `GLOSSARY.md`'s Build Plan entry. `newBuildPlan` sets
 `me: owned?.material_efficiency ?? 0` (`Industry.tsx:122-123`), so unless the
 pilot owns each BPC, **every T2 member quotes at ME0/TE0** while a real
 invented BPC is ME2/TE4. The Group Rollup would overstate material cost on ~77%

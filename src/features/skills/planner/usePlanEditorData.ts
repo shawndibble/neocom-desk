@@ -89,7 +89,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     useState<CachedResult<CharacterAttributes> | null>(null);
   const [attributeBaseline, setAttributeBaseline] = useState<AttributeBaseline | null>(null);
   const [implants, setImplants] = useState<Implants>({});
-  // Remaps Available (CONTEXT.md): live input to `remapBudget`; `newPlan.ts`
+  // Remaps Available (GLOSSARY.md): live input to `remapBudget`; `newPlan.ts`
   // also seeds the offline-fallback `remapCount` from it once, at creation.
   const [remapInfo, setRemapInfo] = useState<RemapAvailability | null>(null);
   const [queueEntries, setQueueEntries] = useState<readonly SkillQueueEntry[]>([]);

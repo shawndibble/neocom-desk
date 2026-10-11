@@ -52,7 +52,7 @@
  * against a budget the caller has already made honest — a built colony passes
  * its Command Center's supply less its own measured link load. A caller with
  * no measured link load has no honest budget to pass and must not invent one;
- * see CONTEXT.md round 56.
+ * see GLOSSARY.md round 56.
  *
  * ## Extra extractors do not yield the measured mean rate (issue #957)
  *
@@ -476,7 +476,7 @@ function scoreRawResource(
   });
 
   // Its export is the only customs boundary extracted-and-sold ore crosses.
-  // A made chain's P0 is billed differently, and CONTEXT.md round 56 records
+  // A made chain's P0 is billed differently, and GLOSSARY.md round 56 records
   // why that asymmetry is inherited rather than fixed here.
   const netPrice = price * (1 - opts.salesTaxPct / 100);
   const marginPerUnit = netPrice - opts.taxRate * CUSTOMS_TAXABLE_VALUE[0];

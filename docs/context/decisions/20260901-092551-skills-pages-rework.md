@@ -89,7 +89,7 @@ _Recorded 2026-09-01._
 - Export (to clipboard / to CSV) collapses into one expandable "Export"
   control instead of two always-visible buttons.
 - **"Optimize remaps" only evaluates the plan's current entry order** — it
-  does not reorder, by design (CONTEXT.md already rules that reorder never
+  does not reorder, by design (GLOSSARY.md already rules that reorder never
   applies silently). Its "no remap improves this plan" result, and the button
   itself, get an explanatory tooltip pointing at "Suggest reorder" for plans
   that aren't yet attribute-grouped. No change to the optimizer's math.

@@ -256,7 +256,7 @@ export async function setCharacterStationPin(
 /**
  * Elevate a station's pin to account-wide: fan out one row per Character
  * currently known on this device — there is no shared account identity to key
- * a single record off (Account has no storage/sync, CONTEXT.md), so each row
+ * a single record off (Account has no storage/sync, GLOSSARY.md), so each row
  * syncs under its own Character's ownerHash instead (parity-plan §5.7).
  *
  * This overwrites every known Character's existing row for the station,
@@ -957,7 +957,7 @@ export async function removeProductionLoss(characterId: number, lossId: string):
 // push window, and the device's own 300-row archive keeps the entry
 // regardless.
 //
-// CONTEXT.md round 45 describes device-detected rows as eventually uploading
+// GLOSSARY.md round 45 describes device-detected rows as eventually uploading
 // through the same callable Scheduled Push Projections use (issue #358),
 // once that callable exists. It doesn't yet (#358 is still open, gated on
 // #356/#357). Until then this uses the same ownerHash two-way sync every

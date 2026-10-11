@@ -20,7 +20,7 @@ import { create } from 'zustand';
 /**
  * Highest priority first. Corp grant leads because it is the rarest and most
  * perishable — it is offered at the moment a Character becomes a Director and
- * (by design, CONTEXT.md round 42) never again for that scope set. Install
+ * (by design, GLOSSARY.md round 42) never again for that scope set. Install
  * comes last: it is the least urgent of the three and is about the device
  * rather than anything the user just did.
  */

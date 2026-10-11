@@ -2,7 +2,7 @@
  * Corp assets, grouped division-first (issue #330), now onto the same
  * virtualized tree engine `/assets` uses (issue #779).
  *
- * Round 41/44 (CONTEXT.md) rejected reusing `engine/assetTree.ts`: division
+ * Round 41/44 (GLOSSARY.md) rejected reusing `engine/assetTree.ts`: division
  * lives in `location_flag` (`CorpSAG1`..`CorpSAG7`), which has no `item_id`
  * to key a URL segment on, and that engine had no grouping level between a
  * station and a container to express it. That reasoning didn't account for
@@ -47,7 +47,7 @@ export type CorpAssetFlagKind = 'officeFolder' | 'corpDeliveries' | 'impounded' 
  * of — a CCP addition, or any flag that is neither `CorpSAGn` nor one of the
  * four named ones. Dropping an unrecognised row instead of bucketing it here
  * would silently vanish assets from the one page whose job is "what does the
- * corporation own" (CONTEXT.md round 44).
+ * corporation own" (GLOSSARY.md round 44).
  */
 export type CorpAssetGroupId = HangarDivisionNumber | CorpAssetFlagKind | 'other';
 
@@ -199,7 +199,7 @@ function withLocationLevels(
  * divisions are always present even when empty ("seven hangar divisions as
  * the top axis" — the issue); the flag groups and `other` are the opposite,
  * appearing only when the corporation actually has something in them
- * (CONTEXT.md round 44). Beneath each root, a container/ship/bay recurses
+ * (GLOSSARY.md round 44). Beneath each root, a container/ship/bay recurses
  * exactly as `/assets`' own tree does — a container placed in a division
  * shows its contents nested inside it, not flag-bucketed separately.
  *

@@ -6,7 +6,7 @@ _Recorded 2026-09-05._
   shows) now renders `hidden md:inline-flex` — it disappears below the `md`
   breakpoint instead of showing on every view's header.** On a phone-width
   header it was competing with the title and the action icons for room that
-  doesn't exist; CONTEXT.md's **Data Age** glossary entry ("Timestamp shown
+  doesn't exist; GLOSSARY.md's **Data Age** glossary entry ("Timestamp shown
   on every API-derived view") still holds in spirit, just not inline on
   mobile — the same information moved to a dedicated place instead of being
   dropped.

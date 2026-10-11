@@ -3,7 +3,7 @@
  * tracked character's personal mining ledger (`GET /characters/{id}/mining/`),
  * grouped into Mining Ledger Entries via `engine/miningTax`. Default scope is
  * every tracked character, not the app's usual single-active-character
- * default (CONTEXT.md) — the point of the feature is not missing an alt's
+ * default (GLOSSARY.md) — the point of the feature is not missing an alt's
  * obligation — so this fans out over `db.characters` the same way
  * `features/character/roster.ts` does, rather than reading the active
  * Character store.

@@ -61,7 +61,7 @@ proposed without checking is usually a feature that shipped months ago.
 
 **Grep the domain concept, never your own word for it.** A past run proposed a
 hub-arbitrage finder on the strength of `grep arbitrage` returning nothing. It
-ships as `hubHaulGaps` in `orderExits.ts`. The app names things in `CONTEXT.md`
+ships as `hubHaulGaps` in `orderExits.ts`. The app names things in `GLOSSARY.md`
 vocabulary, so search that way and read the module list rather than trusting a
 keyword miss.
 
@@ -71,7 +71,7 @@ Establish the real surface before proposing anything:
   route inventory.
 - Modules: `ls src/engine/*/` and `ls src/features/*/` — the calculation
   surface, and the sharpest evidence of what is genuinely covered.
-- `CONTEXT.md` glossary for the vocabulary every later step must speak.
+- `GLOSSARY.md` glossary for the vocabulary every later step must speak.
 
 Done when you can name, for each area you are about to explore, the module that
 covers it or the confirmed absence of one.
@@ -112,7 +112,7 @@ produces weak candidates against a surface this broad; the pipeline question
 produces depth — discovery, scheduling, restocking, routing, competition decay.
 
 Draft **3–4** candidates, then gate each one. Grep by **domain concept**, using
-`CONTEXT.md`'s vocabulary rather than your own phrasing:
+`GLOSSARY.md`'s vocabulary rather than your own phrasing:
 
 1. `docs/context/decisions/` — scope decisions, one file each. Filenames carry
    the summary, so `ls | grep` on a concept usually lands it. A later decision

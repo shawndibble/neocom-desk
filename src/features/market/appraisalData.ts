@@ -124,7 +124,7 @@ export function clearAppraisalCatalogue(): void {
 export interface AppraiseOptions {
   /**
    * Drop the cached prices for these types first, so the refresh button is
-   * not a silent no-op inside the 15-minute TTL. CONTEXT.md's "Data Age"
+   * not a silent no-op inside the 15-minute TTL. GLOSSARY.md's "Data Age"
    * makes the manual button one of the two things allowed to bypass a TTL.
    */
   force?: boolean;

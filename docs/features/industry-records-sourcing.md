@@ -2,7 +2,7 @@
 
 Scope: `src/routes/Industry.tsx` shell + header, Jobs panel, Records tab, BPC Sourcing tab, Opportunities tab (+ All owned, Market-Wide), Blueprint Acquisition link-up. Build Plans tab, plan page, group page, materials, Auto Build, Fit Import, facility defaults, `computeBuildPlan` are covered elsewhere.
 
-Terms per `CONTEXT.md`: **Production Log**, **Production Run**, **BPC Sourcing** (tab label in UI: "BPC Sourcing", i18n `industry.bpcSearchTab`; code comments still say "BPC Search"), **Offer**, **Public Contract Offers snapshot**, **Build Opportunities**, **Market-Wide Build Opportunities**, **Liquidity Floor**, **Order Depth**, **Seeded Build Plan**, **Blueprint Acquisition**.
+Terms per `GLOSSARY.md`: **Production Log**, **Production Run**, **BPC Sourcing** (tab label in UI: "BPC Sourcing", i18n `industry.bpcSearchTab`; code comments still say "BPC Search"), **Offer**, **Public Contract Offers snapshot**, **Build Opportunities**, **Market-Wide Build Opportunities**, **Liquidity Floor**, **Order Depth**, **Seeded Build Plan**, **Blueprint Acquisition**.
 
 Where brief items actually live (code differs from the obvious guess):
 

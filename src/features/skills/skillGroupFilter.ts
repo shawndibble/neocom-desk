@@ -8,7 +8,7 @@
 import { rankedSearch } from '@/lib/rankedSearch';
 import type { SkillGroup } from './skillsCsv';
 
-/** Search starts filtering groups at this many characters (CONTEXT.md; matches the Market Browser). */
+/** Search starts filtering groups at this many characters (GLOSSARY.md; matches the Market Browser). */
 export const SKILL_GROUP_SEARCH_MIN_QUERY_LENGTH = 3;
 
 export interface SkillGroupFilterResult {

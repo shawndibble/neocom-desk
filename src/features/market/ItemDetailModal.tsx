@@ -1,5 +1,5 @@
 /**
- * Item Detail (CONTEXT.md round 6): fitting cost, volume, bonuses and
+ * Item Detail (GLOSSARY.md round 6): fitting cost, volume, bonuses and
  * description for one item — the things a shopper checks before deciding
  * whether a price is worth paying. Read live from ESI on open, the one
  * Market Browser panel that needs the network for its own content — baking

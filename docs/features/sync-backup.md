@@ -1,6 +1,6 @@
 # Sync, backup, delete data
 
-Cross-device sync of Editable Data (Firebase), encrypted device backup, log out, delete all data, and the shell indicators that report sync state. No page of its own: the user surfaces are Settings › Data & storage (`/settings/dataAge`), the rail's status dot, an error note, the Characters page's Remove, and Help › FAQ. Terms per `CONTEXT.md`: Editable Data, Synced Collection, Character, Tab Leader, Notification Feed, Scheduled Push, Projection.
+Cross-device sync of Editable Data (Firebase), encrypted device backup, log out, delete all data, and the shell indicators that report sync state. No page of its own: the user surfaces are Settings › Data & storage (`/settings/dataAge`), the rail's status dot, an error note, the Characters page's Remove, and Help › FAQ. Terms per `GLOSSARY.md`: Editable Data, Synced Collection, Character, Tab Leader, Notification Feed, Scheduled Push, Projection.
 
 ## Feature table
 

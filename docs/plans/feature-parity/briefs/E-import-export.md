@@ -344,7 +344,7 @@ starting (ARCHITECTURE.md flags this dir as "two agents editing concurrently").
   caught by this brief.
 - `<remapping>` element (complex, nested attribute/dogma data) is deliberately out of scope
   — recommend ignoring it entirely on import (this app has its own Remap Marker model,
-  round 2 CONTEXT.md, that doesn't map 1:1 to EVEMon's remap-point serialization). Flag to
+  round 2 GLOSSARY.md, that doesn't map 1:1 to EVEMon's remap-point serialization). Flag to
   orchestrator as an explicit non-goal, not an oversight.
 - Whether importing into an _existing_ plan should offer "merge" vs. "replace" vs. "new
   plan named after the file's `name` attribute" is a product decision, not an engineering

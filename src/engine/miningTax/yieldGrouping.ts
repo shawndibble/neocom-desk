@@ -6,7 +6,7 @@ import type { MiningLedgerRow, OreLine } from './types';
  * unlike `MiningLedgerEntry`, this is not filtered to moon ore, and it is
  * deliberately its own type rather than a reuse of that one: `MiningLedgerEntry`
  * (and `Assignment`/`Payee`) are glossary-bound to the rent/tax feature's very
- * different meaning (CONTEXT.md), and a plain output-stats row is a different
+ * different meaning (GLOSSARY.md), and a plain output-stats row is a different
  * concept even though the two happen to share a shape today.
  */
 export interface MiningYieldEntry {

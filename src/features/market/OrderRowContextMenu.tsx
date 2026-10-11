@@ -1,7 +1,7 @@
 /**
  * Right-click menu for an order row (issue #6): copy the location, copy the
  * price, show the item's info, and filter the book down to this one station
- * — the move CONTEXT.md says the whole tool exists to support. The station
+ * — the move GLOSSARY.md says the whole tool exists to support. The station
  * filter is undone via the banner Market.tsx renders above the tables, not
  * from here. Every row in an order book is for the same selected item, so
  * typeId/itemName come from the caller rather than the row itself.

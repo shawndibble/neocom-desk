@@ -1,7 +1,7 @@
 /**
  * The active Character's own `PilotProfile` (issue #1531's shape): trained
  * skills at Effective Skill Level, plus the active clone's implants — what
- * every open Fitting's stats are worked out under, per CONTEXT.md's
+ * every open Fitting's stats are worked out under, per GLOSSARY.md's
  * **Fitting** entry. The logged-out Fitting Share Code view (#1544) instead uses
  * `buildAllVProfile`; this is only for the normal, Character-present route.
  */

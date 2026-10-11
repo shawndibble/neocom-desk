@@ -2,7 +2,7 @@
 
 Progression group page `/travel` (last in the group). Four tabs (`TRAVEL_TABS`, `src/app/pageTabs.ts`): Route Safety (`/travel/route`, default for bare `/travel`), Thera / Turnur (`/travel/thera`), Pilot Lookup (`/travel/pilot`, see `docs/features/pilot-lookup.md`) and Hauling (`/travel/hauling`, spec in `docs/features/market.md` §4). Settings > Travel edits the same stores as the Route rules panel.
 
-Glossary terms (CONTEXT.md): Route Safety, Route strip, Quiet stretch, Stop, Leg, Hole jump, Ansiblex, Way to fly, Pinned way, Avoided Systems, Route Preference, Travel Settings, Jump Basis, Gank Chokepoint, Current System.
+Glossary terms (GLOSSARY.md): Route Safety, Route strip, Quiet stretch, Stop, Leg, Hole jump, Ansiblex, Way to fly, Pinned way, Avoided Systems, Route Preference, Travel Settings, Jump Basis, Gank Chokepoint, Current System.
 
 Principle in every Route Safety scope decision: conditions, never verdicts (`20260912-172628`). No system, route or way is called safe/unsafe/better. (Pilot Lookup has since gained a Threat verdict, `20261008-181210`; it still has no safe level.) Unknown is never zero.
 
@@ -513,7 +513,7 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 - Route page needs a signed-in Character even though ungated (`Travel.tsx:38`); logged-out access recorded as follow-up (`20260929-234357`).
 - zKillboard failures (429 included) mark rows unavailable with no retry control; the walk only retries on next load (not cached).
 - Gank Chokepoints list is hand-maintained, 7 systems (`chokepoints.ts:26`); no rule derives them.
-- Avoid preview and waypoint set cannot account for the in-game client's own avoidance list (ESI cannot read it; `CONTEXT.md` Avoided Systems).
+- Avoid preview and waypoint set cannot account for the in-game client's own avoidance list (ESI cannot read it; `GLOSSARY.md` Avoided Systems).
 - J-space systems always show N/A for ESI figures; bubble tag only applies in nullsec.
 - `travel.pilotTab` string remains in `src/i18n/locales/en.json` with no code using it (the tab uses `nav.pilotLookup`).
 - Ansiblex list is per device only and needs re-find/paste on every other device (by design: `routeBridgeSettings.ts`).

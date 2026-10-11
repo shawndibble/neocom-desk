@@ -66,11 +66,11 @@ Spinner (first load, until hydrated) -> no active Character: `Navigate('/charact
 - `cloneJumpCooldownHours(level) = max(0, 24 - level)`.
 - `readyAt = lastCloneJumpDate + hours`; `onCooldown = readyAt > loadedAt`; no/unparseable date = ready (`cloneJump.ts`). Skill id 33399, effective level = min(queue-corrected trained, active) (#1236), 0 when unreadable.
 - Chip: warning "Until {date} ({duration} left)" or success "Ready"; time uses the app time-zone setting.
-- `cloneJumpReady` notification uses the same formula, fires once, never for a Character who never jumped (`CONTEXT.md` **Clone Jump Ready**).
+- `cloneJumpReady` notification uses the same formula, fires once, never for a Character who never jumped (`GLOSSARY.md` **Clone Jump Ready**).
 
 ## Decisions
 
-`20261008-085439-clone-training-verdict-counts-attribute-implants-only-and.md` (verdict scope: attribute implants only, jump-when-allowed); `20260922-191151-alpha-clone-state-is-a-per-character-setting.md` (Clone State not on this page); `CONTEXT.md` **Clone State**; ADR 0015 (URL state, unused here).
+`20261008-085439-clone-training-verdict-counts-attribute-implants-only-and.md` (verdict scope: attribute implants only, jump-when-allowed); `20260922-191151-alpha-clone-state-is-a-per-character-setting.md` (Clone State not on this page); `GLOSSARY.md` **Clone State**; ADR 0015 (URL state, unused here).
 
 ## Tests (what they assert)
 

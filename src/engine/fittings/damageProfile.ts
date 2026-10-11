@@ -1,5 +1,5 @@
 /**
- * Damage Profiles (CONTEXT.md): the incoming damage mix a Fitting's EHP is
+ * Damage Profiles (GLOSSARY.md): the incoming damage mix a Fitting's EHP is
  * measured against. Only the ratio matters — the engine normalises the four
  * numbers to sum to 1 — so built-ins and custom profiles alike are stored as
  * plain relative weights. Pure; the synced-setting stores live in

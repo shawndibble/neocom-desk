@@ -1,6 +1,6 @@
 /**
  * Orchestrates the Fittings page (issue #1532): the open Fitting lives in the
- * `?f=` Fitting Share Code (CONTEXT.md **Fitting Share Code**) — every load rewrites it, a
+ * `?f=` Fitting Share Code (GLOSSARY.md **Fitting Share Code**) — every load rewrites it, a
  * reload or a pasted URL decodes it back. Its stats and price come from
  * `useFittingEvaluation`, under the active Character's pilot.
  *

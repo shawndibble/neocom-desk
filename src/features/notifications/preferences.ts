@@ -1,5 +1,5 @@
 /**
- * Notification preferences: device-local by default (CONTEXT.md round 20,
+ * Notification preferences: device-local by default (GLOSSARY.md round 20,
  * same category as font scale / Market's Location Mode), since the browser
  * permission the master switch and browser channel eventually gate is itself
  * per-device. One master switch gates everything; below it, every
@@ -8,7 +8,7 @@
  * `eventSelection.ts`).
  *
  * The **feed** half of those per-Character toggles, plus the structure-fuel
- * and corp-wallet thresholds, are the exception (CONTEXT.md round 44/45,
+ * and corp-wallet thresholds, are the exception (GLOSSARY.md round 44/45,
  * issue #363): nothing about the feed is device-gated, so those sync —
  * `hydrateNotificationPreferences` below splices the synced slice in on top
  * of this store's own local row. See `syncedPreferences.ts`.

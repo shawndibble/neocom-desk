@@ -140,7 +140,7 @@ export function readMailLabelsForCharacters(
   return readCachedRows<MailLabels>(characterIds, KEYS.labels);
 }
 
-/** System + Custom Labels with unread counts — the tab bar's four buckets (CONTEXT.md round 18) and the custom-label filter chips (round 22). ESI or cache. */
+/** System + Custom Labels with unread counts — the tab bar's four buckets (GLOSSARY.md round 18) and the custom-label filter chips (round 22). ESI or cache. */
 export function loadMailLabels(characterId: number): Promise<StatusResult<MailLabels>> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterMailLabels(characterId, options)

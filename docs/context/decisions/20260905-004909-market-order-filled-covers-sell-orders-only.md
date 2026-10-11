@@ -3,7 +3,7 @@
 _Recorded 2026-09-05._
 
 - **`marketOrderFilled` fires for a filled sell order and never for a filled
-  buy order.** This reverses CONTEXT.md round 20, which made one event cover
+  buy order.** This reverses GLOSSARY.md round 20, which made one event cover
   both directions on the grounds that a completed buy and a completed sell are
   the same thing happening. They are the same thing to the diff and a different
   thing to the person being told. A filled sell order is news: someone bought

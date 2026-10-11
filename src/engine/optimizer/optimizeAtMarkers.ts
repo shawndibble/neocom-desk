@@ -1,5 +1,5 @@
 /**
- * "Optimize at remap points" (CONTEXT.md): the user places Remap Markers in
+ * "Optimize at remap points" (GLOSSARY.md): the user places Remap Markers in
  * the plan; this computes the best attribute spread for each marker-delimited
  * segment. Unlike placeRemaps, the boundaries are user-chosen, not searched:
  * segment 0 (before the first marker) trains on the CURRENT attributes at no

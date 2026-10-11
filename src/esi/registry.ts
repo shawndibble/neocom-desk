@@ -39,7 +39,7 @@ export type ScopeRequirement = EsiScopeName | PublicAccess;
  *
  * `corp` exists because the corp section needs ten scopes that ~95% of users
  * can never use — CCP role-gates the endpoints server-side, so a line member
- * granting them gains nothing but a longer consent screen (CONTEXT.md round
+ * granting them gains nothing but a longer consent screen (GLOSSARY.md round
  * 35). `structureMarkets` (issue #538) exists because most Characters never
  * list an order inside a player structure, so `esi-markets.structure_markets.v1`
  * would cost everyone a consent-screen line for a check almost nobody's

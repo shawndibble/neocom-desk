@@ -1,7 +1,7 @@
 /**
  * The rows of a **Stock List**: each **Stock Target** against what the pilot
  * has listed at the market, its **Shortfall**, how much of that the hangar there
- * covers, the cost to source the rest, and a status word (CONTEXT.md).
+ * covers, the cost to source the rest, and a status word (GLOSSARY.md).
  *
  * Pure: quantities and prices are read by the feature layer and passed
  * in, so the same rows drive the Stock tab, the Overview card and the

@@ -1,6 +1,6 @@
 /**
  * Turn a parsed EFT fit into the Build Plans a **Build Group** should hold
- * (issue #626, "Fit Import" in CONTEXT.md).
+ * (issue #626, "Fit Import" in GLOSSARY.md).
  *
  * The counterpart of `fitToSkills.ts`: same input, same injected-lookup shape,
  * and the same promise that no *input* can make it throw — a malformed fit,

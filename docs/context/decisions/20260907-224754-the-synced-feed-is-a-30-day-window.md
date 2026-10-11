@@ -3,7 +3,7 @@
 _Recorded 2026-09-07 · issue #582._
 
 - **The remote `notificationFeed` collection is a 30-day reconciliation window,
-  not a second archive.** CONTEXT.md round 45 said the Notification Feed "never
+  not a second archive.** GLOSSARY.md round 45 said the Notification Feed "never
   deletes" — dismissal is a flag, not a tombstone — and the code took that to
   mean the remote collection too, so nothing but `characterPurge` ever removed a
   row and it grew for the life of the account. That claim is now scoped to the

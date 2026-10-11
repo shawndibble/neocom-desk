@@ -2,7 +2,7 @@
 
 _Recorded 2026-09-05._
 
-- **The Custom Label filter chip row (CONTEXT.md's "Custom Label" glossary
+- **The Custom Label filter chip row (GLOSSARY.md's "Custom Label" glossary
   entry: "surfaced as a filter chip row beneath the tab strip in round 22")
   is removed from Mail.** The System Label Tabs strip (All/Inbox/Corp/
   Alliance/Sent) is unaffected — this only reverses round 22's own filter

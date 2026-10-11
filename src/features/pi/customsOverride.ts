@@ -1,6 +1,6 @@
 /**
  * The customs rate a pilot sets for a system themselves — Editable Data, so it
- * syncs across their devices (CONTEXT.md's "Editable Data" glossary entry).
+ * syncs across their devices (GLOSSARY.md's "Editable Data" glossary entry).
  *
  * ## Why the Advisor needs one at all
  *

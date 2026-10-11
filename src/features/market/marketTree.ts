@@ -7,7 +7,7 @@ import { rankedSearch } from '@/lib/rankedSearch';
 import { fuzzySearch } from '@/lib/fuzzySearch';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
-/** Search starts filtering the tree at this many characters (CONTEXT.md). */
+/** Search starts filtering the tree at this many characters (GLOSSARY.md). */
 export const MARKET_TREE_MIN_QUERY_LENGTH = 3;
 
 /** Cap on matched items shown, so a broad query doesn't dump the whole catalogue into the tree. */

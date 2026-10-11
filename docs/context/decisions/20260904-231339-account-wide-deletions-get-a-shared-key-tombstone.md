@@ -7,7 +7,7 @@ _Recorded 2026-09-04 · issue #436._
   `locationId` for Station Pins) rather than `${characterId}:${locationId}`.**
   Round 7's fan-out writes one row _and one tombstone_ per Character known at
   write/delete time (there is no shared account identity to key a single
-  remote record off — CONTEXT.md, parity plan §5.7). A Character added later
+  remote record off — GLOSSARY.md, parity plan §5.7). A Character added later
   is in neither list, so `accountWideBackfill.ts` can copy a stale row onto it
   under an id (`${newCharacterId}:${locationId}`) no tombstone names, and
   `merge.ts`'s `l && !r` pushes it as a brand-new remote doc nothing can
@@ -37,7 +37,7 @@ _Recorded 2026-09-04 · issue #436._
 - **A top-level, ownership-free Firestore collection keyed on the bare shared
   key was considered and rejected.** It would need `request.auth != null`
   writes with no ownerHash scoping (Account has no server-side identity to
-  scope by — CONTEXT.md), which means every real, unrelated player who has
+  scope by — GLOSSARY.md), which means every real, unrelated player who has
   ever pinned the same popular station (Jita 4-4 being the extreme case)
   bumps the _same_ document's `deletedAt`. Steady state for a popular station
   is that its tombstone is always newer than any legitimate pin's `updatedAt`,

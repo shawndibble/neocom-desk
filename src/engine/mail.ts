@@ -1,5 +1,5 @@
 /**
- * Buckets mail headers into System Label tabs (CONTEXT.md round 18). ESI
+ * Buckets mail headers into System Label tabs (GLOSSARY.md round 18). ESI
  * documents no fixed `label_id` numbers for the four built-in labels, so
  * categorization goes by the `name` each `/mail/labels/` entry already
  * carries ("Inbox"/"Sent"/"Corp"/"Alliance") rather than a guessed id — a
@@ -59,7 +59,7 @@ export function resolveMailTab(
 
 /**
  * Per-tab unread badge counts, straight from each System Label's own
- * `unread_count` (CONTEXT.md: "used as-is, not computed client-side") — the
+ * `unread_count` (GLOSSARY.md: "used as-is, not computed client-side") — the
  * All tab's count is `total_unread_count` on the labels response itself, not
  * a sum of these, since the two can differ once Custom Labels exist.
  */
@@ -107,7 +107,7 @@ interface MailSearchable {
 
 /**
  * Subject/sender substring match, case-insensitively (issue #416, reversing
- * CONTEXT.md round 18's "no subject/sender search" — see round 55: "load
+ * GLOSSARY.md round 18's "no subject/sender search" — see round 55: "load
  * more" (round 22) plus this ticket's own display cap mean a bucket is no
  * longer necessarily small). A blank query matches everything, so callers can
  * pass the raw (possibly-empty) search box value without a separate branch.

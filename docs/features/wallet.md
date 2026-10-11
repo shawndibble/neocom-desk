@@ -1,6 +1,6 @@
 # Wallet — feature inventory
 
-Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed page: `WALLET_TABS` (`src/app/pageTabs.ts:90-94`). Read-only, cached for offline (Dexie). Terms per `CONTEXT.md`: **Character**, **Data Age**, **EverMarks**, **Loyalty Points**.
+Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed page: `WALLET_TABS` (`src/app/pageTabs.ts:90-94`). Read-only, cached for offline (Dexie). Terms per `GLOSSARY.md`: **Character**, **Data Age**, **EverMarks**, **Loyalty Points**.
 
 ## Summary
 
@@ -219,7 +219,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 | Journal filter / sort            | `?journal.q`, `journal.refType`, `journal.start`, `journal.end`, `journal.sort`; balance `balance.sort`; loyalty `loyalty.sort` | no                                    |
 | Journal visible columns          | device-local `walletJournalVisibleColumns`, shared with corp journal                                                            | no (view prefs are not Editable Data) |
 | Highlighted row                  | `?highlight=<journal id>`                                                                                                       | no                                    |
-| Balance, journal, fills, loyalty | Dexie ESI cache per Character (API-Derived Data, never synced through the backend, `CONTEXT.md` glossary)                       | no                                    |
+| Balance, journal, fills, loyalty | Dexie ESI cache per Character (API-Derived Data, never synced through the backend, `GLOSSARY.md` glossary)                      | no                                    |
 | Mining-tax links                 | Dexie `miningTaxAssignments`                                                                                                    | synced elsewhere (Mining Tax)         |
 
 ## Decisions (why)

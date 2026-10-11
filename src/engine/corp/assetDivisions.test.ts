@@ -65,7 +65,7 @@ describe('buildCorpAssetTree', () => {
 
   /**
    * The four special flags are not part of the seven-wide division axis
-   * (CONTEXT.md round 44) — they only appear as sibling groups when the
+   * (GLOSSARY.md round 44) — they only appear as sibling groups when the
    * corporation actually has something in them, and in a fixed order after
    * the seven divisions. `officeFolder` never appears at all: an office is a
    * pass-through, so a childless office row (as here) simply disappears

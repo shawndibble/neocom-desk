@@ -1,5 +1,5 @@
 /**
- * Global Market Region routing (CONTEXT.md round 12): a handful of items
+ * Global Market Region routing (GLOSSARY.md round 12): a handful of items
  * (PLEX today) trade in a region of their own rather than the normal
  * regional books. Pure — `globalMarkets` is `src/sde/loadMarketSde.ts`'s
  * `GlobalMarketEntry[]` reshaped into a typeId lookup by the caller.

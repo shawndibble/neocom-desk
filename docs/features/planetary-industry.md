@@ -2,7 +2,7 @@
 
 Route `/planetary-industry` (`src/routes/PlanetaryIndustry.tsx`). Nav group Progression, scope-gated entry, mobile tab (`src/app/navDestinations.ts:174`). Keyboard `P` goes here (`src/lib/shortcuts.ts:189`). Three peer tabs as path segments (`src/app/pageTabs.ts:72`): `/plan` (default, first tab), `/map`, `/colonies`. Tab = path; all per-tab state is scoped query params on top.
 
-Sources read: `CONTEXT.md` (Goal Plan, Baseline, Lift, Quick win, Bigger chain, Haul between planets, Sell market, Reset Run, Stopped, Throughput, Exportable Rate, Local Draw), `docs/ARCHITECTURE.md` (§ features/pi, route row), `docs/design/pi-tabs/{README,GRAMMAR,DESIGN-RULES,HANDOFF}.md`, `docs/research/pi-cpu-power-mechanics.md`, ADRs 0005 / 0011 / 0012, ~45 decision files in `docs/context/decisions/` (PI-named). The Advisor tab is retired (decision `20261005-183720-retire-the-pi-advisor-accepted-feature-drops`); ADRs 0011/0012 survive as the engine (`pinBudget`, `network`, `stopTier`) behind Plan/Map/Colonies figures.
+Sources read: `GLOSSARY.md` (Goal Plan, Baseline, Lift, Quick win, Bigger chain, Haul between planets, Sell market, Reset Run, Stopped, Throughput, Exportable Rate, Local Draw), `docs/ARCHITECTURE.md` (§ features/pi, route row), `docs/design/pi-tabs/{README,GRAMMAR,DESIGN-RULES,HANDOFF}.md`, `docs/research/pi-cpu-power-mechanics.md`, ADRs 0005 / 0011 / 0012, ~45 decision files in `docs/context/decisions/` (PI-named). The Advisor tab is retired (decision `20261005-183720-retire-the-pi-advisor-accepted-feature-drops`); ADRs 0011/0012 survive as the engine (`pinBudget`, `network`, `stopTier`) behind Plan/Map/Colonies figures.
 
 ## Summary table
 
@@ -51,7 +51,7 @@ PI settings form fields (`src/features/settings/PiSettingsForm.tsx`): Sell at (S
 ## 2. Header strip (`src/features/pi/PiHeaderStrip.tsx`)
 
 - StatChips: Home (system with most colonies; tie goes to lower id, `sellRoute.homeSystemId`) with security colour + number; with no colonies it reads "Location" from the character's current system (`loadCharacterSolarSystemId`); colony count ("—" when unknown); EVE clock (Colonies only, `useNow`).
-- "Sell at" Select: 4 trade hubs (`TRADE_HUBS`) + "Corp buyback". With buyback a second Select picks the % of the hub price. One sell market feeds Plan, Map, Colonies (`CONTEXT.md` Sell market).
+- "Sell at" Select: 4 trade hubs (`TRADE_HUBS`) + "Corp buyback". With buyback a second Select picks the % of the hub price. One sell market feeds Plan, Map, Colonies (`GLOSSARY.md` Sell market).
 - Route chip: jumps to the sell hub plus lowsec/nullsec jump counts (`routeExposure` on the pilot's jump basis); with buyback it reads "Drop-off" instead (no route; collected at home).
 - Nearest-hub nudge (`role="status"`): until the pilot picks or dismisses a hub (`hubChosen`), checks all hubs by gate route and offers "Use <hub>" / "Keep <hub>" buttons (decision `20261005-235706-pi-hubchosen-flag-gates-nearest-hub-suggestion`).
 - "PI settings" text button opens `PageSettingsModal`.

@@ -231,7 +231,7 @@ git grep -n -E "\[#[0-9a-fA-F]{3,8}\]|\[rgba?\(|['\"]#[0-9a-fA-F]{3,8}['\"]|['\"
 
 ## G. Labels and wording
 
-Canonical: `CONTEXT.md`'s glossary for concept names. For action verbs, the
+Canonical: `GLOSSARY.md`'s glossary for concept names. For action verbs, the
 majority wording in `src/i18n/locales/en.json`.
 
 Look for:

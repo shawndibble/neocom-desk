@@ -1,6 +1,6 @@
 // Removing a Character from the app (parity plan §5.7 item 3): local Dexie
 // rows for it are deleted (per each synced collection's `onRemoval` rule in
-// sync/syncedCollections.ts). Its remote Editable Data (CONTEXT.md) is left
+// sync/syncedCollections.ts). Its remote Editable Data (GLOSSARY.md) is left
 // alone: the `purgeStaleAccounts` Cloud Function deletes it once no device
 // has synced the Character for 90 days. Adding the Character back before then
 // pulls it all again — the pull cursors go with the local rows.

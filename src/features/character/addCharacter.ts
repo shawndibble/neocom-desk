@@ -1,4 +1,4 @@
-// Adding a Character to the app (issue #432, CONTEXT.md round 52) — the
+// Adding a Character to the app (issue #432, GLOSSARY.md round 52) — the
 // counterpart to removeCharacter.ts, and it lives here for the same reason:
 // `src/sync` already imports `@/auth/session` (syncAuth.ts, deviceRegistration
 // .ts), so `auth/session.ts` cannot import `@/sync` back without a cycle. The

@@ -2,7 +2,7 @@
  * Make-or-buy for a single material of a build plan: is producing this one
  * material yourself cheaper than acquiring it the way the plan currently
  * assumes? One level deep only — the recipe's own inputs are priced at the
- * hub, never recursively costed (CONTEXT.md round 29).
+ * hub, never recursively costed (GLOSSARY.md round 29).
  *
  * Deliberately not `buildVsBuy`'s `recommendation`, which asks a different
  * question: that one is "build this to sell", so it nets sales tax and broker

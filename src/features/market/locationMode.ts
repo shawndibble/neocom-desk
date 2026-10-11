@@ -1,5 +1,5 @@
 /**
- * Market Browser's Location Mode: Region or Trade Hub (CONTEXT.md round 9),
+ * Market Browser's Location Mode: Region or Trade Hub (GLOSSARY.md round 9),
  * persisted under the plain (non-`sync.`-prefixed) key 'marketLocationMode' —
  * a device-local view preference like `hub.ts`'s Trade Hub setting, never
  * synced.

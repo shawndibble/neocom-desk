@@ -310,7 +310,7 @@ describe('toggleEveTypeChannel', () => {
 });
 
 describe('NOTIFICATION_FAMILIES / eveTypesByFamily', () => {
-  it('holds the six families named in CONTEXT.md round 44', () => {
+  it('holds the six families named in GLOSSARY.md round 44', () => {
     expect(NOTIFICATION_FAMILIES).toEqual([
       'structures',
       'war',

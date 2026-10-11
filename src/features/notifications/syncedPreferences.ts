@@ -1,5 +1,5 @@
 /**
- * The synced slice of Notification Preferences (issue #363, CONTEXT.md round
+ * The synced slice of Notification Preferences (issue #363, GLOSSARY.md round
  * 44/45): the **feed** half of every per-Character event/eve-type toggle, and
  * every threshold (structure fuel, corp wallet, personal wallet balance),
  * cross-device. Everything else in

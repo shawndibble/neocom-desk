@@ -391,7 +391,7 @@ function MakeOrBuyTooltip({
 }
 
 /**
- * The row's make-or-buy verdict (CONTEXT.md round 29). Distinct glyphs
+ * The row's make-or-buy verdict (GLOSSARY.md round 29). Distinct glyphs
  * rather than one glyph in several tones: the verdict has to survive greyscale
  * and a screen reader (docs/DESIGN.md §7), so the shape carries it and the
  * label spells it out with both prices. Deliberately not a control — it has

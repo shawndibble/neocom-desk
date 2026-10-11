@@ -3,7 +3,7 @@
  * own hub/facility/security/build-system, plus the group's own snapshot of
  * what was applied. Two steps, one Save/Apply each — editing the form fields
  * writes nothing until Apply, matching Build Location's own "Override" fold
- * (CONTEXT.md).
+ * (GLOSSARY.md).
  *
  * The fields move as one bundle: there is no per-field apply, the same
  * rule `facilityDefaults.ts` documents for its packed record ("splitting them

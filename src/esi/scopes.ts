@@ -1,5 +1,5 @@
 /**
- * ESI OAuth scopes for Neocom Desk v1. Reads by design (see CONTEXT.md), with
+ * ESI OAuth scopes for Neocom Desk v1. Reads by design (see GLOSSARY.md), with
  * five narrow, user-triggered writes: `esi-mail.organize_mail.v1` marks a
  * mail read on ESI when it's opened here, `esi-calendar.respond_calendar_events.v1`
  * sends an RSVP, `esi-mail.send_mail.v1` sends a reply or forward, and

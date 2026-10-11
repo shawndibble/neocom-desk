@@ -141,7 +141,7 @@ const BLUEPRINT_BADGE: Record<BlueprintKind, { label: string; name: string; clas
 };
 
 /**
- * Marks a blueprint stack as a **BPO** or a **BPC** (CONTEXT.md) — the one
+ * Marks a blueprint stack as a **BPO** or a **BPC** (GLOSSARY.md) — the one
  * distinction the item name can't carry, since a copy shares its original's
  * typeID and name. The written label, not the colour, is the signal
  * (DESIGN.md §7); a screen reader hears the full name instead of the letters.

@@ -1,6 +1,6 @@
 /**
  * Whether a stored fit still works in today's game (issue #2485): an
- * **Out-of-date fit** (CONTEXT.md) names an item or hull the app's current
+ * **Out-of-date fit** (GLOSSARY.md) names an item or hull the app's current
  * game data no longer has, or puts more modules in a rack than the hull now
  * has slots. Read off the EFT loader's own result (`eftLoader.ts`), so a game
  * update is picked up as soon as the app's game data is.

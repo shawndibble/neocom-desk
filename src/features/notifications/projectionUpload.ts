@@ -1,5 +1,5 @@
 /**
- * Scheduled Push upload wiring (issue #358, ADR 0010, CONTEXT.md round 45):
+ * Scheduled Push upload wiring (issue #358, ADR 0010, GLOSSARY.md round 45):
  * the live boundary between the Foreground Poller's freshly computed
  * Projection rows (`foregroundPoller.ts`) and the `registerDevice` callable
  * (`@/sync/deviceRegistration`). Best-effort and silent by design, mirroring

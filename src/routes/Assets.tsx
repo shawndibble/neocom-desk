@@ -836,7 +836,7 @@ export function Assets() {
   const activeCrossCharacterData =
     otherCharacterIds.length > 0 && searchActive ? crossCharacterData : null;
 
-  // Quickbar (CONTEXT.md), the blueprint catalog for Build Plan, and Show
+  // Quickbar (GLOSSARY.md), the blueprint catalog for Build Plan, and Show
   // info's modal — the page's shared Item Actions (issue #2041), loaded
   // lazily on the first menu open (same trade-off as the Market Browser: it
   // pulls the full SDE types.json and most page visits never open a menu).
@@ -1304,7 +1304,7 @@ export function Assets() {
   }, [activeCharacterId]);
 
   // Locations with a row in the virtualizer's current visible range — the
-  // "currently visible" half of CONTEXT.md round 14's "only for pinned and
+  // "currently visible" half of GLOSSARY.md round 14's "only for pinned and
   // currently visible/expanded stations". Keyed on the range's indices, not
   // `getVirtualItems()`'s array (a fresh reference every render), so this
   // only recomputes when the visible window actually moves.
@@ -1321,7 +1321,7 @@ export function Assets() {
   }, [rangeStart, rangeEnd, rows]);
 
   // Lazy, scoped to pinned locations, locations in the virtualizer's visible
-  // range, and the location currently drilled into (CONTEXT.md round 14:
+  // range, and the location currently drilled into (GLOSSARY.md round 14:
   // "only for pinned and currently visible/expanded stations") — bounds the
   // route-call fan-out to what's pinned or actually on screen, rather than
   // every station a character owns.
@@ -1377,7 +1377,7 @@ export function Assets() {
   // Security status (issue #148) piggybacks on `stationSystemIds`/
   // `jumpsAwayScopedStations` above rather than resolving its own scoped
   // station list: same station set, same reason to bound the fan-out
-  // (CONTEXT.md round 14), keyed by system id (not station id) since two
+  // (GLOSSARY.md round 14), keyed by system id (not station id) since two
   // stations can share a system and only need the lookup once.
   const [securityBySystemId, setSecurityBySystemId] = useState<ReadonlyMap<number, number | null>>(
     new Map()
@@ -1517,7 +1517,7 @@ export function Assets() {
 
   // Bulk actions (issue #90): the three actions the item context menu already
   // offers per row, applied to every selected item_id at once. Quickbar and
-  // Compare have different lifetimes (CONTEXT.md) — bulk-adding to Quickbar
+  // Compare have different lifetimes (GLOSSARY.md) — bulk-adding to Quickbar
   // schedules a sync, like a single row's Add to Quickbar; bulk-adding to
   // Compare does not, matching `ItemContextMenu`'s own single-item path.
   function handleBulkAddToQuickbar() {

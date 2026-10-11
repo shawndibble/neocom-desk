@@ -1,5 +1,5 @@
 /**
- * What a **Build Group** totals to (issue #626, "Group Rollup" in CONTEXT.md):
+ * What a **Build Group** totals to (issue #626, "Group Rollup" in GLOSSARY.md):
  * every member's materials merged by type, and the costs summed.
  *
  * Pure, like the rest of `src/engine`. The caller hands in each member's

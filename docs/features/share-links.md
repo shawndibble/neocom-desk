@@ -29,7 +29,7 @@ See also: `entities-share.md` (another author; key format, 7-day TTL and in-memo
 - **Device and cadence:** n/a as a page. Moment of use: the sender right after building an appraisal, fit, scan or survey, on the desktop, the app's primary device (owner, 2026-10-11); the recipient opening a pasted link, possibly on a phone (ShareShell wraps its header on a phone).
 - **Above the fold:** recipient view: brand and the one way in, title, expiry and key figures (stat chips), then the content.
 - **Not for:** Show Info on a name (`entities-share.md`); a permanent fit link (that is a Fitting Share Code, not a Share Link).
-- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); decisions `20261002-125432`, `20261009-113400`; CONTEXT.md Share Link (four types); `src/features/share/shareStore.ts:27` (`appraisal`, `fitting`, `dscan`, `survey`); #2943, #3225, #3497.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); decisions `20261002-125432`, `20261009-113400`; GLOSSARY.md Share Link (four types); `src/features/share/shareStore.ts:27` (`appraisal`, `fitting`, `dscan`, `survey`); #2943, #3225, #3497.
 - **Unconfirmed:** where recipients open links (Discord, in-game chat, phone or desk).
 
 ### Mobbin brief
@@ -96,7 +96,7 @@ No ESI call, no scope. Creating requires `isSyncConfigured()`. States: loading s
 3. How is expiry enforced? Rules, client re-check, TTL policy (lags ~1 day).
 4. How are duplicates avoided? In-session reuse by content unless < 24 h left (`shareStore.ts`).
 5. Why copy inside the click? The client-minted id lets a reused link copy with no await; failures fall to a manual-copy row.
-6. Appraisal vs fitting for a signed-in visitor? Appraisal shows frozen prices; a fitting opens in the editor under their pilot (CONTEXT.md Fitting Share Code).
+6. Appraisal vs fitting for a signed-in visitor? Appraisal shows frozen prices; a fitting opens in the editor under their pilot (GLOSSARY.md Fitting Share Code).
 7. Limits? 1000 items, 20100-char code, 7 d, create-only.
 8. Signed-out "Open Neocom Desk"? `/login` with the target stashed.
 9. Newer doc type? `unsupported`, "needs a newer Neocom Desk".

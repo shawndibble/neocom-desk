@@ -23,7 +23,7 @@ import { useStickyClearance } from '@/lib/useStickyClearance';
  * (issue #1788, `firstScreen.ts`) so it never competes with the very first
  * thing a new player looks at.
  *
- * Shown once ever per device (Install Prompt precedent, CONTEXT.md round 20):
+ * Shown once ever per device (Install Prompt precedent, GLOSSARY.md round 20):
  * Enable makes the single real `Notification.requestPermission()` call, "Not
  * now" makes none at all, and either answer suppresses it permanently — a
  * denied grant can never be re-requested from JS anyway, and Settings owns the

@@ -29,7 +29,7 @@ offeredScopes: Record<number, readonly Scope[]> }`. Round 37's "offered once
   since both buttons funnel through the same record-the-offer path.
 - **An old flat `{ characterIds: number[] }` record parses as nothing
   recorded, not as a migration target.** This is a `useLocalSetting`-backed
-  value — device-local, never synced (CONTEXT.md) — so there is no migration
+  value — device-local, never synced (GLOSSARY.md) — so there is no migration
   concern beyond tolerant parsing. The old shape has no scope set to recover,
   and the correct fallback is exactly what the empty-record default gives:
   every Character it named is re-offered once, which is the fix for the

@@ -110,7 +110,7 @@ import {
   useVisibleMarketOrderColumns,
 } from '@/features/market/marketOrderColumns';
 
-/** Rows shown per side before "show all" (CONTEXT.md). */
+/** Rows shown per side before "show all" (GLOSSARY.md). */
 const ROW_CAP = 15;
 
 /**
@@ -283,13 +283,13 @@ function MarketGroupTree({
 /**
  * Market Browser: find an item (search + Market Group tree, left) and see its
  * live Order Book at the current Location Mode's region (right), read from
- * ESI (ADR 0003). Location Mode (CONTEXT.md round 9) is either Trade Hub
+ * ESI (ADR 0003). Location Mode (GLOSSARY.md round 9) is either Trade Hub
  * (that hub's region, filtered to its station) or Region (the whole region,
  * every station) — a device-local preference like the hub setting it
  * replaces as the sole location control. A globally-traded item (PLEX today)
  * overrides either mode: its own Global Market Region always wins (round
  * 12). The catalogue (groups/types/systems/stations/regions) is lazy-loaded,
- * not precached (CONTEXT.md round 10) — most installs never open /market.
+ * not precached (GLOSSARY.md round 10) — most installs never open /market.
  */
 /**
  * The Market view's tab panel. On a phone the view picker replaces the strip,
@@ -385,7 +385,7 @@ export function Market() {
   const addToCompare = useCompareSet((state) => state.add);
   const removeFromCompare = useCompareSet((state) => state.remove);
 
-  // The Quickbar (CONTEXT.md): Editable Data, one record per character. Reads
+  // The Quickbar (GLOSSARY.md): Editable Data, one record per character. Reads
   // as [] rather than requiring an active character — Market Browser itself
   // needs none — so Add to Quickbar is disabled with nobody active.
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -449,7 +449,7 @@ export function Market() {
     setCompareUndo(null);
   }
 
-  // Narrow screens show one column at a time (CONTEXT.md round 8); matches
+  // Narrow screens show one column at a time (GLOSSARY.md round 8); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width.
   const isDesktop = useIsDesktop();

@@ -74,7 +74,7 @@ _Recorded 2026-09-06._
   panel says the set can reach it, the card says to build it and carries the
   routes and the ISK. The pilot reads the card.
 
-- **Pin kinds use `CONTEXT.md`'s glossary terms exactly** — Basic Industry
+- **Pin kinds use `GLOSSARY.md`'s glossary terms exactly** — Basic Industry
   Facility, Advanced Industry Facility, High-Tech Production Plant, Storage
   Facility, Launchpad, Extractor Control Unit. The UI had been saying "basic
   factory" and "high-tech plant", which are not what the client calls them.

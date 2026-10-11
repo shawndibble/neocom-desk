@@ -1,5 +1,5 @@
 /**
- * Moon Mining Tax ledger domain types (issue #523, CONTEXT.md). Pure shapes
+ * Moon Mining Tax ledger domain types (issue #523, GLOSSARY.md). Pure shapes
  * only — no fetch/DOM/Dexie (CLAUDE.md).
  */
 
@@ -19,7 +19,7 @@ export interface OreLine {
 }
 
 /**
- * One derived Mining Ledger Entry (CONTEXT.md): every moon-goo row ESI
+ * One derived Mining Ledger Entry (GLOSSARY.md): every moon-goo row ESI
  * reports for one (character, EVE/UTC date, solar system), summed per ore
  * type. Not stored as its own record — re-derived from the ESI ledger on
  * every refresh (decision doc, "Data model").

@@ -1,5 +1,5 @@
 /**
- * One outcome for every **Load** (CONTEXT.md): EFT text, a DNA string or
+ * One outcome for every **Load** (GLOSSARY.md): EFT text, a DNA string or
  * chat link, an eveship.fit link, an EVE Workbench fit link, a killmail, a Loaded fittings-file entry
  * and an In-game Fitting all end as either a Fitting plus what it couldn't
  * place, or a failure. A caller holds the last outcome whole, so a new Load

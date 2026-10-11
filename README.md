@@ -73,7 +73,7 @@ Live: https://neocomdesk.com
   item/skill/blueprint catalog (SDE) is snapshotted at build time into
   slim JSON (`npm run sde:build`) — no SDE calls at runtime.
 
-See `CONTEXT.md` (glossary), `docs/context/decisions/` (scope decisions),
+See `GLOSSARY.md` (glossary), `docs/context/decisions/` (scope decisions),
 `docs/ARCHITECTURE.md` (module map, data flows, feature inventory),
 `docs/DESIGN.md` (design system), `docs/adr/` (architecture decisions).
 

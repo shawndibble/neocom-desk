@@ -8,7 +8,7 @@
  *
  * Rendered only when the Character holds `canReadWallet` (`Corp.tsx`). A
  * Station Manager who is not an Accountant simply has no rail: no error, no
- * empty state, nothing (CONTEXT.md round 35, AC3).
+ * empty state, nothing (GLOSSARY.md round 35, AC3).
  */
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';

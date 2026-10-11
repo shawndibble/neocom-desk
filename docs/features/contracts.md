@@ -1,6 +1,6 @@
 # Contracts — feature inventory
 
-Route `/contracts` (`src/routes/Contracts.tsx`). Economy nav group, mobile tab (`src/app/navDestinations.ts:207`). Tabbed (`CONTRACTS_TABS`, `src/app/pageTabs.ts:103-110`): three tabs, one page. Terms per `CONTEXT.md`: **Contract Search**, **Public Contract Offers snapshot**, **Public Courier Contracts snapshot**, **Published Snapshot**, **Offer**, **Going Rate**, **Jump Basis**, **Jump Range**, **Multi-Type Contract**.
+Route `/contracts` (`src/routes/Contracts.tsx`). Economy nav group, mobile tab (`src/app/navDestinations.ts:207`). Tabbed (`CONTRACTS_TABS`, `src/app/pageTabs.ts:103-110`): three tabs, one page. Terms per `GLOSSARY.md`: **Contract Search**, **Public Contract Offers snapshot**, **Public Courier Contracts snapshot**, **Published Snapshot**, **Offer**, **Going Rate**, **Jump Basis**, **Jump Range**, **Multi-Type Contract**.
 
 User goal by tab:
 

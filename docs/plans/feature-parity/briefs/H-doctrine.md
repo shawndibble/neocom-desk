@@ -15,13 +15,13 @@ its premise. Sync is scoped **per character**, not per user/account
 only the _active_ character is ever synced (the `triggerSync` effect in
 `src/app/App.tsx`). A Doctrine is inherently not per-character, so "which
 character owns this record" is the load-bearing design decision, and cross-**user**
-(corp-mate) sharing is out of scope by CONTEXT.md's own rule.
+(corp-mate) sharing is out of scope by GLOSSARY.md's own rule.
 
 ---
 
 ## Domain model (leading section — this is the decision the rest hangs off)
 
-### Proposed glossary entry (for `CONTEXT.md`, round 4 additions)
+### Proposed glossary entry (for `GLOSSARY.md`, round 4 additions)
 
 > - **Doctrine**: A named set of required skill levels defining what a pilot must
 >   train to fly a fleet role (e.g. "Muninn — Basic"). **Editable Data**: created
@@ -132,12 +132,12 @@ pair while honoring prereqs. Reuse, do not write a new sort.
 
 **Out of scope. RECOMMEND export/import payload.** Evidence, strongest first:
 
-1. **CONTEXT.md scope decision, v1:** "Corp/alliance: public info + the member's own
+1. **GLOSSARY.md scope decision, v1:** "Corp/alliance: public info + the member's own
    view only. No director tooling." A shared corp doctrine library _is_ director
    tooling.
 2. **There is no user/account identity anywhere in the backend.** The Firestore root
    is `/characters/{uid}` with `uid = char:{characterId}`
-   (`uidForCharacter`, `src/sync/uid.ts:5-6`; `firestore.rules:22`). CONTEXT.md's
+   (`uidForCharacter`, `src/sync/uid.ts:5-6`; `firestore.rules:22`). GLOSSARY.md's
    **Account** ("implicit app-level grouping of linked Characters") is aspirational —
    grep finds no implementation. So "share with my corp" has no principal to share
    _to_.
@@ -185,7 +185,7 @@ Cost: this is a day, not a milestone, and it is genuinely enough for the real
 workflow (an FC posts the doctrine payload in corp chat / a forum thread).
 
 **Record this as `docs/adr/0003-doctrines-shared-by-export-not-backend.md`**, not as a
-CONTEXT.md bullet. Everything above is already ADR-shaped — context, decision,
+GLOSSARY.md bullet. Everything above is already ADR-shaped — context, decision,
 consequences, enumerated rejected alternatives — and it is the same species of
 security-model decision as ADR 0001.
 
@@ -246,7 +246,7 @@ doctrine-private one.
 
 ## Gap
 
-1. No `Doctrine` concept: not in `CONTEXT.md`, no record type, no table, no route.
+1. No `Doctrine` concept: not in `GLOSSARY.md`, no record type, no table, no route.
 2. No cross-character comparison anywhere in the app. Every route reads
    `activeCharacterId` (`src/routes/SkillPlans.tsx:55`, `Skills.tsx`, `Overview.tsx`).
    No batch "load these N characters' sheets" helper exists.
@@ -286,8 +286,8 @@ existing engine types; no fetch/DOM/Dexie.
 
 | File                                                      | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CONTEXT.md`                                              | Add **Doctrine** (+ _Doctrine Gap_) to glossary, round 4; add scope decision "Doctrines are shared by export/import payload; no cross-user backend sharing in v1 — see ADR 0003".                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `docs/adr/0003-doctrines-shared-by-export-not-backend.md` | **New ADR.** Q3 below is already ADR-shaped (context / decision / consequences / four enumerated rejected alternatives with a security rationale), CLAUDE.md points decisions at `docs/adr/`, and ADR 0001 is the same species of decision. Record it there; keep CONTEXT.md's line as a pointer.                                                                                                                                                                                                                                                                                       |
+| `GLOSSARY.md`                                             | Add **Doctrine** (+ _Doctrine Gap_) to glossary, round 4; add scope decision "Doctrines are shared by export/import payload; no cross-user backend sharing in v1 — see ADR 0003".                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `docs/adr/0003-doctrines-shared-by-export-not-backend.md` | **New ADR.** Q3 below is already ADR-shaped (context / decision / consequences / four enumerated rejected alternatives with a security rationale), CLAUDE.md points decisions at `docs/adr/`, and ADR 0001 is the same species of decision. Record it there; keep GLOSSARY.md's line as a pointer.                                                                                                                                                                                                                                                                                      |
 | `src/db/index.ts`                                         | Add `DoctrineRecord` interface; add `doctrines: EntityTable<DoctrineRecord,'id'>` to the `db` type; **additive** `db.version(4).stores({...v3 stores unchanged..., doctrines: 'id, authorCharacterId'})`. Add optional `sourceDoctrineId?`/`sourceDoctrineUpdatedAt?` to `SkillPlanRecord` (unindexed → no bump needed for those two, same as `markers?` at :43).                                                                                                                                                                                                                       |
 | `src/db/index.test.ts`                                    | Assert v4 opens, v3 data survives, `doctrines` queryable by `authorCharacterId`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `src/sync/merge.ts`                                       | Add `RemoteDoctrineDoc extends RemoteDoc`; add `sourceDoctrineId?`/`sourceDoctrineUpdatedAt?` to `RemotePlanDoc` (mirrors the `markers?` line added in `d90e417`). No change to `mergeRecords` — it is already generic (`merge.ts:62`).                                                                                                                                                                                                                                                                                                                                                 |
@@ -497,7 +497,7 @@ one-liner:
 
 - **Cost per boot.** Every character means one `mintFirebaseToken` invocation plus three
   Firestore collection queries (plans, buildPlans, doctrines) — 10 characters is 10
-  function calls and 30 queries on every cold start. CONTEXT.md's sync decision is
+  function calls and 30 queries on every cold start. GLOSSARY.md's sync decision is
   explicitly "Firebase (Firestore + one Cloud Function). Free scale." Either cache the
   minted custom token per character with a TTL, or sync non-active characters lazily /
   on a longer interval than the active one.
@@ -653,7 +653,7 @@ doctrines.noOtherCharacters
 New Editable Data record type:
 
 ```ts
-/** User-editable Doctrine: required skill levels for a fleet role (CONTEXT.md). */
+/** User-editable Doctrine: required skill levels for a fleet role (GLOSSARY.md). */
 export interface DoctrineRecord {
   id: string;
   /** Character whose sync subcollection carries this doctrine. Doctrines are

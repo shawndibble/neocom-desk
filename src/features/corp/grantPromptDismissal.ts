@@ -14,7 +14,7 @@
  * Device-local, and per Character within the device: an alt who later makes
  * Director deserves its own offer, and a dismissal on the main says nothing
  * about it. Not synced — this is a "you have seen this" flag about one browser,
- * not Editable Data (CONTEXT.md).
+ * not Editable Data (GLOSSARY.md).
  *
  * One `createLocalSetting` key holding a record, rather than a key per
  * Character: the factory is explicit that two stores on one key drift apart,

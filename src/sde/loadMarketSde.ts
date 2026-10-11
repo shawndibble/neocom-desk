@@ -3,7 +3,7 @@
  * Separate from loadSde.ts because these payloads are deliberately excluded
  * from the install precache (vite.config.ts globIgnores) — most installs
  * never open /market, so they should not pay ~1.2 MB for it up front
- * (CONTEXT.md round 10). Same fetch-once-and-memoize shape as loadSde.ts.
+ * (GLOSSARY.md round 10). Same fetch-once-and-memoize shape as loadSde.ts.
  */
 import type {
   MarketGroupNode,

@@ -21,7 +21,7 @@
  * plan entry and that preference — same raw-`indexedDB` route as the plan
  * itself, into the `settings` store `useLocalSetting` reads.
  *
- * Plan Milestone (CONTEXT.md, issue #1406): "Add milestone" is a per-row
+ * Plan Milestone (GLOSSARY.md, issue #1406): "Add milestone" is a per-row
  * control reachable at the same narrow viewport as the priority pill above,
  * and naming one there is what makes it show up as the plan header's "Next
  * milestone" chip — the one thing this file's other tests don't cover

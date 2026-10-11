@@ -381,7 +381,7 @@ export function PlanEditor({
   const [fitGoalOpen, setFitGoalOpen] = useState(false);
   // The entry pending a remove confirmation (#408) — an in-app Modal rather
   // than removing on click, matching the pattern PlanList already uses for
-  // deleting a whole plan (CONTEXT.md's "an in-app Modal replacing
+  // deleting a whole plan (GLOSSARY.md's "an in-app Modal replacing
   // window.confirm on delete").
   // The row awaiting the remove-confirm Modal. Skill *and* level: a plan
   // holds one entry per level, so "which row" needs both.
@@ -415,7 +415,7 @@ export function PlanEditor({
     void hydrateGroupingMode();
   }, [hydrateGroupingMode]);
 
-  // Clone State (CONTEXT.md): per Character, not per plan. The control waits
+  // Clone State (GLOSSARY.md): per Character, not per plan. The control waits
   // for hydration — a write from the empty default would replace the whole
   // blob and drop every other Character's answer.
   const cloneStates = useCloneStates((state) => state.value);
@@ -468,7 +468,7 @@ export function PlanEditor({
   // describes nothing.
   const [dropError, setDropError] = useScopedState<string>(planScope);
 
-  // What-If Implants (CONTEXT.md): swap the clone's real implants for a
+  // What-If Implants (GLOSSARY.md): swap the clone's real implants for a
   // hypothetical set — a uniform preset, or five per-slot bonuses, since EVE's
   // hardwirings are per attribute. Saved on the plan and synced with it, not
   // held for the session: it is one of the two lenses every number on this
@@ -504,7 +504,7 @@ export function PlanEditor({
   const detectedAccelerator =
     attributeBaseline?.kind === 'accelerated' ? attributeBaseline.acceleratorBonus : null;
 
-  // Boosters (CONTEXT.md): an ordered list of cerebral accelerators, each a
+  // Boosters (GLOSSARY.md): an ordered list of cerebral accelerators, each a
   // uniform bonus to every attribute from an optional start until its
   // expiry — EVE has one booster slot, so at most one is ever live. Saved on
   // the plan for the same reason as the lens above.
@@ -712,7 +712,7 @@ export function PlanEditor({
     stepByKey,
   } = schedule;
 
-  // Plan Milestone (CONTEXT.md) statuses against the current schedule —
+  // Plan Milestone (GLOSSARY.md) statuses against the current schedule —
   // recomputed whenever the schedule or the milestones themselves change, the
   // same dependency shape as every other schedule-derived value above.
   const trackedFittingIds = useMemo(
@@ -2256,7 +2256,7 @@ export function PlanEditor({
 
         {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
 
-        {/* Plan Milestones (CONTEXT.md) whose entry was removed from the plan
+        {/* Plan Milestones (GLOSSARY.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here
             instead of vanishing silently. */}
         <div>

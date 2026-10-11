@@ -74,7 +74,7 @@ Edit cards (`CardPicker.tsx`): popover (not a menu, to avoid clashing with drag 
 ## Persistence and sync
 
 - Synced settings: `sync.overviewHiddenCards`, `sync.overviewCardOrder` (string arrays; unknown keys kept; `moveCard` back-fills missing keys then `arrayMove`), `sync.spExtractionMonitoringEnabled`, `sync.spExtractionThresholdSp`.
-- Dexie ESI caches per loader (Freshness Window 10 min, CONTEXT.md); `useRouteSnapshot` per-card keys `overview:*` so each card restores independently. SP summary seeded via `rememberSpSummary` for Clones/Employment headers.
+- Dexie ESI caches per loader (Freshness Window 10 min, GLOSSARY.md); `useRouteSnapshot` per-card keys `overview:*` so each card restores independently. SP summary seeded via `rememberSpSummary` for Clones/Employment headers.
 - No URL state.
 
 ## States

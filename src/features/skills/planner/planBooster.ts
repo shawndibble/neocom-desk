@@ -1,5 +1,5 @@
 /**
- * A Skill Plan's **Boosters** (CONTEXT.md): the cerebral accelerators the plan
+ * A Skill Plan's **Boosters** (GLOSSARY.md): the cerebral accelerators the plan
  * is costed under — an ordered list, each a uniform attribute bonus live from
  * an optional start until an expiry. EVE has one booster slot, so at most one
  * is ever actually live; a second accelerator is something a pilot plans to

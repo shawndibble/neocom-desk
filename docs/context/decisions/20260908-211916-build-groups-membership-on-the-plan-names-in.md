@@ -32,7 +32,7 @@ deploy --only firestore`, and CI deploys nothing and tests that file with
   feature is not worth a failure mode that large.
 
   The precedent is the repo's own: `MiningTaxAssignmentRecord.groupId` is a
-  real, CONTEXT.md-named grouping implemented as a bare shared id with no group
+  real, GLOSSARY.md-named grouping implemented as a bare shared id with no group
   table, and `MiningTaxPaymentInfo.paymentId`'s docstring says a per-Payee
   history is "a group-by away **without a separate synced table**".
 

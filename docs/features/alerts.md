@@ -16,11 +16,11 @@ Route `/alerts` (`src/routes/Alerts.tsx`): the record of every alert this device
 
 See everything that fired, including for Characters you were not looking at (`Alerts.tsx:11-15`), and un-mute a type without going to Settings. Overview shows a summarised column (`overview.md`).
 
-- **Top jobs (ranked):** 1. "What fired while I was away, across all my Characters, worst first?" (CONTEXT.md Alert: a device back from a week away holds hundreds of fires across a dozen-odd types). 2. "Take me to the thing it is about, as that Character" (an alert lands on its row, `20260908-123516`; `?character=` switch). 3. "Clear or silence the noise" (dismiss a fire, a type or all; mute a type).
+- **Top jobs (ranked):** 1. "What fired while I was away, across all my Characters, worst first?" (GLOSSARY.md Alert: a device back from a week away holds hundreds of fires across a dozen-odd types). 2. "Take me to the thing it is about, as that Character" (an alert lands on its row, `20260908-123516`; `?character=` switch). 3. "Clear or silence the noise" (dismiss a fire, a type or all; mute a type).
 - **Device and cadence:** desktop primary (owner, 2026-10-11); a tapped push on the phone opens the linked page, not `/alerts`. The bell with its unread count sits in every page header (#3267, `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`); `/alerts` has no rail row or phone tab. Visited when the bell shows a count (inferred).
 - **Above the fold:** header with Dismiss all and Notification settings; the filter bar with severity chips and counts; groups worst severity first, each with count and age of the newest fire (#3328 asks for that age on collapsed rows from md).
 - **Not for:** choosing which events fire, or on which channel (Settings › Notifications, `notifications.md`); the before-logoff check of what is on a clock (Overview).
-- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `Alerts.tsx:11-17`; CONTEXT.md Alert; decisions `20260908-123516`, `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`; #3267, #3328, #2887.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `Alerts.tsx:11-17`; GLOSSARY.md Alert; decisions `20260908-123516`, `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`; #3267, #3328, #2887.
 - **Unconfirmed:** visit cadence; whether pilots reach this list mostly from the bell or from a tapped push (a tapped push opens the linked page, not `/alerts`).
 
 ### Mobbin brief

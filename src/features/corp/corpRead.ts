@@ -9,7 +9,7 @@
  * field on `esi/cache.ts`'s loaders, so a module that omits it silently falls
  * back to the shared `isAuthFailure` rule, which counts a role-gated 403 as
  * "log in again" — exactly the `ReauthBanner`-over-a-403 failure corp UI
- * hides rather than locks to avoid (CONTEXT.md round 35). These wrappers make
+ * hides rather than locks to avoid (GLOSSARY.md round 35). These wrappers make
  * that omission impossible in the same way the cache key already is.
  */
 import {

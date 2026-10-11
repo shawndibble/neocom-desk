@@ -8,7 +8,7 @@ import { useActiveCorporationId } from './owner';
  *
  * Hidden, never locked, in every other case — including `unknown`, which
  * reads as hidden on purpose: a nav item that flickers into existence
- * mid-load is worse than one that appears a beat late (CONTEXT.md round 35).
+ * mid-load is worse than one that appears a beat late (GLOSSARY.md round 35).
  * The route itself takes the opposite view of `unknown` and waits, so a
  * deep-linked Director is not bounced (`routes/Corp.tsx`).
  *

@@ -1,6 +1,6 @@
 # Ships
 
-Nav section `/ships` (CONTEXT.md "Ships"): two tabs, Fittings (library + editor + Compare, see `fittings.md`) and Ship Tree. This file covers the section shell, redirects, and the Ship Tree tab with its Ship Info window. Scope decision: `docs/context/decisions/20260926-135538-fittings-ship-tree-tab-and-ship-info-window.md`; map zoom: `20260927-100237-ship-tree-map-100-default-zoom-and-pinch.md`; URL model ADR 0015.
+Nav section `/ships` (GLOSSARY.md "Ships"): two tabs, Fittings (library + editor + Compare, see `fittings.md`) and Ship Tree. This file covers the section shell, redirects, and the Ship Tree tab with its Ship Info window. Scope decision: `docs/context/decisions/20260926-135538-fittings-ship-tree-tab-and-ship-info-window.md`; map zoom: `20260927-100237-ship-tree-map-100-default-zoom-and-pinch.md`; URL model ADR 0015.
 
 User goal (Ship Tree): "which hulls can I fly, how long until I can, what Mastery do I have, what do I train/build next". Mirrors the in-game ISIS tree.
 

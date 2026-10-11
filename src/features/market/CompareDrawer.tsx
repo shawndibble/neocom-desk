@@ -1,5 +1,5 @@
 /**
- * Resizable bottom drawer for the Compare Set (CONTEXT.md, round 8): a
+ * Resizable bottom drawer for the Compare Set (GLOSSARY.md, round 8): a
  * persistent `Compare (N)` handle, opening a drawer beside the order book
  * rather than covering it — comparing happens *while* browsing, so this is a
  * non-modal overlay, never `Modal`/`<dialog>` (that would inert the order

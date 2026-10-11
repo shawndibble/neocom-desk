@@ -1,5 +1,5 @@
 /**
- * The Booster (CONTEXT.md) control: an ordered list of cerebral accelerators
+ * The Booster (GLOSSARY.md) control: an ordered list of cerebral accelerators
  * a Skill Plan is costed under, one after another — EVE has a single booster
  * slot, so extracted from `PlanEditor.tsx` (#1407, which added the list) into
  * its own component since a single accelerator's editing state (draft text

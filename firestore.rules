@@ -179,7 +179,7 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Projection rows (issue #358, ADR 0010, CONTEXT.md round 45): one doc
+    // Projection rows (issue #358, ADR 0010, GLOSSARY.md round 45): one doc
     // per device per occurrence, doc id `{deviceId}:{Occurrence Key}` (issue
     // #2240; legacy rows keep the bare Occurrence Key). Written by registerDevice
     // (upload) and dispatchProjections (fire/purge), both admin-privileged —

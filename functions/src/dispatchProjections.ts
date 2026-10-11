@@ -1,5 +1,5 @@
 // dispatchProjections: the pure decision logic behind the Scheduled Push
-// dispatcher (issue #358, ADR 0010, CONTEXT.md round 45). The `onSchedule`
+// dispatcher (issue #358, ADR 0010, GLOSSARY.md round 45). The `onSchedule`
 // wiring lives in index.ts, same split as registerDevice.ts/mintFirebaseToken
 // — this module never touches Firestore or FCM directly, so it's unit
 // testable without an emulator.

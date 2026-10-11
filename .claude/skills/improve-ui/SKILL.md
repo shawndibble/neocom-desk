@@ -64,7 +64,7 @@ that appeal to general taste. Read:
   `FilterBar`, `StatChip`, `EmptyState`, `Tabs`, …) and `controlStyles.ts`. A
   fix composes these. A fix that invents a new one has to argue for it.
 - `src/routes/Styleguide.tsx`: the live reference for how primitives combine.
-- `CONTEXT.md`: the glossary. Tickets use its terms.
+- `GLOSSARY.md`: the glossary. Tickets use its terms.
 - `LEDGER.md` here, plus `.claude/skills/improve-mobile-ux/LEDGER.md` so this
   lane stays off ground the phone lane has already covered.
 

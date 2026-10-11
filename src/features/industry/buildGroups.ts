@@ -1,6 +1,6 @@
 /**
  * **Build Group** names, order and existence — the half of a group that is not
- * membership (issue #626, CONTEXT.md "Build Group").
+ * membership (issue #626, GLOSSARY.md "Build Group").
  *
  * ## Why this is a setting and not a table
  *
@@ -131,7 +131,7 @@ export interface BuildGroup {
    * The Group Owned Overlay's ledger (issue #697): units of each material
    * typeID the group itself owns, keyed by typeID. Manual entry or ESI-detect
    * (see `ownedStockScope`), independent of any member's own per-plan
-   * `materialSourcing.ownedQuantity` — see `CONTEXT.md`'s "Group Owned
+   * `materialSourcing.ownedQuantity` — see `GLOSSARY.md`'s "Group Owned
    * Overlay". Display-only: read by `rollUpBuildGroup`'s `ownedStock` option,
    * never written back into a member plan.
    */

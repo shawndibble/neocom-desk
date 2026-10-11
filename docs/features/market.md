@@ -1,6 +1,6 @@
 # Market, Hauling, LP Store, Contract search: feature inventory
 
-Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, Appraisal), Hauling (now the Travel tab `/travel/hauling`, `20261010-193521`, #3526), LP Store (now the Wallet tab `/wallet/lp-store`, `20261010-200446`, #3527), and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `CONTEXT.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
+Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, Appraisal), Hauling (now the Travel tab `/travel/hauling`, `20261010-193521`, #3526), LP Store (now the Wallet tab `/wallet/lp-store`, `20261010-200446`, #3527), and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `GLOSSARY.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
 
 ## Summary table
 
@@ -478,7 +478,7 @@ Observed gaps: no visible hint of the shortcut outside Help shortcuts; a failed 
 
 ## 4b. Stock (`/market/stock`, Stock Lists)
 
-Issue #3521; scope decision `20261010-182330-stock-targets-v1-scope`; mockup `docs/design/mockups/stock-targets/`. A tab entry with `deep: true`: `/market/stock` lists the markets the pilot stocks (or opens the only one), `/market/stock/<list id>` opens one. Entry `features/stockTargets/StockTab.tsx`. Terms per `CONTEXT.md`: **Stock List** (a "market" in the UI), **Stock Target**, **Shortfall**.
+Issue #3521; scope decision `20261010-182330-stock-targets-v1-scope`; mockup `docs/design/mockups/stock-targets/`. A tab entry with `deep: true`: `/market/stock` lists the markets the pilot stocks (or opens the only one), `/market/stock/<list id>` opens one. Entry `features/stockTargets/StockTab.tsx`. Terms per `GLOSSARY.md`: **Stock List** (a "market" in the UI), **Stock Target**, **Shortfall**.
 
 | Piece                                      | Where                                                                     | Notes                                                                                                                                                                                                             |
 | ------------------------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -1,6 +1,6 @@
 /**
  * Right-click menu for an item — the tree, search results (same tree,
- * CONTEXT.md round 8), the Quickbar, the Assets tree (issue #83), the
+ * GLOSSARY.md round 8), the Quickbar, the Assets tree (issue #83), the
  * Variations table (issue #147) and every item name on a Build Plan page —
  * materials (round 27), product heading, revenue and owned-sale rows, and the
  * recipe and Blueprint Acquisition modals.

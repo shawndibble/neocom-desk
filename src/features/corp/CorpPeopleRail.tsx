@@ -9,7 +9,7 @@
  * `CorpVitalsRail` answers "can the corporation still pay for this"; this
  * answers "is anyone paying attention". The Directorate design study had both
  * on the overview from the start — only Money shipped (#296), and the People
- * panel fell out through ticket scoping rather than a decision (CONTEXT.md
+ * panel fell out through ticket scoping rather than a decision (GLOSSARY.md
  * round 45).
  *
  * **A summary that links, not a second roster.** It answers "should I go
@@ -30,7 +30,7 @@
  *
  * Rendered only when the Character holds `canReadMembers` (`Corp.tsx`) — a
  * Station Manager who is not a Director simply has no People rail: no error,
- * no empty state, nothing (CONTEXT.md round 35).
+ * no empty state, nothing (GLOSSARY.md round 35).
  */
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';

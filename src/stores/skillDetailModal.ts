@@ -3,7 +3,7 @@
  * feature that renders a skill name (Skills, Skill Plan Editor, …) without
  * threading modal state through each one. Same shape as `publicInfoModal.ts`:
  * a global store holds the current request, and `SkillDetailModal` — mounted
- * once in `App.tsx` — renders it. See CONTEXT.md round 49.
+ * once in `App.tsx` — renders it. See GLOSSARY.md round 49.
  */
 import { create } from 'zustand';
 import type { PlanEntry } from '@/engine/types';

@@ -27,7 +27,7 @@ _Recorded 2026-09-05 · issue #523._
   **Mining Tax Assignments are per-character regardless** — an Assignment is
   inherently owned by whichever character mined the ore, so this split was
   never a choice for it.
-- **A Payee's moon/system tag (CONTEXT.md) is set from `AssignDialog`'s
+- **A Payee's moon/system tag (GLOSSARY.md) is set from `AssignDialog`'s
   "remember this system for `<Payee>`" checkbox, not a field in Manage
   Payees.** The tag exists purely to auto-suggest a Payee for a future entry
   from the same system; the moment a pilot is looking at "this system, this

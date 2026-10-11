@@ -151,7 +151,7 @@ export function corpCapabilities(roles: readonly string[]): CorpCapabilities {
 /**
  * Whether any corp surface is readable at all. The rendering rule keys off
  * this: a Character with no capability gets no corp UI, not a locked one
- * (CONTEXT.md round 35).
+ * (GLOSSARY.md round 35).
  */
 export function hasAnyCorpCapability(capabilities: CorpCapabilities): boolean {
   return CORP_CAPABILITIES.some((capability) => capabilities[capability]);

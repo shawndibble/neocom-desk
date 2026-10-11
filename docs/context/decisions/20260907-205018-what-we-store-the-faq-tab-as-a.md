@@ -5,7 +5,7 @@ _Recorded 2026-09-07._
 - **Settings gains an FAQ tab, one Panel per question.** It ships with three:
   **What We Store**, where to report a bug or request a feature, and who to
   thank. The first had no answer anywhere in the product — only in
-  `CONTEXT.md`'s **Editable Data** / **API-Derived Data** split and ADR 0001,
+  `GLOSSARY.md`'s **Editable Data** / **API-Derived Data** split and ADR 0001,
   neither of which a pilot reads. Questions are added because someone asked
   them, never to round the list out: an FAQ padded with invented questions
   reads as filler and goes stale faster than it helps.

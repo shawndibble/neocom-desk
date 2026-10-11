@@ -1,7 +1,7 @@
 /**
  * Groups an item's ESI dogma attribute values by SDE category, resolving
  * each to its display name and unit via the attribute dictionary
- * (scripts/build-sde.mjs, CONTEXT.md round 6 "Item Detail"). Pure — callers
+ * (scripts/build-sde.mjs, GLOSSARY.md round 6 "Item Detail"). Pure — callers
  * adapt ESI/SDE shapes at the boundary. An attribute id with no dictionary
  * entry (unpublished, or published but nameless) is skipped rather than
  * shown as a raw identifier — a curated allow-list was rejected for the same

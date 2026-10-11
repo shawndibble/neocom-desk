@@ -49,7 +49,7 @@ type TypeName = (typeId: number) => string;
  * content route, not the first.
  *
  * A visitor who already has a Character never sees this: the same `?f=` opens
- * straight into the editor instead, per CONTEXT.md's **Fitting Share Code**.
+ * straight into the editor instead, per GLOSSARY.md's **Fitting Share Code**.
  */
 export function FittingShared() {
   const [searchParams] = useSearchParams();
@@ -159,7 +159,7 @@ export function FittingShareView({
     );
   }
   // A visitor with a Character never gets the All-V view — the same link
-  // opens in the editor, under their own pilot (CONTEXT.md **Fitting Share Code**).
+  // opens in the editor, under their own pilot (GLOSSARY.md **Fitting Share Code**).
   if (characterCount > 0) {
     return <Navigate to={fittingEditLocation(code)} replace />;
   }

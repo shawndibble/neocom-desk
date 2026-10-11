@@ -1563,7 +1563,7 @@ function isCorpWalletDivisionSnapshot(raw: unknown): raw is CorpWalletDivisionSn
  * Balance-below is checked across every division `/wallets` already returns
  * in one call; transaction-above is checked only on the master division's
  * journal, since ESI publishes no all-divisions journal and the seven are
- * separately paginated and role-gated (CONTEXT.md round 43, `boardData.ts`'s
+ * separately paginated and role-gated (GLOSSARY.md round 43, `boardData.ts`'s
  * `MASTER_WALLET_DIVISION` reasoning).
  */
 export const corpWalletDomain = defineDomain<

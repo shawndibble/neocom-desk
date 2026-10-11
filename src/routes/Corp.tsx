@@ -14,7 +14,7 @@
  *   well as what is drawn — an ungated read buys a guaranteed 403.
  * - **`unknown` renders neutrally here, and nothing in the nav.** The
  *   asymmetry is deliberate: a nav item that flickers into existence is worse
- *   than one a beat late (CONTEXT.md round 35), but bouncing a Director who
+ *   than one a beat late (GLOSSARY.md round 35), but bouncing a Director who
  *   deep-linked before their roles read landed is simply a bug.
  * - **Hour-stale data is stated, not hidden.** CCP caches these endpoints for
  *   about an hour, which every multi-day clock survives and no short one does.
@@ -523,7 +523,7 @@ export function Corp() {
 
   // Reached the URL without the access for it. A bare explanation, not the
   // section's shell drawn over nothing — that would be a lock, and corp UI
-  // hides rather than locks (CONTEXT.md round 35). The copy says roles only
+  // hides rather than locks (GLOSSARY.md round 35). The copy says roles only
   // change in game; a Character that holds a role but lacks the grant can fix
   // that from Settings' Corporation Permission row.
   if (gate.status === 'denied') {

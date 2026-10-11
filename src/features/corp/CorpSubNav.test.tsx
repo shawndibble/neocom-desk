@@ -40,7 +40,7 @@ describe('CorpSubNav (AC1)', () => {
    * `ready` is the gate on the section, not a promise about this view.
    * `membertracking` answers to Director alone, so an Accountant following a
    * Members tab would land on an explanation instead of a table — the entry is
-   * absent rather than locked (CONTEXT.md round 35).
+   * absent rather than locked (GLOSSARY.md round 35).
    */
   it('hides Members from a ready character without it', () => {
     mockedAccess.mockReturnValue(access({ canReadWallet: true }));

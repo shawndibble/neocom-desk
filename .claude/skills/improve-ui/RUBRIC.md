@@ -134,7 +134,7 @@ Look for:
 - **Token drift.** Raw hex, `rounded-md` or larger on a rectangle, 2px borders
   that aren't a state stripe, shadows on anything but a popover (DESIGN.md §3
   and §6).
-- **Vocabulary drift.** A label that disagrees with the `CONTEXT.md` glossary
+- **Vocabulary drift.** A label that disagrees with the `GLOSSARY.md` glossary
   or with the same label on another page.
 
 ```

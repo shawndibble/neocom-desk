@@ -14,7 +14,7 @@ the sequenced build order, which deliberately does **not** match the
 teardown's value/cost ranking — that ranking was written without the
 dependency graph below.
 
-Terms follow [`CONTEXT.md`](../../../CONTEXT.md). Locations follow
+Terms follow [`GLOSSARY.md`](../../../GLOSSARY.md). Locations follow
 [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md).
 
 ---
@@ -65,7 +65,7 @@ What shipped instead is two central mechanisms plus one per-panel case:
   new `/skillqueue` reads on `/skills` and `/industry` widen this: a revoked
   queue scope now paints the shell notice over pages that still work.
 
-The whole app also moved behind authentication (see `CONTEXT.md` round 4),
+The whole app also moved behind authentication (see `GLOSSARY.md` round 4),
 which removes the anonymous-state branch from the gate entirely.
 
 ### Current measurements
@@ -300,7 +300,7 @@ its own and blocks on `DataTable` + `CharacterAvatar`.
 These change what gets built. They are yours, not the implementer's.
 
 1. ~~**Sync scope (blocks items 07 and 09).**~~ **DECIDED 2026-08-30 — see §5.7. Items 07 and 09 are unblocked and store device-local; no account sync, no uid change.**
-2. ~~**The PI consent string.**~~ **DECIDED 2026-08-30 — ship item 16, and disclose it.** `esi-planets.manage_planets.v1` grants only two GETs in item 16's surface, but the SSO consent screen reads _"manage your planetary installations"_. CCP publishes no read-only PI scope, so that wording is theirs, not a widening of ours. Three conditions: say so plainly on the login screen beside the PI scope; record it in an ADR; and footnote CONTEXT.md's "Read-only: no ESI write scopes" rather than leave it flatly contradicted. The footnote must make the distinction the claim actually rests on — the app issues no ESI writes, which stays true at the behaviour level whatever the consent screen says. The scope is not in `esi/registry.ts` today; it arrives with item 16.
+2. ~~**The PI consent string.**~~ **DECIDED 2026-08-30 — ship item 16, and disclose it.** `esi-planets.manage_planets.v1` grants only two GETs in item 16's surface, but the SSO consent screen reads _"manage your planetary installations"_. CCP publishes no read-only PI scope, so that wording is theirs, not a widening of ours. Three conditions: say so plainly on the login screen beside the PI scope; record it in an ADR; and footnote GLOSSARY.md's "Read-only: no ESI write scopes" rather than leave it flatly contradicted. The footnote must make the distinction the claim actually rests on — the app issues no ESI writes, which stays true at the behaviour level whatever the consent screen says. The scope is not in `esi/registry.ts` today; it arrives with item 16.
 3. ~~**Item 05's badge at `remapCount ≥ 2`.**~~ **Resolved 2026-08-30 by §5.6**, both branches, at different thresholds: exact placement now ships up to `remapCount` = 2, and above that `plans.remapCapNote` states the cap honestly instead of guessing. Reopen only if 5 moves off the main thread.
 4. ~~**Which niche tabs (item 20).**~~ **DECIDED 2026-08-30 — all three: employment history, contacts, loyalty points.** One ticket each rather than one for item 20, because they do not share a dependency: **employment history is a public endpoint** (`security: []`), needing no scope, no re-auth and no batch, so it ships in Phase 2; **contacts** and **loyalty points** each add a scope and must join the single batched re-authorization in Phase 3. The scope batch is what groups them — the features are independent. Still recommended never: notifications (the `text` field is raw YAML needing per-type templates for 150+ types, sourced from neither ESI nor the SDE) and kill log (link zKillboard instead).
 5. **Boosters in the optimizer (D6). DECIDED 2026-08-30 — option (b), teach the optimizer.**
@@ -451,9 +451,9 @@ and the next person to reach for it will not otherwise know what it breaks.
    Closes the asymmetry D1 leaves open — D1 handles a Character sold out from
    under you; this handles one you deliberately drop.
 
-### CONTEXT.md change, not yet applied
+### GLOSSARY.md change, not yet applied
 
-`CONTEXT.md` was checked out by another session when this was decided, so its
+`GLOSSARY.md` was checked out by another session when this was decided, so its
 **Account** line is left for whoever holds that file. Replace it with:
 
 > - **Account**: UI-level grouping of a user's Characters. Has **no storage,
@@ -684,7 +684,7 @@ and takes effect automatically the moment a second Booster becomes enterable.
 ## 6. What was excluded
 
 - **Item 19** (second language) — excluded by request; correctly gated on a stable English UI.
-- Teardown items 21–26 were outside the requested range. Items 21/22 (background refresh, scheduler) conflict with CONTEXT.md's "refresh on app open + manual button only" and need a scope decision first. Items 23–24 are platform-inaccessible or already solved differently. Items 25–26 the teardown itself rejects.
+- Teardown items 21–26 were outside the requested range. Items 21/22 (background refresh, scheduler) conflict with GLOSSARY.md's "refresh on app open + manual button only" and need a scope decision first. Items 23–24 are platform-inaccessible or already solved differently. Items 25–26 the teardown itself rejects.
 - The **skill→item index** (the expensive half of item 03) is deferred to a separate lazily-fetched chunk, and should be built once, shared with item 14 — not twice.
 
 ---

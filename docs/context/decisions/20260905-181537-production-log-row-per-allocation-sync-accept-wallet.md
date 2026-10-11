@@ -28,7 +28,7 @@ _Recorded 2026-09-05 · issue #525._
   `${characterId}:order:{orderId}`) rather than a random uuid. Two devices
   linking different sales to the same run now write two different documents —
   nothing to reconcile, no merge conflict possible. This is a direct copy of
-  the Notification Feed's Occurrence Key precedent (CONTEXT.md) and needed
+  the Notification Feed's Occurrence Key precedent (GLOSSARY.md) and needed
   _zero_ changes to `merge.ts` — `productionRunSpec`/`productionSaleLinkSpec`/
   `productionOrderWatchSpec` (`src/sync/planSync.ts`) are three ordinary
   `CollectionSpec`s using the existing generic `mergeRecords`/

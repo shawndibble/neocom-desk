@@ -3,7 +3,7 @@
  * own blueprint/ME/TE/facility/hub — never the currently-open plan's
  * snapshot — side by side in one table. Mounted by `Industry.tsx` in place of
  * `BuildPlanDetail` while compare mode is active; `onDone` restores whichever
- * plan was open before compare mode started (CONTEXT.md round 25's two-pane
+ * plan was open before compare mode started (GLOSSARY.md round 25's two-pane
  * idiom: this is a state of the detail pane, not a separate route).
  */
 import { useEffect, useMemo, type ReactNode } from 'react';
