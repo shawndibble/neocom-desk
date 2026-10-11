@@ -600,8 +600,9 @@ describe('PilotLookupPanel', () => {
     it('reads a hash-only row on expand, once, and opens its fit in Fittings', async () => {
       mocks.loadKillmailFit.mockResolvedValue(FIT);
       renderTab('/travel/pilot?pilot=42');
-      await screen.findByRole('list', { name: 'Recent kills and losses' });
-      const [, lossRow] = screen.getAllByRole('button', { expanded: false });
+      // Scoped to the list: the header's alerts bell is a collapsed button too.
+      const list = await screen.findByRole('list', { name: 'Recent kills and losses' });
+      const [, lossRow] = within(list).getAllByRole('button', { expanded: false });
       fireEvent.click(lossRow!);
 
       expect(await screen.findByText('High slots')).toBeTruthy();
@@ -623,8 +624,8 @@ describe('PilotLookupPanel', () => {
     it('says so when a killmail cannot be read', async () => {
       mocks.loadKillmailFit.mockResolvedValue({ ok: false });
       renderTab('/travel/pilot?pilot=42');
-      await screen.findByRole('list', { name: 'Recent kills and losses' });
-      fireEvent.click(screen.getAllByRole('button', { expanded: false })[1]!);
+      const list = await screen.findByRole('list', { name: 'Recent kills and losses' });
+      fireEvent.click(within(list).getAllByRole('button', { expanded: false })[1]!);
       expect(await screen.findByText(/killmail couldn't be read/i)).toBeTruthy();
     });
 
