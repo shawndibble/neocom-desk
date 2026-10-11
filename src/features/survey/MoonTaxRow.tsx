@@ -173,20 +173,24 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
-  const [offer, setOffer] = useState(false);
+  const [addPayeeOpen, setAddPayeeOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const inFlight = useRef(false);
+  const hintId = useId();
+  const loggedOut = characterId === null;
 
-  async function run(step: (id: number) => Promise<void>) {
-    if (characterId === null || inFlight.current) return;
+  /** One step at a time; a failure shows the alert. Resolves to the step's result, undefined when it didn't run or failed. */
+  async function run<T>(step: (id: number) => Promise<T>): Promise<T | undefined> {
+    if (characterId === null || inFlight.current) return undefined;
     inFlight.current = true;
     setBusy(true);
     setFailed(false);
     try {
-      await step(characterId);
+      return await step(characterId);
     } catch {
       setFailed(true);
+      return undefined;
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -198,18 +202,26 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
     navigate(MINING_TAX_HREF);
   }
 
-  const open = () =>
-    run(async (id) => {
+  async function open() {
+    const missing = await run(async (id) => {
       const known = findPayeeByName(await loadPayees(id), tax.name);
       if (known) await openTab(known.id);
-      else setOffer(true);
+      return known === undefined;
     });
+    // Opened once the lookup is done, so the dialog never starts out busy.
+    if (missing) setAddPayeeOpen(true);
+  }
 
   const addPayee = () =>
     run(async (id) => {
-      const payee = await createPayee(id, { name: tax.name.trim(), defaultTaxPct: tax.pct });
+      // Looked up again: the Payee may have been added elsewhere while the dialog was open.
+      const payee =
+        findPayeeByName(await loadPayees(id), tax.name) ??
+        (await createPayee(id, { name: tax.name.trim(), defaultTaxPct: tax.pct }));
       await openTab(payee.id);
     });
+
+  const skip = () => run(() => openTab(null));
 
   return (
     <InfoRow label={t('survey.moonTax.label')}>
@@ -222,25 +234,29 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
         <Button
           size="sm"
           className="touch:min-h-11 sm:ml-auto"
-          disabled={characterId === null}
-          loading={busy && !offer}
+          // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
+          aria-disabled={loggedOut || undefined}
+          aria-describedby={loggedOut ? hintId : undefined}
+          loading={busy && !addPayeeOpen}
           onClick={() => void open()}
         >
           {t('survey.moonTax.manage')}
         </Button>
-        {characterId === null && (
-          <span className="w-full text-xs text-text-dim">{t('survey.moonTax.needLogin')}</span>
+        {loggedOut && (
+          <span id={hintId} className="w-full text-xs text-text-dim">
+            {t('survey.moonTax.needLogin')}
+          </span>
         )}
-        {failed && !offer && (
+        {failed && !addPayeeOpen && (
           <span role="alert" className="w-full text-xs text-danger">
             {t('survey.moonTax.failed')}
           </span>
         )}
       </div>
       <Modal
-        open={offer}
+        open={addPayeeOpen}
         onClose={() => {
-          setOffer(false);
+          setAddPayeeOpen(false);
           setFailed(false);
         }}
         title={t('survey.moonTax.addPayee.title')}
@@ -258,7 +274,12 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
             </p>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => void openTab(null)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-disabled={busy || undefined}
+              onClick={() => void skip()}
+            >
               {t('survey.moonTax.addPayee.skip')}
             </Button>
             <Button variant="primary" size="sm" loading={busy} onClick={() => void addPayee()}>

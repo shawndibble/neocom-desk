@@ -148,9 +148,12 @@ describe('MoonTaxReadout', () => {
     expect(screen.getByText('8%')).toBeTruthy();
     expect(screen.getByText('Moon Corp').className).not.toContain('text-accent');
     expect(screen.queryByRole('textbox')).toBeNull();
-    const manage = screen.getByRole('button', { name: 'Manage Taxes' }) as HTMLButtonElement;
-    expect(manage.disabled).toBe(true);
-    expect(screen.getByText('Login to access')).toBeTruthy();
+    const manage = screen.getByRole('button', { name: 'Manage Taxes' });
+    expect(manage.getAttribute('aria-disabled')).toBe('true');
+    expect(manage.getAttribute('aria-describedby')).toBe(screen.getByText('Login to access').id);
+    fireEvent.click(manage);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
   });
 
   it("opens the Tax tab on the viewer's own Payee by that name, keeping their rate", async () => {
@@ -184,5 +187,30 @@ describe('MoonTaxReadout', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open without adding' }));
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
     expect(await db.payees.count()).toBe(0);
+  });
+
+  it('stays on the survey when the dialog is closed', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    renderReadout();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
+    await screen.findByRole('dialog');
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
+    expect(await db.payees.count()).toBe(0);
+  });
+
+  it('says so and stays when the Payee cannot be added', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    renderReadout();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
+    await screen.findByRole('dialog');
+    const add = vi.spyOn(db.payees, 'put').mockRejectedValueOnce(new Error('quota'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Payee' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      "Couldn't save that Payee. Try again."
+    );
+    expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
+    add.mockRestore();
   });
 });

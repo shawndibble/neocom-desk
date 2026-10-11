@@ -8,6 +8,7 @@
  * reason is the same short "Login to…" line Manage Taxes shows. The status
  * lines take the whole row, so the caller's row wraps them under the button.
  */
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useSetDestination } from '@/features/travel/useSetDestination';
@@ -15,6 +16,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 
 export function SurveyWaypointButton({ location }: { location: { id: number; name: string } }) {
   const { t } = useTranslation();
+  const hintId = useId();
   const loggedOut = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null)) === null;
   const destination = useSetDestination(location.id, location.name);
   const { sending, outcome, send } = destination;
@@ -24,7 +26,9 @@ export function SurveyWaypointButton({ location }: { location: { id: number; nam
       <Button
         size="sm"
         className="touch:min-h-11 sm:ml-auto"
-        disabled={blockedReason !== null}
+        // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
+        aria-disabled={blockedReason !== null || undefined}
+        aria-describedby={blockedReason !== null ? hintId : undefined}
         loading={sending}
         aria-label={t('survey.info.setWaypointTo', { placeName: location.name })}
         onClick={send}
@@ -32,7 +36,9 @@ export function SurveyWaypointButton({ location }: { location: { id: number; nam
         {t('survey.info.setWaypoint')}
       </Button>
       {blockedReason !== null && (
-        <span className="w-full text-xs text-text-dim">{blockedReason}</span>
+        <span id={hintId} className="w-full text-xs text-text-dim">
+          {blockedReason}
+        </span>
       )}
       {outcome && (
         <span
