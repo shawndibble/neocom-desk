@@ -156,7 +156,7 @@ export function SurveyBoard({
   const copyButton = (current: SurveySummary, link: string) => (
     <SurveyCopyButton
       outcome={outcome}
-      onCopyChat={() => copy('chat', surveyChatMessage(current, link, labels))}
+      onCopyChat={() => copy('chat', surveyChatMessage(current, link, labels, now))}
       onCopyLink={() => copy('link', link)}
     />
   );

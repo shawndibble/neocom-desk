@@ -7,6 +7,7 @@
  * plain fixtures.
  */
 import type { DeadlineSeverity } from '@/engine/severity';
+import type { EsiEndpointId } from '@/esi/registry';
 import type { StockBoardData } from '@/features/stockTargets/stockBoard';
 import type { ExtractionPrices } from '@/features/character/useExtractionPrices';
 import type { OpenOrdersPageSnapshot } from '@/features/market/openOrdersPageSnapshot';
@@ -33,6 +34,7 @@ import type {
   LocationWidgetData,
   LpWidgetData,
   HaulingWidgetData,
+  JumpTimersWidgetData,
   SurveyWidgetData,
   MiningYieldWidgetData,
   NetWorthWidgetData,
@@ -154,6 +156,8 @@ export interface KindView {
   to: string | null;
   /** Overrides the kind's own empty message, when the reason is not "nothing there". */
   emptyMessage?: string;
+  /** Endpoints whose permission is missing while the rest of the widget reads fine: a Grant access is drawn under the body. */
+  grantEndpoints?: readonly EsiEndpointId[];
   /** Text for a link from the empty state to `to`, for a kind whose page is where its data gets made. */
   emptyLinkLabel?: string;
   /**
@@ -204,6 +208,7 @@ export interface FeedMap {
   survey: SurveyWidgetData;
   hauling: HaulingWidgetData;
   clones: ClonesWidgetData;
+  jumpTimers: JumpTimersWidgetData;
   location: LocationWidgetData;
   routeSafety: RouteSafetyWidgetData;
   kills: KillsWidgetData;

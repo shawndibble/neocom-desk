@@ -67,6 +67,7 @@ export const SCOPE_GROUPS = [
   'currentShip',
   'corp',
   'structureMarkets',
+  'jumpFatigue',
 ] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
@@ -164,6 +165,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   structureMarkets: {
     labelKey: 'permissions.structureMarkets.label',
     captionKey: 'permissions.structureMarkets.caption',
+    defaultOn: false,
+  },
+  jumpFatigue: {
+    labelKey: 'permissions.jumpFatigue.label',
+    captionKey: 'permissions.jumpFatigue.caption',
     defaultOn: false,
   },
 };
@@ -416,6 +422,11 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/clones',
     scope: 'esi-clones.read_clones.v1',
     group: 'characterDetails',
+  },
+  getCharacterFatigue: {
+    route: '/characters/{character_id}/fatigue',
+    scope: 'esi-characters.read_fatigue.v1',
+    group: 'jumpFatigue',
   },
   getUniverseStructure: {
     route: '/universe/structures/{structure_id}',

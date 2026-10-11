@@ -81,8 +81,7 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'number',
     size: 'S',
-    soon: true,
-    endpoints: ['getCharacterClones'],
+    endpoints: ['getCharacterClones', 'getCharacterFatigue'],
   },
   clones: {
     category: 'character',

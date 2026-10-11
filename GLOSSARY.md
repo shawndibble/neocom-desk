@@ -20,7 +20,7 @@ here — they go one per file in `docs/context/decisions/`.
   the event id otherwise). A danger type nobody has acknowledged also raises
   the **Danger banner**. Distinct from the browser notification the same
   fire may also raise: two delivery channels, one event.
-- **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
+- **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend — except the blueprints a **Member** opts to share with a **Community** (ADR 0018).
 - **Appraisal**: A Market page tab that prices a pasted pile of items — loot,
   a haul, a shopping list, or a whole EFT ship fit — at a **Trade Hub**, on
   both sides of the book at once: what it fetches sold into buy orders, and
@@ -196,6 +196,22 @@ here — they go one per file in `docs/context/decisions/`.
   one obligation — almost always a mining session that ran past midnight UTC,
   which ESI's per-day ledger splits in two. Stored as ordinary Assignments on
   one Payee and one tax %; each day keeps its own ore and value.
+- **Community**: A named set of **Members** under one admin, who pool
+  chosen parts of their libraries — blueprints first. Joined only by an invite
+  link; leaving or being removed deletes that Member's shared data at once.
+  Distinct from a **Build Group**, which groups plans, not people. The UI
+  says "Communities"; the bare word "Group" stays unused here because it
+  already names the Build Group.
+- **Community Library**: A **Community** page tab listing every blueprint
+  against the **Members** who share it, with a "missing from the Community"
+  filter. Its rows are every blueprint reachable by any route — market,
+  contract-only or LP store — so a gap is a blueprint nobody in the Community
+  holds.
+- **Community Offer**: A **BPC Sourcing** row sourced from a **Shared
+  Blueprint** at 0 ISK, named for the **Member** holding it. Distinct from a
+  contract **Offer**: nothing is listed or bought. A Shared BPO appears as
+  "ask <name> to copy", and never as a source for a reaction formula, which
+  cannot be copied.
 - **Compare**: A resizable bottom drawer over the **Compare Set**, not a tab —
   it opens beside the order book, since comparing happens _while_ browsing.
   Shows Prices and Attributes views. Distinct from **Appraisal**'s **Compare
@@ -399,6 +415,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Market Region**: A region that can actually hold orders. Wormhole, Abyssal and the unreachable dev regions never do; having an NPC station is not the test.
 - **Material Price Basis**: Which side of a Build Plan's **Trade Hub** order book its materials are costed at: sell orders (buy now) or buy orders (place orders and wait). Stored per plan; absent reads as sell. Materials only: the product is always valued at the hub's lowest sell. A material the chosen side cannot price is unpriceable, never re-quoted at the other side.
 - **Manual Ore Tag**: A pilot's hand-classification of an ore type the SDE-derived allowlists don't recognise: "Tag as moon ore" (group it into **Mining Ledger Entries**) or "Ignore" (treat it as ordinary ore/ice). Device-local and never synced; a stop-gap until the next SDE build. Reversible.
+- **Member**: One Character that has joined a **Community**, never a person:
+  an account's alts join separately and appear separately. EVE exposes no
+  account identity (see **Account**), so none is invented here.
 - **Mining Ledger Entry**: One row of the Moon Mining Tax ledger, derived (not stored) from ESI's personal mining ledger: every moon-goo row for one (character, EVE/UTC date, solar system), summed per ore type.
 - **Multi-Type Contract**: A public contract whose for-sale lines span more than one distinct item type. Its price is a real, indivisible ask for the whole contract, never attributed to any single line as that item's own price.
 - **Notification Allow-List**: The closed set of EVE Notification `type` strings the app delivers. A type outside it is dropped at the poller.
@@ -490,6 +509,10 @@ here — they go one per file in `docs/context/decisions/`.
 - **Survey chat message**: A four-line summary of a Survey for pasting into game chat: status with finish time and time left, a block bar with the percent, the rocks left by short ore name, and the link. Written in words and block characters because only bold works in game chat.
 - **Share Link**: A short `/s/<id>` link to something a pilot chose to share, lasting a fixed 7 days from creation. Its type names the page it opens: a **Shared Appraisal**, a **Shared D-Scan**, a **Fitting**, or a **Survey**. It never names who shared it, except a Survey, which names its owner. A Fitting's Share Link wraps that Fitting's **Fitting Share Code**, which is permanent and is not itself a Share Link.
 - **Shared Appraisal**: An **Appraisal** frozen at the prices it had when its **Share Link** was made, with its **Trade Hub**, **Price Percent** and the time it was priced. Never re-priced, read-only, and not a quote: it commits nobody to buying at those prices.
+- **Shared Blueprint**: One blueprint instance a **Member** chose to share
+  with a **Community** — type, ME/TE, runs (BPO or BPC) and the station or
+  structure it sits in. Chosen per Community, none by default, and stamped
+  with when it was last refreshed so a stale one reads as stale.
 - **Shared D-Scan**: A pasted D-Scan stored in a **Share Link** as its raw scan text, never just the counts; the recipient's **Fleet board** is rebuilt from that text. Read-only, and cannot be revoked: expiry is the only end of the link.
 - **Fleet board**: A D-Scan read as its ships grouped by role (Capitals, Industrial, Transport, Support, DPS, Drones and deployables, Structures and wrecks), with each role's count, percent and ship distances. Counts and distances only: D-Scan gives no bearing and never names a pilot.
 - **Danger read**: The answer a D-Scan view opens with: "am I in danger, and what should I watch?" A level (Clear on scan, Watch, Danger, Busy), then **Watch these** (ranked groups of identical hulls that can pin, reinforce, hurt or find the pilot) and **Leave or re-check if**. Read for the pilot's own ship; the rest sits beneath as the **Full scan**. States a condition, never a verdict.

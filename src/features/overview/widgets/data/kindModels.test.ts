@@ -3,6 +3,7 @@ import { resolveWidget } from '../state';
 import { buildView, feedsFor, KIND_FEEDS } from './models';
 import { humanizeRefType } from './kindModels';
 import type {
+  JumpTimersWidgetData,
   HaulingWidgetData,
   KillsWidgetData,
   RouteSafetyWidgetData,
@@ -874,6 +875,82 @@ describe('hauling', () => {
     expect(resolved.state).toBe('failed');
     expect(resolved.showLastGood).toBe(true);
     expect(failed.number.value).toBe('48M');
+  });
+});
+
+describe('jumpTimers', () => {
+  const HOUR = 3_600_000;
+  const data = (over: Partial<JumpTimersWidgetData> = {}): JumpTimersWidgetData => ({
+    clone: { state: 'read', endsAt: NOW + 3 * HOUR },
+    fatigue: { state: 'read', endsAt: NOW + 5 * HOUR },
+    fetchedAt: new Date(NOW),
+    ...over,
+  });
+
+  it('reads from its own feed and links to the Clones page', () => {
+    expect(KIND_FEEDS.jumpTimers).toEqual(['jumpTimers']);
+    expect(buildView('jumpTimers', { jumpTimers: ok(data()) }, ctx()).to).toBe('/clones');
+  });
+
+  it('leads with the longest timer and tables each', () => {
+    const view = buildView('jumpTimers', { jumpTimers: ok(data()) }, ctx());
+    expect(stateOf(view)).toBe('ok');
+    expect(view.number.value).toBe('5h 0m');
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      ['overview.widgets.jumpTimers.clone', '3h 0m'],
+      ['overview.widgets.jumpTimers.fatigue', '5h 0m'],
+    ]);
+    expect(view.grantEndpoints).toBeUndefined();
+  });
+
+  it('says Ready, and No fatigue, when nothing is running or a timer has passed', () => {
+    const idle = data({
+      clone: { state: 'read', endsAt: null },
+      fatigue: { state: 'read', endsAt: NOW - 1 },
+    });
+    const view = buildView('jumpTimers', { jumpTimers: ok(idle) }, ctx());
+    expect(stateOf(view)).toBe('ok');
+    expect(view.number.value).toBe('overview.widgets.jumpTimers.ready');
+    expect(view.table?.rows.map((r) => r.cells[1])).toEqual([
+      'overview.widgets.jumpTimers.ready',
+      'overview.widgets.jumpTimers.none',
+    ]);
+  });
+
+  it('keeps the readable timer and asks only for the missing endpoint on a partial grant', () => {
+    const partial = data({ fatigue: { state: 'needsPermission' } });
+    const view = buildView('jumpTimers', { jumpTimers: ok(partial) }, ctx());
+    expect(stateOf(view)).toBe('ok');
+    expect(view.number.value).toBe('3h 0m');
+    expect(view.grantEndpoints).toEqual(['getCharacterFatigue']);
+  });
+
+  it('needs permission when neither timer can be read', () => {
+    const none = data({
+      clone: { state: 'needsPermission' },
+      fatigue: { state: 'needsPermission' },
+      fetchedAt: null,
+    });
+    expect(stateOf(buildView('jumpTimers', { jumpTimers: ok(none) }, ctx()))).toBe(
+      'needsPermission'
+    );
+  });
+
+  it('is loading before the first read and failed, keeping the last value, when a read fails', () => {
+    expect(
+      stateOf(
+        buildView('jumpTimers', { jumpTimers: { data: null, error: false, loading: true } }, ctx())
+      )
+    ).toBe('loading');
+    const failed = buildView(
+      'jumpTimers',
+      { jumpTimers: { data: data(), error: true, loading: false } },
+      ctx()
+    );
+    const resolved = resolveWidget(failed.status);
+    expect(resolved.state).toBe('failed');
+    expect(resolved.showLastGood).toBe(true);
+    expect(failed.number.value).toBe('5h 0m');
   });
 });
 

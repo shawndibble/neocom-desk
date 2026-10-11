@@ -10,6 +10,7 @@ import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
 import { journalRefTypeBreakdown } from '@/features/character/walletJournalFilter';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { eveToday, rangeDates, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
+import { longestRemainingSeconds, secondsLeft } from '@/engine/jumpTimers';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { LayerId } from '@/engine/netWorth/series';
@@ -41,6 +42,7 @@ export const KIND_FEED_LISTS: Readonly<Record<string, readonly FeedId[]>> = {
   miningYield: ['miningYield'],
   lp: ['lp'],
   clones: ['clones'],
+  jumpTimers: ['jumpTimers'],
   walletFlow: ['journal'],
   location: ['location'],
   survey: ['survey'],
@@ -352,6 +354,62 @@ const hauling: Builder = (feeds, { t }) => {
       })),
     },
     summary: t(`${D}.hauling.summary`),
+  };
+};
+
+// --- Jump timers --------------------------------------------------------------------
+
+const jumpTimers: Builder = (feeds, { t, now }) => {
+  const feed = feeds.jumpTimers;
+  const data = feed?.data ?? null;
+  const to = '/clones';
+  if (!data) return blank(to, statusOf(feed));
+  const timers = [
+    { key: 'clone', read: data.clone, endpoint: 'getCharacterClones', idle: 'ready' },
+    { key: 'fatigue', read: data.fatigue, endpoint: 'getCharacterFatigue', idle: 'none' },
+  ] as const;
+  const missing = timers.filter((x) => x.read.state === 'needsPermission');
+  const label = (x: (typeof timers)[number]) => {
+    if (x.read.state === 'needsPermission') return t(`${W}.jumpTimers.needsPermission`);
+    const left = secondsLeft(x.read.endsAt, now);
+    return left > 0 ? formatCountdown(left) : t(`${W}.jumpTimers.${x.idle}`);
+  };
+  const longest = longestRemainingSeconds(
+    timers.map((x) => (x.read.state === 'read' ? x.read.endsAt : null)),
+    now
+  );
+  const firstMissing = missing[0];
+  return {
+    ...blank(to, statusOf(feed, { needsPermission: missing.length === timers.length })),
+    fetchedAt: data.fetchedAt,
+    number: {
+      value: longest > 0 ? formatCountdown(longest) : t(`${W}.jumpTimers.ready`),
+      secondary: firstMissing
+        ? {
+            text: t(`${W}.jumpTimers.missing`, { timer: t(`${W}.jumpTimers.${firstMissing.key}`) }),
+          }
+        : undefined,
+      tone: 'clear',
+    },
+    rows: [],
+    table: {
+      columns: [
+        { key: 'timer', label: t(`${W}.jumpTimers.col.timer`), priority: 0 },
+        { key: 'left', label: t(`${W}.jumpTimers.col.left`), align: 'end', priority: 1 },
+      ],
+      rows: timers.map((x) => ({
+        key: x.key,
+        cells: [t(`${W}.jumpTimers.${x.key}`), label(x)],
+      })),
+    },
+    summary: t(`${W}.jumpTimers.summary`, {
+      clone: label(timers[0]),
+      fatigue: label(timers[1]),
+    }),
+    grantEndpoints:
+      missing.length > 0 && missing.length < timers.length
+        ? missing.map((x) => x.endpoint)
+        : undefined,
   };
 };
 
@@ -717,6 +775,7 @@ export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   location,
   survey,
   hauling,
+  jumpTimers,
   routeSafety,
   kills,
 };
