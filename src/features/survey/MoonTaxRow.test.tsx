@@ -150,7 +150,7 @@ describe('MoonTaxReadout', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
     const manage = screen.getByRole('button', { name: 'Manage Taxes' });
     expect(manage.getAttribute('aria-disabled')).toBe('true');
-    expect(manage.getAttribute('aria-describedby')).toBe(screen.getByText('Login to access').id);
+    expect(manage.getAttribute('aria-describedby')).toBe(screen.getByText('Log in to access').id);
     fireEvent.click(manage);
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
@@ -160,7 +160,7 @@ describe('MoonTaxReadout', () => {
     useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
     const mine = await createPayee(7, { name: 'moon corp', defaultTaxPct: 5 });
     renderReadout();
-    expect(screen.queryByText('Login to access')).toBeNull();
+    expect(screen.queryByText('Log in to access')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
     expect(screen.queryByRole('dialog')).toBeNull();
