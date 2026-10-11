@@ -7435,6 +7435,7 @@
       "appraisal": "Appraisal"
     },
     "hauling": {
+      "dataAgeNote": "Prices come from ESI's regional market orders, which EVE refreshes about every 5 minutes.",
       "title": "Hauling",
       "from": "From",
       "to": "To",
