@@ -12,6 +12,7 @@
 import { uniqueTransactions } from './uniqueTransactions';
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import type { SystemJumpsEntry, SystemKillsEntry } from '@/engine/route/routeSafety';
+import type { IncursionEntry } from '@/engine/incursions/incursionRows';
 import { esiFetch, recordEsiActivity, outcomeForError, attachEndpointId } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
@@ -1024,6 +1025,13 @@ export function getIndustrySystemCostIndices(
     ...options,
     endpointId: 'getIndustrySystemCostIndices',
   });
+}
+
+// --- GET /incursions (public) ---
+
+/** Every active Incursion: its constellation, staging system, state and influence. */
+export function getIncursions(options: EndpointOptions = {}): Promise<EsiResult<IncursionEntry[]>> {
+  return esiFetch<IncursionEntry[]>('/incursions', { ...options, endpointId: 'getIncursions' });
 }
 
 // --- GET /universe/system_kills (public) ---

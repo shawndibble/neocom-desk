@@ -51,7 +51,7 @@
  * pins, which belong to legs by position — except the first stop added to a
  * Route via link, which is the leg its pin was made for.
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
@@ -86,11 +86,13 @@ import { formatDuration } from '@/lib/duration';
 import { routeMassCheck } from '@/engine/route/jumpMass';
 import { useRouteShipMass } from '@/features/route/routeShip';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useUrlParams } from '@/lib/useUrlState';
 import { AnsiblexGatesDialog, type AnsiblexDialogMode } from './AnsiblexGatesDialog';
 import { useAnsiblexGates } from './ansiblexGates';
 import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
 import { LegBody, type LegWaysProps } from './LegWays';
+import { IncursionsPanel, type RouteAction } from './IncursionsPanel';
 import { RouteRulesPanel } from './RouteRulesPanel';
 import { RouteStrip } from './RouteStrip';
 import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
@@ -306,6 +308,34 @@ export function RouteSafetyTab({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: 
       ? null
       : () => setAvoidTarget({ systemId: row.systemId, name: routeSystemName(row) });
 
+  // "Incursions near you": its Route adds the staging system as the trip's next stop.
+  const focusAfterCommit = useFocusAfterCommit();
+  const focusStopsOnChange = useRef(false);
+  const incursionRouteAction = (systemId: number): RouteAction =>
+    systemId === fromId || stops.includes(systemId)
+      ? 'on-route'
+      : stops.length >= MAX_STOPS
+        ? 'full'
+        : 'add';
+  const routeToIncursion = (systemId: number) => {
+    if (incursionRouteAction(systemId) !== 'add') return;
+    setParams(
+      { stops: [...stops, systemId], to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
+      { push: true }
+    );
+    focusStopsOnChange.current = true;
+  };
+  // Focus follows the stop to where it landed (§7), once the link's new stops
+  // have rendered; a folded phone panel falls back to the panel itself.
+  useEffect(() => {
+    if (!focusStopsOnChange.current) return;
+    focusStopsOnChange.current = false;
+    focusAfterCommit(
+      () => document.querySelector<HTMLElement>('[data-stops-list]'),
+      () => document.querySelector<HTMLElement>('[data-stops-panel]')
+    );
+  }, [stopsKey, focusAfterCommit]);
+
   const fromTrigger =
     fromId === null
       ? t('travel.pickSystem')
@@ -340,7 +370,7 @@ export function RouteSafetyTab({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: 
           dissolves (`contents`) so Stops, the route, then Route rules stack in order. */}
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
           <div className="contents xl:block xl:space-y-4">
-            <div className="order-1 xl:order-none">
+            <div className="order-1 xl:order-none" data-stops-panel>
               <StopsPanel
                 fromId={fromId}
                 fromName={fromId === null ? fromTrigger : nameOf(fromId)}
@@ -400,6 +430,13 @@ export function RouteSafetyTab({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: 
                   range: jumpRange,
                   onRangeChange: (range) => void useRouteJumpRange.getState().setValue(range),
                 }}
+              />
+            </div>
+            <div className="order-4 xl:order-none">
+              <IncursionsPanel
+                current={current}
+                routeAction={incursionRouteAction}
+                onRoute={routeToIncursion}
               />
             </div>
           </div>

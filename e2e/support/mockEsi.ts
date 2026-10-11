@@ -149,6 +149,8 @@ export async function installEsiMock(page: Page): Promise<void> {
     if (path === `/corporations/${CORPORATION_ID}`) return json(CORPORATION_INFO);
     if (path === `/alliances/${ALLIANCE_ID}`) return json(ALLIANCE_INFO);
     if (path === '/markets/prices') return json(MARKET_PRICES);
+    // Route Safety's Incursions near you (issue #3540): none active unless a spec overrides.
+    if (path === '/incursions') return json([]);
     if (path === '/industry/systems') return json(INDUSTRY_SYSTEMS);
 
     // usePublicInfo.loadMany's bulk roster lookup (src/stores/publicInfo.ts):

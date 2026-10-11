@@ -564,6 +564,11 @@ export const ESI_REGISTRY = {
     route: '/industry/systems',
     scope: PUBLIC,
   },
+  // Route Safety's "Incursions near you" (issue #3540): one call lists them all.
+  getIncursions: {
+    route: '/incursions',
+    scope: PUBLIC,
+  },
   // Route Safety (issue #2328): one call each answers the whole universe, so a
   // route of any length costs two requests, never one per system.
   getUniverseSystemKills: {
