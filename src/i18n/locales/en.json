@@ -2215,6 +2215,20 @@
       "save": "Save",
       "cancel": "Cancel"
     },
+    "fitGoal": {
+      "add": "Add fit goal…",
+      "title": "Fit goal",
+      "empty": "No saved fittings yet.",
+      "loading": "Checking…",
+      "flyableNow": "Flyable now",
+      "flyableOn": "Flyable on {{date}}",
+      "notByEnd_one": "Not by end of plan · {{count}} skill level missing",
+      "notByEnd_other": "Not by end of plan · {{count}} skill levels missing",
+      "confirm_one": "{{name}} needs {{count}} skill level the plan doesn’t train. Add it, with its prerequisites?",
+      "confirm_other": "{{name}} needs {{count}} skill levels the plan doesn’t train. Add them, with their prerequisites?",
+      "confirmAdd": "Add and set goal",
+      "flyable": "Flyable {{date}}"
+    },
     "jumpToAdded": "Jump to it",
     "certified": {
       "title": "New certified plan",

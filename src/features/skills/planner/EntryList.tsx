@@ -355,7 +355,9 @@ function MilestoneMark({ status }: { status: MilestoneStatus }) {
   const { t } = useTranslation();
   const dateText =
     status.state === 'projected' && status.finish
-      ? formatLocalDate(status.finish)
+      ? status.milestone.fittingId !== undefined
+        ? t('plans.fitGoal.flyable', { date: formatLocalDate(status.finish) })
+        : formatLocalDate(status.finish)
       : t(milestoneStateKey(status.state));
   return (
     <Tooltip content={status.milestone.name}>

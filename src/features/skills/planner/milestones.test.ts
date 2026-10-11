@@ -3,8 +3,10 @@ import {
   addMilestone,
   MAX_MILESTONE_NAME_LENGTH,
   normalizeMilestones,
+  reanchorFitGoals,
   removeMilestone,
   renameMilestone,
+  upsertFitGoal,
 } from './milestones';
 import type { PlanMilestone } from '@/engine/types';
 
@@ -105,5 +107,60 @@ describe('removeMilestone', () => {
 
   it('is a no-op when the id is not found', () => {
     expect(removeMilestone([milestone()], 'missing')).toEqual([milestone()]);
+  });
+});
+
+describe('fit goals', () => {
+  const fit = { id: 'fit-1', name: 'Loki PvP' };
+
+  it('upsertFitGoal adds one, then moves it rather than adding a second', () => {
+    const first = upsertFitGoal([], fit, { skillTypeID: 100, level: 3 });
+    expect(first).toEqual([
+      expect.objectContaining({ name: 'Loki PvP', fittingId: 'fit-1', skillTypeID: 100, level: 3 }),
+    ]);
+    const second = upsertFitGoal(first, fit, { skillTypeID: 200, level: 4 });
+    expect(second).toHaveLength(1);
+    expect(second[0]).toMatchObject({ id: first[0].id, skillTypeID: 200, level: 4 });
+  });
+
+  it('lets two fit goals share an anchor', () => {
+    const a = upsertFitGoal([], fit, { skillTypeID: 100, level: 3 });
+    const b = upsertFitGoal(a, { id: 'fit-2', name: 'Other' }, { skillTypeID: 100, level: 3 });
+    expect(normalizeMilestones(b)).toHaveLength(2);
+  });
+
+  it('reanchorFitGoals follows the Fitting and the plan order, and returns the same list when nothing moved', () => {
+    const goals = upsertFitGoal([], fit, { skillTypeID: 100, level: 3 });
+    const fits = new Map([
+      [
+        'fit-1',
+        {
+          name: 'Loki PvP',
+          needed: [
+            { skillTypeID: 100, targetLevel: 3 },
+            { skillTypeID: 200, targetLevel: 4 },
+          ],
+        },
+      ],
+    ]);
+    const steps = [
+      { skillTypeID: 100, level: 3 },
+      { skillTypeID: 200, level: 4 },
+    ];
+    const moved = reanchorFitGoals(goals, fits, new Map(), steps);
+    expect(moved?.[0]).toMatchObject({ skillTypeID: 200, level: 4 });
+    expect(reanchorFitGoals(moved, fits, new Map(), steps)).toBe(moved);
+  });
+
+  it('reanchorFitGoals renames after the Fitting and leaves a deleted Fitting alone', () => {
+    const goals = upsertFitGoal([], fit, { skillTypeID: 100, level: 3 });
+    const renamed = reanchorFitGoals(
+      goals,
+      new Map([['fit-1', { name: 'Loki Solo', needed: [{ skillTypeID: 100, targetLevel: 3 }] }]]),
+      new Map(),
+      [{ skillTypeID: 100, level: 3 }]
+    );
+    expect(renamed?.[0].name).toBe('Loki Solo');
+    expect(reanchorFitGoals(goals, new Map(), new Map(), [])).toBe(goals);
   });
 });

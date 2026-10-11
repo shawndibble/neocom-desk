@@ -35,14 +35,22 @@ export function milestoneKey(milestone: PlanMilestone): StepKey {
  * anchor names a skill the catalog no longer knows. Orphaned is never
  * silently dropped; it is the caller's job to still list it, with a remove
  * action.
+ *
+ * A fit goal whose Fitting is in `goneFittingIds` (deleted from My Fittings)
+ * is 'orphaned' regardless of its anchor: the date it tracked no longer
+ * means anything.
  */
 export function milestoneStates(
   stepByKey: ReadonlyMap<StepKey, ScheduledStep>,
   startDate: Date,
   milestones: readonly PlanMilestone[],
-  trainedSkills: ReadonlyMap<number, TrainedSkill>
+  trainedSkills: ReadonlyMap<number, TrainedSkill>,
+  goneFittingIds: ReadonlySet<string> = new Set()
 ): MilestoneStatus[] {
   const statuses = milestones.map((milestone): MilestoneStatus => {
+    if (milestone.fittingId !== undefined && goneFittingIds.has(milestone.fittingId)) {
+      return { milestone, state: 'orphaned', finish: null };
+    }
     const step = stepByKey.get(milestoneKey(milestone));
     if (step) {
       return {

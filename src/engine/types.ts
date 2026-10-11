@@ -92,6 +92,12 @@ export interface PlanMilestone {
   name: string;
   skillTypeID: number;
   level: number;
+  /**
+   * Set when the goal comes from a saved Fitting (My Fittings record id): the
+   * anchor is then the latest step that Fitting needs, kept current by the
+   * plan editor, and the name follows the Fitting.
+   */
+  fittingId?: string;
 }
 
 /** Normalized single-level training step. */
