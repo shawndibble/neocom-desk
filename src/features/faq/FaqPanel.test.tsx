@@ -69,6 +69,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.navHidden': /pages hidden from the navigation/i,
   'sync.navSetupAnswered': /answered the rail question/i,
   'sync.overviewCardOrder': /hidden and reordered Overview cards/i,
+  'sync.overviewLayout': /your Overview layout/i,
   'sync.avoidedSystems': /avoided systems/i,
   'sync.avoidedSystemsEnabled': /whether the list is on/i,
   'sync.routeHoles': /through Thera \/ Turnur/i,

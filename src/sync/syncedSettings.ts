@@ -221,6 +221,15 @@
 // reorder made on another. Same parse, same unknown-key rule. Never deleted
 // via deleteSyncedSetting: "Reset order" writes an empty list.
 //
+// sync.overviewLayout: the Overview's widget grid — the ordered widgets with
+// their kind, size, view, name, character scope and range, one value for the
+// whole account (features/overview/widgets/layoutStore.ts). Absent means "never
+// chose", which is how first run is detected, so a reset writes the default
+// layout rather than clearing it. Its parse keeps widget kinds and fields this
+// build does not know, so an older build cannot drop a newer build's widgets.
+// Supersedes the two Overview keys above, which stay on the list to seed a
+// returning pilot's first layout. No `legacyKey`: new.
+//
 // sync.avoidedSystems: the solar system ids the pilot keeps off their routes,
 // managed from Settings → Travel (features/route/avoidedSystems.ts). One list
 // for the whole account — "I never fly through Uedama" is about the pilot, not
@@ -296,6 +305,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.oreRefiningStructureRate',
   'sync.overviewCardOrder',
   'sync.overviewHiddenCards',
+  'sync.overviewLayout',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.podKillThreshold',

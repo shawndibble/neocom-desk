@@ -1,0 +1,113 @@
+import { describe, expect, it } from 'vitest';
+import { isAddable } from './kinds';
+import {
+  BASE_KINDS,
+  ROLES,
+  ROLE_IDS,
+  basicsLayout,
+  buildLayoutFromRoles,
+  defaultLayout,
+} from './roles';
+
+const kindsOf = (l: { widgets: { kind: string }[] }) => l.widgets.map((w) => w.kind);
+
+describe('ROLES', () => {
+  it('has the six roles and the four base kinds', () => {
+    expect(ROLE_IDS).toHaveLength(6);
+    expect(BASE_KINDS).toEqual(['wallet', 'training', 'comingUp', 'mail']);
+    expect(ROLES.trader).toEqual(['orders', 'priceWatch', 'stock', 'walletFlow', 'netWorth']);
+    expect(ROLES.explorerHauler).toEqual(['routeSafety', 'hauling', 'incursions', 'location']);
+  });
+});
+
+describe('buildLayoutFromRoles', () => {
+  const ids = () => {
+    let n = 0;
+    return () => `r${++n}`;
+  };
+
+  it('puts the base four first, then role kinds in order', () => {
+    const l = buildLayoutFromRoles(['trader'], ids());
+    expect(kindsOf(l)).toEqual([
+      'wallet',
+      'training',
+      'comingUp',
+      'mail',
+      'orders',
+      'priceWatch',
+      'stock',
+      'walletFlow',
+      'netWorth',
+    ]);
+    expect(l.version).toBe(1);
+  });
+
+  it('dedupes kinds shared between roles', () => {
+    const l = buildLayoutFromRoles(['trader', 'industrialist'], ids());
+    expect(kindsOf(l).filter((k) => k === 'stock')).toHaveLength(1);
+  });
+
+  it('leaves out coming-soon kinds', () => {
+    const l = buildLayoutFromRoles(['miner', 'fighter', 'explorerHauler'], ids());
+    for (const k of kindsOf(l)) expect(isAddable(k), k).toBe(true);
+    expect(kindsOf(l)).not.toContain('survey');
+    expect(kindsOf(l)).toContain('miningYield');
+    expect(kindsOf(l)).toContain('incursions');
+  });
+
+  it('gives unique ids and kind default sizes and views', () => {
+    const l = buildLayoutFromRoles(['trader'], ids());
+    expect(new Set(l.widgets.map((w) => w.id)).size).toBe(l.widgets.length);
+    const orders = l.widgets.find((w) => w.kind === 'orders')!;
+    expect(orders).toMatchObject({ size: 'M', view: 'number', scope: 'header', showOnPhone: true });
+  });
+
+  it('ignores an unknown role and with no roles is just the basics', () => {
+    expect(kindsOf(buildLayoutFromRoles(['nope' as never], ids()))).toEqual([...BASE_KINDS]);
+    expect(kindsOf(buildLayoutFromRoles([], ids()))).toEqual([...BASE_KINDS]);
+  });
+});
+
+describe('basicsLayout', () => {
+  it('is the four base kinds', () => {
+    expect(kindsOf(basicsLayout())).toEqual([...BASE_KINDS]);
+  });
+});
+
+describe('defaultLayout', () => {
+  it('is the mockup default board without coming-soon kinds', () => {
+    const l = defaultLayout();
+    expect(kindsOf(l)).toEqual([
+      'wallet',
+      'training',
+      'netWorth',
+      'orders',
+      'industry',
+      'planetary',
+      'profit',
+      'priceWatch',
+      'comingUp',
+      'mail',
+      'lp',
+      'stock',
+    ]);
+    for (const w of l.widgets) expect(isAddable(w.kind)).toBe(true);
+  });
+
+  it('uses the mockup sizes and views, within each kind views', () => {
+    const by = Object.fromEntries(defaultLayout().widgets.map((w) => [w.kind, w]));
+    expect(by.wallet).toMatchObject({ size: 'S', view: 'number' });
+    expect(by.netWorth).toMatchObject({ size: 'S', view: 'chart' });
+    expect(by.orders).toMatchObject({ size: 'M', view: 'chart' });
+    expect(by.industry).toMatchObject({ size: 'M', view: 'list' });
+    expect(by.comingUp).toMatchObject({ size: 'S', view: 'number' });
+    // priceWatch has no Chart view, so the mockup's chart falls back to List.
+    expect(by.priceWatch).toMatchObject({ size: 'M', view: 'list' });
+  });
+
+  it('has unique ids and is deterministic', () => {
+    const a = defaultLayout();
+    expect(new Set(a.widgets.map((w) => w.id)).size).toBe(a.widgets.length);
+    expect(defaultLayout()).toEqual(a);
+  });
+});
