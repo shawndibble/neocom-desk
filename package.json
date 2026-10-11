@@ -18,7 +18,8 @@
     "sde:build": "node scripts/build-sde.mjs",
     "sde:verify": "node scripts/sde-verify.mjs",
     "prepare": "husky && node scripts/verify-husky.mjs",
-    "verify-hooks": "node scripts/verify-husky.mjs"
+    "verify-hooks": "node scripts/verify-husky.mjs",
+    "storybook": "node scripts/storybook.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs}": [
@@ -56,6 +57,8 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@sentry/vite-plugin": "^5.4.0",
+    "@storybook/addon-docs": "^10.6.1",
+    "@storybook/react-vite": "^10.6.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
@@ -76,6 +79,7 @@
     "lint-staged": "^17.4.1",
     "msw": "^2.15.0",
     "prettier": "^3.9.6",
+    "storybook": "^10.6.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0",
