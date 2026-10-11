@@ -3207,36 +3207,49 @@
     "previewLabel": "Example — logged-in view",
     "previewCorp": "Deep Space Transport",
     "answersHeading": "The questions it exists to answer",
-    "answersLead": "Each of these is a page you open after logging in, with the number you would have worked out by hand already worked out.",
+    "answersLead": "Each of these is a screen from the app, filled with sample data. Select a picture to enlarge it.",
     "answers": {
       "attention": {
         "question": "Which character needs my attention?",
-        "answer": "The character list shows every pilot’s training queue at a glance: training, paused, ending soon or sitting idle. Alerts gathers what fired for every character on this device, not just the one you are looking at: skills finished, jobs ready to deliver, colonies stopped, orders undercut, mail waiting. Open a character and its board leads with the nearest deadline."
+        "answer": "Every pilot’s training queue at a glance, and one Alerts feed for what fired on any character: skills finished, jobs ready to deliver, orders undercut, mail waiting."
       },
       "orders": {
         "question": "Which of my orders is quietly losing ISK?",
-        "answer": "Open Orders is a worklist, not a list. Every order is filed under the worst thing wrong with it — undercut at your station, system or region, sitting under the price where relisting stops paying, or about to expire — worst first, across every character you fly. Open one and it prices the ways out: hold, undercut the station, dump into a standing buy order, or reprocess it and sell the materials, each net of the fee that exit actually pays, plus the trade hubs bidding more and how many jumps away they are."
+        "answer": "Open Orders files each order under the worst thing wrong with it, worst first, across every character. Open one to see what holding, undercutting, dumping into a buy order or reprocessing would net after fees."
       },
       "build": {
         "question": "Is this blueprint worth building today?",
-        "answer": "A Build Plan costs the materials, total job cost and taxes at live hub prices and answers two different questions instead of blurring them: is it cheaper than buying outright, and does it still profit once sales tax and broker fees come off. Sub-builds recurse into the same plan, owned stock is checked against what it would fetch if you sold it instead, and every figure on screen opens the rule it came from with your own values substituted in."
+        "answer": "A Build Plan costs materials, job cost and taxes at live hub prices, then says whether building beats buying and whether it still profits after sales tax and broker fees."
       },
-      "training": {
-        "question": "What is this training plan really going to cost me?",
-        "answer": "Drag skills into a plan and it schedules against the character’s real attributes, implants and queue. The optimizer places remaps for you — or at markers you drop yourself — and re-costs the plan under what-if implants and an accelerator before you spend anything. Put your characters side by side to see which of them should be training it."
+      "journal": {
+        "question": "Where did this ISK come from?",
+        "answer": "Each Wallet journal line links to the contract or item behind it, so a payment can be followed back to its source."
       },
-      "colonies": {
-        "question": "Are my colonies earning what they could?",
-        "answer": "The PI Colonies tab reads every colony and lists what is not working — idle facilities, storage that fills before you are back — then prices what is being left on the table: the ISK/hr you would add by tuning what is already built, and, as a separate figure, by rebuilding from scratch. Every rate is net of export customs and sales tax at your own Accounting level."
+      "marketJumps": {
+        "question": "What is for sale within 15 jumps?",
+        "answer": "Market shows every order for an item with its jump count from the system you pick, so you can see what a trip is worth before you make it."
       },
-      "appraisal": {
-        "question": "What is this pile of loot actually worth?",
-        "answer": "Paste straight from your inventory, a multibuy or a fitting. The appraisal prices it at the trade hub you pick three ways — sold into buy orders now or listed one step under the cheapest seller, each net of the sales tax and broker fee that route pays, and reprocessed with your own skills. Copy a ready-made sell list, or share the result as a link."
+      "routeSafety": {
+        "question": "Is this route safe right now?",
+        "answer": "Route Safety checks the route between two systems and flags the chokepoints on the way."
+      },
+      "pilot": {
+        "question": "Who is this pilot?",
+        "answer": "Pilot Lookup reads a character’s killboard history: a threat rating, kill and loss ratios, and kills per month."
+      },
+      "flyNext": {
+        "question": "Which ship can I fly next?",
+        "answer": "The Ship Tree lays hulls out by faction and marks each one “can fly” or the training time it still needs."
+      },
+      "fitting": {
+        "question": "Will this fit hold up?",
+        "answer": "Build a fit on the ring and see its DPS against a target profile."
+      },
+      "survey": {
+        "question": "How long until this belt is mined out?",
+        "answer": "Survey tracks a belt’s scans: how much is mined, a chart of it, and when it will finish."
       }
     },
-    "screenshotsHeading": "See it in action",
-    "screenshotsLead": "Screens from the app, filled with sample data. The same app runs on a desktop or installed on your phone.",
-    "screenshotsPhoneHeading": "On your phone",
     "screenshotEnlarge": "Enlarge: {{alt}}",
     "screenshots": {
       "overview": {
@@ -3250,34 +3263,6 @@
       "buildPlan": {
         "alt": "A Build Plan for an Orca: profit after fees, materials with sub-builds, and costs and revenue.",
         "caption": "Build plans with profit after fees"
-      },
-      "lpStore": {
-        "alt": "A faction loyalty store ranked by ISK per LP, with one offer’s net profit broken down.",
-        "caption": "LP offers ranked by ISK per LP"
-      },
-      "calendar": {
-        "alt": "The in-game calendar by month, beside a list of what is coming up: events, industry jobs and skill queue finishes.",
-        "caption": "The in-game calendar, outside the game"
-      },
-      "contracts": {
-        "alt": "Contract history with one item exchange contract opened to show what it held.",
-        "caption": "Every contract, and what was in it"
-      },
-      "phoneOverview": {
-        "alt": "A character’s Overview board on a phone: next deadline, training, wallet, open orders and mining tax.",
-        "caption": "Overview"
-      },
-      "phoneAlerts": {
-        "alt": "Alerts on a phone, grouped by type across every character.",
-        "caption": "Alerts"
-      },
-      "phoneWallet": {
-        "alt": "A wallet balance chart and loyalty point totals on a phone.",
-        "caption": "Wallet"
-      },
-      "phonePriceHistory": {
-        "alt": "A market price history chart on a phone, with daily range, average and volume.",
-        "caption": "Price history"
       },
       "survey": {
         "alt": "A Mining Survey: percent of the field mined, volume left over time by ore, mining pace and an estimated finish time.",
@@ -3295,10 +3280,6 @@
         "alt": "The wallet journal with links from each line to its contract and the item that was traded.",
         "caption": "A journal that links to what each line was"
       },
-      "piPlan": {
-        "alt": "The Planetary Industry plan: ranked products to build, the planet types each one needs and ISK per day.",
-        "caption": "Planetary Industry plans ranked by ISK per day"
-      },
       "phoneMarketJumps": {
         "alt": "The market order book on a phone, limited to stations within 15 jumps of a chosen system, with jump counts per order.",
         "caption": "Market within 15 jumps"
@@ -3310,10 +3291,6 @@
       "phonePilotLookup": {
         "alt": "Pilot Lookup on a phone: a pilot’s corporation, threat reading, danger and fleet-size ratios and kills per month by kind of space.",
         "caption": "Pilot lookup"
-      },
-      "phoneSurvey": {
-        "alt": "A Mining Survey on a phone, with the progress chart and the finish time.",
-        "caption": "Mining survey"
       }
     },
     "featuresHeading": "Everything outside the client",
@@ -3325,89 +3302,55 @@
     },
     "features": {
       "corp": {
-        "name": "Corporation",
-        "desc": "Ops board, wallet divisions, corp industry jobs, division-grouped assets and a member roster that flags who has gone dark. Gated on your in-game roles.",
-        "tag": "Role-gated"
+        "name": "Corporation"
       },
       "alerts": {
-        "name": "Alerts",
-        "desc": "Every alert this device has fired, grouped by type — including the ones belonging to a character you were not looking at. Search it, filter by character, mute a type, or dismiss a whole group from its row.",
-        "tag": "Every character"
+        "name": "Alerts"
       },
       "notifications": {
-        "name": "Notifications",
-        "desc": "Per character, per event. Skills, industry jobs, extractors, calendar events and — with the corporation grant — structure fuel carry a timestamp, so those arrive with the app closed; order fills, mail, contracts and price alerts fire while it is open.",
-        "tag": "Push"
+        "name": "Notifications"
       },
       "skills": {
-        "name": "Skills",
-        "desc": "Drag-and-drop skill plans, a remap-, implant- and accelerator-aware optimizer, live queue import, ship mastery and fit checks, and a side-by-side character comparison.",
-        "tag": "Planning"
+        "name": "Skills"
       },
       "clones": {
-        "name": "Clones",
-        "desc": "Your jump clones with where they are, how far, and what each wears, the one jump cooldown they all share, what you are wearing now, and which clone finishes your training queue soonest.",
-        "tag": "Read-only"
+        "name": "Clones"
       },
       "industry": {
-        "name": "Industry",
-        "desc": "Build plans for manufacturing and reactions: materials, total job costs, facility rigs and taxes at live hub prices. A production log tracks what each run really made, Opportunities ranks the blueprints you own and scans the market for what is profitable to build, and BPC Search covers every public blueprint-copy contract by ME/TE, runs, price and jumps.",
-        "tag": "Manufacturing"
+        "name": "Industry"
       },
       "ships": {
-        "name": "Ships",
-        "desc": "Build a Fitting against a ship's actual skills and implants, with DPS, tank and cap against a target profile you set, save it to My Fittings with a share code, and compare fits side by side. The Ship Tree maps every hull by faction and race, ladder or map view, showing which you can already fly.",
-        "tag": "Fitting & Ship Tree"
+        "name": "Ships"
       },
       "miningTax": {
-        "name": "Mining",
-        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus a tax ledger for moons you mine in someone else’s space: each day’s ore in each system assigned to the payee you owe, tax and ISK snapshotted at assignment, splits, settle-up and payment matching. A Survey tab turns pasted Survey Scanner results into field progress, pace and a finish time you can share with your fleet by link.",
-        "tag": "Ledger"
+        "name": "Mining"
       },
       "planetary": {
-        "name": "Planetary Industry",
-        "desc": "Colonies, extraction timers and idle warnings, a chain planner that fits pins against CPU and powergrid, and a planner that shows what each colony could earn by tuning or rebuilding it.",
-        "tag": "Planning"
+        "name": "Planetary Industry"
       },
       "travel": {
-        "name": "Travel",
-        "desc": "Route Safety lists every system on a stargate route with its security, region and the last hour of jumps and kills, and can route through Thera or Turnur, jump bridges or a jump drive. Pilot Lookup sizes up a pilot, a Local list or a D-Scan from zKillboard.",
-        "tag": "No grant needed"
+        "name": "Travel"
       },
       "market": {
-        "name": "Market",
-        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, an appraisal of pasted items or fits net of fees, Hauling Opportunities ranking routes by expected profit, and an LP Store that ranks offers by what they are worth at your hub. Built on public price data, so it works whatever you did or didn’t grant.",
-        "tag": "No scope needed"
+        "name": "Market"
       },
       "orders": {
-        "name": "Open Orders",
-        "desc": "Your open orders grouped by what is wrong with them, with the relist floor, the undercut that caused it, and the better exits — for every character at once.",
-        "tag": "Trading"
+        "name": "Open Orders"
       },
       "walletOrders": {
-        "name": "Wallet",
-        "desc": "Your balance charted over time, the journal behind it, and your loyalty point totals by corporation. Fills and the LP Store live under Market.",
-        "tag": "Read-only"
+        "name": "Wallet"
       },
       "assets": {
-        "name": "Assets",
-        "desc": "Every hangar, station and structure your characters hold, searchable, with player structures resolved to real names, and a Move tab that plans a haul of what you pick.",
-        "tag": "Read-only"
+        "name": "Assets"
       },
       "contracts": {
-        "name": "Contracts",
-        "desc": "Your contract history and what each one held, plus a search of public item exchange and courier contracts by jump range, with ISK per jump for couriers.",
-        "tag": "Yours + public"
+        "name": "Contracts"
       },
       "social": {
-        "name": "Mail & Calendar",
-        "desc": "In-game mail with reply and forward, and a calendar you can RSVP from, without launching the client.",
-        "tag": "Out of game"
+        "name": "Mail & Calendar"
       },
       "contacts": {
-        "name": "Contacts & Standings",
-        "desc": "Contacts and the standings you set on them, for one character or across all of them at once, flagging where your characters disagree.",
-        "tag": "Every character"
+        "name": "Contacts & Standings"
       }
     },
     "trustHeading": "It reads. It writes only when you act.",
