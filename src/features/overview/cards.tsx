@@ -58,6 +58,9 @@ import type { StockSummary } from '@/engine/stockTargets/stockRows';
 import { StockNeedPill } from '@/features/stockTargets/StockStatus';
 import { stockBoardSeverity, type StockBoardData } from '@/features/stockTargets/stockBoard';
 import type { CorpBoardItem } from '@/engine/corp/board';
+import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { INCURSION_STATE_TONE } from '@/features/travel/incursionStateTone';
+import { incursionJumpsWhen, type IncursionsBoardData } from './incursionsBoard';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import {
   moonChunkSeverity,
@@ -732,6 +735,88 @@ export function PriceAlertsCard({
                 to="/market"
               />
             ))}
+          </ul>
+        </>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Incursions -----------------------------------------------------------
+
+/**
+ * The nearest Incursions from the pilot's Current System, off by default
+ * (`hiddenCards.ts`). Each row opens Route Safety with its staging system as a
+ * stop. No severity word in the header: a nearby Incursion is a condition, not
+ * something the board can call clear or urgent. Rows carry `clear` only
+ * because a `TriageRow` must carry a tone; it is the neutral one.
+ */
+export function IncursionsCard({ data }: { data: IncursionsBoardData | null }) {
+  const { t } = useTranslation();
+  const ready = data?.status === 'ready' ? data : null;
+  const shown = ready?.rows.slice(0, ROW_LIMIT) ?? [];
+  // Why the rows carry no distance, said once instead of a zero on every row.
+  const originNote =
+    ready?.jumpsStatus === 'no-origin'
+      ? t('travel.incursions.noOrigin')
+      : ready?.jumpsStatus === 'unknown'
+        ? t('travel.incursions.unknownJumps')
+        : null;
+  return (
+    <BoardCard
+      title={t('overview.board.incursions')}
+      to="/travel/route"
+      openLabel={t('overview.board.open')}
+      footer={
+        ready
+          ? t('overview.board.incursionsActive', { count: ready.rows.length })
+          : data?.status === 'failed'
+            ? undefined
+            : t('overview.board.checking')
+      }
+    >
+      {shown.length === 0 || ready === null ? (
+        <CardEmpty>
+          {data === null || data.status === 'loading'
+            ? t('overview.board.checking')
+            : data.status === 'failed'
+              ? t('travel.incursions.failed')
+              : t('travel.incursions.none')}
+        </CardEmpty>
+      ) : (
+        <>
+          {originNote && <p className="px-3 pt-3 text-xs text-text-dim">{originNote}</p>}
+          <ul>
+            {shown.map((row) => {
+              const system =
+                ready.systemNames.get(row.stagingSystemId) ??
+                t('travel.stops.unnamed', { id: row.stagingSystemId });
+              const constellation =
+                ready.constellationNames.get(row.constellationId) ??
+                t('travel.incursions.constellation', { id: row.constellationId });
+              const state = t(`travel.incursions.state.${row.state}`);
+              return (
+                <TriageRow
+                  key={row.constellationId}
+                  severity="clear"
+                  when={incursionJumpsWhen(t, row, ready.jumpsStatus)}
+                  subject={system}
+                  detail={
+                    <Trans
+                      i18nKey="overview.board.incursionsDetail"
+                      values={{ state, constellation }}
+                      components={{
+                        state: (
+                          <span className={`font-semibold ${INCURSION_STATE_TONE[row.state]}`} />
+                        ),
+                      }}
+                    />
+                  }
+                  detailLabel={t('overview.board.incursionsDetailLabel', { state, constellation })}
+                  to={routeToHref(row.stagingSystemId)}
+                />
+              );
+            })}
           </ul>
         </>
       )}

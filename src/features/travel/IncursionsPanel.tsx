@@ -8,33 +8,19 @@
  * never whether a site is worth running. Folded by default and remembered per
  * device; folded, it still names the nearest one.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Button, CollapsiblePanel, LiveStatus, Tooltip } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
-import {
-  buildIncursionRows,
-  type IncursionRow,
-  type IncursionState,
-} from '@/engine/incursions/incursionRows';
-import { useJumpRangeFilter, type CurrentSystemState } from '@/features/route/currentSystem';
+import type { IncursionRow } from '@/engine/incursions/incursionRows';
+import type { CurrentSystemState } from '@/features/route/currentSystem';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { cx } from '@/lib/cx';
 import { useRetryFocus } from '@/lib/useRetryFocus';
-import {
-  loadConstellationNames,
-  loadIncursions,
-  useIncursionsPanelOpen,
-  type IncursionsFeed,
-} from './incursionsData';
-
-/** The state as a tinted word (§6c verdict): no fill, which would read as clickable, and no accent. */
-const STATE_TONE: Record<IncursionState, string> = {
-  mobilizing: 'text-warning',
-  established: 'text-text',
-  withdrawing: 'text-text-dim',
-};
+import { useIncursionsPanelOpen } from './incursionsData';
+import { INCURSION_STATE_TONE } from './incursionStateTone';
+import { useIncursions } from './useIncursions';
 
 /** What Route can do for a staging system: add it, or why not (already on the trip, stops full). */
 export type RouteAction = 'add' | 'on-route' | 'full';
@@ -55,35 +41,11 @@ export function IncursionsPanel({
     void hydrateOpen();
   }, [hydrateOpen]);
   const systems = useSolarSystemIndex();
-  const { jumps, jumpsStatus } = useJumpRangeFilter(current, 'any');
-
-  const [feed, setFeed] = useState<IncursionsFeed | null | undefined>(undefined);
-  const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
-  const [attempt, setAttempt] = useState(0);
+  const { feed, rows, constellationNames: names, jumpsStatus, retry } = useIncursions(current);
   // Retry unmounts into "reading…": focus waits on the panel body, never `<body>` (§7).
   const [bodyRef, , holdRetryFocus] = useRetryFocus(
     feed === undefined ? 'busy' : feed === null ? 'failed' : 'ok',
     'incursions'
-  );
-  useEffect(() => {
-    let live = true;
-    void loadIncursions().then((result) => {
-      if (!live) return;
-      setFeed(result);
-      if (result) {
-        void loadConstellationNames(result.entries.map((e) => e.constellation_id)).then((n) => {
-          if (live) setNames(n);
-        });
-      }
-    });
-    return () => {
-      live = false;
-    };
-  }, [attempt]);
-
-  const rows = useMemo(
-    () => (feed ? buildIncursionRows(feed.entries, jumpsStatus === 'ready' ? jumps : null) : []),
-    [feed, jumps, jumpsStatus]
   );
   const systemName = (id: number) => systems?.get(id)?.name ?? t('travel.stops.unnamed', { id });
   const nearest = rows[0];
@@ -141,8 +103,7 @@ export function IncursionsPanel({
                 size="sm"
                 onClick={() => {
                   holdRetryFocus();
-                  setFeed(undefined);
-                  setAttempt((n) => n + 1);
+                  retry();
                 }}
               >
                 {t('common.retry')}
@@ -168,7 +129,7 @@ export function IncursionsPanel({
                         <span
                           className={cx(
                             'text-[0.6875rem] font-semibold tracking-wider uppercase',
-                            STATE_TONE[row.state]
+                            INCURSION_STATE_TONE[row.state]
                           )}
                         >
                           {t(`travel.incursions.state.${row.state}`)}
