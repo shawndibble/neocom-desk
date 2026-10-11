@@ -491,7 +491,7 @@ describe('Travel › Route Safety › Incursions near you', () => {
     visit(`?from=${JITA}`);
 
     await user.click(await screen.findByRole('button', { name: 'Show incursions' }));
-    await user.click(await screen.findByRole('button', { name: 'Add Uedama as a stop' }));
+    await user.click(await screen.findByRole('button', { name: 'Route to Uedama' }));
 
     expect(stopsInLink()).toBe(String(UEDAMA));
     await waitFor(() =>

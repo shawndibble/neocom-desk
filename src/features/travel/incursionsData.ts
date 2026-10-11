@@ -18,7 +18,6 @@ export const useIncursionsPanelOpen = createLocalSetting<boolean>({
 
 export interface IncursionsFeed {
   entries: IncursionEntry[];
-  fetchedAt: Date;
 }
 
 /** `null` when the feed could not be read and nothing was cached: an unread feed is not "no incursions". */
@@ -29,7 +28,7 @@ export async function loadIncursions(): Promise<IncursionsFeed | null> {
   const result = await loadWithCache(GLOBAL_CACHE_CHARACTER_ID, CACHE_KEY, fetchLive, {
     conditional,
   }).catch(() => null);
-  return result ? { entries: result.data, fetchedAt: result.fetchedAt } : null;
+  return result ? { entries: result.data } : null;
 }
 
 /** Names never change, so one lookup per constellation per session is enough. */

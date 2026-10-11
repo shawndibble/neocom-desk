@@ -370,7 +370,7 @@ export function RouteSafetyTab({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: 
           dissolves (`contents`) so Stops, the route, then Route rules stack in order. */}
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
           <div className="contents xl:block xl:space-y-4">
-            <div className="order-1 xl:order-none" data-stops-panel>
+            <div className="order-1 focus:outline-none xl:order-none" data-stops-panel>
               <StopsPanel
                 fromId={fromId}
                 fromName={fromId === null ? fromTrigger : nameOf(fromId)}

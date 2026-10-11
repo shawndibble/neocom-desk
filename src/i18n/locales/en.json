@@ -9310,6 +9310,8 @@
       "jumps_one": "{{count}} jump",
       "jumps_other": "{{count}} jumps",
       "noRoute": "No route with your route rules",
+      "noOriginRow": "Jumps need your current system",
+      "unknownRow": "Jumps could not be counted",
       "constellation": "Constellation {{id}}",
       "influence": "{{percent}}% influence",
       "systems_one": "{{count}} system",
@@ -9321,7 +9323,7 @@
         "withdrawing": "Withdrawing"
       },
       "route": "Route",
-      "routeTo": "Add {{system}} as a stop",
+      "routeTo": "Route to {{system}}",
       "onRoute": "On route",
       "stopsFull": "Your trip already has the most stops it can take. Remove one first.",
       "jumpBasis": "Jumps use your route rules",

@@ -21,6 +21,7 @@ import {
 import { useJumpRangeFilter, type CurrentSystemState } from '@/features/route/currentSystem';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { cx } from '@/lib/cx';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import {
   loadConstellationNames,
   loadIncursions,
@@ -28,13 +29,14 @@ import {
   type IncursionsFeed,
 } from './incursionsData';
 
-const STATE_PILL: Record<IncursionState, string> = {
-  mobilizing: 'text-warning bg-warning/10',
-  established: 'text-accent bg-accent/10',
-  withdrawing: 'text-text-dim bg-panel-2',
+/** The state as a tinted word (§6c verdict): no fill, which would read as clickable, and no accent. */
+const STATE_TONE: Record<IncursionState, string> = {
+  mobilizing: 'text-warning',
+  established: 'text-text',
+  withdrawing: 'text-text-dim',
 };
 
-/** Why a staging system cannot be added as a stop, or null when it can. */
+/** What Route can do for a staging system: add it, or why not (already on the trip, stops full). */
 export type RouteAction = 'add' | 'on-route' | 'full';
 
 export function IncursionsPanel({
@@ -58,6 +60,11 @@ export function IncursionsPanel({
   const [feed, setFeed] = useState<IncursionsFeed | null | undefined>(undefined);
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [attempt, setAttempt] = useState(0);
+  // Retry unmounts into "reading…": focus waits on the panel body, never `<body>` (§7).
+  const [bodyRef, , holdRetryFocus] = useRetryFocus(
+    feed === undefined ? 'busy' : feed === null ? 'failed' : 'ok',
+    'incursions'
+  );
   useEffect(() => {
     let live = true;
     void loadIncursions().then((result) => {
@@ -84,6 +91,9 @@ export function IncursionsPanel({
   const jumpsText = (row: IncursionRow) => {
     if (row.jumps !== null) return t('travel.incursions.jumps', { count: row.jumps });
     if (jumpsStatus === 'ready') return t('travel.incursions.noRoute');
+    // Each row says why it has no distance, rather than leaving it blank.
+    if (jumpsStatus === 'no-origin') return t('travel.incursions.noOriginRow');
+    if (jumpsStatus === 'unknown') return t('travel.incursions.unknownRow');
     return null;
   };
 
@@ -121,13 +131,20 @@ export function IncursionsPanel({
         </p>
       }
     >
-      <div className="space-y-2 text-xs">
+      <div ref={bodyRef} tabIndex={-1} className="space-y-2 text-xs focus:outline-none">
         <LiveStatus>{status ?? ''}</LiveStatus>
         {status !== null ? (
           <div className="flex items-center gap-2 text-text-dim">
             <p>{status}</p>
             {feed === null && (
-              <Button size="sm" onClick={() => setAttempt((n) => n + 1)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  holdRetryFocus();
+                  setFeed(undefined);
+                  setAttempt((n) => n + 1);
+                }}
+              >
                 {t('common.retry')}
               </Button>
             )}
@@ -150,8 +167,8 @@ export function IncursionsPanel({
                         {security !== undefined && <SecurityStatus security={security} />}
                         <span
                           className={cx(
-                            'rounded-xs px-1.5 text-[0.6875rem] font-semibold tracking-wider uppercase',
-                            STATE_PILL[row.state]
+                            'text-[0.6875rem] font-semibold tracking-wider uppercase',
+                            STATE_TONE[row.state]
                           )}
                         >
                           {t(`travel.incursions.state.${row.state}`)}
@@ -178,7 +195,14 @@ export function IncursionsPanel({
                       </span>
                     ) : action === 'full' ? (
                       <Tooltip content={t('travel.incursions.stopsFull')}>
-                        <Button size="sm" aria-disabled className="shrink-0">
+                        <Button
+                          size="sm"
+                          aria-disabled
+                          className="shrink-0"
+                          aria-label={t('travel.incursions.routeTo', {
+                            system: systemName(row.stagingSystemId),
+                          })}
+                        >
                           {t('travel.incursions.route')}
                         </Button>
                       </Tooltip>
