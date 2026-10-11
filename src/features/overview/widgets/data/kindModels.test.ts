@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveWidget } from '../state';
 import { buildView, feedsFor, KIND_FEEDS } from './models';
 import { humanizeRefType } from './kindModels';
-import type { RouteSafetyWidgetData, SurveyWidgetData } from './kindLoaders';
+import type { HaulingWidgetData, RouteSafetyWidgetData, SurveyWidgetData } from './kindLoaders';
 import type { BuildContext, FeedState, Feeds } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
@@ -819,5 +819,55 @@ describe('routeSafety', () => {
     expect(resolved.state).toBe('failed');
     expect(resolved.showLastGood).toBe(true);
     expect(failed.number.value).toBe('1');
+  });
+});
+
+describe('hauling', () => {
+  const data = (over: Partial<HaulingWidgetData> = {}): HaulingWidgetData => ({
+    hasScan: true,
+    routes: [
+      { from: 'Jita', to: 'Amarr', item: 'Tritanium', profit: 48_000_000, jumps: 12 },
+      { from: 'Jita', to: 'Dodixie', item: 'Pyerite', profit: 30_000_000, jumps: null },
+    ],
+    fetchedAt: new Date(NOW),
+    ...over,
+  });
+
+  it('reads from its own feed and links to the Hauling tab', () => {
+    expect(KIND_FEEDS.hauling).toEqual(['hauling']);
+    expect(buildView('hauling', { hauling: ok(data()) }, ctx()).to).toBe('/travel/hauling');
+  });
+
+  it('leads with the best profit and tables each route with jumps and ISK per jump', () => {
+    const view = buildView('hauling', { hauling: ok(data()) }, ctx());
+    expect(stateOf(view)).toBe('ok');
+    expect(view.number.value).toBe('48M');
+    expect(view.number.secondary?.text).toContain('Tritanium');
+    expect(view.number.secondary?.text).toContain('Jita → Amarr');
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      ['Jita → Amarr', '48M', '12', '4M'],
+      ['Jita → Dodixie', '30M', '—', '—'],
+    ]);
+    expect(view.fetchedAt).toEqual(new Date(NOW));
+  });
+
+  it('is empty before any scan has run', () => {
+    const none = data({ hasScan: false, routes: [], fetchedAt: null });
+    expect(stateOf(buildView('hauling', { hauling: ok(none) }, ctx()))).toBe('empty');
+  });
+
+  it('is loading before the first read and failed, keeping the last value, when a read fails', () => {
+    expect(
+      stateOf(buildView('hauling', { hauling: { data: null, error: false, loading: true } }, ctx()))
+    ).toBe('loading');
+    const failed = buildView(
+      'hauling',
+      { hauling: { data: data(), error: true, loading: false } },
+      ctx()
+    );
+    const resolved = resolveWidget(failed.status);
+    expect(resolved.state).toBe('failed');
+    expect(resolved.showLastGood).toBe(true);
+    expect(failed.number.value).toBe('48M');
   });
 });

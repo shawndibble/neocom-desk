@@ -30,7 +30,7 @@ describe('feedsFor', () => {
   });
 
   it('is empty for kinds with no data yet', () => {
-    expect(feedsFor(['hauling', 'unknownKindFromANewerBuild'])).toEqual([]);
+    expect(feedsFor(['kills', 'unknownKindFromANewerBuild'])).toEqual([]);
   });
 
   it('gives every built kind at least one feed', () => {
@@ -104,7 +104,7 @@ describe('buildView status', () => {
 
 describe('placeholder kinds', () => {
   it('render empty, never loading, for kinds the catalogue marks coming soon', () => {
-    for (const kind of ['hauling', 'kills', 'jumpTimers']) {
+    for (const kind of ['kills', 'jumpTimers']) {
       expect(stateOf(buildView(kind, {}, ctx())), kind).toBe('empty');
     }
   });
@@ -237,7 +237,7 @@ describe('stock', () => {
   });
 
   it('gives a kind with no page of its own no title link target', () => {
-    expect(buildView('hauling', {}, ctx()).to).toBeNull();
+    expect(buildView('kills', {}, ctx()).to).toBeNull();
   });
 
   it('counts out and low, tabling every market with its own state', () => {
