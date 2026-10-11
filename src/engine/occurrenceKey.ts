@@ -187,11 +187,6 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // The diff only fires on a drop into Low or Out, so the drop itself —
     // per list, item, Stock Target and status, bucketed by day — is the
     // identity: the same drop seen twice in a day is one occurrence.
-    // Once per Incursion: its constellation and staging system name it for
-    // as long as it lasts, so no day bucket — an Incursion leaving range and
-    // coming back is the same occurrence, not a second alert.
-    case 'incursionNearby':
-      return [characterId, fire.eventId, fire.constellationId, fire.stagingSystemId].join(':');
     case 'stockBelowTarget':
       return [
         characterId,
@@ -202,6 +197,11 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
         fire.status,
         dayBucket(nowMs),
       ].join(':');
+    // Once per Incursion: its constellation and staging system name it for
+    // as long as it lasts, so no day bucket — an Incursion leaving range and
+    // coming back is the same occurrence, not a second alert.
+    case 'incursionNearby':
+      return [characterId, fire.eventId, fire.constellationId, fire.stagingSystemId].join(':');
     default: {
       const exhaustive: never = fire;
       throw new Error(`occurrenceKey: unhandled Notification Event ${JSON.stringify(exhaustive)}`);

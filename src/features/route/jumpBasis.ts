@@ -108,7 +108,10 @@ export async function loadJumpBasis(): Promise<Pick<JumpBasis, 'rules' | 'networ
     holesResult?.kind === 'ok'
       ? routeHoles(holesResult.connections, holeQuery.settings, now)
       : NO_HOLES;
-  const bridges = useRouteBridgesEnabled.getState().value ? await gatesOf() : null;
+  // An unreadable gate list counts gates only, as the hook does while it has none.
+  const bridges = useRouteBridgesEnabled.getState().value
+    ? await gatesOf().catch(() => null)
+    : null;
   return {
     rules,
     network: networkFromKeys(holeNetworkKey(holes), bridges === null ? '' : bridgeKey(bridges)),

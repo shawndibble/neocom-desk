@@ -43,7 +43,7 @@ export interface IncursionNearbyFire {
   jumps: number;
 }
 
-function inRange(entry: IncursionAlertEntry): boolean {
+function inRange(entry: IncursionAlertEntry): entry is IncursionAlertEntry & { jumps: number } {
   return entry.jumps !== null && entry.jumps <= entry.withinJumps;
 }
 
@@ -69,7 +69,7 @@ export function diffIncursionNearby(
       constellationId: entry.constellationId,
       stagingSystemId: entry.stagingSystemId,
       state: entry.state,
-      jumps: entry.jumps!,
+      jumps: entry.jumps,
     });
   }
   return fires;

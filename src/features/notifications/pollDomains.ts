@@ -1775,17 +1775,18 @@ export const incursionDomain = defineDomain<
     const basis = await loadJumpBasis();
     const distances = await localJumpDistances(originSystemId, basis.rules, basis.network);
     if (distances.kind === 'unknown') return null;
-    return feed.entries.map((entry) => ({
-      constellationId: entry.constellation_id,
-      stagingSystemId: entry.staging_solar_system_id,
-      state: entry.state,
-      jumps:
-        entry.staging_solar_system_id === originSystemId
-          ? 0
-          : (distances.jumps.get(entry.staging_solar_system_id) ?? null),
-      originSystemId,
-      withinJumps,
-    }));
+    // Counted exactly as Route Safety's Incursions panel counts them
+    // (`buildIncursionRows`): a state ESI adds later is dropped, not stored.
+    return feed.entries
+      .filter((entry) => (INCURSION_STATES as readonly unknown[]).includes(entry.state))
+      .map((entry) => ({
+        constellationId: entry.constellation_id,
+        stagingSystemId: entry.staging_solar_system_id,
+        state: entry.state,
+        jumps: distances.jumps.get(entry.staging_solar_system_id) ?? null,
+        originSystemId,
+        withinJumps,
+      }));
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   names: async (fire) => {

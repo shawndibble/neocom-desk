@@ -95,10 +95,11 @@ describe('incursionDomain.load (issue #3542)', () => {
     expect(entry.withinJumps).toBe(10);
   });
 
-  it('counts a staging system the pilot sits in as zero jumps', async () => {
-    vi.mocked(loadCurrentSystemId).mockResolvedValue(30000144);
-    const [entry] = (await incursionDomain.load(CHARACTER)) as { jumps: number }[];
-    expect(entry.jumps).toBe(0);
+  it('drops an Incursion in a state it does not know, as the Incursions panel does', async () => {
+    vi.mocked(loadIncursions).mockResolvedValue({
+      entries: [incursion({ state: 'retreating' as never })],
+    });
+    expect(await incursionDomain.load(CHARACTER)).toEqual([]);
   });
 
   it('skips the poll rather than writing an empty baseline when an input is unreadable', async () => {
