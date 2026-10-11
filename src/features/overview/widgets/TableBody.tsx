@@ -33,7 +33,7 @@ function cellText(cell: TableCell): string {
   return typeof cell === 'string' ? cell : cell.text;
 }
 
-const CELL_TONE = { good: 'text-isk-pos', caution: 'text-warning', bad: 'text-danger' } as const;
+const CELL_TONE = { good: 'text-success', caution: 'text-warning', bad: 'text-danger' } as const;
 
 function CellValue({ cell }: { cell: TableCell }) {
   if (typeof cell === 'string') return <>{cell}</>;

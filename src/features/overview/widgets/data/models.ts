@@ -30,7 +30,7 @@ import { routeToHref } from '@/features/travel/routeSafetyLink';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { formatAge } from '@/lib/age';
+import { DAY_MS, formatAge } from '@/lib/age';
 import { sortQueueEntries, selectActiveEntryFromSorted } from '@/routes/overviewQueue';
 import { dailyWalletFromJournal } from '@/engine/netWorth/series';
 import { getKind } from '../kinds';
@@ -107,7 +107,6 @@ import type {
 /** The Contracts History table filtered to accepted contracts, the courier hauls the widget counts. */
 export const CONTRACTS_IN_PROGRESS_HREF = '/contracts/history?history.status=in_progress';
 const STOCK_PATH = '/market/stock';
-const DAY_MS = 86_400_000;
 
 // --- Which reads a kind needs ------------------------------------------------
 

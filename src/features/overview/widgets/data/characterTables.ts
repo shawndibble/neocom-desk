@@ -11,6 +11,7 @@ import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { ContractDeadlineItem } from '@/engine/contractsBoard';
 import type { CommittedCalendarEvent } from '@/engine/calendarDeadline';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
 import type { BoardMail } from '../../boardData';
@@ -114,7 +115,7 @@ export function spTable(t: Translate, input: SpTableInput): TableModel {
     {
       key: 'extractable',
       cells: [
-        t('overview.board.spareSp'),
+        t(`${W}.sp.extractable`),
         formatCompactNumber(extractable),
         t(`${W}.sp.extractors`, { count: extractors }),
       ],
@@ -215,7 +216,7 @@ export function contractsTable(
         isk(courier ? item.collateral : null),
       ],
       // Overdue is the only red; anything due within a day is an amber heads-up.
-      tone: item.overdue ? 'critical' : left <= 24 * 3_600_000 ? 'warning' : 'clear',
+      tone: item.overdue ? 'critical' : left <= DAY_MS ? 'warning' : 'clear',
     };
   });
   return {

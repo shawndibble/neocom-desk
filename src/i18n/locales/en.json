@@ -3819,10 +3819,10 @@
         "threshold": "Toward threshold",
         "value": "Extraction value",
         "col": {
-          "measure": "Skill points",
           "sp": "SP"
         },
-        "ofThreshold": "of {{sp}}"
+        "ofThreshold": "of {{sp}}",
+        "extractable": "Extractable SP"
       },
       "location": {
         "title": "Location and ship",
