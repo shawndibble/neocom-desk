@@ -366,9 +366,15 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const scanFetchedAt = state.status === 'ready' ? state.scan.fetchedAt : null;
   useEffect(() => {
     if (scanFetchedAt === null || sameHub || bothAny) return;
-    const summary = summarizeHaulingRows(shown, scanFetchedAt);
+    // The default filters, not the pilot's current ones: tightening a filter must not change what the Overview shows for the same scan.
+    const { shown: usual } = filterHaulingRows(viewRows, {
+      maxDays: DEFAULT_HAULING_FILTER.days,
+      minMarginPct: DEFAULT_HAULING_FILTER.margin,
+      steadyOnly: DEFAULT_HAULING_FILTER.demand === 'steady',
+    });
+    const summary = summarizeHaulingRows(usual, scanFetchedAt);
     if (summary) rememberHaulingSummary(summary);
-  }, [shown, scanFetchedAt, sameHub, bothAny]);
+  }, [viewRows, scanFetchedAt, sameHub, bothAny]);
 
   // The user's edits belong to one scan: a new route, category or mode starts a fresh plan.
   const [overrides, setOverrides] = useState<ReadonlyMap<number, TripOverride>>(new Map());
