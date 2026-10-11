@@ -4212,6 +4212,7 @@
     "taxOwedLabel": "Tax owed",
     "markPaidLabel": "I already paid this",
     "markPaidAction": "Mark as paid",
+    "unmarkPaidAction": "Mark as unpaid",
     "detailTitle": "{{date}} — {{system}}",
     "dateEveHint": "EVE (UTC) calendar date, as the in-game mining ledger reports it. ESI gives no time of day, so this can't be converted to your local date.",
     "assignAction": "Assign",

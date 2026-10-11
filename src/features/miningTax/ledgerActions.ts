@@ -37,6 +37,7 @@ import {
   planNeedsReviewResolution,
   splitAssignment,
   uncombineAssignments,
+  unmarkAssignmentsPaid,
   unlinkPaymentTransaction,
   updateCombinedAssignments,
   type AssignInput,
@@ -256,6 +257,13 @@ export function settle(
   payment?: PaymentInput
 ): Promise<LedgerActionResult> {
   return commit(charactersOf(assignments), () => markAssignmentsPaid(assignments, payment));
+}
+
+/** Undoes "mark paid": the Assignments go back to owed, and their payment record with them. */
+export function unsettle(
+  assignments: readonly MiningTaxAssignmentRecord[]
+): Promise<LedgerActionResult> {
+  return commit(charactersOf(assignments), () => unmarkAssignmentsPaid(assignments));
 }
 
 /** Splits part of one assigned day over to a second Payee. */
