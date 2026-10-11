@@ -83,6 +83,7 @@ function Row({
   caret,
   compact,
   rowHeader,
+  growKey,
 }: {
   row: TableRowModel;
   columns: readonly TableColumn[];
@@ -92,6 +93,8 @@ function Row({
   compact: boolean;
   /** No header row: the first cell names the row for a screen reader. */
   rowHeader: boolean;
+  /** The visible column that truncates in the first one's place, when a table has one. */
+  growKey: string | undefined;
 }) {
   const { t } = useTranslation();
   const toned = row.tone !== undefined && row.tone !== 'clear';
@@ -121,7 +124,13 @@ function Row({
             className={cx(
               cellPad,
               'py-0.5 text-[0.8125rem] tabular-nums',
-              first ? 'w-full max-w-0' : 'whitespace-nowrap',
+              column.key === growKey
+                ? 'w-full max-w-0 truncate whitespace-nowrap'
+                : first
+                  ? growKey === undefined
+                    ? 'w-full max-w-0'
+                    : 'max-w-40'
+                  : 'whitespace-nowrap',
               column.align === 'end' && 'text-right',
               Cell === 'th' && 'text-left',
               first && 'font-semibold',
@@ -185,6 +194,7 @@ export function TableBody({ table, columnsFor, rowLimit, ariaLabel, className }:
   const more = table.rows.length - shown.length;
   if (shown.length === 0) return null;
   const hasHeader = columns.some((column) => column.label !== '');
+  const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
   const caret = shown.some((row) => row.to !== undefined);
   return (
     <div className={className}>
@@ -219,6 +229,7 @@ export function TableBody({ table, columnsFor, rowLimit, ariaLabel, className }:
               caret={caret}
               compact={columnsFor === 'S'}
               rowHeader={!hasHeader}
+              growKey={growKey}
             />
           ))}
         </tbody>

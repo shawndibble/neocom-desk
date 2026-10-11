@@ -244,7 +244,7 @@ export function mailTable(
     columns: [
       { key: 'from', label: t(`${W}.mail.col.from`), priority: 0 },
       { key: 'age', label: t(`${W}.mail.col.age`), align: 'end', priority: 1 },
-      { key: 'subject', label: t(`${W}.mail.col.subject`), priority: 2 },
+      { key: 'subject', label: t(`${W}.mail.col.subject`), priority: 2, grow: true },
     ],
     rows: mails.map((mail) => ({
       key: String(mail.mailId),
