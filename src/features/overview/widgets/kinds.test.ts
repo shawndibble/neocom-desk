@@ -87,12 +87,50 @@ describe('widget kind catalogue', () => {
 
   it('reduces the views the spec says are reduced', () => {
     const v = (id: string) => getKind(id)!.views;
-    expect(v('sp')).toEqual(['number', 'list']);
-    expect(v('priceWatch')).toEqual(['number', 'list']);
+    expect(v('sp')).toEqual(['number', 'table']);
+    expect(v('priceWatch')).toEqual(['number', 'table']);
     // No per-payee breakdown exists, so there is nothing honest to chart.
-    expect(v('miningTax')).toEqual(['number', 'list']);
-    expect(v('wallet')).toEqual(['number', 'chart', 'list']);
-    expect(v('netWorth')).toEqual(['number', 'chart', 'list']);
+    expect(v('miningTax')).toEqual(['number', 'table']);
+    expect(v('wallet')).toEqual(['number', 'chart', 'table']);
+    expect(v('netWorth')).toEqual(['number', 'chart', 'table']);
+  });
+
+  it('opens each kind in a view it offers, per the defaults matrix', () => {
+    for (const k of WIDGET_KINDS) expect(k.views, k.id).toContain(k.defaultView);
+    const view = (id: string) => getKind(id)!.defaultView;
+    // Not everything is a Number: some answer best as a chart, some as a table.
+    for (const id of ['training', 'sp', 'location', 'miningTax'])
+      expect(view(id), id).toBe('number');
+    for (const id of ['wallet', 'walletFlow', 'netWorth', 'lp', 'profit', 'miningYield']) {
+      expect(view(id), id).toBe('chart');
+    }
+    for (const id of [
+      'clones',
+      'orders',
+      'priceWatch',
+      'stock',
+      'industry',
+      'planetary',
+      'structures',
+      'moonChunks',
+      'incursions',
+      'comingUp',
+      'contracts',
+      'mail',
+    ]) {
+      expect(view(id), id).toBe('table');
+    }
+  });
+
+  it('opens each kind at the size the defaults matrix names', () => {
+    const size = (id: string) => getKind(id)!.defaultSize;
+    for (const id of ['training', 'sp', 'location', 'wallet', 'miningTax', 'incursions']) {
+      expect(size(id), id).toBe('S');
+    }
+    expect(size('orders')).toBe('L');
+    for (const id of ['netWorth', 'lp', 'structures', 'moonChunks', 'contracts', 'mail']) {
+      expect(size(id), id).toBe('M');
+    }
   });
 
   it('marks the five unbuilt kinds as coming soon and the rest as available', () => {

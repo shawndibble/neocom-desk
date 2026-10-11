@@ -344,7 +344,7 @@ describe('Overview widget grid', () => {
 
   it('shows unread mail as a headline count with the newest mails as rows in List view', async () => {
     await grantScopes([MAIL_SCOPE]);
-    await seedLayout(widget('m', 'mail', { view: 'list' }));
+    await seedLayout(widget('m', 'mail', { view: 'table' }));
     render(<App />);
 
     const mail = await widgetCard('Mail');

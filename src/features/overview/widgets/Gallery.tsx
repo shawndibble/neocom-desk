@@ -40,7 +40,7 @@ function Preview({ kind }: { kind: WidgetKindDef }) {
     return {
       ...base,
       size: 'M' as const,
-      view: kind.views.includes('list') ? ('list' as const) : base.view,
+      view: base.view,
     };
   }, [kind]);
   if (!view || !widget) return null;

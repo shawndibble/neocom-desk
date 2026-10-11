@@ -3,9 +3,11 @@
  * Open link, a settings button) over a body that is one of the five Widget
  * States.
  *
- * The body is a Number, a Chart or a List, and **the headline number is always
- * on screen**: the List view carries it as a line above its rows, the Chart
- * view above its chart, and a kind with no chart falls back to the Number.
+ * The body is a Number, a Chart or a Table, and **the headline number is always
+ * on screen**: the Table view carries it as a line above its rows, the Chart
+ * view above its chart (with the table beside it at Large and Full), and a kind
+ * with no chart falls back to the Number. The Number view is only a number:
+ * never a mini chart or a sparkline.
  * Every state is drawn for real rather than collapsing to blank: a widget that
  * vanishes when it has nothing to say cannot be told from one that failed to
  * load.
@@ -22,29 +24,26 @@ import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadou
 import {
   Button,
   IskAmount,
-  RowCaret,
   SEVERITY_TEXT,
   SeverityIcon,
   entityLinkClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { GrantBanner } from '@/app/GrantNote';
 import { cx } from '@/lib/cx';
 import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { boardRowLinkClassName } from '../boardRowLink';
 import { useOverviewRefresh } from './data/refreshContext';
-import type { KindView, ListRow, NumberModel } from './data/types';
+import type { KindView, NumberModel, NumberSecondary } from './data/types';
 import { useWidgetView } from './data/useWidgetView';
 import { getKind } from './kinds';
 import { Chart } from './charts/Chart';
-import { showsInNumberView } from './charts/sizing';
 import { DEFAULT_RANGE, type Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
 import { resolveWidget } from './state';
-import { rowsForSize } from './sizes';
+import { TableBody } from './TableBody';
+import { TABLE_ROWS, tableOf } from './tableModel';
 
 export interface WidgetProps {
   widget: WidgetModel;
@@ -68,6 +67,35 @@ export interface WidgetProps {
 
 const TICK_MS = 30_000;
 
+const SECONDARY_TONE = {
+  good: 'text-isk-pos',
+  bad: 'text-danger',
+  caution: 'text-warning',
+} as const;
+
+const DIRECTION_GLYPH = {
+  up: Icon.Ascending,
+  down: Icon.Descending,
+  flat: Icon.Decrease,
+} as const;
+
+/** The one line under the headline: a glyph for a direction, then text, on one line at every size. */
+function SecondaryLine({ secondary }: { secondary: NumberSecondary }) {
+  const Glyph = secondary.direction ? DIRECTION_GLYPH[secondary.direction] : null;
+  return (
+    <p
+      title={secondary.text}
+      className={cx(
+        'flex min-w-0 items-center gap-1 text-[0.8125rem]',
+        secondary.tone ? SECONDARY_TONE[secondary.tone] : 'text-text-dim'
+      )}
+    >
+      {Glyph && <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />}
+      <span className="min-w-0 truncate">{secondary.text}</span>
+    </p>
+  );
+}
+
 function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: boolean }) {
   const toned = model.tone !== 'clear';
   return (
@@ -90,69 +118,23 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
           <small className="text-xs font-normal tracking-normal text-text-dim">{model.unit}</small>
         )}
       </div>
-      {model.note && <p className="text-[0.8125rem] text-text-dim">{model.note}</p>}
+      {model.secondary && <SecondaryLine secondary={model.secondary} />}
     </div>
   );
 }
 
-function RowBody({ row }: { row: ListRow }) {
-  const value = (
-    <span
-      className={cx(
-        'shrink-0 text-[0.8125rem] font-semibold whitespace-nowrap tabular-nums',
-        SEVERITY_TEXT[row.tone] === SEVERITY_TEXT.clear ? 'text-text' : SEVERITY_TEXT[row.tone]
-      )}
-    >
-      {row.iskAmount === undefined ? row.value : <IskAmount value={row.iskAmount} decimals={0} />}
-    </span>
-  );
-  const text = (
-    <span className="min-w-0 flex-1">
-      <span className="block truncate text-[0.8125rem] font-semibold">{row.title}</span>
-      {row.detail && <span className="block truncate text-xs text-text-dim">{row.detail}</span>}
-    </span>
-  );
-  if (row.to === undefined) {
-    return (
-      <li className="flex items-center justify-between gap-2.5 border-b border-line px-3 py-1.5 last:border-b-0">
-        {text}
-        {value}
-      </li>
-    );
-  }
-  return (
-    <li className="border-b border-line last:border-b-0">
-      <RowTappableContext.Provider value>
-        <Link to={row.to} className={boardRowLinkClassName}>
-          {text}
-          {value}
-          <RowCaret />
-        </Link>
-      </RowTappableContext.Provider>
-    </li>
-  );
-}
-
-function ListBody({ view, size }: { view: KindView; size: WidgetModel['size'] }) {
-  const { t } = useTranslation();
-  const shown = view.rows.slice(0, rowsForSize[size]);
-  const more = view.rows.length - shown.length;
+/** The Table view: the headline, then the kind's table at this size's rows and columns. */
+function TableViewBody({ view, size }: { view: KindView; size: WidgetModel['size'] }) {
   return (
     <div>
-      {/* The headline stays on screen in every view. */}
-      <NumberBody model={{ ...view.number, note: undefined }} />
-      {shown.length > 0 && (
-        <ul className="border-t border-line">
-          {shown.map((row) => (
-            <RowBody key={row.key} row={row} />
-          ))}
-          {more > 0 && (
-            <li className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
-              {t('overview.widgets.moreRows', { count: more })}
-            </li>
-          )}
-        </ul>
-      )}
+      {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
+      <NumberBody model={{ ...view.number, secondary: undefined }} />
+      <TableBody
+        table={tableOf(view)}
+        columnsFor={size}
+        rowLimit={TABLE_ROWS[size]}
+        className="border-t border-line"
+      />
     </div>
   );
 }
@@ -160,34 +142,41 @@ function ListBody({ view, size }: { view: KindView; size: WidgetModel['size'] })
 /**
  * The Chart view: the headline stays on screen above the chart (a Small chart
  * still shows its value), the chart's caption and hidden text summary below.
- * A kind with no chart for this data falls back to the Number, never a blank.
+ * At Large and Full the table sits beside the chart (stacked below it on a
+ * phone), with no toggle: the View menu is the only switcher. A kind with no
+ * chart for this data falls back to the Number, never a blank.
  */
 function ChartBody({ view, size }: { view: KindView; size: WidgetModel['size'] }) {
   if (!view.chart) return <NumberBody model={view.number} />;
+  const table = size === 'L' || size === 'F' ? tableOf(view) : null;
+  const beside = table !== null && table.rows.length > 0;
   return (
     <div>
       <NumberBody model={view.number} />
-      <Chart model={view.chart} size={size} className="px-3 pb-2.5" />
-    </div>
-  );
-}
-
-/** The Number view: from Medium up it also carries the kind's mini chart under the figure (donuts stay in the Chart view). */
-function NumberChartBody({ view, size }: { view: KindView; size: WidgetModel['size'] }) {
-  const mini = view.chart && size !== 'S' && showsInNumberView(view.chart) ? view.chart : null;
-  return (
-    <div>
-      <NumberBody model={view.number} />
-      {mini && <Chart model={mini} size="S" className="px-3 pb-2.5" />}
+      <div className={cx(beside && 'md:flex md:items-start')}>
+        <Chart
+          model={view.chart}
+          size={size}
+          className={cx('px-3 pb-2.5', beside && 'md:w-[55%] md:shrink-0')}
+        />
+        {beside && (
+          <TableBody
+            table={table}
+            columnsFor={size === 'F' ? 'M' : 'S'}
+            rowLimit={size === 'F' ? 8 : 5}
+            className="border-t border-line md:min-w-0 md:flex-1 md:border-t-0 md:border-l"
+          />
+        )}
+      </div>
     </div>
   );
 }
 
 /** The fixed scope readout (DESIGN §6c): this widget reads every Character on the device. */
-function AllCharactersReadout() {
+function AllCharactersReadout({ compact }: { compact: boolean }) {
   const total = useLiveQuery(() => db.characters.count(), []);
   if (!total) return null;
-  return <CharacterScopeReadout scope="all" total={total} />;
+  return <CharacterScopeReadout scope="all" total={total} compact={compact} />;
 }
 
 /** The same readout in its "Name only" form: All was asked for, but this kind reads one Character. */
@@ -320,12 +309,12 @@ function WidgetFrame({
     );
   } else {
     body =
-      widget.view === 'list' ? (
-        <ListBody view={view} size={widget.size} />
+      widget.view === 'table' ? (
+        <TableViewBody view={view} size={widget.size} />
       ) : widget.view === 'chart' ? (
         <ChartBody view={view} size={widget.size} />
       ) : (
-        <NumberChartBody view={view} size={widget.size} />
+        <NumberBody model={view.number} />
       );
   }
 
@@ -348,7 +337,7 @@ function WidgetFrame({
             {t('overview.widgets.new')}
           </span>
         )}
-        {scope.chip && <AllCharactersReadout />}
+        {scope.chip && <AllCharactersReadout compact={widget.size === 'S'} />}
         <span className="flex-1" />
         {view.to !== null && (
           <Link

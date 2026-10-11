@@ -40,6 +40,19 @@ import type {
 /** The narrow slice of i18next's `t` the adapters need. */
 export type Translate = (key: string, options?: Record<string, unknown>) => string;
 
+/**
+ * The one line under the headline figure. It must add a fact the headline
+ * lacks (a delta, the nearest item, how old); a line that restates the
+ * headline is deleted, not shortened. At Small it stays on one line.
+ */
+export interface NumberSecondary {
+  text: string;
+  /** Draws a direction glyph before the text; the text always carries the meaning too. */
+  direction?: 'up' | 'down' | 'flat';
+  /** Good or bad for the pilot (income up is good, undercuts up is bad), not the sign. */
+  tone?: 'good' | 'bad' | 'caution';
+}
+
 /** A widget's headline figure. Always shown, whatever the view. */
 export interface NumberModel {
   /** Display text. When `iskAmount` is set the shell draws an `IskAmount` and this is its plain-text form. */
@@ -48,8 +61,8 @@ export interface NumberModel {
   iskAmount?: number;
   /** What the figure counts ("undercut", "ISK"). */
   unit?: string;
-  /** One line under the figure. */
-  note?: string;
+  /** At most one structured line under the figure. */
+  secondary?: NumberSecondary;
   /** The severity ladder's tone; `clear` draws plain. */
   tone: DeadlineSeverity;
 }
@@ -66,6 +79,33 @@ export interface ListRow {
   to?: string;
 }
 
+/** A table cell: plain text, or text with the exact ISK behind it (drawn as an `IskAmount`). */
+export type TableCell = string | { text: string; iskAmount: number };
+
+export interface TableColumn {
+  key: string;
+  /** Header text; a table whose labels are all empty draws no header row. */
+  label: string;
+  align?: 'start' | 'end';
+  /** Which columns survive a narrow widget: lower is kept longer (default: the column's position). */
+  priority?: number;
+}
+
+export interface TableRowModel {
+  key: string;
+  /** One cell per column, in column order. */
+  cells: TableCell[];
+  /** A severity dot before the first cell; absent or `clear` draws none. */
+  tone?: DeadlineSeverity;
+  /** Set only when the row leads somewhere narrower than the widget's own Open link. */
+  to?: string;
+}
+
+export interface TableModel {
+  columns: TableColumn[];
+  rows: TableRowModel[];
+}
+
 export interface KindView {
   status: WidgetStateInput;
   /** When the read behind it landed; null when not known. */
@@ -73,8 +113,10 @@ export interface KindView {
   /** The read came from cache, not a live fetch. */
   fromCache: boolean;
   number: NumberModel;
-  /** Every row; the shell shows as many as the size allows. */
+  /** Every row; the Table view shows as many as the size allows. Becomes a two or three column table unless `table` is set. */
   rows: ListRow[];
+  /** The kind's own columns; absent means the table is derived from `rows` (see `tableModel.ts`). */
+  table?: TableModel;
   /** Clocks this kind contributes to the header's Next deadline chip. */
   deadlines: BoardDeadline[];
   /** One plain line, for the widget's accessible description. */
@@ -84,9 +126,10 @@ export interface KindView {
   /** Overrides the kind's own empty message, when the reason is not "nothing there". */
   emptyMessage?: string;
   /**
-   * The kind's chart, when it has one and the data to draw it. The Chart view
-   * draws it under the headline; the Number view at Medium and up carries it
-   * as a mini chart. Absent means the Chart view falls back to the Number.
+   * The kind's chart, when it has one and the data to draw it. Only the Chart
+   * view draws it (the Number view is a number, never a mini chart); at Large
+   * and Full the table sits beside it. Absent means the Chart view falls back
+   * to the Number.
    */
   chart?: ChartModel;
 }

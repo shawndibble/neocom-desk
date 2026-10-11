@@ -48,8 +48,8 @@ describe('addWidget', () => {
     expect(next.widgets[1]).toEqual({
       id: 'w1',
       kind: 'orders',
-      size: 'M',
-      view: 'number',
+      size: 'L',
+      view: 'table',
       scope: 'header',
       showOnPhone: true,
     });
@@ -166,7 +166,7 @@ describe('setView', () => {
   });
   it('refuses an unknown kind', () => {
     const l = layoutOf(w('a', 'future'));
-    expect(setView(l, 'a', 'list')).toBe(l);
+    expect(setView(l, 'a', 'table')).toBe(l);
   });
 });
 
@@ -212,12 +212,12 @@ describe('setShowOnPhone', () => {
 describe('duplicateWidget', () => {
   it('inserts right after the source with a new id and no title', () => {
     const l = layoutOf(
-      w('a', 'orders', { title: 'Mine', size: 'L', view: 'list' }),
+      w('a', 'orders', { title: 'Mine', size: 'L', view: 'table' }),
       w('b', 'mail')
     );
     const next = duplicateWidget(l, 'a', counter('d'));
     expect(ids(next)).toEqual(['a', 'd1', 'b']);
-    expect(next.widgets[1]).toMatchObject({ kind: 'orders', size: 'L', view: 'list' });
+    expect(next.widgets[1]).toMatchObject({ kind: 'orders', size: 'L', view: 'table' });
     expect(next.widgets[1].title).toBeUndefined();
     expect(next.widgets[0].title).toBe('Mine');
   });

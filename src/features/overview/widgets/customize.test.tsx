@@ -234,8 +234,8 @@ describe('Widget menu', () => {
     const { user, seen } = setup();
     await user.click(screen.getByRole('button', { name: 'Settings for Wallet' }));
     expect(screen.getByRole('menuitemradio', { name: 'Chart' })).toBeInTheDocument();
-    await user.click(screen.getByRole('menuitemradio', { name: 'List' }));
-    expect(seen.current.widgets[0].view).toBe('list');
+    await user.click(screen.getByRole('menuitemradio', { name: 'Table' }));
+    expect(seen.current.widgets[0].view).toBe('table');
 
     // Mail has no Chart view.
     await user.click(screen.getByRole('button', { name: 'Settings for Mail' }));

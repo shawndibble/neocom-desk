@@ -3684,7 +3684,7 @@
         "low": "low {{value}}",
         "high": "high {{value}}",
         "max": "max {{value}}",
-        "listSummary": "{{note}}: {{items}}. Switch to List for the table.",
+        "listSummary": "{{note}}: {{items}}. Switch to Table for the figures.",
         "orders": {
           "notUndercut": "Not undercut",
           "undercut": "Undercut",
@@ -3742,41 +3742,35 @@
       },
       "data": {
         "walletFlow": {
-          "note": "Income {{income}} · spending {{spending}}",
           "incomeLabel": "Income",
           "spendingLabel": "Spending",
           "income": "Income",
           "spending": "Spending"
         },
         "netWorth": {
-          "none": "No net worth has been recorded yet.",
-          "asOf": "As of {{day}}"
+          "none": "No net worth has been recorded yet."
         },
         "profit": {
           "built_one": "{{count}} built",
-          "built_other": "{{count}} built",
-          "note": "{{runs}} runs logged · {{open}} still selling"
+          "built_other": "{{count}} built"
         },
         "miningYield": {
           "unit": "ISK/day",
           "share": "{{pct}}% of yield",
-          "note": "Average over {{range}} days, {{days}} with mining",
-          "sinceNote": "Saved history starts {{date}}"
+          "bestDay": "Best day {{value}}"
         },
         "lp": {
           "unit": "LP",
           "corporation": "Corporation #{{id}}",
           "corporations_one": "{{count}} corporation",
           "corporations_other": "{{count}} corporations",
-          "everMarks_one": "{{count}} EverMark",
-          "everMarks_other": "{{count}} EverMarks"
+          "largest": "{{name}} {{value}}"
         },
         "clones": {
           "current": "Current clone",
           "cloneId": "Clone #{{id}}",
           "sooner": "Finishes your queue {{duration}} sooner",
           "stay": "Stay put",
-          "stayNote": "No jump clone finishes your queue sooner",
           "best": "Best for your queue",
           "baseline": "About the same",
           "soonerBy": "{{duration}} sooner",
@@ -3843,14 +3837,14 @@
       "priceWatch": {
         "title": "Price watch",
         "description": "Prices you track and the alerts that fired",
-        "empty": "No Quickbar item has a price target. Set one from the Market page."
+        "empty": "No Quickbar item has a price target. Set one from the Market page.",
+        "nearest": "Nearest: {{name}}, {{pct}}% away"
       },
       "stock": {
         "title": "Market stock",
         "description": "How well stocked your markets are",
         "empty": "You do not keep a Stock List yet.",
-        "low_one": "{{count}} low",
-        "low_other": "{{count}} low"
+        "short": "short"
       },
       "lp": {
         "title": "LP balances",
@@ -3869,7 +3863,8 @@
         "description": "Jobs ready to deliver and the next to finish",
         "empty": "No industry jobs running.",
         "ready": "ready",
-        "running": "running"
+        "running": "running",
+        "next": "Next: {{name}}, {{duration}}"
       },
       "profit": {
         "title": "Realized profit",
@@ -3895,7 +3890,8 @@
       "structures": {
         "title": "Structures",
         "description": "Reinforcement timers, fuel and offline services",
-        "empty": "There are no structures to show."
+        "empty": "There are no structures to show.",
+        "fuelLeft": "fuel left"
       },
       "moonChunks": {
         "title": "Moon extractions",
@@ -3908,7 +3904,8 @@
         "title": "Incursions",
         "description": "The nearest Incursions to your current system",
         "empty": "No Incursions are active.",
-        "unit": "active"
+        "unit": "active",
+        "nearest": "Nearest: {{system}}, {{jumps}}"
       },
       "routeSafety": {
         "title": "Route safety",
@@ -3941,7 +3938,8 @@
         "title": "Mail",
         "description": "Unread mail and the newest few",
         "empty": "Your mail has not loaded yet.",
-        "unit": "unread"
+        "unit": "unread",
+        "latest": "Latest: {{from}}, {{age}}"
       },
       "loading": "Loading",
       "needsPermission": "Needs permission",
@@ -4071,7 +4069,7 @@
       "views": {
         "number": "Number",
         "chart": "Chart",
-        "list": "List"
+        "table": "Table"
       },
       "character": "Character",
       "header": "Header",
