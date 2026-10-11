@@ -62,6 +62,8 @@ export interface WidgetProps {
   editControls?: ReactNode;
   /** Draw this sample instead of the live read: the Gallery's inert preview. */
   previewView?: KindView;
+  /** The Gallery's preview already sits under the kind's name: draw the body alone, no header. */
+  hideHeader?: boolean;
   /** The empty state's Remove widget. */
   onRemove: (id: string) => void;
 }
@@ -245,6 +247,7 @@ function WidgetFrame({
   headerStart,
   editControls,
   view,
+  hideHeader = false,
   onRemove,
 }: Omit<WidgetProps, 'previewView'> & { view: KindView }) {
   const { t } = useTranslation();
@@ -338,32 +341,34 @@ function WidgetFrame({
         editing ? 'border-dashed border-line-bright' : 'border-line'
       )}
     >
-      <div className="flex min-h-11 items-center gap-1.5 border-b border-line py-1 pr-1.5 pl-2.5 md:min-h-9">
-        {headerStart}
-        <h2 className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
-          {title}
-        </h2>
-        {showNew && kind.isNew && (
-          <span className="rounded-xs bg-accent px-1.5 text-[0.5625rem] font-bold tracking-widest text-accent-contrast uppercase">
-            {t('overview.widgets.new')}
-          </span>
-        )}
-        {scope.chip && <AllCharactersReadout />}
-        <span className="flex-1" />
-        {view.to !== null && (
-          <Link
-            to={view.to}
-            aria-label={t('overview.widgets.openPage', { title })}
-            className={entityLinkClassName(
-              'flex min-h-11 items-center gap-0.5 text-xs font-semibold whitespace-nowrap md:min-h-0'
-            )}
-          >
-            {t('overview.board.open')}
-            <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-          </Link>
-        )}
-        {menu}
-      </div>
+      {!hideHeader && (
+        <div className="flex min-h-11 items-center gap-1.5 border-b border-line py-1 pr-1.5 pl-2.5 md:min-h-9">
+          {headerStart}
+          <h2 className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
+            {title}
+          </h2>
+          {showNew && kind.isNew && (
+            <span className="rounded-xs bg-accent px-1.5 text-[0.5625rem] font-bold tracking-widest text-accent-contrast uppercase">
+              {t('overview.widgets.new')}
+            </span>
+          )}
+          {scope.chip && <AllCharactersReadout />}
+          <span className="flex-1" />
+          {view.to !== null && (
+            <Link
+              to={view.to}
+              aria-label={t('overview.widgets.openPage', { title })}
+              className={entityLinkClassName(
+                'flex min-h-11 items-center gap-0.5 text-xs font-semibold whitespace-nowrap md:min-h-0'
+              )}
+            >
+              {t('overview.board.open')}
+              <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+            </Link>
+          )}
+          {menu}
+        </div>
+      )}
       <div className="flex-1">{body}</div>
       {editControls}
       {scope.fallbackNote && state === 'ok' && characterId !== null && (
