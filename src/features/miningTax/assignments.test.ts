@@ -14,6 +14,7 @@ import {
   planNeedsReviewResolution,
   splitAssignment,
   uncombineAssignments,
+  unmarkAssignmentsPaid,
   unlinkPaymentTransaction,
   updateCombinedAssignments,
 } from './assignments';
@@ -412,6 +413,55 @@ describe('linkPaymentTransaction', () => {
       method: 'donation',
       amount: 1,
     });
+  });
+});
+
+describe('unmarkAssignmentsPaid', () => {
+  const base = {
+    characterId: CHAR_A,
+    solarSystemId: 1,
+    payeeId: 'p',
+    oreLines: [{ typeId: TYPE_A, quantity: 10 }],
+    taxPct: 10,
+    estimatedValue: 100,
+    taxOwed: 10,
+    markPaid: false,
+  };
+
+  it('puts a Paid Assignment back to outstanding and drops its payment and paidAt', async () => {
+    const a = await createAssignment({ ...base, date: '2026-09-04' });
+    await markAssignmentsPaid([a], { paidOn: '2026-09-06', method: 'donation', amount: 20 });
+    await linkRecordedPayment([(await db.miningTaxAssignments.get(a.id))!], { journalRefId: 42 });
+    const paid = (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
+
+    await unmarkAssignmentsPaid([paid]);
+
+    const after = await db.miningTaxAssignments.get(a.id);
+    expect(after?.status).toBe('outstanding');
+    expect(after?.paidAt).toBeUndefined();
+    expect(after?.payment).toBeUndefined();
+  });
+
+  it('leaves the other Assignments of a shared payment paid', async () => {
+    const a = await createAssignment({ ...base, date: '2026-09-04' });
+    const b = await createAssignment({ ...base, date: '2026-09-05' });
+    await markAssignmentsPaid([a, b], { paidOn: '2026-09-06', method: 'donation', amount: 20 });
+    const [paidA] = (await db.miningTaxAssignments.bulkGet([a.id])) as MiningTaxAssignmentRecord[];
+
+    await unmarkAssignmentsPaid([paidA]);
+
+    expect((await db.miningTaxAssignments.get(b.id))?.status).toBe('paid');
+    expect((await db.miningTaxAssignments.get(b.id))?.payment?.amount).toBe(20);
+  });
+
+  it('leaves a non-paid Assignment alone', async () => {
+    const a = await createAssignment({ ...base, date: '2026-09-04' });
+    await unmarkAssignmentsPaid([a]);
+    expect((await db.miningTaxAssignments.get(a.id))?.status).toBe('outstanding');
+  });
+
+  it('is a no-op for an empty list', async () => {
+    await unmarkAssignmentsPaid([]);
   });
 });
 

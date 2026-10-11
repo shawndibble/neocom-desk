@@ -389,6 +389,30 @@ export async function markAssignmentsPaid(
   await db.miningTaxAssignments.bulkPut(updated);
 }
 
+/**
+ * Takes Paid Assignments back to `outstanding` — the undo for "mark paid" (a
+ * wrong click, or a payment that was recorded against the wrong days). The
+ * payment record goes with the status: an owed row carrying a payment would
+ * keep its linked transaction claimed, so the wallet picker could never offer
+ * it to the right days. Only the rows passed in revert; the rest of a shared
+ * `paymentId` stays Paid. A row that isn't `paid` is left exactly as it is.
+ */
+export async function unmarkAssignmentsPaid(
+  assignments: readonly MiningTaxAssignmentRecord[]
+): Promise<void> {
+  const now = Date.now();
+  const updated = assignments
+    .filter((a) => a.status === 'paid')
+    .map((a): MiningTaxAssignmentRecord => {
+      const next = { ...a, status: 'outstanding' as const, updatedAt: now };
+      delete next.paidAt;
+      delete next.payment;
+      return next;
+    });
+  if (updated.length === 0) return;
+  await db.miningTaxAssignments.bulkPut(updated);
+}
+
 /** Which linked-transaction array a call targets — a wallet-journal entry id or a contract id, never both. */
 export type PaymentTransactionRef = { journalRefId: number } | { contractId: number };
 
