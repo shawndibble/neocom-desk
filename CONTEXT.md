@@ -1028,6 +1028,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   ore as of the newest scan that had it; no new ore, none with more m³) is an
   update of the Survey, even if an ore dropped out of the latest scan; any other scan is a different
   field. Shown on the Mining › Survey tab and on the public page of its link.
+- **Survey name**: The pilot's own short label for a Survey in their recents,
+  shown as the Survey card's title and leading its entry in the Survey picker.
+  Personal: kept with the pilot's recent-Surveys list, never on the Survey, so
+  no one else sees it. Scope decision
+  `20261010-203712-survey-a-surveys-name-is-the-pilots-own`.
 - **Cleared marker** (also: mark field cleared): The scan with no rocks that ends a
   Survey, stored by a button because the scanner has nothing to copy once the last
   rock is gone. Who may press it: scope decision `20261009-233623-survey-the-field-is-marked-cleared-by-a`.
