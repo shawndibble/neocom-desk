@@ -201,3 +201,33 @@ across Characters fall back to the header Character and say so.
 Layout sync per account vs device (decided: per pilot, synced) · single list vs
 separate phone layout (decided: single list + Hide on phone) · which Widgets sum
 across Characters · whether other alert types than danger raise the banner.
+
+## 12. Implementation decisions (settled after reading the code)
+
+- **Unavailable in v1** (shown in the Gallery marked "Coming soon", not addable):
+  survey, routeSafety, hauling, kills, jumpTimers (no jump-fatigue ESI endpoint).
+  Each needs a follow-up ticket; listed in the PR.
+- **Reduced kinds:** `sp` is Number/List only (no SP history store); `priceWatch`
+  is Number/List only (the poller keeps no price history, so no sparkline);
+  `wallet` Chart uses the journal-derived daily balance; `netWorth` has the four
+  layers the app records (ISK, assets, escrow, sell orders) — no Contracts layer.
+- **Acknowledge = dismiss.** Acknowledging a danger Alert dismisses its feed
+  entries (synced `dismissedAt`); Mark all read dismisses every non-danger entry.
+  No new synced field.
+- **Snooze 1h** is device-local (`createLocalSetting`, group key -> until ms),
+  offered only where the type is snoozable (price alerts).
+- **Undo toast is persistent** (the existing `Toast` with an `undo` action closes
+  on its close button, Esc, the next toast or a route change — WCAG 2.2.1), not 8 s.
+- **Old Alerts page features** (per-Character filter, search, muted-type chips)
+  move to the panel footer: "Notify me about…" and "Older alerts" link to
+  Settings > Notifications; recorded in the PR.
+- **Charts are hand-built inline SVG/CSS.** recharts is never imported statically
+  into the Overview graph; Firebase-backed loaders are `import()`ed (the boot
+  import graph test enforces it).
+- **Data architecture:** per-kind data hooks mounted once above the grid, keyed by
+  Character (or all), with a refresh epoch from context; widgets of one kind
+  share a provider and range is applied at render time.
+- **Layout store:** `createSyncedSetting` key `sync.overviewLayout`, default
+  `null`; `parse` keeps unknown kinds and fields (forward compatible); first run =
+  `null` after hydration. Returning pilots with old hidden/order keys are
+  migrated.
