@@ -253,6 +253,8 @@ export interface ContractsBoardData {
   summary: ContractsBoardSummary;
   /** "Jita → Amarr" for the soonest courier, or null when it is not a courier or the names did not resolve. */
   route: string | null;
+  /** The same for every courier in `summary.items`, by contract id: `[from, to]` full location names. */
+  routes?: Record<number, readonly [string, string]>;
   needsReauth: boolean;
   fetchedAt: Date | null;
 }
@@ -266,19 +268,29 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
   const loadedAt = Date.now();
   const summary = summarizeContractsBoard(cached?.data ?? [], characterId, loadedAt);
   const { soonest } = summary;
-  let route: string | null = null;
-  if (soonest?.kind === 'courier' && soonest.startLocationId && soonest.endLocationId) {
-    try {
-      const [from, to] = await Promise.all([
-        loadContractLocationName(characterId, soonest.startLocationId),
-        loadContractLocationName(characterId, soonest.endLocationId),
-      ]);
-      if (from && to) route = `${from} → ${to}`;
-    } catch {
-      route = null;
-    }
-  }
-  return { summary, route, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
+  // Names are cached lookups; a failed one leaves that row without a route, never the board.
+  const routes: Record<number, readonly [string, string]> = {};
+  await Promise.all(
+    summary.items
+      .filter((item) => item.kind === 'courier')
+      .slice(0, 12)
+      .map(async (item) => {
+        const { startLocationId, endLocationId } = item;
+        if (!startLocationId || !endLocationId) return;
+        try {
+          const [from, to] = await Promise.all([
+            loadContractLocationName(characterId, startLocationId),
+            loadContractLocationName(characterId, endLocationId),
+          ]);
+          if (from && to) routes[item.contractId] = [from, to];
+        } catch {
+          // A courtesy: the row names the contract without a route.
+        }
+      })
+  );
+  const soonestRoute = soonest ? routes[soonest.contractId] : undefined;
+  const route = soonestRoute ? `${soonestRoute[0]} → ${soonestRoute[1]}` : null;
+  return { summary, route, routes, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
 }
 
 // --- Calendar ---------------------------------------------------------------
@@ -320,12 +332,17 @@ export interface SpExtractionBoardData {
 
 // --- Mail -------------------------------------------------------------------
 
+/** Mail rows the Table view can show at its tallest size. */
+const INBOX_ROWS = 12;
+
 export interface BoardMail {
   mailId: number;
   subject: string;
   /** Null when the sender's name did not resolve; the row leaves it out. */
   from: string | null;
   atMs: number | null;
+  /** Set on `inbox` rows: false for mail already read. */
+  unread?: boolean;
 }
 
 export interface MailBoardData {
@@ -333,6 +350,8 @@ export interface MailBoardData {
   unread: number;
   /** The newest unread mails, newest first — a few rows, not the inbox. */
   recent: BoardMail[];
+  /** The newest mail, read or not, newest first: the Table view's rows. */
+  inbox?: BoardMail[];
   needsReauth: boolean;
   fetchedAt: Date | null;
 }
@@ -347,15 +366,15 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
     loadMailLabels(characterId),
     loadMailHeaders(characterId),
   ]);
-  const unreadHeaders = (headers.cached?.data ?? [])
-    .filter((header) => header.is_read === false)
+  const newestFirst = (headers.cached?.data ?? [])
     .map((header) => ({
       header,
       atMs: header.timestamp ? Date.parse(header.timestamp) : Number.NaN,
     }))
-    .sort((a, b) => (Number.isNaN(b.atMs) ? -1 : b.atMs) - (Number.isNaN(a.atMs) ? -1 : a.atMs))
-    .slice(0, 4);
-  const senderIds = unreadHeaders.flatMap(({ header }) =>
+    .sort((a, b) => (Number.isNaN(b.atMs) ? -1 : b.atMs) - (Number.isNaN(a.atMs) ? -1 : a.atMs));
+  const unreadHeaders = newestFirst.filter(({ header }) => header.is_read === false).slice(0, 4);
+  const inboxHeaders = newestFirst.slice(0, INBOX_ROWS);
+  const senderIds = [...new Set([...unreadHeaders, ...inboxHeaders])].flatMap(({ header }) =>
     header.from === undefined ? [] : [header.from]
   );
   let names = new Map<number, string>();
@@ -366,16 +385,19 @@ export async function loadMailBoard(characterId: number): Promise<MailBoardData>
       // A courtesy: a row without a sender still names the mail.
     }
   }
+  const boardMail = ({ header, atMs }: (typeof newestFirst)[number]): BoardMail => ({
+    mailId: header.mail_id,
+    subject: header.subject ?? '',
+    from: header.from === undefined ? null : (names.get(header.from) ?? null),
+    atMs: Number.isNaN(atMs) ? null : atMs,
+    unread: header.is_read === false,
+  });
   return {
     unread:
       labels.cached?.data.total_unread_count ??
       (headers.cached?.data ?? []).filter((header) => header.is_read === false).length,
-    recent: unreadHeaders.map(({ header, atMs }) => ({
-      mailId: header.mail_id,
-      subject: header.subject ?? '',
-      from: header.from === undefined ? null : (names.get(header.from) ?? null),
-      atMs: Number.isNaN(atMs) ? null : atMs,
-    })),
+    recent: unreadHeaders.map(boardMail),
+    inbox: inboxHeaders.map(boardMail),
     needsReauth: headers.needsReauth || labels.needsReauth,
     // The older of the two reads: the count is only as fresh as the labels.
     fetchedAt:

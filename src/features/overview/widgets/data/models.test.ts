@@ -166,37 +166,6 @@ describe('mail', () => {
   });
 });
 
-describe('contracts', () => {
-  const data = (over: Partial<{ inProgress: number; dueSoon: number; overdue: number }>) => ({
-    summary: { inProgress: 2, dueSoon: 0, overdue: 0, soonest: null, ...over },
-    route: null,
-    needsReauth: false,
-    fetchedAt: new Date(NOW),
-  });
-
-  it('shows the in-progress count and lists the three counts', () => {
-    const view = buildView('contracts', { contracts: ok(data({})) as never }, ctx());
-    expect(view.number.value).toBe('2');
-    expect(view.rows.map((r) => r.value)).toEqual(['2', '0', '0']);
-    expect(view.deadlines).toEqual([]);
-  });
-
-  it('turns critical and offers a deadline when a courier is overdue', () => {
-    const soonest = { kind: 'courier', atMs: NOW + HOUR, overdue: true };
-    const feeds = {
-      contracts: ok({
-        ...data({ overdue: 1 }),
-        summary: { inProgress: 2, dueSoon: 0, overdue: 1, soonest },
-      }),
-    };
-    const view = buildView('contracts', feeds as never, ctx());
-    expect(view.number.tone).toBe('critical');
-    expect(view.deadlines).toHaveLength(1);
-    expect(view.deadlines[0].at).toBe(NOW + HOUR);
-    expect(view.deadlines[0].severity).toBe('critical');
-  });
-});
-
 describe('structures and moon extractions', () => {
   it('say the roles do not cover it, rather than asking for a grant', () => {
     const feeds: Feeds = {
@@ -563,5 +532,247 @@ describe('the Number view says one new thing', () => {
     };
     const view = buildView('mail', feeds, ctx());
     expect(view.number.tone).toBe('clear');
+  });
+});
+
+describe('mail table', () => {
+  it('tables the newest mail, read or not, with the unread ones marked', () => {
+    const data = {
+      unread: 1,
+      recent: [{ mailId: 1, subject: 'New', from: 'Aria', atMs: NOW - HOUR, unread: true }],
+      inbox: [
+        { mailId: 1, subject: 'New', from: 'Aria', atMs: NOW - HOUR, unread: true },
+        { mailId: 2, subject: 'Old', from: null, atMs: NOW - 5 * HOUR, unread: false },
+      ],
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    };
+    const view = buildView('mail', { mail: ok(data) }, ctx());
+    expect(view.table?.columns.map((c) => c.key)).toEqual(['from', 'age', 'subject']);
+    expect(view.table?.rows.map((r) => [r.cells[0], r.cells[2], r.tone])).toEqual([
+      ['Aria', 'New', 'watch'],
+      ['overview.widgets.mail.unknownSender', 'Old', 'clear'],
+    ]);
+  });
+
+  it('falls back to the unread mail when the read has no inbox', () => {
+    const data = {
+      unread: 1,
+      recent: [{ mailId: 1, subject: 'New', from: 'Aria', atMs: NOW - HOUR }],
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    };
+    const view = buildView('mail', { mail: ok(data) }, ctx());
+    expect(view.table?.rows).toHaveLength(1);
+    expect(view.table?.rows[0]?.tone).toBe('watch');
+  });
+});
+
+describe('contracts table', () => {
+  const noItems = { inProgress: 2, dueSoon: 0, overdue: 0, soonest: null, items: [] };
+  const data = (over: Record<string, unknown> = {}) => ({
+    summary: { ...noItems, ...over },
+    route: null,
+    needsReauth: false,
+    fetchedAt: new Date(NOW),
+  });
+  const courier = (over: Record<string, unknown> = {}) => ({
+    contractId: 1,
+    kind: 'courier' as const,
+    atMs: NOW + 3 * HOUR,
+    overdue: false,
+    title: null,
+    reward: 2_000_000,
+    collateral: 90_000_000,
+    price: null,
+    ...over,
+  });
+
+  it('with nothing on a clock, counts the hauls in progress', () => {
+    const view = buildView('contracts', { contracts: ok(data()) as never }, ctx());
+    expect(view.number.value).toBe('2');
+    expect(view.number.unit).toBe('overview.widgets.contracts.unit');
+    expect(view.table?.rows).toEqual([]);
+  });
+
+  it('leads with the soonest deadline and counts the hauls as the secondary', () => {
+    const soonest = courier();
+    const feeds = { contracts: ok(data({ soonest, items: [soonest] })) };
+    const view = buildView('contracts', feeds as never, ctx());
+    expect(view.number.value).toBe('3h 0m');
+    expect(view.number.secondary?.text).toContain('overview.widgets.contracts.inProgress');
+    expect(view.number.secondary?.text).toContain('"count":2');
+  });
+
+  it('says overdue when the soonest courier is past its deliver-by', () => {
+    const soonest = courier({ atMs: NOW - HOUR, overdue: true });
+    const feeds = { contracts: ok(data({ overdue: 1, soonest, items: [soonest] })) };
+    const view = buildView('contracts', feeds as never, ctx());
+    expect(view.number.tone).toBe('critical');
+    expect(view.number.value).toBe('overview.widgets.contracts.overdue');
+  });
+
+  it('tables each contract: route, expiry, status, reward and collateral', () => {
+    const hauls = courier({ contractId: 1 });
+    const late = courier({ contractId: 2, atMs: NOW - HOUR, overdue: true, reward: null });
+    const listing = courier({
+      contractId: 3,
+      kind: 'listing',
+      atMs: NOW + 20 * HOUR,
+      title: 'Spare hulls',
+      reward: null,
+      collateral: null,
+      price: 5_000_000,
+    });
+    const feeds = {
+      contracts: ok({
+        ...data({ soonest: late, items: [late, hauls, listing] }),
+        routes: {
+          1: ['Jita IV - Moon 4 - Caldari Navy Assembly Plant', 'Amarr VIII (Oris) - Emperor'],
+        },
+      }),
+    };
+    const table = buildView('contracts', feeds as never, ctx()).table;
+    expect(table?.columns.map((c) => c.key)).toEqual([
+      'contract',
+      'expires',
+      'status',
+      'reward',
+      'collateral',
+    ]);
+    expect(table?.rows.map((r) => r.cells[0])).toEqual([
+      'overview.widgets.contracts.courier',
+      'Jita → Amarr',
+      'Spare hulls',
+    ]);
+    expect(table?.rows[0]?.cells[1]).toBe('overview.widgets.contracts.overdue');
+    expect(table?.rows[0]?.tone).toBe('critical');
+    expect(table?.rows[1]?.cells[3]).toMatchObject({ iskAmount: 2_000_000 });
+    expect(table?.rows[2]?.cells[2]).toBe('overview.widgets.contracts.statusListed');
+    expect(table?.rows[2]?.cells[3]).toMatchObject({ iskAmount: 5_000_000 });
+  });
+});
+
+describe('training table', () => {
+  const skills = (queue: unknown[]) =>
+    ok({
+      skillsResult: null,
+      queueResult: { data: queue, fetchedAt: new Date(NOW), fromCache: false, truncated: false },
+      queueNeedsReauth: false,
+      totalSp: 5_000_000,
+      catalog: { bySkillTypeID: new Map([[3300, { name: 'Gunnery' }]]) },
+      maxOrders: 5,
+    });
+
+  it('tables the queue: skill, when it ends, how long it trains, level and SP per hour', () => {
+    const queue = [
+      {
+        skill_id: 3300,
+        queue_position: 0,
+        finished_level: 5,
+        start_date: new Date(NOW - HOUR).toISOString(),
+        finish_date: new Date(NOW + 3 * HOUR).toISOString(),
+        training_start_sp: 100_000,
+        level_end_sp: 260_000,
+      },
+      {
+        skill_id: 3300,
+        queue_position: 1,
+        finished_level: 5,
+        finish_date: new Date(NOW + 5 * HOUR).toISOString(),
+      },
+    ];
+    const view = buildView('training', { skills: skills(queue) as never }, ctx());
+    expect(view.table?.columns.map((c) => c.key)).toEqual([
+      'skill',
+      'endsIn',
+      'takes',
+      'level',
+      'spPerHour',
+    ]);
+    // 160,000 SP over the 4 hours between start and finish.
+    expect(view.table?.rows[0]?.cells).toEqual(['Gunnery', '3h 0m', '4h 0m', '5', '40K']);
+    expect(view.table?.rows[1]?.cells[4]).toBe('—');
+  });
+});
+
+describe('sp table', () => {
+  const spFeeds = (
+    over: { unallocated?: number; monitoring?: boolean; net?: number | null } = {}
+  ) =>
+    ({
+      skills: ok({
+        totalSp: 80_000_000,
+        skillsResult: {
+          data: { total_sp: 80_000_000, unallocated_sp: over.unallocated ?? 1_450_000, skills: [] },
+          fetchedAt: new Date(NOW),
+          fromCache: false,
+        },
+      }),
+      spExtras: ok({
+        monitoring: over.monitoring ?? true,
+        thresholdSp: 100_000_000,
+        price: { hubName: 'Jita', loaded: true, net: over.net ?? null },
+      }),
+    }) as unknown as Feeds;
+
+  it('puts the unallocated SP under the total in the Number view', () => {
+    const view = buildView('sp', spFeeds(), ctx());
+    expect(view.number.secondary?.text).toContain('overview.widgets.sp.unallocated');
+    expect(view.number.secondary?.text).toContain('1.5M');
+  });
+
+  it('keeps the extraction summary when nothing is unallocated', () => {
+    const view = buildView('sp', spFeeds({ unallocated: 0 }), ctx());
+    expect(view.number.secondary?.text).not.toContain('overview.widgets.sp.unallocated');
+  });
+
+  it('tables total, unallocated and extractable SP, with a bar toward the extraction threshold', () => {
+    const view = buildView('sp', spFeeds({ net: 200_000 }), ctx());
+    expect(view.table?.rows.map((r) => r.key)).toEqual([
+      'total',
+      'unallocated',
+      'extractable',
+      'threshold',
+      'value',
+    ]);
+    expect(view.table?.rows[1]?.cells.slice(0, 2)).toEqual([
+      'skills.unallocatedSp',
+      (1_450_000).toLocaleString(),
+    ]);
+    // 75M extractable of the 100M threshold.
+    expect(view.table?.rows[3]?.cells[1]).toEqual({ text: '75%', bar: 0.75 });
+    expect(view.table?.rows[3]?.cells[2]).toContain('overview.widgets.sp.ofThreshold');
+    expect(view.table?.rows[4]?.cells[1]).toMatchObject({ iskAmount: 150 * 200_000 });
+  });
+
+  it('leaves the threshold and value rows out when monitoring is off and nothing is priced', () => {
+    const view = buildView('sp', spFeeds({ monitoring: false }), ctx());
+    expect(view.table?.rows.map((r) => r.key)).toEqual(['total', 'unallocated', 'extractable']);
+  });
+});
+
+describe('comingUp table', () => {
+  it('tables event, time left and response, and counts the others within a day', () => {
+    const ev = (id: number, hours: number, response: string) => ({
+      event_id: id,
+      title: `Event ${id}`,
+      event_date: new Date(NOW + hours * HOUR).toISOString(),
+      event_response: response,
+      importance: 1,
+    });
+    const events = [ev(1, 2, 'accepted'), ev(2, 5, 'tentative'), ev(3, 30, 'accepted')];
+    const feeds: Feeds = {
+      calendar: ok({ events, needsReauth: false, fetchedAt: new Date(NOW) }) as never,
+    };
+    const view = buildView('comingUp', feeds, ctx());
+    expect(view.number.unit).toContain('overview.widgets.comingUp.more');
+    expect(view.number.unit).toContain('"count":1');
+    expect(view.table?.columns.map((c) => c.key)).toEqual(['event', 'in', 'response']);
+    expect(view.table?.rows[1]?.cells).toEqual([
+      'Event 2',
+      '5h 0m',
+      'overview.board.response.tentative',
+    ]);
   });
 });

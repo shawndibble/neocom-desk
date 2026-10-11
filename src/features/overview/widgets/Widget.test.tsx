@@ -92,23 +92,23 @@ describe('Widget states', () => {
     const region = screen.getByRole('region', { name: 'Mail' });
     expect(within(region).getByText('9')).toBeInTheDocument();
     // A Small shows four rows and says how many more there are.
-    expect(within(region).getAllByText(/^Subject \d$/)).toHaveLength(4);
+    expect(within(region).getAllByText(/^Sender [0-9]$/)).toHaveLength(4);
     expect(within(region).getByText('+1 more')).toBeInTheDocument();
   });
 
-  it('shows the name and the key value only at Small', () => {
+  it('shows the sender and the age only at Small', () => {
     renderWidget(model({ view: 'table', size: 'S' }), (store) =>
       store.set('mail', { data: mailData(2, 2), error: false, loading: false })
     );
-    expect(screen.queryByText('Sender 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('Subject 1')).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Mail' }).querySelectorAll('td')).toHaveLength(4);
   });
 
-  it('shows the sender as a third column at Medium', () => {
+  it('shows the subject as a third column at Medium', () => {
     renderWidget(model({ view: 'table', size: 'M' }), (store) =>
       store.set('mail', { data: mailData(2, 2), error: false, loading: false })
     );
-    expect(screen.getByText('Sender 1')).toBeInTheDocument();
+    expect(screen.getByText('Subject 1')).toBeInTheDocument();
   });
 
   it('draws a Chart view as the Number for a kind with no chart', () => {

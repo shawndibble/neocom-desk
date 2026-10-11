@@ -458,7 +458,7 @@ describe('location', () => {
 });
 
 describe('charts on the existing kinds', () => {
-  it('charts the time each queued skill takes', () => {
+  it('charts the queue as one bar, a part per skill sized by its training time', () => {
     const feeds: Feeds = {
       skills: ok({
         skillsResult: null,
@@ -490,10 +490,9 @@ describe('charts on the existing kinds', () => {
       }) as never,
     };
     const view = buildView('training', feeds, ctx());
-    if (view.chart?.kind !== 'hbars') throw new Error('hbars');
-    expect(view.chart.rows).toHaveLength(2);
-    expect(view.chart.rows[0]!.share).toBe(0.2);
-    expect(view.chart.rows[1]!.share).toBe(1);
+    if (view.chart?.kind !== 'stack') throw new Error('stack');
+    expect(view.chart.parts.map((p) => p.value)).toEqual([4 * 3600, 20 * 3600]);
+    expect(view.chart.note).toContain('overview.widgets.chart.training.note');
   });
 
   it('charts how stocked each market is, as a share of its items', () => {
@@ -523,5 +522,106 @@ describe('charts on the existing kinds', () => {
       ['Jita IV', '50%', 0.5],
       ['Amarr VIII', '100%', 1],
     ]);
+  });
+});
+
+describe('clones table', () => {
+  const SDAY = 86_400;
+  const base = {
+    needsReauth: false,
+    note: null,
+    cloneCount: 2,
+    cooldownReadyAt: null,
+    fetchedAt: new Date(NOW),
+  };
+
+  it('compares the clones: finish, saving against the current one, implants, where', () => {
+    const view = buildView(
+      'clones',
+      {
+        clones: ok({
+          ...base,
+          verdict: 'jump' as const,
+          bestId: 7,
+          savedSeconds: 3 * SDAY,
+          rows: [
+            { id: 'worn', label: null, implantCount: 5, totalSeconds: 9 * SDAY, deltaSeconds: 0 },
+            {
+              id: 7,
+              label: 'Hauling alt',
+              location: 'Jita IV',
+              implantCount: 2,
+              totalSeconds: 6 * SDAY,
+              deltaSeconds: -3 * SDAY,
+            },
+            { id: 8, label: 'Far', implantCount: 0, totalSeconds: 10 * SDAY, deltaSeconds: SDAY },
+          ],
+        }),
+      },
+      ctx()
+    );
+    const table = view.table;
+    expect(table?.columns.map((c) => c.key)).toEqual([
+      'clone',
+      'vs',
+      'finishes',
+      'implants',
+      'location',
+    ]);
+    expect(table?.rows[1]?.cells).toEqual([
+      'Hauling alt',
+      { text: expect.stringContaining('soonerBy'), tone: 'good' },
+      '6d 0h',
+      '2',
+      'Jita IV',
+    ]);
+    expect(table?.rows[0]?.cells[1]).toBe('—');
+    expect(table?.rows[2]?.cells[1]).toEqual(expect.stringContaining('laterBy'));
+  });
+
+  it('names the nearest rival when the answer is to stay', () => {
+    const view = buildView(
+      'clones',
+      {
+        clones: ok({
+          ...base,
+          verdict: 'stay' as const,
+          bestId: 'worn',
+          savedSeconds: null,
+          rows: [
+            { id: 'worn', label: null, totalSeconds: 9, deltaSeconds: 0 },
+            { id: 7, label: 'Far', totalSeconds: 12, deltaSeconds: 3 * SDAY },
+            { id: 8, label: 'Farther', totalSeconds: 13, deltaSeconds: 5 * SDAY },
+          ],
+        }),
+      },
+      ctx()
+    );
+    expect(view.number.secondary?.text).toContain('overview.widgets.data.clones.nextBest');
+    expect(view.number.secondary?.text).toContain('"duration":"3d');
+  });
+});
+
+describe('location table', () => {
+  it.each([
+    [0.9459, 'good'],
+    [0.3, 'caution'],
+    [-0.2, 'bad'],
+  ])('colours security %s by its band', (security, tone) => {
+    const view = buildView(
+      'location',
+      {
+        location: ok({
+          needsReauth: false,
+          system: { id: 1, name: 'Sys', security },
+          shipTypeId: 1,
+          shipName: 'Muninn',
+        }),
+      },
+      ctx()
+    );
+    expect(view.table?.rows.map((r) => r.key)).toEqual(['system', 'security', 'ship']);
+    expect(view.table?.rows[1]?.cells[1]).toMatchObject({ tone });
+    expect(view.table?.rows[0]?.cells).toEqual([expect.any(String), 'Sys']);
   });
 });

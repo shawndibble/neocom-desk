@@ -79,8 +79,15 @@ export interface ListRow {
   to?: string;
 }
 
-/** A table cell: plain text, or text with the exact ISK behind it (drawn as an `IskAmount`). */
-export type TableCell = string | { text: string; iskAmount: number };
+/**
+ * A table cell: plain text, text with the exact ISK behind it (drawn as an
+ * `IskAmount`), or text with a good/caution/bad colour (never the only signal:
+ * the text states it) and/or a thin bar (0..1) drawn before it.
+ */
+export type TableCell =
+  | string
+  | { text: string; iskAmount: number }
+  | { text: string; tone?: 'good' | 'caution' | 'bad'; bar?: number };
 
 export interface TableColumn {
   key: string;

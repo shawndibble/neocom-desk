@@ -3697,7 +3697,7 @@
           "note": "How far along each job is; time left at the end"
         },
         "training": {
-          "note": "Time per skill in your queue"
+          "note": "Queue ends in {{duration}}"
         },
         "planetary": {
           "note": "Time until extractors run out"
@@ -3772,13 +3772,22 @@
           "best": "Best for your queue",
           "baseline": "About the same",
           "soonerBy": "{{duration}} sooner",
-          "laterBy": "{{duration}} later"
+          "laterBy": "{{duration}} later",
+          "nextBest": "Next best: {{duration}} later",
+          "col": {
+            "clone": "Clone",
+            "vs": "Vs current",
+            "finishes": "Queue ends in",
+            "implants": "Implants",
+            "location": "Location"
+          }
         },
         "location": {
           "system": "System",
           "ship": "Ship",
           "systemId": "System #{{id}}",
-          "security": "Security {{value}}"
+          "security": "Security {{value}}",
+          "securityLabel": "Security"
         }
       },
       "training": {
@@ -3788,13 +3797,30 @@
         "skillLevel": "{{name}} {{level}}",
         "now": "Training now",
         "next": "Next",
-        "idle": "Idle"
+        "idle": "Idle",
+        "col": {
+          "skill": "Skill",
+          "endsIn": "Ends in",
+          "takes": "Takes",
+          "level": "Level",
+          "spPerHour": "SP/h"
+        }
       },
       "sp": {
         "title": "Skill points",
         "description": "Total and unallocated SP, and what you could extract",
         "empty": "Skill points have not loaded yet.",
-        "unit": "SP"
+        "unit": "SP",
+        "unallocated": "{{sp}} unallocated",
+        "extractors_one": "{{count}} extractor",
+        "extractors_other": "{{count}} extractors",
+        "threshold": "Toward threshold",
+        "value": "Extraction value",
+        "col": {
+          "sp": "SP"
+        },
+        "ofThreshold": "of {{sp}}",
+        "extractable": "Extractable SP"
       },
       "location": {
         "title": "Location and ship",
@@ -3996,21 +4022,46 @@
       "comingUp": {
         "title": "Coming up",
         "description": "Calendar events you accepted or may attend",
-        "empty": "No accepted or tentative events ahead."
+        "empty": "No accepted or tentative events ahead.",
+        "more": "+{{count}} more in 24h",
+        "col": {
+          "event": "Event",
+          "in": "In",
+          "response": "Response"
+        }
       },
       "contracts": {
         "title": "Contracts",
         "description": "Couriers in progress and listings about to lapse",
         "empty": "No contracts are on a clock.",
         "overdue": "Overdue",
-        "unit": "in progress"
+        "unit": "in progress",
+        "inProgress": "{{count}} in progress",
+        "courier": "Courier",
+        "listing": "Listing",
+        "statusTransit": "In transit",
+        "statusOverdue": "Overdue",
+        "statusListed": "Listed",
+        "col": {
+          "contract": "Contract",
+          "expires": "Due in",
+          "status": "Status",
+          "reward": "Reward",
+          "collateral": "Collateral"
+        }
       },
       "mail": {
         "title": "Mail",
         "description": "Unread mail and the newest few",
         "empty": "Your mail has not loaded yet.",
         "unit": "unread",
-        "latest": "Latest: {{from}}, {{age}}"
+        "latest": "Latest: {{from}}, {{age}}",
+        "unknownSender": "Unknown sender",
+        "col": {
+          "from": "From",
+          "age": "Age",
+          "subject": "Subject"
+        }
       },
       "loading": "Loading",
       "needsPermission": "Needs permission",
