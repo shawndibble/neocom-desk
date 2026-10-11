@@ -131,7 +131,7 @@ export function CharacterHeader({
         </StatChips>
       )}
       {/* This header stands in for `PageHeader` on Overview, Clones and Employment History. */}
-      <AlertsBell />
+      <AlertsBell showWhenEmpty={overview ? true : undefined} />
     </header>
   );
 }

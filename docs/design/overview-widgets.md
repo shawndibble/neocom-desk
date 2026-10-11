@@ -217,7 +217,7 @@ Gallery & first run
 Header & alerts
 - [ ] E17 No header Character switcher; Updated N ago (read-only, no Refresh button) beside the name; Next deadline button (amber < 3 h, red < 30 min), Customize and the bell in one equal-height row at the top right (phone: Next on its own line under Customize and the bell); no SP chips.
 - [ ] E18 Sub-nav unchanged (Overview / Clones / Employment history).
-- [ ] E19 Bell in every page header; badge red only for danger; dim at zero.
+- [ ] E19 Bell in every page header; badge red only for danger; dim, not hidden, on desktop and on the Overview; hidden at zero on phone page headers elsewhere.
 - [ ] E20 Alerts panel (desktop popover / phone sheet) with chips, Mark all read (spares danger), View/Snooze/Dismiss/Acknowledge, empty state, footer, Esc/outside close.
 - [ ] E21 Danger banner with View + Acknowledge.
 - [ ] E22 `/alerts` redirects to Overview with panel open; old Alerts column and "Everything else" fold removed.

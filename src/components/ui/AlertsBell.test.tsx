@@ -1,12 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { AlertsBell } from './AlertsBell';
 import { AlertsPanelContext, type AlertsPanelState } from './alertsPanelContext';
 import { UnreadAlertsContext, type AlertBadge } from './unreadAlertsContext';
 
-function renderBell(badge: AlertBadge, panel: Partial<AlertsPanelState> = {}) {
+function renderBell(
+  badge: AlertBadge,
+  panel: Partial<AlertsPanelState> = {},
+  props: { showWhenEmpty?: boolean } = {}
+) {
   const setOpen = vi.fn();
   const state: AlertsPanelState = {
     open: false,
@@ -17,7 +22,7 @@ function renderBell(badge: AlertBadge, panel: Partial<AlertsPanelState> = {}) {
   render(
     <UnreadAlertsContext.Provider value={badge}>
       <AlertsPanelContext.Provider value={state}>
-        <AlertsBell />
+        <AlertsBell {...props} />
       </AlertsPanelContext.Provider>
     </UnreadAlertsContext.Provider>
   );
@@ -44,6 +49,37 @@ describe('AlertsBell', () => {
     const bell = screen.getByRole('button', { name: 'Alerts, none waiting' });
     expect(bell).toHaveClass('opacity-70');
     expect(bell).not.toHaveTextContent(/\d/);
+  });
+
+  describe('on a phone', () => {
+    const original = window.matchMedia;
+    beforeEach(() => {
+      window.matchMedia = ((media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    });
+    afterEach(() => {
+      window.matchMedia = original;
+    });
+
+    it('draws nothing at zero, so a header with other icons stays clear', () => {
+      renderBell({ count: 0, danger: false });
+      expect(screen.queryByRole('button')).toBeNull();
+    });
+
+    it('still draws at zero when the header asks for it (the Overview)', () => {
+      renderBell({ count: 0, danger: false }, {}, { showWhenEmpty: true });
+      expect(screen.getByRole('button', { name: 'Alerts, none waiting' })).toBeInTheDocument();
+    });
+
+    it('draws while alerts wait', () => {
+      renderBell({ count: 2, danger: false });
+      expect(screen.getByRole('button', { name: 'Alerts, 2 waiting' })).toBeInTheDocument();
+    });
   });
 
   it('caps the badge at 99+', () => {
