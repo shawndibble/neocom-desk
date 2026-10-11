@@ -20,6 +20,8 @@ import {
   setShowOnPhone,
   setView,
   snapshotLayout,
+  stepWidget,
+  moveToWidget,
   type OverviewLayout,
   type Widget,
 } from './layout';
@@ -288,5 +290,36 @@ describe('undoable actions', () => {
     const r = removeWidgetUndoable(before, 'a')!;
     before.widgets[0].size = 'F';
     expect(r.undoTo.widgets[0].size).toBe('S');
+  });
+});
+
+describe('stepWidget', () => {
+  const drawn = (x: Widget) => x.kind !== 'future';
+  it('steps to the neighbour that is drawn, hopping over one that is not', () => {
+    const l = layoutOf(w('a', 'wallet'), w('x', 'future'), w('b', 'mail'));
+    expect(ids(stepWidget(l, 'b', 'earlier', drawn))).toEqual(['b', 'a', 'x']);
+    expect(ids(stepWidget(l, 'a', 'later', drawn))).toEqual(['x', 'b', 'a']);
+  });
+  it('does nothing at either end', () => {
+    const l = layoutOf(w('a', 'wallet'), w('b', 'mail'));
+    expect(stepWidget(l, 'a', 'earlier', drawn)).toBe(l);
+    expect(stepWidget(l, 'b', 'later', drawn)).toBe(l);
+  });
+  it('does nothing for an unknown id', () => {
+    const l = layoutOf(w('a', 'wallet'));
+    expect(stepWidget(l, 'zz', 'later', drawn)).toBe(l);
+  });
+});
+
+describe('moveToIndexOfWidget', () => {
+  it('drops a widget where another sits, by id, in the full list', () => {
+    const l = layoutOf(w('a', 'wallet'), w('x', 'future'), w('b', 'mail'), w('c', 'orders'));
+    expect(ids(moveToWidget(l, 'a', 'c'))).toEqual(['x', 'b', 'c', 'a']);
+    expect(ids(moveToWidget(l, 'c', 'a'))).toEqual(['c', 'a', 'x', 'b']);
+  });
+  it('is the same layout for the same id or an unknown one', () => {
+    const l = layoutOf(w('a', 'wallet'), w('b', 'mail'));
+    expect(moveToWidget(l, 'a', 'a')).toBe(l);
+    expect(moveToWidget(l, 'a', 'nope')).toBe(l);
   });
 });

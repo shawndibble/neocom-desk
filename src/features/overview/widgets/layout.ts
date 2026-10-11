@@ -250,3 +250,31 @@ export function resetLayoutUndoable(
     undoTo: snapshotLayout(layout),
   };
 }
+
+/**
+ * Move a widget one place earlier or later among the widgets the page draws.
+ * The grid hides kinds a newer build wrote and (on a phone) widgets set to Hide
+ * on phone; stepping by one index in the full list would land beside one of
+ * those and look like a no-op, so this hops to the drawn neighbour's place.
+ */
+export function stepWidget(
+  layout: OverviewLayout,
+  id: string,
+  direction: 'earlier' | 'later',
+  isDrawn: (widget: Widget) => boolean
+): OverviewLayout {
+  const from = layout.widgets.findIndex((w) => w.id === id);
+  if (from < 0) return layout;
+  const step = direction === 'earlier' ? -1 : 1;
+  for (let i = from + step; i >= 0 && i < layout.widgets.length; i += step) {
+    if (isDrawn(layout.widgets[i])) return moveWidget(layout, id, i);
+  }
+  return layout;
+}
+
+/** A drop: put `id` where `overId` sits, both named by id so the drawn subset never matters. */
+export function moveToWidget(layout: OverviewLayout, id: string, overId: string): OverviewLayout {
+  const to = layout.widgets.findIndex((w) => w.id === overId);
+  if (to < 0 || id === overId) return layout;
+  return moveWidget(layout, id, to);
+}
