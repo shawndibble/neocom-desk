@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIZE_LAYOUT, SIZES, chartHeight, rowsForSize } from './sizes';
+import { SIZE_LAYOUT, SIZES, chartHeight } from './sizes';
 import { GRID_GAP } from './gridStyle';
 
 /** The Overview's content column on a 1440 px desktop with the rail open (`max-w-6xl`). */
@@ -38,10 +38,6 @@ describe('sizes', () => {
         );
       }
     }
-  });
-
-  it('shows more list rows as the widget grows', () => {
-    expect(rowsForSize).toEqual({ S: 3, M: 4, L: 6, F: 10 });
   });
 
   it('draws charts taller as the widget grows', () => {

@@ -19,8 +19,5 @@ export const SIZE_LAYOUT: Record<WidgetSize, { basis: number; minWidth: number }
   F: { basis: 1, minWidth: 0 },
 };
 
-/** List rows shown per size. */
-export const rowsForSize: Record<WidgetSize, number> = { S: 3, M: 4, L: 6, F: 10 };
-
 /** Chart height in px per size. */
 export const chartHeight: Record<WidgetSize, number> = { S: 44, M: 70, L: 100, F: 100 };

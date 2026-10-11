@@ -20,6 +20,3 @@ export const CHART_COLOR: Record<ChartColor, string> = {
   s4: 'var(--color-kind-skill-plan)',
   s5: 'var(--color-kind-order-expiry)',
 };
-
-/** The categorical slots in order, for a model that just needs "the next series". */
-export const SERIES_COLORS: readonly ChartColor[] = ['s1', 's2', 's3', 's4', 's5'];
