@@ -129,7 +129,7 @@ const SPECS: Record<string, Spec> = {
     isNew: true,
     endpoints: ['getCharacterLoyaltyPoints'],
   },
-  miningTax: { category: 'industry', views: NCL, size: 'S', endpoints: ['getCharacterMining'] },
+  miningTax: { category: 'industry', views: NL, size: 'S', endpoints: ['getCharacterMining'] },
   industry: {
     category: 'industry',
     views: NCL,

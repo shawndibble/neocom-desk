@@ -40,6 +40,15 @@ import {
   loadStockBoardFor,
   loadWalletPanel,
 } from './loaders';
+import {
+  loadClonesWidget,
+  loadJournalPanel,
+  loadLocationWidget,
+  loadLpWidget,
+  loadMiningYieldWidget,
+  loadNetWorthWidget,
+  loadProfitWidget,
+} from './kindLoaders';
 import { feedsFor } from './models';
 import { useOverviewRefresh } from './refreshContext';
 import type { FeedId, FeedMap } from './types';
@@ -185,6 +194,30 @@ function Source({ feed }: { feed: FeedId }) {
           load={loadMoonChunksBoard}
           cacheKey="overview:moon-chunks"
         />
+      );
+    case 'journal':
+      return <SnapshotSource feed="journal" load={loadJournalPanel} cacheKey="overview:journal" />;
+    case 'netWorth':
+      return (
+        <SnapshotSource feed="netWorth" load={loadNetWorthWidget} cacheKey="overview:net-worth" />
+      );
+    case 'profit':
+      return <SnapshotSource feed="profit" load={loadProfitWidget} cacheKey="overview:profit" />;
+    case 'miningYield':
+      return (
+        <SnapshotSource
+          feed="miningYield"
+          load={loadMiningYieldWidget}
+          cacheKey="overview:mining-yield"
+        />
+      );
+    case 'lp':
+      return <SnapshotSource feed="lp" load={loadLpWidget} cacheKey="overview:lp" />;
+    case 'clones':
+      return <SnapshotSource feed="clones" load={loadClonesWidget} cacheKey="overview:clones" />;
+    case 'location':
+      return (
+        <SnapshotSource feed="location" load={loadLocationWidget} cacheKey="overview:location" />
       );
     case 'incursions':
       return <IncursionsSource />;

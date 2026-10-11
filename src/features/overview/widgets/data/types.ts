@@ -24,7 +24,18 @@ import type {
 import type { IncursionsBoardData } from '../../incursionsBoard';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
+import type { WidgetRange } from '../layout';
+import type { ChartModel } from '../charts/types';
 import type { SkillsQueuePanelData, WalletPanelData } from './loaders';
+import type {
+  ClonesWidgetData,
+  JournalData,
+  LocationWidgetData,
+  LpWidgetData,
+  MiningYieldWidgetData,
+  NetWorthWidgetData,
+  ProfitWidgetData,
+} from './kindLoaders';
 
 /** The narrow slice of i18next's `t` the adapters need. */
 export type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -72,6 +83,12 @@ export interface KindView {
   to: string | null;
   /** Overrides the kind's own empty message, when the reason is not "nothing there". */
   emptyMessage?: string;
+  /**
+   * The kind's chart, when it has one and the data to draw it. The Chart view
+   * draws it under the headline; the Number view at Medium and up carries it
+   * as a mini chart. Absent means the Chart view falls back to the Number.
+   */
+  chart?: ChartModel;
 }
 
 /** One read's state, as `useRouteSnapshot` reports it. */
@@ -105,6 +122,13 @@ export interface FeedMap {
   moonChunks: MoonChunksBoardData;
   incursions: IncursionsBoardData;
   spExtras: SpExtras;
+  journal: JournalData;
+  netWorth: NetWorthWidgetData;
+  profit: ProfitWidgetData;
+  miningYield: MiningYieldWidgetData;
+  lp: LpWidgetData;
+  clones: ClonesWidgetData;
+  location: LocationWidgetData;
 }
 
 export type FeedId = keyof FeedMap;
@@ -120,4 +144,6 @@ export interface BuildContext {
   scopeAll: boolean;
   /** The `characterNotTraining` alert is on for this Character, so an idle queue is a warning. */
   notTrainingAlert: boolean;
+  /** The widget's time window in days, for kinds that read one (applied over shared data here, never in a loader). */
+  range: WidgetRange;
 }
