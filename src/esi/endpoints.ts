@@ -1583,6 +1583,26 @@ export function getCharacterClones(
   });
 }
 
+// --- GET /characters/{character_id}/fatigue (esi-characters.read_fatigue.v1) ---
+
+/** Every field is absent for a Character who has never jumped. */
+export interface CharacterFatigue {
+  jump_fatigue_expire_date?: string;
+  last_jump_date?: string;
+  last_update_date?: string;
+}
+
+export function getCharacterFatigue(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterFatigue>> {
+  return esiFetch<CharacterFatigue>(`/characters/${characterId}/fatigue`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterFatigue',
+  });
+}
+
 // --- GET /universe/structures/{structure_id} (esi-universe.read_structures.v1) ---
 
 /**

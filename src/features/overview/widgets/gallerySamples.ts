@@ -86,6 +86,14 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ],
       ],
     },
+    jumpTimers: {
+      value: '3h 20m',
+      note: t('overview.gallery.samples.jumpTimers.note'),
+      rows: [
+        [t('overview.widgets.jumpTimers.clone'), '', '3h 20m'],
+        [t('overview.widgets.jumpTimers.fatigue'), '', t('overview.widgets.jumpTimers.none')],
+      ],
+    },
     clones: {
       value: 'Jita Alpha',
       note: t('overview.gallery.samples.clones.note'),

@@ -49,6 +49,7 @@ import {
   loadNetWorthWidget,
   loadProfitWidget,
   loadHaulingWidget,
+  loadJumpTimersWidget,
   loadRouteSafetyWidget,
   loadSurveyWidget,
 } from './kindLoaders';
@@ -222,6 +223,14 @@ function Source({ feed }: { feed: FeedId }) {
       return <SnapshotSource feed="lp" load={loadLpWidget} cacheKey="overview:lp" />;
     case 'clones':
       return <SnapshotSource feed="clones" load={loadClonesWidget} cacheKey="overview:clones" />;
+    case 'jumpTimers':
+      return (
+        <SnapshotSource
+          feed="jumpTimers"
+          load={loadJumpTimersWidget}
+          cacheKey="overview:jump-timers"
+        />
+      );
     case 'location':
       return (
         <SnapshotSource feed="location" load={loadLocationWidget} cacheKey="overview:location" />

@@ -339,6 +339,24 @@ function WidgetFrame({
       );
   }
 
+  if (state === 'ok' && view.grantEndpoints !== undefined && characterId !== null) {
+    body = (
+      <>
+        {body}
+        <div className="px-3 pb-3">
+          <GrantBanner
+            variant="ghost"
+            characterId={characterId}
+            endpoints={view.grantEndpoints}
+            title={t('overview.widgets.needsPermission')}
+            hint={t('overview.widgets.needsPermissionHint', { title })}
+            actionLabel={t('overview.widgets.grantAction')}
+          />
+        </div>
+      </>
+    );
+  }
+
   return (
     <section
       aria-label={title}

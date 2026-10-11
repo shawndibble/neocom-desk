@@ -3873,7 +3873,18 @@
       "jumpTimers": {
         "title": "Jump timers",
         "description": "Jump fatigue and the clone jump cooldown",
-        "empty": "Jump timers are not available yet."
+        "empty": "There are no jump timers to show.",
+        "clone": "Clone jump",
+        "fatigue": "Jump fatigue",
+        "ready": "Ready",
+        "none": "No fatigue",
+        "needsPermission": "Needs permission",
+        "missing": "{{timer}} needs permission",
+        "summary": "Clone jump: {{clone}}. Jump fatigue: {{fatigue}}.",
+        "col": {
+          "timer": "Timer",
+          "left": "Time left"
+        }
       },
       "clones": {
         "title": "Best clone to train in",
@@ -4448,6 +4459,9 @@
         },
         "hauling": {
           "note": "Best haul from your last scan"
+        },
+        "jumpTimers": {
+          "note": "Everything clears in 3h 20m"
         },
         "routeSafety": {
           "note": "Efa to Amarr, 14 systems"
@@ -9127,6 +9141,10 @@
     "structureMarkets": {
       "label": "Structure markets",
       "caption": "A player structure's own market, when you dock there."
+    },
+    "jumpFatigue": {
+      "label": "Jump fatigue",
+      "caption": "How long your jump fatigue lasts."
     },
     "core": {
       "skills": {

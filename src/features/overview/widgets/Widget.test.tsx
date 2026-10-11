@@ -200,6 +200,41 @@ describe('Widget states', () => {
     );
   });
 
+  it('offers Grant access for the one Jump timer it cannot read, beside the one it can', () => {
+    useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
+    renderWidget(model({ kind: 'jumpTimers' }), (store) =>
+      store.set('jumpTimers', {
+        data: {
+          clone: { state: 'read', endsAt: null },
+          fatigue: { state: 'needsPermission' },
+          fetchedAt: new Date(),
+        },
+        error: false,
+        loading: false,
+      })
+    );
+    const region = screen.getByRole('region', { name: 'Jump timers' });
+    expect(within(region).getAllByText('Ready').length).toBeGreaterThan(0);
+    expect(within(region).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+  });
+
+  it('asks for permission outright when neither Jump timer can be read', () => {
+    useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
+    renderWidget(model({ kind: 'jumpTimers' }), (store) =>
+      store.set('jumpTimers', {
+        data: {
+          clone: { state: 'needsPermission' },
+          fatigue: { state: 'needsPermission' },
+          fetchedAt: null,
+        },
+        error: false,
+        loading: false,
+      })
+    );
+    const region = screen.getByRole('region', { name: 'Jump timers' });
+    expect(within(region).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+  });
+
   it('draws a kind that is coming soon as empty, never a spinner', () => {
     renderWidget(model({ kind: 'kills' }), () => undefined);
     const region = screen.getByRole('region', { name: 'Kills and losses' });

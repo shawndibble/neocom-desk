@@ -23,6 +23,7 @@ import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character
 import { hasWalletScope, loadWalletJournalWithStatus } from '@/features/character/wallet';
 
 export type { ClonesWidgetData } from '@/features/character/cloneVerdictLoad';
+export type { JumpTimersWidgetData } from '@/features/character/jumpTimers';
 
 // --- Wallet journal ------------------------------------------------------------
 
@@ -261,6 +262,10 @@ export function loadClonesWidget(characterId: number) {
   return import('@/features/character/cloneVerdictLoad').then((m) =>
     m.loadCloneVerdictWidget(characterId)
   );
+}
+
+export function loadJumpTimersWidget(characterId: number) {
+  return import('@/features/character/jumpTimers').then((m) => m.loadJumpTimersWidget(characterId));
 }
 
 // --- Location and ship ---------------------------------------------------------
