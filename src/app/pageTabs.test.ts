@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   isTabRedirectPath,
+  MARKET_TABS,
   pageKeyFor,
   PAGE_LEGACY_LOCATIONS,
   routePatternFor,
   tabbedPagePathFor,
+  TRAVEL_TABS,
 } from './pageTabs';
 
 describe('routePatternFor', () => {
@@ -158,5 +160,28 @@ describe('Assets (Items, Ships, Move)', () => {
       pathname: '/assets/items/60003760',
       search: '',
     });
+  });
+});
+
+describe('Hauling, a Travel tab (issue #3526)', () => {
+  it('sits last on Travel and is gone from Market', () => {
+    expect(TRAVEL_TABS.tabs.map((tab) => tab.id)).toEqual(['route', 'thera', 'pilot', 'hauling']);
+    expect(MARKET_TABS.tabs.map((tab) => tab.id)).not.toContain('hauling');
+  });
+
+  it('moves an old Market Hauling link to Travel with its query intact', () => {
+    const moved = PAGE_LEGACY_LOCATIONS['/market'];
+    expect(moved?.('/market/hauling', '?from=amarr&to=jita')).toEqual({
+      pathname: '/travel/hauling',
+      search: '?from=amarr&to=jita',
+    });
+    expect(moved?.('/market/browser', '')).toBeNull();
+    expect(moved?.('/market/haulingx', '')).toBeNull();
+  });
+
+  it('reports the old path as a redirect and the new one as a Travel tab', () => {
+    expect(isTabRedirectPath('/market/hauling')).toBe(true);
+    expect(pageKeyFor('/travel/hauling')).toBe('/travel');
+    expect(tabbedPagePathFor('/travel/hauling')).toBe('/travel/hauling');
   });
 });

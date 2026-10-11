@@ -103,7 +103,7 @@ const { HaulingPanel } = await import('./HaulingPanel');
 function renderPanel(query = 'from=jita&to=amarr') {
   const actions = fakeItemActions();
   render(
-    <MemoryRouter initialEntries={[`/market/hauling?${query}`]}>
+    <MemoryRouter initialEntries={[`/travel/hauling?${query}`]}>
       <FakeItemActions actions={actions}>
         <HaulingPanel />
       </FakeItemActions>

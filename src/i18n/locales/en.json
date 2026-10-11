@@ -9322,6 +9322,7 @@
   "travel": {
     "title": "Travel",
     "routeTab": "Route Safety",
+    "haulingTab": "Hauling",
     "pilotTab": "Pilot Lookup",
     "pilot": {
       "pickTitle": "Look up a pilot by name",
