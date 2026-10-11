@@ -91,7 +91,7 @@ export interface SurveySummary {
 }
 
 /** How many of the latest intervals the pace is averaged over. */
-export const PACE_INTERVALS = 3;
+export const PACE_INTERVALS = 2;
 
 const total = (scan: SurveyScan): number => scan.rocks.reduce((sum, r) => sum + r.volume, 0);
 
