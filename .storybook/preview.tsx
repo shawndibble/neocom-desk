@@ -10,6 +10,17 @@ const preview: Preview = {
   parameters: {
     layout: 'padded',
     backgrounds: { disable: true },
+    // 390 wide is the phone the design is checked at (docs/DESIGN.md §4a). A
+    // story sets `globals: { viewport: { value: 'phone390' } }` to open there.
+    viewport: {
+      options: {
+        phone390: {
+          name: 'Phone (390)',
+          styles: { width: '390px', height: '844px' },
+          type: 'mobile',
+        },
+      },
+    },
     controls: { matchers: { date: /Date$/i } },
   },
   decorators: [

@@ -22,7 +22,11 @@ interface TabPanelProps {
   children: ReactNode;
 }
 
-/** The content region for the selected tab of a `Tabs` bar. */
+/**
+ * The content region for the selected tab of a `Tabs` bar.
+ *
+ * @summary The panel that holds the selected tab's content; pair it with `Tabs`.
+ */
 export function TabPanel({ tabsId, tabId, className, children }: TabPanelProps) {
   const { className: ring, ...rest } = useTabPanelProps(tabsId, tabId);
   return (
@@ -35,10 +39,13 @@ export function TabPanel({ tabsId, tabId, className, children }: TabPanelProps) 
 interface TabsProps {
   /** Shared id base from `useTabsId`, also given to the tab's panel. */
   tabsId: string;
+  /** @summary The tabs, each with an id and an already-translated label. */
   tabs: TabItem[];
+  /** @summary Id of the selected tab. */
   value: string;
+  /** @summary Called with the id of the tab the user picked. */
   onChange: (id: string) => void;
-  /** Accessible name for the tablist. */
+  /** @summary Accessible name for the tablist. */
   label: string;
   className?: string;
   /**
@@ -55,6 +62,8 @@ interface TabsProps {
  * The bar scrolls sideways rather than squeezing when it outgrows its frame —
  * see `tabScrollerClassName` for why the scroller is the wrapper and not the
  * tablist itself.
+ *
+ * @summary Horizontal tab bar for peer views inside one page (Open / History); not for navigation.
  */
 export function Tabs({
   tabsId,
