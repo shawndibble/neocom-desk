@@ -56,7 +56,7 @@ The app writes most of them down:
   (RUBRIC.md axis E).
 - `eslint.config.js` — patterns already enforced by lint. A lint-enforced rule
   cannot drift; do not audit it.
-- `CONTEXT.md` — the glossary. A label that names a concept differently from
+- `GLOSSARY.md` — the glossary. A label that names a concept differently from
   the glossary is a finding under axis G.
 - `LEDGER.md` — what past runs swept, settled, filed and killed.
 

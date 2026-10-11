@@ -8,7 +8,7 @@ _Recorded 2026-09-05._
   menu's "filter to this station" still narrows it. This rules out the chips
   as a standing control above the tables.
 - **That panel also drops its Data Age badge, at the product owner's request,
-  narrowing CONTEXT.md's "Data Age: timestamp shown on every API-derived
+  narrowing GLOSSARY.md's "Data Age: timestamp shown on every API-derived
   view".** The Market Browser item panel is now the single exception; every
   other API-derived view keeps its badge, and the rule stands everywhere
   else.

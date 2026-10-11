@@ -5,7 +5,7 @@
  * different things (an item has a quantity, a station has jumps away), so they
  * are two fields under two keys rather than one shared choice.
  *
- * Device-local view preference, never synced (CONTEXT.md round 7), and
+ * Device-local view preference, never synced (GLOSSARY.md round 7), and
  * deliberately silent: the sort Select is its own control and its own display,
  * so a Settings-page duplicate would be a second place to read the same fact
  * from.

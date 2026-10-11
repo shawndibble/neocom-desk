@@ -457,7 +457,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   }
 
   // Every tracked character, not just those with a Mining Ledger Entry this
-  // refresh (CONTEXT.md: the point of the feature is not missing an alt's
+  // refresh (GLOSSARY.md: the point of the feature is not missing an alt's
   // obligation) — a character with nothing mined yet still needs to appear
   // in the Characters filter and in Manage Payees.
   const characters = data?.characters ?? [];

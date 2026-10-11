@@ -1,5 +1,5 @@
 /**
- * Fit goal (CONTEXT.md "Plan Milestone"): the skill levels a saved Fitting
+ * Fit goal (GLOSSARY.md "Plan Milestone"): the skill levels a saved Fitting
  * needs, checked against a Skill Plan's normalized steps. The requirement
  * aggregation is `computeSkillGaps`'s own, asked about a pilot who trained
  * nothing — one rule for what a Fitting needs, not a second copy.

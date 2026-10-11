@@ -1,5 +1,5 @@
 /**
- * Target Profiles (CONTEXT.md): the signature radius, speed and resists of
+ * Target Profiles (GLOSSARY.md): the signature radius, speed and resists of
  * an imagined target a Fitting's applied DPS is worked out against. Pure; the
  * synced-setting stores live in `features/fittings/targetProfiles.ts`.
  * Mirrors `damageProfile.ts` — same id scheme, same strict parse.

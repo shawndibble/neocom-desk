@@ -2,7 +2,7 @@
 
 Corporation section. Four routes under one nav entry (`src/app/navDestinations.ts:133`, `gating: 'corp'`: hidden, never locked). Sub-nav is real routes (`src/features/corp/CorpSubNav.tsx`), each tab shown only if its Corp Capability is held. All four routes `UNGATED` in `src/app/routeScopes.ts:141-165` (the page gate is `useCorpRouteGate`, not a scope gate, so a non-Director is not offered a pointless re-login). `/corp` is not allowed in the phone tab bar (`mobileTab` false; nav hides rather than locks).
 
-Terms per `CONTEXT.md`: Corp Access, Corp Capability, Corp Role, Corp Board Item, Kind Card, Deadline Strip, Board Severity, Permission, Core Grant. (CONTEXT's Corp Capability entry lists four capabilities; code has seven, see gaps.)
+Terms per `GLOSSARY.md`: Corp Access, Corp Capability, Corp Role, Corp Board Item, Kind Card, Deadline Strip, Board Severity, Permission, Core Grant. (GLOSSARY's Corp Capability entry lists four capabilities; code has seven, see gaps.)
 
 | View     | Route                            | Component                    | Gate                                 | One-liner                                                                                |
 | -------- | -------------------------------- | ---------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------- |
@@ -276,7 +276,7 @@ All pure, `nowMs` is a parameter (never `Date.now()` inside `src/engine`).
 - Corp Assets CSV is whole-corporation (group label, item, quantity), not the current view, with no ISK value or location column; no ISK sort/filter or totals beyond per-row estimates; no offline/refresh-failed banner (wallet panels have one).
 - Net/runway use only master wallet division 1; a corp that pays bills from another division gets misleading runway; no per-division burn.
 - Wallet journal/transaction reads can truncate (flagged) with no "load more".
-- `CONTEXT.md` Corp Capability lists 4 of 7 capabilities; `corp.assetsExpanded` in `VIEW_PREFERENCE_KEYS` is unused (stale).
+- `GLOSSARY.md` Corp Capability lists 4 of 7 capabilities; `corp.assetsExpanded` in `VIEW_PREFERENCE_KEYS` is unused (stale).
 - Corp industry jobs have no page in Corp (full list is in Industry Active Jobs, by installer, decision `20260929-102524`).
 - Only way into corp UI after dismissing the banner is Settings -> Permissions; `unknown` roles failure has no error surface by design (invisible failure).
 - Active-Character-only access state; the Notifications panel resolves capabilities per stored Character separately (`NotificationsPanel.tsx`), so the two can briefly disagree.

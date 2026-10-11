@@ -590,7 +590,7 @@ export function checkThroughput(
   // that ever threads a built colony's own numbers through `planColony`)
   // passes `linkCapacityPerHour: null` unconditionally, because whether the
   // link-upgrade axis shares a skill with the CPU/Powergrid table is
-  // unconfirmed (CONTEXT.md round 51). So `link-capacity` never fires today —
+  // unconfirmed (GLOSSARY.md round 51). So `link-capacity` never fires today —
   // deliberately, not by accident of a bug here. This axis stays unanswered
   // until a caller can supply a real figure; it does not mean the check below
   // is broken.

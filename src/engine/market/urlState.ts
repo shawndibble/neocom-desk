@@ -1,5 +1,5 @@
 /**
- * Market Browser URL state (issue #4, CONTEXT.md round 7): the selected item
+ * Market Browser URL state (issue #4, GLOSSARY.md round 7): the selected item
  * and the current location are query parameters, not path segments — routes
  * are keyed by literal path. Pure parsing/serialising only; the caller (the
  * route) is responsible for validating a parsed id against the loaded
@@ -130,7 +130,7 @@ export function marketItemUrl(typeId: number, currentSearch: string): string {
 }
 
 /**
- * The Market Browser's Location Mode precedence (CONTEXT.md round 7/9,
+ * The Market Browser's Location Mode precedence (GLOSSARY.md round 7/9,
  * issue #4): a valid region param wins, then a valid hub param, then the
  * device-local Location Mode preference. `valid` is supplied by the caller —
  * region validity depends on the (possibly still-loading) Market Region

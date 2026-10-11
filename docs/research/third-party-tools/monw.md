@@ -12,7 +12,7 @@ Thread: "MONW - a free industry tool that got out of hand. Everyone welcome, and
 | Net worth over time, all characters                                   | Wallet + assets history chart                                        | PARTIAL: wallet balance history chart (active Character only); no assets valuation history, no all-character total | wallet.md "Balance history", README.md cross-cutting gap 4 |
 | Market order checks                                                   | Order status                                                         | HAVE (Open Orders, undercut alerts)                                                                                | market.md, alerts.md                                       |
 | Mining, PI                                                            |                                                                      | HAVE                                                                                                               | mining.md, planetary-industry.md                           |
-| "Feed that watches what the game is losing" -> what is worth building | Build ideas from market signals                                      | PARTIAL: Build Opportunities ranks owned BPs by ISK/h; no loss/demand feed (zKill destroyed volume)                | CONTEXT.md Build Opportunities                             |
+| "Feed that watches what the game is losing" -> what is worth building | Build ideas from market signals                                      | PARTIAL: Build Opportunities ranks owned BPs by ISK/h; no loss/demand feed (zKill destroyed volume)                | GLOSSARY.md Build Opportunities                            |
 | IRIS assistant (bring your own API key)                               | LLM answers on own data                                              | OUT OF SCOPE: key handling, not companion core                                                                     | -                                                          |
 | Corp: BPOs vs corp hangar plan                                        | Director views                                                       | PARTIAL: corp assets browsable, corp jobs/structures board; no plan-against-corp-hangar                            | corp.md                                                    |
 | Free job slots per member; assign job to member with skills           | Corp job routing                                                     | MISSING (and needs members' tokens => server)                                                                      | corp.md                                                    |
@@ -23,7 +23,7 @@ Thread: "MONW - a free industry tool that got out of hand. Everyone welcome, and
 ## Candidate gaps
 
 1. All-Character net worth over time (wallet + asset value snapshots): MONW demo video, jEveAssets also has it (competitors.md). Feasible browser-only, Dexie snapshots; needs scheduled capture while app is open or the push backend. Overlaps README gap 4 (cross-Character reach).
-2. Corp stockpile targets (set min qty per type, show hangar shortfall): corp-only, director tooling, scope questionable vs CONTEXT.md corp scope; low confidence.
+2. Corp stockpile targets (set min qty per type, show hangar shortfall): corp-only, director tooling, scope questionable vs GLOSSARY.md corp scope; low confidence.
 
 ## Pitfalls
 

@@ -2,7 +2,7 @@
  * The gate every `/corp*` route mounts behind, so the `CorpAccessState` union
  * is pattern-matched once rather than at each route. `unknown` collapses to
  * `loading`; `none` and `roles-without-grant` collapse to `denied` (corp UI
- * hides, it never locks — CONTEXT.md round 35); `ready` carries the resolved
+ * hides, it never locks — GLOSSARY.md round 35); `ready` carries the resolved
  * capabilities the caller mounts its real view with.
  *
  * `denied` says why (`CorpDenialReason`): a Corporation Permission that was

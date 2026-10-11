@@ -1,6 +1,6 @@
 /**
  * "What do these badges mean?" reference for the redesigned Open Orders tab
- * (CONTEXT.md) — every `OrderBadgeKind`, what it means, and what to do about
+ * (GLOSSARY.md) — every `OrderBadgeKind`, what it means, and what to do about
  * it, opened from a link under the order groups. Built on the repo's own
  * `Modal` (`placement="wide"` per the ticket, even though the content is a
  * single column — consistent with `RemapMarkerModal`'s always-mounted

@@ -136,7 +136,7 @@ Desktop: Value menu (basis, buyback %, refining) in header. Mobile: `MobileSetti
 
 Purpose: Moon Mining Tax. All tracked Characters by default. Files: `TaxTab.tsx`, `snapshot.ts`, `ledgerActions.ts`, `assignments.ts`.
 
-### Entities (CONTEXT.md)
+### Entities (GLOSSARY.md)
 
 - Mining Ledger Entry: (Character, EVE date, system) with moon-ore lines summed per type; derived each refresh, never stored (`groupLedger.ts`). Moon ore = SDE moon set + manual "tag as moon ore"; ordinary ore/ice/ignored are excluded (that exclusion is the whole moon filter).
 - Assignment: stored record claiming (part of) an entry for a Payee at a tax %: `oreLines` snapshot, `estimatedValue`, `taxOwed` (both snapshotted), `status`, optional `groupId` (combined), `collectsGrowth`, `payment`, `reviewDiff` (`src/db/index.ts:659-700`).

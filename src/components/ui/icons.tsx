@@ -291,7 +291,7 @@ export const ImportClipboard = withWeight(Clipboard);
 export const OptimizeRemaps = withWeight(Sliders);
 /** Drop a remap marker at the current end of the queue (#224 icon-only toolbar). */
 export const AddMarker = withWeight(Flag);
-/** Pins a named goal ("Fly Loki") to a plan entry row — CONTEXT.md "Plan Milestone". Same glyph as `AddMarker`, named for the goal-marking sense rather than the remap sense. */
+/** Pins a named goal ("Fly Loki") to a plan entry row — GLOSSARY.md "Plan Milestone". Same glyph as `AddMarker`, named for the goal-marking sense rather than the remap sense. */
 export const Milestone = withWeight(Flag);
 /** Tune remaps against the plan's existing markers (#224 icon-only toolbar). */
 export const OptimizeAtMarkers = withWeight(Target);
@@ -305,7 +305,7 @@ export const Build = withWeight(Hammer);
 export const Buy = withWeight(ShoppingCart);
 /** A build plan material this character is better off reacting than buying (issue #460) — its own glyph, not the manufacturing hammer or the planetary globe. */
 export const Reaction = withWeight(Flask);
-/** Promote a derived prereq row into a real Skill Plan entry (CONTEXT.md "Prereq Promotion"). */
+/** Promote a derived prereq row into a real Skill Plan entry (GLOSSARY.md "Prereq Promotion"). */
 export const AddToPlan = withWeight(Plus);
 /** Append a new row to an editable list, e.g. another Booster (#1407). */
 export const AddRow = withWeight(Plus);
@@ -366,7 +366,7 @@ export const PiSkyhook = withWeight(ArrowLineUp);
 /** Mail, calendar and contacts, grouped as one row. */
 export const Social = withWeight(EnvelopeSimple);
 /**
- * The four System Label mail folders (CONTEXT.md), as the glyphs that let a
+ * The four System Label mail folders (GLOSSARY.md), as the glyphs that let a
  * mail row say which folder it is in without spending a hue on it — see
  * `docs/context/decisions/` (Mail rows go two-line). Corp reuses
  * `Corporation` below rather than taking a fifth glyph: it is the same
@@ -404,7 +404,7 @@ export const Notifications = withWeight(Bell);
 export const Settings = withWeight(Gear);
 /**
  * Clear every alert currently listed. A double check, not a bin: dismissal is
- * a flag and the rows stay stored (CONTEXT.md, Notification Feed) — a delete
+ * a flag and the rows stay stored (GLOSSARY.md, Notification Feed) — a delete
  * glyph would promise a destruction that does not happen.
  */
 export const DismissAll = withWeight(Checks);

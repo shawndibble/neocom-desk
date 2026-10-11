@@ -16,7 +16,7 @@
  * range is involved — the discriminator is the table itself.
  *
  * When the snapshot cannot be read at all (a first offline visit — it is
- * outside the install precache on purpose, CONTEXT.md round 10)
+ * outside the install precache on purpose, GLOSSARY.md round 10)
  * `lookupNpcStation` says so rather than answering "not a station", and this
  * falls back to the original station-then-structure probe. Both
  * `loadStationName` and `loadStructureName` resolve a lookup failure to `null`

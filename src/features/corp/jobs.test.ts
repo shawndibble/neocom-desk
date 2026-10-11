@@ -82,7 +82,7 @@ describe('loadCorporationIndustryJobs', () => {
 
     // CCP gates this endpoint on in-game roles server-side, so a 403 is not
     // something logging in again can fix — a ReauthBanner over it is exactly
-    // the lock-the-user-can-never-open failure CONTEXT.md round 35 forbids.
+    // the lock-the-user-can-never-open failure GLOSSARY.md round 35 forbids.
     expect(result.needsReauth).toBe(false);
     expect(result.cached).toBeNull();
   });

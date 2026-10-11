@@ -104,7 +104,7 @@ export function EmploymentHistory() {
           // character record hasn't caught up to yet stay plain text. Never
           // a link to /corp: this route needs no scope and a typical viewer
           // has no Corp Access grant, so it would just land them on a
-          // rejection. The name opens Show Info instead (CONTEXT.md round 49,
+          // rejection. The name opens Show Info instead (GLOSSARY.md round 49,
           // amended: an entity link, not a row menu).
           const link = <CorporationLink id={row.corporationId}>{name}</CorporationLink>;
           if (!row.ongoing || character?.corporationId !== row.corporationId) return link;

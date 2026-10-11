@@ -1,5 +1,5 @@
 /**
- * Shared, read-only skill detail lookup (CONTEXT.md round 49): description,
+ * Shared, read-only skill detail lookup (GLOSSARY.md round 49): description,
  * prerequisites (trained vs. still needed), and unlocks for one skill, opened
  * from any feature that renders a skill name via
  * `openSkillDetailModal`/`useSkillDetailModal` (`stores/skillDetailModal.ts`).

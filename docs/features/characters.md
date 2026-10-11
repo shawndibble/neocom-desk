@@ -96,7 +96,7 @@ Modal copy states local deletion and that the synced copy stays. `removeCharacte
 3. Why no group sections in table? `20260927-071415`: group column instead; management card-only.
 4. Add vs re-auth? Add = whole Base Grant, no union (`loginFlow.ts`).
 5. Removal semantics? Local transaction + purge; remote after 90 days (`removeCharacter.ts`).
-6. "Starred" not "pinned"? CONTEXT.md reserves pinned for PI structures.
+6. "Starred" not "pinned"? GLOSSARY.md reserves pinned for PI structures.
 7. URL contract? Params above, ADR 0015.
 8. Return after select? `from` state or Overview.
 9. Dangling ids? Prune effects.

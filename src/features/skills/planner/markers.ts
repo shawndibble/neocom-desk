@@ -1,5 +1,5 @@
 /**
- * Remap Marker (CONTEXT.md) helpers: a marker is a user-placed row in the
+ * Remap Marker (GLOSSARY.md) helpers: a marker is a user-placed row in the
  * entry list marking where the character will remap attributes.
  *
  * Persistence: `SkillPlanRecord.markers?: number[]` — entry-list positions,

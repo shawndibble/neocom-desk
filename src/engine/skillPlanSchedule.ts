@@ -1,5 +1,5 @@
 /**
- * Skill Plan schedule (CONTEXT.md): everything the plan editor shows about
+ * Skill Plan schedule (GLOSSARY.md): everything the plan editor shows about
  * *when* a Skill Plan trains, computed in one pass from one set of inputs.
  *
  * The plan editor used to assemble this itself — normalize, place Remap

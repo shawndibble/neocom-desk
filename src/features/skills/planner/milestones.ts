@@ -1,5 +1,5 @@
 /**
- * Plan Milestone (CONTEXT.md) UI-layer CRUD: `SkillPlanRecord.milestones` is
+ * Plan Milestone (GLOSSARY.md) UI-layer CRUD: `SkillPlanRecord.milestones` is
  * read through `normalizeMilestones` on every read (a malformed or
  * over-length row from an older build or a sync race degrades gracefully
  * rather than corrupting the list), same convention as markers.ts's

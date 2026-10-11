@@ -168,7 +168,7 @@ export function buildOrderBookView(
   if (fetched.status === 'failed') return { status: 'failed', region, error: fetched.error };
 
   // A Global Market Region's orders still point at ordinary stations, so the
-  // Trade Hub filter applies on top of an override too (CONTEXT.md).
+  // Trade Hub filter applies on top of an override too (GLOSSARY.md).
   const atLocation =
     location.mode === 'hub'
       ? filterOrdersByLocation(fetched.result.orders, location.hubStationId)
@@ -176,7 +176,7 @@ export function buildOrderBookView(
   // Jump Range/Security (by system_id), Min quantity and NPC stations only
   // narrow next to the station filter, so the summary, best price, spread and
   // row cap all read the same set the table shows — never applied after the
-  // fact (CONTEXT.md: Jump Range).
+  // fact (GLOSSARY.md: Jump Range).
   const orders = filterOrdersByLocation(atLocation, location.stationFilter ?? null).filter(
     (order) => passesOrderFilters(order, location)
   );

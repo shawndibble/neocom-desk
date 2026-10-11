@@ -24,7 +24,7 @@ const INSTRUCTION_KEYS = {
  * shows instructions for this browser's own menu on iOS and Firefox for
  * Android, which never fire the event. Shown once ever per device —
  * accepting or dismissing either variant permanently suppresses it
- * (CONTEXT.md "Install Prompt"; decision 20261002-165619).
+ * (GLOSSARY.md "Install Prompt"; decision 20261002-165619).
  */
 export function InstallPrompt() {
   const { t } = useTranslation();

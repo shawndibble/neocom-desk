@@ -8,7 +8,7 @@
  *
  * Persisted like the market hub picker beside it (`features/market/hub.ts`):
  * a device-local UI preference, not Editable Data, so it's never synced
- * (CONTEXT.md).
+ * (GLOSSARY.md).
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 

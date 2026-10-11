@@ -263,7 +263,7 @@ interface MailViewProps {
   scopeControl: ReactNode;
 }
 
-/** Mail's two-pane client for one scope: list beside reading pane, each scrolling independently (CONTEXT.md round 18). */
+/** Mail's two-pane client for one scope: list beside reading pane, each scrolling independently (GLOSSARY.md round 18). */
 function MailView({ scope, scopeControl }: MailViewProps) {
   const { t } = useTranslation();
   const isAll = scope === 'all';

@@ -1,5 +1,5 @@
 /**
- * Variations table (CONTEXT.md round 6): the selected item's Tech/Meta/
+ * Variations table (GLOSSARY.md round 6): the selected item's Tech/Meta/
  * Faction variation group, or its Market Group siblings when the item has
  * none, sorted by Sell ascending by default so the cheapest alternative
  * leads. Clicking a row selects it, which re-anchors this table as a side

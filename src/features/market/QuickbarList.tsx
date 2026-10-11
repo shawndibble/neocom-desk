@@ -1,5 +1,5 @@
 /**
- * The Quickbar (CONTEXT.md): a flat, drag-ordered list of saved item
+ * The Quickbar (GLOSSARY.md): a flat, drag-ordered list of saved item
  * shortcuts, rendered in the Market Browser's left column below the tree.
  * Drag-and-drop mirrors the Skill Plan entry list (EntryList.tsx).
  */

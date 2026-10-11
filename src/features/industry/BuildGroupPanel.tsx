@@ -1,6 +1,6 @@
 /**
  * A **Build Group** opened as one thing: every member's materials merged and
- * its costs summed (issue #626, "Group Rollup" in CONTEXT.md).
+ * its costs summed (issue #626, "Group Rollup" in GLOSSARY.md).
  *
  * Prices its members through `useComparedBuildResults`, which computes one
  * independent `BuildResult` per plan with per-plan error isolation, off a

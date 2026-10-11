@@ -14,7 +14,7 @@ export interface PageItemActionsOptions {
   activeCharacterId: number | null;
   /**
    * Loads the blueprint catalog on the first item-menu open rather than on
-   * mount — it pulls the full SDE types.json, which CONTEXT.md keeps out of
+   * mount — it pulls the full SDE types.json, which GLOSSARY.md keeps out of
    * the install precache (Market, Assets). Pages without it either have their
    * catalog already or offer no Build Plan: their menus say which blueprint
    * directly, or "No blueprint options".

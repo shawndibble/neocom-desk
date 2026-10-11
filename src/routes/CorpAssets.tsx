@@ -2,7 +2,7 @@
  * `/corp/assets` — every item the corporation owns, browsed the same
  * virtualized, URL-addressable way `/assets` is (issue #779).
  *
- * Round 41/44 (CONTEXT.md) rejected this: a hangar division has no `item_id`
+ * Round 41/44 (GLOSSARY.md) rejected this: a hangar division has no `item_id`
  * for `engine/assetPath.ts` to key a URL on, and `engine/assetTree.ts` had no
  * grouping level between a station and a container to express one. Neither
  * held up against the fact the tree engine already solves an identical

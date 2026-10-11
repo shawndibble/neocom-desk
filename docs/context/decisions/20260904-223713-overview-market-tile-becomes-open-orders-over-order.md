@@ -10,7 +10,7 @@ _Recorded 2026-09-04._
   "Open orders" and links to `/market?section=orders` — the Open Orders tab —
   rather than the scope-free Browser tab.
 - **The tile shows used over available: `12 / 305`.** The denominator is the
-  character's Order Slots (see `CONTEXT.md`), derived in
+  character's Order Slots (see `GLOSSARY.md`), derived in
   `src/engine/market/orderSlots.ts` from the four Trade-group skills. ESI
   publishes the open orders but never the ceiling, so the ceiling has to be
   computed; putting it in `src/engine` keeps it pure and test-first, and keeps

@@ -1,6 +1,6 @@
 /**
  * Copy account-wide Editable Data onto a Character added after it was created
- * (issue #432, CONTEXT.md round 52).
+ * (issue #432, GLOSSARY.md round 52).
  *
  * ## Why this has to exist at all
  *

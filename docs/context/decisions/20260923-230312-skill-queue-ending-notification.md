@@ -4,7 +4,7 @@ _Recorded 2026-09-23 · issue #1410._
 
 - **No "Skill Plan step completed" event.** A Skill Plan step only completes
   when its corresponding in-game skill-queue entry finishes — a Skill Plan is
-  a user-editable _intent_ (`CONTEXT.md`'s **Skill Plan**), not a thing ESI
+  a user-editable _intent_ (`GLOSSARY.md`'s **Skill Plan**), not a thing ESI
   tracks progress against on its own — and that queue-entry completion is
   already announced by **Skill Level Complete**
   (`diffSkillLevelComplete`/`characterNotTraining` in

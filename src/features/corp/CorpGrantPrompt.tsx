@@ -1,13 +1,13 @@
 /**
  * The one-time offer of the corp grant (issue #295).
  *
- * Corp UI hides rather than locks (CONTEXT.md round 35), which leaves a
+ * Corp UI hides rather than locks (GLOSSARY.md round 35), which leaves a
  * Character who has just made Director with no sign that there is anything to
  * turn on. This is that sign — offered once per scope set, at the moment the
  * state actually becomes `roles-without-grant`, and then never again for that
  * same set on its own.
  *
- * "Never again for the same offer" is the whole design (CONTEXT.md round 42).
+ * "Never again for the same offer" is the whole design (GLOSSARY.md round 42).
  * A prompt that keeps returning for a group it has already asked about is the
  * consent-screen bloat this ticket exists to prevent, wearing a different
  * hat, so both buttons record the dismissal against `CORP_GROUP_SCOPES`:

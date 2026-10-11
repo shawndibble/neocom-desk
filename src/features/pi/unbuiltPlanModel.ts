@@ -7,7 +7,7 @@
  * `stopTierModel.ts` states the rule this module breaks: an unbuilt planet has
  * no links to measure, so fitting a layout against its budget would charge
  * nothing for links and overstate what fits by exactly the amount #440 was
- * filed about. CONTEXT.md rounds 51/53/56 wrote that down as "the estimate
+ * filed about. GLOSSARY.md rounds 51/53/56 wrote that down as "the estimate
  * stays out of pin-fitting".
  *
  * That rule cost the ranker its purpose. A pilot could record which resources

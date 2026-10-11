@@ -1,5 +1,5 @@
 /**
- * The Compare Set (CONTEXT.md): items the user is pricing against each other
+ * The Compare Set (GLOSSARY.md): items the user is pricing against each other
  * right now, usually variants of one thing. Scratch state — unlike the
  * Quickbar it does not sync and does not survive a reload, so this is a plain
  * zustand store with no Dexie backing, local to this feature like `hub.ts`.

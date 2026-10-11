@@ -2,7 +2,7 @@
 
 Travel tab `/travel/pilot`. Find one pilot by name; see identity from public ESI and all-time + recent killboard figures from zKillboard. A Travel tab again (scope decision `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`, which supersedes the own-page half of `20261002-145653-lp-store-under-market-pilot-lookup-its-own`). Origin: issue #2331 (stats), #2332 (recent kills/fits), decision `20260929-234357`.
 
-Glossary (CONTEXT.md): **Pilot Lookup** - portrait, corporation, alliance, character age from public ESI; all-time kills, losses, ISK, solo kills, danger and gang ratios, most-used hulls from zKillboard; newest 25 kills and losses, each expanding to the victim's fit with Open in Fittings (killmail read only then). A Threat badge beside the name (here and on every Local list row); beyond that, numbers: no pilot is called hostile or safe. "No zKillboard history" and "zKillboard couldn't be reached" are different answers.
+Glossary (GLOSSARY.md): **Pilot Lookup** - portrait, corporation, alliance, character age from public ESI; all-time kills, losses, ISK, solo kills, danger and gang ratios, most-used hulls from zKillboard; newest 25 kills and losses, each expanding to the victim's fit with Open in Fittings (killmail read only then). A Threat badge beside the name (here and on every Local list row); beyond that, numbers: no pilot is called hostile or safe. "No zKillboard history" and "zKillboard couldn't be reached" are different answers.
 
 ## Feature summary
 
@@ -33,7 +33,7 @@ Answer "who is this pilot and what have they done" from facts: identity (public 
 - **Device and cadence:** desktop primary, with the EVE client open beside it: D-Scan and Local lists are copied from the client and pasted here (owner, 2026-10-11). Several times in a play session (inferred: Scan age turns to a warning after 2 minutes, `20261009-111531`). The phone is for one-off lookups of a friend or a pilot by name (job 3; owner, 2026-10-11); Pilot Lookup is not in the default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts`).
 - **Above the fold:** the search and paste box; then, for a D-Scan, the Danger read (level, sentence, Watch these); for a Local list, the grouped rows with Threat badges; for one pilot, identity and the Threat band (on a phone, the name box and this profile are the whole job).
 - **Not for:** route conditions (Route Safety, `travel.md`); a corporation or alliance (Show Info).
-- **Sources:** owner, 2026-10-11 (desktop primary beside the client; phone for one-off friend or pilot lookups); #2331, #2332, #2863, #2943; decisions `20260929-234357`, `20261007-224716`, `20261009-111531`, `20261008-181210`, `20261008-222917`; CONTEXT.md Threat, Danger read.
+- **Sources:** owner, 2026-10-11 (desktop primary beside the client; phone for one-off friend or pilot lookups); #2331, #2332, #2863, #2943; decisions `20260929-234357`, `20261007-224716`, `20261009-111531`, `20261008-181210`, `20261008-222917`; GLOSSARY.md Threat, Danger read.
 - **Unconfirmed:** the job ranking.
 
 ### Mobbin brief

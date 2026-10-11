@@ -14,7 +14,7 @@
  * Registered and cached, with no surface reading it yet. `/assets` deliberately
  * does not offer a Personal / Corporation switch: seven hangar divisions across
  * many structures do not fit the station-and-container tree that page browses
- * (CONTEXT.md round 41). The corp assets surface is its own ticket, and this is
+ * (GLOSSARY.md round 41). The corp assets surface is its own ticket, and this is
  * the read it will use.
  */
 import { conditionalPagedFetch } from '@/esi/cache';

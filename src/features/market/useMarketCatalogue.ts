@@ -3,7 +3,7 @@
  * systems/market regions, loaded together (one `Promise.all`) since the tree,
  * the URL param validation and the order book's location lookups all need
  * them before they can render anything meaningful. Not precached — most
- * installs never open /market (CONTEXT.md round 10) — so this is the lazy
+ * installs never open /market (GLOSSARY.md round 10) — so this is the lazy
  * load for it.
  *
  * `variations.json` is fetched by its own effect, independent of the five

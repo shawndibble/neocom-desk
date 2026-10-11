@@ -1,5 +1,5 @@
 /**
- * Full breakdown of one open order (CONTEXT.md's redesigned Market > Open
+ * Full breakdown of one open order (GLOSSARY.md's redesigned Market > Open
  * Orders tab): what to do about it, the numbers behind that call, who is
  * cheaper and where, and — for a sell order — the cost-basis ledger the
  * floor came from.

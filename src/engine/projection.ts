@@ -1,5 +1,5 @@
 /**
- * The Projection engine (ADR 0010, CONTEXT.md round 44, issue #355): turns
+ * The Projection engine (ADR 0010, GLOSSARY.md round 44, issue #355): turns
  * what a Character's already-fetched snapshot data says about the future
  * into Projection rows the Scheduled Push backend can fire later without an
  * EVE token or an ESI call of its own.

@@ -1,6 +1,6 @@
 // Pure merge logic for two-way sync (no firebase imports — unit-testable).
 //
-// Policy (CONTEXT.md): last-write-wins by updatedAt (epoch ms). Deletes
+// Policy (GLOSSARY.md): last-write-wins by updatedAt (epoch ms). Deletes
 // propagate via tombstones: a remote doc with deleted: true is kept for
 // TOMBSTONE_TTL_MS (30 days), then purged.
 //
@@ -325,7 +325,7 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
 }
 
 /**
- * Feed sync has no tombstones (CONTEXT.md round 45: dismissal is a flag, not
+ * Feed sync has no tombstones (GLOSSARY.md round 45: dismissal is a flag, not
  * a delete) and no generic LWW over a whole record — content
  * fields never change once a row is fired, only `dismissedAt` does. So unlike
  * {@link mergeRecords}, this keys strictly on `firedAt`/`dismissedAt`:
@@ -333,7 +333,7 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
  * absent treated as 0/never), the same shape as `mergeRecords`' `updatedAt`
  * policy but scoped to that single field.
  *
- * `pushEligible` gates push-CREATE only — CONTEXT.md's synced window (30 days
+ * `pushEligible` gates push-CREATE only — GLOSSARY.md's synced window (30 days
  * or 100 rows, whichever is smaller; see `rowsWithinSyncWindow` in
  * `features/notifications/feed.ts`) bounds which *new* rows a device starts
  * uploading, not what it will accept, and not corrections to a row the

@@ -195,7 +195,7 @@ notifications template parser is built (it isn't, per recommendation).
 picks which tabs ship.
 
 **Sync / Dexie impact:** None for any of the nine. All nine are pure API-Derived
-Data (CONTEXT.md glossary) cached in the existing generic `esiCache` table
+Data (GLOSSARY.md glossary) cached in the existing generic `esiCache` table
 (`src/db/index.ts` `EsiCacheRecord`) — no new Dexie table, no schema version bump, no
 `sync.`-prefixed setting, no `src/sync/` push/pull mapping. None of these are
 Editable Data.

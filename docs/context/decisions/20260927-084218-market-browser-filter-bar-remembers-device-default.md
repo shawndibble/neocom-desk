@@ -23,7 +23,7 @@ _Recorded 2026-09-27._
   15 jumps is slow” complaint this change exists to fix. Rules out adding a
   remembered device default to a value that feeds `allRegionsFetchKey`
   without also adding it to this gate.
-- **The Current System pick's self-clear-on-movement behavior (CONTEXT.md's
+- **The Current System pick's self-clear-on-movement behavior (GLOSSARY.md's
   “Current System” glossary entry, `effectiveCurrentSystem` in
   `src/engine/route/jumpRange.ts`) is unchanged.** It already persists a
   picked system per-Character across reloads and already tracks the active

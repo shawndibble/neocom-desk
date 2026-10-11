@@ -345,7 +345,7 @@ function milestoneStateKey(state: MilestoneState): string {
 }
 
 /**
- * Plan Milestone (CONTEXT.md): a named goal ("Fly Loki") pinned to this row's
+ * Plan Milestone (GLOSSARY.md): a named goal ("Fly Loki") pinned to this row's
  * skill level. Decorative only — sits beside the name so a flagged row reads
  * as one at a glance; the Add/Rename/Remove actions live in the row's own
  * the row's ⋮ menu instead, so this never has to fight the name's own
@@ -408,7 +408,7 @@ interface EntryRowProps {
    * level's real remaining time instead of a bare, misleading "0m".
    */
   pinnedInProgress: PinnedInProgressEntry | null | undefined;
-  /** This row's Plan Milestone (CONTEXT.md), if one is anchored to its skill/level. */
+  /** This row's Plan Milestone (GLOSSARY.md), if one is anchored to its skill/level. */
   milestoneStatus: MilestoneStatus | undefined;
   onAddMilestone: (skillTypeID: number, targetLevel: number) => void;
   onRenameMilestone: (milestoneId: string) => void;
@@ -650,7 +650,7 @@ interface PrereqRowProps {
 /**
  * Prereq-inserted step the user didn't add directly: dimmed, and derived
  * rather than stored — but draggable, because dragging one promotes it into a
- * real entry at that position (CONTEXT.md "Prereq Promotion"). The "+" button
+ * real entry at that position (GLOSSARY.md "Prereq Promotion"). The "+" button
  * beside it does the same promotion in place, so the affordance is reachable
  * without guessing that a dimmed row can be dragged.
  *
@@ -789,7 +789,7 @@ interface MarkerRowProps {
 }
 
 /**
- * Remap Marker (CONTEXT.md): accent divider row, draggable like an entry.
+ * Remap Marker (GLOSSARY.md): accent divider row, draggable like an entry.
  * Once its target attributes are known (a manual edit, or an "Optimize at my
  * markers" run), the divider gives way to the spread itself and the "REMAP
  * MARKER" label drops out entirely — the numbers already say what this row
@@ -903,9 +903,9 @@ interface EntryListProps {
    * if any (#1701 follow-up) — see `queueRows.ts`'s `pinnedInProgressEntry`.
    */
   pinnedInProgress?: PinnedInProgressEntry | null;
-  /** Turn a derived prereq row into a real entry where it already sits (CONTEXT.md "Prereq Promotion"). */
+  /** Turn a derived prereq row into a real entry where it already sits (GLOSSARY.md "Prereq Promotion"). */
   onPromotePrereq: (rowId: string) => void;
-  /** An entry row's Plan Milestone (CONTEXT.md), keyed by (skillTypeID, level) — see `skillPlanSchedule.ts`'s `stepKey`. Derived prereq rows never carry one (out of scope). */
+  /** An entry row's Plan Milestone (GLOSSARY.md), keyed by (skillTypeID, level) — see `skillPlanSchedule.ts`'s `stepKey`. Derived prereq rows never carry one (out of scope). */
   milestoneStatusFor: (skillTypeID: number, targetLevel: number) => MilestoneStatus | undefined;
   onAddMilestone: (skillTypeID: number, targetLevel: number) => void;
   /** Opens the naming Modal, prefilled, for an existing milestone. */

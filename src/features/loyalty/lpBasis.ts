@@ -4,7 +4,7 @@
  * corporation's exchange rate (`engine/loyalty/concordExchange.ts`). Only the
  * displayed figure and its sort change; the offer's profit does not.
  *
- * A device-local UI preference like `priceBasis.ts`, never synced (CONTEXT.md).
+ * A device-local UI preference like `priceBasis.ts`, never synced (GLOSSARY.md).
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 

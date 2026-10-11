@@ -1,5 +1,5 @@
 /**
- * The one badge choice for an Open Orders row (CONTEXT.md's redesigned
+ * The one badge choice for an Open Orders row (GLOSSARY.md's redesigned
  * Market > Open Orders tab) — pulled out of `OpenOrdersPanel` (the row's own
  * badge column) and `OrderDetailModal` (its "quick answer" header), which
  * used to each carry their own copy of this switch. Two copies "must agree"

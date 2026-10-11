@@ -1,5 +1,5 @@
 /**
- * "What-If Implants" (CONTEXT.md): a planner override that swaps the
+ * "What-If Implants" (GLOSSARY.md): a planner override that swaps the
  * clone's actual implant bonuses for a hypothetical set, for exploring "what
  * if I had +4s in" without touching the character's real fitted implants.
  *

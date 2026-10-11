@@ -1,6 +1,6 @@
 /**
  * Paste an EFT fit, see exactly what it will create, then create it
- * (issue #626, "Fit Import" in CONTEXT.md).
+ * (issue #626, "Fit Import" in GLOSSARY.md).
  *
  * Modelled on the Skill Planner's `ImportClipboardDialog`: textarea → Parse →
  * a preview split into what will be built, what will not, and what could not

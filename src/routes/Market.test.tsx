@@ -1139,7 +1139,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     expect(hits.get(MERLIN_TYPE_ID)).toBe(2);
   });
 
-  it('respects the order-row station filter, matching the on-screen tables (CONTEXT.md round 10)', async () => {
+  it('respects the order-row station filter, matching the on-screen tables (GLOSSARY.md round 10)', async () => {
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup();
     render(<App />);

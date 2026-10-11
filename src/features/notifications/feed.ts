@@ -45,7 +45,7 @@ export function idsBeyondLimit(newestFirst: readonly { id: string }[], limit: nu
 }
 
 /**
- * The synced window (issue #362, CONTEXT.md round 45): 30 days or 100 rows,
+ * The synced window (issue #362, GLOSSARY.md round 45): 30 days or 100 rows,
  * whichever is smaller, against the local {@link NOTIFICATION_FEED_LIMIT} of
  * 300. Only rows in this window are eligible to be *pushed* during a sync —
  * the fuller local archive stays device-local. Pure so it's testable without

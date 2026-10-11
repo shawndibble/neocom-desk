@@ -58,7 +58,7 @@ export interface SettingRecord {
 }
 
 /**
- * The one-click What-If Implant sets (CONTEXT.md). `+N` is that bonus in
+ * The one-click What-If Implant sets (GLOSSARY.md). `+N` is that bonus in
  * every slot; `current` resolves late, against whatever the clone is
  * actually wearing.
  */
@@ -82,7 +82,7 @@ export type WhatIfImplantSelection =
   | { readonly kind: 'custom'; readonly bonuses: Implants };
 
 /**
- * A Skill Plan's Booster (CONTEXT.md): one cerebral accelerator the plan is
+ * A Skill Plan's Booster (GLOSSARY.md): one cerebral accelerator the plan is
  * costed under, one of a `boosters` list run one after another (EVE has a
  * single booster slot, so two can never be live at once). `startsAt` and
  * `expiresAt` are **instants** (epoch ms), not the `datetime-local` strings
@@ -156,7 +156,7 @@ export interface SkillPlanRecord {
    */
   boosters?: PlanBooster[];
   /**
-   * Named goals pinned to a plan entry's skill level ("Fly Loki") — CONTEXT.md
+   * Named goals pinned to a plan entry's skill level ("Fly Loki") — GLOSSARY.md
    * "Plan Milestone". Optional and additive, like `markers` above — not
    * indexed, so no Dexie schema version bump. Absent means the plan has never
    * had one, which is how every plan behaved before this existed.
@@ -206,7 +206,7 @@ export interface EsiCacheRecord {
 
 export type { CachedPage, EsiCacheMetaRecord };
 
-/** One saved shortcut in the Quickbar (CONTEXT.md). */
+/** One saved shortcut in the Quickbar (GLOSSARY.md). */
 export interface QuickbarItem {
   typeId: number;
   name: string;
@@ -224,7 +224,7 @@ export interface QuickbarItem {
 
 /**
  * User-editable Quickbar: one record per character holding the ordered list
- * of saved item shortcuts (CONTEXT.md). Modelled as a single record, like a
+ * of saved item shortcuts (GLOSSARY.md). Modelled as a single record, like a
  * Skill Plan's `entries`, rather than one row per item — the whole list edits
  * and merges together, and a flat drag-ordered list needs no per-item id.
  */
@@ -237,7 +237,7 @@ export interface QuickbarRecord {
   updatedAt: number;
 }
 
-/** User-editable Build Plan: manufacturing inputs for one blueprint (CONTEXT.md). */
+/** User-editable Build Plan: manufacturing inputs for one blueprint (GLOSSARY.md). */
 export interface BuildPlanRecord {
   id: string;
   characterId: number;
@@ -421,7 +421,7 @@ export type StationPinScope = 'character' | 'account';
  * `character` pin elevates the station to the top of the list only while that
  * Character is active; an `account` pin elevates it regardless of which
  * Character is active. Account-wide pins have no shared account identity to
- * key off (Account has no storage/sync — CONTEXT.md) so they fan out: one row
+ * key off (Account has no storage/sync — GLOSSARY.md) so they fan out: one row
  * per Character currently known on this device, each synced under that
  * Character's own ownerHash (see docs/plans/feature-parity/README.md §5.7).
  */
@@ -437,7 +437,7 @@ export interface StationPinRecord {
 
 /**
  * A pilot's own best-to-worst ranking of the P0 resources on one planet
- * (issue #425, CONTEXT.md round 51/52).
+ * (issue #425, GLOSSARY.md round 51/52).
  *
  * ESI carries no per-planet resource richness at all, and the in-game scan
  * overlay shows a colour map rather than a number — so an ordering is the only
@@ -470,7 +470,7 @@ export interface PlanetRichnessRecord {
 
 /**
  * One notification the Foreground Poller fired, kept so the Overview's
- * Notification Feed can show what was missed (CONTEXT.md round 20). Device-
+ * Notification Feed can show what was missed (GLOSSARY.md round 20). Device-
  * local and never synced, like the preferences that gate it: the poller runs
  * per device, so two devices legitimately hold different feeds.
  *
@@ -504,7 +504,7 @@ export interface NotificationFeedRecord {
    * Epoch ms the row was dismissed, absent while live. A flag rather than a
    * delete: this collection carries no tombstones, so a device that comes
    * back after `sync/merge.ts`'s 30-day TTL edge can't resurrect a row that
-   * would have been a delete's tombstone (CONTEXT.md round 45, issue #361).
+   * would have been a delete's tombstone (GLOSSARY.md round 45, issue #361).
    * A row written before this field existed has no `dismissedAt` and is
    * treated as not dismissed.
    */
@@ -592,7 +592,7 @@ export interface FittingRecord {
 }
 
 /**
- * A Payee (CONTEXT.md, issue #523): who the Moon Mining Tax ledger owes —
+ * A Payee (GLOSSARY.md, issue #523): who the Moon Mining Tax ledger owes —
  * user-managed, per-character (like `BuildPlanRecord`). The moon/system tag
  * is what lets a future entry auto-suggest this Payee and its rate — "pick
  * the moon, the corp, or the person, whichever is memorable" — and is
@@ -637,7 +637,7 @@ export interface MiningTaxOreLine {
   quantity: number;
 }
 
-/** Before/after quantity for one ore type, recorded when a `needs-review` flip occurs (CONTEXT.md, issue #523). */
+/** Before/after quantity for one ore type, recorded when a `needs-review` flip occurs (GLOSSARY.md, issue #523). */
 export interface MiningTaxQuantityDiff {
   typeId: number;
   before: number;
@@ -647,7 +647,7 @@ export interface MiningTaxQuantityDiff {
 export type MiningTaxAssignmentStatus = 'outstanding' | 'paid' | 'needs-review' | 'dismissed';
 
 /**
- * An Assignment (CONTEXT.md, issue #523): links a Mining Ledger Entry (or a
+ * An Assignment (GLOSSARY.md, issue #523): links a Mining Ledger Entry (or a
  * split slice of its ore lines) to a Payee, snapshotting the tax percent and
  * ISK value **at assignment time** — invoice semantics, so neither a later
  * Jita price move nor an edited Payee default retroactively changes what an
@@ -786,7 +786,7 @@ export interface MiningTaxPaymentInfo {
 }
 
 /**
- * A manually logged Production Run (issue #525, CONTEXT.md): a snapshot of
+ * A manually logged Production Run (issue #525, GLOSSARY.md): a snapshot of
  * one production batch off a Build Plan — materials cost, job fee, and
  * quantity as they stood at logging time, user-overridable and never
  * re-derived afterward. Exists to answer "what did this batch actually cost
@@ -857,7 +857,7 @@ export interface NetWorthSnapshotRecord {
  * merely handled: two devices linking different sales write two different
  * documents, and the deterministic id makes the same sale linked twice on
  * two devices collide into one document rather than double-count. Mirrors
- * the Notification Feed's Occurrence Key precedent (CONTEXT.md).
+ * the Notification Feed's Occurrence Key precedent (GLOSSARY.md).
  *
  * `transactionId` is absent for a "Manual / Private Sale" entry — a sale the
  * pilot recorded by hand for a disposal ESI has no record of at all (gifted,

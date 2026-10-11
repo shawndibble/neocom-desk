@@ -674,7 +674,7 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
 /**
  * AC1: the Corp nav entry exists only for a Character whose Corp Access is
  * `ready`, and in the other three states it does not render *at all* — no
- * link, no lock marker. Corp UI hides rather than locks (CONTEXT.md round 35),
+ * link, no lock marker. Corp UI hides rather than locks (GLOSSARY.md round 35),
  * because what stands in the way is an in-game role only CCP can grant and no
  * re-login can produce.
  */

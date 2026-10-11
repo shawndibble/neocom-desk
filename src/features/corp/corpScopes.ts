@@ -56,7 +56,7 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
   ],
   canReadIndustry: ['esi-industry.read_corporation_jobs.v1'],
   /**
-   * `read_divisions` too, not `canReadWallet`'s alone (#330, CONTEXT.md round
+   * `read_divisions` too, not `canReadWallet`'s alone (#330, GLOSSARY.md round
    * 44): naming a division ("SRP") rather than a number needs the `hangar`
    * half of the same read the wallet rail already uses for its `wallet` half
    * (`features/corp/divisions.ts`), and without this a Director-only assets

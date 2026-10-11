@@ -81,7 +81,7 @@ export interface PlanEntry {
 }
 
 /**
- * A named goal ("Fly Loki") pinned to a plan entry's skill level (CONTEXT.md
+ * A named goal ("Fly Loki") pinned to a plan entry's skill level (GLOSSARY.md
  * "Plan Milestone"). Anchored to (skillTypeID, level) rather than a position,
  * so it survives reorder and removal by construction — looked up by
  * `skillPlanSchedule.ts`'s `StepKey`, which simply misses when the anchor is

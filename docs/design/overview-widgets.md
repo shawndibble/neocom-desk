@@ -19,7 +19,7 @@ alerts feature moves out of the page into a **bell in every page header** and a
 Everything on the page is the pilot's choice. The default is only a starting
 point.
 
-## 2. Vocabulary (add to CONTEXT.md)
+## 2. Vocabulary (add to GLOSSARY.md)
 
 - **Widget** — one tile on the Overview, an instance of a **Widget Kind** with
   its own size, view, optional rename, character scope and range. The same kind

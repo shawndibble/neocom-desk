@@ -447,7 +447,7 @@ describe('mergeFeed', () => {
 
   it('does not push a local-only row outside the push window', () => {
     // An old row still in the local archive (cap 300) but past the 30-day/100-row
-    // sync window (CONTEXT.md round 45) is left alone, not pushed.
+    // sync window (GLOSSARY.md round 45) is left alone, not pushed.
     const result = mergeFeedNow([feedRow()], new Set(), []);
     expect(result.pushCreate).toEqual([]);
   });

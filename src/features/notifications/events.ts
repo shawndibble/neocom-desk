@@ -1,5 +1,5 @@
 /**
- * The fixed catalog of Notification Events (CONTEXT.md round 20): every
+ * The fixed catalog of Notification Events (GLOSSARY.md round 20): every
  * character-state change a user can be notified about, each independently
  * toggleable per Character. This is the service-worker-safe half of an event
  * — id, label, gates, channel default — and the id union is derived from it.
@@ -23,7 +23,7 @@ interface NotificationEventTraits {
   /**
    * Which channels an untouched preference has on: `'both'` for nearly every
    * event, `'feedOnly'` for the few worth a Feed row but not an interruption
-   * (CONTEXT.md round 45; `contractCompleted`/`contractFailed` by issue
+   * (GLOSSARY.md round 45; `contractCompleted`/`contractFailed` by issue
    * #1091's explicit decision — a forfeited courier is irreversible by the
    * time you hear about it, so the value is the durable feed record, not a
    * popup). Read by `eventSelection.ts`'s absence-means-default idiom.
@@ -203,7 +203,7 @@ const CATALOG = [
   // `isEventEnabledFor` default-both-channels-on path (`eventSelection.ts`'s
   // "absence means enabled" idiom), never `eveTypeEnabledFor`'s
   // feed-on/browser-off default the ~100 `eveNotification` types use — they
-  // are rare and high-stakes, not numerous and informational. CONTEXT.md
+  // are rare and high-stakes, not numerous and informational. GLOSSARY.md
   // round 43 records this as a scope decision.
   {
     id: 'structureFuelLow',

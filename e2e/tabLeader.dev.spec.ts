@@ -1,5 +1,5 @@
 /**
- * Tab Leader election (`src/lib/tabLeader.ts`, CONTEXT.md) against real Web
+ * Tab Leader election (`src/lib/tabLeader.ts`, GLOSSARY.md) against real Web
  * Locks, which its unit tests fake. Every page in one BrowserContext shares
  * the origin's lock manager, so two pages here are two tabs of the app.
  *

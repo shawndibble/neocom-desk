@@ -10,7 +10,7 @@ import { joinTabElection, runUnlessRunningElsewhere } from '@/lib/tabLeader';
 import { ignoreIdbTeardown } from '@/db/teardown';
 
 /**
- * Mounts the Foreground Poller (CONTEXT.md round 20): renders nothing, just
+ * Mounts the Foreground Poller (GLOSSARY.md round 20): renders nothing, just
  * runs a poll every `POLL_INTERVAL_MS` while the tab is visible *and* the Tab
  * Leader (`lib/tabLeader.ts` — one tab polls for all of them), paused while
  * hidden, with an immediate catch-up check on regaining visibility — and

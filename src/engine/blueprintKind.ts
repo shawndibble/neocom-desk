@@ -1,5 +1,5 @@
 /**
- * Whether an asset stack is a **BPO** or a **BPC** (CONTEXT.md), for the
+ * Whether an asset stack is a **BPO** or a **BPC** (GLOSSARY.md), for the
  * Assets pages' blueprint badge.
  *
  * ESI flags a copy directly (`is_blueprint_copy`), so a copy is known from

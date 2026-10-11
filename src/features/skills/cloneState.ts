@@ -1,7 +1,7 @@
 /**
- * Clone State (CONTEXT.md): whether each Character is Alpha or Omega.
+ * Clone State (GLOSSARY.md): whether each Character is Alpha or Omega.
  *
- * ESI has no field for it (CONTEXT.md "Character Not Training"), so the pilot
+ * ESI has no field for it (GLOSSARY.md "Character Not Training"), so the pilot
  * sets it. Default Omega — the rate every plan was costed at before this
  * existed — so a Character nobody has touched keeps quoting the same times.
  *

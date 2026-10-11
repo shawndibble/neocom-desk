@@ -33,7 +33,7 @@ const ROLES_SCOPE: Scope = ESI_REGISTRY.getCharacterRoles.scope;
  * Only `ready` puts corp UI on screen. Every other state renders nothing at
  * all — no nav item, no tab, no lock — and `unknown` renders the same as
  * `none`, because a nav item that flickers into existence on load is worse
- * than one that appears a beat late (CONTEXT.md round 35).
+ * than one that appears a beat late (GLOSSARY.md round 35).
  */
 export type CorpAccessState = 'unknown' | 'not-granted' | 'none' | 'roles-without-grant' | 'ready';
 

@@ -1,11 +1,11 @@
 /**
  * Pure per-character Notification Event toggle helpers.
  *
- * Every event is on by default for both channels (CONTEXT.md round 20), so
+ * Every event is on by default for both channels (GLOSSARY.md round 20), so
  * absence from the map means enabled, not unset — mirroring
  * `assetSelection.ts`'s tri-state shape but keyed by event id with a
  * default-true map instead of a `Set`. `marketOrderFilled` and
- * `walletBalanceChanged` are the exception (CONTEXT.md round 45): they
+ * `walletBalanceChanged` are the exception (GLOSSARY.md round 45): they
  * default to feed-on/browser-off, the same reasoning in reverse as
  * `eveTypeDefaultFor`'s default below — worth a row, not worth an
  * interruption.
@@ -35,7 +35,7 @@ export type EventEnabledMap = Partial<Record<NotificationEventId, EventChannelSt
 
 /**
  * Events that default to feed-on/browser-off instead of on-for-both
- * (CONTEXT.md round 45) — worth a row, not worth an interruption. Declared per
+ * (GLOSSARY.md round 45) — worth a row, not worth an interruption. Declared per
  * event in the catalog (`events.ts`'s `defaultChannels`, where the reasoning
  * for each lives), read here.
  */
@@ -272,7 +272,7 @@ export function broadcastAllEventsChannelFlags(
 }
 
 /**
- * A presentation grouping over the Notification Allow-List (CONTEXT.md round
+ * A presentation grouping over the Notification Allow-List (GLOSSARY.md round
  * 44) — carries no defaults, gates no delivery. Exists so Settings can be
  * enumerated up front and bulk-toggled by coherent set (issue #352).
  */
@@ -287,7 +287,7 @@ export const NOTIFICATION_FAMILIES = [
 export type NotificationFamily = (typeof NOTIFICATION_FAMILIES)[number];
 
 /**
- * The closed Notification Allow-List (CONTEXT.md round 44): a `type` outside
+ * The closed Notification Allow-List (GLOSSARY.md round 44): a `type` outside
  * it is dropped at the poller (`foregroundPoller.ts`) before it reaches
  * either delivery channel or any name-resolution work, rather than opted out
  * from a much larger catalog after the fact (round 34's model — the live ESI

@@ -1,5 +1,5 @@
 /**
- * **Stock Lists** — a market's named set of **Stock Targets** (CONTEXT.md) —
+ * **Stock Lists** — a market's named set of **Stock Targets** (GLOSSARY.md) —
  * and the pure edits the Stock tab and the "Set stock target…" dialog make to them.
  *
  * The stored value is whatever the last device to sync wrote, possibly an

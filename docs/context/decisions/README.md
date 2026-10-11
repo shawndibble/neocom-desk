@@ -2,11 +2,11 @@
 
 One file per decision. Append-only as a _directory_, never as a file.
 
-`CONTEXT.md` at the repo root holds the glossary — the shared vocabulary,
+`GLOSSARY.md` at the repo root holds the glossary — the shared vocabulary,
 read whole. This directory holds the decision log that used to live at the
 bottom of it. Splitting them is not tidiness: several `/next-ticket` agents
 run at once, and every one of them appending to the same last line of
-`CONTEXT.md` conflicted on essentially every merge. Distinct new paths merge
+`GLOSSARY.md` conflicted on essentially every merge. Distinct new paths merge
 without a conflict.
 
 ## Adding a decision
@@ -43,6 +43,6 @@ files as historical titles only — do not continue the series.
 ## New vocabulary
 
 A term the whole project will reuse belongs in the glossary in root
-`CONTEXT.md`. That list is sorted by term — insert yours in alphabetical
+`GLOSSARY.md`. That list is sorted by term — insert yours in alphabetical
 position, never at the end. A mid-file insert is why it seldom conflicts.
 Write the term there and the decision here.

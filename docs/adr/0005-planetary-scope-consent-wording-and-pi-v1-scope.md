@@ -12,7 +12,7 @@ see ADR 0011's Consequences for exactly which parts stand.
 `esi-planets.manage_planets.v1` is the only scope CCP publishes for planetary
 industry data, and it grants exactly two GETs
 (`/characters/{id}/planets`, `/characters/{id}/planets/{planet_id}`) with no
-write operations in the current ESI surface. CONTEXT.md's "Read-only" scope
+write operations in the current ESI surface. GLOSSARY.md's "Read-only" scope
 decision holds at the behaviour level, but EVE's own consent screen renders
 the scope's name as "manage your planetary installations" to a user of an app
 that otherwise advertises itself as read-only — a wording Neocom Desk does

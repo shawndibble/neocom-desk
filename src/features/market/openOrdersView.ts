@@ -14,7 +14,7 @@ export interface OpenOrdersView {
   visibleRows: OpenOrderRow[];
   /**
    * Every row matching the filter except `hideHealthy`, sorted. Healthy
-   * orders are FOLDED, not filtered out (CONTEXT.md): grouping always sees
+   * orders are FOLDED, not filtered out (GLOSSARY.md): grouping always sees
    * them so the healthy group's own heading and count still render — just
    * without its table — while `hideHealthy` is on.
    */

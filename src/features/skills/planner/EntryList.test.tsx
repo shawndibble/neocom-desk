@@ -813,7 +813,7 @@ describe('EntryList row menu (#2223: a later entry still needing this level)', (
   });
 });
 
-describe('EntryList Plan Milestones (CONTEXT.md)', () => {
+describe('EntryList Plan Milestones (GLOSSARY.md)', () => {
   it("offers Add milestone on a row with none, anchored to that row's skill and level", async () => {
     const user = userEvent.setup();
     const added: Array<[number, number]> = [];

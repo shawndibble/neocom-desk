@@ -72,7 +72,7 @@ export type IdReferenceKind = 'type' | 'group' | 'attribute';
 
 /**
  * The units that are an id in disguise. `groupID` names an item **Group**
- * (`invGroups`), never a Market Group — CONTEXT.md keeps those distinct.
+ * (`invGroups`), never a Market Group — GLOSSARY.md keeps those distinct.
  */
 const ID_REFERENCE_UNITS: Readonly<Record<string, IdReferenceKind>> = {
   typeID: 'type',

@@ -5,7 +5,7 @@ _Recorded 2026-09-30._
 - **One Route Preference vocabulary, the game's.** Prefer shorter / safer /
   less secure in the UI; `shortest`/`prefer-highsec`/`avoid-highsec` in code;
   ESI's `Shorter`/`Safer`/`LessSecure` mapped in one place
-  (`features/route/esiRoute.ts`). This is the unification CONTEXT.md owed
+  (`features/route/esiRoute.ts`). This is the unification GLOSSARY.md owed
   before a second persisted preference shipped, and the default preference in
   Settings → Travel is that second one. Assets' device-local Shortest/Safest
   (`assetsRoutePreference`) is gone; its value seeds the synced default once.

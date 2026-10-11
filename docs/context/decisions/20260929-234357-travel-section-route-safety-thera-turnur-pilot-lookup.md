@@ -40,7 +40,7 @@ _Recorded 2026-09-29 · issue #2328._
   route. A test scans the section's copy for the verdict words.
 
 - **The Route Preference stays URL-only.** Travel is the second control offering
-  one, but it is not persisted either, so the vocabulary unification CONTEXT.md
+  one, but it is not persisted either, so the vocabulary unification GLOSSARY.md
   records as owed before a second _persisted_ preference still has not come due.
   `ROUTE_PREFERENCES` moved to `features/route/routePreferences.ts` so the two
   controls cannot drift apart.

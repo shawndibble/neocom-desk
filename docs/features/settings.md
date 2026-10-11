@@ -2,7 +2,7 @@
 
 `/settings` (`src/routes/Settings.tsx`, route `src/app/App.tsx:207`, `UNGATED` in `src/app/routeScopes.ts:77`). Footer nav entry, not in the phone tab bar (`src/app/navDestinations.ts:264`). Eleven sections, each a real URL `/settings/<id>` (`SETTINGS_TABS`, `src/app/pageTabs.ts:42`). Help/FAQ/Shortcuts are NOT here any more: `/help` (`HELP_TABS`); `/settings/shortcuts|faq|help` redirect (`App.tsx:209-211`).
 
-Terms per `CONTEXT.md`: Permission, Base Grant, Core Grant, Notification Event, Alert, Notification Feed, Trade Hub, Avoided Systems, Corp Access, Corp Capability.
+Terms per `GLOSSARY.md`: Permission, Base Grant, Core Grant, Notification Event, Alert, Notification Feed, Trade Hub, Avoided Systems, Corp Access, Corp Capability.
 
 | Group    | Section        | URL                       | Contents                                                                                                   |
 | -------- | -------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |

@@ -2,7 +2,7 @@
 
 Scope: `src/routes/Industry.tsx` shell + header, Jobs panel, Records tab, BPC Sourcing tab, Opportunities tab (+ All owned, Market-Wide), Blueprint Acquisition link-up. Build Plans tab, plan page, group page, materials, Auto Build, Fit Import, facility defaults, `computeBuildPlan` are covered elsewhere.
 
-Terms per `CONTEXT.md`: **Production Log**, **Production Run**, **BPC Sourcing** (tab label in UI: "BPC Sourcing", i18n `industry.bpcSearchTab`; code comments still say "BPC Search"), **Offer**, **Public Contract Offers snapshot**, **Build Opportunities**, **Market-Wide Build Opportunities**, **Liquidity Floor**, **Order Depth**, **Seeded Build Plan**, **Blueprint Acquisition**.
+Terms per `GLOSSARY.md`: **Production Log**, **Production Run**, **BPC Sourcing** (tab label in UI: "BPC Sourcing", i18n `industry.bpcSearchTab`; code comments still say "BPC Search"), **Offer**, **Public Contract Offers snapshot**, **Build Opportunities**, **Market-Wide Build Opportunities**, **Liquidity Floor**, **Order Depth**, **Seeded Build Plan**, **Blueprint Acquisition**.
 
 Where brief items actually live (code differs from the obvious guess):
 
@@ -215,7 +215,7 @@ Observed gaps (Opportunities):
 
 - Price history reachable only from the phone card menu; desktop Ranked table has no row menu or history action (`PriceHistoryPanel` modal opens only via `onViewHistory`: `OpportunitiesPanel.tsx:636` -> modal `:644-655`, fired from the card menu at `MobileOpportunityList.tsx:324`; desktop `DataTable` at `OpportunitiesPanel.tsx:616` is chosen by `isDesktop` and only has `onRowClick` = Start plan).
 - No `rowContextMenu` or `rowMoreActions` on Ranked (`:616`), All owned (`OwnedBlueprintsPanel.tsx:493`) or Market-Wide (`MarketWideOpportunitiesPanel.tsx:570`) tables (grep: none in the three panels).
-- Market-Wide has no compare/select and no hub picker; ME-0 trees and NPC-station fees are approximations (CONTEXT: "selecting a row still opens a real Build Plan for exact numbers").
+- Market-Wide has no compare/select and no hub picker; ME-0 trees and NPC-station fees are approximations (GLOSSARY: "selecting a row still opens a real Build Plan for exact numbers").
 - Ranked recompute is manual above 10 blueprints; assets-only changes do not invalidate cache (by design).
 - Ranked rows never price a blueprint acquisition gap (all owned by construction).
 - All owned: corp blueprints in containers show only "In container"; no corp assets cache for placement.

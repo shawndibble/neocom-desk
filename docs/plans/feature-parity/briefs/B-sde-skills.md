@@ -210,7 +210,7 @@ match-`count`. Item 04 consumes it as-is; no new chip variant needed.
 
 **i18n keys:** `plans.filters.trained`, `plans.filters.untrained`, `plans.filters.hasPrerequisites`, `plans.filters.hideMaxed` (chip labels); no new copy needed for search itself (`plans.searchPlaceholder` already exists, `en.json:76`).
 
-**Sync / Dexie impact:** None. Filter-chip state is ephemeral UI state (not persisted per CONTEXT.md's Editable Data definition), search query is transient. No Dexie schema bump, no `sync.`-prefixed setting, no push/pull mapping change.
+**Sync / Dexie impact:** None. Filter-chip state is ephemeral UI state (not persisted per GLOSSARY.md's Editable Data definition), search query is transient. No Dexie schema bump, no `sync.`-prefixed setting, no push/pull mapping change.
 
 **New ESI scopes:** none.
 

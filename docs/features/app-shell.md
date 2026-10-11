@@ -1,6 +1,6 @@
 # App shell, navigation, gates, Help
 
-Everything around the feature pages: router and route table, the signed-in `Layout` (desktop rail, phone tab bar, More sheet), nav customization, Character switcher, scope gates and Grant banners, Permissions, onboarding banners (Install Prompt), update flow, boot/error screens, document title, keyboard shortcuts, global paste, analytics, and the Help & FAQ page. Settings is only a pointer here. Terms per `CONTEXT.md`: Character, Permission, Base Grant, Core Grant, Grant note, Install Prompt, Corp Access, Tab Leader. Sibling docs: `docs/features/auth-login.md` (Login, Callback, SSO session), `characters.md`, `command-palette.md`, `settings.md`, `sync-backup.md`, `entities-share.md`.
+Everything around the feature pages: router and route table, the signed-in `Layout` (desktop rail, phone tab bar, More sheet), nav customization, Character switcher, scope gates and Grant banners, Permissions, onboarding banners (Install Prompt), update flow, boot/error screens, document title, keyboard shortcuts, global paste, analytics, and the Help & FAQ page. Settings is only a pointer here. Terms per `GLOSSARY.md`: Character, Permission, Base Grant, Core Grant, Grant note, Install Prompt, Corp Access, Tab Leader. Sibling docs: `docs/features/auth-login.md` (Login, Callback, SSO session), `characters.md`, `command-palette.md`, `settings.md`, `sync-backup.md`, `entities-share.md`.
 
 ## Feature table
 

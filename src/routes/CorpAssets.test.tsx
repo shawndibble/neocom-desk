@@ -306,7 +306,7 @@ describe('special flag groups (AC3)', () => {
    * CCP can extend `location_flag` without notice; a row with a flag this
    * app has never heard of must still be visible somewhere rather than
    * silently vanishing from the one page whose job is "what does the
-   * corporation own" (CONTEXT.md round 44).
+   * corporation own" (GLOSSARY.md round 44).
    */
   it('buckets an unrecognised flag under Other rather than dropping the row', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(

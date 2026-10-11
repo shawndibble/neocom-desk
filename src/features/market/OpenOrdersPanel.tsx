@@ -119,7 +119,7 @@ import {
   type OpenOrderColumnId,
 } from './openOrdersColumns';
 
-/** Healthy orders start collapsed (CONTEXT.md redesign) — the `showHealthy` toggle is the way back, not the funnel filter. */
+/** Healthy orders start collapsed (GLOSSARY.md redesign) — the `showHealthy` toggle is the way back, not the funnel filter. */
 const DEFAULT_FILTER: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true };
 
 const SORTS: readonly OpenOrdersSort[] = OPEN_ORDERS_SORTS;

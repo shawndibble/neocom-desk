@@ -89,7 +89,7 @@ const ESI_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
 const ESI_BASE = 'https://esi.evetech.net';
 const PROBE_CACHE_FILE = join(CACHE_DIR, 'market-regions-probe.json');
 // Delve: canary region with no NPC station that still carries busy
-// player-structure markets (CONTEXT.md — "31 nullsec regions have none").
+// player-structure markets (GLOSSARY.md — "31 nullsec regions have none").
 const DELVE_REGION_ID = 10000060;
 // Jita: the game's busiest system, used as the jump graph's canary — if the
 // stargate join ever produces nothing, it shows up here first.
@@ -114,7 +114,7 @@ const ALPHA_SKILLS_MAX = 250;
 // bound. GPMR-01, the region PLEX trades in, holds one such system (GPMS-01,
 // position 1,1,1 — verified against Fuzzwork's mapSolarSystems.csv and ESI
 // 2026-08-31): CCP synthesized it purely to hold a cluster-wide market, so it
-// is a Global Market Region (CONTEXT.md round 12) rather than a place a
+// is a Global Market Region (GLOSSARY.md round 12) rather than a place a
 // picker should offer.
 const SYNTHETIC_POSITION_MAX_M = 1_000_000;
 
@@ -518,7 +518,7 @@ async function fetchAllMarketTypeIds(regionId) {
  * than trusting NPC-station presence or a hand-written exclusion list — 31
  * nullsec regions have no NPC station and still carry busy player-structure
  * markets, while wormhole/Abyssal/dev regions never carry orders at all
- * (CONTEXT.md). Results are cached to disk (like the CSV downloads), so
+ * (GLOSSARY.md). Results are cached to disk (like the CSV downloads), so
  * repeated local builds do not re-probe ~150 regions against ESI every time.
  */
 async function probeMarketRegions(candidates) {
@@ -1984,7 +1984,7 @@ async function main() {
   const globalMarketRegions = regionsWithOrders.filter((r) => globalMarketRegionIds.has(r.id));
 
   // --- market/globalMarkets.json: which types trade in a Global Market
-  // Region (CONTEXT.md round 12) instead of the normal regional books, and
+  // Region (GLOSSARY.md round 12) instead of the normal regional books, and
   // where — read live per region, not hardcoded (only a handful of regions
   // qualify, so this is a few requests, not hundreds).
   console.log(
@@ -2000,7 +2000,7 @@ async function main() {
   globalMarkets.sort((a, b) => a.typeId - b.typeId);
 
   // --- market/attributes.json: dgmAttributeTypes -> attribute dictionary
-  // (display name, unit, category), published only. Item Detail (CONTEXT.md
+  // (display name, unit, category), published only. Item Detail (GLOSSARY.md
   // round 6) reads dogma_attributes live from ESI per item; this dictionary
   // is the small piece the snapshot carries instead, so attribute_ids become
   // readable without shipping every item's own attributes. An attribute with

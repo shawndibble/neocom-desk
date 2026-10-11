@@ -9,7 +9,7 @@
  * board's three sources and the money from the wallet, and a Character can hold
  * either without the other. A Station Manager who is not an Accountant gets the
  * clock figures and no money ones — absent, not blank, not "you cannot see
- * this" (CONTEXT.md round 35, AC3). With neither readable the caller renders no
+ * this" (GLOSSARY.md round 35, AC3). With neither readable the caller renders no
  * panel at all, which is why both props are nullable and the empty case returns
  * `null` rather than an empty state.
  */

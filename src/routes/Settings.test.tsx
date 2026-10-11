@@ -495,7 +495,7 @@ describe('Settings — Notifications (issue #170)', () => {
       screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
     ).toBeChecked();
     // marketOrderFilled/walletBalanceChanged default feed-on/browser-off
-    // (CONTEXT.md round 45) — worth a row, not worth an interruption.
+    // (GLOSSARY.md round 45) — worth a row, not worth an interruption.
     expect(
       screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
     ).not.toBeChecked();
@@ -560,7 +560,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
     // The browser column starts indeterminate: Wallet Balance Changed/Market
     // Order Filled default browser-off while the rest default browser-on
-    // (CONTEXT.md round 45). A partial column fills in rather than clears.
+    // (GLOSSARY.md round 45). A partial column fills in rather than clears.
     await user.click(
       screen.getByRole('checkbox', { name: /toggle all device notifications for pilot one/i })
     );
@@ -1101,7 +1101,7 @@ describe('Settings — Notifications (issue #170)', () => {
       await openAllCharacters();
 
       // Wallet Balance Changed/Market Order Filled default browser-off while
-      // the rest default browser-on (CONTEXT.md round 45) — the grid starts
+      // the rest default browser-on (GLOSSARY.md round 45) — the grid starts
       // partial, so the first click fills every event, every Character, on.
       const selectAllCharacters = await screen.findByRole('checkbox', {
         name: 'Toggle device notifications for every character',
@@ -1189,7 +1189,7 @@ describe('Settings — Notifications (issue #170)', () => {
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
-      // Wallet Balance Changed defaults browser-off (CONTEXT.md round 45).
+      // Wallet Balance Changed defaults browser-off (GLOSSARY.md round 45).
       await user.click(
         screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
       );

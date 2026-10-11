@@ -1,5 +1,5 @@
 /**
- * Notification Event diff functions (CONTEXT.md round 20): one pure function
+ * Notification Event diff functions (GLOSSARY.md round 20): one pure function
  * per event, each comparing the previous and current skill-queue snapshot and
  * deciding whether to fire. Registered into `SKILL_QUEUE_NOTIFICATION_DIFFS`
  * so the Foreground Poller (features/notifications) runs one fetch-and-diff
@@ -88,7 +88,7 @@ function isCompleted(entry: SkillQueueEntrySnapshot, nowMs: number): boolean {
 
 /**
  * Fires per finished skill-queue entry while the queue still has more behind
- * it (CONTEXT.md round 20) — a completion that leaves nothing training is
+ * it (GLOSSARY.md round 20) — a completion that leaves nothing training is
  * `characterNotTraining`'s to report instead, not this event's.
  *
  * Edge-triggered on the entry's own finish instant rather than by matching it
@@ -141,7 +141,7 @@ function headStatus(snapshot: SkillQueueSnapshot): HeadStatus {
 
 /**
  * Fires when the skill queue's head entry has no active finish date, whether
- * from an empty queue or a stalled one (CONTEXT.md round 20) — deliberately
+ * from an empty queue or a stalled one (GLOSSARY.md round 20) — deliberately
  * one unified event, since ESI exposes no way to distinguish the cause.
  * Edge-triggered on the transition into that state so a stall that persists
  * across many polls only notifies once.
@@ -389,7 +389,7 @@ interface JobReadyFire<TEventId extends string> {
  * way as `diffSkillLevelComplete`, comparing the job's own fixed finish
  * instant against `prev.nowMs` rather than matching job identity against
  * `prev.entries`. Both loaders this feeds (`loadCharacterIndustryJobs`,
- * `loadCorporationIndustryJobs`) only return non-completed jobs (CONTEXT.md/
+ * `loadCorporationIndustryJobs`) only return non-completed jobs (GLOSSARY.md/
  * ADR: ESI keeps a finished-but-undelivered job at status `ready` in that
  * list until collected), so a job can sit in `next.entries` for many polls
  * after completing — the `endMs <= prev.nowMs` check is what stops a re-fire
@@ -1289,7 +1289,7 @@ function fillMatchFor(entry: MarketOrderEntrySnapshot): FillMatch | undefined {
  * order missing from `prev.entries` is treated as not-previously-filled, so
  * one discovered already filled with no prior baseline still fires once.
  *
- * Sell orders only. This reverses CONTEXT.md round 20, which made one event
+ * Sell orders only. This reverses GLOSSARY.md round 20, which made one event
  * cover both directions on the grounds that a completed buy and a completed
  * sell are the same thing happening — they are not, to the person being told.
  * A filled sell order is news: someone bought from you while you were doing
@@ -1865,7 +1865,7 @@ export interface CorpWalletDivisionSnapshot {
   division: number;
   balance: number;
   /**
-   * Only the master division's journal is fetched (CONTEXT.md round 43): ESI
+   * Only the master division's journal is fetched (GLOSSARY.md round 43): ESI
    * publishes no all-divisions journal and the seven are separately paginated
    * and role-gated, so every other division's `journal` is empty here — its
    * `balance` still participates in the balance-below check below, which

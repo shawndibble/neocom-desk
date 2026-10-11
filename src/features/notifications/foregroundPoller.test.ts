@@ -1207,7 +1207,7 @@ describe('runForegroundPoll', () => {
     ]);
   });
 
-  it('records walletBalanceChanged to the feed but does not raise a browser notification by default (feed-only, CONTEXT.md round 45)', async () => {
+  it('records walletBalanceChanged to the feed but does not raise a browser notification by default (feed-only, GLOSSARY.md round 45)', async () => {
     const savedWallet: WalletPollerState = {
       [CHAR.characterId]: {
         entries: [{ id: 5, amount: 100, thresholdIsk: 0, dateMs: 1_000_000 }],
@@ -1348,7 +1348,7 @@ describe('runForegroundPoll', () => {
     ]);
   });
 
-  it('records marketOrderFilled to the feed but does not raise a browser notification by default (feed-only, CONTEXT.md round 45)', async () => {
+  it('records marketOrderFilled to the feed but does not raise a browser notification by default (feed-only, GLOSSARY.md round 45)', async () => {
     const savedMarketOrders: MarketOrderPollerState = {
       [CHAR.characterId]: {
         entries: [{ orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 }],

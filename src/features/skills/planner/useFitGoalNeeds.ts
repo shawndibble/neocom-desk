@@ -1,5 +1,5 @@
 /**
- * What each saved Fitting needs from a Skill Plan (fit goals, CONTEXT.md
+ * What each saved Fitting needs from a Skill Plan (fit goals, GLOSSARY.md
  * "Plan Milestone"): the skill levels its hull, modules, charges, drones and
  * fighters require, from the same dogma lookup the Fitting editor's skill
  * gaps use. Requirements are one uncached ESI round trip per type, so only

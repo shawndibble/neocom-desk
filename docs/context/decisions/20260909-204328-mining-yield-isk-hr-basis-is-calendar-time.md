@@ -5,7 +5,7 @@ _Recorded 2026-09-09 · issue #671._
 - **ISK/hr is total value divided by wall-clock hours across the covered date
   range (earliest to latest date with a mining entry, inclusive, at 24h/day)
   — not active mining time.** ESI's personal mining ledger has no intra-day
-  timestamp (CONTEXT.md's Mining Ledger Entry), so there is no data to
+  timestamp (GLOSSARY.md's Mining Ledger Entry), so there is no data to
   measure an actual mining session's length from. The ticket's acceptance
   criteria ask for "ISK/hr" without defining a basis, and no human was in the
   loop to ask. Inventing a fixed "hours played per mining day" constant would

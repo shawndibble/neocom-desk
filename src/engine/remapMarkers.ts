@@ -1,5 +1,5 @@
 /**
- * Remap Marker (CONTEXT.md) position math that the Skill Plan schedule needs:
+ * Remap Marker (GLOSSARY.md) position math that the Skill Plan schedule needs:
  * a marker at entry-list position p means "remap before entries[p]". Lives in
  * the engine (not planner/markers.ts, which also carries the drag helpers) so
  * `skillPlanSchedule.ts` can use it and stay pure.

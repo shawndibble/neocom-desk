@@ -1,5 +1,5 @@
 /**
- * Variations (CONTEXT.md round 6): the selected item's Tech I/II/Faction/
+ * Variations (GLOSSARY.md round 6): the selected item's Tech I/II/Faction/
  * Storyline/Officer variation group (src/engine/market/variations.ts),
  * falling back to its Market Group siblings when the item has no variation
  * data — e.g. plain commodities/minerals with no meta variants. Pure and

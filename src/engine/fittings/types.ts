@@ -93,7 +93,7 @@ export interface FittingImplantSet {
 }
 
 /**
- * One ship hull plus everything loaded into it (CONTEXT.md **Fitting**).
+ * One ship hull plus everything loaded into it (GLOSSARY.md **Fitting**).
  * `implantSet`, when carried, is the implants and boosters its stats are
  * stated on (`defaultImplantBasis`); `undefined` means stats fall back to
  * the active Character's clone via `PilotProfile` instead.
@@ -123,7 +123,7 @@ export interface Fitting {
  * switching to a Fitting's own carried set.
  */
 export interface PilotProfile {
-  /** Effective Skill Level (CONTEXT.md) per skill type id. Missing = untrained. */
+  /** Effective Skill Level (GLOSSARY.md) per skill type id. Missing = untrained. */
   skillLevels: Map<number, number>;
   /** Type ids of the implants in play, EVE's own implant-slot order. */
   implantTypeIds: readonly number[];
@@ -165,7 +165,7 @@ export interface PerDamageType {
 
 /**
  * The incoming damage mix EHP is measured against (a Damage Profile,
- * CONTEXT.md) — relative weights, not fractions; only the ratio matters. Our
+ * GLOSSARY.md) — relative weights, not fractions; only the ratio matters. Our
  * own shape rather than the engine's (ADR 0016: nothing here imports it).
  */
 export type DamageProfile = PerDamageType;

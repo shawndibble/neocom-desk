@@ -22,7 +22,7 @@ interface PlanHeaderProps {
   /** null when the plan has no valid entries to optimize. */
   badge: OptimizationBadge | null;
   /**
-   * The soonest not-yet-reached Plan Milestone (CONTEXT.md), or null when the
+   * The soonest not-yet-reached Plan Milestone (GLOSSARY.md), or null when the
    * plan has none still ahead — a reached or orphaned one never shows here
    * (`engine/skillPlanMilestones.ts`'s `nextMilestone`).
    */

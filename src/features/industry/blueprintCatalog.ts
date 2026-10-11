@@ -135,7 +135,7 @@ export function searchByProductName(
  * keyed by that typeID — mirrors `byProductTypeID`'s first-wins shape.
  * Backs Assets' "View in Industry as material" action (issue #414): it
  * links off the character's own plans, not a full-SDE reverse index over
- * every blueprint in the game (CONTEXT.md round 49 — materials are matched
+ * every blueprint in the game (GLOSSARY.md round 49 — materials are matched
  * by SDE type against a Build Plan's own materials list).
  */
 export function buildPlansByMaterialTypeID(

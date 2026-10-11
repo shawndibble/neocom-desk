@@ -232,7 +232,7 @@ export function conditionalPagedFetch<T>(
 /**
  * How long a cached row is served without a live call. The window is a floor,
  * not a ceiling: `readFreshRow` takes whichever is later, this or ESI's own
- * `Expires` (issue #221 / CONTEXT.md round 25) — so an endpoint ESI caches for
+ * `Expires` (issue #221 / GLOSSARY.md round 25) — so an endpoint ESI caches for
  * an hour keeps that hour, while one it caches for 60s still holds for the
  * full 10 minutes the app promises.
  */

@@ -28,6 +28,6 @@ _Recorded 2026-10-04. Direct request from the pilot, from a UX review with mocku
 
 - **Payees as two-line rows.** Name on line one with the owed balance — Outstanding entries only, the same figure as the owed cards — (or Settled); rate, hub and the systems mined for them on line two. The add form hides behind "Add Payee". Deleting a Payee that is still owed offers to move its owed entries to another Payee (`moveAssignmentsToPayee`) or delete anyway, which leaves them as "Unknown Payee" as before.
 
-- **"Combine" is the word.** The UI said both "Join" and "Combine"; it now says Combine everywhere (the i18n keys keep their `join*` names). Added **Combined Entry** to `CONTEXT.md`.
+- **"Combine" is the word.** The UI said both "Join" and "Combine"; it now says Combine everywhere (the i18n keys keep their `join*` names). Added **Combined Entry** to `GLOSSARY.md`.
 
 - **Out of scope here:** the "Mining now" card (direction B, not chosen), split by share, bulk "Assign N to…", account-wide Payees.

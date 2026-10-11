@@ -50,7 +50,7 @@ _Recorded 2026-09-09 · issue #655._
 
 - **`stations.json` stays outside the install precache.** Moving it in would
   add ~540 KB to every install to serve surfaces that already degrade
-  gracefully without it, and would reverse CONTEXT.md round 10's deliberate
+  gracefully without it, and would reverse GLOSSARY.md round 10's deliberate
   exclusion of the whole market catalogue. The consequence, stated plainly
   rather than glossed: **this does not make station names work offline.**
   `src/sw.ts` has no runtime-caching route for `data/market/**` either, so a

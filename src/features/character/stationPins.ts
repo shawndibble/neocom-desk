@@ -1,5 +1,5 @@
 /**
- * Pure Station Pin state helpers (issue #84, CONTEXT.md §5.7 fan-out): cycling
+ * Pure Station Pin state helpers (issue #84, GLOSSARY.md §5.7 fan-out): cycling
  * a pin through unpinned -> character -> account -> unpinned, and deriving
  * one station's pin state for the currently active Character from the raw
  * pin records. The Dexie writes/tombstones themselves live in src/sync

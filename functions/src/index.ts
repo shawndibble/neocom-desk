@@ -170,7 +170,7 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
 
 /**
  * dispatchProjections: fires whatever is due (issue #358, ADR 0010,
- * CONTEXT.md round 45). Runs every 5 minutes, matching the Foreground
+ * GLOSSARY.md round 45). Runs every 5 minutes, matching the Foreground
  * Poller's own cadence (`POLL_INTERVAL_MS`). One of this deployment's two
  * Cloud Scheduler jobs — `purgeNotificationFeed` below is the other.
  *

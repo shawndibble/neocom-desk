@@ -166,7 +166,7 @@ not here): `activity.scopeRevoked`.
 ### Sync / Dexie impact
 
 **None.** No schema bump, no push/pull mapping. `TokenRecord.scopes` already exists and
-`esiCache` is API-derived and never synced (CONTEXT.md).
+`esiCache` is API-derived and never synced (GLOSSARY.md).
 
 ### New ESI scopes
 
@@ -549,7 +549,7 @@ a "just for debugging" field.
 
 Argument:
 
-1. **It is diagnostic device state, not Editable Data** (CONTEXT.md). It must never sync
+1. **It is diagnostic device state, not Editable Data** (GLOSSARY.md). It must never sync
    (`planSync.ts:436` excludes it automatically as long as it isn't a `sync.` setting — and
    it's not a setting at all).
 2. **Persisting it is user data at rest on a shared machine.** The log records that a character
@@ -735,7 +735,7 @@ per-route keys are what keep server strings out of the DOM; they are not optiona
 ### Sync / Dexie impact
 
 **None.** In-memory only: no `db.version(4)` bump, no new table, no push/pull mapping in
-`src/sync/`. The log is API-derived/device state, explicitly **not** Editable Data (CONTEXT.md),
+`src/sync/`. The log is API-derived/device state, explicitly **not** Editable Data (GLOSSARY.md),
 and must never reach Firebase — which is structurally guaranteed here because it never touches
 `db.settings` at all, so `planSync.ts:436`'s `sync.`-prefix filter is never even in play.
 Stating this plainly because the shared spec flags d90e417 as a known past miss: this item has

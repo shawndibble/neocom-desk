@@ -62,7 +62,7 @@ export function resolveOrderLocation(
 
 /**
  * Narrows an order book to one location_id: Trade Hub mode's own-station
- * filter (CONTEXT.md: "filters the rows down to the hub's own station") and
+ * filter (GLOSSARY.md: "filters the rows down to the hub's own station") and
  * the order-row "filter to this station" context-menu action share this
  * function. `null` passes every order through, for the context-menu action's
  * undo.
@@ -94,7 +94,7 @@ interface PricedOrder extends RawOrder {
   volume_remain: number;
 }
 
-/** Compare Set summary (CONTEXT.md "Compare"): best sell, best buy, spread and available volume for one item's order book. Pure; callers pass an already location-filtered order list. */
+/** Compare Set summary (GLOSSARY.md "Compare"): best sell, best buy, spread and available volume for one item's order book. Pure; callers pass an already location-filtered order list. */
 export function summarizeOrderBook<T extends PricedOrder>(orders: readonly T[]): OrderBookSummary {
   const { sell, buy } = splitOrderBook(orders);
   const bestSell = sell.length === 0 ? null : Math.min(...sell.map((o) => o.price));

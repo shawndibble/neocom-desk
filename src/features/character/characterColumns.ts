@@ -24,7 +24,7 @@ export const CHARACTER_COLUMN_IDS = [
   'pi',
   'spReady',
   'alerts',
-  // Last, always — CONTEXT.md's glossary reserves "pinned" for a planetary
+  // Last, always — GLOSSARY.md's glossary reserves "pinned" for a planetary
   // structure, so this is `starred` internally (same feature the card view's
   // star toggle already drives), header text says "Starred".
   'starred',

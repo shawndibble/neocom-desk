@@ -18,7 +18,7 @@ const KEY = 'corpRoles';
  * The Character's own corporation roles. ESI or cache, with the auth-failure
  * state exposed for parity with every other data module — though `useCorpAccess`
  * deliberately does not surface it: an unprovable role is simply no corp UI,
- * not an error (CONTEXT.md round 35).
+ * not an error (GLOSSARY.md round 35).
  */
 export function loadCharacterRoles(
   characterId: number

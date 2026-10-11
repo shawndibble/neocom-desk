@@ -20,7 +20,7 @@ import type { AppRoutePath } from './routeScopes';
  * - `scope`: an ordinary page; a missing grant marks it locked (never hidden,
  *   never disabled — the route's `ScopeGate` explains).
  * - `corp`: hidden, not locked, unless the Character's Corp Access is ready and
- *   its corporation known (CONTEXT.md round 35) — an amber dot would offer a
+ *   its corporation known (GLOSSARY.md round 35) — an amber dot would offer a
  *   re-login for a role only CCP can grant.
  * - `ungated`: needs no scope at all (routeScopes.ts `UNGATED`).
  */

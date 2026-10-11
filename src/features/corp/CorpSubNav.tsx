@@ -24,7 +24,7 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
  * approximating them.
  *
  * No lock markers, unlike `OverviewSubNav`. Corp views hide rather than lock
- * (CONTEXT.md round 35), and this whole nav renders only for a Character whose
+ * (GLOSSARY.md round 35), and this whole nav renders only for a Character whose
  * Corp Access is `ready` — so there is no locked state left for an entry here
  * to mark.
  *

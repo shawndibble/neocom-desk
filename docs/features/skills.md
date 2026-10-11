@@ -11,7 +11,7 @@ Skills section. Four routed views under one nav entry (`src/app/navDestinations.
 | Certificates | `/skills/certificates`  | `src/routes/SkillCertificates.tsx`                   | CCP combat Certificates graded per Character           |
 | Legacy       | `/skills/ships`         | `LegacyShipsRedirect`                                | Redirects to Ship Tree (see ships.md)                  |
 
-Terms per `CONTEXT.md`: Skill Plan, Plan Milestone, Certified Plan, Optimize Modes, Remap, Booster, What-If Implants, Effective Skill Level, Clone State.
+Terms per `GLOSSARY.md`: Skill Plan, Plan Milestone, Certified Plan, Optimize Modes, Remap, Booster, What-If Implants, Effective Skill Level, Clone State.
 
 Data sources (all views)
 

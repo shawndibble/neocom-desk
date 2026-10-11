@@ -8,7 +8,7 @@
  * user cannot grant and re-authing cannot change. Painting a login button over
  * it is the `ReauthBanner`-over-a-403 failure `ScopeGate.tsx` warns about, made
  * routine — and the corp surfaces hide rather than lock precisely to avoid it
- * (CONTEXT.md round 35).
+ * (GLOSSARY.md round 35).
  *
  * So: the role gate is subtracted, and everything the shared rule would still
  * have called an auth failure — a 401, or a token refresh that itself failed —

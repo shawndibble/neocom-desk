@@ -1,5 +1,5 @@
 /**
- * The cross-device store of every **Stock List** (CONTEXT.md). A synced
+ * The cross-device store of every **Stock List** (GLOSSARY.md). A synced
  * setting rather than a synced collection — see `sync.stockLists` in
  * `src/sync/syncedSettings.ts` for why. The edits themselves are pure, in
  * `engine/stockTargets/stockLists.ts`.

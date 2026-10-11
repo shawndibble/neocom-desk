@@ -1,5 +1,5 @@
 /**
- * Starred Characters (CONTEXT.md): the Characters the user has pinned to the
+ * Starred Characters (GLOSSARY.md): the Characters the user has pinned to the
  * top of the Characters page. Device-local, like the groupings they sort
  * inside — a star is a statement about the roster rather than about any one
  * Character, so it cannot live under a single Character's sync scope, and EVE

@@ -11,7 +11,7 @@
  *
  * `adjustedPrices`/`systemCostIndex` are `null` only when the live ESI call
  * itself failed with nothing inside its TTL to answer instead — a persisted
- * row is never served past its TTL as a stale fallback (CONTEXT.md: "Data Age").
+ * row is never served past its TTL as a stale fallback (GLOSSARY.md: "Data Age").
  * That is the app's offline signal for price-dependent Build Plan results;
  * hub prices never signal offline this way (src/market/prices.ts already
  * degrades unreachable Fuzzwork to per-type nulls, not a throw).

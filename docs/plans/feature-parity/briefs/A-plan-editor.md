@@ -607,7 +607,7 @@ juggling drag handles, Remap Markers, and remove buttons —
   decide: recompute marker positions, warn, or disable grouping while markers
   exist. This is the sharpest hidden risk in item 08.
 - Grouping is described as a "toggle" (a view mode) but any accept-and-apply
-  path rewrites `plan.entries`. CONTEXT.md is explicit that "reorder never
+  path rewrites `plan.entries`. GLOSSARY.md is explicit that "reorder never
   applies silently" — so grouping must be either purely visual, or an
   accept/reject preview like `reorderPreview` (`PlanEditor.tsx:537-558`).
 

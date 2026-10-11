@@ -1,5 +1,5 @@
 /**
- * The one badge every Open Orders row carries (CONTEXT.md's redesigned
+ * The one badge every Open Orders row carries (GLOSSARY.md's redesigned
  * Market > Open Orders tab). Colour marks **scope** only — station (danger),
  * system (warning), region (accent) — per docs/DESIGN.md §7's "colour is
  * never the only signal": every badge shows its own words too, and a kind

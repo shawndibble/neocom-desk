@@ -2,21 +2,21 @@
 
 _Recorded 2026-09-04._
 
-- **`CONTEXT.md` is the glossary and nothing else.** Its 21 `Glossary (round N
+- **`GLOSSARY.md` is the glossary and nothing else.** Its 21 `Glossary (round N
 additions)` headings are folded into a single `## Glossary` list, so a new
   term is inserted among its peers rather than appended after the last one.
   All 66 terms are carried over verbatim.
 - **Scope decisions live one per file in `docs/context/decisions/`.** The 54
   `Scope decisions (round N)` sections that used to sit at the bottom of
-  `CONTEXT.md` are now 54 files. Every heading, bullet and `###` subsection is
+  `GLOSSARY.md` are now 54 files. Every heading, bullet and `###` subsection is
   carried over unchanged; the `round N` titles survive as each file's `#`
-  heading, so the `(CONTEXT.md round 12)` comments already in
+  heading, so the `(GLOSSARY.md round 12)` comments already in
   `scripts/build-sde.mjs` and `docs/ARCHITECTURE.md` still resolve by grep.
   Those comments are deliberately left alone.
 - **Why: the old layout conflicted structurally, not occasionally.** Several
   `/next-ticket` agents work this repo at once, and each finished ticket
   appended a new section to the same last line of one file. Git has no way to
-  merge that. `CONTEXT.md` had 66 modifications and needed dedicated
+  merge that. `GLOSSARY.md` had 66 modifications and needed dedicated
   conflict-resolution commits (`d4ab05d`, `a88733e`). Distinct new paths merge
   without a conflict, which is the whole mechanism.
 - **Filenames are timestamps, never sequence numbers**:

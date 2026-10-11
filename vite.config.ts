@@ -314,7 +314,7 @@ export default defineConfig({
         // The Market Browser's catalogue (~1.2 MB: market groups, market
         // types, solar systems, NPC stations, market regions) is fetched
         // lazily on first visit to /market instead — most installs never
-        // open it, so an install should not pay for it up front (CONTEXT.md).
+        // open it, so an install should not pay for it up front (GLOSSARY.md).
         // The dogma engine's WASM binary and its SDE data file (ADR 0016,
         // ~10 MB together) are fetched lazily on first Fitting open instead —
         // same reasoning as the market catalogue above.

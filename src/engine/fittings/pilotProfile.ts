@@ -2,7 +2,7 @@ import type { PilotProfile } from './types';
 
 /**
  * A profile from the active Character: skills at Effective Skill Level
- * (CONTEXT.md) and the implants in the active clone. Copies the skills map
+ * (GLOSSARY.md) and the implants in the active clone. Copies the skills map
  * so the profile is a snapshot, not a live view onto the caller's data.
  * `boosterTypeIds` is always empty here — see `PilotProfile`'s own doc.
  */

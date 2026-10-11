@@ -1,5 +1,5 @@
 /**
- * What a drag-and-drop on the merged entry list means (#112 rows, CONTEXT.md
+ * What a drag-and-drop on the merged entry list means (#112 rows, GLOSSARY.md
  * "Prereq Promotion").
  *
  * Two things live here that markers.ts's `reorderRows` cannot express:

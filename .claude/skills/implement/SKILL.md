@@ -8,7 +8,7 @@ Implement the work described in the spec or ticket you were given. Do not reopen
 ## Beats, in order
 
 1. Explore in a **sub-agent** (`Agent`, `subagent_type: general-purpose`):
-   read the ticket or spec, `CONTEXT.md` for domain vocabulary,
+   read the ticket or spec, `GLOSSARY.md` for domain vocabulary,
    `docs/context/decisions/` (grep it — one file per past scope decision) and
    `docs/adr/`
    for decisions that touch the code you're changing, and the existing code

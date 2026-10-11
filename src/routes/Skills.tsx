@@ -307,7 +307,7 @@ export function Skills() {
     return buildSkillRequirements(catalog, trainedSkillsMap, selectedSkillTypeID);
   }, [selectedSkillTypeID, catalog, trainedSkillsMap]);
 
-  // All groups start collapsed on every load (CONTEXT.md round 17); nothing
+  // All groups start collapsed on every load (GLOSSARY.md round 17); nothing
   // seeds this set from a previous visit.
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(() => new Set());
   const [groupSearch, setGroupSearch] = useUrlParam('groupSearch', GROUP_SEARCH_PARAM);

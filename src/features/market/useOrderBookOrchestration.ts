@@ -189,7 +189,7 @@ export interface OrderBookOrchestration {
    */
   headerScopeSummary: OrderBookSummary | undefined;
 
-  /** Bypasses every TTL cache for what's on screen, then bumps `refreshTick` (CONTEXT.md "Data Age"). */
+  /** Bypasses every TTL cache for what's on screen, then bumps `refreshTick` (GLOSSARY.md "Data Age"). */
   refresh: () => void;
 }
 
@@ -237,7 +237,7 @@ export function useOrderBookOrchestration({
   const [myOrderIds, setMyOrderIds] = useState<ReadonlySet<number>>(new Set());
   const [sellShowAll, setSellShowAll] = useState(false);
   const [buyShowAll, setBuyShowAll] = useState(false);
-  // The order row context menu's "filter to this station" action (CONTEXT.md
+  // The order row context menu's "filter to this station" action (GLOSSARY.md
   // round 10); undone via the banner rendered above the tables. URL-backed
   // (ADR 0015), scoped to the Browser tab.
   const [stationFilter, setStationFilter] = useUrlParam('browser.station', STATION_FILTER_PARAM);
@@ -457,7 +457,7 @@ export function useOrderBookOrchestration({
   ]);
 
   // Location Mode, Trade Hub station, the order-row "filter to this station"
-  // action (CONTEXT.md round 10), the filter bar, split and sort all happen
+  // action (GLOSSARY.md round 10), the filter bar, split and sort all happen
   // in the view.
   // A fan-out (All regions, or a range) with no region catalogue has no
   // "every region" to read: a failed book (with its retry), not a spinner
@@ -594,7 +594,7 @@ export function useOrderBookOrchestration({
   const jumpNoteShown =
     rangeSet && (jumpRangeFilter.status === 'no-origin' || jumpRangeFilter.status === 'unknown');
 
-  // Variations (CONTEXT.md round 6): the selected item's Tech/Meta/Faction
+  // Variations (GLOSSARY.md round 6): the selected item's Tech/Meta/Faction
   // variation group, falling back to Market Group siblings, re-anchored
   // whenever selectedItem changes — including a click on a row itself, which
   // just becomes the new selectedItem.
@@ -695,7 +695,7 @@ export function useOrderBookOrchestration({
     variationCache.reset,
   ]);
 
-  // Manual refresh must bypass getOrderBook's 300s TTL cache (CONTEXT.md
+  // Manual refresh must bypass getOrderBook's 300s TTL cache (GLOSSARY.md
   // "Data Age": refresh happens on app open + manual button only) — scoped
   // to what's actually on screen (the selected item, plus the Variations
   // table rows beneath it, which reuse this same tick to refetch their own

@@ -1,6 +1,6 @@
 # Assets — feature inventory
 
-Route `/assets/*` (`src/routes/Assets.tsx`): tabs Items (`/assets/items`, drill-down `/assets/items/:stationId/*`), Ships (`/assets/ships`, `features/character/MyShipsView.tsx`) and Move (`/assets/move`, `features/assets/MovePlanTab.tsx`). Economy nav group, mobile tab (`src/app/navDestinations.ts:205`). A tabbed page (`ASSETS_TABS`, Items is `deep`): depth is drill-down in the URL path below Items. Old `/assets/<id>/…` and `/assets?view=ships` redirect via `legacyAssetsLocation`. Read-only, cached for offline. Terms per `CONTEXT.md`: **Quickbar**, **Compare Set**, **Station Pin**, **Jump Basis**, **BPO/BPC**, **Character filter**.
+Route `/assets/*` (`src/routes/Assets.tsx`): tabs Items (`/assets/items`, drill-down `/assets/items/:stationId/*`), Ships (`/assets/ships`, `features/character/MyShipsView.tsx`) and Move (`/assets/move`, `features/assets/MovePlanTab.tsx`). Economy nav group, mobile tab (`src/app/navDestinations.ts:205`). A tabbed page (`ASSETS_TABS`, Items is `deep`): depth is drill-down in the URL path below Items. Old `/assets/<id>/…` and `/assets?view=ships` redirect via `legacyAssetsLocation`. Read-only, cached for offline. Terms per `GLOSSARY.md`: **Quickbar**, **Compare Set**, **Station Pin**, **Jump Basis**, **BPO/BPC**, **Character filter**.
 
 Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row components and tree engine; pointer only, see end.
 

@@ -154,7 +154,7 @@ export interface RegisterDeviceOptions {
  * both ordinary, non-exceptional states.
  *
  * `projectionsByCharacter` is this call's Scheduled Push upload (issue #358,
- * ADR 0010, CONTEXT.md round 45): each Character's whole 72-hour Projection
+ * ADR 0010, GLOSSARY.md round 45): each Character's whole 72-hour Projection
  * window, replacing whatever this device previously uploaded for that
  * Character wholesale — never another device's rows (issue #2240).
  * A Character with no entry here (the default, an empty map) uploads an empty

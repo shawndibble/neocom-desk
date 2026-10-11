@@ -138,7 +138,7 @@ describe('missingCorpScopes', () => {
   });
 
   /**
-   * #330's scope decision (CONTEXT.md round 44): `canReadAssets` claims
+   * #330's scope decision (GLOSSARY.md round 44): `canReadAssets` claims
    * `read_divisions` too, not just `canReadWallet`, so this map does not lie
    * about what a division-first assets surface actually needs. It costs no
    * one a re-grant — every Director (the only role `canReadAssets` answers

@@ -1,7 +1,7 @@
 /**
  * "Has this device already been offered install" — a plain (non-`sync.`) key:
  * device state, not Editable Data. Install-prompt permission is inherently
- * per-device (CONTEXT.md round 20).
+ * per-device (GLOSSARY.md round 20).
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 

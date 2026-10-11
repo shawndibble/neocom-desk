@@ -1,7 +1,7 @@
 import type { SecurityBand } from '@/engine/securityStatus';
 
 /**
- * Trade Hub constants for Build Plan price lookups (CONTEXT.md, ADR 0002).
+ * Trade Hub constants for Build Plan price lookups (GLOSSARY.md, ADR 0002).
  * Station/system/region IDs verified against ESI
  * (/universe/stations/{id}, /universe/systems/{id}, /universe/regions/{id})
  * 2026-08-29.
@@ -101,7 +101,7 @@ export const TRADE_HUBS: readonly TradeHub[] = [
   },
 ] as const;
 
-/** Default Trade Hub for a fresh Build Plan (CONTEXT.md: "Jita 4-4 (default)"). */
+/** Default Trade Hub for a fresh Build Plan (GLOSSARY.md: "Jita 4-4 (default)"). */
 export const DEFAULT_TRADE_HUB: TradeHub = TRADE_HUBS[0];
 
 export function getTradeHub(id: string): TradeHub | undefined {

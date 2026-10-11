@@ -98,7 +98,7 @@ interface RemoteCollectionBase {
 }
 
 /**
- * One piece of Editable Data (CONTEXT.md) synced record-by-record:
+ * One piece of Editable Data (GLOSSARY.md) synced record-by-record:
  * last-write-wins per id, deletions carried by tombstones (merge.ts).
  *
  * Mappings are method signatures on purpose, so a typed declaration can sit

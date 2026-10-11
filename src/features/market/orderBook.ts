@@ -47,7 +47,7 @@ function cacheKey(regionId: number, typeId: number): string {
 
 /**
  * Manual refresh bypasses the TTL — "Data Age: refresh on app open + manual
- * button only" (CONTEXT.md). Scoped to one region/item when both are given,
+ * button only" (GLOSSARY.md). Scoped to one region/item when both are given,
  * so refreshing the selected item doesn't force every other open Compare
  * row to refetch too; called with neither, it clears everything (tests, and
  * any future full-reset caller).

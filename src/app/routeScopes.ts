@@ -59,7 +59,7 @@ export const ROUTE_REQUIREMENTS = {
   // queue carries levels /skills has not caught up to — but a plan still
   // edits and still schedules without any of it.
   '/skills/plans': UNGATED,
-  // Plan editor, its own route off the list (CONTEXT.md round 17). Same
+  // Plan editor, its own route off the list (GLOSSARY.md round 17). Same
   // reasoning as the list above — nothing here needs a scope to function.
   '/skills/plans/:planId': UNGATED,
   // Reads each compared character's already-cached skills endpoint (same one
@@ -128,7 +128,7 @@ export const ROUTE_REQUIREMENTS = {
    * Corp data is gated on a second axis this table cannot express: CCP
    * role-gates the endpoints server-side, so a Character can hold every corp
    * scope and still take a permanent 403. `useCorpAccess` is that gate, and it
-   * *hides* rather than locks (CONTEXT.md round 35). Declaring the corp
+   * *hides* rather than locks (GLOSSARY.md round 35). Declaring the corp
    * endpoints here would put a `ReauthBanner` in front of a `roles-without-grant`
    * Character — offering a re-login for a grant the `CorpGrantPrompt` and the
    * Settings Corporation Permission row exist to ask for properly — and in front of a
@@ -216,7 +216,7 @@ export const ROUTE_REQUIREMENTS = {
   // Deliberately does not list getCharacterSkills, even though the loader
   // reads it for the cooldown's Infomorph Synchronizing level: skills is a
   // secondary enhancement here, and gating the whole tab on it would repeat
-  // the mistake round 4 already ruled out for multi-scope pages (CONTEXT.md
+  // the mistake round 4 already ruled out for multi-scope pages (GLOSSARY.md
   // "Missing-scope handling"). A character without the skills grant still
   // sees clones/locations/implants; the cooldown just degrades to the
   // untrained (24h) estimate instead of erroring.

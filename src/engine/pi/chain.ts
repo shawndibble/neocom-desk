@@ -5,7 +5,7 @@
  *
  * ## Why this recurses when `recipeInputs` deliberately does not
  *
- * CONTEXT.md round 29 fixed `features/industry/recipes.ts` at **one level
+ * GLOSSARY.md round 29 fixed `features/industry/recipes.ts` at **one level
  * deep**, and `engine/industry/makeOrBuy.ts` prices a planetary material from
  * its inputs at the hub with no customs tax at all. Both are right for what
  * they answer: a Build Plan material row asks "is making this one material

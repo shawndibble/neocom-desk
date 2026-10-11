@@ -54,7 +54,7 @@ export interface MoonMiningTaxSnapshot {
    * Tracked characters whose ledger read needed a re-login this refresh —
    * per character, not one flag OR'd across all of them, so a single lapsed
    * alt's obligation cannot go missing behind the other characters' data
-   * looking fine (CONTEXT.md: "the point of the feature is not missing an
+   * looking fine (GLOSSARY.md: "the point of the feature is not missing an
    * alt's obligation").
    */
   reauthCharacters: TrackedCharacter[];

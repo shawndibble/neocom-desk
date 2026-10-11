@@ -11,7 +11,7 @@
  * `canReadMembers` maps to that one role (`engine/corpRoles.ts`) and an
  * Accountant gets nothing useful here at all. `/corp` degrades panel by panel
  * because its panels answer to four different roles; this page has exactly one
- * gate, so it hides whole (CONTEXT.md round 35) rather than rendering a shell
+ * gate, so it hides whole (GLOSSARY.md round 35) rather than rendering a shell
  * over a permission no login can grant.
  *
  * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are
@@ -243,7 +243,7 @@ function CorpMembersView() {
 
   // Search + dark-only/ship/location filters (issue #421, AC2/AC3):
   // AND-composed, same stacking rule as Mail's search-and-label filters
-  // (CONTEXT.md round 55). The stat strip's dark count stays computed from the
+  // (GLOSSARY.md round 55). The stat strip's dark count stays computed from the
   // full roster — only the table narrows.
   // All in the URL (ADR 0015); the dark *threshold* is a synced setting and
   // stays out of it.

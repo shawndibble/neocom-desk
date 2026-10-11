@@ -1,5 +1,5 @@
 /**
- * Plan Milestone (CONTEXT.md): a named goal ("Fly Loki") pinned to a plan
+ * Plan Milestone (GLOSSARY.md): a named goal ("Fly Loki") pinned to a plan
  * entry's skill level, anchored to a `StepKey` rather than a position — a
  * reorder or a removal changes the schedule's `stepByKey` map, never the
  * milestone's own identity, so a status computed here simply misses the

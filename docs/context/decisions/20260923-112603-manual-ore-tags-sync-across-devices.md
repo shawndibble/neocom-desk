@@ -13,7 +13,7 @@ _Recorded 2026-09-23._
   SDE-derived allowlists (`sde/loadSde.ts`) regardless of how often the SDE
   is rebuilt, so the tag is permanent for that pilot. Re-tagging the same
   type_id on every device they use is exactly the kind of repeated,
-  unnecessary confirmation Editable Data exists to avoid (CONTEXT.md). This
+  unnecessary confirmation Editable Data exists to avoid (GLOSSARY.md). This
   rules out leaving the lists as plain, unsynced Dexie keys.
 
 - **Two `sync.`-prefixed keys, not one blob.** Same independence the

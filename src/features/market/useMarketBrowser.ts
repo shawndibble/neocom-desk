@@ -4,7 +4,7 @@
  * preferences, and the Market Group tree's own search/expand state.
  *
  * The selected item and the current location are read from the URL
- * (CONTEXT.md round 7), not held in component state — the query string is
+ * (GLOSSARY.md round 7), not held in component state — the query string is
  * the single source of truth, so a shared link and the browser's own
  * back/forward both just work, and it's why `Market.tsx` reads this hook's
  * output at route level even while another tab is showing (this also backs

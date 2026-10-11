@@ -1,5 +1,5 @@
 /**
- * Pure Quickbar list editing helpers (CONTEXT.md): a flat, drag-ordered list
+ * Pure Quickbar list editing helpers (GLOSSARY.md): a flat, drag-ordered list
  * of saved item shortcuts, deduped by typeId. Reordering moves the active
  * item to sit at the target item's position, matching @dnd-kit's arrayMove.
  */

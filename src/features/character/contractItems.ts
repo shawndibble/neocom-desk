@@ -1,7 +1,7 @@
 /**
  * Contract item lines, fetched on demand when a contract's detail modal
  * opens (item_exchange/auction only — courier/loan contracts have none).
- * Same "read live from ESI on open" shape as Item Detail (CONTEXT.md round
+ * Same "read live from ESI on open" shape as Item Detail (GLOSSARY.md round
  * 6): baking every contract's items into the list fetch would pay for detail
  * nobody opens.
  */
