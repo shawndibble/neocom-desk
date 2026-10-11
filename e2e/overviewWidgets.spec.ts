@@ -88,6 +88,28 @@ test('Customize adds a widget from the Gallery', async ({ page }) => {
   await expect(cards).toHaveCount(4);
 });
 
+test('the Gallery list scrolls only up and down; the category row is the one that scrolls sideways', async ({
+  page,
+}) => {
+  await signInAndGoto(page, './overview', SCOPES, THREE);
+  await expect(card(page, 'Training')).toBeVisible(FIRST_LOAD);
+  await page.locator('main').getByRole('button', { name: 'Customize' }).click();
+  await page.getByRole('button', { name: /^Add widget$/ }).click();
+  const gallery = page.getByRole('dialog', { name: 'Add a widget' });
+  await expect(gallery).toBeVisible();
+  const sideways = await gallery.evaluate((root) =>
+    [root, ...root.querySelectorAll('*')]
+      .filter(
+        (el) => el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX !== 'hidden'
+      )
+      // sr-only helpers clip themselves; only scrollers matter
+      .filter((el) => !el.classList.contains('sr-only'))
+      .map((el) => el.getAttribute('role') ?? el.className.toString())
+  );
+  // Exactly one thing may scroll sideways: the category chips (role=group).
+  expect(sideways).toEqual(['group']);
+});
+
 test("a widget's menu offers its settings and closes on Escape", async ({ page }) => {
   await signInAndGoto(page, './overview', SCOPES, THREE);
   await expect(card(page, 'Wallet')).toBeVisible(FIRST_LOAD);

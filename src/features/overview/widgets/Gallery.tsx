@@ -323,7 +323,7 @@ function GalleryBody({
       {/* Pinned: the sheet's scroller pads its edges (hence the negative margins), the drawer's does not. */}
       <div
         className={cx(
-          'sticky z-10 grid gap-2.5 border-b border-line bg-panel px-3 pb-2.5',
+          'sticky z-10 grid grid-cols-[minmax(0,1fr)] gap-2.5 border-b border-line bg-panel px-3 pb-2.5',
           isPhone ? '-top-3 -mx-3 -mt-3 pt-3' : 'top-0 pt-3'
         )}
       >
@@ -340,7 +340,7 @@ function GalleryBody({
         <div
           role="group"
           aria-label={t('overview.gallery.categoriesLabel')}
-          className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:thin]"
+          className="relative -mx-3 flex min-w-0 gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:thin]"
         >
           {chips.map((chip) => (
             <FilterChip
