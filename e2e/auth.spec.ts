@@ -1,10 +1,12 @@
 import { test, expect } from './support/testBase';
-import { CHARACTER_NAME, WALLET_BALANCE_FORMATTED } from './support/fixtureData';
+import { CHARACTER_NAME } from './support/fixtureData';
 
 // A phone, per #1771: what a newbie's first login looks like.
 test.use({ viewport: { width: 390, height: 844 } });
 
-test('first login via mocked EVE SSO lands straight on the overview wallet', async ({ page }) => {
+test('first login via mocked EVE SSO lands straight on the first-run Overview', async ({
+  page,
+}) => {
   await page.goto('./');
   await expect(page).toHaveURL(/\/login$/);
   // Unlike RTL's getByText (exact by default), Playwright's matches
@@ -37,5 +39,7 @@ test('first login via mocked EVE SSO lands straight on the overview wallet', asy
   await page.waitForLoadState('load');
   await expect(page).toHaveURL(/\/overview$/);
   await expect(page.getByRole('heading', { name: CHARACTER_NAME })).toBeVisible();
-  await expect(page.getByText(`${WALLET_BALANCE_FORMATTED} ISK`)).toBeVisible();
+  // A first-ever login has no saved layout: the Overview asks what the pilot does
+  // in EVE before it draws any widget.
+  await expect(page.getByRole('heading', { name: /what do you do in eve/i })).toBeVisible();
 });

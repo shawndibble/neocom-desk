@@ -79,11 +79,16 @@ interface SeedPayload {
  * grant (e.g. Core Grant only) passes its own. `expiresAt` stays far in the
  * future regardless, so nothing in the app ever refreshes this token mid-test
  * and quietly widens the grant back via `installSsoMock`'s own default.
+ *
+ * `extraSettings` are more `settings` rows to seed, e.g. a saved Overview
+ * layout (`overviewLayoutSetting`); without one the Overview shows its
+ * first-run Role chooser.
  */
 export async function signInAndGoto(
   page: Page,
   path = './overview',
-  scopes: readonly string[] = SCOPES
+  scopes: readonly string[] = SCOPES,
+  extraSettings: readonly { key: string; value: unknown }[] = []
 ): Promise<void> {
   await page.route(`**/${BLANK_PATH}`, (route) =>
     route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>seed</title>' })
@@ -110,6 +115,7 @@ export async function signInAndGoto(
       { key: ACTIVE_CHARACTER_KEY, value: CHARACTER_ID },
       // Nothing hidden, so specs find every page.
       { key: 'sync.navHidden', value: [] },
+      ...extraSettings,
     ],
   };
 
@@ -141,4 +147,31 @@ export async function signInAndGoto(
   }, payload);
 
   await page.goto(path);
+}
+
+/** The `settings` row of a saved Overview layout; see `src/features/overview/widgets/layout.ts`. */
+export interface SeededWidget {
+  kind: string;
+  size?: 'S' | 'M' | 'L' | 'F';
+  view?: 'number' | 'chart' | 'list';
+}
+
+export function overviewLayoutSetting(widgets: readonly SeededWidget[]): {
+  key: string;
+  value: unknown;
+} {
+  return {
+    key: 'sync.overviewLayout',
+    value: {
+      version: 1,
+      widgets: widgets.map((widget, index) => ({
+        id: `w${index}`,
+        kind: widget.kind,
+        size: widget.size ?? 'M',
+        view: widget.view ?? 'number',
+        scope: 'header',
+        showOnPhone: true,
+      })),
+    },
+  };
 }

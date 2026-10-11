@@ -1,149 +1,151 @@
 /**
- * Overview board card's "Open" link touch target on a phone (issue #1070):
- * the link had no height class of its own, so its hit box was only its own
- * text/icon height (~16-17px) — well under the touch floor — even though
- * the header around it was already sized to the 44px touch tier. (`Panel`'s
- * `actions` wrapper div only hugs its content's height rather than
- * stretching to the header, so the link couldn't inherit that height for
- * free.) The fix adds `min-h-11 md:min-h-0` directly to the link: a 44px
- * floor below `md`, reset back to the original content-hugging height at
- * and above it, since desktop's box was never meant to grow.
+ * The Overview's widget grid and header geometry. Invariants, not pixels (CI's
+ * fonts are not this machine's): no overlap, no horizontal overflow, the
+ * header's controls one height, an Open link on the touch floor, and the grid's
+ * "four Small, three Medium, two Large across" rule at desktop width.
+ *
+ * A layout is seeded through the `sync.overviewLayout` settings row; without
+ * one the Overview shows its first-run prompt (see overviewWidgets.spec.ts).
  */
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { signInAndGoto } from './support/authSeed';
-import { CHARACTER_ID } from './support/fixtureData';
-import { expireCachedEsiRows, goExternallyOffline } from './support/login';
+import { overviewLayoutSetting, signInAndGoto, type SeededWidget } from './support/authSeed';
+import { CHARACTER_ID, SCOPES } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
+const HOUR_MS = 60 * 60 * 1000;
+const FIRST_LOAD_MS = 20_000;
 
-test('board card "Open" link meets the 44px touch floor at 390px', async ({ page }) => {
-  await page.setViewportSize(PHONE);
-  await signInAndGoto(page, './overview');
+/** Distinct kinds, enough to fill two rows of four. */
+const KINDS = [
+  'training',
+  'sp',
+  'location',
+  'wallet',
+  'orders',
+  'industry',
+  'mail',
+  'comingUp',
+  'contracts',
+  'planetary',
+  'structures',
+  'miningTax',
+] as const;
 
-  // Every board card's link shares this label — one is enough per the AC
-  // ("for at least one board card"), so the first rendered card's is fine.
-  const openLink = page.getByRole('link', { name: 'Open' }).first();
+function layoutOf(size: SeededWidget['size'], count: number) {
+  return overviewLayoutSetting(KINDS.slice(0, count).map((kind) => ({ kind, size })));
+}
+
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+async function cardBoxes(page: Page, count: number): Promise<Box[]> {
+  const cards = page.locator('main section[aria-label]');
+  // The first load on a cold dev server is slow; later assertions use the default budget.
+  await expect(cards).toHaveCount(count, { timeout: FIRST_LOAD_MS });
+  const boxes: Box[] = [];
+  for (let i = 0; i < count; i += 1) boxes.push((await cards.nth(i).boundingBox())!);
+  return boxes;
+}
+
+/** How many cards share the first card's row. */
+function firstRowCount(boxes: readonly Box[]): number {
+  return boxes.filter((box) => Math.abs(box.y - boxes[0].y) < 2).length;
+}
+
+function overlaps(a: Box, b: Box): boolean {
+  return (
+    a.x < b.x + b.width - 1 &&
+    b.x < a.x + a.width - 1 &&
+    a.y < b.y + b.height - 1 &&
+    b.y < a.y + a.height - 1
+  );
+}
+
+function expectNoOverlap(boxes: readonly Box[]): void {
+  for (let i = 0; i < boxes.length; i += 1) {
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      expect(overlaps(boxes[i], boxes[j]), `cards ${i} and ${j} overlap`).toBe(false);
+    }
+  }
+}
+
+async function hasHorizontalOverflow(page: Page): Promise<boolean> {
+  return page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+  );
+}
+
+async function seedAndOpen(
+  page: Page,
+  size: SeededWidget['size'],
+  count: number,
+  viewport: { width: number; height: number }
+) {
+  await page.setViewportSize(viewport);
+  await signInAndGoto(page, './overview', SCOPES, [layoutOf(size, count)]);
+  return cardBoxes(page, count);
+}
+
+for (const [size, across] of [
+  ['S', 4],
+  ['M', 3],
+  ['L', 2],
+  ['F', 1],
+] as const) {
+  test(`${across} ${size} widget${across > 1 ? 's' : ''} per row on a 1440px desktop`, async ({
+    page,
+  }) => {
+    const boxes = await seedAndOpen(page, size, 8, { width: 1440, height: 1000 });
+    expect(firstRowCount(boxes)).toBe(across);
+    expectNoOverlap(boxes);
+    expect(await hasHorizontalOverflow(page)).toBe(false);
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 900 },
+  { width: 1024, height: 768 },
+]) {
+  test(`Small widgets wrap without overflow or overlap at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    const boxes = await seedAndOpen(page, 'S', 8, viewport);
+    // Never more than four across; a narrower window wraps to fewer, not to a squeeze.
+    expect(firstRowCount(boxes)).toBeLessThanOrEqual(4);
+    expect(firstRowCount(boxes)).toBeGreaterThanOrEqual(2);
+    expectNoOverlap(boxes);
+    expect(await hasHorizontalOverflow(page)).toBe(false);
+  });
+}
+
+test('on a phone S sits two across, with no overflow', async ({ page }) => {
+  const small = await seedAndOpen(page, 'S', 6, PHONE);
+  expect(firstRowCount(small)).toBe(2);
+  expectNoOverlap(small);
+  expect(await hasHorizontalOverflow(page)).toBe(false);
+});
+
+test('on a phone M takes the whole row, with no overflow', async ({ page }) => {
+  const medium = await seedAndOpen(page, 'M', 4, PHONE);
+  expect(firstRowCount(medium)).toBe(1);
+  expectNoOverlap(medium);
+  expect(await hasHorizontalOverflow(page)).toBe(false);
+});
+
+test('a widget "Open" link meets the 44px touch floor at 390px', async ({ page }) => {
+  await seedAndOpen(page, 'S', 4, PHONE);
+  const openLink = page.getByRole('link', { name: /^Open .* page$/ }).first();
   await expect(openLink).toBeVisible();
-
-  // Polled: a card remounted as the board's reads land measures as a null box.
+  // Polled: a card remounted as its reads land measures as a null box.
   await expect
     .poll(async () => (await openLink.boundingBox())?.height ?? 0)
     .toBeGreaterThanOrEqual(44);
 });
-
-// Issue #1680: the cards|alerts split keys off the viewport, not the width the
-// sidebar leaves, so it starts at `xl` — below that the cards take the full row.
-for (const size of [
-  { width: 1024, height: 768 },
-  { width: 1180, height: 900 },
-]) {
-  test(`board cards do not truncate and alerts stack below at ${size.width}px`, async ({
-    page,
-  }) => {
-    await page.setViewportSize(size);
-    await signInAndGoto(page, './overview');
-    const opens = page.getByRole('link', { name: 'Open' });
-    await expect(opens.first()).toBeVisible();
-
-    const truncated = await page.locator('main').evaluate((main) =>
-      [...main.querySelectorAll<HTMLElement>('*')]
-        .filter((el) => el.children.length === 0 && el.scrollWidth > el.clientWidth + 1)
-        .filter((el) => getComputedStyle(el).textOverflow === 'ellipsis')
-        .map((el) => el.textContent)
-    );
-    expect(truncated).toEqual([]);
-
-    const alerts = await page
-      .locator('main')
-      .getByText('Alerts', { exact: true })
-      .first()
-      .boundingBox();
-    const firstCard = await opens.first().boundingBox();
-    expect(alerts!.y).toBeGreaterThan(firstCard!.y);
-  });
-}
-
-// The summary strip's three values need nearly all of its row from `sm` up
-// (about 600px at 700 with no sidebar, 775px at 1024 with one), so a font a
-// hair wider than this machine's (CI's) used to push one under its cell and
-// truncate the wallet's ten-figure balance. The row now wraps before any value
-// truncates; widening every glyph a little stands in for that other font, so
-// this holds on any machine rather than by font luck.
-for (const size of [
-  { width: 700, height: 900 },
-  { width: 1024, height: 768 },
-  { width: 1180, height: 900 },
-]) {
-  test(`summary strip wraps rather than truncating a value, even in a wider font, at ${size.width}px`, async ({
-    page,
-  }) => {
-    await page.setViewportSize(size);
-    await signInAndGoto(page, './overview');
-    // Labels keep their own wide tracking; only the values are widened.
-    await page.addStyleTag({
-      content: 'main section *:not(.uppercase) { letter-spacing: 0.04em !important; }',
-    });
-    const strip = page.locator('main section').first();
-    // Wallet and training arrive from separate reads — wait for both, or the
-    // check below could pass against a strip that is still half empty.
-    await expect(strip.getByText(/ISK$/)).toBeVisible();
-    const trainingCell = strip.locator('span.flex-col', {
-      has: page.getByText('Training now', { exact: true }),
-    });
-    // `.first()`: an idle queue now renders "Nothing in training" as a link
-    // (issue #1731), whose accessible name matches `getByRole('link')` while
-    // its own inner text node also matches `getByText` — two elements for
-    // one state, so the `.or()` needs a `.first()` to stay a single match.
-    await expect(
-      trainingCell.getByRole('link').or(trainingCell.getByText('Nothing in training')).first()
-    ).toBeVisible();
-
-    const truncated = await strip.evaluate((section) =>
-      [...section.querySelectorAll<HTMLElement>('*')]
-        .filter((el) => el.children.length === 0 && el.scrollWidth > el.clientWidth + 1)
-        .filter((el) => getComputedStyle(el).textOverflow === 'ellipsis')
-        .map((el) => el.textContent)
-    );
-    expect(truncated).toEqual([]);
-  });
-}
-
-for (const width of [1280, 1440]) {
-  test(`alerts column sits right of the cards at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await signInAndGoto(page, './overview');
-    const opens = page.getByRole('link', { name: 'Open' });
-    await expect(opens.first()).toBeVisible();
-
-    // The first row's second card is the rightmost domain card; later Open
-    // links include the Alerts panel's own, which would defeat the comparison.
-    const rightCard = await opens.nth(1).boundingBox();
-    const cardsRight = rightCard!.x + rightCard!.width;
-    const alerts = await page
-      .locator('main')
-      .getByText('Alerts', { exact: true })
-      .first()
-      .boundingBox();
-    expect(alerts!.x).toBeGreaterThan(cardsRight);
-  });
-}
-
-// Issue #1684: the strip's fixed empty answers used to be single-line
-// truncated to "Nothing on a cl..." at phone width.
-test('summary strip empty answers are not clipped at 390px', async ({ page }) => {
-  await page.setViewportSize(PHONE);
-  await signInAndGoto(page, './overview');
-
-  for (const text of ['Nothing on a clock', 'Nothing in training']) {
-    const value = page.locator('main').getByText(text, { exact: true }).first();
-    await expect(value).toBeVisible();
-    const clipped = await value.evaluate((el) => el.scrollWidth > el.clientWidth);
-    expect(clipped).toBe(false);
-  }
-});
-
-// Issue #1714: contracts on a clock feed the Next deadline strip and get a folded row.
-const HOUR_MS = 60 * 60 * 1000;
 
 function contractFixture(over: Record<string, unknown>) {
   return {
@@ -162,67 +164,58 @@ function contractFixture(over: Record<string, unknown>) {
   };
 }
 
-async function mockContracts(page: import('@playwright/test').Page, body: unknown[]) {
-  await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/contracts*`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
-  );
-}
-
-test('a courier due soon shows in the Contracts row and the next deadline at 390px', async ({
-  page,
-}) => {
-  await page.setViewportSize(PHONE);
-  await mockContracts(page, [
-    contractFixture({
-      contract_id: 7,
-      issuer_id: 1,
-      acceptor_id: CHARACTER_ID,
-      type: 'courier',
-      status: 'in_progress',
-      date_accepted: new Date(Date.now() - 67 * HOUR_MS).toISOString(),
-      days_to_complete: 3,
-    }),
-  ]);
-  await signInAndGoto(page, './overview');
-
-  const row = page.getByRole('link', { name: /^Contracts: 1 haul in progress/ });
-  await expect(row).toBeVisible();
-  await expect(row).toContainText(/next due (4h 5\d|5h 0)m/);
-  await expect(row).toHaveAttribute('href', /\/contracts\/history\?history\.status=in_progress$/);
-  await expect(page.getByText(/^Courier due/).first()).toBeVisible();
-});
-
-test('long-dated listings leave the Contracts row at "Nothing due" at 390px', async ({ page }) => {
-  await page.setViewportSize(PHONE);
-  await mockContracts(
+for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
+  test(`the header's controls are one height, with the bell top right, at ${viewport.width}px`, async ({
     page,
-    Array.from({ length: 12 }, (_, i) =>
-      contractFixture({
-        contract_id: 100 + i,
-        date_expired: new Date(Date.now() + (5 + i) * 24 * HOUR_MS).toISOString(),
+  }) => {
+    // A courier due soon gives the Next deadline button something to show.
+    await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/contracts*`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          contractFixture({
+            contract_id: 7,
+            issuer_id: 1,
+            acceptor_id: CHARACTER_ID,
+            type: 'courier',
+            status: 'in_progress',
+            date_accepted: new Date(Date.now() - 67 * HOUR_MS).toISOString(),
+            days_to_complete: 3,
+          }),
+        ]),
       })
-    )
-  );
-  await signInAndGoto(page, './overview');
+    );
+    await page.setViewportSize(viewport);
+    await signInAndGoto(page, './overview', SCOPES, [
+      overviewLayoutSetting([{ kind: 'contracts', size: 'M' }]),
+    ]);
 
-  await expect(page.getByRole('link', { name: 'Contracts: Nothing due' })).toBeVisible();
-});
+    const main = page.locator('main');
+    const next = main.getByRole('link', { name: /^Next/ });
+    const customize = main.getByRole('button', { name: 'Customize' });
+    const bell = main.getByRole('button', { name: /^Alerts/ });
+    await expect(next).toBeVisible({ timeout: FIRST_LOAD_MS });
+    await expect(customize).toBeVisible();
+    // The header has no Refresh and no Character switcher.
+    await expect(main.getByRole('button', { name: 'Refresh' })).toHaveCount(0);
+    await expect(main.getByRole('button', { name: /^Character:/ })).toHaveCount(0);
 
-// Issue #1794: the strip's age badge is hidden below `md`, so a stale board
-// looked identical to a fresh one on a phone. It says so itself now.
-test('summary strip says the data is cached on a phone when offline with stale data', async ({
-  page,
-}) => {
-  await page.setViewportSize(PHONE);
-  await signInAndGoto(page, './overview');
-  // The wallet lands last of the reads the strip ages, so waiting on it means
-  // every one of them is in the ESI cache before it is expired below.
-  await expect(page.getByText(/1,234,567,890\.12 ISK/)).toBeVisible();
-  await expect(page.getByText(/Showing cached data/)).toHaveCount(0);
+    const boxes = {
+      next: (await next.boundingBox())!,
+      customize: (await customize.boundingBox())!,
+      bell: (await bell.boundingBox())!,
+    };
+    expect(Math.abs(boxes.next.height - boxes.customize.height)).toBeLessThan(1);
+    expect(Math.abs(boxes.bell.height - boxes.customize.height)).toBeLessThan(1);
+    if (viewport.width < 768) expect(boxes.customize.height).toBeGreaterThanOrEqual(44);
+    // Next and Customize share a row; the bell sits above it, at the right, not wrapped under.
+    expect(Math.abs(boxes.next.y - boxes.customize.y)).toBeLessThan(2);
+    expect(boxes.bell.y + boxes.bell.height).toBeLessThanOrEqual(boxes.next.y + 1);
+    expect(boxes.bell.x).toBeGreaterThan(boxes.customize.x);
 
-  await goExternallyOffline(page);
-  await expireCachedEsiRows(page);
-  await page.reload();
-
-  await expect(page.getByText(/Showing cached data · \d+[mhd] ago/)).toBeVisible();
-});
+    // The button goes where the clock lives.
+    await expect(next).toHaveAttribute('href', /\/contracts/);
+    expect(await hasHorizontalOverflow(page)).toBe(false);
+  });
+}
