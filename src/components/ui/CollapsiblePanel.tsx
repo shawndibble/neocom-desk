@@ -4,6 +4,7 @@ import { IconButton } from './IconButton';
 import { Panel } from './Panel';
 
 interface CollapsiblePanelProps {
+  /** @summary Already-translated panel heading. */
   title: string;
   /** The one-line read shown beside the title whether open or closed. */
   meta?: ReactNode;
@@ -13,7 +14,9 @@ interface CollapsiblePanelProps {
   metaOwnRow?: boolean;
   /** Header controls other than the caret; always visible. */
   actions?: ReactNode;
+  /** @summary Whether the body is open; the caller owns this state. */
   expanded: boolean;
+  /** @summary Called when the caret is pressed. */
   onToggle: () => void;
   /** Accessible names for the caret in each state. */
   labels: { show: string; hide: string };
@@ -53,6 +56,8 @@ interface CollapsiblePanelProps {
  * `collapsedSummary` is the exception, and the only thing a folded panel
  * renders in its body — a handful of figures standing in for the detail, so
  * the fold costs a reader the breakdown rather than the answer.
+ *
+ * @summary A `Panel` whose body folds away behind a caret; the header keeps title, meta and actions.
  */
 export function CollapsiblePanel({
   title,

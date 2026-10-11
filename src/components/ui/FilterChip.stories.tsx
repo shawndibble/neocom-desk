@@ -2,36 +2,30 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { FilterChip } from './FilterChip';
 
-/**
- * @summary Independent on/off filter toggle (`aria-pressed`). §6c States, Selected: a toggle takes the accent tint. Not for "exactly one of" (`SegmentedControl`).
- */
 const meta = {
   title: 'ui/FilterChip',
   component: FilterChip,
   tags: ['autodocs'],
-  args: { label: 'Frigates', selected: false, onToggle: () => {} },
+  args: { label: 'Unread', selected: false, onToggle: () => {} },
   render: function Render(args) {
     const [selected, setSelected] = useState(args.selected);
-    return <FilterChip {...args} selected={selected} onToggle={() => setSelected(!selected)} />;
+    return <FilterChip {...args} selected={selected} onToggle={() => setSelected((s) => !s)} />;
   },
 } satisfies Meta<typeof FilterChip>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Off. */
+/** @summary Off: hairline border. Click to turn it on. */
 export const Off: Story = {};
 
-/** @summary On: accent tint, distinct from hover (§6c States: selected must never look like hover). */
+/** @summary On: accent tint, `aria-pressed`. */
 export const On: Story = { args: { selected: true } };
 
-/** @summary `count` shows how many rows the filter matches. */
-export const WithCount: Story = { args: { selected: true, count: 12, countLabel: 'matching' } };
+/** @summary A match count after the label, with a screen-reader gloss saying what it counts. */
+export const WithCount: Story = { args: { count: 3, countLabel: 'unread' } };
 
-/** @summary Disabled with a reason (§6c States, Disabled): `aria-disabled` plus a tooltip instead of the native attribute. */
+/** @summary Disabled with a tooltip giving the reason; stays hoverable. */
 export const DisabledWithReason: Story = {
-  args: { disabled: true, tooltip: 'No frigates in this list' },
+  args: { disabled: true, tooltip: 'Needs the Director role.' },
 };
-
-/** @summary Plain disabled: `opacity-40` and `cursor-not-allowed`. */
-export const Disabled: Story = { args: { disabled: true } };
