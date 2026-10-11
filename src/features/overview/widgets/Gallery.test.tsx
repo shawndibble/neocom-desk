@@ -123,7 +123,7 @@ describe('Gallery', () => {
       within(facts)
         .getAllByRole('listitem')
         .map((li) => li.textContent)
-    ).toEqual(['Number', 'Chart', 'List', 'Size L']);
+    ).toEqual(['Number', 'Chart', 'Table', 'Size M']);
   });
 
   it('adds a kind, confirms it, and offers Add another', async () => {
