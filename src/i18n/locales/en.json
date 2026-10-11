@@ -3735,6 +3735,198 @@
       "contractsDueTile": "Due < 24h",
       "everythingElse": "Everything else",
       "foldedRowLabel": "{{domain}}: {{summary}}"
+    },
+    "widgets": {
+      "training": {
+        "title": "Training",
+        "description": "The skill training now, its time left and the queue",
+        "empty": "Your skill queue is empty.",
+        "skillLevel": "{{name}} {{level}}",
+        "now": "Training now",
+        "next": "Next",
+        "idle": "Idle"
+      },
+      "sp": {
+        "title": "Skill points",
+        "description": "Total and unallocated SP, and what you could extract",
+        "empty": "Skill points have not loaded yet.",
+        "unit": "SP"
+      },
+      "location": {
+        "title": "Location and ship",
+        "description": "Where you are and what you fly",
+        "empty": "Your location is not available yet."
+      },
+      "jumpTimers": {
+        "title": "Jump timers",
+        "description": "Jump fatigue and the clone jump cooldown",
+        "empty": "Jump timers are not available yet."
+      },
+      "clones": {
+        "title": "Best clone to train in",
+        "description": "Which jump clone finishes your queue soonest",
+        "empty": "There are no jump clones to compare."
+      },
+      "wallet": {
+        "title": "Wallet",
+        "description": "Your balance",
+        "empty": "Your wallet has not loaded yet.",
+        "balance": "Balance"
+      },
+      "walletFlow": {
+        "title": "Wallet flow",
+        "description": "Income against spending over a range",
+        "empty": "There is no wallet activity in this range."
+      },
+      "netWorth": {
+        "title": "Net worth",
+        "description": "Everything you own, by layer",
+        "empty": "No net worth has been recorded yet."
+      },
+      "orders": {
+        "title": "Open orders",
+        "description": "How many of your orders have been undercut",
+        "empty": "You have no open orders."
+      },
+      "priceWatch": {
+        "title": "Price watch",
+        "description": "Prices you track and the alerts that fired",
+        "empty": "No Quickbar item has a price target. Set one from the Market page."
+      },
+      "stock": {
+        "title": "Market stock",
+        "description": "How well stocked your markets are",
+        "empty": "You do not keep a Stock List yet.",
+        "low_one": "{{count}} low",
+        "low_other": "{{count}} low"
+      },
+      "lp": {
+        "title": "LP balances",
+        "description": "Loyalty points by corporation",
+        "empty": "You have no loyalty points."
+      },
+      "miningTax": {
+        "title": "Mining tax",
+        "description": "Mining tax you owe and have not paid",
+        "empty": "Nothing is owed.",
+        "payees": "Payees",
+        "oldest": "Oldest unpaid {{days}}d"
+      },
+      "industry": {
+        "title": "Industry",
+        "description": "Jobs ready to deliver and the next to finish",
+        "empty": "No industry jobs running.",
+        "ready": "ready",
+        "running": "running"
+      },
+      "profit": {
+        "title": "Realized profit",
+        "description": "What your builds earned",
+        "empty": "No production has been logged yet."
+      },
+      "miningYield": {
+        "title": "Mining yield",
+        "description": "ISK per day from your mining",
+        "empty": "No mining recorded in this range."
+      },
+      "survey": {
+        "title": "Mining survey",
+        "description": "The best ores in your latest survey",
+        "empty": "There is no survey yet."
+      },
+      "planetary": {
+        "title": "Planetary",
+        "description": "Colonies and when their extractors run out",
+        "empty": "No colonies yet",
+        "unit": "colonies"
+      },
+      "structures": {
+        "title": "Structures",
+        "description": "Reinforcement timers, fuel and offline services",
+        "empty": "There are no structures to show."
+      },
+      "moonChunks": {
+        "title": "Moon extractions",
+        "description": "Moon drills and when their chunks arrive or decay",
+        "empty": "No moon drills running.",
+        "ready": "chunks ready",
+        "untilNext": "until the next chunk"
+      },
+      "incursions": {
+        "title": "Incursions",
+        "description": "The nearest Incursions to your current system",
+        "empty": "No Incursions are active.",
+        "unit": "active"
+      },
+      "routeSafety": {
+        "title": "Route safety",
+        "description": "How dangerous your saved route is",
+        "empty": "There is no saved route."
+      },
+      "hauling": {
+        "title": "Hauling",
+        "description": "Profitable hauls near you",
+        "empty": "There are no hauls to show."
+      },
+      "kills": {
+        "title": "Kills and losses",
+        "description": "Your recent kills and losses",
+        "empty": "No recent kills or losses."
+      },
+      "comingUp": {
+        "title": "Coming up",
+        "description": "Calendar events you accepted or may attend",
+        "empty": "No accepted or tentative events ahead."
+      },
+      "contracts": {
+        "title": "Contracts",
+        "description": "Couriers in progress and listings about to lapse",
+        "empty": "No contracts are on a clock.",
+        "overdue": "Overdue",
+        "unit": "in progress"
+      },
+      "mail": {
+        "title": "Mail",
+        "description": "Unread mail and the newest few",
+        "empty": "Your mail has not loaded yet.",
+        "unit": "unread"
+      },
+      "loading": "Loading",
+      "needsPermission": "Needs permission",
+      "needsPermissionHint": "{{title}} needs a permission that has not been granted for this Character.",
+      "grantAction": "Grant access",
+      "failed": {
+        "title": "Could not load",
+        "lastGood": "Last good value {{age}}.",
+        "lastGoodUndated": "Showing the last value we had.",
+        "nothing": "Nothing was saved to show.",
+        "retry": "Retry"
+      },
+      "emptyHint": "This widget has no data for this Character.",
+      "remove": "Remove widget",
+      "new": "New",
+      "scopeAll": "All characters",
+      "headerCharacterNote": "Shows the header Character only.",
+      "openPage": "Open {{title}} page",
+      "settingsFor": "Settings for {{title}}",
+      "moreRows_one": "+{{count}} more",
+      "moreRows_other": "+{{count}} more",
+      "noWidgets": "There are no widgets to show on this Overview."
+    },
+    "header": {
+      "allCharacters": "All characters",
+      "allCharactersCount_one": "All characters · {{count}}",
+      "allCharactersCount_other": "All characters · {{count}}",
+      "switchLabel": "Character: {{name}}",
+      "next": "Next",
+      "updated": "Updated",
+      "customize": "Customize",
+      "done": "Done"
+    },
+    "firstRun": {
+      "title": "Set up your Overview",
+      "body": "Your Overview is a grid of widgets you choose. Start with Wallet, Training, Coming up and Mail.",
+      "basics": "Just the basics"
     }
   },
   "alerts": {
