@@ -18,7 +18,6 @@ import {
   Checkbox,
   ColumnPickerMenu,
   DataTable,
-  DataAgeBadge,
   EmptyState,
   FilterBar,
   FilterField,
@@ -200,17 +199,20 @@ function signed(value: number, fractionDigits: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(fractionDigits)}`;
 }
 
-/** What the page header needs to render Hauling's own reload button beside the page title. */
+/** What the page header needs to render Hauling's reload button and Data Age beside the page title. */
 export interface HaulingRefreshInfo {
   refresh: () => void;
   disabled: boolean;
+  /** When the shown scan was fetched (epoch ms), or `null` while no scan is ready. */
+  fetchedAt: number | null;
 }
 
 interface HaulingPanelProps {
   /**
-   * Reload lives in the page title bar next to "Travel", not in this Panel's
-   * own header — so the scan state (and the function that re-triggers it)
-   * is handed up to whoever renders that title bar. Called on every change,
+   * Reload and the scan's Data Age live in the page title bar next to
+   * "Travel", not in this Panel's own header or filter bar (DESIGN.md §6c:
+   * Refresh beside the `DataAgeBadge`) — so the scan state (and the function
+   * that re-triggers it) is handed up to whoever renders that title bar. Called on every change,
    * and with `null` on unmount so a stale button never lingers.
    */
   onRefreshInfoChange?: (info: HaulingRefreshInfo | null) => void;
@@ -336,11 +338,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   );
   const fees = useHaulingFees(activeCharacterId);
 
-  const refreshDisabled = state.status !== 'ready';
+  // A disabled scan keeps its last `ready` state, so a same-hub or both-Any
+  // lane must not report that stale scan's age (or offer to reload it).
+  const fetchedAt = state.status === 'ready' && !sameHub && !bothAny ? state.scan.fetchedAt : null;
+  const refreshDisabled = fetchedAt === null;
   useEffect(() => {
-    onRefreshInfoChange?.({ refresh, disabled: refreshDisabled });
+    onRefreshInfoChange?.({ refresh, disabled: refreshDisabled, fetchedAt });
     return () => onRefreshInfoChange?.(null);
-  }, [onRefreshInfoChange, refresh, refreshDisabled]);
+  }, [onRefreshInfoChange, refresh, refreshDisabled, fetchedAt]);
 
   const viewRows = useMemo(
     () => (state.status === 'ready' ? toViewRows(state.scan.rows, fees.at) : []),
@@ -792,9 +797,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           }
           actions={
             <>
-              {state.status === 'ready' && !isNarrow && (
-                <DataAgeBadge date={new Date(state.scan.fetchedAt)} />
-              )}
               <ColumnPickerMenu
                 available={availableColumnIds}
                 visible={columnVisibility.visible}

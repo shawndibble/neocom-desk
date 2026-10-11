@@ -302,3 +302,40 @@ describe('HaulingPanel, a Cargo Space of several holds', () => {
     );
   });
 });
+
+describe('HaulingPanel data age (#3534)', () => {
+  beforeEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: null });
+  });
+
+  it('hands the ready scan’s fetchedAt up to the page header instead of badging its own filter bar', () => {
+    const onRefreshInfoChange = vi.fn();
+    const { container } = render(
+      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=amarr']}>
+        <FakeItemActions actions={fakeItemActions()}>
+          <HaulingPanel onRefreshInfoChange={onRefreshInfoChange} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+
+    expect(onRefreshInfoChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ disabled: false, fetchedAt: 0 })
+    );
+    expect(container.querySelector('time')).toBeNull();
+  });
+
+  it('hands up no fetchedAt while no scan is ready', () => {
+    const onRefreshInfoChange = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=jita']}>
+        <FakeItemActions actions={fakeItemActions()}>
+          <HaulingPanel onRefreshInfoChange={onRefreshInfoChange} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+
+    expect(onRefreshInfoChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ disabled: true, fetchedAt: null })
+    );
+  });
+});
