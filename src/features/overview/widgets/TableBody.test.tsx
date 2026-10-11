@@ -61,3 +61,32 @@ describe('TableBody cell tone and bar', () => {
     expect(screen.getByRole('rowheader', { name: 'Alpha' })).toBeInTheDocument();
   });
 });
+
+describe('TableBody grow column', () => {
+  const mail: TableModel = {
+    columns: [
+      { key: 'from', label: 'From', priority: 0 },
+      { key: 'age', label: 'Age', align: 'end', priority: 1 },
+      { key: 'subject', label: 'Subject', priority: 2, grow: true },
+    ],
+    rows: [{ key: 'a', cells: ['Bob', '12d ago', 'A very long subject line that would overflow'] }],
+  };
+
+  it('truncates the grow column instead of letting it overflow the card', () => {
+    renderTable(mail);
+    expect(screen.getByRole('cell', { name: /very long subject/ })).toHaveClass(
+      'truncate',
+      'max-w-0'
+    );
+    expect(screen.getByRole('cell', { name: 'Bob' })).not.toHaveClass('w-full');
+  });
+
+  it('leaves the first column as the truncating one when the grow column is hidden', () => {
+    render(
+      <MemoryRouter>
+        <TableBody table={mail} columnsFor="S" rowLimit={10} ariaLabel="Sample" />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('cell', { name: 'Bob' })).toHaveClass('w-full');
+  });
+});

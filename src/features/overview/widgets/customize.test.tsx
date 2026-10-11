@@ -32,7 +32,7 @@ const START: OverviewLayout = {
 
 const ids = (layout: OverviewLayout) => layout.widgets.map((x) => x.id);
 
-function Shell({ showNew, phone = false }: { showNew: boolean; phone?: boolean }) {
+function Shell({ phone = false }: { phone?: boolean }) {
   const edit = useOverviewEdit();
   const [gallery, setGallery] = useState(false);
   return (
@@ -46,25 +46,22 @@ function Shell({ showNew, phone = false }: { showNew: boolean; phone?: boolean }
       ) : (
         <WidgetGrid
           widgets={edit.layout.widgets}
-          showNew={showNew}
           editing={edit.editing}
           onRemove={edit.remove}
           onAdd={() => setGallery(true)}
         />
       )}
-      <Gallery open={gallery} onClose={() => setGallery(false)} showNew={showNew} />
+      <Gallery open={gallery} onClose={() => setGallery(false)} />
     </>
   );
 }
 
 function Host({
   initial = START,
-  showNew = false,
   phone = false,
   onSeen,
 }: {
   initial?: OverviewLayout;
-  showNew?: boolean;
   phone?: boolean;
   onSeen?: (layout: OverviewLayout) => void;
 }) {
@@ -80,7 +77,7 @@ function Host({
             onSeen?.(next);
           }}
         >
-          <Shell showNew={showNew} phone={phone} />
+          <Shell phone={phone} />
         </OverviewEditProvider>
       </FeedStoreContext.Provider>
     </MemoryRouter>

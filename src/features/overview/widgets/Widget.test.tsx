@@ -56,7 +56,7 @@ function renderWidget(
     <MemoryRouter>
       <FeedStoreContext.Provider value={store}>
         <OverviewRefreshContext.Provider value={{ epoch: 0, refresh }}>
-          <Widget widget={widget} showNew={false} onRemove={onRemove} {...props} />
+          <Widget widget={widget} onRemove={onRemove} {...props} />
         </OverviewRefreshContext.Provider>
       </FeedStoreContext.Provider>
     </MemoryRouter>
@@ -324,13 +324,8 @@ describe('Widget header', () => {
       loading: false,
     });
 
-  it('shows the New tag only for a new kind, and only to a returning pilot', () => {
-    renderWidget(model({ kind: 'priceWatch' }), ready, { showNew: true });
-    expect(screen.getByText('New')).toBeInTheDocument();
-  });
-
-  it('shows no New tag for a first-run layout', () => {
-    renderWidget(model({ kind: 'priceWatch' }), ready, { showNew: false });
+  it('draws no New tag: every widget is new', () => {
+    renderWidget(model({ kind: 'priceWatch' }), ready);
     expect(screen.queryByText('New')).not.toBeInTheDocument();
   });
 
@@ -387,7 +382,6 @@ describe('WidgetGrid', () => {
               model({ id: 'b', kind: 'fromTheFuture' }),
               model({ id: 'c', kind: 'mail', size: 'F' }),
             ]}
-            showNew={false}
             onRemove={() => undefined}
           />
         </FeedStoreContext.Provider>
@@ -405,7 +399,6 @@ describe('WidgetGrid', () => {
       <MemoryRouter>
         <WidgetGrid
           widgets={[]}
-          showNew={false}
           onRemove={() => undefined}
           onAdd={onAdd}
           onRoles={() => undefined}
@@ -421,11 +414,7 @@ describe('WidgetGrid', () => {
   it('says so when none of the stored widgets can be drawn', () => {
     render(
       <MemoryRouter>
-        <WidgetGrid
-          widgets={[model({ kind: 'fromTheFuture' })]}
-          showNew={false}
-          onRemove={() => undefined}
-        />
+        <WidgetGrid widgets={[model({ kind: 'fromTheFuture' })]} onRemove={() => undefined} />
       </MemoryRouter>
     );
     expect(screen.getByText('There are no widgets to show on this Overview.')).toBeInTheDocument();
