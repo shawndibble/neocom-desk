@@ -34,7 +34,11 @@ import { DangerBanner } from '@/features/notifications/DangerBanner';
 import { getLastKnownSpSummary } from '@/stores/characterSp';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { OverviewControls, OverviewDataAge } from '@/features/overview/OverviewHeader';
+import {
+  OverviewCustomize,
+  OverviewDataAge,
+  OverviewNext,
+} from '@/features/overview/OverviewHeader';
 import { useOverviewCardOrder } from '@/features/overview/cardOrder';
 import { useOverviewHiddenCards } from '@/features/overview/hiddenCards';
 import { useFeedStore } from '@/features/overview/widgets/data/feedStoreContext';
@@ -88,7 +92,12 @@ function Board({ characterId, layout, showNew }: BoardProps) {
         unallocatedSp={skills?.skillsResult?.data?.unallocated_sp ?? lastKnownSp.unallocatedSp}
         overview
         aside={<OverviewDataAge widgets={layout.widgets} />}
-        actions={<OverviewControls widgets={layout.widgets} />}
+        actions={
+          <>
+            <OverviewNext widgets={layout.widgets} />
+            <OverviewCustomize />
+          </>
+        }
       />
       <OverviewSubNav />
       <DangerBanner />

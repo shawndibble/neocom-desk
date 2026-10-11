@@ -1,8 +1,7 @@
 /**
- * The Overview's header controls, handed to `CharacterHeader`'s two slots: the
- * data age (`OverviewDataAge`, beside the Character's name) and
- * the controls row (`OverviewControls`: the Next deadline button and
- * Customize).
+ * The Overview's header controls, handed to `CharacterHeader`'s slots: the
+ * data age (`OverviewDataAge`, beside the Character's name) and the
+ * controls (`OverviewNext` and `OverviewCustomize`, level with the bell).
  *
  * It reads what is on screen, not what is stored: the button and the age count
  * only the widgets the page draws (a widget hidden on a phone offers neither a
@@ -78,46 +77,50 @@ export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
 }
 
 /**
- * The controls row: the Next deadline (a link to the page that owns the clock,
- * drawn as a plain button, absent with no deadline) and Customize. Every
- * control in it is the one `md` control height.
+ * The Next deadline: a link to the page that owns the clock, drawn as a plain
+ * button (absent with no deadline). It is a child of `CharacterHeader`'s flex
+ * row: left of Customize and the bell from `md`, on its own full-width line
+ * under them on a phone.
  */
-export function OverviewControls({ widgets }: { widgets: readonly Widget[] }) {
+export function OverviewNext({ widgets }: { widgets: readonly Widget[] }) {
+  const { t } = useTranslation();
+  const { next, remaining, tone } = useOverviewSummary(widgets);
+  if (!next) return null;
+  return (
+    <div className="order-last min-w-0 basis-full md:order-none md:basis-auto">
+      <Tooltip content={t('overview.header.nextGoTo', { note: next.note })}>
+        <Link
+          to={next.to}
+          className={buttonClassName({
+            size: 'md',
+            className: 'w-full min-w-0 whitespace-nowrap md:w-auto',
+          })}
+        >
+          <span className="text-text-dim">{t('overview.header.next')}</span>
+          {tone !== 'neutral' && (
+            <SeverityIcon severity={tone === 'danger' ? 'critical' : 'warning'} />
+          )}
+          <b className={cx('font-semibold tabular-nums', CHIP_TEXT[tone])}>
+            {formatCountdown(remaining / 1000)}
+          </b>
+          <span className="min-w-0 truncate text-text-dim normal-case md:max-w-40">
+            {next.note}
+          </span>
+        </Link>
+      </Tooltip>
+    </div>
+  );
+}
+
+/** Customize: icon-only on a phone (44px), icon and word from `md`. Hidden while the edit bar owns Done. */
+export function OverviewCustomize() {
   const { t } = useTranslation();
   const { editing, startEditing } = useOverviewEdit();
-  const { next, remaining, tone } = useOverviewSummary(widgets);
-
+  if (editing) return null;
   return (
-    <div className="flex items-center gap-2">
-      {next && (
-        <Tooltip content={t('overview.header.nextGoTo', { note: next.note })}>
-          <Link
-            to={next.to}
-            className={buttonClassName({
-              size: 'md',
-              className: 'min-w-0 shrink whitespace-nowrap',
-            })}
-          >
-            <span className="text-text-dim">{t('overview.header.next')}</span>
-            {tone !== 'neutral' && (
-              <SeverityIcon severity={tone === 'danger' ? 'critical' : 'warning'} />
-            )}
-            <b className={cx('font-semibold tabular-nums', CHIP_TEXT[tone])}>
-              {formatCountdown(remaining / 1000)}
-            </b>
-            <span className="min-w-0 truncate text-text-dim normal-case md:max-w-48">
-              {next.note}
-            </span>
-          </Link>
-        </Tooltip>
-      )}
-      {/* While customizing, the edit bar owns Cancel and Done: two Done buttons would be one too many. */}
-      {!editing && (
-        <Button className="shrink-0" onClick={startEditing}>
-          <Icon.EditBoard size={Icon.ICON_SIZE.md} aria-hidden="true" />
-          {t('overview.header.customize')}
-        </Button>
-      )}
-    </div>
+    <Button className="w-11 px-0 md:w-auto md:px-4" onClick={startEditing}>
+      <Icon.EditBoard size={Icon.ICON_SIZE.md} aria-hidden="true" />
+      <span className="sr-only md:not-sr-only">{t('overview.header.customize')}</span>
+    </Button>
   );
 }

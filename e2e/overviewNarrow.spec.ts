@@ -209,10 +209,18 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
     expect(Math.abs(boxes.next.height - boxes.customize.height)).toBeLessThan(1);
     expect(Math.abs(boxes.bell.height - boxes.customize.height)).toBeLessThan(1);
     if (viewport.width < 768) expect(boxes.customize.height).toBeGreaterThanOrEqual(44);
-    // Next and Customize share a row; the bell sits above it, at the right, not wrapped under.
-    expect(Math.abs(boxes.next.y - boxes.customize.y)).toBeLessThan(2);
-    expect(boxes.bell.y + boxes.bell.height).toBeLessThanOrEqual(boxes.next.y + 1);
+    // Customize and the bell share a row, the bell last, top right.
+    expect(Math.abs(boxes.bell.y - boxes.customize.y)).toBeLessThan(2);
     expect(boxes.bell.x).toBeGreaterThan(boxes.customize.x);
+    if (viewport.width < 768) {
+      // Phone: Next is its own full-width line under Customize and the bell.
+      expect(boxes.next.y).toBeGreaterThanOrEqual(boxes.customize.y + boxes.customize.height - 1);
+      expect(boxes.next.width).toBeGreaterThan(viewport.width * 0.8);
+    } else {
+      // Desktop: one row, Next then Customize then the bell.
+      expect(Math.abs(boxes.next.y - boxes.customize.y)).toBeLessThan(2);
+      expect(boxes.next.x + boxes.next.width).toBeLessThanOrEqual(boxes.customize.x + 1);
+    }
 
     // The button goes where the clock lives.
     await expect(next).toHaveAttribute('href', /\/contracts/);

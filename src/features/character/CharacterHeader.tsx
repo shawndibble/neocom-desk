@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { cx } from '@/lib/cx';
 import { AlertsBell, CharacterAvatar, StatChip, StatChips } from '@/components/ui';
 import { AllianceLink, CorporationLink } from '@/features/entities';
 import { usePublicInfo } from '@/stores/publicInfo';
@@ -13,9 +14,10 @@ interface CharacterHeaderProps {
   /** ESI's unallocated_sp; null while loading, or when unavailable. */
   unallocatedSp: number | null;
   /**
-   * The Overview's layout: Total SP is dropped (a Skill points widget carries
-   * it), the bell sits top right on the Unallocated SP line, and `aside` and
-   * `actions` are drawn. Clones and Employment History leave it off.
+   * The Overview's layout: no SP chips (a Skill points widget carries them),
+   * `aside` beside the name and `actions` (Next deadline, Customize) in the
+   * header's own flex row, level with and ahead of the bell. Clones and
+   * Employment History leave it off.
    */
   overview?: boolean;
   /** Overview only: beside the name (the data age); wraps under it when the name is long. */
@@ -74,10 +76,6 @@ export function CharacterHeader({
   const sp = (value: number | null): string =>
     value === null ? t('common.unknown') : value.toLocaleString();
 
-  // On the Overview the chips drop to their own line on a phone (order-1) so the
-  // bell stays top right beside the identity; from `md` they sit left of the bell.
-  const chipsClassName = overview ? 'order-1 basis-full md:order-none md:basis-auto' : undefined;
-
   return (
     <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
       <CharacterAvatar
@@ -92,7 +90,7 @@ export function CharacterHeader({
         to a single letter instead. Given a real basis, the chips wrap to
         their own line and the name gets the full width.
       */}
-      <div className="min-w-0 flex-1 basis-48">
+      <div className={cx('min-w-0 flex-1', overview ? 'basis-36' : 'basis-48')}>
         {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
         <div className="flex flex-wrap items-center gap-x-3">
           <h1
@@ -123,13 +121,17 @@ export function CharacterHeader({
           )}
         </p>
       </div>
-      <StatChips className={chipsClassName}>
-        {!overview && <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />}
-        <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />
-      </StatChips>
+      {overview ? (
+        // The Overview's controls sit in this flex row: Next, Customize, then the bell.
+        actions
+      ) : (
+        <StatChips>
+          <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />
+          <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />
+        </StatChips>
+      )}
       {/* This header stands in for `PageHeader` on Overview, Clones and Employment History. */}
       <AlertsBell />
-      {overview && actions && <div className="order-2 min-w-0 basis-full">{actions}</div>}
     </header>
   );
 }

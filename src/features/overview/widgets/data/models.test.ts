@@ -410,3 +410,25 @@ describe('industry', () => {
     expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 5 * HOUR]);
   });
 });
+
+describe('sp', () => {
+  it('lists Unallocated SP among its rows now the header chip is gone', () => {
+    const feeds = {
+      skills: ok({
+        totalSp: 80_000_000,
+        skillsResult: {
+          data: { total_sp: 80_000_000, unallocated_sp: 1_450_000, skills: [] },
+          fetchedAt: new Date(NOW),
+          fromCache: false,
+        },
+      }),
+      spExtras: ok({ monitoring: false, thresholdSp: 500_000, price: null }),
+    } as unknown as Feeds;
+    const view = buildView('sp', feeds, ctx());
+    const row = view.rows.find((r) => r.key === 'unallocated');
+    expect(row).toMatchObject({
+      title: 'skills.unallocatedSp',
+      value: (1_450_000).toLocaleString(),
+    });
+  });
+});

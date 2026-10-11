@@ -396,7 +396,7 @@ describe('Overview widget grid', () => {
     expect(await within(wallet).findByText('Pilot One only')).toBeInTheDocument();
   });
 
-  it('draws no Character switcher in the header, and no Total SP chip', async () => {
+  it('draws no Character switcher in the header, and no SP chips', async () => {
     await db.characters.put({
       characterId: OTHER_ID,
       name: 'Pilot Two',
@@ -410,7 +410,7 @@ describe('Overview widget grid', () => {
     const main = within(screen.getByRole('main'));
     expect(main.queryByRole('button', { name: /character: /i })).not.toBeInTheDocument();
     expect(main.queryByText('Total SP')).not.toBeInTheDocument();
-    expect(main.getByText('Unallocated SP')).toBeInTheDocument();
+    expect(main.queryByText('Unallocated SP')).not.toBeInTheDocument();
     // No header Refresh; the data age sits in the identity block beside the name.
     expect(main.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
     const heading = main.getByRole('heading', { level: 1 });

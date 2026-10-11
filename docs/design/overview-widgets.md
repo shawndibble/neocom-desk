@@ -42,15 +42,18 @@ point.
 ## 3. Page structure
 
 1. Page header (existing `CharacterHeader`, with the Overview's `overview`
-   layout): the Character's name with a read-only "Updated N ago" beside it (there is no header Refresh; a failed widget's Retry reloads),
-   the corporation line, the **Unallocated SP** chip with the **bell** at the
-   top right of the same line, and a controls row under it: the **Next
-   deadline** button (a link to the page that owns the clock) and
-   **Customize**. There is no Character switcher in the header (the rail
-   footer and the command palette switch the active Character; a widget's own
-   menu chooses Header character or All characters) and no Total SP chip (a
-   Skill points widget carries it). Every control in the row is one `md`
-   control height (44px on a phone, 36px on a pointer).
+   layout): the Character's name with a read-only "Updated N ago" beside it
+   (there is no header Refresh; a failed widget's Retry reloads) over the
+   corporation line, on the left; on the right one row of the **Next
+   deadline** button (a link to the page that owns the clock), **Customize**
+   and the **bell**, last at the top right. On a phone Customize (icon only)
+   and the bell sit at the right end of the identity row and the Next button
+   is its own full-width line under them. There is no Character switcher (the
+   rail footer and the command palette switch the active Character; a
+   widget's own menu chooses Header character or All characters) and no SP
+   chips: the Skill points widget carries Total, Unallocated and spare SP.
+   Every control in a row is one `md` control height (44px on a phone, 36px
+   on a pointer).
 2. Sub-nav: Overview / Clones / Employment history. **Unchanged — those pages
    stay.** Only the Overview tab's content changes.
 3. **Danger banner** (when an unacknowledged danger Alert exists).
@@ -181,7 +184,7 @@ Gallery & first run
 - [ ] E16 First run Role chooser builds the Layout; Just the basics; reachable later via Start from a role.
 
 Header & alerts
-- [ ] E17 No header Character switcher; Updated N ago (read-only, no Refresh button) beside the name; Next deadline button (amber < 3 h, red < 30 min) and Customize in one equal-height row; bell top right.
+- [ ] E17 No header Character switcher; Updated N ago (read-only, no Refresh button) beside the name; Next deadline button (amber < 3 h, red < 30 min), Customize and the bell in one equal-height row at the top right (phone: Next on its own line under Customize and the bell); no SP chips.
 - [ ] E18 Sub-nav unchanged (Overview / Clones / Employment history).
 - [ ] E19 Bell in every page header; badge red only for danger; dim at zero.
 - [ ] E20 Alerts panel (desktop popover / phone sheet) with chips, Mark all read (spares danger), View/Snooze/Dismiss/Acknowledge, empty state, footer, Esc/outside close.

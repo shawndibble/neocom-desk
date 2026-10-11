@@ -81,7 +81,7 @@ describe('CharacterHeader', () => {
     ).toEqual(['Alerts, none waiting']);
   });
 
-  it('on the Overview drops Total SP, keeps Unallocated SP, and draws the aside beside the name', async () => {
+  it('on the Overview drops both SP chips, and draws the aside beside the name', async () => {
     render(
       <CharacterHeader
         characterId={CHARACTER_ID}
@@ -95,7 +95,7 @@ describe('CharacterHeader', () => {
     const heading = await screen.findByRole('heading', { level: 1, name: 'Mero Otichoda' });
 
     expect(screen.queryByText('Total SP')).not.toBeInTheDocument();
-    expect(screen.getByText('719,732')).toBeInTheDocument();
+    expect(screen.queryByText('Unallocated SP')).not.toBeInTheDocument();
     expect(heading.parentElement).toContainElement(screen.getByText('aside-slot'));
     expect(screen.getByRole('button', { name: 'actions-slot' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Alerts/ })).toBeInTheDocument();
