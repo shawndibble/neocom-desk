@@ -26,6 +26,7 @@ import {
   IskAmount,
   SEVERITY_TEXT,
   SeverityIcon,
+  Tooltip,
   entityLinkClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -327,10 +328,24 @@ function WidgetFrame({
         editing ? 'border-dashed border-line-bright' : 'border-line'
       )}
     >
-      <div className="flex min-h-11 items-center gap-1.5 border-b border-line py-1 pr-1.5 pl-2.5 md:min-h-9">
+      <div className="flex min-h-11 items-center gap-1.5 border-b border-line pr-1 pl-2.5 md:min-h-8">
         {headerStart}
-        <h2 className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
-          {title}
+        <h2 className="min-w-0 text-[0.6875rem] font-semibold tracking-widest uppercase">
+          {view.to !== null ? (
+            <Tooltip content={t('overview.widgets.opensPage', { title })}>
+              <Link
+                to={view.to}
+                className={entityLinkClassName(
+                  'flex min-h-11 min-w-0 items-center gap-0.5 text-text md:min-h-8'
+                )}
+              >
+                <span className="min-w-0 truncate">{title}</span>
+                <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+              </Link>
+            </Tooltip>
+          ) : (
+            <span className="block truncate text-text">{title}</span>
+          )}
         </h2>
         {showNew && kind.isNew && (
           <span className="rounded-xs bg-accent px-1.5 text-[0.5625rem] font-bold tracking-widest text-accent-contrast uppercase">
@@ -339,18 +354,6 @@ function WidgetFrame({
         )}
         {scope.chip && <AllCharactersReadout compact={widget.size === 'S'} />}
         <span className="flex-1" />
-        {view.to !== null && (
-          <Link
-            to={view.to}
-            aria-label={t('overview.widgets.openPage', { title })}
-            className={entityLinkClassName(
-              'flex min-h-11 items-center gap-0.5 text-xs font-semibold whitespace-nowrap md:min-h-0'
-            )}
-          >
-            {t('overview.board.open')}
-            <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-          </Link>
-        )}
         {menu}
       </div>
       <div className="flex-1">{body}</div>

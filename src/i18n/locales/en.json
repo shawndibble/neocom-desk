@@ -3955,7 +3955,7 @@
       "emptyHint": "This widget has no data for this Character.",
       "remove": "Remove widget",
       "new": "New",
-      "openPage": "Open {{title}} page",
+      "opensPage": "Opens the {{title}} page",
       "settingsFor": "Settings for {{title}}",
       "moreRows_one": "+{{count}} more",
       "moreRows_other": "+{{count}} more",

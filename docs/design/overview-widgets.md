@@ -80,7 +80,11 @@ column and the "Everything else" phone fold are gone.
 - Phone: same list and order; S two across, M/L/Full full width. A Widget can be
   set **Hide on phone**.
 - Each Widget header: title (micro), optional **New** tag, optional character
-  scope chip ("All characters"), **Open ›** link to its page, **⋯ menu**.
+  scope chip ("All characters"; an icon with a tooltip at S), **⋯ menu**. The
+  **title is the link** to the kind's page (entity link, trailing chevron, tooltip
+  "Opens the X page"); a kind with no page has a plain title. One compact line
+  (about 32px on desktop, 44px on a phone for the touch target); no separate
+  Open link, and the card itself is not clickable.
 - No Widget header carries glyph view-cyclers; view switching lives in ⋯.
 
 ### Widget ⋯ menu
@@ -166,7 +170,7 @@ Grid & widgets
 - [ ] E1 Overview renders a Widget grid from a persisted Overview Layout.
 - [ ] E2 Sizes S/M/L/Full set row width; order = screen order, no holes.
 - [ ] E3 Views Number/Chart/Table per kind, each kind opening in its default view; headline number always visible.
-- [ ] E4 Widget header: title, New tag (returning only), scope chip, Open link, ⋯.
+- [ ] E4 Widget header: one compact line: title as the page link with a chevron (plain when the kind has no page), New tag (returning only), scope chip, ⋯.
 - [ ] E5 ⋯ menu: view, character, range, rename, duplicate, top, bottom, phone, remove; Esc/outside closes.
 - [ ] E6 Same kind addable twice.
 - [ ] E7 Widget states: loading, needs permission (Grant access), failed (Retry + last good), empty (Remove).

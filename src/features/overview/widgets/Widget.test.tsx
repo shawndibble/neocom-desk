@@ -88,10 +88,7 @@ describe('Widget states', () => {
     expect(region).toHaveAttribute('aria-busy', 'false');
     expect(within(region).getByText('7')).toBeInTheDocument();
     expect(within(region).getByText('unread')).toBeInTheDocument();
-    expect(within(region).getByRole('link', { name: 'Open Mail page' })).toHaveAttribute(
-      'href',
-      '/mail'
-    );
+    expect(within(region).getByRole('link', { name: 'Mail' })).toHaveAttribute('href', '/mail');
   });
 
   it('keeps the headline above the rows in Table view and counts what the size hides', () => {
@@ -297,11 +294,9 @@ describe('Widget header', () => {
     expect(await screen.findByText('All characters · 2')).toBeInTheDocument();
   });
 
-  it('has no Open link for a kind with no page of its own yet', () => {
+  it('has no title link for a kind with no page of its own yet', () => {
     renderWidget(model({ kind: 'survey' }), () => undefined);
-    expect(
-      screen.queryByRole('link', { name: /open mining survey page/i })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /mining survey/i })).not.toBeInTheDocument();
   });
 
   it('uses the widget own name when it has one', () => {
