@@ -1,13 +1,13 @@
 /**
  * The Overview's header controls, handed to `CharacterHeader`'s two slots: the
- * data age with Refresh (`OverviewDataAge`, beside the Character's name) and
+ * data age (`OverviewDataAge`, beside the Character's name) and
  * the controls row (`OverviewControls`: the Next deadline button and
  * Customize).
  *
  * It reads what is on screen, not what is stored: the button and the age count
  * only the widgets the page draws (a widget hidden on a phone offers neither a
- * clock nor a read). Refresh bumps the page's refresh epoch, which every
- * mounted data source watches. There is no Character switcher here: the rail
+ * clock nor a read). There is no Refresh here (a failed widget's Retry bumps the
+ * page's refresh epoch) and no Character switcher: the rail
  * footer and the command palette switch the active Character, and each
  * widget's own menu chooses its Character scope.
  */
@@ -17,7 +17,6 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataAgeBadge,
-  IconButton,
   SEVERITY_TEXT,
   SeverityIcon,
   Tooltip,
@@ -28,7 +27,6 @@ import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { useOverviewRefresh } from './widgets/data/refreshContext';
 import { useKindViews } from './widgets/data/useWidgetView';
 import { useOverviewEdit } from './widgets/editContext';
 import { collectDeadlines, stalestFetch } from './widgets/headerSummary';
@@ -63,29 +61,18 @@ function useOverviewSummary(widgets: readonly Widget[]) {
     remaining,
     tone: chipTone(remaining),
     fetchedAt: stalestFetch(all).date,
-    refreshing: all.some((view) => view.status.loading),
   };
 }
 
-/** "Updated N ago" and Refresh: they sit beside the Character's name, whose data they describe. */
+/** "Updated N ago", a read-only indicator beside the Character's name (no Refresh: widgets retry themselves). */
 export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
   const { t } = useTranslation();
-  const { refresh } = useOverviewRefresh();
-  const { fetchedAt, refreshing } = useOverviewSummary(widgets);
+  const { fetchedAt } = useOverviewSummary(widgets);
+  if (!fetchedAt) return null;
   return (
-    <span className="flex items-center gap-1.5">
-      {fetchedAt && (
-        <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
-          {t('overview.header.updated')}
-          <DataAgeBadge date={fetchedAt} alwaysVisible />
-        </span>
-      )}
-      <IconButton
-        icon={<Icon.Refresh />}
-        label={t('overview.board.refresh')}
-        onClick={refresh}
-        busy={refreshing}
-      />
+    <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
+      {t('overview.header.updated')}
+      <DataAgeBadge date={fetchedAt} alwaysVisible />
     </span>
   );
 }

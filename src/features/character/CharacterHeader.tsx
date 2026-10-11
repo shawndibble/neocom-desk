@@ -18,7 +18,7 @@ interface CharacterHeaderProps {
    * `actions` are drawn. Clones and Employment History leave it off.
    */
   overview?: boolean;
-  /** Overview only: beside the name (data age and Refresh); wraps under it when the name is long. */
+  /** Overview only: beside the name (the data age); wraps under it when the name is long. */
   aside?: ReactNode;
   /** Overview only: the controls row under the identity (the Next deadline and Customize). */
   actions?: ReactNode;
@@ -38,7 +38,7 @@ interface CharacterHeaderProps {
  * above the tab strip is the same on every tab, and a view's `DataAgeBadge`
  * and Refresh belong to the data they describe, so they sit in that view's
  * `Panel` toolbar below the tabs. The exception is the Overview (`overview`),
- * whose widgets are the page: its header carries the data age and Refresh
+ * whose widgets are the page: its header carries the data age
  * beside the name (`aside`), the Unallocated SP chip with the bell at the top
  * right, and a controls row (`actions`: Next deadline, Customize). Total SP is
  * not drawn there; a Skill points widget carries it. Switching Character is the

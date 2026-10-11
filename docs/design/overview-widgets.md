@@ -42,7 +42,7 @@ point.
 ## 3. Page structure
 
 1. Page header (existing `CharacterHeader`, with the Overview's `overview`
-   layout): the Character's name with "Updated N ago" and Refresh beside it,
+   layout): the Character's name with a read-only "Updated N ago" beside it (there is no header Refresh; a failed widget's Retry reloads),
    the corporation line, the **Unallocated SP** chip with the **bell** at the
    top right of the same line, and a controls row under it: the **Next
    deadline** button (a link to the page that owns the clock) and
@@ -181,7 +181,7 @@ Gallery & first run
 - [ ] E16 First run Role chooser builds the Layout; Just the basics; reachable later via Start from a role.
 
 Header & alerts
-- [ ] E17 No header Character switcher; Updated N ago + Refresh beside the name; Next deadline button (amber < 3 h, red < 30 min) and Customize in one equal-height row; bell top right.
+- [ ] E17 No header Character switcher; Updated N ago (read-only, no Refresh button) beside the name; Next deadline button (amber < 3 h, red < 30 min) and Customize in one equal-height row; bell top right.
 - [ ] E18 Sub-nav unchanged (Overview / Clones / Employment history).
 - [ ] E19 Bell in every page header; badge red only for danger; dim at zero.
 - [ ] E20 Alerts panel (desktop popover / phone sheet) with chips, Mark all read (spares danger), View/Snooze/Dismiss/Acknowledge, empty state, footer, Esc/outside close.

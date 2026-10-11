@@ -411,9 +411,10 @@ describe('Overview widget grid', () => {
     expect(main.queryByRole('button', { name: /character: /i })).not.toBeInTheDocument();
     expect(main.queryByText('Total SP')).not.toBeInTheDocument();
     expect(main.getByText('Unallocated SP')).toBeInTheDocument();
-    // The data age and Refresh sit in the identity block beside the name.
+    // No header Refresh; the data age sits in the identity block beside the name.
+    expect(main.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
     const heading = main.getByRole('heading', { level: 1 });
-    expect(heading.parentElement).toContainElement(main.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(heading.parentElement).toHaveTextContent(/Updated/));
   });
 });
 
