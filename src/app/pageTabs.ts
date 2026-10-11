@@ -27,11 +27,16 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'standings', labelKey: 'contacts.tabStandings' },
 ]);
 
-/** Travel (issue #2328), with Thera/Turnur (#2330). Pilot Lookup (#2331) is its tab again. */
+/**
+ * Travel (issue #2328), with Thera/Turnur (#2330). Pilot Lookup (#2331) is its
+ * tab again, and Hauling moved here from Market (#3526): a route problem, not a
+ * market lookup. `/market/hauling` redirects via `PAGE_LEGACY_LOCATIONS`.
+ */
 export const TRAVEL_TABS = definePageTabs('/travel', [
   { id: 'route', labelKey: 'travel.routeTab' },
   { id: 'thera', labelKey: 'travel.thera.tab' },
   { id: 'pilot', labelKey: 'nav.pilotLookup' },
+  { id: 'hauling', labelKey: 'travel.haulingTab' },
 ]);
 
 /**
@@ -132,7 +137,6 @@ export const MARKET_TABS = definePageTabs('/market', [
   { id: 'history', labelKey: 'market.sections.history' },
   { id: 'history/transactions', labelKey: 'market.sections.transactions' },
   { id: 'appraisal', labelKey: 'market.sections.appraisal' },
-  { id: 'hauling', labelKey: 'market.sections.hauling' },
   // Its own route (`/market/lp-store[/:corporationId]`) outranks Market's, so
   // `LoyaltyStore` draws the tab bar itself; the entry is what makes the path a Market tab.
   { id: 'lp-store', labelKey: 'loyaltyStore.title' },
@@ -176,6 +180,11 @@ export const PAGE_LEGACY_LOCATIONS: Partial<
   >
 > = {
   '/assets': legacyAssetsLocation,
+  // Hauling was a Market tab until #3526; it is a Travel tab now.
+  '/market': (pathname, search) =>
+    pathname === '/market/hauling' || pathname.startsWith('/market/hauling/')
+      ? { pathname: tabPath(TRAVEL_TABS, 'hauling'), search }
+      : null,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);

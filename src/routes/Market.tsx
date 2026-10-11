@@ -72,7 +72,6 @@ import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
-import { HaulingPanel, type HaulingRefreshInfo } from '@/features/market/HaulingPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { tradeHubStanding, useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import {
@@ -325,10 +324,6 @@ export function Market() {
   // Appraisal" action, so the panel mounts with its Compare Hubs section
   // already open instead of collapsed.
   const [expandCompareOnAppraisal, setExpandCompareOnAppraisal] = useState(false);
-  // Hauling's own reload lives in this page's title bar rather than its
-  // Panel header (round: hauling header tweaks) — the tab hands the button
-  // its click handler and disabled state up through this callback.
-  const [haulingRefresh, setHaulingRefresh] = useState<HaulingRefreshInfo | null>(null);
   // `expandCompare` defaults false so every ordinary tab switch clears it —
   // only `handleViewQuickbarInAppraisal` passes `true`, and only that call's
   // own value should reach the next `AppraisalPanel` mount.
@@ -353,7 +348,6 @@ export function Market() {
       { id: 'orders', label: t('market.sections.openOrders') },
       { id: 'history', label: t('market.sections.history') },
       { id: 'appraisal', label: t('market.sections.appraisal') },
-      { id: 'hauling', label: t('market.sections.hauling') },
       { id: 'lp-store', label: t('loyaltyStore.title') },
     ],
   };
@@ -941,13 +935,6 @@ export function Market() {
                   }
                 />
               </>
-            ) : tab === 'hauling' && haulingRefresh ? (
-              <IconButton
-                icon={<Icon.Refresh />}
-                label={t('market.refresh')}
-                onClick={haulingRefresh.refresh}
-                disabled={haulingRefresh.disabled}
-              />
             ) : undefined
           }
         />
@@ -1002,8 +989,6 @@ export function Market() {
               defaultCompareExpanded={expandCompareOnAppraisal}
             />
           )}
-
-          {tab === 'hauling' && <HaulingPanel onRefreshInfoChange={setHaulingRefresh} />}
 
           {tab === 'browser' && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">

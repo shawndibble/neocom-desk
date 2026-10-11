@@ -1,6 +1,6 @@
 /**
- * The Market page's Hauling tab: what is worth buying at one Trade Hub to sell
- * at another, priced at what a hauler can expect to actually get rather than
+ * The Travel page's Hauling tab (moved from Market, #3526): what is worth
+ * buying at one Trade Hub to sell at another, priced at what a hauler can expect to actually get rather than
  * at today's cheapest listing, and sized to a hold.
  *
  * The first view needs nothing from the user: a route and a category are
@@ -208,7 +208,7 @@ export interface HaulingRefreshInfo {
 
 interface HaulingPanelProps {
   /**
-   * Reload lives in the page title bar next to "Market", not in this Panel's
+   * Reload lives in the page title bar next to "Travel", not in this Panel's
    * own header — so the scan state (and the function that re-triggers it)
    * is handed up to whoever renders that title bar. Called on every change,
    * and with `null` on unmount so a stale button never lingers.
