@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addMissingStockTargets,
   addStockList,
   MAX_STOCK_TARGET,
   parseStockLists,
@@ -87,6 +88,14 @@ describe('list edits', () => {
     expect(removeStockList([efa], 'a')).toEqual([]);
   });
 
+  it('keeps one market per station: a second list there, or a move onto one, is refused', () => {
+    expect(addStockList([efa], { id: 'b', name: 'Again', locationId: efa.locationId })).toEqual([
+      efa,
+    ]);
+    const other = { ...efa, id: 'b', name: 'Other', locationId: 9 };
+    expect(setStockListLocation([efa, other], 'b', efa.locationId)).toEqual([efa, other]);
+  });
+
   it('moves a list to another market', () => {
     expect(setStockListLocation([efa], 'a', 60003760)[0].locationId).toBe(60003760);
   });
@@ -117,5 +126,18 @@ describe('setStockTarget', () => {
 
   it('leaves the value alone for an unknown list', () => {
     expect(setStockTarget([efa], 'zzz', 34, 5)).toEqual([efa]);
+  });
+});
+
+describe('addMissingStockTargets', () => {
+  it('adds only the items the list does not already have, keeping existing targets', () => {
+    const [list] = addMissingStockTargets([efa], 'a', [
+      { typeId: 16242, target: 1 },
+      { typeId: 34, target: 500 },
+    ]);
+    expect(list.items).toEqual([
+      { typeId: 16242, target: 40 },
+      { typeId: 34, target: 500 },
+    ]);
   });
 });

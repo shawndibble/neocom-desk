@@ -1149,8 +1149,9 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   station or structure (ready to list). Shared by link as a copy, never with
   the sender's counts. In the UI it is called a "market".
 - **Stock Target**: One item on a **Stock List** with the whole number of
-  units to keep listed. Always written in full, never a bare "target", so it
-  cannot be read as a **Target Profile**. Its status is measured by what is
+  units to keep listed. Always written in full in prose, never a bare
+  "target", so it cannot be read as a **Target Profile**; inside the Stock tab
+  a column header or field label may say "Target". Its status is measured by what is
   listed: Out (none listed), Low (under half), OK, or Over.
 - **Shortfall**: How many units a **Stock Target** is short (target minus
   listed, never below zero). The part the hangar at the market covers is

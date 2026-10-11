@@ -36,11 +36,13 @@ import * as Icon from '@/components/ui/icons';
 import { useOpenAfterMenu } from '@/components/ui/useOpenAfterMenu';
 import { encodeStockListShare } from '@/engine/stockTargets/stockListShare';
 import {
+  addMissingStockTargets,
   removeStockList,
   removeStockTarget,
   renameStockList,
   setStockListLocation,
   setStockTarget,
+  stockListAt,
   type StockList,
 } from '@/engine/stockTargets/stockLists';
 import { STOCK_STATUSES, summarizeStock, type StockStatus } from '@/engine/stockTargets/stockRows';
@@ -137,14 +139,7 @@ export function StockMarketPage({
   async function addListed() {
     const listed = await loadListedAtMarket(list.locationId).catch(() => []);
     const fresh = listed.filter((item) => !list.items.some((i) => i.typeId === item.typeId));
-    if (fresh.length > 0) {
-      onSave(
-        fresh.reduce(
-          (acc, item) => setStockTarget(acc, list.id, item.typeId, item.target),
-          [...lists]
-        )
-      );
-    }
+    if (fresh.length > 0) onSave(addMissingStockTargets(lists, list.id, fresh));
     setToast(
       fresh.length > 0
         ? t('stockTargets.list.addedListed', { count: fresh.length })
@@ -167,6 +162,10 @@ export function StockMarketPage({
         <MarketDialog
           mode="change"
           characterId={activeCharacterId}
+          takenBy={(locationId) => {
+            const there = stockListAt(lists, locationId);
+            return there && there.id !== list.id ? there.name : undefined;
+          }}
           initial={{
             locationId: list.locationId,
             placeName: data?.place?.name ?? list.name,

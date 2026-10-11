@@ -18,8 +18,14 @@ describe('stock list share code', () => {
     expect(decodeStockListShare(encodeStockListShare(list))).toEqual(list);
   });
 
-  it('is URL-safe', () => {
-    expect(encodeStockListShare(list)).toMatch(/^[A-Za-z0-9._~%-]+$/);
+  it('is URL-safe and survives the link reading it back, even with % in the name', () => {
+    const odd = { ...list, name: '100% Stocked & co' };
+    const code = encodeStockListShare(odd);
+    expect(code).toMatch(/^[A-Za-z0-9._~%-]+$/);
+    // The Stock tab reads it back with `searchParams.get`, which decodes once.
+    expect(decodeStockListShare(new URLSearchParams(`list=${code}`).get('list') ?? '')).toEqual(
+      odd
+    );
   });
 
   it('rejects a code from another format, or a damaged one', () => {
@@ -32,7 +38,7 @@ describe('stock list share code', () => {
   });
 
   it('drops unusable pairs but keeps the rest', () => {
-    const code = encodeURIComponent(`2|Efa|${EFA36}|a:1,-5:3,b:0,c:2`);
+    const code = `2|Efa|${EFA36}|a:1,-5:3,b:0,c:2`;
     expect(decodeStockListShare(code)?.items).toEqual([
       { typeId: 10, target: 1 },
       { typeId: 12, target: 2 },
@@ -44,7 +50,7 @@ describe('stock list share code', () => {
       { length: MAX_SHARED_ITEMS + 5 },
       (_, i) => `${(i + 1).toString(36)}:1`
     );
-    const code = encodeURIComponent(`2|Big|${EFA36}|${many.join(',')}`);
+    const code = `2|Big|${EFA36}|${many.join(',')}`;
     expect(decodeStockListShare(code)?.items).toHaveLength(MAX_SHARED_ITEMS);
   });
 });

@@ -22,6 +22,8 @@ export function marketNeed(market: MarketSummary): MarketNeed {
 }
 
 /** Most items out first, then most low, then the dearest to fill. */
-export function rankMarkets<T extends MarketSummary>(markets: readonly T[]): T[] {
+export function rankMarkets<T extends Pick<MarketSummary, 'out' | 'low' | 'costToFill'>>(
+  markets: readonly T[]
+): T[] {
   return [...markets].sort((a, b) => b.out - a.out || b.low - a.low || b.costToFill - a.costToFill);
 }

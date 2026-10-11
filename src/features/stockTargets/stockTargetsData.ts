@@ -13,6 +13,7 @@ import type { StockList, StockTarget } from '@/engine/stockTargets/stockLists';
 import { db } from '@/db';
 import type { CharacterAsset, MarketOrder } from '@/esi/endpoints';
 import { readCachedRows } from '@/esi/cache';
+import { ESI_REGISTRY } from '@/esi/registry';
 import { KEY as ASSETS_KEY, loadAllCharactersAssets } from '@/features/character/assets';
 import { KEYS as ORDER_KEYS } from '@/features/character/orders';
 import { loadStationSummary } from '@/features/character/stations';
@@ -41,14 +42,19 @@ interface Holdings {
   characterIds: number[];
 }
 
-async function readHoldings(typeIds: readonly number[]): Promise<Holdings> {
+/** `'all'` places every type the pilot holds, for "where are my things" rather than "where is this item". */
+async function readHoldings(typeIds: readonly number[] | 'all'): Promise<Holdings> {
   const [assets, orders] = await Promise.all([
     loadAllCharactersAssets(),
     loadAllCharactersOpenOrders(),
   ]);
+  const wanted =
+    typeIds === 'all'
+      ? new Set(assets.entries.flatMap((entry) => entry.assets.map((asset) => asset.type_id)))
+      : new Set(typeIds);
   const detected = detectOwnedStock(
     assets.entries.map((entry) => ({ characterId: entry.characterId, assets: entry.assets })),
-    new Set(typeIds)
+    wanted
   );
   const sellOrders = orders.entries.flatMap((entry) =>
     entry.orders
@@ -225,15 +231,29 @@ export interface SellLocation {
   locationId: number;
   name: string;
   kind: MarketPlace['kind'];
+  /** Zero for a structure the pilot only keeps items at. */
   orderCount: number;
 }
 
-/** Every station and structure the pilot has sell orders at, most orders first: the New market dialog's first suggestions. */
+/**
+ * The New market dialog's suggestions: every station and structure the pilot
+ * has sell orders at, most orders first, then the structures they keep items
+ * at. A structure is otherwise found only by ESI's name search; an NPC station
+ * is always searchable from the snapshot, so stations with items alone are not
+ * suggested.
+ */
 export async function loadSellLocations(): Promise<SellLocation[]> {
-  const holdings = await readHoldings([]);
+  const holdings = await readHoldings('all');
   const counts = new Map<number, number>();
   for (const order of holdings.sellOrders) {
     counts.set(order.location_id, (counts.get(order.location_id) ?? 0) + 1);
+  }
+  for (const stock of holdings.detected.values()) {
+    for (const placement of stock.placements) {
+      if (placement.locationId >= MAX_NPC_STATION_ID && !counts.has(placement.locationId)) {
+        counts.set(placement.locationId, 0);
+      }
+    }
   }
   const locations = await Promise.all(
     [...counts].map(async ([locationId, orderCount]) => {
@@ -287,8 +307,13 @@ export async function loadStockAlertEntries(
     readCachedRows<MarketOrder[]>(characterIds, ORDER_KEYS.open),
     loadTypeNames(typeIds),
   ]);
-  // Listed counts come from the order cache: without it the count is unknown, not zero.
-  const known = orders.size > 0;
+  // Listed counts come from the order cache. Every Character that can sell must have one:
+  // a missing cache would read their listings as gone and fire a false Out.
+  const orderScope = ESI_REGISTRY.getCharacterOrders.scope;
+  const sellers = (await db.tokens.toArray())
+    .filter((token) => (token.scopes ?? []).includes(orderScope))
+    .map((token) => token.characterId);
+  const known = sellers.length > 0 && sellers.every((id) => orders.has(id));
   const detected = detectOwnedStock(
     [...assets].map(([characterId, cached]) => ({ characterId, assets: cached.data })),
     new Set(typeIds)

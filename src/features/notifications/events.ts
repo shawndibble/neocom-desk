@@ -253,7 +253,8 @@ const CATALOG = [
     id: 'stockBelowTarget',
     labelKey: 'settings.notifications.event.stockBelowTarget',
     defaultChannels: 'both',
-    scope: requiredScope('getCharacterAssets'),
+    // Listed counts are the alert: they come from the pilot's own orders.
+    scope: requiredScope('getCharacterOrders'),
   },
 ] as const satisfies readonly CatalogRow[];
 

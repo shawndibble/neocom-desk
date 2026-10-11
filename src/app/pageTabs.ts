@@ -142,7 +142,7 @@ export const MARKET_TABS = definePageTabs('/market', [
 
 /**
  * Assets' Items tab owns the drill-down below it (`/assets/items/<location>/...`,
- * `PageTab.deep`), so Ships, Move and Targets (Stock Lists, issue #3521) sit beside it. Old links
+ * `PageTab.deep`), so Ships and Move sit beside it. Old links
  * (`/assets/<location>/...`, `/assets?view=ships`) move via
  * `PAGE_LEGACY_LOCATIONS`.
  */

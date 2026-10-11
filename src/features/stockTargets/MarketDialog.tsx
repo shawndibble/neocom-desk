@@ -115,7 +115,7 @@ function MarketPlacePicker({
 
   const { sellingNow, others } = useMemo(() => {
     const lower = typed.toLowerCase();
-    const sellingNow: PlaceOption[] = selling
+    const known: PlaceOption[] = selling
       .filter((place) => lower === '' || place.name.toLowerCase().includes(lower))
       .map((place) => ({
         id: place.locationId,
@@ -123,8 +123,11 @@ function MarketPlacePicker({
         kind: place.kind,
         orderCount: place.orderCount,
       }));
-    const taken = new Set(sellingNow.map((place) => place.id));
-    const others: PlaceOption[] =
+    const sellingNow = known.filter((place) => (place.orderCount ?? 0) > 0);
+    // Structures the pilot keeps items at lead the other places, even before typing.
+    const itemsHere = known.filter((place) => place.orderCount === 0);
+    const taken = new Set(known.map((place) => place.id));
+    const searched: PlaceOption[] =
       typed === ''
         ? []
         : [
@@ -133,6 +136,7 @@ function MarketPlacePicker({
             ),
             ...(structureHits?.key === searchKey ? structureHits.places : []),
           ].filter((place) => !taken.has(place.id));
+    const others = [...itemsHere, ...searched];
     return { sellingNow, others };
   }, [selling, stations, typed, structureHits, searchKey]);
   const options = [...sellingNow, ...others];
@@ -200,7 +204,11 @@ function MarketPlacePicker({
       <span className="text-xs text-text-dim">
         {t(`stockTargets.place.${place.kind}`)}
         {place.orderCount !== undefined &&
-          ` · ${t('stockTargets.list.sellOrders', { count: place.orderCount })}`}
+          ` · ${
+            place.orderCount > 0
+              ? t('stockTargets.list.sellOrders', { count: place.orderCount })
+              : t('stockTargets.list.itemsHere')
+          }`}
       </span>
     </li>
   );
@@ -256,6 +264,7 @@ export function MarketDialog({
   characterId,
   initial,
   returnFocusFallback,
+  takenBy,
   onSubmit,
   onClose,
 }: {
@@ -265,6 +274,8 @@ export function MarketDialog({
   initial?: { locationId: number; placeName: string; name: string };
   /** Where focus goes when the button that opened this is gone after Create. */
   returnFocusFallback?: () => HTMLElement | null;
+  /** The name of another market already kept at a place: one market per place. */
+  takenBy: (locationId: number) => string | undefined;
   onSubmit: (choice: MarketChoice) => void;
   onClose: () => void;
 }) {
@@ -279,7 +290,7 @@ export function MarketDialog({
   const [name, setName] = useState<string | null>(initial ? initial.name : null);
   const [seed, setSeed] = useState(true);
   const [listed, setListed] = useState<{ locationId: number; items: StockTarget[] } | null>(null);
-  const [error, setError] = useState<'location' | 'name' | null>(null);
+  const [error, setError] = useState<'location' | 'taken' | 'name' | null>(null);
 
   useEffect(() => {
     if (mode !== 'new' || picked === null) return;
@@ -314,6 +325,11 @@ export function MarketDialog({
             pickerRef.current?.focus();
             return;
           }
+          if (takenBy(picked.id) !== undefined) {
+            setError('taken');
+            pickerRef.current?.focus();
+            return;
+          }
           if (shownName.trim() === '') {
             setError('name');
             nameRef.current?.focus();
@@ -336,8 +352,8 @@ export function MarketDialog({
             inputRef={pickerRef}
             picked={picked}
             characterId={characterId}
-            invalid={error === 'location'}
-            describedBy={error === 'location' ? `${id}-error` : undefined}
+            invalid={error === 'location' || error === 'taken'}
+            describedBy={error === 'location' || error === 'taken' ? `${id}-error` : undefined}
             onPick={(place) => {
               // A rename the pilot typed survives a change of place; the default follows it.
               if (mode === 'change' && name === initial?.placeName) setName(null);
@@ -379,11 +395,13 @@ export function MarketDialog({
         )}
         {error !== null && (
           <FieldError id={`${id}-error`} className="block text-xs">
-            {t(
-              error === 'location'
-                ? 'stockTargets.list.locationRequired'
-                : 'stockTargets.list.nameRequired'
-            )}
+            {error === 'taken'
+              ? t('stockTargets.list.locationTaken', { name: picked ? takenBy(picked.id) : '' })
+              : t(
+                  error === 'location'
+                    ? 'stockTargets.list.locationRequired'
+                    : 'stockTargets.list.nameRequired'
+                )}
           </FieldError>
         )}
         <div className="flex justify-end gap-2">

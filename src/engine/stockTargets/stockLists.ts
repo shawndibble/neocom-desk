@@ -87,7 +87,7 @@ export function addStockList(
   list: { id: string; name: string; locationId: number; items?: readonly StockTarget[] }
 ): StockList[] {
   const name = list.name.trim();
-  if (name === '') return [...lists];
+  if (name === '' || stockListAt(lists, list.locationId)) return [...lists];
   return [
     ...lists,
     { id: list.id, name, locationId: list.locationId, items: usableTargets(list.items ?? []) },
@@ -113,7 +113,34 @@ export function setStockListLocation(
   listId: string,
   locationId: number
 ): StockList[] {
+  const there = stockListAt(lists, locationId);
+  if (there && there.id !== listId) return [...lists];
   return updateList(lists, listId, (list) => ({ ...list, locationId }));
+}
+
+/**
+ * The market kept at a station or structure. One list per place: an alert names
+ * its market by place, so two lists there would leave it unable to say which.
+ */
+export function stockListAt(
+  lists: readonly StockList[],
+  locationId: number
+): StockList | undefined {
+  return lists.find((list) => list.locationId === locationId);
+}
+
+/** Adds the Stock Targets a list does not have yet; an item already on it keeps its own. */
+export function addMissingStockTargets(
+  lists: readonly StockList[],
+  listId: string,
+  targets: readonly StockTarget[]
+): StockList[] {
+  const list = lists.find((l) => l.id === listId);
+  if (!list) return [...lists];
+  const have = new Set(list.items.map((item) => item.typeId));
+  return targets
+    .filter((item) => !have.has(item.typeId))
+    .reduce((acc, item) => setStockTarget(acc, listId, item.typeId, item.target), [...lists]);
 }
 
 /**

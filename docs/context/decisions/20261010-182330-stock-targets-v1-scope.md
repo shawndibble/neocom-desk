@@ -22,8 +22,12 @@ market they sell at stocked._
 - **With two or more markets the tab opens on a list of them, worst first
   (most Out, then most Low, then cost); with one it opens that market.** The
   user asked to see which market needs attention. A market's own page is a
-  deep sub-path (`/market/stock/<list id>`), so alerts, the Overview card
-  and a browser back all land on it.
+  deep sub-path (`/market/stock/<list id>`), so the Overview card and a
+  browser back land on it. **One market per station or structure**: an
+  alert carries the place (`?market=<location id>`, since alert subjects are
+  numbers and list ids are not), so a second list at the same place is
+  refused, and a shared market for a place already stocked fills in what
+  that market lacks rather than adding a twin.
 - **A new market can start from what the pilot already sells there**, each
   target set to the amount listed now. A pilot who already runs a market
   then only adjusts numbers; "Add everything I sell here" in the market's

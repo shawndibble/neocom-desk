@@ -54,16 +54,9 @@ export async function loadStockBoard(): Promise<StockBoardData | null> {
       : [];
     return { listId: list.id, name: list.name, summary: summarizeStock(rows) };
   });
-  const ranked = rankMarkets(
-    markets.map((market) => ({
-      ...market,
-      items: 0,
-      out: market.summary.out,
-      low: market.summary.low,
-      readyToList: market.summary.readyToList,
-      costToFill: market.summary.costToFill,
-    }))
-  ).map(({ listId, name, summary }) => ({ listId, name, summary }));
+  const ranked = rankMarkets(markets.map((market) => ({ ...market, ...market.summary }))).map(
+    ({ listId, name, summary }) => ({ listId, name, summary })
+  );
   return {
     markets: ranked,
     totals: {

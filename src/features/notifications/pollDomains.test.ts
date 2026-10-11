@@ -1530,6 +1530,7 @@ describe('stockTargetDomain (issue #3521)', () => {
     };
     await db.esiCache.put({ characterId: 2, key: 'assets', value: [asset], fetchedAt: 1 });
     await db.esiCache.put({ characterId: 1, key: 'orders', value: [order], fetchedAt: 1 });
+    await db.esiCache.put({ characterId: 2, key: 'orders', value: [], fetchedAt: 1 });
     expect(await stockTargetDomain.load(1)).toEqual([
       {
         listId: 'efa',
@@ -1541,6 +1542,14 @@ describe('stockTargetDomain (issue #3521)', () => {
         listed: 7,
         inHangar: 12,
       },
+    ]);
+  });
+
+  it('reads listed as unknown while any selling Character has no cached orders', async () => {
+    await db.tokens.bulkPut([token(1), token(2)]);
+    await db.esiCache.put({ characterId: 1, key: 'orders', value: [], fetchedAt: 1 });
+    expect(await stockTargetDomain.load(1)).toEqual([
+      expect.objectContaining({ typeId: 16240, listed: null }),
     ]);
   });
 

@@ -24,6 +24,7 @@ Skipped on purpose: killboards (zKillboard, EVE-KILL, nKillboard, Socket.Kill), 
 - **Needs local file access** (not a web fit): RIFT and EVE Wrench settings copy/backup, live chat-log tailing.
 - **PI**: stopped-colony and storage forecasts. PI pages are mid-overhaul, so recheck afterwards.
 - **No price feed**: abyssal module appraisal (MutaMarket) has no public price source here.
+- **Intel chat-log parser** (RIFT), rejected 2026-10-10: RIFT reads the chat logs live and alerts on its own; a paste-only parser here would be a weaker copy of what intel pilots already run.
 - **Niche, unverified**: Abyss run log, SRP loss-to-payout calculator, gank-efficiency and ESS raid calculators.
 
 ## Candidate gaps
@@ -31,7 +32,7 @@ Skipped on purpose: killboards (zKillboard, EVE-KILL, nKillboard, Socket.Kill), 
 1. **Hide bait orders** (ISK.GG scam filter). Market flags a sell price >= 10x best sell with `BaitFlag` but never hides it. A toggle is missing.
 2. **Multi-region price history** (ISK.GG). The Price History tab reads one region only. Band, average and the 7-day moving average already exist; the region comparison does not.
 3. **Incursion feed** (TradeLooper). Public ESI `/incursions`. Nothing in `src/` mentions it.
-4. **Intel chat-log parser** (RIFT). Paste channel text and get system/report intel plus nearby systems, in the style of the paste-based Local/D-Scan lookup. Paste-only; no live tailing.
-5. **Stockpile targets** (jEveAssets). Per-item target quantity across characters with a shortfall view. Already a known gap in `docs/research/competitors.md`.
+4. ~~Intel chat-log parser~~: rejected, see above.
+5. **Stockpile targets** (jEveAssets). Built as Market › Stock (issue #3521): markets the pilot sells at, with listed and hangar counts against targets.
 
 Smaller: ESI `/search` for systems and types in the command palette (palette has no solar-system search, `travel.md`), per-item price overrides in asset valuation, an ore-form (compressed vs raw vs refined) comparison on top of the Mining Survey.

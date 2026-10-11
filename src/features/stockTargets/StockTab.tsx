@@ -8,7 +8,12 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button, EmptyState, Spinner } from '@/components/ui';
 import { decodeStockListShare } from '@/engine/stockTargets/stockListShare';
-import { addStockList, type StockList } from '@/engine/stockTargets/stockLists';
+import {
+  addMissingStockTargets,
+  addStockList,
+  stockListAt,
+  type StockList,
+} from '@/engine/stockTargets/stockLists';
 import { useMarketHub } from '@/features/market/hub';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
@@ -114,8 +119,14 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
       <Button
         variant="primary"
         onClick={() => {
-          const id = newStockListId();
-          save(addStockList(lists, { id, ...shared }));
+          // One market per place: a share for a place already stocked fills in what it lacks.
+          const existing = stockListAt(lists, shared.locationId);
+          const id = existing?.id ?? newStockListId();
+          save(
+            existing
+              ? addMissingStockTargets(lists, existing.id, shared.items)
+              : addStockList(lists, { id, ...shared })
+          );
           dismissShared();
           open(id);
         }}
@@ -130,6 +141,7 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
       mode="new"
       characterId={activeCharacterId}
       returnFocusFallback={heading}
+      takenBy={(locationId) => stockListAt(lists, locationId)?.name}
       onSubmit={create}
       onClose={() => setCreating(false)}
     />

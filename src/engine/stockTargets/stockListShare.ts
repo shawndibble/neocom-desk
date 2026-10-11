@@ -38,11 +38,15 @@ function base36Int(text: string): number | null {
 }
 
 export function decodeStockListShare(code: string): SharedStockList | null {
-  let text: string;
-  try {
-    text = decodeURIComponent(code);
-  } catch {
-    return null;
+  // A link's query string is decoded once already (`searchParams.get`): decoding a
+  // name with a "%" in it again would throw. Only a still-encoded code is decoded.
+  let text = code;
+  if (!code.includes('|')) {
+    try {
+      text = decodeURIComponent(code);
+    } catch {
+      return null;
+    }
   }
   const parts = text.split('|');
   if (parts.length !== 4 || parts[0] !== VERSION) return null;

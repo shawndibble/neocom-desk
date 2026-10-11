@@ -10395,9 +10395,11 @@
       "otherPlaces": "Other stations and structures",
       "sellOrders_one": "{{count}} sell order",
       "sellOrders_other": "{{count}} sell orders",
+      "itemsHere": "your items are here",
+      "locationTaken": "You already stock this place as \"{{name}}\".",
       "seed_one": "Start with the {{count}} item I'm selling here",
       "seed_other": "Start with the {{count}} items I'm selling here",
-      "seedHint": "Each starts with its current listed amount as the target. Change any of them afterwards."
+      "seedHint": "Each starts with its current listed amount as its stock target. Change any of them afterwards."
     },
     "add": {
       "open": "Add items…",
