@@ -3694,10 +3694,7 @@
           "summary": "{{undercut}} of {{open}} open orders are undercut. {{expiring}} more are expiring or stale."
         },
         "industry": {
-          "max_one": "max {{count}} job in an hour",
-          "max_other": "max {{count}} jobs in an hour",
-          "note": "Jobs finishing each hour",
-          "summary": "{{total}} jobs: {{ready}} ready now, the rest finishing over the next {{hours}} hours, and {{later}} later."
+          "note": "How far along each job is; time left at the end"
         },
         "training": {
           "note": "Time per skill in your queue"
@@ -3731,13 +3728,14 @@
         },
         "profit": {
           "summary": "Realized profit {{total}} from {{runs}} logged runs in the last {{range}} days. Per period, oldest first: {{buckets}}.",
-          "noteDaily": "ISK earned per day (a loss draws as an empty bar)",
-          "noteWeekly": "ISK earned per week (a loss draws as an empty bar)"
+          "noteDaily": "ISK profit per day; a loss hangs below the axis",
+          "noteWeekly": "ISK profit per week; a loss hangs below the axis"
         },
         "miningYield": {
           "summary": "Averaging {{average}} ISK a day over the last {{range}} days, {{days}} of them with mining, {{total}} in all.",
           "note": "ISK mined per day",
-          "noteSince": "ISK mined per day (saved history starts {{date}})"
+          "noteSince": "ISK mined per day (saved history starts {{date}})",
+          "average": "avg {{value}}/day"
         }
       },
       "data": {
@@ -3864,17 +3862,38 @@
         "empty": "No industry jobs running.",
         "ready": "ready",
         "running": "running",
-        "next": "Next: {{name}}, {{duration}}"
+        "next": "Next: {{name}}, {{duration}}",
+        "col": {
+          "job": "Job",
+          "ends": "Ends in",
+          "progress": "Done",
+          "activity": "Activity",
+          "location": "Location"
+        }
       },
       "profit": {
         "title": "Realized profit",
         "description": "What your builds earned",
-        "empty": "No production has been logged yet."
+        "empty": "No production has been logged yet.",
+        "vsPrevious_one": "{{delta}} vs the previous day",
+        "vsPrevious_other": "{{delta}} vs the previous {{count}} days",
+        "col": {
+          "product": "Product",
+          "profit": "Profit",
+          "built": "Built",
+          "perUnit": "Per unit"
+        }
       },
       "miningYield": {
         "title": "Mining yield",
         "description": "ISK per day from your mining",
-        "empty": "No mining recorded in this range."
+        "empty": "No mining recorded in this range.",
+        "col": {
+          "ore": "Ore",
+          "isk": "ISK",
+          "share": "Share",
+          "units": "Units"
+        }
       },
       "survey": {
         "title": "Mining survey",
@@ -3885,27 +3904,79 @@
         "title": "Planetary",
         "description": "Colonies and when their extractors run out",
         "empty": "No colonies yet",
-        "unit": "colonies"
+        "unit": "colonies",
+        "untilNext": "until the first extractor ends",
+        "stoppedUnit": "colonies stopped",
+        "idleUnit": "planets with no extractor",
+        "unnamed": "Planet #{{id}}",
+        "stopped_one": "{{count}} colony stopped",
+        "stopped_other": "{{count}} colonies stopped",
+        "together_one": "{{count}} of {{total}} colonies end together",
+        "together_other": "{{count}} of {{total}} colonies end together",
+        "state": {
+          "running": "Running",
+          "soon": "Ending soon",
+          "stopped": "Stopped",
+          "idle": "No extractor"
+        },
+        "col": {
+          "colony": "Colony",
+          "ends": "Ends in",
+          "state": "State",
+          "programs": "Programs"
+        }
       },
       "structures": {
         "title": "Structures",
         "description": "Reinforcement timers, fuel and offline services",
         "empty": "There are no structures to show.",
-        "fuelLeft": "fuel left"
+        "fuelLeft": "fuel left",
+        "state": {
+          "ok": "OK",
+          "lowFuel": "Low fuel",
+          "offline": "Service offline"
+        },
+        "col": {
+          "structure": "Structure",
+          "fuel": "Fuel left",
+          "state": "State",
+          "timer": "Timer"
+        }
       },
       "moonChunks": {
         "title": "Moon extractions",
         "description": "Moon drills and when their chunks arrive or decay",
         "empty": "No moon drills running.",
         "ready": "chunks ready",
-        "untilNext": "until the next chunk"
+        "untilNext": "until the next chunk",
+        "queued": "{{name}} · {{count}} queued",
+        "event": {
+          "arrival": "Chunk arrives",
+          "decay": "Chunk decays"
+        },
+        "col": {
+          "drill": "Drill",
+          "in": "In",
+          "event": "Event"
+        }
       },
       "incursions": {
         "title": "Incursions",
         "description": "The nearest Incursions to your current system",
         "empty": "No Incursions are active.",
         "unit": "active",
-        "nearest": "Nearest: {{system}}, {{jumps}}"
+        "nearest": "Nearest: {{system}}, {{jumps}}",
+        "jumpsAway_one": "jump to the nearest",
+        "jumpsAway_other": "jumps to the nearest",
+        "nearestActive": "{{system}} · {{count}} active",
+        "withBoss": "{{state}}, boss",
+        "col": {
+          "system": "System",
+          "jumps": "Jumps",
+          "state": "State",
+          "influence": "Influence",
+          "constellation": "Constellation"
+        }
       },
       "routeSafety": {
         "title": "Route safety",

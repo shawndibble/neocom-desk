@@ -458,31 +458,6 @@ describe('location', () => {
 });
 
 describe('charts on the existing kinds', () => {
-  it('draws industry jobs finishing per hour, the done ones in the first', () => {
-    const job = (id: number, end: number) => ({
-      job_id: id,
-      activity_id: 1,
-      runs: 1,
-      blueprint_type_id: 5,
-      product_type_id: 6,
-      end_date: iso(end),
-      status: 'active',
-    });
-    const feeds: Feeds = {
-      industry: ok({
-        jobs: [job(1, NOW - HOUR), job(2, NOW + 30 * 60_000), job(3, NOW + 5 * HOUR)],
-        productNames: new Map(),
-        needsReauth: false,
-        fetchedAt: new Date(NOW),
-      }) as never,
-    };
-    const view = buildView('industry', feeds, ctx());
-    if (view.chart?.kind !== 'bars') throw new Error('bars');
-    expect(view.chart.values[0]).toBe(2);
-    expect(view.chart.values[5]).toBe(1);
-    expect(view.chart.max).toContain('"count":2');
-  });
-
   it('charts the time each queued skill takes', () => {
     const feeds: Feeds = {
       skills: ok({

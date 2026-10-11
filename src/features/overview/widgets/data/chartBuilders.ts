@@ -12,20 +12,15 @@ import type { DeadlineSeverity } from '@/engine/severity';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type {
   AreaChartModel,
-  BarsChartModel,
   ChartColor,
   DonutChartModel,
   HBarRow,
   HBarsChartModel,
 } from '../charts/types';
 import { sharesOfMax } from '../charts/geometry';
-import { forwardBucketCounts } from './chartSeries';
 import type { Translate } from './types';
 
 const K = 'overview.widgets.chart';
-const HOUR_MS = 3_600_000;
-/** Hours the industry chart looks ahead. */
-export const INDUSTRY_CHART_HOURS = 12;
 
 /** A status colour for a row whose length is itself an urgency (time left to act). */
 export function severityColor(severity: DeadlineSeverity): ChartColor {
@@ -52,31 +47,6 @@ export function ordersDonut(
     centreNote: t(`${K}.orders.open`),
     note: expiring > 0 ? t(`${K}.orders.note`, { count: expiring }) : undefined,
     summary: t(`${K}.orders.summary`, { undercut, open, expiring }),
-  };
-}
-
-/** Jobs finishing in each of the next hours, those already done counted in the first. Null with no jobs. */
-export function industryBars(
-  t: Translate,
-  endTimes: readonly number[],
-  now: number
-): BarsChartModel | null {
-  if (endTimes.length === 0) return null;
-  const { counts, later } = forwardBucketCounts(endTimes, now, HOUR_MS, INDUSTRY_CHART_HOURS);
-  const tallest = Math.max(...counts);
-  return {
-    kind: 'bars',
-    values: counts,
-    max: t(`${K}.industry.max`, { count: tallest }),
-    xStart: t(`${K}.now`),
-    xEnd: t(`${K}.inHours`, { count: INDUSTRY_CHART_HOURS }),
-    note: t(`${K}.industry.note`),
-    summary: t(`${K}.industry.summary`, {
-      total: endTimes.length,
-      ready: endTimes.filter((at) => at <= now).length,
-      hours: INDUSTRY_CHART_HOURS,
-      later,
-    }),
   };
 }
 

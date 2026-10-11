@@ -36,13 +36,15 @@ export interface AreaChartModel extends ChartBase {
 
 export interface BarsChartModel extends ChartBase {
   kind: 'bars';
-  /** Oldest first. */
+  /** Oldest first. A negative value draws below a zero axis. */
   values: number[];
   /** "max 3 jobs": the tallest bar's value, already formatted. */
   max: string;
   /** The time range's two ends ("30 days ago", "today"). */
   xStart?: string;
   xEnd?: string;
+  /** A dashed reference line across the bars (a daily average); its value is on the bars' own scale. */
+  ref?: { value: number; label: string };
 }
 
 export interface HBarRow {

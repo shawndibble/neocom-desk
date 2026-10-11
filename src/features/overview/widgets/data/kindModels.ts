@@ -5,8 +5,6 @@
  * time, the widget's range applied here over data shared by every widget of
  * the kind.
  */
-import { filterYieldRange, eveToday, rangeDates, daysCovered } from '@/engine/miningTax/yieldRange';
-import type { MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
 import { journalRefTypeBreakdown } from '@/features/character/walletJournalFilter';
@@ -17,10 +15,9 @@ import type { LayerId } from '@/engine/netWorth/series';
 import type { ChartColor, StackPart } from '../charts/types';
 import { blank, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { hbarsFromRows } from './chartBuilders';
-import { backwardBucketSums, journalCoverageDays, withinRange } from './chartSeries';
+import { journalCoverageDays, withinRange } from './chartSeries';
 import type { FeedId, ListRow, NumberModel } from './types';
 
-const DAY_MS = 86_400_000;
 const D = 'overview.widgets.data';
 const C = 'overview.widgets.chart';
 
@@ -179,167 +176,6 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
     })),
     summary,
     chart: { kind: 'stack', parts, note: t(`${C}.netWorth.note`, { day }), summary },
-  };
-};
-
-// --- Realized profit --------------------------------------------------------------
-
-const profit: Builder = (feeds, { t, now, range }) => {
-  const feed = feeds.profit;
-  const data = feed?.data ?? null;
-  const to = '/industry';
-  if (!data) return blank(to, statusOf(feed));
-  const inRange = data.runs.filter(
-    (run) => run.loggedAt >= now - range * DAY_MS && run.loggedAt <= now
-  );
-  const total = inRange.reduce((sum, run) => sum + run.profit, 0);
-  // A week is the unit the spec asks for; a 7-day range has too few weeks to be a chart, so days.
-  const daily = range <= 7;
-  const bucketMs = daily ? DAY_MS : 7 * DAY_MS;
-  const buckets = daily ? range : Math.ceil(range / 7);
-  const values = backwardBucketSums(
-    data.runs,
-    (run) => run.loggedAt,
-    (run) => run.profit,
-    now,
-    bucketMs,
-    buckets
-  );
-  const byProduct = new Map<number, { profit: number; built: number }>();
-  for (const run of inRange) {
-    const row = byProduct.get(run.productTypeID) ?? { profit: 0, built: 0 };
-    row.profit += run.profit;
-    row.built += run.quantity;
-    byProduct.set(run.productTypeID, row);
-  }
-  const rows: ListRow[] = [...byProduct.entries()]
-    .sort((a, b) => b[1].profit - a[1].profit)
-    .map(([typeId, row]) => ({
-      key: String(typeId),
-      title: data.names.get(typeId) ?? `#${typeId}`,
-      detail: t(`${D}.profit.built`, { count: row.built }),
-      value: formatIskCompactSigned(row.profit),
-      iskAmount: row.profit,
-      tone: 'clear',
-    }));
-  const summary = t(`${C}.profit.summary`, {
-    total: formatIskCompactSigned(total),
-    runs: inRange.length,
-    range,
-    buckets: values.map((v) => formatIskCompactSigned(v)).join(', '),
-  });
-  return {
-    ...blank(to, statusOf(feed, { isEmpty: data.runs.length === 0 })),
-    number: {
-      value: formatIskCompactSigned(total),
-      iskAmount: total,
-      unit: t('overview.isk'),
-      tone: 'clear',
-    },
-    rows,
-    summary,
-    chart:
-      inRange.length === 0
-        ? undefined
-        : {
-            kind: 'bars',
-            values,
-            max: t(`${C}.max`, { value: formatIskCompact(Math.max(0, ...values)) }),
-            xStart: t(daily ? `${C}.daysAgo` : `${C}.weeksAgo`, { count: buckets }),
-            xEnd: t(daily ? `${C}.today` : `${C}.thisWeek`),
-            note: t(daily ? `${C}.profit.noteDaily` : `${C}.profit.noteWeekly`),
-            summary,
-          },
-  };
-};
-
-// --- Mining yield -----------------------------------------------------------------
-
-const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) => {
-  const feed = feeds.miningYield;
-  const data = feed?.data ?? null;
-  const to = '/mining';
-  if (!data) return blank(to, statusOf(feed));
-  const everyone = scopeAll || activeCharacterId === null;
-  const rows = data.rows.filter((row) => everyone || row.characterId === activeCharacterId);
-  const needsPermission = everyone
-    ? data.trackedIds.length > 0 && data.reauthIds.length === data.trackedIds.length
-    : activeCharacterId !== null &&
-      (data.reauthIds.includes(activeCharacterId) || !data.trackedIds.includes(activeCharacterId));
-  const window = `${range}d` as MiningYieldRange;
-  const today = eveToday(new Date(now));
-  const inRange = filterYieldRange(rows, window, today);
-  const perDay = new Map<string, number>();
-  const perOre = new Map<number, number>();
-  for (const row of inRange) {
-    perDay.set(row.date, (perDay.get(row.date) ?? 0) + row.isk);
-    for (const ore of row.ores) perOre.set(ore.typeId, (perOre.get(ore.typeId) ?? 0) + ore.isk);
-  }
-  const values = rangeDates(window, today).map((date) => perDay.get(date) ?? 0);
-  const total = values.reduce((sum, v) => sum + v, 0);
-  const average = total / range;
-  const covered = daysCovered(
-    inRange.map((row) => row.date),
-    window,
-    today,
-    data.oldestSaved
-  );
-  const oreTotal = [...perOre.values()].reduce((sum, v) => sum + v, 0);
-  const oreRows: ListRow[] = [...perOre.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([typeId, isk]) => ({
-      key: String(typeId),
-      title: data.typeNames.get(typeId) ?? `#${typeId}`,
-      detail:
-        oreTotal > 0
-          ? t(`${D}.miningYield.share`, { pct: Math.round((isk / oreTotal) * 100) })
-          : undefined,
-      value: formatIskCompact(isk),
-      iskAmount: isk,
-      tone: 'clear',
-    }));
-  const summary = t(`${C}.miningYield.summary`, {
-    average: formatIskCompact(average),
-    days: covered.daysWithData,
-    range,
-    total: formatIskCompact(total),
-  });
-  return {
-    ...blank(
-      to,
-      statusOf(feed, { needsPermission, isEmpty: !needsPermission && rows.length === 0 })
-    ),
-    fetchedAt: data.fetchedAt,
-    number: {
-      value: formatIskCompact(average),
-      iskAmount: average,
-      unit: t(`${D}.miningYield.unit`),
-      // The headline is the average; the best day is the fact it lacks. The history caveat lives in the chart caption.
-      secondary:
-        Math.max(...values) > 0
-          ? {
-              text: t(`${D}.miningYield.bestDay`, { value: formatIskCompact(Math.max(...values)) }),
-            }
-          : undefined,
-      tone: 'clear',
-    },
-    rows: oreRows,
-    summary,
-    chart:
-      total <= 0
-        ? undefined
-        : {
-            kind: 'bars',
-            values,
-            max: t(`${C}.max`, { value: formatIskCompact(Math.max(...values)) }),
-            xStart: t(`${C}.daysAgo`, { count: range }),
-            xEnd: t(`${C}.today`),
-            note:
-              covered.historyStartsInRange !== null
-                ? t(`${C}.miningYield.noteSince`, { date: covered.historyStartsInRange })
-                : t(`${C}.miningYield.note`),
-            summary,
-          },
   };
 };
 
@@ -528,8 +364,6 @@ const location: Builder = (feeds, { t }) => {
 export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   walletFlow,
   netWorth,
-  profit,
-  miningYield,
   lp,
   clones,
   location,

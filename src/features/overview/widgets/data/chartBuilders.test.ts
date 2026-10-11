@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   hbarsFromRows,
-  industryBars,
   ordersDonut,
   queueSegments,
   severityColor,
@@ -11,7 +10,6 @@ import {
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const HOUR = 3_600_000;
 
 describe('ordersDonut', () => {
   it('splits open orders into not undercut and undercut, the undercut slice equal to the headline', () => {
@@ -40,21 +38,6 @@ describe('ordersDonut', () => {
   it('does not colour undercut in a series hue, and never red', () => {
     const colors = ordersDonut(t, { open: 3, undercut: 1, expiring: 0 }).parts.map((p) => p.color);
     expect(colors).toEqual(['neutral', 'warning']);
-  });
-});
-
-describe('industryBars', () => {
-  it('is null with no jobs', () => {
-    expect(industryBars(t, [], NOW)).toBeNull();
-  });
-
-  it('counts per hour with the done jobs in the first, and says what finishes later', () => {
-    const model = industryBars(t, [NOW - HOUR, NOW + 90 * 60_000, NOW + 30 * HOUR], NOW)!;
-    expect(model.values).toHaveLength(12);
-    expect(model.values.slice(0, 3)).toEqual([1, 1, 0]);
-    expect(model.xStart).toBe('overview.widgets.chart.now');
-    expect(model.summary).toContain('"later":1');
-    expect(model.max).toContain('"count":1');
   });
 });
 

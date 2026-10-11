@@ -14,19 +14,9 @@ import { severityForRemaining, type DeadlineSeverity } from '@/engine/severity';
 import { soonestCalendarDeadline, upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import { UNDERCUT_PROBLEMS } from '@/engine/market/orderProblems';
-import type { CorpBoardItem } from '@/engine/corp/board';
-import {
-  activityI18nKey,
-  isJobDone,
-  secondsRemaining,
-  sortJobsBySoonest,
-  summarizeJobs,
-} from '@/features/industry/jobs';
 import { buildOpenOrderRows, openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import { openOrdersHref } from '@/features/market/openOrdersFilter';
-import { structureStateLabel } from '@/features/corp/boardSources';
 import { stockBoardSeverity } from '@/features/stockTargets/stockBoard';
-import { routeToHref } from '@/features/travel/routeSafetyLink';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
@@ -38,12 +28,9 @@ import {
   comingUpEventSeverity,
   comingUpSeverity,
   contractsSeverity,
-  industrySeverity,
-  jobSeverity,
   mailSeverity,
   miningTaxSeverity,
   ordersSeverity,
-  planetarySeverity,
   priceAlertsSeverity,
   spExtractionSeverity,
 } from '../../boardSeverity';
@@ -51,47 +38,25 @@ import {
   comingUpSummary,
   contractsDeadlineNote,
   contractsSummary,
-  industrySummary,
   mailSummary,
   miningTaxSummary,
-  moonChunksSummary,
   ordersSummary,
-  planetarySummary,
   priceAlertsSummary,
   spExtractionSummary,
   stockBoardSummary,
-  structuresSummary,
 } from '../../boardSummary';
-import {
-  moonChunkSeverity,
-  moonChunksDeadline,
-  moonChunksSeverity,
-  structureCounts,
-  structuresDeadline,
-  structuresSeverity,
-  structuresView,
-} from '../../corpCards';
 import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../boardData';
-import { incursionJumpsWhen, incursionsSeverity, incursionsSummary } from '../../incursionsBoard';
-import type { IncursionsBoardData } from '../../incursionsBoard';
 import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
-import {
-  hbarsFromRows,
-  industryBars,
-  ordersDonut,
-  queueSegments,
-  severityColor,
-  walletArea,
-} from './chartBuilders';
+import { hbarsFromRows, ordersDonut, queueSegments, walletArea } from './chartBuilders';
 import { dailyBalanceSeries } from './chartSeries';
 import { KIND_BUILDERS, KIND_FEED_LISTS } from './kindModels';
+import { WORLD_BUILDERS } from './worldModels';
 import type {
   BuildContext,
   FeedId,
   Feeds,
   KindView,
   ListRow,
-  NumberModel,
   NumberSecondary,
   Translate,
 } from './types';
@@ -577,144 +542,6 @@ const contracts: Builder = (feeds, { t, now }) => {
   };
 };
 
-const industry: Builder = (feeds, { t, now }) => {
-  const feed = feeds.industry;
-  const data = feed?.data ?? null;
-  const to = '/industry';
-  if (!data) return blank(to, statusOf(feed));
-  const { jobs } = data;
-  const summary = summarizeJobs(jobs, now);
-  const running = sortJobsBySoonest(jobs.filter((job) => !isJobDone(job, now)));
-  const done = jobs.filter((job) => isJobDone(job, now));
-  const oldestDoneMs =
-    done.length > 0 ? Math.min(...done.map((job) => Date.parse(job.end_date))) : null;
-  const list: ListRow[] = [];
-  if (summary.done > 0) {
-    list.push({
-      key: 'ready',
-      title: t('overview.board.jobsReady', { count: summary.done }),
-      detail:
-        oldestDoneMs === null
-          ? undefined
-          : t('overview.board.oldestFinished', {
-              age: formatDuration(Math.max(0, now - oldestDoneMs) / 1000),
-            }),
-      value: t('overview.board.ready'),
-      tone: 'warning',
-    });
-  }
-  for (const job of running) {
-    list.push({
-      key: String(job.job_id),
-      title: t('overview.board.jobSubject', {
-        name: data.productNames.get(job.job_id) ?? t('overview.board.unknownProduct'),
-        count: job.runs,
-      }),
-      detail: t(activityI18nKey(job.activity_id), { id: job.activity_id }),
-      value: formatDuration(secondsRemaining(job, now)),
-      tone: jobSeverity(job, now),
-    });
-  }
-  const nextJobMs = running.length > 0 ? Date.parse(running[0].end_date) : Number.NaN;
-  const ready = summary.done > 0;
-  // The headline is a count; the next clock is the fact it lacks.
-  const nextJobSecondary = (): NumberSecondary | undefined => {
-    const next = running[0];
-    if (!next) return undefined;
-    return {
-      text: t('overview.widgets.industry.next', {
-        name: t('overview.board.jobSubject', {
-          name: data.productNames.get(next.job_id) ?? t('overview.board.unknownProduct'),
-          count: next.runs,
-        }),
-        duration: formatDuration(secondsRemaining(next, now)),
-      }),
-    };
-  };
-  return {
-    ...blank(to, statusOf(feed, { needsPermission: data.needsReauth, isEmpty: jobs.length === 0 })),
-    fetchedAt: data.fetchedAt,
-    number: {
-      value: count(ready ? summary.done : summary.running),
-      unit: t(ready ? 'overview.widgets.industry.ready' : 'overview.widgets.industry.running'),
-      secondary: nextJobSecondary(),
-      tone: industrySeverity(jobs, data.needsReauth, now),
-    },
-    rows: list,
-    deadlines: Number.isNaN(nextJobMs)
-      ? []
-      : [{ at: nextJobMs, note: t('overview.board.nextJob'), severity: 'watch', to }],
-    summary: industrySummary(t, data, now),
-    chart:
-      industryBars(
-        t,
-        jobs.map((job) => Date.parse(job.end_date)).filter((at) => !Number.isNaN(at)),
-        now
-      ) ?? undefined,
-  };
-};
-
-const planetary: Builder = (feeds, { t, now }) => {
-  const feed = feeds.planetary;
-  const data = feed?.data ?? null;
-  const to = '/planetary-industry';
-  if (!data) return blank(to, statusOf(feed));
-  const nextBatch = data.batches.find((batch) => batch.kind === 'running');
-  return {
-    ...blank(
-      to,
-      statusOf(feed, { needsPermission: data.needsReauth, isEmpty: data.colonyCount === 0 })
-    ),
-    fetchedAt: data.fetchedAt,
-    number: {
-      value: count(data.colonyCount),
-      unit: t('overview.widgets.planetary.unit'),
-      secondary: { text: planetarySummary(t, data) },
-      tone: planetarySeverity(data) ?? 'clear',
-    },
-    rows: data.batches.map((batch) => ({
-      key: `${batch.kind}:${batch.expiryMs ?? 'none'}`,
-      title: t(`overview.board.batch.${batch.kind}`, { count: batch.colonies.length }),
-      detail: batch.colonies.map((colony) => colony.name ?? `#${colony.planetId}`).join(', '),
-      value:
-        batch.kind === 'idle'
-          ? t('overview.board.noProgram')
-          : batch.kind === 'expired'
-            ? t('overview.board.stopped')
-            : formatDuration(Math.max(0, (batch.expiryMs ?? 0) - now) / 1000),
-      tone: batch.severity,
-    })),
-    deadlines: nextBatch?.expiryMs
-      ? [
-          {
-            at: nextBatch.expiryMs,
-            note: t('overview.board.batch.running', { count: nextBatch.colonies.length }),
-            severity: nextBatch.severity,
-            to,
-          },
-        ]
-      : [],
-    summary: planetarySummary(t, data),
-    chart:
-      hbarsFromRows(
-        t,
-        data.batches
-          .filter((batch) => batch.kind === 'running' && batch.expiryMs !== null)
-          .map((batch) => {
-            const seconds = Math.max(0, (batch.expiryMs ?? 0) - now) / 1000;
-            return {
-              key: `${batch.kind}:${batch.expiryMs}`,
-              label: t('overview.board.batch.running', { count: batch.colonies.length }),
-              value: seconds,
-              text: formatDuration(seconds),
-              color: severityColor(batch.severity),
-            };
-          }),
-        t('overview.widgets.chart.planetary.note')
-      ) ?? undefined,
-  };
-};
-
 /** The headline is the ISK owed; how long it has been owed is the fact it lacks. */
 function miningTaxSecondary(t: Translate, data: MiningTaxBoardData): NumberSecondary | undefined {
   if (data.unpaidIsk > 0 && data.oldestUnpaidDays !== null) {
@@ -767,173 +594,6 @@ const miningTax: Builder = (feeds, { t }) => {
       },
     ],
     summary: miningTaxSummary(t, data),
-  };
-};
-
-function structureWhen(item: CorpBoardItem, t: Translate): string {
-  if (item.timing === 'passed') return t('overview.board.structureDry');
-  if (item.timing === 'untimed') return t('overview.board.structureOffline');
-  // A clock shorter than CCP's hour-long cache may already be over, so it is not ticked down.
-  if (item.withinStaleWindow) return t('overview.board.structureSoon');
-  return formatDuration(Math.max(0, item.remainingMs ?? 0) / 1000);
-}
-
-/**
- * The lowest fuel clock leads (the question a pilot asks of a fleet of
- * structures); with no fuel clock it falls back to the reinforcement count. A
- * zero count is never toned: a warning beside "0 Timers" contradicts itself.
- */
-function structuresNumber(
-  t: Translate,
-  items: readonly CorpBoardItem[],
-  timers: number,
-  tone: DeadlineSeverity
-): NumberModel {
-  const lowest = items
-    .filter((item) => item.kind === 'structureFuel' && item.timing === 'timed')
-    .sort((a, b) => (a.remainingMs ?? 0) - (b.remainingMs ?? 0))[0];
-  if (lowest) {
-    return {
-      value: formatDuration(Math.max(0, lowest.remainingMs ?? 0) / 1000),
-      unit: t('overview.widgets.structures.fuelLeft'),
-      secondary: {
-        text: timers > 0 ? t('overview.board.structuresTimers', { count: timers }) : lowest.subject,
-      },
-      tone,
-    };
-  }
-  return {
-    value: count(timers),
-    unit: t('overview.board.reinforced'),
-    tone: timers > 0 ? tone : 'clear',
-  };
-}
-
-const structures: Builder = (feeds, { t, now }) => {
-  const feed = feeds.structures;
-  const raw = feed?.data ?? null;
-  const to = '/corp';
-  if (!raw) return blank(to, statusOf(feed));
-  const view = structuresView(raw, now);
-  const items = view.items;
-  // A grant lapsed: ask for it. No roles: a grant would not fix that, so say so.
-  if (items === null) {
-    return {
-      ...blank(
-        to,
-        statusOf(feed, { needsPermission: view.needsReauth, isEmpty: !view.needsReauth })
-      ),
-      emptyMessage: t('overview.board.corpUnreadable'),
-      summary: structuresSummary(t, view),
-    };
-  }
-  const counts = structureCounts(items);
-  const flagged = items.filter(
-    (item) => item.kind !== 'structureFuel' || item.severity !== 'clear'
-  );
-  const clock = structuresDeadline(items, now);
-  return {
-    ...blank(to, statusOf(feed, { isEmpty: view.structureCount === 0 })),
-    fetchedAt: view.fetchedAt,
-    number: structuresNumber(t, items, counts.timers, structuresSeverity(view) ?? 'clear'),
-    rows: flagged.map((item) => ({
-      key: item.id,
-      title: item.subject,
-      detail:
-        item.kind === 'structureTimer'
-          ? structureStateLabel(item.detail)
-          : item.kind === 'serviceOffline'
-            ? t('overview.board.serviceOffline', { service: item.detail })
-            : t('overview.board.fuelRunsOut'),
-      value: structureWhen(item, t),
-      tone: item.severity,
-    })),
-    deadlines: clock
-      ? [
-          {
-            at: clock.atMs,
-            note: t(`overview.board.structureDeadline.${clock.kind}`, { subject: clock.subject }),
-            severity: clock.severity,
-            to,
-          },
-        ]
-      : [],
-    summary: structuresSummary(t, view),
-    chart:
-      hbarsFromRows(
-        t,
-        items
-          .filter((item) => item.kind === 'structureFuel' && item.timing === 'timed')
-          .map((item) => {
-            const seconds = Math.max(0, item.remainingMs ?? 0) / 1000;
-            return {
-              key: item.id,
-              label: item.subject,
-              value: seconds,
-              text: formatDuration(seconds),
-              color: severityColor(item.severity),
-            };
-          }),
-        t('overview.widgets.chart.structures.note')
-      ) ?? undefined,
-  };
-};
-
-const moonChunks: Builder = (feeds, { t, now }) => {
-  const feed = feeds.moonChunks;
-  const data = feed?.data ?? null;
-  const to = '/corp';
-  if (!data) return blank(to, statusOf(feed));
-  if (data.chunks === null) {
-    return {
-      ...blank(
-        to,
-        statusOf(feed, { needsPermission: data.needsReauth, isEmpty: !data.needsReauth })
-      ),
-      emptyMessage: t('overview.board.corpUnreadable'),
-      summary: moonChunksSummary(t, data, now),
-    };
-  }
-  const chunks = [...data.chunks].sort((a, b) => a.deadlineMs - b.deadlineMs);
-  const ready = chunks.filter((chunk) => chunk.detail === 'decay').length;
-  const nextChunk = moonChunksDeadline(data.chunks, now);
-  return {
-    ...blank(to, statusOf(feed, { isEmpty: chunks.length === 0 })),
-    fetchedAt: data.fetchedAt,
-    number:
-      ready > 0 || !nextChunk
-        ? {
-            value: count(ready),
-            unit: t('overview.widgets.moonChunks.ready'),
-            tone: moonChunksSeverity(data, now) ?? 'clear',
-          }
-        : {
-            value: formatCountdown(Math.max(0, nextChunk.deadlineMs - now) / 1000),
-            unit: t('overview.widgets.moonChunks.untilNext'),
-            secondary: { text: nextChunk.subject },
-            tone: moonChunksSeverity(data, now) ?? 'clear',
-          },
-    rows: chunks.map((chunk) => ({
-      key: chunk.id,
-      title: chunk.subject,
-      detail: t(`overview.board.chunk.${chunk.detail === 'decay' ? 'decay' : 'arrival'}`),
-      value: formatDuration(Math.max(0, chunk.deadlineMs - now) / 1000),
-      tone: moonChunkSeverity(chunk, now),
-    })),
-    deadlines: nextChunk
-      ? [
-          {
-            at: nextChunk.deadlineMs,
-            note: t(
-              `overview.board.chunkDeadline.${nextChunk.detail === 'decay' ? 'decay' : 'arrival'}`,
-              { subject: nextChunk.subject }
-            ),
-            severity: moonChunkSeverity(nextChunk, now),
-            to,
-          },
-        ]
-      : [],
-    summary: moonChunksSummary(t, data, now),
   };
 };
 
@@ -1065,56 +725,6 @@ const priceWatch: Builder = (feeds, { t }) => {
   };
 };
 
-/** The nearest staging system and its distance, when there is one: the fact the active count lacks. */
-function nearestIncursion(t: Translate, data: IncursionsBoardData): NumberSecondary | undefined {
-  const nearest = data.rows[0];
-  if (!nearest || nearest.jumps === null) return undefined;
-  return {
-    text: t('overview.widgets.incursions.nearest', {
-      system:
-        data.systemNames.get(nearest.stagingSystemId) ??
-        t('travel.stops.unnamed', { id: nearest.stagingSystemId }),
-      jumps: incursionJumpsWhen(t, nearest, data.jumpsStatus),
-    }),
-  };
-}
-
-const incursions: Builder = (feeds, { t }) => {
-  const feed = feeds.incursions;
-  const data = feed?.data ?? null;
-  const to = '/travel/route';
-  if (!data) return blank(to, statusOf(feed));
-  return {
-    ...blank(to, statusOf(feed)),
-    number: {
-      value: count(data.rows.length),
-      unit: t('overview.widgets.incursions.unit'),
-      secondary: nearestIncursion(t, data),
-      tone: incursionsSeverity(data) ?? 'clear',
-    },
-    rows: data.rows.map((row) => {
-      const system =
-        data.systemNames.get(row.stagingSystemId) ??
-        t('travel.stops.unnamed', { id: row.stagingSystemId });
-      const constellation =
-        data.constellationNames.get(row.constellationId) ??
-        t('travel.incursions.constellation', { id: row.constellationId });
-      return {
-        key: String(row.constellationId),
-        title: system,
-        detail: t('overview.board.incursionsDetailLabel', {
-          state: t(`travel.incursions.state.${row.state}`),
-          constellation,
-        }),
-        value: incursionJumpsWhen(t, row, data.jumpsStatus),
-        tone: 'clear' as DeadlineSeverity,
-        to: routeToHref(row.stagingSystemId),
-      };
-    }),
-    summary: incursionsSummary(t, data),
-  };
-};
-
 const BUILDERS: Readonly<Record<string, Builder>> = {
   wallet,
   training,
@@ -1123,14 +733,10 @@ const BUILDERS: Readonly<Record<string, Builder>> = {
   mail,
   orders,
   contracts,
-  industry,
-  planetary,
   miningTax,
-  structures,
-  moonChunks,
   stock,
   priceWatch,
-  incursions,
+  ...WORLD_BUILDERS,
   ...KIND_BUILDERS,
 };
 

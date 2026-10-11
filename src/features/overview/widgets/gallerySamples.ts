@@ -218,14 +218,11 @@ const SAMPLES: Record<string, Sample> = {
       ['Gila', 'Manufacturing', 'Ready'],
       ['Hurricane', 'Manufacturing', '5h 02m'],
     ],
-    chart: {
-      kind: 'bars',
-      summary: '',
-      values: [3, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0],
-      max: '3 jobs',
-      xStart: 'now',
-      xEnd: '12h',
-    },
+    chart: hbars([
+      ['Rifter', 1, 'Ready'],
+      ['Gila', 1, 'Ready'],
+      ['Hurricane', 0.4, '5h 02m'],
+    ]),
   },
   profit: {
     value: '1.12B',

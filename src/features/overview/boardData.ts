@@ -57,6 +57,8 @@ export interface BoardColony {
   /** Null until the public planet-name read lands; the row falls back to the id. */
   name: string | null;
   status: ColonyStatus;
+  /** Extractor programs on the colony; absent on data built before the widget read it. */
+  programCount?: number;
 }
 
 export interface PlanetaryBoardData {
@@ -121,6 +123,7 @@ export async function loadPlanetaryBoard(
       planetId: planet.planet_id,
       name: names[i],
       status: colonyStatus(programs, loadedAt),
+      programCount: programs.length,
     };
   });
 
@@ -196,9 +199,18 @@ export interface IndustryBoardData {
    * is what the Industry page's own rows lead with.
    */
   productNames: Map<number, string>;
+  /**
+   * Where each job sits (its `station_id`), by that id. Best effort: a
+   * location that does not resolve is simply absent, and the Table view drops
+   * its Location column when none resolved.
+   */
+  locationNames?: Map<number, string>;
   needsReauth: boolean;
   fetchedAt: Date | null;
 }
+
+/** A pilot's jobs sit in a handful of places; naming more than this is not worth the reads. */
+const MAX_JOB_LOCATIONS = 6;
 
 export async function loadIndustryBoard(characterId: number): Promise<IndustryBoardData> {
   const { cached, needsReauth } = await loadCharacterIndustryJobs(characterId);
@@ -214,9 +226,22 @@ export async function loadIndustryBoard(characterId: number): Promise<IndustryBo
     if (name !== undefined) productNames.set(job.job_id, name);
   }
 
+  const locationIds = [...new Set(jobs.map((job) => job.station_id))]
+    .filter((id) => id > 0)
+    .slice(0, MAX_JOB_LOCATIONS);
+  const located = await Promise.all(
+    locationIds.map((id) => loadContractLocationName(characterId, id).catch(() => null))
+  );
+  const locationNames = new Map<number, string>();
+  locationIds.forEach((id, i) => {
+    const name = located[i];
+    if (name) locationNames.set(id, name);
+  });
+
   return {
     jobs,
     productNames,
+    locationNames,
     needsReauth,
     fetchedAt: cached ? cached.fetchedAt : null,
   };

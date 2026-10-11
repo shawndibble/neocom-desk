@@ -151,7 +151,7 @@ export interface MiningYieldDay {
   date: string;
   /** The day's ore, valued raw at that day's price. */
   isk: number;
-  ores: { typeId: number; isk: number }[];
+  ores: { typeId: number; isk: number; /** Units mined. */ units?: number }[];
 }
 
 export interface MiningYieldWidgetData {
@@ -175,7 +175,11 @@ export async function loadMiningYieldWidget(): Promise<MiningYieldWidgetData> {
     characterId: row.characterId,
     date: row.entry.date,
     isk: row.valuation.rawValue,
-    ores: row.valuation.lines.map((line) => ({ typeId: line.typeId, isk: line.rawValue })),
+    ores: row.valuation.lines.map((line) => ({
+      typeId: line.typeId,
+      isk: line.rawValue,
+      units: line.quantity,
+    })),
   }));
   return {
     rows,
