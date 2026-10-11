@@ -13,6 +13,7 @@ import { db } from '@/db';
 import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
 import { layerValues, type LayerValues } from '@/engine/netWorth/series';
 import type { BestOre } from '@/engine/survey/bestOres';
+import type { RouteKillSystem } from '@/engine/route/routeKillTrend';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import type { CachedResult } from '@/esi/cache';
@@ -368,6 +369,62 @@ export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
     hasSurvey: true,
     location: survey.info?.location?.name ?? null,
     ores: bestOres(scans, prices),
+    fetchedAt: new Date(),
+  };
+}
+
+// --- Route safety --------------------------------------------------------------
+
+export interface RouteSafetyWidgetData {
+  /** False when Route Safety has drawn no route on this device yet. */
+  hasRoute: boolean;
+  /** Route Safety, opened on the saved route. */
+  href: string | null;
+  /** The saved route's systems in flight order, each with its kills over 24 hours. */
+  systems: RouteKillSystem[];
+  fetchedAt: Date | null;
+}
+
+const NO_ROUTE: RouteSafetyWidgetData = {
+  hasRoute: false,
+  href: null,
+  systems: [],
+  fetchedAt: null,
+};
+
+/**
+ * The route Route Safety last drew, with each system's player kills over the
+ * last day. No trip is planned here: the tab saved the systems it drew
+ * (`travel/savedRoute`). Kills are one zKillboard read per region, cached and
+ * behind `import()`. A read that got no system at all throws, which keeps the
+ * last good figure on show rather than drawing a route of unknowns.
+ */
+export async function loadRouteSafetyWidget(): Promise<RouteSafetyWidgetData> {
+  const { useSavedRoute } = await import('@/features/travel/savedRoute');
+  await useSavedRoute.getState().hydrate();
+  const route = useSavedRoute.getState().value;
+  if (route === null) return NO_ROUTE;
+  const [{ loadRouteKills24h }, { loadSolarSystemsById }, { routeStopsHref }] = await Promise.all([
+    import('@/features/travel/routeKills24h'),
+    import('@/sde/solarSystems'),
+    import('@/features/travel/routeSafetyLink'),
+  ]);
+  const [kills, names] = await Promise.all([
+    loadRouteKills24h(route.systems),
+    loadSolarSystemsById().catch(() => null),
+  ]);
+  const systems = route.systems.map((systemId) => ({
+    systemId,
+    name: names?.get(systemId)?.name ?? `#${systemId}`,
+    kills: kills.get(systemId) ?? null,
+  }));
+  if (systems.every((system) => system.kills === null)) {
+    throw new Error('Route kills could not be read');
+  }
+  return {
+    hasRoute: true,
+    href: routeStopsHref(route.fromId, route.stops),
+    systems,
     fetchedAt: new Date(),
   };
 }

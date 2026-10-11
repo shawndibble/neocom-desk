@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveWidget } from '../state';
 import { buildView, feedsFor, KIND_FEEDS } from './models';
 import { humanizeRefType } from './kindModels';
-import type { SurveyWidgetData } from './kindLoaders';
+import type { RouteSafetyWidgetData, SurveyWidgetData } from './kindLoaders';
 import type { BuildContext, FeedState, Feeds } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
@@ -726,5 +726,98 @@ describe('survey', () => {
     expect(resolved.state).toBe('failed');
     expect(resolved.showLastGood).toBe(true);
     expect(failed.number.value).toBe('6.4K');
+  });
+});
+
+describe('routeSafety', () => {
+  const kills = (n: number, ago = 60_000) => Array.from({ length: n }, (_, i) => NOW - ago - i);
+  const data = (over: Partial<RouteSafetyWidgetData> = {}): RouteSafetyWidgetData => ({
+    hasRoute: true,
+    href: '/travel/route?from=1&stops=3',
+    systems: [
+      { systemId: 1, name: 'Efa', kills: [] },
+      { systemId: 2, name: 'Niarja', kills: kills(6) },
+      { systemId: 3, name: 'Amarr', kills: kills(1, 5 * HOUR) },
+      { systemId: 4, name: 'Unread', kills: null },
+    ],
+    fetchedAt: new Date(NOW),
+    ...over,
+  });
+
+  it('reads from its own feed and links to Route Safety on the saved route', () => {
+    expect(KIND_FEEDS.routeSafety).toEqual(['routeSafety']);
+    expect(buildView('routeSafety', { routeSafety: ok(data()) }, ctx()).to).toBe(
+      '/travel/route?from=1&stops=3'
+    );
+  });
+
+  it('leads with the busy systems and adds what the headline lacks', () => {
+    const view = buildView('routeSafety', { routeSafety: ok(data()) }, ctx());
+    expect(stateOf(view)).toBe('ok');
+    expect(view.number.value).toBe('1');
+    expect(view.number.unit).toContain('"count":1');
+    // 7 kills over the three systems that were read, one system unread.
+    expect(view.number.secondary?.text).toContain('"count":7');
+    expect(view.number.secondary?.text).toContain('"unread":1');
+  });
+
+  it('tables system, kills and a condition word, busiest first, unknown kept apart from zero', () => {
+    const view = buildView('routeSafety', { routeSafety: ok(data()) }, ctx());
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      ['Niarja', '6', { text: 'overview.widgets.routeSafety.level.busy', tone: 'caution' }],
+      ['Amarr', '1', 'overview.widgets.routeSafety.level.some'],
+      ['Efa', '0', 'overview.widgets.routeSafety.level.quiet'],
+      ['Unread', '—', '—'],
+    ]);
+  });
+
+  it('charts kills per hour with its max, its range and a text summary', () => {
+    const view = buildView('routeSafety', { routeSafety: ok(data()) }, ctx());
+    if (view.chart?.kind !== 'bars') throw new Error('bars');
+    expect(view.chart.values).toHaveLength(24);
+    expect(view.chart.values[23]).toBe(6);
+    expect(view.chart.values[18]).toBe(1);
+    expect(view.chart.max).toContain('"count":6');
+    expect(view.chart.xStart).toBe('overview.widgets.chart.routeSafety.xStart');
+    expect(view.chart.xEnd).toBe('overview.widgets.chart.routeSafety.xEnd');
+    expect(view.chart.summary).toContain('"count":7');
+    expect(view.chart.summary).toContain('unread');
+  });
+
+  it('draws no chart when nothing died, and says so with a zero rather than an unknown', () => {
+    const quiet = data({ systems: [{ systemId: 1, name: 'Efa', kills: [] }] });
+    const view = buildView('routeSafety', { routeSafety: ok(quiet) }, ctx());
+    expect(stateOf(view)).toBe('ok');
+    expect(view.chart).toBeUndefined();
+    expect(view.number.value).toBe('0');
+  });
+
+  it('is empty, with a way to Route Safety, when no route is saved', () => {
+    const none = data({ hasRoute: false, href: null, systems: [] });
+    const view = buildView('routeSafety', { routeSafety: ok(none) }, ctx());
+    expect(stateOf(view)).toBe('empty');
+    expect(view.to).toBe('/travel/route');
+    expect(view.emptyLinkLabel).toBe('overview.widgets.routeSafety.emptyLink');
+  });
+
+  it('is loading before the first read and failed, keeping the last value, when a read fails', () => {
+    expect(
+      stateOf(
+        buildView(
+          'routeSafety',
+          { routeSafety: { data: null, error: false, loading: true } },
+          ctx()
+        )
+      )
+    ).toBe('loading');
+    const failed = buildView(
+      'routeSafety',
+      { routeSafety: { data: data(), error: true, loading: false } },
+      ctx()
+    );
+    const resolved = resolveWidget(failed.status);
+    expect(resolved.state).toBe('failed');
+    expect(resolved.showLastGood).toBe(true);
+    expect(failed.number.value).toBe('1');
   });
 });

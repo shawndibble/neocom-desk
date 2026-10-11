@@ -216,9 +216,8 @@ const SPECS: Record<string, Spec> = {
   routeSafety: {
     category: 'space',
     views: NCT,
-    view: 'number',
+    view: 'chart',
     size: 'M',
-    soon: true,
     endpoints: [],
   },
   hauling: {

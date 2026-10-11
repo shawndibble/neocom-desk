@@ -102,6 +102,7 @@ import { SetWaypoints } from './SetWaypoints';
 import { StopsPanel, type StopOrderSettings } from './StopsPanel';
 import { TripLegs } from './TripLegs';
 import { useRouteHoles, type RouteHolesState } from './useRouteHoles';
+import { sameSavedRoute, useSavedRoute } from './savedRoute';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
 import { useRouteSafety, type RouteSafetyLeg } from './useRouteSafety';
 import type { TravelTabProps } from './travelTab';
@@ -296,6 +297,17 @@ export function RouteSafetyTab({ tabBar, tabsId, views }: TravelTabProps) {
     return [...seen.values()].map((row) => ({ systemId: row.systemId, band: row.band }));
   }, [state]);
   const killsOf = useRouteKills(routeSystems);
+  // The drawn route is what the Overview's Route safety widget reads: kept so it never plans a trip itself.
+  useEffect(() => {
+    if (routeSystems === null || fromId === null || stops.length === 0) return;
+    const next = { fromId, stops, systems: routeSystems.map((system) => system.systemId) };
+    void (async () => {
+      await useSavedRoute.getState().hydrate();
+      if (!sameSavedRoute(useSavedRoute.getState().value, next)) {
+        await useSavedRoute.getState().setValue(next);
+      }
+    })();
+  }, [routeSystems, fromId, stops]);
   const avoided = useAvoidedSystems((s) => s.value);
   const avoidedEnabled = useAvoidedSystemsEnabled((s) => s.value);
   const [avoidTarget, setAvoidTarget] = useState<AvoidTarget | null>(null);
