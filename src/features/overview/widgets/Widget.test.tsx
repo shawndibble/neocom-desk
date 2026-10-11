@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -98,7 +98,7 @@ describe('Widget states', () => {
     expect(within(region).getByText('+2 more')).toBeInTheDocument();
   });
 
-  it('draws a Chart view as the Number until charts land', () => {
+  it('draws a Chart view as the Number for a kind with no chart', () => {
     renderWidget(model({ view: 'chart' }), (store) =>
       store.set('mail', { data: mailData(4), error: false, loading: false })
     );
@@ -155,11 +155,63 @@ describe('Widget states', () => {
     expect(onRemove).toHaveBeenCalledWith('w1');
   });
 
-  it('draws a kind the next stage fills as empty, never a spinner', () => {
-    renderWidget(model({ kind: 'netWorth' }), () => undefined);
-    const region = screen.getByRole('region', { name: 'Net worth' });
+  it('draws a kind that is coming soon as empty, never a spinner', () => {
+    renderWidget(model({ kind: 'survey' }), () => undefined);
+    const region = screen.getByRole('region', { name: 'Mining survey' });
     expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(within(region).getByText('No net worth has been recorded yet.')).toBeInTheDocument();
+    expect(within(region).getByText('There is no survey yet.')).toBeInTheDocument();
+  });
+});
+
+describe('Widget charts', () => {
+  const netWorthFeed = (store: FeedStore) =>
+    store.set('netWorth', {
+      data: {
+        characters: [
+          {
+            characterId: 91,
+            day: '2026-10-10',
+            covered: true,
+            layers: {
+              isk: 4_000_000_000,
+              assets: 29_000_000_000,
+              escrow: 0,
+              sellOrders: 6_000_000_000,
+            },
+          },
+        ],
+      },
+      error: false,
+      loading: false,
+    });
+
+  beforeEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
+  });
+
+  const legend = (region: HTMLElement) =>
+    [...region.querySelectorAll('li')].map((li) => li.textContent);
+
+  it('keeps the headline above the chart in the Chart view, with a hidden text summary and a legend', () => {
+    renderWidget(model({ kind: 'netWorth', view: 'chart', size: 'L' }), netWorthFeed);
+    const region = screen.getByRole('region', { name: 'Net worth' });
+    // The headline note is the number's own; the chart is drawn beneath it.
+    expect(within(region).getAllByText('As of 2026-10-10').length).toBeGreaterThan(0);
+    // The legend names every layer in bar order, so colour is never the only signal.
+    expect(legend(region)).toEqual(['Assets 29B', 'Sell orders 6B', 'ISK 4B']);
+    const summary = region.querySelector('p.sr-only');
+    expect(summary?.textContent).toContain('Net worth 39B');
+    expect(summary?.closest('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it('adds the mini chart under the figure in the Number view from Medium up', () => {
+    renderWidget(model({ kind: 'netWorth', view: 'number', size: 'M' }), netWorthFeed);
+    expect(legend(screen.getByRole('region', { name: 'Net worth' }))).toHaveLength(3);
+  });
+
+  it('draws only the headline in the Number view at Small', () => {
+    renderWidget(model({ kind: 'netWorth', view: 'number', size: 'S' }), netWorthFeed);
+    expect(legend(screen.getByRole('region', { name: 'Net worth' }))).toHaveLength(0);
   });
 });
 
@@ -204,8 +256,10 @@ describe('Widget header', () => {
   });
 
   it('has no Open link for a kind with no page of its own yet', () => {
-    renderWidget(model({ kind: 'netWorth' }), () => undefined);
-    expect(screen.queryByRole('link', { name: /open net worth page/i })).not.toBeInTheDocument();
+    renderWidget(model({ kind: 'survey' }), () => undefined);
+    expect(
+      screen.queryByRole('link', { name: /open mining survey page/i })
+    ).not.toBeInTheDocument();
   });
 
   it('uses the widget own name when it has one', () => {

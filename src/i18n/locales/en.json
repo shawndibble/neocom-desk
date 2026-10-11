@@ -3714,6 +3714,126 @@
       "contractsDueTile": "Due < 24h"
     },
     "widgets": {
+      "chart": {
+        "now": "now",
+        "today": "today",
+        "thisWeek": "this week",
+        "inHours_one": "+{{count}}h",
+        "inHours_other": "+{{count}}h",
+        "daysAgo_one": "{{count}} day ago",
+        "daysAgo_other": "{{count}} days ago",
+        "weeksAgo_one": "{{count}} week ago",
+        "weeksAgo_other": "{{count}} weeks ago",
+        "span_one": "{{count}} day",
+        "span_other": "{{count}} days",
+        "low": "low {{value}}",
+        "high": "high {{value}}",
+        "max": "max {{value}}",
+        "listSummary": "{{note}}: {{items}}. Switch to List for the table.",
+        "orders": {
+          "notUndercut": "Not undercut",
+          "undercut": "Undercut",
+          "open": "open",
+          "note_one": "{{count}} order is expiring or stale, counted separately",
+          "note_other": "{{count}} orders are expiring or stale, counted separately",
+          "summary": "{{undercut}} of {{open}} open orders are undercut. {{expiring}} more are expiring or stale."
+        },
+        "industry": {
+          "max_one": "max {{count}} job in an hour",
+          "max_other": "max {{count}} jobs in an hour",
+          "note": "Jobs finishing each hour",
+          "summary": "{{total}} jobs: {{ready}} ready now, the rest finishing over the next {{hours}} hours, and {{later}} later."
+        },
+        "training": {
+          "note": "Time per skill in your queue"
+        },
+        "planetary": {
+          "note": "Time until extractors run out"
+        },
+        "structures": {
+          "note": "Time of fuel left"
+        },
+        "stock": {
+          "note": "Share of items at or above their target"
+        },
+        "lp": {
+          "note": "Loyalty points by corporation"
+        },
+        "wallet": {
+          "summary": "Balance went from {{from}} to {{to}} over {{days}} days, lowest {{low}}, highest {{high}}."
+        },
+        "walletFlow": {
+          "note_one": "Last {{count}} day",
+          "note_other": "Last {{count}} days",
+          "noteCovered_one": "Last {{count}} day (the journal reaches back {{covered}})",
+          "noteCovered_other": "Last {{count}} days (the journal reaches back {{covered}})",
+          "summary_one": "Income {{income}}, spending {{spending}}, net {{net}} over the last {{count}} day.",
+          "summary_other": "Income {{income}}, spending {{spending}}, net {{net}} over the last {{count}} days."
+        },
+        "netWorth": {
+          "summary": "Net worth {{total}}: {{parts}}.",
+          "note": "As of {{day}}"
+        },
+        "profit": {
+          "summary": "Realized profit {{total}} from {{runs}} logged runs in the last {{range}} days. Per period, oldest first: {{buckets}}.",
+          "noteDaily": "ISK earned per day (a loss draws as an empty bar)",
+          "noteWeekly": "ISK earned per week (a loss draws as an empty bar)"
+        },
+        "miningYield": {
+          "summary": "Averaging {{average}} ISK a day over the last {{range}} days, {{days}} of them with mining, {{total}} in all.",
+          "note": "ISK mined per day",
+          "noteSince": "ISK mined per day (saved history starts {{date}})"
+        }
+      },
+      "data": {
+        "walletFlow": {
+          "note": "Income {{income}} · spending {{spending}}",
+          "incomeLabel": "Income",
+          "spendingLabel": "Spending",
+          "income": "Income",
+          "spending": "Spending"
+        },
+        "netWorth": {
+          "none": "No net worth has been recorded yet.",
+          "asOf": "As of {{day}}"
+        },
+        "profit": {
+          "built_one": "{{count}} built",
+          "built_other": "{{count}} built",
+          "note": "{{runs}} runs logged · {{open}} still selling"
+        },
+        "miningYield": {
+          "unit": "ISK/day",
+          "share": "{{pct}}% of yield",
+          "note": "Average over {{range}} days, {{days}} with mining",
+          "sinceNote": "Saved history starts {{date}}"
+        },
+        "lp": {
+          "unit": "LP",
+          "corporation": "Corporation #{{id}}",
+          "corporations_one": "{{count}} corporation",
+          "corporations_other": "{{count}} corporations",
+          "everMarks_one": "{{count}} EverMark",
+          "everMarks_other": "{{count}} EverMarks"
+        },
+        "clones": {
+          "current": "Current clone",
+          "cloneId": "Clone #{{id}}",
+          "sooner": "Finishes your queue {{duration}} sooner",
+          "stay": "Stay put",
+          "stayNote": "No jump clone finishes your queue sooner",
+          "best": "Best for your queue",
+          "baseline": "About the same",
+          "soonerBy": "{{duration}} sooner",
+          "laterBy": "{{duration}} later"
+        },
+        "location": {
+          "system": "System",
+          "ship": "Ship",
+          "systemId": "System #{{id}}",
+          "security": "Security {{value}}"
+        }
+      },
       "training": {
         "title": "Training",
         "description": "The skill training now, its time left and the queue",

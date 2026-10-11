@@ -6,6 +6,7 @@ import {
   useNotificationPreferences,
 } from '@/features/notifications/preferences';
 import { useTicker } from '@/lib/ticker';
+import { DEFAULT_RANGE, type WidgetRange } from '../layout';
 import { useFeedStore } from './feedStoreContext';
 import { buildView } from './models';
 import type { KindView } from './types';
@@ -17,10 +18,12 @@ export interface ViewRequest {
   kind: string;
   /** This widget reads across Characters, and its kind can sum them. */
   scopeAll: boolean;
+  /** The widget's time window; left out, the default. Two widgets of one kind with different ranges get their own view. */
+  range?: WidgetRange;
 }
 
 export const viewKey = (request: ViewRequest): string =>
-  `${request.kind}:${request.scopeAll ? 1 : 0}`;
+  `${request.kind}:${request.scopeAll ? 1 : 0}:${request.range ?? DEFAULT_RANGE}`;
 
 /** Views for several kinds at once, rebuilt as their feeds change and as the clock ticks. */
 export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<string, KindView> {
@@ -37,7 +40,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   return useMemo(() => {
     const views = new Map<string, KindView>();
     for (const id of key === '' ? [] : key.split('|')) {
-      const [kind, scope] = id.split(':');
+      const [kind, scope, range] = id.split(':');
       views.set(
         id,
         buildView(kind, feeds, {
@@ -45,6 +48,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
           now,
           activeCharacterId,
           scopeAll: scope === '1',
+          range: Number(range) as WidgetRange,
           notTrainingAlert,
         })
       );
@@ -54,8 +58,8 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
 }
 
 /** The view for one widget. */
-export function useWidgetView(kind: string, scopeAll: boolean): KindView {
-  const requests = useMemo(() => [{ kind, scopeAll }], [kind, scopeAll]);
+export function useWidgetView(kind: string, scopeAll: boolean, range?: WidgetRange): KindView {
+  const requests = useMemo(() => [{ kind, scopeAll, range }], [kind, scopeAll, range]);
   const views = useKindViews(requests);
-  return views.get(viewKey({ kind, scopeAll })) as KindView;
+  return views.get(viewKey({ kind, scopeAll, range })) as KindView;
 }

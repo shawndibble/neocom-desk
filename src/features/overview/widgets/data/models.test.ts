@@ -15,6 +15,7 @@ const ctx = (patch: Partial<BuildContext> = {}): BuildContext => ({
   activeCharacterId: 91,
   scopeAll: false,
   notTrainingAlert: false,
+  range: 30,
   ...patch,
 });
 
@@ -24,12 +25,12 @@ const stateOf = (view: ReturnType<typeof buildView>) => resolveWidget(view.statu
 describe('feedsFor', () => {
   it('lists each feed once, for only the kinds given', () => {
     expect(feedsFor(['training', 'sp', 'wallet']).sort()).toEqual(
-      ['skills', 'spExtras', 'wallet'].sort()
+      ['journal', 'skills', 'spExtras', 'wallet'].sort()
     );
   });
 
   it('is empty for kinds with no data yet', () => {
-    expect(feedsFor(['netWorth', 'lp', 'unknownKindFromANewerBuild'])).toEqual([]);
+    expect(feedsFor(['survey', 'routeSafety', 'unknownKindFromANewerBuild'])).toEqual([]);
   });
 
   it('gives every built kind at least one feed', () => {
@@ -41,7 +42,15 @@ describe('feedsFor', () => {
 
 describe('kindSumsAcrossCharacters', () => {
   it('is true for the account-wide kinds and orders', () => {
-    for (const kind of ['miningTax', 'stock', 'priceWatch', 'incursions', 'orders']) {
+    for (const kind of [
+      'miningTax',
+      'stock',
+      'priceWatch',
+      'incursions',
+      'orders',
+      'netWorth',
+      'miningYield',
+    ]) {
       expect(kindSumsAcrossCharacters(kind), kind).toBe(true);
     }
   });
@@ -93,16 +102,8 @@ describe('buildView status', () => {
 });
 
 describe('placeholder kinds', () => {
-  it('render empty, never loading, for kinds the next stage fills', () => {
-    for (const kind of [
-      'netWorth',
-      'profit',
-      'miningYield',
-      'lp',
-      'clones',
-      'walletFlow',
-      'location',
-    ]) {
+  it('render empty, never loading, for kinds the catalogue marks coming soon', () => {
+    for (const kind of ['survey', 'routeSafety', 'hauling', 'kills', 'jumpTimers']) {
       expect(stateOf(buildView(kind, {}, ctx())), kind).toBe('empty');
     }
   });
@@ -233,7 +234,7 @@ describe('stock', () => {
   });
 
   it('gives a kind with no page of its own no Open link target', () => {
-    expect(buildView('netWorth', {}, ctx()).to).toBeNull();
+    expect(buildView('survey', {}, ctx()).to).toBeNull();
   });
 
   it('counts out and low, listing the markets that need restocking', () => {

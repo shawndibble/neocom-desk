@@ -36,8 +36,8 @@ import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { formatAge } from '@/lib/age';
 import { sortQueueEntries, selectActiveEntryFromSorted } from '@/routes/overviewQueue';
+import { dailyWalletFromJournal } from '@/engine/netWorth/series';
 import { getKind } from '../kinds';
-import type { WidgetStateInput } from '../state';
 import {
   comingUpEventSeverity,
   comingUpSeverity,
@@ -76,29 +76,28 @@ import {
   structuresView,
 } from '../../corpCards';
 import { incursionJumpsWhen, incursionsSeverity, incursionsSummary } from '../../incursionsBoard';
-import type {
-  BuildContext,
-  FeedId,
-  FeedState,
-  Feeds,
-  KindView,
-  ListRow,
-  NumberModel,
-  Translate,
-} from './types';
+import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
+import {
+  hbarsFromRows,
+  industryBars,
+  ordersDonut,
+  queueSegments,
+  severityColor,
+  walletArea,
+} from './chartBuilders';
+import { dailyBalanceSeries } from './chartSeries';
+import { KIND_BUILDERS, KIND_FEED_LISTS } from './kindModels';
+import type { BuildContext, FeedId, Feeds, KindView, ListRow, Translate } from './types';
 
 /** The Contracts History table filtered to accepted contracts, the courier hauls the widget counts. */
 export const CONTRACTS_IN_PROGRESS_HREF = '/contracts/history?history.status=in_progress';
 const STOCK_PATH = '/market/stock';
 
-/** What a figure shows when the question cannot be answered at all, a lapsed grant, not a zero. */
-const UNKNOWN = '—';
-
 // --- Which reads a kind needs ------------------------------------------------
 
 /** Kind -> the feeds it reads. A kind absent here has no data yet (the next stage fills it). */
 export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = {
-  wallet: ['wallet'],
+  wallet: ['wallet', 'journal'],
   training: ['skills'],
   sp: ['skills', 'spExtras'],
   comingUp: ['calendar'],
@@ -113,6 +112,7 @@ export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = {
   stock: ['stock'],
   priceWatch: ['priceAlerts'],
   incursions: ['incursions'],
+  ...KIND_FEED_LISTS,
 };
 
 /** The distinct feeds needed by `kinds`; only these are ever fetched. */
@@ -123,7 +123,15 @@ export function feedsFor(kinds: readonly string[]): FeedId[] {
 }
 
 /** Kinds that read the whole account (or every Character) whatever the header Character is. */
-const SUMS_ACROSS = new Set(['miningTax', 'stock', 'priceWatch', 'incursions', 'orders']);
+const SUMS_ACROSS = new Set([
+  'miningTax',
+  'stock',
+  'priceWatch',
+  'incursions',
+  'orders',
+  'netWorth',
+  'miningYield',
+]);
 
 export function kindSumsAcrossCharacters(kind: string): boolean {
   return SUMS_ACROSS.has(kind);
@@ -131,47 +139,31 @@ export function kindSumsAcrossCharacters(kind: string): boolean {
 
 // --- Helpers ----------------------------------------------------------------
 
-function statusOf(
-  feed: FeedState<unknown> | undefined,
-  over: { needsPermission?: boolean; isEmpty?: boolean; hasData?: boolean; loading?: boolean } = {}
-): WidgetStateInput {
-  return {
-    loading: over.loading ?? feed?.loading ?? true,
-    needsPermission: over.needsPermission ?? false,
-    error: feed?.error ?? false,
-    hasData: over.hasData ?? (feed?.data !== null && feed?.data !== undefined),
-    isEmpty: over.isEmpty ?? false,
-  };
-}
-
-const NEUTRAL_NUMBER: NumberModel = { value: UNKNOWN, tone: 'clear' };
-
-/** A view with nothing in it yet; every builder starts from this and fills what it has. */
-function blank(to: string | null, status: WidgetStateInput): KindView {
-  return {
-    status,
-    fetchedAt: null,
-    fromCache: false,
-    number: NEUTRAL_NUMBER,
-    rows: [],
-    deadlines: [],
-    summary: '',
-    to,
-    emptyMessage: undefined,
-  };
-}
-
-const count = (n: number): string => String(n);
-
 function ageText(t: Translate, nowMs: number, atMs: number | null): string {
   return atMs === null ? UNKNOWN : formatAge(Math.max(0, nowMs - atMs), t);
 }
 
-type Builder = (feeds: Feeds, ctx: BuildContext) => KindView;
-
 // --- Builders ---------------------------------------------------------------
 
-const wallet: Builder = (feeds, { t }) => {
+/** The journal-derived daily balance, over the widget's range (ESI keeps about 30 days of journal). */
+function walletChart(
+  feeds: Feeds,
+  t: Translate,
+  now: number,
+  range: number,
+  balance: number | null
+): KindView['chart'] {
+  const journal = feeds.journal?.data?.result?.data;
+  if (!journal || balance === null) return undefined;
+  const series = dailyBalanceSeries(
+    dailyWalletFromJournal(journal),
+    new Date(now).toISOString().slice(0, 10),
+    range
+  );
+  return walletArea(t, series, formatIskCompact) ?? undefined;
+}
+
+const wallet: Builder = (feeds, { t, now, range }) => {
   const feed = feeds.wallet;
   const data = feed?.data ?? null;
   if (!data) return blank('/wallet', statusOf(feed));
@@ -202,6 +194,8 @@ const wallet: Builder = (feeds, { t }) => {
             },
           ],
     summary: balance === null ? UNKNOWN : `${formatIsk(balance, 2)} ${t('overview.isk')}`,
+    // A secondary read: while the journal loads or fails the Number stays ok and the chart is just absent.
+    chart: walletChart(feeds, t, now, range, balance),
   };
 };
 
@@ -258,8 +252,23 @@ const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
   }
   const finish = finishOf(active);
   const queued = rows.length;
+  const segments = queueSegments(sorted, now);
   return {
     ...base,
+    chart:
+      hbarsFromRows(
+        t,
+        segments.map(({ entry, seconds }) => ({
+          key: `${entry.skill_id}:${entry.queue_position}`,
+          label: t('overview.widgets.training.skillLevel', {
+            name: nameOf(entry.skill_id),
+            level: entry.finished_level,
+          }),
+          value: seconds,
+          text: formatDuration(seconds),
+        })),
+        t('overview.widgets.chart.training.note')
+      ) ?? undefined,
     number: {
       value: finish === null ? UNKNOWN : formatCountdown(Math.max(0, finish - now) / 1000),
       note: [
@@ -495,6 +504,10 @@ const orders: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
     },
     rows: list,
     summary: ordersSummary(t, rows, needsReauth),
+    chart:
+      rows.length === 0
+        ? undefined
+        : ordersDonut(t, { open: rows.length, undercut, expiring: counts.expiringOrStale }),
   };
 };
 
@@ -605,6 +618,12 @@ const industry: Builder = (feeds, { t, now }) => {
       ? []
       : [{ at: nextJobMs, note: t('overview.board.nextJob'), severity: 'watch', to }],
     summary: industrySummary(t, data, now),
+    chart:
+      industryBars(
+        t,
+        jobs.map((job) => Date.parse(job.end_date)).filter((at) => !Number.isNaN(at)),
+        now
+      ) ?? undefined,
   };
 };
 
@@ -649,6 +668,23 @@ const planetary: Builder = (feeds, { t, now }) => {
         ]
       : [],
     summary: planetarySummary(t, data),
+    chart:
+      hbarsFromRows(
+        t,
+        data.batches
+          .filter((batch) => batch.kind === 'running' && batch.expiryMs !== null)
+          .map((batch) => {
+            const seconds = Math.max(0, (batch.expiryMs ?? 0) - now) / 1000;
+            return {
+              key: `${batch.kind}:${batch.expiryMs}`,
+              label: t('overview.board.batch.running', { count: batch.colonies.length }),
+              value: seconds,
+              text: formatDuration(seconds),
+              color: severityColor(batch.severity),
+            };
+          }),
+        t('overview.widgets.chart.planetary.note')
+      ) ?? undefined,
   };
 };
 
@@ -759,6 +795,23 @@ const structures: Builder = (feeds, { t, now }) => {
         ]
       : [],
     summary: structuresSummary(t, view),
+    chart:
+      hbarsFromRows(
+        t,
+        items
+          .filter((item) => item.kind === 'structureFuel' && item.timing === 'timed')
+          .map((item) => {
+            const seconds = Math.max(0, item.remainingMs ?? 0) / 1000;
+            return {
+              key: item.id,
+              label: item.subject,
+              value: seconds,
+              text: formatDuration(seconds),
+              color: severityColor(item.severity),
+            };
+          }),
+        t('overview.widgets.chart.structures.note')
+      ) ?? undefined,
   };
 };
 
@@ -871,6 +924,26 @@ const stock: Builder = (feeds, { t }) => {
       };
     }),
     summary: stockBoardSummary(t, board),
+    chart:
+      hbarsFromRows(
+        t,
+        board.markets
+          .map((market) => {
+            const { out, low, ok, over } = market.summary;
+            const total = out + low + ok + over;
+            return { market, stocked: ok + over, total };
+          })
+          .filter(({ total }) => total > 0)
+          .map(({ market, stocked, total }) => ({
+            key: market.listId,
+            label: market.name.split(' - ')[0],
+            value: stocked,
+            share: stocked / total,
+            text: `${Math.round((stocked / total) * 100)}%`,
+            color: stocked / total < 0.5 ? ('warning' as const) : ('accent' as const),
+          })),
+        t('overview.widgets.chart.stock.note')
+      ) ?? undefined,
   };
 };
 
@@ -954,13 +1027,14 @@ const BUILDERS: Readonly<Record<string, Builder>> = {
   stock,
   priceWatch,
   incursions,
+  ...KIND_BUILDERS,
 };
 
 /**
- * Kinds in the catalogue whose data the next stage adds, and kinds a newer
- * build wrote that this one has never heard of. Both read as "nothing to show
- * yet": a loading-free empty state the pilot can remove, never a spinner that
- * would not end.
+ * Kinds still marked coming soon in the catalogue, and kinds a newer build
+ * wrote that this one has never heard of. Both read as "nothing to show yet": a
+ * loading-free empty state the pilot can remove, never a spinner that would
+ * not end.
  */
 function placeholder(kind: string): KindView {
   return {

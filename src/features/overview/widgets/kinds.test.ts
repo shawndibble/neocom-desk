@@ -89,6 +89,8 @@ describe('widget kind catalogue', () => {
     const v = (id: string) => getKind(id)!.views;
     expect(v('sp')).toEqual(['number', 'list']);
     expect(v('priceWatch')).toEqual(['number', 'list']);
+    // No per-payee breakdown exists, so there is nothing honest to chart.
+    expect(v('miningTax')).toEqual(['number', 'list']);
     expect(v('wallet')).toEqual(['number', 'chart', 'list']);
     expect(v('netWorth')).toEqual(['number', 'chart', 'list']);
   });

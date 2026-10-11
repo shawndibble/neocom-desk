@@ -1,0 +1,156 @@
+import { describe, expect, it } from 'vitest';
+import {
+  hbarsFromRows,
+  industryBars,
+  ordersDonut,
+  queueSegments,
+  severityColor,
+  walletArea,
+} from './chartBuilders';
+
+const t = (key: string, options?: Record<string, unknown>) =>
+  options ? `${key}${JSON.stringify(options)}` : key;
+const NOW = Date.parse('2026-10-11T12:00:00Z');
+const HOUR = 3_600_000;
+
+describe('ordersDonut', () => {
+  it('splits open orders into not undercut and undercut, the undercut slice equal to the headline', () => {
+    const model = ordersDonut(t, { open: 38, undercut: 21, expiring: 2 });
+    expect(model.parts.map((p) => [p.key, p.value])).toEqual([
+      ['notUndercut', 17],
+      ['undercut', 21],
+    ]);
+    expect(model.centre).toBe('38');
+    expect(model.summary).toContain('"undercut":21');
+    expect(model.summary).toContain('"open":38');
+  });
+
+  it('keeps expiring as a separate count in the note, not a third slice', () => {
+    const model = ordersDonut(t, { open: 38, undercut: 21, expiring: 2 });
+    expect(model.parts).toHaveLength(2);
+    expect(model.note).toContain('"count":2');
+  });
+
+  it('has no note when nothing is expiring, and never a negative slice', () => {
+    const model = ordersDonut(t, { open: 3, undercut: 5, expiring: 0 });
+    expect(model.note).toBeUndefined();
+    expect(model.parts[0]!.value).toBe(0);
+  });
+
+  it('does not colour undercut in a series hue, and never red', () => {
+    const colors = ordersDonut(t, { open: 3, undercut: 1, expiring: 0 }).parts.map((p) => p.color);
+    expect(colors).toEqual(['neutral', 'warning']);
+  });
+});
+
+describe('industryBars', () => {
+  it('is null with no jobs', () => {
+    expect(industryBars(t, [], NOW)).toBeNull();
+  });
+
+  it('counts per hour with the done jobs in the first, and says what finishes later', () => {
+    const model = industryBars(t, [NOW - HOUR, NOW + 90 * 60_000, NOW + 30 * HOUR], NOW)!;
+    expect(model.values).toHaveLength(12);
+    expect(model.values.slice(0, 3)).toEqual([1, 1, 0]);
+    expect(model.xStart).toBe('overview.widgets.chart.now');
+    expect(model.summary).toContain('"later":1');
+    expect(model.max).toContain('"count":1');
+  });
+});
+
+describe('hbarsFromRows', () => {
+  it('is null for no rows', () => {
+    expect(hbarsFromRows(t, [], 'note')).toBeNull();
+  });
+
+  it('scales shares to the largest and names every row in the summary', () => {
+    const model = hbarsFromRows(
+      t,
+      [
+        { key: 'a', label: 'Sisters', value: 800, text: '800' },
+        { key: 'b', label: 'Navy', value: 400, text: '400' },
+      ],
+      'LP by corporation'
+    )!;
+    expect(model.rows.map((r) => r.share)).toEqual([1, 0.5]);
+    expect(model.note).toBe('LP by corporation');
+    expect(model.summary).toContain('Sisters 800, Navy 400');
+  });
+
+  it('honours an explicit share, for figures that are already a share of something', () => {
+    const model = hbarsFromRows(
+      t,
+      [{ key: 'a', label: 'Jita', value: 82, share: 0.82, text: '82%' }],
+      'n'
+    )!;
+    expect(model.rows[0]!.share).toBe(0.82);
+  });
+});
+
+describe('severityColor', () => {
+  it('puts warnings and worse in the warning hue and the rest in the accent, never in a series hue', () => {
+    expect(severityColor('clear')).toBe('accent');
+    expect(severityColor('watch')).toBe('accent');
+    expect(severityColor('warning')).toBe('warning');
+    expect(severityColor('critical')).toBe('warning');
+  });
+});
+
+describe('walletArea', () => {
+  it('needs two days to draw a line', () => {
+    expect(walletArea(t, { days: ['2026-10-11'], values: [5] }, (n) => String(n))).toBeNull();
+  });
+
+  it('labels the low and high and names the span it actually has', () => {
+    const model = walletArea(t, { days: ['a', 'b', 'c'], values: [3, 9, 5] }, (n) => `${n}B`)!;
+    expect(model.low).toContain('"value":"3B"');
+    expect(model.high).toContain('"value":"9B"');
+    expect(model.rangeLabel).toContain('"count":3');
+    expect(model.summary).toContain('"from":"3B"');
+    expect(model.summary).toContain('"to":"5B"');
+  });
+});
+
+describe('queueSegments', () => {
+  const entry = (position: number, start: string | undefined, finish: string | undefined) => ({
+    skill_id: 3300 + position,
+    finished_level: 5,
+    queue_position: position,
+    start_date: start,
+    finish_date: finish,
+  });
+
+  it('measures the running skill from now and later ones from their own start', () => {
+    const segments = queueSegments(
+      [
+        entry(0, '2026-10-11T08:00:00Z', '2026-10-11T16:00:00Z'),
+        entry(1, '2026-10-11T16:00:00Z', '2026-10-12T16:00:00Z'),
+      ],
+      NOW
+    );
+    expect(segments.map((s) => s.seconds)).toEqual([4 * 3600, 24 * 3600]);
+  });
+
+  it('falls back to the previous finish when a skill has no start', () => {
+    const segments = queueSegments(
+      [
+        entry(0, '2026-10-11T08:00:00Z', '2026-10-11T16:00:00Z'),
+        entry(1, undefined, '2026-10-11T20:00:00Z'),
+      ],
+      NOW
+    );
+    expect(segments.map((s) => s.seconds)).toEqual([4 * 3600, 4 * 3600]);
+  });
+
+  it('drops finished skills and ones with no finish time', () => {
+    const segments = queueSegments(
+      [
+        entry(0, '2026-10-10T08:00:00Z', '2026-10-10T16:00:00Z'),
+        entry(1, undefined, undefined),
+        entry(2, '2026-10-11T12:00:00Z', '2026-10-11T14:00:00Z'),
+      ],
+      NOW
+    );
+    expect(segments.map((s) => s.entry.queue_position)).toEqual([2]);
+  });
+});
