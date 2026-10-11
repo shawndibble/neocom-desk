@@ -178,6 +178,7 @@ describe('ContractDetailModal System rows', () => {
       'href',
       expect.stringContaining('30002187')
     );
+    expect(screen.getAllByRole('link', { name: /^(Jita|Amarr)$/ })).toHaveLength(2);
     expect(screen.queryByRole('link', { name: /Emperor Family Academy/ })).toBeNull();
   });
 
