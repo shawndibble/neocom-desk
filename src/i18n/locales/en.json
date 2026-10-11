@@ -3526,17 +3526,7 @@
     "timeLeft": "{{duration}} left",
     "board": {
       "open": "Open",
-      "refresh": "Refresh the board",
-      "editCards": "Choose and arrange cards",
-      "editCardsTitle": "Cards",
-      "showAllCards": "Show all cards",
-      "resetOrder": "Reset order",
-      "reorderCard": "Move {{name}}",
-      "dragInstructions": "Press space to pick up a card. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel.",
-      "dragStart": "Picked up {{name}}.",
-      "dragOver": "{{name}} is at position {{position}} of {{total}}.",
-      "dragEnd": "{{name}} dropped at position {{position}} of {{total}}.",
-      "dragCancel": "Moving {{name}} cancelled.",
+      "refresh": "Refresh",
       "structures": "Structures",
       "structuresTimers_one": "{{count}} timer running",
       "structuresTimers_other": "{{count}} timers running",
@@ -3546,12 +3536,8 @@
       "structuresOffline_other": "{{count}} services offline",
       "structuresFine_one": "{{count}} structure, nothing due",
       "structuresFine_other": "{{count}} structures, nothing due",
-      "structureCount_one": "{{count}} structure",
-      "structureCount_other": "{{count}} structures",
       "corpUnreadable": "Your corp roles don't cover this.",
       "reinforced": "Timers",
-      "lowFuel": "Low fuel",
-      "servicesOffline": "Offline",
       "structureDry": "Out of fuel",
       "structureOffline": "Offline",
       "structureSoon": "Under 1h",
@@ -3566,9 +3552,6 @@
       "moonChunksReady_other": "{{count}} chunks ready",
       "moonChunksNext": "Next chunk in {{when}}",
       "moonChunksNone": "No extractions scheduled",
-      "moonChunksEmpty": "No moon drills running.",
-      "drillCount_one": "{{count}} drill",
-      "drillCount_other": "{{count}} drills",
       "chunk": {
         "arrival": "Chunk arrives",
         "decay": "Chunk ready — decays"
@@ -3580,9 +3563,6 @@
       "comingUp": "Coming up",
       "comingUpNone": "Nothing scheduled",
       "comingUpNext": "{{title}} in {{when}}",
-      "comingUpEmpty": "No accepted or tentative events ahead.",
-      "comingUpFooter_one": "{{count}} event ahead",
-      "comingUpFooter_other": "{{count}} events ahead",
       "response": {
         "accepted": "Accepted",
         "tentative": "Tentative"
@@ -3593,38 +3573,26 @@
       "spExtractable": "{{sp}} spare SP",
       "spExtractionReady_one": "{{count}} extractor ready",
       "spExtractionReady_other": "{{count}} extractors ready",
-      "spExtractionThreshold": "Flags at {{sp}} spare SP",
-      "spExtractionOff": "Monitoring is off — turn it on in Settings",
-      "extractionNet": "Net each",
-      "extractionBasis": "Sell Large Skill Injector − buy Skill Extractor at {{hub}}, before fees",
       "mail": "Mail",
       "mailUnread_one": "{{count}} unread",
       "mailUnread_other": "{{count}} unread",
       "mailNone": "No unread mail",
-      "mailEmpty": "Nothing unread.",
       "mailNoSubject": "(no subject)",
       "stock": "Stock",
       "stockOut": "Out",
-      "stockLow": "Low",
       "stockSummary": "{{out}} out · {{low}} low",
       "stockAllStocked": "Every market is stocked",
       "stockNotCounted": "Waiting for your orders to load",
       "stockReady_one": "{{count}} ready to list",
       "stockReady_other": "{{count}} ready to list",
       "stockToSource": "{{isk}} ISK to buy or build",
-      "stockMoreStocked_one": "{{count}} more market fully stocked",
-      "stockMoreStocked_other": "{{count}} more markets fully stocked",
       "priceAlerts": "Price alerts",
       "priceAlertsCrossed_one": "{{count}} target hit",
       "priceAlertsCrossed_other": "{{count}} targets hit",
       "priceAlertsWatching_one": "Watching {{count}} item",
       "priceAlertsWatching_other": "Watching {{count}} items",
       "priceAlertsNone": "No price targets set",
-      "priceAlertsEmpty": "No Quickbar item has a price target. Set one from the Market page.",
       "priceAlertsHit": "Target hit",
-      "priceAlertsWatched": "Watching",
-      "priceAlertsChecked": "Prices checked {{age}}",
-      "priceAlertsNotChecked": "Not priced yet — the alert poller checks these",
       "incursions": "Incursions",
       "incursionsJumps_one": "{{count}} jump",
       "incursionsJumps_other": "{{count}} jumps",
@@ -3643,18 +3611,13 @@
         "above": "Target ≥ <isk/>",
         "below": "Target ≤ <isk/>"
       },
-      "allCardsHidden": "Every card is hidden. Use the edit button above to bring some back.",
       "nextDeadline": "Next deadline",
-      "noDeadline": "Nothing on a clock",
       "trainingNow": "Training now",
       "notTraining": "Nothing in training",
       "nextJob": "Next industry job finishes",
       "nextSkill": "Next skill finishes",
       "queued_one": "{{count}} skill queued",
       "queued_other": "{{count}} skills queued",
-      "rowLabel": "{{subject}}, {{when}}",
-      "rowLabelWithDetail": "{{subject}}, {{when}}, {{detail}}",
-      "rowLabelSeverity": "{{label}} ({{severity}})",
       "priceAlertTargetLabel": {
         "above": "Target at least {{isk}}",
         "below": "Target at most {{isk}}"
@@ -3667,18 +3630,9 @@
       "relist": "Relist",
       "belowFloor_one": "{{count}} below your cost floor",
       "belowFloor_other": "{{count}} below your cost floor",
-      "noneBelowFloor": "Nothing below your cost floor",
-      "ordersHelp": "Undercut: another seller listed the same item cheaper. Outbid: a buyer bid higher than your buy order. Relist: the order is about to expire or has gone stale. Cost floor: the price below which a sale loses you ISK.",
-      "miningTaxHelp": "ISK unpaid: mining tax owed and not yet paid. Unassigned: mined ore not yet matched to a payee, so its tax is not worked out yet.",
-      "planetaryHelp": "Stopped: an extractor program has run out and the colony is producing nothing. Unbuilt: a planet with no extractor program set up.",
-      "miningTax": "Mining tax",
       "iskUnpaid": "ISK unpaid",
       "unassigned": "Unassigned",
-      "miningFooter_one": "{{count}} payee · oldest unpaid {{days}}d",
-      "miningFooter_other": "{{count}} payees · oldest unpaid {{days}}d",
       "miningSettled": "Nothing outstanding",
-      "planetary": "Planetary industry",
-      "planetaryEmpty": "No colonies on this character.",
       "stopped": "Stopped",
       "noProgram": "Unbuilt",
       "batch": {
@@ -3690,9 +3644,6 @@
         "idle_other": "{{count}} planets with no extractor"
       },
       "industry": "Industry jobs",
-      "industryEmpty": "No industry jobs running.",
-      "industryFooter_one": "{{count}} running · +{{more}} more",
-      "industryFooter_other": "{{count}} running · +{{more}} more",
       "ready": "Ready",
       "jobsReady_one": "{{count}} job ready to deliver",
       "jobsReady_other": "{{count}} jobs ready to deliver",
@@ -3701,34 +3652,17 @@
       "alertsUnread_one": "{{count}} unread",
       "alertsUnread_other": "{{count}} unread",
       "alertsEmpty": "Nothing new.",
-      "alertsMore_one": "+{{count}} more type — open the feed for all of them",
-      "alertsMore_other": "+{{count}} more types — open the feed for all of them",
-      "alertsOpen": "Open the alert feed",
-      "dismissAll": "Dismiss all",
       "jobSubject_one": "{{name}} ×{{count}}",
       "jobSubject_other": "{{name}} ×{{count}}",
       "unknownProduct": "Unnamed job",
       "checking": "Checking…",
       "reauth": "Log in again to see this.",
-      "word": {
-        "unpaid": "Unpaid",
-        "ready": "Ready",
-        "restock": "Restock",
-        "reauth": "Log in again"
-      },
       "slotsUsed": "{{used}} of {{total}} slots used",
       "industryRunning_one": "{{count}} running",
       "industryRunning_other": "{{count}} running",
       "industryIdle": "Nothing running",
-      "walletUnavailable": "Log in again",
-      "trainingUnavailable": "Log in again",
-      "colonyCount_one": "{{count}} colony",
-      "colonyCount_other": "{{count}} colonies",
-      "programCount_one": "{{count}} extractor program",
-      "programCount_other": "{{count}} extractor programs",
       "ordersClear": "Nothing needs work",
       "miningUnpaid": "{{isk}} unpaid",
-      "miningUnpaidRich": "<isk/> unpaid",
       "miningUnassigned_one": "{{count}} entry unassigned",
       "miningUnassigned_other": "{{count}} entries unassigned",
       "noColonies": "No colonies",
@@ -3746,32 +3680,776 @@
       "contractsCourierOverdue": "Courier overdue",
       "contractsListingExpires": "Listing expires",
       "contractsInProgressTile": "In progress",
-      "contractsDueTile": "Due < 24h",
-      "everythingElse": "Everything else",
-      "foldedRowLabel": "{{domain}}: {{summary}}"
+      "contractsDueTile": "Due < 24h"
+    },
+    "widgets": {
+      "chart": {
+        "now": "now",
+        "today": "today",
+        "thisWeek": "this week",
+        "inHours_one": "+{{count}}h",
+        "inHours_other": "+{{count}}h",
+        "daysAgo_one": "{{count}} day ago",
+        "daysAgo_other": "{{count}} days ago",
+        "weeksAgo_one": "{{count}} week ago",
+        "weeksAgo_other": "{{count}} weeks ago",
+        "span_one": "{{count}} day",
+        "span_other": "{{count}} days",
+        "low": "low {{value}}",
+        "high": "high {{value}}",
+        "max": "max {{value}}",
+        "listSummary": "{{note}}: {{items}}. Switch to Table for the figures.",
+        "ordersStates": {
+          "healthy": "Healthy",
+          "undercut": "Undercut",
+          "outbid": "Outbid",
+          "expiring": "Expiring",
+          "belowFloor": "Below floor",
+          "summary": "{{open}} open orders: {{parts}}. Switch to Table for each order."
+        },
+        "industry": {
+          "note": "How far along each job is; time left at the end"
+        },
+        "training": {
+          "note": "Queue ends in {{duration}}"
+        },
+        "planetary": {
+          "note": "Time until extractors run out"
+        },
+        "structures": {
+          "note": "Time of fuel left"
+        },
+        "stock": {
+          "out": "Out",
+          "low": "Low",
+          "ok": "OK",
+          "over": "Over",
+          "note": "Items by state in each market",
+          "summary": "Items by state, per market. {{markets}}."
+        },
+        "lp": {
+          "note": "Loyalty points by corporation"
+        },
+        "wallet": {
+          "summary": "Balance went from {{from}} to {{to}} over {{days}} days, lowest {{low}}, highest {{high}}."
+        },
+        "walletFlow": {
+          "note_one": "Last {{count}} day",
+          "note_other": "Last {{count}} days",
+          "noteCovered_one": "Last {{count}} day (the journal reaches back {{covered}})",
+          "noteCovered_other": "Last {{count}} days (the journal reaches back {{covered}})",
+          "summary_one": "Income {{income}}, spending {{spending}}, net {{net}} over the last {{count}} day.",
+          "summary_other": "Income {{income}}, spending {{spending}}, net {{net}} over the last {{count}} days."
+        },
+        "netWorth": {
+          "summary": "Net worth {{total}}: {{parts}}.",
+          "note": "As of {{day}}"
+        },
+        "profit": {
+          "summary": "Realized profit {{total}} from {{runs}} logged runs in the last {{range}} days. Per period, oldest first: {{buckets}}.",
+          "noteDaily": "ISK profit per day; a loss hangs below the axis",
+          "noteWeekly": "ISK profit per week; a loss hangs below the axis"
+        },
+        "miningYield": {
+          "summary": "Averaging {{average}} ISK a day over the last {{range}} days, {{days}} of them with mining, {{total}} in all.",
+          "note": "ISK mined per day",
+          "noteSince": "ISK mined per day (saved history starts {{date}})",
+          "average": "avg {{value}}/day"
+        }
+      },
+      "data": {
+        "netWorth": {
+          "none": "No net worth has been recorded yet."
+        },
+        "profit": {
+          "built_one": "{{count}} built",
+          "built_other": "{{count}} built"
+        },
+        "miningYield": {
+          "unit": "ISK/day",
+          "share": "{{pct}}% of yield",
+          "bestDay": "Best day {{value}}"
+        },
+        "lp": {
+          "unit": "LP",
+          "corporation": "Corporation #{{id}}",
+          "corporations_one": "{{count}} corporation",
+          "corporations_other": "{{count}} corporations",
+          "largest": "{{name}} {{value}}"
+        },
+        "clones": {
+          "current": "Current clone",
+          "cloneId": "Clone #{{id}}",
+          "sooner": "Finishes your queue {{duration}} sooner",
+          "stay": "Stay put",
+          "best": "Best for your queue",
+          "baseline": "About the same",
+          "soonerBy": "{{duration}} sooner",
+          "laterBy": "{{duration}} later",
+          "nextBest": "Next best: {{duration}} later",
+          "col": {
+            "clone": "Clone",
+            "vs": "Vs current",
+            "finishes": "Queue ends in",
+            "implants": "Implants",
+            "location": "Location"
+          }
+        },
+        "location": {
+          "system": "System",
+          "ship": "Ship",
+          "systemId": "System #{{id}}",
+          "security": "Security {{value}}",
+          "securityLabel": "Security"
+        }
+      },
+      "training": {
+        "title": "Training",
+        "description": "The skill training now, its time left and the queue",
+        "empty": "Your skill queue is empty.",
+        "skillLevel": "{{name}} {{level}}",
+        "now": "Training now",
+        "next": "Next",
+        "idle": "Idle",
+        "col": {
+          "skill": "Skill",
+          "endsIn": "Ends in",
+          "takes": "Takes",
+          "level": "Level",
+          "spPerHour": "SP/h"
+        }
+      },
+      "sp": {
+        "title": "Skill points",
+        "description": "Total and unallocated SP, and what you could extract",
+        "empty": "Skill points have not loaded yet.",
+        "unit": "SP",
+        "unallocated": "{{sp}} unallocated",
+        "extractors_one": "{{count}} extractor",
+        "extractors_other": "{{count}} extractors",
+        "threshold": "Toward threshold",
+        "value": "Extraction value",
+        "col": {
+          "sp": "SP"
+        },
+        "ofThreshold": "of {{sp}}",
+        "extractable": "Extractable SP"
+      },
+      "location": {
+        "title": "Location and ship",
+        "description": "Where you are and what you fly",
+        "empty": "Your location is not available yet."
+      },
+      "jumpTimers": {
+        "title": "Jump timers",
+        "description": "Jump fatigue and the clone jump cooldown",
+        "empty": "Jump timers are not available yet."
+      },
+      "clones": {
+        "title": "Best clone to train in",
+        "description": "Which jump clone finishes your queue soonest",
+        "empty": "There are no jump clones to compare."
+      },
+      "wallet": {
+        "title": "Wallet",
+        "description": "Your balance",
+        "empty": "Your wallet has not loaded yet.",
+        "change_one": "{{isk}} in {{count}} day",
+        "change_other": "{{isk}} in {{count}} days",
+        "unchanged_one": "No change in {{count}} day",
+        "unchanged_other": "No change in {{count}} days",
+        "col": {
+          "type": "Type",
+          "amount": "Amount",
+          "when": "When",
+          "balance": "Balance"
+        }
+      },
+      "walletFlow": {
+        "title": "Wallet flow",
+        "description": "Income against spending over a range",
+        "empty": "There is no wallet activity in this range.",
+        "change_one": "{{isk}} vs previous {{count}} day",
+        "change_other": "{{isk}} vs previous {{count}} days",
+        "unchanged_one": "Same as previous {{count}} day",
+        "unchanged_other": "Same as previous {{count}} days",
+        "top": "Top: {{name}} {{isk}}",
+        "col": {
+          "type": "Type",
+          "net": "Net",
+          "income": "Income",
+          "spending": "Spending",
+          "share": "Share"
+        }
+      },
+      "netWorth": {
+        "title": "Net worth",
+        "description": "Everything you own, by layer",
+        "empty": "No net worth has been recorded yet.",
+        "change_one": "{{isk}} in {{count}} day",
+        "change_other": "{{isk}} in {{count}} days",
+        "unchanged_one": "No change in {{count}} day",
+        "unchanged_other": "No change in {{count}} days",
+        "col": {
+          "layer": "Layer",
+          "value": "Value",
+          "share": "Share",
+          "change": "Change"
+        }
+      },
+      "orders": {
+        "title": "Open orders",
+        "description": "How many of your orders have been undercut",
+        "empty": "You have no open orders.",
+        "listed": "{{isk}} ISK listed",
+        "expired": "Expired",
+        "stationUnknown": "Structure",
+        "sideBuy": "Buy",
+        "sideSell": "Sell",
+        "slots": "{{used}} of {{total}} order slots used",
+        "col": {
+          "item": "Item",
+          "side": "Side",
+          "price": "Price",
+          "vsBest": "vs best",
+          "expires": "Expires",
+          "station": "Station"
+        }
+      },
+      "priceWatch": {
+        "title": "Price watch",
+        "description": "Prices you track and the alerts that fired",
+        "empty": "No Quickbar item has a price target. Set one from the Market page.",
+        "nearest": "Nearest: {{name}}, {{pct}}% away",
+        "target": {
+          "above": "≥ {{isk}}",
+          "below": "≤ {{isk}}"
+        },
+        "col": {
+          "item": "Item",
+          "gap": "Gap",
+          "now": "Now",
+          "target": "Target"
+        }
+      },
+      "stock": {
+        "title": "Market stock",
+        "description": "How well stocked your markets are",
+        "empty": "You do not keep a Stock List yet.",
+        "short": "short",
+        "rowShort": "{{count}} short",
+        "rowOk": "OK",
+        "col": {
+          "market": "Market",
+          "out": "Out",
+          "low": "Low",
+          "restock": "To restock",
+          "ready": "Ready"
+        }
+      },
+      "lp": {
+        "title": "LP balances",
+        "description": "Loyalty points by corporation",
+        "empty": "You have no loyalty points.",
+        "col": {
+          "corporation": "Corporation",
+          "lp": "LP",
+          "share": "Share"
+        }
+      },
+      "miningTax": {
+        "title": "Mining tax",
+        "description": "Mining tax you owe and have not paid",
+        "empty": "Nothing is owed.",
+        "oldest": "Oldest unpaid {{days}}d",
+        "noPayee": "No payee",
+        "days": "{{count}}d",
+        "unassigned_one": "{{count}} entry has no assignment yet",
+        "unassigned_other": "{{count}} entries have no assignment yet",
+        "col": {
+          "payee": "Payee",
+          "unpaid": "Unpaid",
+          "oldest": "Oldest",
+          "entries": "Entries"
+        }
+      },
+      "industry": {
+        "title": "Industry",
+        "description": "Jobs ready to deliver and the next to finish",
+        "empty": "No industry jobs running.",
+        "ready": "ready",
+        "running": "running",
+        "next": "Next: {{name}}, {{duration}}",
+        "col": {
+          "job": "Job",
+          "ends": "Ends in",
+          "progress": "Done",
+          "activity": "Activity",
+          "location": "Location"
+        }
+      },
+      "profit": {
+        "title": "Realized profit",
+        "description": "What your builds earned",
+        "empty": "No production has been logged yet.",
+        "vsPrevious_one": "{{delta}} vs the previous day",
+        "vsPrevious_other": "{{delta}} vs the previous {{count}} days",
+        "col": {
+          "product": "Product",
+          "profit": "Profit",
+          "built": "Built",
+          "perUnit": "Per unit"
+        }
+      },
+      "miningYield": {
+        "title": "Mining yield",
+        "description": "ISK per day from your mining",
+        "empty": "No mining recorded in this range.",
+        "col": {
+          "ore": "Ore",
+          "isk": "ISK",
+          "share": "Share",
+          "units": "Units"
+        }
+      },
+      "survey": {
+        "title": "Mining survey",
+        "description": "The best ores in your latest survey",
+        "empty": "There is no survey yet."
+      },
+      "planetary": {
+        "title": "Planetary",
+        "description": "Colonies and when their extractors run out",
+        "empty": "No colonies yet",
+        "unit": "colonies",
+        "untilNext": "until the first extractor ends",
+        "stoppedUnit": "colonies stopped",
+        "idleUnit": "planets with no extractor",
+        "unnamed": "Planet #{{id}}",
+        "stopped_one": "{{count}} colony stopped",
+        "stopped_other": "{{count}} colonies stopped",
+        "together_one": "{{count}} of {{total}} colonies end together",
+        "together_other": "{{count}} of {{total}} colonies end together",
+        "state": {
+          "running": "Running",
+          "soon": "Ending soon",
+          "stopped": "Stopped",
+          "idle": "No extractor"
+        },
+        "col": {
+          "colony": "Colony",
+          "ends": "Ends in",
+          "state": "State",
+          "programs": "Programs"
+        }
+      },
+      "structures": {
+        "title": "Structures",
+        "description": "Reinforcement timers, fuel and offline services",
+        "empty": "There are no structures to show.",
+        "fuelLeft": "fuel left",
+        "state": {
+          "ok": "OK",
+          "lowFuel": "Low fuel",
+          "offline": "Service offline"
+        },
+        "col": {
+          "structure": "Structure",
+          "fuel": "Fuel left",
+          "state": "State",
+          "timer": "Timer"
+        }
+      },
+      "moonChunks": {
+        "title": "Moon extractions",
+        "description": "Moon drills and when their chunks arrive or decay",
+        "empty": "No moon drills running.",
+        "ready": "chunks ready",
+        "untilNext": "until the next chunk",
+        "queued": "{{name}} · {{count}} queued",
+        "event": {
+          "arrival": "Chunk arrives",
+          "decay": "Chunk decays"
+        },
+        "col": {
+          "drill": "Drill",
+          "in": "In",
+          "event": "Event"
+        }
+      },
+      "incursions": {
+        "title": "Incursions",
+        "description": "The nearest Incursions to your current system",
+        "empty": "No Incursions are active.",
+        "unit": "active",
+        "nearest": "Nearest: {{system}}, {{jumps}}",
+        "jumpsAway_one": "jump to the nearest",
+        "jumpsAway_other": "jumps to the nearest",
+        "nearestActive": "{{system}} · {{count}} active",
+        "withBoss": "{{state}}, boss",
+        "col": {
+          "system": "System",
+          "jumps": "Jumps",
+          "state": "State",
+          "influence": "Influence",
+          "constellation": "Constellation"
+        }
+      },
+      "routeSafety": {
+        "title": "Route safety",
+        "description": "How dangerous your saved route is",
+        "empty": "There is no saved route."
+      },
+      "hauling": {
+        "title": "Hauling",
+        "description": "Profitable hauls near you",
+        "empty": "There are no hauls to show."
+      },
+      "kills": {
+        "title": "Kills and losses",
+        "description": "Your recent kills and losses",
+        "empty": "No recent kills or losses."
+      },
+      "comingUp": {
+        "title": "Coming up",
+        "description": "Calendar events you accepted or may attend",
+        "empty": "No accepted or tentative events ahead.",
+        "more": "+{{count}} more in 24h",
+        "col": {
+          "event": "Event",
+          "in": "In",
+          "response": "Response"
+        }
+      },
+      "contracts": {
+        "title": "Contracts",
+        "description": "Couriers in progress and listings about to lapse",
+        "empty": "No contracts are on a clock.",
+        "overdue": "Overdue",
+        "unit": "in progress",
+        "inProgress": "{{count}} in progress",
+        "courier": "Courier",
+        "listing": "Listing",
+        "statusTransit": "In transit",
+        "statusOverdue": "Overdue",
+        "statusListed": "Listed",
+        "col": {
+          "contract": "Contract",
+          "expires": "Due in",
+          "status": "Status",
+          "reward": "Reward",
+          "collateral": "Collateral"
+        }
+      },
+      "mail": {
+        "title": "Mail",
+        "description": "Unread mail and the newest few",
+        "empty": "Your mail has not loaded yet.",
+        "unit": "unread",
+        "latest": "Latest: {{from}}, {{age}}",
+        "unknownSender": "Unknown sender",
+        "col": {
+          "from": "From",
+          "age": "Age",
+          "subject": "Subject"
+        }
+      },
+      "loading": "Loading",
+      "needsPermission": "Needs permission",
+      "needsPermissionHint": "{{title}} needs a permission that has not been granted for this Character.",
+      "grantAction": "Grant access",
+      "failed": {
+        "title": "Could not load",
+        "lastGood": "Last good value {{age}}.",
+        "lastGoodUndated": "Showing the last value we had.",
+        "nothing": "Nothing was saved to show.",
+        "retry": "Retry"
+      },
+      "emptyHint": "This widget has no data for this Character.",
+      "remove": "Remove widget",
+      "new": "New",
+      "opensPage": "Opens the {{title}} page",
+      "settingsFor": "Settings for {{title}}",
+      "tone": {
+        "good": "good",
+        "caution": "caution",
+        "bad": "bad"
+      },
+      "moreRows_one": "+{{count}} more",
+      "moreRows_other": "+{{count}} more",
+      "noWidgets": "There are no widgets to show on this Overview."
+    },
+    "header": {
+      "next": "Next",
+      "nextGoTo": "Opens the page for {{note}}",
+      "updated": "Updated",
+      "customize": "Customize"
+    },
+    "customize": {
+      "title": "Customizing",
+      "barLabel": "Customize the Overview",
+      "count": "{{count}} of {{max}} widgets",
+      "add": "Add widget",
+      "roles": "Start from a role",
+      "reset": "Reset",
+      "resetAsk": "Reset the layout?",
+      "resetConfirm": "Reset",
+      "resetKeep": "Keep",
+      "cancel": "Cancel",
+      "done": "Done",
+      "sizeGroup": "Size of {{title}}",
+      "size": {
+        "S": "S",
+        "M": "M",
+        "L": "L",
+        "F": "Full"
+      },
+      "sizeName": {
+        "S": "Small",
+        "M": "Medium",
+        "L": "Large",
+        "F": "Full width"
+      },
+      "moveEarlier": "Move {{title}} earlier",
+      "moveLater": "Move {{title}} later",
+      "remove": "Remove {{title}}",
+      "dragHandle": "Move {{title}}",
+      "dragInstructions": "Press space to pick up a widget. Use the arrow keys to move it, space again to drop it, or escape to cancel.",
+      "dragStart": "Picked up {{name}}.",
+      "dragOver": "{{name}} is at position {{position}} of {{total}}.",
+      "dragEnd": "{{name}} dropped at position {{position}} of {{total}}.",
+      "dragCancel": "Moving {{name}} cancelled.",
+      "emptyTitle": "Your Overview is empty",
+      "emptyBody": "Add widgets, or start from a role.",
+      "undo": {
+        "action": "Undo",
+        "added": "Widget added",
+        "removed": "Widget removed",
+        "resized": "Widget resized",
+        "duplicated": "Widget duplicated",
+        "reset": "Layout reset",
+        "roles": "Layout replaced"
+      },
+      "phone": {
+        "note": "Sizes, views and ranges are set on a larger screen.",
+        "hidden": "Hidden on phone",
+        "moveUp": "Move {{title}} up",
+        "moveDown": "Move {{title}} down",
+        "remove": "Remove {{title}}"
+      }
+    },
+    "gallery": {
+      "title": "Add a widget",
+      "search": "Search widgets",
+      "categoriesLabel": "Categories",
+      "noMatch": "No widget matches \"{{query}}\".",
+      "categories": {
+        "all": "All",
+        "recent": "Recently added",
+        "character": "Character",
+        "money": "Money and market",
+        "industry": "Industry and mining",
+        "planets": "Planets and structures",
+        "space": "Space and travel",
+        "messages": "Messages and schedule"
+      },
+      "add": "Add",
+      "addAnother": "Add another",
+      "addLabel": "Add {{title}}",
+      "addAnotherLabel": "Add another {{title}}",
+      "limit": "Limit reached",
+      "comingSoon": "Coming soon",
+      "new": "New",
+      "subtitle": "{{total}} widgets · {{onBoard}} on your Overview",
+      "chipCount_one": "{{count}} widget",
+      "chipCount_other": "{{count}} widgets",
+      "facts": "Views and default size",
+      "sizeBadge": "Size {{size}}",
+      "onBoard": "On your Overview ×{{count}}",
+      "added": "Added",
+      "noMatchHint": "Try another word, or clear the search to see every widget.",
+      "clearSearch": "Clear search",
+      "samples": {
+        "training": {
+          "note": "Advanced Industry V · 4 skills queued",
+          "then": "Then"
+        },
+        "sp": {
+          "note": "+0.9M this week",
+          "total": "Total",
+          "unallocated": "Unallocated",
+          "week": "This week"
+        },
+        "location": {
+          "note": "Muninn · docked",
+          "status": "Status",
+          "docked": "Docked"
+        },
+        "clones": {
+          "note": "Finishes your queue 3d sooner",
+          "first": "Finishes your queue first"
+        },
+        "wallet": {
+          "note": "+212M this week",
+          "balance": "Balance"
+        },
+        "walletFlow": {
+          "unit": "ISK net",
+          "note": "Income 292M · spending 60M",
+          "income": "Income",
+          "spending": "Spending",
+          "net": "Net"
+        },
+        "netWorth": {
+          "note": "+0.8B this month",
+          "wallet": "Wallet",
+          "assets": "Assets",
+          "orders": "Sell orders"
+        },
+        "orders": {
+          "unit": "undercut",
+          "note": "of 38 open · 2 expire in 6h",
+          "jitaUndercut": "Jita · undercut",
+          "amarrUndercut": "Amarr · undercut"
+        },
+        "priceWatch": {
+          "unit": "alert triggered",
+          "note": "2 armed",
+          "below": "Below target",
+          "armed": "Armed"
+        },
+        "stock": {
+          "value": "2 out",
+          "unit": "5 low",
+          "note": "Across 3 hubs",
+          "of50": "0 of 50",
+          "of10M": "8M of 10M",
+          "of40": "2 of 40",
+          "out2": "2 out",
+          "low3": "3 low"
+        },
+        "miningTax": {
+          "unit": "ISK owed",
+          "note": "6 mining days not yet billed",
+          "hangar": "Corp hangar",
+          "days_one": "{{count}} day",
+          "days_other": "{{count}} days"
+        },
+        "industry": {
+          "unit": "jobs ready",
+          "note": "2 more finish in 5h",
+          "manufacturing": "Manufacturing",
+          "ready": "Ready"
+        },
+        "profit": {
+          "note": "This month · +18%"
+        },
+        "miningYield": {
+          "note": "Average over the range"
+        },
+        "planetary": {
+          "unit": "colonies run dry",
+          "note": "in 2h 10m",
+          "runsDry": "Extractor runs dry"
+        },
+        "structures": {
+          "unit": "low on fuel",
+          "note": "Lowest 3d 4h",
+          "fuel": "Fuel"
+        },
+        "moonChunks": {
+          "unit": "to next chunk",
+          "note": "2 drills",
+          "arrives": "Chunk arrives",
+          "drilling": "Drilling"
+        },
+        "incursions": {
+          "unit": "jumps away",
+          "established": "Established",
+          "mobilizing": "Mobilizing",
+          "jumps_one": "{{count}} jump",
+          "jumps_other": "{{count}} jumps"
+        },
+        "comingUp": {
+          "note": "Stratop fleet forms · 2 events ahead",
+          "fleet": "Stratop fleet",
+          "forms": "Forms",
+          "meeting": "Alliance meeting"
+        },
+        "contracts": {
+          "unit": "couriers due",
+          "note": "in 9h 05m",
+          "route": "Efa to Amarr",
+          "courier": "Courier",
+          "exchange": "Item exchange",
+          "outstanding": "Outstanding"
+        },
+        "mail": {
+          "unit": "unread",
+          "note": "Aria Nox and 2 more",
+          "doctrine": "Fleet doctrine update",
+          "payday": "Payday",
+          "corp": "Corp",
+          "contract": "Re: contract"
+        }
+      }
+    },
+    "roles": {
+      "title": "What do you do in EVE?",
+      "titleLater": "Start from a role",
+      "body": "Pick everything that applies. We build your Overview from it, and you can change every widget afterwards.",
+      "group": "Roles",
+      "always": "Always included: Wallet, Training, Coming up and Mail.",
+      "build": "Build my Overview",
+      "basics": "Just the basics",
+      "cancel": "Cancel",
+      "names": {
+        "trader": "Trader",
+        "industrialist": "Industrialist",
+        "planetaryIndustry": "Planetary industry",
+        "miner": "Miner",
+        "fighter": "Fighter",
+        "explorerHauler": "Explorer and hauler"
+      }
+    },
+    "menu": {
+      "view": "View",
+      "views": {
+        "number": "Number",
+        "chart": "Chart",
+        "table": "Table"
+      },
+      "character": "Character",
+      "header": "Header",
+      "all": "All",
+      "nameOnly": "This widget shows the header Character only.",
+      "range": "Range",
+      "rangeDays": "{{days}}d",
+      "rename": "Rename",
+      "renameTitle": "Rename {{title}}",
+      "renameLabel": "Name",
+      "renameHint": "Leave it empty to use \"{{title}}\".",
+      "renameSave": "Save",
+      "renameCancel": "Cancel",
+      "duplicate": "Duplicate",
+      "top": "Move to top",
+      "bottom": "Move to bottom",
+      "phone": "Show on phone",
+      "remove": "Remove from Overview"
     }
   },
   "alerts": {
     "title": "Alerts",
     "switchedTo": "Switched to {{name}}",
     "settings": "Notification settings",
-    "dismissAll": "Dismiss all",
     "byType": "By type",
-    "deviceWide": "Every character on this device",
     "muted": "Muted",
     "mute": "Stop showing {{type}} in this list",
-    "unmute": "Show {{type}} in this list again",
-    "muteHint": "Stop showing this type",
-    "unmuteHint": "Show this type again",
-    "dismissType": "Dismiss every {{type}} alert",
-    "dismissOne": "Dismiss {{title}}",
     "fillTimeProvisional": {
       "label": "Approximate time",
       "content": "This is when the fill was noticed, not when it happened. The exact time comes from your wallet transactions, which EVE updates once an hour."
     },
     "newest": "newest {{age}}",
-    "mutedTypes": "Muted types",
-    "filterTitle": "Filter alerts",
     "searchLabel": "Search alerts",
     "searchPlaceholder": "Search alerts…",
     "characterLabel": "Character",
@@ -3780,8 +4458,47 @@
     "emptyHint": "Events you have enabled appear here while the app is open.",
     "noMatches": "No alerts match these filters",
     "noMatchesHint": "Clear the search, pick All characters, clear the severity filters, or turn on Muted types to see every alert.",
-    "feedOff": "The in-app alert list is switched off in Settings, so nothing new will be added to it. What is already here is still listed.",
-    "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices."
+    "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices.",
+    "panel": {
+      "title": "Alerts",
+      "bellNone": "Alerts, none waiting",
+      "bellDanger_one": "Alerts, {{count}} waiting, one is danger",
+      "bellDanger_other": "Alerts, {{count}} waiting, one is danger",
+      "heading_one": "Alerts, {{count}} new",
+      "heading_other": "Alerts, {{count}} new",
+      "headingAllRead": "Alerts, all read",
+      "markAllRead": "Mark all read",
+      "close": "Close",
+      "chipsLabel": "Alert types",
+      "chip": {
+        "all": "All",
+        "danger": "Danger",
+        "market": "Market",
+        "industry": "Industry",
+        "mail": "Mail",
+        "structures": "Structures",
+        "skills": "Skills"
+      },
+      "groupCount_one": "{{count}} alert",
+      "groupCount_other": "{{count}} alerts",
+      "eveTime": "EVE time {{time}}",
+      "view": "View",
+      "viewLabel": "View {{title}}",
+      "snooze": "Snooze 1h",
+      "snoozeLabel": "Snooze {{title}} for 1 hour",
+      "dismiss": "Dismiss",
+      "dismissLabel": "Dismiss {{title}}",
+      "acknowledge": "Acknowledge",
+      "acknowledgeLabel": "Acknowledge {{title}}",
+      "danger": "Danger",
+      "empty": "You are all caught up",
+      "emptyHint": "New alerts will appear here and on the bell.",
+      "emptyChip": "Nothing for this type.",
+      "notifyMe": "Notify me about…",
+      "pushOn": "Push on this device: On",
+      "pushOff": "Push on this device: Off",
+      "bannerNote": "Danger alerts also appear as a banner on the Overview"
+    }
   },
   "common": {
     "viewPicker": {
@@ -8540,7 +9257,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
-            "layout": "Layout: hidden and reordered Overview cards, pages hidden from the navigation, and whether you answered the rail question.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views and order), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }
         },

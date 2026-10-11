@@ -90,7 +90,6 @@ export function remembered<P extends object>(
 export const loadLayout = remembered(named(() => import('./Layout'), 'Layout'));
 export const loadOverview = remembered(named(() => import('@/routes/Overview'), 'Overview'));
 export const loadCharacters = named(() => import('@/routes/Characters'), 'Characters');
-export const loadAlerts = named(() => import('@/routes/Alerts'), 'Alerts');
 export const loadSkills = named(() => import('@/routes/Skills'), 'Skills');
 export const loadSkillPlans = named(() => import('@/routes/SkillPlans'), 'SkillPlans');
 export const loadSkillPlanEditor = named(
@@ -146,13 +145,13 @@ export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorP
 /**
  * Every feature route, keyed the way `Layout`'s links are. Exhaustive by type, so a route added to `routeScopes.ts` without
  * a chunk here is a compile error rather than a link that never preloads. The
- * redirect-only paths (`/skills`, `/bpc-contracts`, `/skills/ships`,
+ * redirect-only paths (`/alerts`, `/skills`, `/bpc-contracts`, `/skills/ships`,
  * `/fittings/*`) preload their target.
  */
 const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/characters': loadCharacters,
   '/overview': loadOverview,
-  '/alerts': loadAlerts,
+  '/alerts': loadOverview,
   '/skills': loadSkillPlans,
   '/skills/trained': loadSkills,
   '/skills/plans': loadSkillPlans,

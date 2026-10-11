@@ -115,7 +115,8 @@ export const NAV_PAGES = [
   },
   /*
    * No rail row, no phone tab or sheet row: the bell in every page header
-   * (`AlertsBell`) is the way in, and Ctrl K still lists it.
+   * (`AlertsBell`) is the way in. This entry survives for Ctrl K and the `a`
+   * shortcut: `/alerts` redirects to the Overview with the panel open.
    */
   {
     path: '/alerts',

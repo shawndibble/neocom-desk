@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
@@ -13,12 +13,20 @@ interface SlideOverProps {
   onClose: () => void;
   title: ReactNode;
   children: ReactNode;
+  /** One quiet line under the title, inside the header (a count, a scope). */
+  subtitle?: ReactNode;
+  /** Where focus lands on open instead of the panel itself: the one field the panel exists for. */
+  initialFocusRef?: RefObject<HTMLElement | null>;
+  /** Drop the body's own padding: the children draw their own gutters (full-bleed rows). */
+  flush?: boolean;
   /** Which edge it slides over. */
   side?: 'left' | 'right';
   /** Extra classes on the panel itself, e.g. an offset to clear a sidebar. */
   className?: string;
   /** A panel holding a table: up to 64rem wide instead of the 25rem default. */
   wide?: boolean;
+  /** Replaces the 25rem default max width (ignored with `wide`): the Overview Gallery's 460px. */
+  maxWidthClassName?: string;
   /** As `Modal`'s: `false` only for a panel a URL already backs, or Back is pushed twice. */
   closeOnBack?: boolean;
   /** Where focus goes on close when the opener is gone (e.g. a panel a URL opened). */
@@ -48,9 +56,13 @@ export function SlideOver({
   onClose,
   title,
   children,
+  subtitle,
+  initialFocusRef,
+  flush = false,
   side = 'right',
   className,
   wide = false,
+  maxWidthClassName,
   closeOnBack = true,
   returnFocusFallback,
 }: SlideOverProps) {
@@ -83,7 +95,8 @@ export function SlideOver({
             // tooltip would otherwise open on this programmatic focus and eat
             // the first Escape. The dialog's title is announced instead.
             event.preventDefault();
-            (event.currentTarget as HTMLElement).focus({ preventScroll: true });
+            const target = initialFocusRef?.current ?? (event.currentTarget as HTMLElement);
+            target.focus({ preventScroll: true });
           }}
           onCloseAutoFocus={(event) => {
             // The opener may be gone (a recycled list row, a page that changed
@@ -97,16 +110,21 @@ export function SlideOver({
           }}
           className={cx(
             'outline-none fixed top-0 bottom-0 z-40 flex w-full flex-col pb-[env(safe-area-inset-bottom)] border-line-bright bg-panel shadow-lg shadow-black/50',
-            wide ? 'max-w-5xl' : 'max-w-[25rem]',
+            wide ? 'max-w-5xl' : (maxWidthClassName ?? 'max-w-[25rem]'),
             SIDE_CLASS[side],
             className
           )}
         >
           <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-            <DialogPrimitive.Title className="text-sm font-semibold">{title}</DialogPrimitive.Title>
+            <div className="min-w-0">
+              <DialogPrimitive.Title className="text-sm font-semibold">
+                {title}
+              </DialogPrimitive.Title>
+              {subtitle && <p className="text-xs text-text-dim">{subtitle}</p>}
+            </div>
             <IconButton icon={<Close />} label={t('common.close')} onClick={onClose} />
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className={cx('min-h-0 flex-1 overflow-y-auto', !flush && 'p-3')}>
             <RowTappableContext.Provider value={false}>{children}</RowTappableContext.Provider>
           </div>
         </DialogPrimitive.Content>

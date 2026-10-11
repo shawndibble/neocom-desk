@@ -42,6 +42,7 @@ describe('summarizeContractsBoard', () => {
       dueSoon: 0,
       overdue: 0,
       soonest: null,
+      items: [],
     });
   });
 
@@ -51,6 +52,31 @@ describe('summarizeContractsBoard', () => {
     expect(s.dueSoon).toBe(1);
     expect(s.overdue).toBe(0);
     expect(s.soonest).toMatchObject({ contractId: 5, kind: 'courier', atMs: NOW + 23 * H });
+  });
+
+  it('lists each contract on a clock, soonest first, with what the Table view needs', () => {
+    const rows = [
+      contract({ contract_id: 8, title: 'Mine', price: 5, date_expired: iso(NOW + 3 * H) }),
+      courier({
+        contract_id: 9,
+        title: 'Hull haul',
+        reward: 2_000_000,
+        collateral: 90_000_000,
+        start_location_id: 60003760,
+        end_location_id: 60008494,
+      }),
+      contract({ contract_id: 10, date_expired: iso(NOW + 9 * 24 * H) }),
+    ];
+    const { items } = summarizeContractsBoard(rows, ME, NOW);
+    expect(items.map((i) => i.contractId)).toEqual([8, 9]);
+    expect(items[0]).toMatchObject({ kind: 'listing', title: 'Mine', price: 5 });
+    expect(items[1]).toMatchObject({
+      kind: 'courier',
+      reward: 2_000_000,
+      collateral: 90_000_000,
+      startLocationId: 60003760,
+      endLocationId: 60008494,
+    });
   });
 
   it('ignores a courier the pilot issued that someone else is hauling', () => {

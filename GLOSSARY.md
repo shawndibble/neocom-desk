@@ -16,8 +16,9 @@ here — they go one per file in `docs/context/decisions/`.
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
 - **Alert**: One fired Notification Event as it appears in the Notification
-  Feed and on the alerts page, grouped by _type_ (the EVE notification type,
-  or the event id otherwise). Distinct from the browser notification the same
+  Feed and in the bell panel, grouped by _type_ (the EVE notification type, or
+  the event id otherwise). A danger type nobody has acknowledged also raises
+  the **Danger banner**. Distinct from the browser notification the same
   fire may also raise: two delivery channels, one event.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
 - **Appraisal**: A Market page tab that prices a pasted pile of items — loot,
@@ -249,6 +250,10 @@ here — they go one per file in `docs/context/decisions/`.
   them. This app does not read, display, or pay it; a rejected send surfaces
   ESI's own error text and points the pilot at the in-game client.
 - **Damage Profile**: The mix of EM, Thermal, Kinetic and Explosive damage a **Fitting**'s tank is measured against — uniform, one pure type, a common NPC faction's average, or one the pilot defines. Changes EHP, never raw HP or resists, except that a running Reactive Armor Hardener adapts its own resists to it. Distinct from a **Target Profile**, which is about what the Fitting shoots at.
+- **Danger banner**: The red strip under the Overview's sub-nav while an
+  unacknowledged danger **Alert** exists (a structure under attack, a Corp
+  kick). Acknowledging it dismisses the whole danger type. Nothing else raises
+  it.
 - **Dark**: A member with no login for the corp's inactivity span or more —
   the pilot's own setting, defaulting to 30 days. A member who joined and has
   never logged in is counted from the day they joined, not excluded.
@@ -321,6 +326,8 @@ here — they go one per file in `docs/context/decisions/`.
   It suppresses its own browser notification for an occurrence the
   Notification Feed already shows as delivered.
 - **Freshness Window**: how long a cached row is served without asking ESI again. Ten minutes for a Character's own data, a day for game constants. Distinct from **Data Age**, which reports how old the shown data is; the window decides whether to go and get newer.
+- **Gallery**: The Overview's "Add a widget" drawer: the **Widget Kind**
+  catalogue with search and category chips. A kind may be added more than once.
 - **Gank Chokepoint**: one of the named systems haulers are most often killed in — Uedama, Sivala, Aufay, Balle, Tama, Rancer, Ahbazon. A property of _traffic_, not of security status. An explicit list rather than a derived rule. States where a haul goes, never that anything will happen to the hauler there.
 - **Goal Plan**: the PI Plan tab's answer to "here are my colonies and the products I want per day — what does each colony do?". Goals (products at a units/day rate) are expanded into demand, and a greedy solver assigns each enabled colony a role — extract and refine P0 to P1, host the P2+ factories, or sit idle. Measured against the **Baseline**: every colony selling the best P1 it can make by itself; the plan's **Lift** is its net ISK minus the Baseline. What it cannot cover is a **Shortfall**, either a **Type gap** (no enabled colony's planet type yields that P0) or a **Budget gap** (colonies that could yield it are full). Its output is a change list against what each colony runs today, never a fresh layout.
 - **Chain estimate**: a P3 or P4's ISK a day as a whole multi-planet chain: the Goal Plan's solver run on new planets the pilot would add. Always labelled "multi-planet, needs hauling" and an estimate, and never ranked against one-planet figures, except in Plan's opt-in **Bigger chain** section.
@@ -411,6 +418,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Ore Form**: Whether mining ore, moon ore and ice are valued and named as their Compressed or Raw type. A synced setting, Compressed by default; a type with no Compressed counterpart is always Raw. Applies to Unassigned and Outstanding rows only; Paid rows keep the ISK they were paid at.
 - **Reprocessing Yield**: What one type breaks down into when refined, per portion size rather than per unit. Combined with the character's skills into an expected output: ore, ice and moon ore use Reprocessing, Reprocessing Efficiency and their own specialisation skill; scrap uses Scrapmetal Processing only. Assumes the base 50% station rate (shown as an assumption); structure rate, rigs and standings tax are deliberately not modelled.
 - **Order Slots**: How many market orders a character may keep open at once: a base 5, plus 4 per level of Trade, 8 per Retail, 16 per Wholesale and 32 per Tycoon, so 305 with all four at V. Derived from trained skills, since ESI never reports the ceiling.
+- **Overview Layout**: The ordered list of **Widgets** on the Overview, with
+  each one's size, view, rename, character scope and range. One per pilot, not
+  per Character, and synced as a whole.
 - **Owned-Stock Offer**: A materials row's "Use assets" offer: the owned quantity it would write (detected stock in the owned-stock scope, capped at what the row needs), or none. "Use all" is every row's offer at once; "Use none" clears every row. One rule for a Build Plan and a Build Group alike.
 - **Payee**: Who the Moon Mining Tax ledger owes: user-managed name, default tax %, optional moon/system tag, optional Trade Hub. The tag lets the app suggest the Payee and rate for a future **Mining Ledger Entry** from that system. The Trade Hub is the order book this Payee's ore is valued at (absent means Jita). May also carry `entityId`, the EVE character or corporation the ISK goes to, learned when a **Made Payment** to that recipient is confirmed.
 - **Pending Login**: One authorize round trip this tab has started and not yet finished: its PKCE verifier, its **Requested Scopes**, and when it began, stored under its own `state`. Per-`state` so two round trips started together both stay valid; an abandoned one is forgotten.
@@ -451,6 +461,10 @@ here — they go one per file in `docs/context/decisions/`.
 - **Remembered Location**: Where a new **Build Plan** starts. There is one per activity, manufacturing and reaction: the whole location the pilot last set from a Build Plan page (facility, rigs, tax, security band, **Build System** and **Build Location**). Each plan keeps its own location once created. Not a Settings control.
 - **Requested Scopes**: What one authorize round trip asked SSO for, carried on its **Pending Login**. The baseline the login path judges revocation against.
 - **Reset Run**: The unit of planetary work: every colony a pilot resets in one sitting, whose extractor programs therefore come to share an expiry. A colony is what the Colonies table lists; a Reset Run is what a pilot actually goes and does.
+- **Role**: A first-run answer to "What do you do in EVE?" (Trader,
+  Industrialist, Planetary industry, Miner, Fighter, Explorer and hauler) that
+  maps to a set of **Widget Kinds** and seeds the first **Overview Layout**.
+  Not a **Corp Role**, which is a permission in the game.
 - **Roster Baseline**: The member list one observer last saw, per Character,
   device-local and never synced. Each observer keeps its own; the baseline
   records what _that_ observer has already reported.
@@ -491,6 +505,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Skill Plan schedule**: A **Skill Plan** costed in time: per-level steps with training seconds, plan total, projected finish, skill count, **Remap Marker** segments, **Booster**-boosted and Alpha-capped steps and effective **Priority (Skill Plan)**, computed in one pass from the plan, the Character's trained skills and attributes, **Clone State**, implants (or **What-If Implants**) and Booster. Every timing figure the plan editor shows reads from it, so none can disagree.
 - **Skill Queue Ending**: Fires once the in-game **Skill Queue**'s last queued item will finish within a Character's configured lead time, warning ahead of the queue running dry. Distinct from **Character Not Training**, which fires only after the queue has _already_ gone idle or stalled; a paused or empty queue is that event's state, never this one's.
+- **Size**: A **Widget**'s width on the Overview: S, M, L or Full, a share of
+  one row. Not a height; its content sets that. Also sets how much a **View**
+  shows.
 - **Stale-Serve**: Showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Signalled for a **Published Snapshot**, where a long window encodes a publish cadence; silent for a game constant, whose long window asserts the value cannot change. One that fails to revalidate must say so on the next read.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp manager acts on (clocks due inside a day, Runway, 30-day net), beside the Deadline Strip. Degrades figure by figure on Corp Capability.
 - **Starred Character**: A Character the user has marked to float to the top of its group on the Characters page. Device-local, never synced. Called "starred", not "pinned", because **Pin** already means a planetary structure (and a **Station Pin**).
@@ -505,7 +522,10 @@ here — they go one per file in `docs/context/decisions/`.
 - **Tab Leader**: The one open tab that runs a piece of origin-wide background work, such as the **Foreground Poller** or the background sync sweep, so several open tabs do it once, not once each. Always a visible tab: with every tab hidden nobody leads.
 - **Target Profile**: The signature radius, speed and (optionally) resist to each damage type of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. A profile with no resists resists nothing. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
 - **Throughput** (planetary): A second budget, independent of the **Pin Budget**: whether the colony's links can carry the material flow and whether a buffer cycle fits in the Launchpad and Storage Facility. A layout can clear the Pin Budget and still stall.
-- **Triage Board**: What `/overview` is: an answer to "is there anything I have to do before I log off", one card per domain, each linking to the page that fixes it. Distinct from the **Corp Ops Board** (`/corp`), which answers the same question for a corporation.
+- **Triage Board**: The Overview as it was before the widget grid: a fixed board
+  with one card per domain. Retired; the Overview is now an **Overview Layout**
+  the pilot builds. Distinct from the **Corp Ops Board** (`/corp`), which
+  answers the same question for a corporation.
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
 - **Hauling Opportunities**: The Travel page's Hauling tab: items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list.
 - **Selling into buy orders**: (`instant` mode in code.) The **Hauling Opportunities** mode that sells the cargo instantly into the destination hub station's standing buy orders instead of listing it: priced at what those orders actually pay, after sales tax only, with no **Days to Sell** or demand.
@@ -522,5 +542,16 @@ here — they go one per file in `docs/context/decisions/`.
 - **Verdict Hero**: The first panel of a Build Plan: net profit as one large figure, the margin / ISK-hour / duration / break-even line under it, and the **Acquisition Verdict**, **Sale Profitability** and **Use-or-Sell Check** as three labelled pills.
 - **Liquidation Basis**: How owned materials would be turned into ISK in the **Use-or-Sell Check**: `instant` (fill the hub's standing buy orders, sales tax only) or `order` (list your own stack at the hub's sell price, sales tax plus broker fee). Independent of a plan's material price basis, which is about buying.
 - **Variations**: The selected item's Tech I/II/Faction/Storyline/Officer variation group, shown on its own item tab as a price comparison grouped by tier; falls back to its Market Group siblings when it has no variation data.
+- **View**: How a **Widget** draws its data: Number, Chart or Table, whichever
+  its **Widget Kind** has. Chosen in the widget's settings menu.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in their own words, what leaves their device. Not documentation but a **commitment**: the **Synced Collection** registry is the authoritative set, and every synced collection must be accounted for. Names its own exceptions (Notification Feed rows, Scheduled Push occurrences, crash reports) rather than rounding them off.
 - **What-If Implants**: Optimizer override that assumes a hypothetical implant set instead of the clone's current implants: five independent per-attribute bonuses (+0..+5 each), since EVE's attribute hardwirings are per slot. The matched sets (+1..+5 in every slot) remain one-click **presets** over those five values. Stored on the Skill Plan and synced with it.
+- **Widget**: One tile on the Overview: an instance of a **Widget Kind** with
+  its own **Size**, **View**, optional rename, character scope and range. The
+  same kind may appear more than once. Always in one **Widget State**.
+- **Widget Kind**: An entry in the catalogue of what the Overview can show
+  (Wallet, Orders, Planetary...): its title, category, which **Views** it has,
+  default **Size** and the ESI permission it needs. A kind not built yet is
+  "coming soon": listed in the **Gallery**, not addable.
+- **Widget State**: Which of five things a **Widget** is showing: loading,
+  needs permission, failed, empty or ok.

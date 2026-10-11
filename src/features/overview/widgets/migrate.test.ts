@@ -1,0 +1,84 @@
+import { describe, expect, it } from 'vitest';
+import { isReturningPilot, migrateFromCards } from './migrate';
+
+const kinds = (l: { widgets: { kind: string }[] }) => l.widgets.map((w) => w.kind);
+
+describe('migrateFromCards', () => {
+  it('starts with wallet and training, then the 13 cards in built-in order (incursions off)', () => {
+    const l = migrateFromCards({ hidden: [], order: [] });
+    expect(kinds(l)).toEqual([
+      'wallet',
+      'training',
+      'orders',
+      'miningTax',
+      'contracts',
+      'planetary',
+      'industry',
+      'structures',
+      'moonChunks',
+      'comingUp',
+      'sp',
+      'mail',
+      'priceWatch',
+      'stock',
+    ]);
+    expect(l.version).toBe(1);
+  });
+
+  it('honours hidden cards', () => {
+    const l = migrateFromCards({ hidden: ['mining', 'orders', 'alerts'], order: [] });
+    expect(kinds(l)).not.toContain('miningTax');
+    expect(kinds(l)).not.toContain('orders');
+    expect(kinds(l)[0]).toBe('wallet');
+  });
+
+  it('turns incursions on only with the show marker', () => {
+    expect(kinds(migrateFromCards({ hidden: ['show:incursions'], order: [] }))).toContain(
+      'incursions'
+    );
+    expect(kinds(migrateFromCards({ hidden: [], order: [] }))).not.toContain('incursions');
+    expect(kinds(migrateFromCards({ hidden: ['incursions'], order: [] }))).not.toContain(
+      'incursions'
+    );
+  });
+
+  it('follows the stored order, then appends cards the pilot never placed', () => {
+    const l = migrateFromCards({ hidden: [], order: ['mail', 'spExtraction', 'orders'] });
+    expect(kinds(l).slice(0, 5)).toEqual(['wallet', 'training', 'mail', 'sp', 'orders']);
+    expect(kinds(l)).toContain('stock');
+    expect(new Set(kinds(l)).size).toBe(kinds(l).length);
+  });
+
+  it('ignores keys this build has no card for and the retired alerts card', () => {
+    const l = migrateFromCards({
+      hidden: ['someFutureCard'],
+      order: ['alerts', 'someFutureCard', 'mail'],
+    });
+    expect(kinds(l).slice(0, 3)).toEqual(['wallet', 'training', 'mail']);
+    expect(kinds(l)).not.toContain('someFutureCard');
+  });
+
+  it('maps renamed cards and uses kind default sizes and unique ids', () => {
+    const l = migrateFromCards({ hidden: [], order: [] });
+    const sp = l.widgets.find((w) => w.kind === 'sp')!;
+    expect(sp).toMatchObject({ size: 'S', view: 'number', scope: 'header', showOnPhone: true });
+    expect(new Set(l.widgets.map((w) => w.id)).size).toBe(l.widgets.length);
+  });
+
+  it('uses the caller makeId', () => {
+    let n = 0;
+    const l = migrateFromCards({ hidden: [], order: [] }, () => `z${++n}`);
+    expect(l.widgets[0].id).toBe('z1');
+  });
+});
+
+describe('isReturningPilot', () => {
+  it('is false with nothing stored', () => {
+    expect(isReturningPilot([], [])).toBe(false);
+  });
+  it('is true when either old setting holds anything', () => {
+    expect(isReturningPilot(['mining'], [])).toBe(true);
+    expect(isReturningPilot([], ['mail'])).toBe(true);
+    expect(isReturningPilot(['show:incursions'], [])).toBe(true);
+  });
+});

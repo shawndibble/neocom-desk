@@ -83,7 +83,7 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
     run: ({ addCharacter }) => addCharacter(),
   },
   {
-    // The Notification Feed is the Alerts page's list.
+    // The Notification Feed is the bell panel's list.
     id: 'notification-feed',
     labelKey: 'commandPalette.commands.notificationFeed',
     run: ({ navigate }) => navigate('/alerts'),

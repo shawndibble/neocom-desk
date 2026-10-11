@@ -38,6 +38,7 @@ import { PAGE_LEGACY_LOCATIONS, PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
+import { AlertsRedirect } from './AlertsRedirect';
 import { useHiddenNav, useNavSetupAnswered, useRecentNav } from './navPreferences';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
@@ -65,7 +66,6 @@ configureActiveCharacter(() => useActiveCharacter.getState().activeCharacterId);
 const Layout = preloadedLazy(routeChunks.loadLayout);
 const Overview = preloadedLazy(routeChunks.loadOverview);
 const Characters = lazy(routeChunks.loadCharacters);
-const Alerts = lazy(routeChunks.loadAlerts);
 const Skills = lazy(routeChunks.loadSkills);
 const SkillPlans = lazy(routeChunks.loadSkillPlans);
 const SkillPlanEditor = lazy(routeChunks.loadSkillPlanEditor);
@@ -152,7 +152,8 @@ function SignedInShell() {
 const ROUTE_ELEMENTS = {
   '/characters': <Characters />,
   '/overview': <Overview />,
-  '/alerts': <Alerts />,
+  // Retired page: the bell's panel replaced it, so this just opens that.
+  '/alerts': <AlertsRedirect />,
   // The Skills section opens on planning: /skills is an index that redirects,
   // so the rail's own link (and any existing bookmark) lands on the plan list
   // while the trained view keeps a URL of its own.

@@ -259,8 +259,12 @@ export const SeverityClear = withWeight(CheckCircle);
 export const Close = withWeight(X);
 /** Edit a name in place — the rename affordance on a saved-plan row. */
 export const Rename = withWeight(PencilSimple);
-/** Choose which cards a board shows — the Overview's edit menu. */
+/** Customize the Overview: the header's button that starts editing the widget grid. */
 export const EditBoard = withWeight(PencilSimple);
+/** Put another widget on the Overview (the edit bar's and the empty board's Add widget). */
+export const AddWidget = withWeight(Plus);
+/** Take a widget off the Overview while customizing: the one-click remove, undoable. */
+export const RemoveWidget = withWeight(Minus);
 /**
  * Grab a row to drag it. The six-dot grip is the near-universal handle mark,
  * and DESIGN.md §5 wants an SVG here rather than the `⠿` braille dingbat the
@@ -392,7 +396,7 @@ export const MoonMining = withWeight(Moon);
  */
 export const Notifications = withWeight(Bell);
 /**
- * Where a feature's own preferences live — the Alerts page's shortcut into
+ * Where a feature's own preferences live — the bell panel's shortcut into
  * Settings, say, or a page header's gear that opens its settings modal. The
  * destination, not an action, so it is never the glyph on a
  * button that changes something.

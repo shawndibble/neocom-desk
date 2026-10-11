@@ -47,7 +47,7 @@ export function entryChannelTarget(
  * be set to raise a browser notification while staying out of this list, and
  * the reverse.
  *
- * Exported because the Alerts page needs the question answered rather than
+ * Exported because the bell panel needs the question answered rather than
  * acted on: it shows muted types, marked and behind a chip, since
  * a feed row's own mute is one-way from a row that disappears
  * the instant it applies. Un-muting has to be reachable somewhere that is not
