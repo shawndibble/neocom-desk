@@ -1,14 +1,14 @@
 /**
  * How urgent each card is — one answer per domain, read twice.
  *
- * The card's own header wears it as a word, and on a phone its folded row in
- * "Everything else" wears it as a glyph. Two independent judgements would
- * drift the first time either changed. It never reorders anything: where a
- * card sits is the pilot's order (`cardOrder.ts`).
+ * A widget wears it as a word and a glyph, and the header's Next deadline reads
+ * the same ladder. Two independent judgements would drift the first time either
+ * changed. It never reorders anything: where a widget sits is the pilot's
+ * Overview Layout (`widgets/layout.ts`).
  *
  * `null` means "not loaded yet", and is deliberately not `clear`: a card whose
- * read has not landed printing "Clear" beside a footer saying "Checking…" is
- * the same silence this board was rebuilt to remove.
+ * read has not landed printing "Clear" beside a note saying "Checking…" is
+ * the same silence the old card board was rebuilt to remove.
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/severity';
 import { isCompletingSoon, isJobDone } from '@/features/industry/jobs';

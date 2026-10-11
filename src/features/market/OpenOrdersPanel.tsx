@@ -175,7 +175,7 @@ export function OpenOrdersPanel() {
 
   /*
    * The whole filter lives in the URL (ADR 0015), one `orders.*` key per
-   * field — a deep link (the Overview board's count tiles, `openOrdersHref`)
+   * field — a deep link (an Overview Orders widget's row, `openOrdersHref`)
    * narrows it on arrival, and every chip, select and search keystroke from
    * here on writes straight back to it, so a reload or a shared link always
    * reopens exactly what was on screen.
@@ -604,14 +604,14 @@ export function OpenOrdersPanel() {
    * principled way to know which one id, if any, the pilot who made it would
    * have meant, so this never guesses `'current'` for it (mirrors
    * `characterFilterValue.ts`'s `fromStoredCharacterFilterValue`) — and the
-   * Overview board's own per-Character Orders tile (`overview/cards.tsx`),
-   * which deep-links here with exactly one *other* alt's id on purpose, live
+   * Overview Orders widget (`overview/widgets`),
+   * which can deep-link here with exactly one *other* alt's id on purpose, live
    * traffic rather than anything stale. Either way the label falls back to
    * "All characters" rather than lying that it's "This character," but the
    * table itself keeps filtering to whatever `characterIds` actually holds —
    * this function only ever feeds the picker's display, never the row filter
    * (`matchesCharacterIds` reads `filter.characterIds` directly), so an
-   * Overview tile's narrowed view still opens narrowed; only its label can no
+   * Overview widget's narrowed view still opens narrowed; only its label can no
    * longer name the one alt it's showing.
    */
   function characterFilterValueOf(characterIds: readonly number[]): CharacterFilterValue {
