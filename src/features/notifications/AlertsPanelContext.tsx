@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/alertsPanelContext';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
+import { ALERTS_PANEL_PATH } from './alertsPanelPath';
 
 // Deferred: the panel pulls in the feed-sync write path, and nothing needs it
 // until a bell is pressed.
@@ -26,9 +27,6 @@ const AlertsPanel = lazy(() =>
 );
 
 const PARAMS = { alerts: boolParam() };
-
-/** The only route the retired `/alerts` redirect points at. */
-export const ALERTS_PANEL_PATH = '/overview';
 
 function renderPanel(props: AlertsPanelRenderProps): ReactNode {
   return (

@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { ALERTS_PANEL_PATH } from '@/features/notifications/alertsPanelPath';
 
 /**
  * The retired Alerts page. Alerts live in the bell's panel now, so `/alerts`
@@ -11,5 +12,5 @@ export function AlertsRedirect() {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   params.set('alerts', '1');
-  return <Navigate replace to={{ pathname: '/overview', search: `?${params}` }} />;
+  return <Navigate replace to={{ pathname: ALERTS_PANEL_PATH, search: `?${params}` }} />;
 }
