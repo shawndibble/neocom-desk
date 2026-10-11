@@ -48,35 +48,56 @@ async function readBody(init: RequestInit | undefined): Promise<unknown> {
   }
 }
 
-/** Returns an uninstall function that restores the previous `fetch`. */
+let original: typeof globalThis.fetch | undefined;
+/** Route tables of every installed story; stories on one docs page overlap. */
+const installed = new Set<readonly FixtureRoute[]>();
+let lastActivity = 0;
+
+/** Resolves once no request has gone through the fixture fetch for `quietMs`. */
+export async function whenFetchQuiet(quietMs = 300): Promise<void> {
+  while (Date.now() - lastActivity < quietMs) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  lastActivity = Date.now();
+  const url = new URL(
+    input instanceof Request ? input.url : String(input),
+    globalThis.location?.href
+  );
+  if (globalThis.location && url.origin === globalThis.location.origin) {
+    return original!(input, init);
+  }
+  const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+  const route = [...installed].flat().find((candidate) => matches(candidate, method, url.pathname));
+  if (!route) {
+    const label = `${method} ${url.origin}${url.pathname}`;
+    unexpected.push(label);
+    console.error(`Story reached the network with no fixture: ${label}`);
+    throw new TypeError(`Story reached the network with no fixture: ${label}`);
+  }
+  const { body, headers } = route.respond({ method, url, body: await readBody(init) });
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', ...headers },
+  });
+}
+
+/** Returns an uninstall function; the real `fetch` returns when the last story uninstalls. */
 export function installFixtureFetch(routes: readonly FixtureRoute[]): () => void {
-  const realFetch = globalThis.fetch;
+  if (installed.size === 0) {
+    original = globalThis.fetch;
+    globalThis.fetch = fixtureFetch;
+  }
   unexpected.length = 0;
-  globalThis.fetch = async (input, init) => {
-    const url = new URL(
-      input instanceof Request ? input.url : String(input),
-      globalThis.location?.href
-    );
-    if (globalThis.location && url.origin === globalThis.location.origin) {
-      return realFetch(input, init);
-    }
-    const method = (
-      init?.method ?? (input instanceof Request ? input.method : 'GET')
-    ).toUpperCase();
-    const route = routes.find((candidate) => matches(candidate, method, url.pathname));
-    if (!route) {
-      const label = `${method} ${url.origin}${url.pathname}`;
-      unexpected.push(label);
-      console.error(`Story reached the network with no fixture: ${label}`);
-      throw new TypeError(`Story reached the network with no fixture: ${label}`);
-    }
-    const { body, headers } = route.respond({ method, url, body: await readBody(init) });
-    return new Response(JSON.stringify(body), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...headers },
-    });
-  };
+  const mine = [...routes];
+  installed.add(mine);
   return () => {
-    globalThis.fetch = realFetch;
+    installed.delete(mine);
+    if (installed.size === 0 && original) {
+      globalThis.fetch = original;
+      original = undefined;
+    }
   };
 }

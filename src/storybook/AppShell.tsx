@@ -19,7 +19,7 @@ const SAMPLE_SCOPES = ['esi-wallet.read_character_wallet.v1', 'esi-characters.re
 export interface AppShellParameters {
   /** Where the page sits, e.g. `/wallet/balance`. */
   path: string;
-  /** ESI answers for this page; defaults to the wallet routes. */
+  /** ESI answers for this page; defaults to the wallet routes. Keep the reference stable (module-level). */
   routes?: () => FixtureRoute[];
 }
 
@@ -35,7 +35,7 @@ function wireEsiToStoredTokens() {
   configureActiveCharacter(() => useActiveCharacter.getState().activeCharacterId);
 }
 
-async function seedSampleAccount() {
+async function seedSampleAccount(isCancelled: () => boolean) {
   await Promise.all([
     db.characters.clear(),
     db.tokens.clear(),
@@ -43,6 +43,7 @@ async function seedSampleAccount() {
     db.esiCache.clear(),
     db.esiCacheMeta.clear(),
   ]);
+  if (isCancelled()) return;
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
@@ -65,6 +66,7 @@ async function seedSampleAccount() {
     }))
   );
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: SAMPLE_ACTIVE_CHARACTER.characterId });
+  if (isCancelled()) return;
   // `App`'s Root does this at boot; the shell stands in for it.
   await useActiveCharacter.getState().hydrate();
 }
@@ -73,8 +75,9 @@ const PORTRAIT_PATH = /^\/characters\/(\d+)\/portrait$/;
 
 /** Points a Character portrait at its offline tile, so the page makes no image request either. */
 function localisePortrait(img: HTMLImageElement) {
-  if (!img.src.startsWith(characterPortraitUrl(0, 64).split('/characters')[0])) return;
-  const match = PORTRAIT_PATH.exec(new URL(img.src).pathname);
+  const url = new URL(img.src, document.baseURI);
+  if (url.origin !== new URL(characterPortraitUrl(0, 64)).origin) return;
+  const match = PORTRAIT_PATH.exec(url.pathname);
   if (!match) return;
   const name = SAMPLE_CHARACTERS.find((c) => c.characterId === Number(match[1]))?.name ?? '?';
   img.src = samplePortraitDataUri(name);
@@ -111,7 +114,7 @@ export function AppShell({ shell, children }: { shell: AppShellParameters; child
     wireEsiToStoredTokens();
     const uninstallFetch = installFixtureFetch(routes);
     const stopWatching = watchPortraits(document.body);
-    void seedSampleAccount().then(() => {
+    void seedSampleAccount(() => cancelled).then(() => {
       if (!cancelled) setReady(true);
     });
     return () => {
@@ -124,12 +127,14 @@ export function AppShell({ shell, children }: { shell: AppShellParameters; child
 
   if (!ready) return null;
   return (
-    <MemoryRouter initialEntries={[shell.path]}>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="*" element={<Suspense fallback={null}>{children}</Suspense>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>
+    <div data-shell-ready>
+      <MemoryRouter initialEntries={[shell.path]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="*" element={<Suspense fallback={null}>{children}</Suspense>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </div>
   );
 }

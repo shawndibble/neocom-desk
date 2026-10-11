@@ -50,4 +50,15 @@ describe('installFixtureFetch', () => {
     installFixtureFetch([])();
     expect(globalThis.fetch).toBe(before);
   });
+
+  it('keeps routing for a story still mounted when another unmounts, in any order', async () => {
+    const before = globalThis.fetch;
+    const first = installFixtureFetch([{ path: '/a', respond: () => ({ body: 'a' }) }]);
+    const second = installFixtureFetch([{ path: '/b', respond: () => ({ body: 'b' }) }]);
+    first();
+    const response = await fetch('https://esi.evetech.net/b');
+    expect(await response.json()).toBe('b');
+    second();
+    expect(globalThis.fetch).toBe(before);
+  });
 });
