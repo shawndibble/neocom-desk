@@ -54,7 +54,7 @@ describe('walletFlow', () => {
     }),
   });
 
-  it('nets income against spending over the range, with Income and Spending bars', () => {
+  it('nets income against spending over the range, as paired weekly bars and a table by type', () => {
     const view = buildView(
       'walletFlow',
       journal([
@@ -66,15 +66,26 @@ describe('walletFlow', () => {
     );
     expect(stateOf(view)).toBe('ok');
     expect(view.number.iskAmount).toBe(200);
-    expect(view.chart?.kind).toBe('hbars');
-    if (view.chart?.kind !== 'hbars') return;
-    expect(view.chart.rows.map((r) => [r.key, r.share])).toEqual([
-      ['income', 1],
-      ['spending', 1 / 3],
-    ]);
-    expect(view.chart.rows.map((r) => r.color)).toEqual(['iskPos', 'iskNeg']);
+    expect(view.chart?.kind).toBe('diverging');
+    if (view.chart?.kind !== 'diverging') return;
+    // Seven daily bars: 300 came in yesterday, 100 went out the day before.
+    expect(view.chart.up).toEqual([0, 0, 0, 0, 0, 300, 0]);
+    expect(view.chart.down).toEqual([0, 0, 0, 0, 100, 0, 0]);
     // The 20-day-old entry is outside a 7-day range.
-    expect(view.rows.map((r) => r.key)).toEqual(['bounty_prize', 'market_fee']);
+    expect(view.table?.rows.map((r) => r.key)).toEqual(['bounty_prize', 'market_fee']);
+    expect(view.rows).toEqual([]);
+  });
+
+  it('compares with the previous window when the journal is long enough, else names the top source', () => {
+    const long = buildView(
+      'walletFlow',
+      journal([entry(1, DAY, 300, 'a'), entry(2, 9 * DAY, 100, 'a'), entry(3, 20 * DAY, 1, 'a')]),
+      ctx({ range: 7 })
+    );
+    expect(long.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
+    const short = buildView('walletFlow', journal([entry(1, DAY, 300, 'a')]), ctx({ range: 30 }));
+    expect(short.number.secondary?.direction).toBeUndefined();
+    expect(short.number.secondary?.text).toContain('walletFlow.top');
   });
 
   it('applies the widget range over the same data, not in the loader', () => {
@@ -144,6 +155,7 @@ describe('netWorth', () => {
     day,
     covered,
     layers: { isk: 1000, assets: 9000, escrow: 0, sellOrders: 2000 },
+    history: [],
   });
 
   it('stacks the recorded layers in bar order with a legend, and no contracts layer', () => {
@@ -158,6 +170,36 @@ describe('netWorth', () => {
       ['isk', 's3'],
     ]);
     expect(view.chart.parts.some((p) => p.color === 'iskNeg' || p.color === 'warning')).toBe(false);
+  });
+
+  it('draws the layers over time and says how the total moved when there is a history', () => {
+    const history = [
+      { day: '2026-10-09', layers: { isk: 500, assets: 8000, escrow: 0, sellOrders: 1500 } },
+      { day: '2026-10-10', layers: { isk: 1000, assets: 9000, escrow: 0, sellOrders: 2000 } },
+    ];
+    const view = buildView(
+      'netWorth',
+      { netWorth: ok({ characters: [{ ...char(91), history }] }) },
+      ctx()
+    );
+    expect(view.chart?.kind).toBe('stackedArea');
+    if (view.chart?.kind !== 'stackedArea') return;
+    expect(view.chart.layers.map((l) => [l.key, l.values])).toEqual([
+      ['assets', [8000, 9000]],
+      ['sellOrders', [1500, 2000]],
+      ['isk', [500, 1000]],
+    ]);
+    expect(view.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
+    expect(view.table?.rows.map((r) => r.key)).toEqual(['assets', 'sellOrders', 'isk']);
+    expect(view.table?.rows[0]!.cells[3]).toBe('+1K');
+    expect(view.rows).toEqual([]);
+  });
+
+  it('falls back to one bar of the latest layers with no history, and offers no change', () => {
+    const view = buildView('netWorth', { netWorth: ok({ characters: [char(91)] }) }, ctx());
+    expect(view.chart?.kind).toBe('stack');
+    expect(view.number.secondary).toBeUndefined();
+    expect(view.table?.rows[0]!.cells[3]).toBe('—');
   });
 
   it('sums every Character only when scoped to all, and counts only those with every permission', () => {
@@ -321,9 +363,10 @@ describe('lp', () => {
       ctx()
     );
     expect(view.number.value).toBe('1.2K');
-    expect(view.rows.map((r) => r.title)).toEqual([
-      'Sisters of EVE',
-      expect.stringContaining('lp.corporation'),
+    expect(view.rows).toEqual([]);
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      ['Sisters of EVE', '800', '67%'],
+      [expect.stringContaining('lp.corporation'), '400', '33%'],
     ]);
     if (view.chart?.kind !== 'hbars') throw new Error('hbars');
     expect(view.chart.rows.map((r) => r.share)).toEqual([1, 0.5]);
@@ -495,20 +538,20 @@ describe('charts on the existing kinds', () => {
     expect(view.chart.note).toContain('overview.widgets.chart.training.note');
   });
 
-  it('charts how stocked each market is, as a share of its items', () => {
+  it('charts each market as a bar split Out, Low, OK, Over, worst market first', () => {
     const feeds: Feeds = {
       stock: ok({
         board: {
           markets: [
             {
-              listId: 'a',
-              name: 'Jita IV - Moon 4',
-              summary: { out: 1, low: 1, ok: 2, over: 0 } as never,
-            },
-            {
               listId: 'b',
               name: 'Amarr VIII',
               summary: { out: 0, low: 0, ok: 3, over: 1 } as never,
+            },
+            {
+              listId: 'a',
+              name: 'Jita IV - Moon 4',
+              summary: { out: 1, low: 1, ok: 2, over: 0 } as never,
             },
           ],
           totals: { out: 1, low: 1 },
@@ -517,11 +560,12 @@ describe('charts on the existing kinds', () => {
       }),
     };
     const view = buildView('stock', feeds, ctx());
-    if (view.chart?.kind !== 'hbars') throw new Error('hbars');
-    expect(view.chart.rows.map((r) => [r.label, r.text, r.share])).toEqual([
-      ['Jita IV', '50%', 0.5],
-      ['Amarr VIII', '100%', 1],
+    if (view.chart?.kind !== 'stackRows') throw new Error('stackRows');
+    expect(view.chart.rows.map((r) => [r.label, r.parts.map((p) => p.value)])).toEqual([
+      ['Jita IV', [1, 1, 2, 0]],
+      ['Amarr VIII', [0, 0, 3, 1]],
     ]);
+    expect(view.table?.rows.map((r) => r.key)).toEqual(['a', 'b']);
   });
 });
 

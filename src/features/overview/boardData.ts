@@ -29,6 +29,7 @@ import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
 import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
 import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
+import { payeesOwed, type PayeeOwed } from './miningTaxPayees';
 import type { BoardStructureSource, CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { CalendarEventSummary } from '@/esi/endpoints';
@@ -147,6 +148,8 @@ export interface MiningTaxBoardData {
   oldestUnpaidDays: number | null;
   needsReauth: boolean;
   fetchedAt: Date | null;
+  /** Who is owed what, the most owed first. Absent in a snapshot cached before this field existed. */
+  payees?: PayeeOwed[];
   /** Every Character on the account. */
   characterCount: number;
   /** Characters whose ledger could not be read (re-auth), so the figures leave them out. */
@@ -184,6 +187,13 @@ export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
       oldestUnpaidMs === null ? null : Math.floor((now - oldestUnpaidMs) / 86_400_000),
     needsReauth: snapshot.reauthCharacters.length > 0,
     fetchedAt: snapshot.fetchedAt,
+    payees: payeesOwed(
+      snapshot.rows,
+      new Map(
+        [...snapshot.payeesByCharacter.values()].flat().map((payee) => [payee.id, payee.name])
+      ),
+      now
+    ),
     characterCount: await db.characters.count(),
     missingCharacterNames: snapshot.reauthCharacters.map((character) => character.characterName),
   };

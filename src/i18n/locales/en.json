@@ -3685,13 +3685,13 @@
         "high": "high {{value}}",
         "max": "max {{value}}",
         "listSummary": "{{note}}: {{items}}. Switch to Table for the figures.",
-        "orders": {
-          "notUndercut": "Not undercut",
+        "ordersStates": {
+          "healthy": "Healthy",
           "undercut": "Undercut",
-          "open": "open",
-          "note_one": "{{count}} order is expiring or stale, counted separately",
-          "note_other": "{{count}} orders are expiring or stale, counted separately",
-          "summary": "{{undercut}} of {{open}} open orders are undercut. {{expiring}} more are expiring or stale."
+          "outbid": "Outbid",
+          "expiring": "Expiring",
+          "belowFloor": "Below floor",
+          "summary": "{{open}} open orders: {{parts}}. Switch to Table for each order."
         },
         "industry": {
           "note": "How far along each job is; time left at the end"
@@ -3706,7 +3706,12 @@
           "note": "Time of fuel left"
         },
         "stock": {
-          "note": "Share of items at or above their target"
+          "out": "Out",
+          "low": "Low",
+          "ok": "OK",
+          "over": "Over",
+          "note": "Items by state in each market",
+          "summary": "Items by state, per market. {{markets}}."
         },
         "lp": {
           "note": "Loyalty points by corporation"
@@ -3739,12 +3744,6 @@
         }
       },
       "data": {
-        "walletFlow": {
-          "incomeLabel": "Income",
-          "spendingLabel": "Spending",
-          "income": "Income",
-          "spending": "Spending"
-        },
         "netWorth": {
           "none": "No net worth has been recorded yet."
         },
@@ -3841,46 +3840,124 @@
         "title": "Wallet",
         "description": "Your balance",
         "empty": "Your wallet has not loaded yet.",
-        "balance": "Balance"
+        "change_one": "{{isk}} in {{count}} day",
+        "change_other": "{{isk}} in {{count}} days",
+        "unchanged_one": "No change in {{count}} day",
+        "unchanged_other": "No change in {{count}} days",
+        "col": {
+          "type": "Type",
+          "amount": "Amount",
+          "when": "When",
+          "balance": "Balance"
+        }
       },
       "walletFlow": {
         "title": "Wallet flow",
         "description": "Income against spending over a range",
-        "empty": "There is no wallet activity in this range."
+        "empty": "There is no wallet activity in this range.",
+        "change_one": "{{isk}} vs previous {{count}} day",
+        "change_other": "{{isk}} vs previous {{count}} days",
+        "unchanged_one": "Same as previous {{count}} day",
+        "unchanged_other": "Same as previous {{count}} days",
+        "top": "Top: {{name}} {{isk}}",
+        "col": {
+          "type": "Type",
+          "net": "Net",
+          "income": "Income",
+          "spending": "Spending",
+          "share": "Share"
+        }
       },
       "netWorth": {
         "title": "Net worth",
         "description": "Everything you own, by layer",
-        "empty": "No net worth has been recorded yet."
+        "empty": "No net worth has been recorded yet.",
+        "change_one": "{{isk}} in {{count}} day",
+        "change_other": "{{isk}} in {{count}} days",
+        "unchanged_one": "No change in {{count}} day",
+        "unchanged_other": "No change in {{count}} days",
+        "col": {
+          "layer": "Layer",
+          "value": "Value",
+          "share": "Share",
+          "change": "Change"
+        }
       },
       "orders": {
         "title": "Open orders",
         "description": "How many of your orders have been undercut",
-        "empty": "You have no open orders."
+        "empty": "You have no open orders.",
+        "listed": "{{isk}} ISK listed",
+        "expired": "Expired",
+        "stationUnknown": "Structure",
+        "sideBuy": "Buy",
+        "sideSell": "Sell",
+        "slots": "{{used}} of {{total}} order slots used",
+        "col": {
+          "item": "Item",
+          "side": "Side",
+          "price": "Price",
+          "vsBest": "vs best",
+          "expires": "Expires",
+          "station": "Station"
+        }
       },
       "priceWatch": {
         "title": "Price watch",
         "description": "Prices you track and the alerts that fired",
         "empty": "No Quickbar item has a price target. Set one from the Market page.",
-        "nearest": "Nearest: {{name}}, {{pct}}% away"
+        "nearest": "Nearest: {{name}}, {{pct}}% away",
+        "target": {
+          "above": "≥ {{isk}}",
+          "below": "≤ {{isk}}"
+        },
+        "col": {
+          "item": "Item",
+          "gap": "Gap",
+          "now": "Now",
+          "target": "Target"
+        }
       },
       "stock": {
         "title": "Market stock",
         "description": "How well stocked your markets are",
         "empty": "You do not keep a Stock List yet.",
-        "short": "short"
+        "short": "short",
+        "rowShort": "{{count}} short",
+        "rowOk": "OK",
+        "col": {
+          "market": "Market",
+          "out": "Out",
+          "low": "Low",
+          "restock": "To restock",
+          "ready": "Ready"
+        }
       },
       "lp": {
         "title": "LP balances",
         "description": "Loyalty points by corporation",
-        "empty": "You have no loyalty points."
+        "empty": "You have no loyalty points.",
+        "col": {
+          "corporation": "Corporation",
+          "lp": "LP",
+          "share": "Share"
+        }
       },
       "miningTax": {
         "title": "Mining tax",
         "description": "Mining tax you owe and have not paid",
         "empty": "Nothing is owed.",
-        "payees": "Payees",
-        "oldest": "Oldest unpaid {{days}}d"
+        "oldest": "Oldest unpaid {{days}}d",
+        "noPayee": "No payee",
+        "days": "{{count}}d",
+        "unassigned_one": "{{count}} entry has no assignment yet",
+        "unassigned_other": "{{count}} entries have no assignment yet",
+        "col": {
+          "payee": "Payee",
+          "unpaid": "Unpaid",
+          "oldest": "Oldest",
+          "entries": "Entries"
+        }
       },
       "industry": {
         "title": "Industry",

@@ -21,6 +21,16 @@ const MODELS: Record<string, ChartModel> = {
     note: 'Jobs finishing each hour',
     summary: 'Six jobs finish in the next 12 hours.',
   },
+  diverging: {
+    kind: 'diverging',
+    up: [3, 0, 5],
+    down: [1, 4, 0],
+    max: 'max 5',
+    xStart: '3 weeks ago',
+    xEnd: 'this week',
+    note: 'Last 21 days',
+    summary: 'Income 8, spending 5.',
+  },
   hbars: {
     kind: 'hbars',
     rows: [
@@ -46,6 +56,46 @@ const MODELS: Record<string, ChartModel> = {
       { key: 'isk', label: 'Wallet', value: 4, text: '4B', color: 's3' },
     ],
     summary: 'Assets 29B, wallet 4B.',
+  },
+  stackedArea: {
+    kind: 'stackedArea',
+    layers: [
+      { key: 'assets', values: [29, 30], color: 's1' },
+      { key: 'isk', values: [3, 4], color: 's3' },
+    ],
+    parts: [
+      { key: 'assets', label: 'Assets', value: 30, text: '30B', color: 's1' },
+      { key: 'isk', label: 'Wallet', value: 4, text: '4B', color: 's3' },
+    ],
+    max: 'max 34B',
+    xStart: '30 days ago',
+    xEnd: 'today',
+    summary: 'Net worth rose to 34B.',
+  },
+  stackRows: {
+    kind: 'stackRows',
+    rows: [
+      {
+        key: 'jita',
+        label: 'Jita IV',
+        parts: [
+          { key: 'out', value: 1, color: 'warning' },
+          { key: 'ok', value: 3, color: 'accent' },
+        ],
+        text: '1 short',
+      },
+      {
+        key: 'amarr',
+        label: 'Amarr',
+        parts: [{ key: 'ok', value: 2, color: 'accent' }],
+        text: 'OK',
+      },
+    ],
+    legend: [
+      { key: 'out', label: 'Out', value: 1, text: '1', color: 'warning' },
+      { key: 'ok', label: 'OK', value: 5, text: '5', color: 'accent' },
+    ],
+    summary: 'Jita IV: 1 out, 3 ok.',
   },
   spark: {
     kind: 'spark',
@@ -89,11 +139,50 @@ describe('Chart', () => {
     expect(container.textContent).toContain('Jobs finishing each hour');
   });
 
+  it('draws income above the axis and spending below it, one pair per period', () => {
+    const { container } = render(<Chart model={MODELS.diverging!} size="M" />);
+    const pairs = container.querySelectorAll('.grid-rows-2');
+    expect(pairs).toHaveLength(3);
+    const bars = pairs[0]!.querySelectorAll('i');
+    expect(bars).toHaveLength(2);
+    expect(bars[0]!.style.height).toBe('60%');
+    expect(bars[1]!.style.height).toBe('25%');
+    expect(container.textContent).toContain('max 5');
+    expect(container.textContent).toContain('3 weeks ago');
+  });
+
   it('draws the height the size asks for', () => {
     const small = render(<Chart model={MODELS.bars!} size="S" />);
     const large = render(<Chart model={MODELS.bars!} size="L" />);
     expect(small.container.querySelector<HTMLElement>('.border-b')?.style.height).toBe('44px');
     expect(large.container.querySelector<HTMLElement>('.border-b')?.style.height).toBe('100px');
+  });
+
+  it('draws layers over time at Medium and only the latest day as one bar at Small', () => {
+    const medium = render(<Chart model={MODELS.stackedArea!} size="M" />).container;
+    expect(medium.querySelectorAll('polygon')).toHaveLength(2);
+    expect(medium.textContent).toContain('max 34B');
+    expect([...medium.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'Assets 30B',
+      'Wallet 4B',
+    ]);
+    const small = render(<Chart model={MODELS.stackedArea!} size="S" />).container;
+    expect(small.querySelectorAll('polygon')).toHaveLength(0);
+    expect([...small.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'Assets 30B',
+      'Wallet 4B',
+    ]);
+  });
+
+  it('splits each row by its own total, leaving a zero part out, with the legend totals below', () => {
+    const { container } = render(<Chart model={MODELS.stackRows!} size="M" />);
+    const bars = [...container.querySelectorAll<HTMLElement>('span.flex > i')];
+    expect(bars.map((bar) => bar.style.width)).toEqual(['25%', '75%', '100%']);
+    expect(container.textContent).toContain('1 short');
+    expect([...container.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'Out 1',
+      'OK 5',
+    ]);
   });
 
   it('keeps stack segments in legend order', () => {

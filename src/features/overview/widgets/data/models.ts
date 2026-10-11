@@ -13,9 +13,7 @@
 import { severityForRemaining, type DeadlineSeverity } from '@/engine/severity';
 import { soonestCalendarDeadline, upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
-import { UNDERCUT_PROBLEMS } from '@/engine/market/orderProblems';
 import { buildOpenOrderRows, openOrderProblemCounts } from '@/features/market/openOrdersModel';
-import { openOrdersHref } from '@/features/market/openOrdersFilter';
 import { stockBoardSeverity } from '@/features/stockTargets/stockBoard';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
@@ -47,7 +45,7 @@ import {
 } from '../../boardSummary';
 import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../boardData';
 import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
-import { hbarsFromRows, ordersDonut, queueSegments, queueStack, walletArea } from './chartBuilders';
+import { queueSegments, queueStack, walletArea } from './chartBuilders';
 import { dailyBalanceSeries } from './chartSeries';
 import {
   comingUpTable,
@@ -56,6 +54,17 @@ import {
   spTable,
   trainingTable,
 } from './characterTables';
+import {
+  balanceChange,
+  journalTable,
+  ordersListed,
+  ordersStateChart,
+  miningTaxTable,
+  ordersTable,
+  priceWatchTable,
+  stockChart,
+  stockTable,
+} from './moneyModels';
 import { KIND_BUILDERS, KIND_FEED_LISTS } from './kindModels';
 import { WORLD_BUILDERS } from './worldModels';
 import type {
@@ -126,21 +135,14 @@ function ageText(t: Translate, nowMs: number, atMs: number | null): string {
 // --- Builders ---------------------------------------------------------------
 
 /** The journal-derived daily balance, over the widget's range (ESI keeps about 30 days of journal). */
-function walletChart(
-  feeds: Feeds,
-  t: Translate,
-  now: number,
-  range: number,
-  balance: number | null
-): KindView['chart'] {
+function walletSeries(feeds: Feeds, now: number, range: number, balance: number | null) {
   const journal = feeds.journal?.data?.result?.data;
-  if (!journal || balance === null) return undefined;
-  const series = dailyBalanceSeries(
+  if (!journal || balance === null) return null;
+  return dailyBalanceSeries(
     dailyWalletFromJournal(journal),
     new Date(now).toISOString().slice(0, 10),
     range
   );
-  return walletArea(t, series, formatIskCompact) ?? undefined;
 }
 
 const wallet: Builder = (feeds, { t, now, range }) => {
@@ -148,6 +150,8 @@ const wallet: Builder = (feeds, { t, now, range }) => {
   const data = feed?.data ?? null;
   if (!data) return blank('/wallet', statusOf(feed));
   const balance = data.result?.data ?? null;
+  const series = walletSeries(feeds, now, range, balance);
+  const journal = feeds.journal?.data?.result?.data;
   return {
     ...blank('/wallet', statusOf(feed, { needsPermission: data.needsReauth })),
     fetchedAt: data.result?.fetchedAt ?? null,
@@ -159,23 +163,16 @@ const wallet: Builder = (feeds, { t, now, range }) => {
             value: formatIskCompact(balance),
             iskAmount: balance,
             unit: t('overview.isk'),
+            // How far it moved is the fact the balance lacks; no journal, no line.
+            secondary: series ? balanceChange(t, series.values) : undefined,
             tone: 'clear',
           },
-    rows:
-      balance === null
-        ? []
-        : [
-            {
-              key: 'balance',
-              title: t('overview.widgets.wallet.balance'),
-              value: formatIsk(balance, 2),
-              iskAmount: balance,
-              tone: 'clear',
-            },
-          ],
+    // The Table is the journal's newest entries, never the balance again.
+    rows: [],
+    table: balance !== null && journal ? journalTable(t, journal, now) : undefined,
     summary: balance === null ? UNKNOWN : `${formatIsk(balance, 2)} ${t('overview.isk')}`,
     // A secondary read: while the journal loads or fails the Number stays ok and the chart is just absent.
-    chart: walletChart(feeds, t, now, range, balance),
+    chart: series ? (walletArea(t, series, formatIskCompact) ?? undefined) : undefined,
   };
 };
 
@@ -430,7 +427,7 @@ const mail: Builder = (feeds, { t, now }) => {
   };
 };
 
-const orders: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
+const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const feed = feeds.orders;
   const snapshot = feed?.data ?? null;
   const to = '/market/orders';
@@ -462,56 +459,29 @@ const orders: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
   const counts = openOrderProblemCounts(rows);
   const undercut = counts.undercutStation + counts.undercutSystem + counts.undercutRegion;
   const maxOrders = feeds.skills?.data?.maxOrders ?? null;
-  const href = (problems: Parameters<typeof openOrdersHref>[0]['problems']) =>
-    openOrdersHref({
-      problems,
-      characterIds: everyone ? undefined : [activeCharacterId as number],
-    });
-  const row = (
-    key: string,
-    title: string,
-    n: number,
-    tone: DeadlineSeverity,
-    problems: Parameters<typeof openOrdersHref>[0]['problems']
-  ): ListRow => ({
-    key,
-    title,
-    value: count(n),
-    tone: n === 0 ? 'clear' : tone,
-    // A zero is never a link: behind it is a page filtered down to nothing.
-    to: n === 0 ? undefined : href(problems),
-  });
-  const list: ListRow[] = [
-    row('undercut', t('overview.board.undercut'), undercut, 'warning', UNDERCUT_PROBLEMS),
-    row('outbid', t('overview.board.outbid'), counts.outbid, 'warning', ['outbid']),
-    row('relist', t('overview.board.relist'), counts.expiringOrStale, 'watch', ['expiringOrStale']),
-  ];
-  if (counts.belowFloor > 0) {
-    list.push({
-      key: 'belowFloor',
-      title: t('overview.board.belowFloor', { count: counts.belowFloor }),
-      value: count(counts.belowFloor),
-      tone: 'critical',
-    });
-  }
+  const listed = ordersListed(rows);
   const severity = ordersSeverity(rows, needsReauth);
   return {
     ...blank(to, statusOf(feed, { needsPermission: needsReauth, isEmpty: rows.length === 0 })),
     number: {
       value: count(undercut),
       unit: t('overview.board.undercut'),
+      // What is on the market is the fact the undercut count lacks; the slots sit under the table.
       secondary:
-        maxOrders !== null
-          ? { text: t('overview.board.slotsUsed', { used: rows.length, total: maxOrders }) }
+        listed > 0
+          ? { text: t('overview.widgets.orders.listed', { isk: formatIskCompact(listed) }) }
           : undefined,
       tone: undercut === 0 && severity !== 'critical' ? 'clear' : (severity ?? 'clear'),
     },
-    rows: list,
+    rows: [],
+    table: ordersTable(
+      t,
+      rows,
+      now,
+      maxOrders !== null ? { used: rows.length, total: maxOrders } : null
+    ),
     summary: ordersSummary(t, rows, needsReauth),
-    chart:
-      rows.length === 0
-        ? undefined
-        : ordersDonut(t, { open: rows.length, undercut, expiring: counts.expiringOrStale }),
+    chart: ordersStateChart(t, rows) ?? undefined,
   };
 };
 
@@ -609,31 +579,8 @@ const miningTax: Builder = (feeds, { t }) => {
       secondary: miningTaxSecondary(t, data),
       tone: miningTaxSeverity(data) ?? 'clear',
     },
-    rows: [
-      {
-        key: 'unpaid',
-        title: t('overview.board.iskUnpaid'),
-        value: formatIskCompact(data.unpaidIsk),
-        iskAmount: data.unpaidIsk,
-        tone: data.unpaidIsk > 0 ? 'watch' : 'clear',
-      },
-      {
-        key: 'payees',
-        title: t('overview.widgets.miningTax.payees'),
-        detail:
-          data.oldestUnpaidDays === null
-            ? undefined
-            : t('overview.widgets.miningTax.oldest', { days: data.oldestUnpaidDays }),
-        value: count(data.payeeCount),
-        tone: 'clear',
-      },
-      {
-        key: 'unassigned',
-        title: t('overview.board.unassigned'),
-        value: count(data.unassignedCount),
-        tone: data.unassignedCount > 0 ? 'watch' : 'clear',
-      },
-    ],
+    rows: [],
+    table: data.payees ? miningTaxTable(t, data.payees, data.unassignedCount) : undefined,
     summary: miningTaxSummary(t, data),
   };
 };
@@ -658,19 +605,8 @@ const stock: Builder = (feeds, { t }) => {
       summary: stockBoardSummary(t, board),
     };
   }
-  const needing = board.markets.filter(
-    (market) => market.summary.out > 0 || market.summary.low > 0
-  );
   const shortfall = board.totals.out + board.totals.low;
   const cost = board.markets.reduce((sum, market) => sum + market.summary.costToFill, 0);
-  const detail = (summary: (typeof board.markets)[number]['summary']) =>
-    [
-      summary.readyToList > 0 && t('overview.board.stockReady', { count: summary.readyToList }),
-      summary.costToFill > 0 &&
-        t('overview.board.stockToSource', { isk: formatIskCompact(summary.costToFill) }),
-    ]
-      .filter(Boolean)
-      .join(' · ');
   return {
     ...blank(to, statusOf(feed)),
     // The shortfall (out plus low) is the count to act on; "0 out" beside "2 low" hid it.
@@ -683,41 +619,11 @@ const stock: Builder = (feeds, { t }) => {
           : undefined,
       tone: shortfall > 0 ? (stockBoardSeverity(board) ?? 'clear') : 'clear',
     },
-    rows: needing.map((market) => {
-      const out = market.summary.out > 0;
-      return {
-        key: market.listId,
-        // "Amarr VIII (Oris) - Emperor Family Academy" reads as its first part on a widget.
-        title: market.name.split(' - ')[0],
-        detail: detail(market.summary) || undefined,
-        value: out
-          ? t('stockTargets.need.out', { count: market.summary.out })
-          : t('stockTargets.need.low', { count: market.summary.low }),
-        tone: out ? 'critical' : 'warning',
-        to: `${STOCK_PATH}/${encodeURIComponent(market.listId)}`,
-      };
-    }),
+    rows: [],
+    // Every market, not only those short: the healthy ones are the answer to "am I fine".
+    table: stockTable(t, board.markets),
     summary: stockBoardSummary(t, board),
-    chart:
-      hbarsFromRows(
-        t,
-        board.markets
-          .map((market) => {
-            const { out, low, ok, over } = market.summary;
-            const total = out + low + ok + over;
-            return { market, stocked: ok + over, total };
-          })
-          .filter(({ total }) => total > 0)
-          .map(({ market, stocked, total }) => ({
-            key: market.listId,
-            label: market.name.split(' - ')[0],
-            value: stocked,
-            share: stocked / total,
-            text: `${Math.round((stocked / total) * 100)}%`,
-            color: stocked / total < 0.5 ? ('warning' as const) : ('accent' as const),
-          })),
-        t('overview.widgets.chart.stock.note')
-      ) ?? undefined,
+    chart: stockChart(t, board.markets) ?? undefined,
   };
 };
 
@@ -752,16 +658,8 @@ const priceWatch: Builder = (feeds, { t }) => {
       secondary: nearestAlert(t, data),
       tone: priceAlertsSeverity(data) ?? 'clear',
     },
-    rows: data.alerts.map((alert) => ({
-      key: String(alert.typeId),
-      title: alert.name,
-      detail: t(`overview.board.priceAlertTargetLabel.${alert.direction}`, {
-        isk: formatIskCompact(alert.targetPrice),
-      }),
-      value: alert.price === null ? UNKNOWN : formatIskCompact(alert.price),
-      iskAmount: alert.price ?? undefined,
-      tone: alert.crossed ? 'warning' : 'clear',
-    })),
+    rows: [],
+    table: priceWatchTable(t, data.alerts),
     summary: priceAlertsSummary(t, data),
   };
 };

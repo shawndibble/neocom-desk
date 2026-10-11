@@ -84,3 +84,61 @@ export function donutSegments(values: readonly number[]): DonutSegment[] {
     return segment;
   });
 }
+
+export interface DivergingGeometry {
+  /** Each bar above the axis, as a percentage of the region above it. */
+  up: number[];
+  /** Each bar below the axis, as a percentage of the region below it. */
+  down: number[];
+  /** The share of the chart's height above the axis, 0.2 to 0.8. */
+  split: number;
+}
+
+const MIN_SPLIT = 0.2;
+
+/**
+ * Heights for paired bars either side of an axis. The axis sits where it
+ * gives both sides the same pixels-per-ISK (income that is four times
+ * spending gets four times the room), but never closer than a fifth of the
+ * height to an edge, so a small side still reads. A zero draws nothing; any
+ * other value is never thinner than a visible sliver.
+ */
+export function divergingHeights(
+  up: readonly number[],
+  down: readonly number[]
+): DivergingGeometry {
+  const maxUp = up.reduce((m, v) => Math.max(m, v), 0);
+  const maxDown = down.reduce((m, v) => Math.max(m, v), 0);
+  const total = maxUp + maxDown;
+  const split = total <= 0 ? 0.5 : Math.min(1 - MIN_SPLIT, Math.max(MIN_SPLIT, maxUp / total));
+  const scale = (max: number) => (v: number) =>
+    max <= 0 || v <= 0 ? 0 : Math.max(MIN_BAR_PERCENT, (v / max) * 100);
+  return { up: up.map(scale(maxUp)), down: down.map(scale(maxDown)), split };
+}
+
+/**
+ * Closed polygons (`x,y` pairs in a `100 x height` viewBox) for a stacked area,
+ * bottom layer first. The scale runs from zero to the tallest total, so a
+ * layer's thickness is its real share; a negative value stacks as nothing.
+ * Fewer than two points, or nothing above zero, draw nothing.
+ */
+export function stackedAreaBands(layers: readonly (readonly number[])[], height: number): string[] {
+  const points = layers[0]?.length ?? 0;
+  if (points < 2) return [];
+  const totals = Array.from({ length: points }, (_, i) =>
+    layers.reduce((sum, layer) => sum + Math.max(0, layer[i] ?? 0), 0)
+  );
+  const max = Math.max(...totals);
+  if (max <= 0) return [];
+  const y = (value: number) => (height - (value / max) * (height - 4)).toFixed(1);
+  const x = (i: number) => ((i / (points - 1)) * 100).toFixed(0);
+  const below = Array<number>(points).fill(0);
+  return layers.map((layer) => {
+    const upper = layer.map((_, i) => below[i]! + Math.max(0, layer[i] ?? 0));
+    const lower = [...below];
+    upper.forEach((value, i) => (below[i] = value));
+    const top = upper.map((value, i) => `${x(i)},${y(value)}`);
+    const bottom = lower.map((value, i) => `${x(i)},${y(value)}`).reverse();
+    return [...top, ...bottom].join(' ');
+  });
+}

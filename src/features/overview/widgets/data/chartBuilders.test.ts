@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   hbarsFromRows,
-  ordersDonut,
   queueSegments,
   queueStack,
   severityColor,
@@ -11,36 +10,6 @@ import {
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-
-describe('ordersDonut', () => {
-  it('splits open orders into not undercut and undercut, the undercut slice equal to the headline', () => {
-    const model = ordersDonut(t, { open: 38, undercut: 21, expiring: 2 });
-    expect(model.parts.map((p) => [p.key, p.value])).toEqual([
-      ['notUndercut', 17],
-      ['undercut', 21],
-    ]);
-    expect(model.centre).toBe('38');
-    expect(model.summary).toContain('"undercut":21');
-    expect(model.summary).toContain('"open":38');
-  });
-
-  it('keeps expiring as a separate count in the note, not a third slice', () => {
-    const model = ordersDonut(t, { open: 38, undercut: 21, expiring: 2 });
-    expect(model.parts).toHaveLength(2);
-    expect(model.note).toContain('"count":2');
-  });
-
-  it('has no note when nothing is expiring, and never a negative slice', () => {
-    const model = ordersDonut(t, { open: 3, undercut: 5, expiring: 0 });
-    expect(model.note).toBeUndefined();
-    expect(model.parts[0]!.value).toBe(0);
-  });
-
-  it('does not colour undercut in a series hue, and never red', () => {
-    const colors = ordersDonut(t, { open: 3, undercut: 1, expiring: 0 }).parts.map((p) => p.color);
-    expect(colors).toEqual(['neutral', 'warning']);
-  });
-});
 
 describe('hbarsFromRows', () => {
   it('is null for no rows', () => {

@@ -111,6 +111,8 @@ export interface TableRowModel {
 export interface TableModel {
   columns: TableColumn[];
   rows: TableRowModel[];
+  /** One quiet line under the rows ("38 of 49 slots"), when the table has a fact that is not a row. */
+  footer?: string;
 }
 
 export interface KindView {

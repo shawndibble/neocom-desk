@@ -47,6 +47,18 @@ export interface BarsChartModel extends ChartBase {
   ref?: { value: number; label: string };
 }
 
+export interface DivergingChartModel extends ChartBase {
+  kind: 'diverging';
+  /** What came in per period, oldest first; drawn above the axis. */
+  up: number[];
+  /** What went out per period as positive magnitudes, same length as up; drawn below the axis. */
+  down: number[];
+  /** "max 250": the largest bar's value, already formatted. */
+  max: string;
+  xStart?: string;
+  xEnd?: string;
+}
+
 export interface HBarRow {
   key: string;
   label: string;
@@ -94,6 +106,34 @@ export interface StackChartModel extends ChartBase {
   parts: StackPart[];
 }
 
+export interface StackedAreaChartModel extends ChartBase {
+  kind: 'stackedArea';
+  /** Bottom layer first; every layer has the same number of points, oldest first. */
+  layers: { key: string; values: number[]; color: ChartColor }[];
+  /** The latest day as legend parts, in layer order; also what Small draws as one bar. */
+  parts: StackPart[];
+  /** The tallest total, already formatted. */
+  max: string;
+  xStart?: string;
+  xEnd?: string;
+}
+
+export interface StackRow {
+  key: string;
+  label: string;
+  /** In bar order; zero parts draw nothing but keep the order. */
+  parts: { key: string; value: number; color: ChartColor }[];
+  /** The figure at the row's end ("3 short"). */
+  text?: string;
+}
+
+export interface StackRowsChartModel extends ChartBase {
+  kind: 'stackRows';
+  rows: StackRow[];
+  /** One entry per part key, with its total across the rows, in bar order. */
+  legend: StackPart[];
+}
+
 export interface SparkRow {
   key: string;
   label: string;
@@ -110,9 +150,12 @@ export interface SparkChartModel extends ChartBase {
 export type ChartModel =
   | AreaChartModel
   | BarsChartModel
+  | DivergingChartModel
   | HBarsChartModel
   | DonutChartModel
   | StackChartModel
+  | StackedAreaChartModel
+  | StackRowsChartModel
   | SparkChartModel;
 
 export type ChartKind = ChartModel['kind'];

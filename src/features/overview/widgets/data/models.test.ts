@@ -114,7 +114,7 @@ describe('placeholder kinds', () => {
 });
 
 describe('wallet', () => {
-  it('shows the balance as an ISK figure with a one-row list', () => {
+  it('shows the balance as an ISK figure and no table without a journal', () => {
     const feeds: Feeds = {
       wallet: ok({
         result: {
@@ -130,10 +130,43 @@ describe('wallet', () => {
     expect(stateOf(view)).toBe('ok');
     expect(view.number.iskAmount).toBe(3_820_000_000);
     expect(view.number.unit).toBe('overview.isk');
-    expect(view.rows).toHaveLength(1);
+    expect(view.rows).toEqual([]);
+    expect(view.table).toBeUndefined();
+    expect(view.number.secondary).toBeUndefined();
+    expect(view.chart).toBeUndefined();
     expect(view.fetchedAt?.getTime()).toBe(NOW - HOUR);
     expect(view.fromCache).toBe(true);
     expect(view.to).toBe('/wallet');
+  });
+
+  it('says how far the balance moved over the journal, and tables its newest entries', () => {
+    const day = (n: number, balance: number, amount: number) => ({
+      id: n,
+      date: new Date(NOW - (30 - n) * 86_400_000).toISOString(),
+      ref_type: 'bounty_prizes',
+      description: '',
+      amount,
+      balance,
+    });
+    const feeds: Feeds = {
+      wallet: ok({
+        result: { data: 400, fetchedAt: new Date(NOW), fromCache: false, truncated: false },
+        needsReauth: false,
+      }),
+      journal: ok({
+        result: {
+          data: [day(1, 100, 10), day(15, 250, 150), day(29, 400, 150)],
+          fetchedAt: new Date(NOW),
+          fromCache: false,
+          truncated: false,
+        },
+        needsReauth: false,
+      }),
+    };
+    const view = buildView('wallet', feeds, ctx());
+    expect(view.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
+    expect(view.table!.rows.map((r) => r.key)).toEqual(['29', '15', '1']);
+    expect(view.chart?.kind).toBe('area');
   });
 });
 
@@ -206,8 +239,8 @@ describe('stock', () => {
     expect(buildView('survey', {}, ctx()).to).toBeNull();
   });
 
-  it('counts out and low, listing the markets that need restocking', () => {
-    const summary = { out: 2, low: 1, readyToList: 0, costToFill: 0 };
+  it('counts out and low, tabling every market with its own state', () => {
+    const summary = { out: 2, low: 1, ok: 4, over: 0, readyToList: 0, costToFill: 0 };
     const feeds: Feeds = {
       stock: ok({
         board: {
@@ -220,9 +253,10 @@ describe('stock', () => {
     const view = buildView('stock', feeds, ctx());
     expect(view.number.value).toBe('3');
     expect(view.number.tone).toBe('warning');
-    expect(view.rows).toHaveLength(1);
-    expect(view.rows[0].title).toBe('Jita IV');
-    expect(view.rows[0].to).toBe('/market/stock/a');
+    expect(view.table?.rows).toHaveLength(1);
+    expect(view.table?.rows[0]!.cells[0]).toBe('Jita IV');
+    expect(view.table?.rows[0]!.to).toBe('/market/stock/a');
+    expect(view.chart?.kind).toBe('stackRows');
   });
 });
 
@@ -327,7 +361,8 @@ describe('priceWatch', () => {
     const view = buildView('priceWatch', feeds, ctx());
     expect(view.number.value).toBe('1');
     expect(view.number.tone).toBe('warning');
-    expect(view.rows.map((r) => r.title)).toEqual(['Tritanium', 'PLEX']);
+    expect(view.rows).toEqual([]);
+    expect(view.table?.rows.map((r) => r.cells[0])).toEqual(['Tritanium', 'PLEX']);
   });
 });
 
@@ -458,6 +493,25 @@ describe('the Number view says one new thing', () => {
     const view = buildView('miningTax', { mining: ok(data) as never }, ctx());
     expect(view.number.secondary?.text).toContain('"days":13');
     expect(view.number.secondary?.text).not.toContain('miningUnpaid');
+  });
+
+  it('mining tax tables who is owed what, and has no table from a cache older than the payee list', () => {
+    const data = {
+      unpaidIsk: 10_900_000,
+      oldestUnpaidDays: 13,
+      payeeCount: 1,
+      unassignedCount: 2,
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    };
+    const payees = [
+      { payeeId: 'p1', name: 'Corp Tax', unpaidIsk: 10_900_000, oldestDays: 13, entries: 4 },
+    ];
+    const withPayees = buildView('miningTax', { mining: ok({ ...data, payees }) as never }, ctx());
+    expect(withPayees.rows).toEqual([]);
+    expect(withPayees.table?.rows[0]!.cells[0]).toBe('Corp Tax');
+    expect(withPayees.table?.footer).toContain('"count":2');
+    expect(buildView('miningTax', { mining: ok(data) as never }, ctx()).table).toBeUndefined();
   });
 
   it('price watch names the nearest target that has not been hit', () => {

@@ -191,6 +191,7 @@ describe('Widget charts', () => {
               escrow: 0,
               sellOrders: 6_000_000_000,
             },
+            history: [],
           },
         ],
       },

@@ -16,6 +16,15 @@ import type { ChartColor, StackPart } from '../charts/types';
 import { blank, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { hbarsFromRows } from './chartBuilders';
 import { clonesTable, locationTable } from './characterTables';
+import {
+  balanceChange,
+  flowDiverging,
+  flowSecondary,
+  flowTable,
+  lpTable,
+  netWorthSeries,
+  netWorthTable,
+} from './moneyModels';
 import { journalCoverageDays, withinRange } from './chartSeries';
 import type { FeedId, ListRow, NumberModel } from './types';
 
@@ -65,14 +74,12 @@ const walletFlow: Builder = (feeds, { t, now, range }) => {
       : t(`${C}.walletFlow.note`, { count: range });
   const income = formatIskCompact(flow.totalIn);
   const spending = formatIskCompact(flow.totalOut);
-  const rows: ListRow[] = flow.rows.map((row) => ({
-    key: row.refType,
-    title: humanizeRefType(row.refType),
-    detail: t(row.net >= 0 ? `${D}.walletFlow.income` : `${D}.walletFlow.spending`),
-    value: formatIskCompactSigned(row.net),
-    iskAmount: row.net,
-    tone: 'clear',
-  }));
+  const summary = t(`${C}.walletFlow.summary`, {
+    income,
+    spending,
+    net: formatIskCompactSigned(flow.net),
+    count: range,
+  });
   return {
     ...blank(
       to,
@@ -84,36 +91,14 @@ const walletFlow: Builder = (feeds, { t, now, range }) => {
       value: formatIskCompactSigned(flow.net),
       iskAmount: flow.net,
       unit: t('overview.isk'),
+      // Income and spending are the chart's and the table's: the line says how the net moved.
+      secondary: flowSecondary(t, all, now, range, covered, flow.rows),
       tone: 'clear',
     },
-    rows,
-    summary: t(`${C}.walletFlow.summary`, {
-      income,
-      spending,
-      net: formatIskCompactSigned(flow.net),
-      count: range,
-    }),
-    chart:
-      hbarsFromRows(
-        t,
-        [
-          {
-            key: 'income',
-            label: t(`${D}.walletFlow.incomeLabel`),
-            value: flow.totalIn,
-            text: income,
-            color: 'iskPos',
-          },
-          {
-            key: 'spending',
-            label: t(`${D}.walletFlow.spendingLabel`),
-            value: flow.totalOut,
-            text: spending,
-            color: 'iskNeg',
-          },
-        ],
-        note
-      ) ?? undefined,
+    rows: [],
+    table: flowTable(t, flow.rows),
+    summary,
+    chart: flowDiverging(t, entries, now, range, note, summary) ?? undefined,
   };
 };
 
@@ -158,6 +143,8 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
     total: formatIskCompact(total),
     parts: parts.map((p) => `${p.label} ${p.text}`).join(', '),
   });
+  const series = netWorthSeries(included);
+  const note = t(`${C}.netWorth.note`, { day });
   return {
     ...blank(to, statusOf(feed)),
     fetchedAt: new Date(Date.parse(day)),
@@ -166,17 +153,35 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
       value: formatIskCompact(total),
       iskAmount: total,
       unit: t('overview.isk'),
+      // How far it moved over the recorded days; "as of" is the chart's caption.
+      secondary: balanceChange(t, series.totals, 'overview.widgets.netWorth'),
       tone: 'clear',
     },
-    rows: shown.map(({ id }) => ({
-      key: id,
-      title: t(LAYER_LABEL_KEYS[id]),
-      value: formatIskCompact(layers[id]),
-      iskAmount: layers[id],
-      tone: 'clear',
-    })),
+    rows: [],
+    table: netWorthTable(
+      t,
+      layers,
+      series,
+      shown.map(({ id }) => id)
+    ),
     summary,
-    chart: { kind: 'stack', parts, note: t(`${C}.netWorth.note`, { day }), summary },
+    chart:
+      series.days.length >= 2
+        ? {
+            kind: 'stackedArea',
+            layers: shown.map(({ id, color }) => ({
+              key: id,
+              values: series.layers[id],
+              color,
+            })),
+            parts,
+            max: t(`${C}.max`, { value: formatIskCompact(Math.max(...series.totals)) }),
+            xStart: t(`${C}.daysAgo`, { count: series.days.length }),
+            xEnd: t(`${C}.today`),
+            note,
+            summary,
+          }
+        : { kind: 'stack', parts, note, summary },
   };
 };
 
@@ -218,12 +223,8 @@ const lp: Builder = (feeds, { t }) => {
           : undefined,
       tone: 'clear',
     },
-    rows: data.entries.map((entry) => ({
-      key: String(entry.corporationId),
-      title: nameOf(entry),
-      value: formatCompactNumber(entry.points),
-      tone: 'clear' as const,
-    })),
+    rows: [],
+    table: lpTable(t, data.entries),
     summary: note,
     chart:
       hbarsFromRows(
