@@ -348,7 +348,6 @@ export function Market() {
       { id: 'orders', label: t('market.sections.openOrders') },
       { id: 'history', label: t('market.sections.history') },
       { id: 'appraisal', label: t('market.sections.appraisal') },
-      { id: 'lp-store', label: t('loyaltyStore.title') },
     ],
   };
   const searchInputRef = useRef<HTMLInputElement>(null);

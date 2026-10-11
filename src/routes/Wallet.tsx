@@ -387,7 +387,7 @@ export function Wallet() {
         // is on the LP Store page header.
         render: (entry) => (
           <Link
-            to={`/market/lp-store/${entry.corporation_id}`}
+            to={`/wallet/lp-store/${entry.corporation_id}`}
             className={entityLinkClassName('group')}
           >
             {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
@@ -564,6 +564,8 @@ export function Wallet() {
         tabs={[
           { id: 'balance', label: t('wallet.balanceTab') },
           { id: 'journal', label: t('wallet.journalTab') },
+          // Its own route draws this same bar (`LoyaltyStore`); picking it navigates there.
+          { id: 'lp-store', label: t('loyaltyStore.title') },
         ]}
       />
 
@@ -736,7 +738,7 @@ export function Wallet() {
                     onSortChange={loyaltySortProps.onSortChange}
                     responsive="table"
                     rowClassName={() => 'group'}
-                    onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
+                    onRowClick={(entry) => navigate(`/wallet/lp-store/${entry.corporation_id}`)}
                   />
                 )}
               </Panel>

@@ -33,11 +33,11 @@ const CONCRETE_PATH: Partial<Record<AppRoutePath, string>> = {
   '/skills/plans/:planId': '/skills/plans/e2e-missing-plan',
   '/industry/plans/:planId': '/industry/plans/e2e-missing-plan',
   '/industry/groups/:groupId': '/industry/groups/e2e-missing-group',
-  '/market/lp-store/:corporationId': `/market/lp-store/${CORPORATION_ID}`,
+  '/wallet/lp-store/:corporationId': `/wallet/lp-store/${CORPORATION_ID}`,
   '/corp/assets/*': '/corp/assets/e2e-missing-location',
 };
 
-// A path can be both a route and a tab (`/market/lp-store`), so the list is de-duplicated.
+// A path can be both a route and a tab (`/wallet/lp-store`), so the list is de-duplicated.
 const PATHS = [
   ...new Set([
     ...(Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[]).map(

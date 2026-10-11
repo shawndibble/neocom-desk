@@ -149,7 +149,7 @@ describe('Wallet', () => {
     // reaches the LP Store without the row. Not a Show Info link any more.
     expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
       'href',
-      '/market/lp-store/1000167'
+      '/wallet/lp-store/1000167'
     );
     expect(screen.queryByRole('columnheader', { name: 'LP Store' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Open LP Store/ })).not.toBeInTheDocument();
@@ -274,6 +274,38 @@ describe('Wallet', () => {
     render(<App />);
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Journal' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('shows Balance, Journal and LP Store tabs (issue #3527)', async () => {
+    render(<App />);
+    const tabs = within(await screen.findByRole('tablist', { name: 'Wallet' })).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Balance', 'Journal', 'LP Store']);
+  });
+
+  it('opens a store from its URL as the LP Store tab, under the Wallet tab bar (issue #3527)', async () => {
+    window.history.pushState({}, '', '/wallet/lp-store/1000167');
+    render(<App />);
+    expect(
+      await screen.findByRole('tab', { name: 'LP Store', selected: true })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Balance' })).toBeInTheDocument();
+  });
+
+  it('moves an old Market LP Store link to Wallet, keeping the corporation and query (issue #3527)', async () => {
+    window.history.pushState({}, '', '/market/lp-store/1000167?affordableOnly=0');
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store/1000167'));
+    expect(window.location.search).toBe('?affordableOnly=0');
+    expect(
+      await screen.findByRole('tab', { name: 'LP Store', selected: true })
+    ).toBeInTheDocument();
+  });
+
+  it('moves the old Market LP Store landing to Wallet with its search (issue #3527)', async () => {
+    window.history.pushState({}, '', '/market/lp-store?q=tritanium');
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store'));
+    expect(window.location.search).toBe('?q=tritanium');
   });
 
   it('redirects /wallet/transactions to Market › History (issue #1749)', async () => {

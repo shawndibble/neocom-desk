@@ -41,7 +41,7 @@ const DESTINATIONS: NavDestination[] = [
   }),
   destination({ path: '/assets', label: 'Assets', breadcrumb: 'Assets', locked: true }),
   destination({
-    path: '/market/lp-store',
+    path: '/wallet/lp-store',
     kind: 'tab',
     label: 'LP Store',
     breadcrumb: 'Wallet › LP Store',

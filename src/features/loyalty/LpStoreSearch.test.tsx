@@ -75,11 +75,11 @@ function LocationProbe() {
 
 function renderSearch(query = 'trit') {
   return render(
-    <MemoryRouter initialEntries={['/market/lp-store']}>
+    <MemoryRouter initialEntries={['/wallet/lp-store']}>
       <LocationProbe />
       <Routes>
         <Route
-          path="/market/lp-store"
+          path="/wallet/lp-store"
           element={<LpStoreSearch query={query} onQueryChange={() => {}} />}
         />
         <Route path="*" element={null} />
@@ -123,7 +123,7 @@ describe('LpStoreSearch', () => {
 
     fireEvent.click(screen.getByText('Sisters of EVE'));
 
-    expect(probe.pathname).toBe('/market/lp-store/1000130');
+    expect(probe.pathname).toBe('/wallet/lp-store/1000130');
     expect(probe.search).toBe('?offer=12');
     expect(probe.state).toEqual({ from: 'lp-search', q: 'trit' });
   });
@@ -171,7 +171,7 @@ describe('LpStoreSearch', () => {
     );
     renderSearch('fed');
     const link = screen.getByRole('link', { name: 'Federal Navy Academy' });
-    expect(link).toHaveAttribute('href', '/market/lp-store/1000120');
+    expect(link).toHaveAttribute('href', '/wallet/lp-store/1000120');
     expect(screen.queryByText(/No stargate route/)).not.toBeInTheDocument();
   });
 
@@ -191,7 +191,7 @@ describe('LpStoreSearch', () => {
       'Sisters of EVE300 LP',
     ]);
     fireEvent.click(links[0]!);
-    expect(probe.pathname).toBe('/market/lp-store/1000120');
+    expect(probe.pathname).toBe('/wallet/lp-store/1000120');
     expect(probe.state).toBeNull();
   });
 

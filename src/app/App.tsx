@@ -175,10 +175,12 @@ const ROUTE_ELEMENTS = {
   // copied is `/fittings?f=`, so these redirects are for good.
   '/fittings/*': <LegacyShipsRedirect />,
   '/market': <Market />,
-  // LP Store moved from Wallet to Market; the old paths redirect for good.
-  '/market/lp-store': <LoyaltyStore />,
-  '/market/lp-store/:corporationId': <LoyaltyStore />,
   '/wallet': <Wallet />,
+  // LP Store is a Wallet tab (it was a Market tab before; `PAGE_LEGACY_LOCATIONS`
+  // sends `/market/lp-store` here). Its oldest paths, under `/wallet/loyalty`,
+  // redirect for good.
+  '/wallet/lp-store': <LoyaltyStore />,
+  '/wallet/lp-store/:corporationId': <LoyaltyStore />,
   '/wallet/loyalty': <LegacyPathRedirect />,
   '/wallet/loyalty/:corporationId': <LegacyPathRedirect />,
   '/mining': <MoonMiningTax />,
