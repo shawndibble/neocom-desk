@@ -3225,7 +3225,7 @@
     "answers": {
       "attention": {
         "question": "Which character needs my attention?",
-        "answer": "Every pilot’s training queue at a glance, and one Alerts feed for what fired on any character: skills finished, jobs ready to deliver, orders undercut, mail waiting."
+        "answer": "An Overview of widgets you choose and arrange, with every pilot’s training queue at a glance and one alerts bell for what fired on any character: skills finished, jobs ready to deliver, orders undercut, mail waiting."
       },
       "orders": {
         "question": "Which of my orders is quietly losing ISK?",
@@ -3267,8 +3267,8 @@
     "screenshotEnlarge": "Enlarge: {{alt}}",
     "screenshots": {
       "overview": {
-        "alt": "A character’s Overview board on a desktop: next deadline, training, wallet, open orders, mining tax, contracts, industry jobs and what is coming up, beside the alerts column.",
-        "caption": "One board for what needs you next"
+        "alt": "A character’s Overview on a desktop: a grid of widgets the pilot chose, here the skill queue and industry jobs as tables beside the wallet balance and skill points, with the next deadline and the alerts bell above.",
+        "caption": "Your own Overview of what needs you next"
       },
       "orderDetail": {
         "alt": "An open sell order: who is cheaper at the station, system and region, and whether there is a better exit.",
