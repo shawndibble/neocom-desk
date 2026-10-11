@@ -548,7 +548,7 @@ describe('Contacts keyboard access (issue #3396)', () => {
     window.history.pushState({}, '', '/contacts/across');
     render(<App />);
     await screen.findByText('Good Friend');
-    const tab = await screen.findByRole('tab', { name: /this character/i });
+    const tab = await screen.findByRole('tab', { name: /contacts/i });
     expect(tab).toHaveAttribute('aria-selected', 'true');
     expect(tab).toHaveAttribute('tabindex', '0');
   });

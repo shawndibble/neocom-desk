@@ -6792,7 +6792,7 @@
     },
     "standingSummaryOwn": "Your contact: {{tier}} standing ({{value}})",
     "standingSummaryInherited": "{{tier}} standing ({{value}}) — your entry on their {{source}}, not on them",
-    "tabThisCharacter": "This character",
+    "tabContacts": "Contacts",
     "tabAcrossCharacters": "Across characters",
     "tabStandings": "Standings",
     "standingsKind": {
