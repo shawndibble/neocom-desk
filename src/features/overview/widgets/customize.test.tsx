@@ -192,6 +192,32 @@ describe('Customize', () => {
     expect(seen.current).toEqual(START);
   });
 
+  it('puts focus on Add widget after a confirmed Reset', async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole('button', { name: 'Start customizing' }));
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(screen.getByRole('button', { name: 'Add widget' })).toHaveFocus();
+  });
+
+  it('Done drops the Undo toast raised inside Customize', async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole('button', { name: 'Start customizing' }));
+    await user.click(screen.getByRole('button', { name: 'Remove Wallet' }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+  });
+
+  it('Done keeps an Undo toast raised from the settings menu outside Customize', async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole('button', { name: 'Settings for Training' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove from Overview' }));
+    await user.click(screen.getByRole('button', { name: 'Start customizing' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+  });
+
   it('reorders and removes on a phone with its own list', async () => {
     const { user, seen } = setup({ phone: true });
     await user.click(screen.getByRole('button', { name: 'Start customizing' }));

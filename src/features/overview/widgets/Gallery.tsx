@@ -85,7 +85,7 @@ function GalleryItem({
     action = (
       <Button
         variant="primary"
-        size="sm"
+        size={preview ? 'sm' : 'md'}
         aria-label={
           count > 0
             ? t('overview.gallery.addAnotherLabel', { title })

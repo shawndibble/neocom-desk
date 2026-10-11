@@ -7,6 +7,8 @@
  *   replacing the layout) raises one `Toast` with an Undo. That toast is
  *   persistent by design (it carries an action; docs/DESIGN.md §6c, WCAG
  *   2.2.1), and Cancel drops it because its `undoTo` is older than the snapshot.
+ *   Done drops one raised while Customizing too; one raised from a widget's
+ *   settings menu outside Customize stays until dismissed.
  * - A widget leaving takes its focus target with it, so focus moves to its
  *   neighbour (or the edit bar) rather than falling to the top of the page.
  */
@@ -50,6 +52,8 @@ export interface OverviewEditProviderProps {
 interface UndoToast {
   message: string;
   to: OverviewLayout;
+  /** Raised while Customize was open, so Done retires it with the bar. */
+  inCustomize: boolean;
 }
 
 export function OverviewEditProvider({
@@ -89,10 +93,10 @@ export function OverviewEditProvider({
     (result: UndoableResult | null): boolean => {
       if (result === null) return false;
       commit(result.layout);
-      setToast({ message: t(result.undoLabel), to: result.undoTo });
+      setToast({ message: t(result.undoLabel), to: result.undoTo, inCustomize: editing });
       return true;
     },
-    [commit, t]
+    [commit, editing, t]
   );
 
   const flash = useCallback((id: string) => setFlashId(id), []);
@@ -138,6 +142,7 @@ export function OverviewEditProvider({
       done: () => {
         snapshot.current = null;
         setEditing(false);
+        setToast((current) => (current?.inCustomize ? null : current));
       },
       cancel: () => {
         const before = snapshot.current;
@@ -172,7 +177,11 @@ export function OverviewEditProvider({
       replace: (next) => {
         const before = layoutRef.current;
         commit(next);
-        setToast({ message: t(ROLES_UNDO_LABEL), to: snapshotLayout(before) });
+        setToast({
+          message: t(ROLES_UNDO_LABEL),
+          to: snapshotLayout(before),
+          inCustomize: editing,
+        });
       },
       step: (id, direction) => {
         const shown = new Set(drawn().map((w) => w.id));

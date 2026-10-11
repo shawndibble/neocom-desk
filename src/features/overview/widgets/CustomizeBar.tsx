@@ -8,7 +8,7 @@
  * rather than a dialog: asking twice (a dialog, then a toast) for a change that
  * can be undone would be heavier than the change.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -21,14 +21,21 @@ export function CustomizeBar({ onAdd, onRoles }: { onAdd: () => void; onRoles: (
   const [confirming, setConfirming] = useState(false);
   const keepRef = useRef<HTMLButtonElement>(null);
   const resetRef = useRef<HTMLButtonElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  const askId = useId();
   // Focus follows the swap: onto Keep when the question appears, back onto Reset when dismissed.
   const returnToReset = useRef(false);
+  // After a confirmed Reset the widgets are replaced, so the pilot is put back on Add widget.
+  const returnToAdd = useRef(false);
 
   useEffect(() => {
     if (confirming) keepRef.current?.focus();
     else if (returnToReset.current) {
       returnToReset.current = false;
       resetRef.current?.focus();
+    } else if (returnToAdd.current) {
+      returnToAdd.current = false;
+      addRef.current?.focus();
     }
   }, [confirming]);
 
@@ -46,13 +53,14 @@ export function CustomizeBar({ onAdd, onRoles }: { onAdd: () => void; onRoles: (
       <span className="flex-1" />
       {confirming ? (
         <>
-          <span className="text-sm" id="overview-reset-ask">
+          <span className="text-sm" id={askId}>
             {t('overview.customize.resetAsk')}
           </span>
           <Button
             variant="danger"
-            aria-describedby="overview-reset-ask"
+            aria-describedby={askId}
             onClick={() => {
+              returnToAdd.current = true;
               setConfirming(false);
               edit.reset();
             }}
@@ -71,7 +79,7 @@ export function CustomizeBar({ onAdd, onRoles }: { onAdd: () => void; onRoles: (
         </>
       ) : (
         <>
-          <Button variant="primary" onClick={onAdd} data-focus-target>
+          <Button ref={addRef} variant="primary" onClick={onAdd} data-focus-target>
             <Icon.AddWidget size={Icon.ICON_SIZE.md} aria-hidden="true" />
             {t('overview.customize.add')}
           </Button>
