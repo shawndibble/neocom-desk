@@ -48,10 +48,10 @@ describe('CustomizePermissionsDialog', () => {
     expect(screen.getAllByText('Required')).toHaveLength(2);
   });
 
-  it('tags Corporation and Structure markets as opt-in', async () => {
+  it('tags Corporation, Structure markets and Jump fatigue as opt-in', async () => {
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
     await screen.findByRole('checkbox', { name: 'Wallet' });
-    expect(screen.getAllByText('Opt-in')).toHaveLength(2);
+    expect(screen.getAllByText('Opt-in')).toHaveLength(3);
   });
 
   it('reads the Opt-in tag in an opt-in checkbox’s description', async () => {
