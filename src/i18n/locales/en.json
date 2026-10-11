@@ -3807,8 +3807,7 @@
       "notifyMe": "Notify me about…",
       "pushOn": "Push on this device: On",
       "pushOff": "Push on this device: Off",
-      "bannerNote": "Danger alerts also appear as a banner on the Overview",
-      "bannerLabel": "Danger alert"
+      "bannerNote": "Danger alerts also appear as a banner on the Overview"
     }
   },
   "common": {
