@@ -20,10 +20,10 @@ Route `/clones` (`src/routes/Clones.tsx`). Second tab of the Character overview 
 See where the active Character's home clone and jump clones are, what is fitted in each, and when the next jump is allowed.
 
 - **Top jobs (ranked):** 1. "Which clone should I wear for this training queue?" (the verdict: "the answer the page exists for", #3487; #3003). 2. "Can I jump yet?" (shared Jump Cooldown). 3. "Where are my clones, what is in them, how far away?"
-- **Device and cadence:** both; #3487 reorders the phone layout so the verdict is the first block at 390px. Cadence: when a queue changes or before a jump.
+- **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11). Phone parity: #3487 reorders the phone layout so the verdict is the first block at 390px. Cadence: when a queue changes or before a jump.
 - **Above the fold:** the verdict card (Worth a jump with the Route button, or Stay put), then cooldown, You are in, Respawn, then the clone list.
 - **Not for:** planning the skills themselves (Skills); the route to a clone's station (the Route button opens Travel › Route Safety).
-- **Sources:** `20261008-085439`; #3001, #3002, #3003, #3487, #1236.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `20261008-085439`; #3001, #3002, #3003, #3487, #1236.
 - **Unconfirmed:** cadence; the ranking of jobs 2 and 3.
 
 ### Mobbin brief

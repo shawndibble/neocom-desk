@@ -26,22 +26,23 @@ Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, 
 
 "What is this item worth where I trade, and do my own orders need me?" Market is the pilot's trading desk: look up a price, keep their own orders competitive, keep a market they sell at stocked, and price a pile of loot. The live tabs (`MARKET_TABS`, `src/app/pageTabs.ts`) are Browser, Open orders, Stock, History (+ Transactions) and Appraisal. Tab jobs: **Browser** = price one item from the real order book (ADR 0003, `20260831-140406-market-browser-rebuild`); **Open orders** = "what needs me", grouped by worst Order Problem (`20260906-155913`); **Stock** = "does the market I sell at have what it should" (`20261010-182330`); **History / Transactions** = what filled and what it made; **Appraisal** = price a pasted list at a Trade Hub (`20260908-164742`).
 
-- **Top jobs (ranked):** 1. "Which of my orders are undercut, outbid or expiring?" (Open orders) 2. "What does this item sell and buy for, and how far away?" (Browser) 3. "What is this pile worth?" (Appraisal). Ranking is inferred, see Unconfirmed.
-- **Device and cadence:** both. Market is one of the four default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); Open orders has a compact phone list (`20260924-020211`, #1429). Pilots arrive from alerts: `marketOrderUndercut` → `/market/orders`, `stockBelowTarget` → `/market/stock`, `marketOrderFilled` → Transactions, `priceAlertTriggered` → Browser (`src/features/notifications/notificationOptions.ts`). Browser is laid out two-column at desk width (`max-w-[96rem]`).
-- **Above the fold:** Open orders: problem groups worst first, healthy folded, one relist floor per row. Browser: item finder + Quickbar beside the selected item's best sell/buy and order book. Appraisal: paste box, then the total at the chosen hub.
+- **Top jobs (ranked):** 1. "Where can I get item X within N jumps, even in another region?" (Browser: Jump Range from the Current System spans regions, `20260929-204125`; owner, 2026-10-11) 2. "Which of my orders have a problem, and how do I fix it?" (Open orders; owner, 2026-10-11) 3. "What is this pile worth?" (Appraisal).
+- **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11): copy a new price, a sell list or a multibuy list into the client; paste an inventory list into Appraisal. Phone parity: Market is one of the four default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); Open orders has a compact phone list (`20260924-020211`, #1429). Pilots arrive from alerts: `marketOrderUndercut` → `/market/orders`, `stockBelowTarget` → `/market/stock`, `marketOrderFilled` → Transactions, `priceAlertTriggered` → Browser (`src/features/notifications/notificationOptions.ts`). Browser is laid out two-column at desk width (`max-w-[96rem]`).
+- **Above the fold:** Browser: item finder (Quickbar below it) beside the selected item's scope bar ("Within N jumps of X, N stations") and order book with a Jumps column. Open orders: problem groups worst first, healthy folded, one relist floor and Copy new price per row. Appraisal: paste box, then the total at the chosen hub.
 - **Not for:** spending LP (Wallet › LP Store, `20261010-200446`, #3527) or picking a haul (Travel › Hauling, `20261010-193521`, #3526); Hauling in section 4, and section 5 (LP Store), predate both moves. Public contracts are Contracts. Net worth is Wallet.
-- **Sources:** `20260906-155913`, `20260924-020211`, `20261010-182330`, `20260831-140406-market-browser-rebuild`, `20260904-111509`, `20260908-164742`, `20261010-193521`, `20261010-200446`, ADR 0002, 0003; #1429, #3526, #3527.
-- **Unconfirmed:** the job ranking (Open orders first); that order upkeep is a daily or per-session habit; that Browser, Appraisal and Stock are mostly desk use; how often pilots far from a Trade Hub use Browser vs Appraisal.
+- **Sources:** owner, 2026-10-11 (job ranking, desktop use); `20260906-155913`, `20260924-020211`, `20261010-182330`, `20260831-140406-market-browser-rebuild`, `20260929-204125`, `20260904-111509`, `20260908-164742`, `20261010-193521`, `20261010-200446`, ADR 0002, 0003; #1429, #3526, #3527.
+- **Unconfirmed:** that order upkeep is a daily or per-session habit; how often pilots far from a Trade Hub use Browser vs Appraisal.
 
 ### Mobbin brief
 
 - **Fit:** medium. Search + detail, a watchlist, paste-to-price and a problem-grouped worklist are generic; the order book, jump-range filters and undercut ladder are EVE-specific.
 - **Analog apps:** Robinhood, Coinbase, Kraken Pro, eBay Seller Hub, Shopify (inventory).
 - **Screen queries:**
+  - `web: product availability search listing nearby stores within a distance radius, nearest first, with price and stock per store`
   - `web: asset search with a pinned watchlist in a left column and the selected asset's price chart and buy/sell order tables on the right`
   - `web: seller's active listings grouped by status with a count per group and an action button on each row`
-  - `ios: watchlist of tracked items with current price and a price-alert indicator per row`
   - `web: inventory list with target quantity, on-hand quantity, a fill bar and a low-stock status per item`
+  - `ios: watchlist of tracked items with current price and a price-alert indicator per row`
 - **Flow queries:** `web: paste a list of items and get an itemized valuation with a total and a share link`.
 - **Mobbin won't help with:** the order book's depth ladder by station/system/region with jump distance and security, bait-sell flags, legal 4-significant-figure undercut prices, and region-wide price history with a moving average; reference the EVE client market window and EVE market tools.
 
@@ -710,5 +711,6 @@ Scope matrix: Browser, Variations, Compare, Price History, Appraisal, Hauling = 
 - Contract search: sign-in-free path (cache key not tied to character); today it redirects to `/characters`.
 - Hauling: station-level history when ESI allows, user-selectable category groups, show scan coverage ("top 80 of N").
 - Open orders: slot usage line (`orderSlots.ts` exists), price-alert action on rows, filter/copy-location in row menu.
+- Browser: "item X within N jumps" is the top job (owner, 2026-10-11), but Jump Range is set inside the Filter funnel (`BrowserFilterBar`); a range control on the scope bar would make it one step.
 - Notifications: add expiring/under-floor events from the feasibility note.
 - Surface `fillTime.ts` in History.

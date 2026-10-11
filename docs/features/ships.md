@@ -23,11 +23,11 @@ All paths under `src/features/fittings/` unless stated.
 "Which hulls can I fly, and how long until I can fly the one I want?" The Ship Tree copies the in-game ISIS tree and every mark on it is the pilot's own progress; it sits beside Fittings because clicking a hull leads to fitting it (`20260926-135538`). The Fittings tab is covered in `fittings.md`.
 
 - **Top jobs (ranked):** 1. "Can this Character fly hull X, and if not, how long?" 2. "What Mastery do I have, and what do I add to my Skill Plan for the next tier?" 3. "What comes next in this line, and do I own its blueprint?"
-- **Device and cadence:** desk first: a pan/zoom map and a Ship Info window. Pinch zoom exists (`20260927-100237`) and Ships has `mobileTab: true` (`src/app/navDestinations.ts:166`), though every page but Alerts, Corp, Help and Settings has that flag, so it is weak evidence. Cadence: occasional, when picking a next ship.
+- **Device and cadence:** desktop primary (owner, 2026-10-11): a pan/zoom map and a Ship Info window. Phone parity: pinch zoom exists (`20260927-100237`) and Ships has `mobileTab: true` (`src/app/navDestinations.ts:166`), though every page but Alerts, Corp, Help and Settings has that flag, so it is weak evidence. Cadence: occasional, when picking a next ship.
 - **Above the fold:** the faction's tree with flyable hulls lit and the search box; in Ship Info: can fly / time to fly, Mastery, Add tier N to plan.
 - **Not for:** building or tuning a fit (Fittings tab); editing the plan itself (Skills).
-- **Sources:** `20260926-135538`, `20260927-100237`, ADR 0015; #2652, #2146.
-- **Unconfirmed:** desk-first and occasional cadence; the ranking of jobs 2 and 3.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `20260926-135538`, `20260927-100237`, ADR 0015; #2652, #2146.
+- **Unconfirmed:** occasional cadence; the ranking of jobs 2 and 3.
 
 ### Mobbin brief
 

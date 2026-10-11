@@ -13,10 +13,10 @@ Two routes outside `RequireCharacter`/`ScopeGate`, neither in the nav: `/stylegu
 Two users. `/styleguide` is for developers and agents, not pilots: "What does each token, primitive and §6c cue look like?" (DESIGN.md says to add a new cue there). NotFound is for a pilot who followed a bad link: "This address is wrong; how do I get back in?"
 
 - **Top jobs (ranked):** 1. Developer: check a token, primitive or cue before building UI. 2. Pilot: leave a dead URL with one button.
-- **Device and cadence:** styleguide at the desk, while building; NotFound on any device, rarely.
+- **Device and cadence:** styleguide at the desk, while building; NotFound mostly on the desktop, the app's primary device (owner, 2026-10-11), rarely.
 - **Above the fold:** styleguide n/a; NotFound: heading, one-line hint, Go to Neocom Desk.
 - **Not for:** the styleguide is not a pilot page (no nav entry).
-- **Sources:** `NotFound.tsx` header; DESIGN.md §6c; `docs/DESIGN.md` line 9.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `NotFound.tsx` header; DESIGN.md §6c; `docs/DESIGN.md` line 9.
 - **Unconfirmed:** none.
 
 ### Mobbin brief

@@ -35,10 +35,10 @@ Everything around the feature pages: router and route table, the signed-in `Layo
 "Get me to the page I need, as the Character I mean." The shell is the chrome around every page: navigation, the Character switcher, the alerts bell, and the gate that explains a locked page.
 
 - **Top jobs (ranked):** 1. "Go to a page or view" (rail, phone tab bar, More sheet, Go to). 2. "Switch to another Character" (portrait link, key `C`). 3. "Why is this page locked, and how do I fix it?" (ScopeGate, Grant).
-- **Device and cadence:** both, every session. Phone: a bar of the pilot's four pages (`20260913-095527`; default `DEFAULT_MOBILE_TABS` in `src/lib/mobileTabs.ts`: Overview, Skills, Industry, Market) plus More; desktop: the grouped rail.
+- **Device and cadence:** desktop primary, every session: the grouped rail, beside the EVE client (owner, 2026-10-11). Phone parity: a bar of the pilot's four pages (`20260913-095527`; default `DEFAULT_MOBILE_TABS` in `src/lib/mobileTabs.ts`: Overview, Skills, Industry, Market) plus More. The owner's own phone use is one-off route and pilot lookups (Travel, Pilot Lookup), neither in the default bar.
 - **Above the fold:** n/a. Always visible: rail or tab bar, the Character portrait, the bell with its count.
 - **Not for:** page content; finding an item or asset (command palette, `command-palette.md`).
-- **Sources:** decisions `20260913-095527`, `20261002-145653-rail-opens-the-current-page-icons-hiding-and`, `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); decisions `20260913-095527`, `20261002-145653-rail-opens-the-current-page-icons-hiding-and`, `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`.
 - **Unconfirmed:** ranking of switching Character against navigating; how many pilots use hide-pages.
 
 ### Mobbin brief
@@ -47,9 +47,9 @@ Everything around the feature pages: router and route table, the signed-in `Layo
 - **Analog apps:** Linear, Notion, Slack, Discord.
 - **Screen queries:**
   - `web: grouped sidebar navigation with sections that expand to sub-pages and an account switcher at the bottom`
+  - `web: locked feature screen explaining a missing permission with one grant button`
   - `ios: bottom tab bar with four tabs and a More tab opening a grid of every section`
   - `ios: account switcher listing several profiles with avatars and the active one marked`
-  - `web: locked feature screen explaining a missing permission with one grant button`
 - **Flow queries:** `web: first-run choice of which sections to show in navigation`.
 - **Mobbin won't help with:** EVE Permissions and scopes, Corp Access rules.
 

@@ -23,11 +23,11 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 "Take me to X." One box to go anywhere without learning the nav: a page or tab, another Character, an owned asset, an item, an LP Store or a contact (#2318).
 
 - **Top jobs (ranked):** 1. "Go to that page or tab by name." 2. "Switch to that Character." 3. "Where is this item, across my Characters?" (assets, market items).
-- **Device and cadence:** mostly desk, by keyboard chord, many times a session (inferred); phone reaches it from the More sheet's search field (`20261002-145653-go-to-button-opens-the-command-palette`).
+- **Device and cadence:** desktop primary (owner, 2026-10-11), by keyboard chord, many times a session (inferred). Phone parity: the More sheet's search field opens it (`20261002-145653-go-to-button-opens-the-command-palette`); phone use is one-off lookups (owner, 2026-10-11), so the palette matters little there.
 - **Above the fold:** n/a. Moment of use: mid-session, opened by Ctrl/Cmd K or Go to; the search field and the first group of results.
 - **Not for:** filtering the page underneath (its own search box does that, footer `commandPalette.scopeNote`).
-- **Sources:** #2318; decisions `20260929-235256` (superseded), `20261002-145653-go-to-button-opens-the-command-palette`.
-- **Unconfirmed:** usage cadence; whether phone pilots use it at all.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); #2318; decisions `20260929-235256` (superseded), `20261002-145653-go-to-button-opens-the-command-palette`.
+- **Unconfirmed:** usage cadence.
 
 ### Mobbin brief
 

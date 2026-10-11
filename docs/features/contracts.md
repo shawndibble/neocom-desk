@@ -28,14 +28,14 @@ User goal by tab:
 
 ## Purpose and user goal
 
-"Is anyone selling this on contract for less, and which hauls are worth taking?" The per-tab goals at the top of this file stand. Search is the landing tab because "the public corpus is the thing pilots open Contracts _to use_", while History is "a look-up-what-happened list consulted occasionally" (`20260912-200030`). Items opens on a search prompt, not a table (`20261007-161833`, #2921).
+"Is anyone selling this on contract for less?" Courier hauls are a distant second (owner, 2026-10-11). The per-tab goals at the top of this file stand. Search is the landing tab because "the public corpus is the thing pilots open Contracts _to use_", while History is "a look-up-what-happened list consulted occasionally" (`20260912-200030`). Items opens on a search prompt, not a table (`20261007-161833`, #2921).
 
-- **Top jobs (ranked):** 1. "Where is the cheapest public listing of this item?" (Item search) 2. "Which courier contracts pay best per jump without a trap?" (Courier, `20260912-141100`, `20260912-172628`) 3. "What happened to my contract, and when must I deliver?" (History).
-- **Device and cadence:** both. Not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); search tabs have dense phone cards and a filter sheet (Mobile vs desktop summary below). Alerts land on History: `contractAccepted`, `courierDeliveryDue` → `/contracts/history` (`notificationOptions.ts`).
-- **Above the fold:** Items: search box and filter bar, then cheapest offers with price, location and jumps. Courier: hauls ranked by ISK/jump with risk markers. History: own contracts with status and deadline. Each search tab shows the snapshot's Data Age (up to 30 min old).
+- **Top jobs (ranked):** 1. "Where is the cheapest public listing of this item?" (Item search; used far more than Courier, owner, 2026-10-11) 2. "What happened to my contract, and when must I deliver?" (History) 3. "Which courier contracts pay best per jump without a trap?" (Courier, `20260912-141100`, `20260912-172628`). Courier ranks low: the owner knows nobody using it and opens it only to verify features (owner, 2026-10-11).
+- **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11); the contract detail copies a contract id for the client. Phone parity: not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); search tabs have dense phone cards and a filter sheet (Mobile vs desktop summary below). Alerts land on History: `contractAccepted`, `courierDeliveryDue` → `/contracts/history` (`notificationOptions.ts`).
+- **Above the fold:** Items: search box and filter bar, then cheapest offers with price, location and jumps, with the snapshot's Data Age (up to 30 min old). History: own contracts with status and deadline. Courier: hauls ranked by ISK/jump with risk markers; it should not compete with Item search for space or entry points.
 - **Not for:** blueprint copies (Industry › BPC Sourcing reads the same snapshot); live order-book prices (Market › Browser); moving own stock (Assets › Move); hub-to-hub trade runs (Travel › Hauling).
-- **Sources:** `20260912-200030`, `20261007-161833`, `20260912-141100`, `20260912-172628`, `20260912-200442`, ADR 0013; #908, #2921.
-- **Unconfirmed:** search cadence (assumed on demand, not routine); whether Item search outranks Courier for most pilots; how many pilots run courier hauls at all; that History is mostly reached from alerts and the wallet journal link.
+- **Sources:** owner, 2026-10-11 (Item search far above Courier, desktop use); `20260912-200030`, `20261007-161833`, `20260912-141100`, `20260912-172628`, `20260912-200442`, ADR 0013; #908, #2921.
+- **Unconfirmed:** search cadence (assumed on demand, not routine); that History is mostly reached from alerts and the wallet journal link.
 
 ### Mobbin brief
 
@@ -43,9 +43,10 @@ User goal by tab:
 - **Analog apps:** eBay, Facebook Marketplace, Uber Freight, DAT Load Board, Upwork (job board).
 - **Screen queries:**
   - `web: marketplace search page with an empty-state prompt before a query and a filter bar of price, location and distance`
+  - `web: marketplace results table sorted by lowest price with location, distance and a listing-detail modal`
+  - `web: my orders history table with status chips and a deadline countdown column`
   - `web: load board table of shipping jobs ranked by pay per mile with origin, destination and risk badges per row`
   - `ios: listing detail sheet with item contents, price and seller location`
-  - `web: my orders history table with status chips and a deadline countdown column`
 - **Flow queries:** none.
 - **Mobbin won't help with:** jump counts under Travel rules, security bands, player-structure strand risk, collateral-to-reward ratios and multi-type contract contents; reference the EVE client contract search window.
 

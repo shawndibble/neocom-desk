@@ -23,11 +23,11 @@ Scope gating: `/ships` and `/ships/fittings/compare` are UNGATED (`src/app/route
 "Can my Character fly this fit, and how does it perform?" A full fitter whose numbers follow the active Character, with missing skills one step from a Skill Plan and the URL as the working state (`20260924-150509`). On a desktop the Start screen is the pilot's own fittings with a preview, not a hull picker (`20260925-152418`).
 
 - **Top jobs (ranked):** 1. "Can I fly this saved or In-game Fitting, and what is missing?" 2. "If I change this module, what happens to DPS, tank, capacitor and CPU/powergrid?" 3. "Get a fit in or out: paste EFT, Share Link, Save to EVE, multibuy."
-- **Device and cadence:** desk session for editing (drag and drop is off on touch, `Fittings.tsx:141-143`; list-and-preview is desktop only). On a phone the Start screen is tabs and a tap opens the Fitting (`20260925-152418`, `20261001-210222`), suggesting look-up use. Cadence: occasional, around a new ship or a doctrine.
+- **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11): EFT text and fitting links are pasted in, Copy Fitting (EFT) and Copy multibuy list go back to the client, Save to EVE writes the fit. Editing is a desk session (drag and drop is off on touch, `Fittings.tsx:141-143`; list-and-preview is desktop only). Phone parity: the Start screen is tabs and a tap opens the Fitting (`20260925-152418`, `20261001-210222`). Cadence: occasional, around a new ship or a doctrine.
 - **Above the fold:** Start screen: search, fittings grouped by hull, preview with can-fly, DPS, EHP, CPU and powergrid. Editor: name and hull, over-budget CPU/powergrid, can-fly / missing-skills chip, then slots and stats.
 - **Not for:** which hulls the Character can fly overall (Ship Tree); building the hull (Industry, via the Manufacture Plan export).
-- **Sources:** `20260924-150509`, `20260925-152418`, `20261001-210222`, `20260924-183346`, ADR 0016; #1547, #2830, #2954.
-- **Unconfirmed:** cadence; that phone use is mainly look-up; the ranking of job 3 against Compare.
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `20260924-150509`, `20260925-152418`, `20261001-210222`, `20260924-183346`, ADR 0016; #1547, #2830, #2954.
+- **Unconfirmed:** cadence; the ranking of job 3 against Compare.
 
 ### Mobbin brief
 

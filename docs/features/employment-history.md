@@ -16,11 +16,11 @@ Route `/employment-history` (`src/routes/EmploymentHistory.tsx`). Third tab of t
 See the active Character's corporation history and time spent in each.
 
 - **Top jobs (ranked):** 1. "Which corps has this Character been in, and for how long?" 2. "What is that corp?" (Show Info).
-- **Device and cadence:** occasional; a sub-view of Overview reached from its tabs (`src/app/navDestinations.ts:113`), not a rail or tab-bar item. No phone-specific evidence.
+- **Device and cadence:** desktop primary (owner, 2026-10-11); occasional; a sub-view of Overview reached from its tabs (`src/app/navDestinations.ts:113`), not a rail or tab-bar item. No phone-specific evidence.
 - **Above the fold:** the table, newest first, with the Current badge.
 - **Not for:** another pilot's history (Pilot Lookup / Public Info, `20260930-104922`).
-- **Sources:** `20261005-211423`, `20260930-104922`; #30, #729.
-- **Unconfirmed:** device and cadence; why a pilot checks their own history (e.g. a recruitment check).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `20261005-211423`, `20260930-104922`; #30, #729.
+- **Unconfirmed:** cadence; why a pilot checks their own history (e.g. a recruitment check).
 
 ### Mobbin brief
 
