@@ -225,7 +225,6 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'number',
     size: 'M',
-    soon: true,
     endpoints: [],
   },
   kills: {

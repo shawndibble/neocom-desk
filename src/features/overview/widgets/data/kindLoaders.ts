@@ -373,6 +373,64 @@ export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
   };
 }
 
+// --- Hauling ---------------------------------------------------------------------
+
+export interface HaulingWidgetRoute {
+  from: string;
+  to: string;
+  item: string;
+  profit: number;
+  /** Stargate jumps between the two hubs; null where no route is known. */
+  jumps: number | null;
+}
+
+export interface HaulingWidgetData {
+  /** False until the Hauling tab has finished a scan on this device. */
+  hasScan: boolean;
+  /** Best first. */
+  routes: HaulingWidgetRoute[];
+  /** When the scan these routes came from finished. */
+  fetchedAt: Date | null;
+}
+
+const NO_SCAN: HaulingWidgetData = { hasScan: false, routes: [], fetchedAt: null };
+
+/**
+ * The best hauls from the last scan the Hauling tab ran. Only a stored summary
+ * is read, never a market call: a scan costs hundreds of requests and the
+ * Overview must not start one on every load. The jump counts come from the
+ * local stargate graph. The age shown is the scan's own, so a stale answer is
+ * plainly stale; a fresh scan comes from the Hauling tab.
+ */
+export async function loadHaulingWidget(): Promise<HaulingWidgetData> {
+  const [{ useHaulingSummary }, { getTradeHub }, { findLocalJumps }] = await Promise.all([
+    import('@/features/market/haulingSummary'),
+    import('@/market/hubs'),
+    import('@/features/route/localRoute'),
+  ]);
+  await useHaulingSummary.getState().hydrate();
+  const summary = useHaulingSummary.getState().value;
+  if (summary === null) return NO_SCAN;
+  const routes = await Promise.all(
+    summary.lanes.map(async (lane) => {
+      const from = getTradeHub(lane.fromHub);
+      const to = getTradeHub(lane.toHub);
+      if (!from || !to) return [];
+      const jumps = await findLocalJumps(from.systemId, to.systemId);
+      return [
+        {
+          from: from.systemName,
+          to: to.systemName,
+          item: lane.item,
+          profit: lane.profit,
+          jumps: jumps.kind === 'known' ? jumps.jumps : null,
+        },
+      ];
+    })
+  );
+  return { hasScan: true, routes: routes.flat(), fetchedAt: new Date(summary.fetchedAt) };
+}
+
 // --- Route safety --------------------------------------------------------------
 
 export interface RouteSafetyWidgetData {

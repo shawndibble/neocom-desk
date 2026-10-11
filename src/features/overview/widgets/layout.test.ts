@@ -80,7 +80,7 @@ describe('addWidget', () => {
 
   it('refuses a coming-soon or unknown kind', () => {
     const l = layoutOf();
-    expect(addWidget(l, 'hauling', counter())).toBe(l);
+    expect(addWidget(l, 'kills', counter())).toBe(l);
     expect(addWidget(l, 'someFutureKind', counter())).toBe(l);
   });
 
@@ -101,7 +101,7 @@ describe('canAdd', () => {
   });
 
   it('is false for a kind that cannot be added', () => {
-    expect(canAdd(layoutOf(), 'hauling')).toBe(false);
+    expect(canAdd(layoutOf(), 'kills')).toBe(false);
     expect(canAdd(layoutOf(), 'mail')).toBe(true);
   });
 });
@@ -283,7 +283,7 @@ describe('undoable actions', () => {
     const before = layoutOf(w('a', 'wallet'));
     expect(resizeWidgetUndoable(before, 'a', 'S')).toBeNull();
     expect(removeWidgetUndoable(before, 'nope')).toBeNull();
-    expect(addWidgetUndoable(before, 'hauling', counter())).toBeNull();
+    expect(addWidgetUndoable(before, 'kills', counter())).toBeNull();
   });
   it('undoTo is a copy, immune to later mutation', () => {
     const before = layoutOf(w('a', 'wallet'));

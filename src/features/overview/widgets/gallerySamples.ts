@@ -327,6 +327,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         xEnd: t('overview.widgets.chart.today'),
       },
     },
+    hauling: {
+      value: '48M',
+      unit: t('overview.widgets.data.hauling.unit'),
+      note: t('overview.gallery.samples.hauling.note'),
+      rows: [
+        ['Jita → Amarr', '12 jumps', '48M'],
+        ['Jita → Dodixie', '9 jumps', '31M'],
+        ['Amarr → Jita', '12 jumps', '22M'],
+      ],
+    },
     survey: {
       value: '6.4K',
       unit: t('overview.widgets.data.survey.unit'),

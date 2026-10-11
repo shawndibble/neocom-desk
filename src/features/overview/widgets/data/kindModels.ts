@@ -44,6 +44,7 @@ export const KIND_FEED_LISTS: Readonly<Record<string, readonly FeedId[]>> = {
   walletFlow: ['journal'],
   location: ['location'],
   survey: ['survey'],
+  hauling: ['hauling'],
   routeSafety: ['routeSafety'],
   kills: ['kills'],
 };
@@ -299,6 +300,58 @@ const survey: Builder = (feeds, { t }) => {
         })),
         note
       ) ?? undefined,
+  };
+};
+
+// --- Hauling ------------------------------------------------------------------------
+
+const HAULING_PATH = '/travel/hauling';
+
+const hauling: Builder = (feeds, { t }) => {
+  const feed = feeds.hauling;
+  const data = feed?.data ?? null;
+  if (!data) return blank(HAULING_PATH, statusOf(feed));
+  const best = data.routes[0];
+  const lane = (r: { from: string; to: string }) => `${r.from} → ${r.to}`;
+  const perJump = (r: { profit: number; jumps: number | null }) =>
+    r.jumps === null || r.jumps === 0 ? UNKNOWN : formatIskCompact(r.profit / r.jumps);
+  return {
+    ...blank(HAULING_PATH, statusOf(feed, { isEmpty: best === undefined })),
+    emptyLinkLabel: t(`${W}.hauling.emptyLink`),
+    fetchedAt: data.fetchedAt,
+    number: best
+      ? {
+          value: formatIskCompact(best.profit),
+          unit: t(`${D}.hauling.unit`),
+          secondary: {
+            text: t(`${D}.hauling.secondary`, {
+              item: best.item,
+              lane: lane(best),
+              jumps: best.jumps === null ? UNKNOWN : String(best.jumps),
+            }),
+          },
+          tone: 'clear',
+        }
+      : NEUTRAL_NUMBER,
+    rows: [],
+    table: {
+      columns: [
+        { key: 'route', label: t(`${W}.hauling.col.route`), priority: 0 },
+        { key: 'profit', label: t(`${W}.hauling.col.profit`), align: 'end', priority: 1 },
+        { key: 'jumps', label: t(`${W}.hauling.col.jumps`), align: 'end', priority: 2 },
+        { key: 'perJump', label: t(`${W}.hauling.col.perJump`), align: 'end', priority: 3 },
+      ],
+      rows: data.routes.map((r) => ({
+        key: `${r.from}>${r.to}`,
+        cells: [
+          lane(r),
+          formatIskCompact(r.profit),
+          r.jumps === null ? UNKNOWN : String(r.jumps),
+          perJump(r),
+        ],
+      })),
+    },
+    summary: t(`${D}.hauling.summary`),
   };
 };
 
@@ -663,6 +716,7 @@ export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   clones,
   location,
   survey,
+  hauling,
   routeSafety,
   kills,
 };
