@@ -8,9 +8,16 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { createFeedStore, type FeedStore } from './data/feedStore';
 import { FeedStoreContext } from './data/feedStoreContext';
 import { OverviewRefreshContext } from './data/refreshContext';
+import { sampleView } from './gallerySamples';
+import * as widgetView from './data/useWidgetView';
 import { WidgetGrid } from './WidgetGrid';
 import { Widget } from './Widget';
 import type { Widget as WidgetModel } from './layout';
+
+vi.mock('./data/useWidgetView', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./data/useWidgetView')>();
+  return { ...actual, useWidgetView: vi.fn(actual.useWidgetView) };
+});
 
 const NOW = Date.now();
 
@@ -345,5 +352,26 @@ describe('WidgetGrid', () => {
       </MemoryRouter>
     );
     expect(screen.getByText('There are no widgets to show on this Overview.')).toBeInTheDocument();
+  });
+});
+
+describe('Widget preview', () => {
+  it('draws a previewView without starting a live read', () => {
+    const spy = vi.mocked(widgetView.useWidgetView);
+    spy.mockClear();
+    const sample = sampleView('mail');
+    expect(sample).toBeDefined();
+    renderWidget(model(), () => undefined, { previewView: sample });
+    expect(screen.getByRole('region', { name: 'Mail' })).toBeInTheDocument();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('reads live when no previewView is given', () => {
+    const spy = vi.mocked(widgetView.useWidgetView);
+    spy.mockClear();
+    renderWidget(model(), (store) =>
+      store.set('mail', { data: null, error: false, loading: true })
+    );
+    expect(spy).toHaveBeenCalled();
   });
 });

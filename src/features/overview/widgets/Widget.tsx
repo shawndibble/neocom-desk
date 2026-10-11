@@ -211,7 +211,32 @@ function Skeleton() {
   );
 }
 
-export function Widget({
+/**
+ * The live read lives in its own component so the Gallery's preview, which
+ * brings its own sample , never mounts  and so never
+ * starts a live builder per previewed kind.
+ */
+export function Widget(props: WidgetProps) {
+  return props.previewView ? (
+    <WidgetFrame {...props} view={props.previewView} />
+  ) : (
+    <LiveWidget {...props} />
+  );
+}
+
+function LiveWidget(props: WidgetProps) {
+  const { widget } = props;
+  const kind = getKind(widget.kind);
+  const scope = scopePresentation(widget.kind, widget.scope, props.headerAll);
+  const view = useWidgetView(
+    widget.kind,
+    scope.scopeAll,
+    kind?.hasRange ? (widget.range ?? DEFAULT_RANGE) : undefined
+  );
+  return <WidgetFrame {...props} view={view} />;
+}
+
+function WidgetFrame({
   widget,
   showNew,
   headerAll,
@@ -219,21 +244,15 @@ export function Widget({
   menu,
   headerStart,
   editControls,
-  previewView,
+  view,
   onRemove,
-}: WidgetProps) {
+}: Omit<WidgetProps, 'previewView'> & { view: KindView }) {
   const { t } = useTranslation();
   const kind = getKind(widget.kind);
   const { refresh } = useOverviewRefresh();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(TICK_MS);
   const scope = scopePresentation(widget.kind, widget.scope, headerAll);
-  const liveView = useWidgetView(
-    widget.kind,
-    scope.scopeAll,
-    kind?.hasRange ? (widget.range ?? DEFAULT_RANGE) : undefined
-  );
-  const view = previewView ?? liveView;
   const { state, showLastGood } = resolveWidget(view.status);
 
   // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.
