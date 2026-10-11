@@ -19,7 +19,6 @@ const UNSTORIED = [
   'CharacterAvatar',
   'Checkbox',
   'CheckboxSelect',
-  'CollapsiblePanel',
   'ColumnPickerMenu',
   'ContextMenu',
   'ContextMenuContent',
@@ -31,7 +30,6 @@ const UNSTORIED = [
   'ContextMenuSubContent',
   'ContextMenuSubTrigger',
   'ContextMenuTrigger',
-  'DataAgeBadge',
   'DateRangeFields',
   'DisabledMenuItem',
   'Disclosure',
@@ -51,9 +49,6 @@ const UNSTORIED = [
   'Field',
   'FieldError',
   'Fields',
-  'FilterBar',
-  'FilterChip',
-  'FilterField',
   'IconButton',
   'InfoTooltip',
   'IskAmount',
@@ -81,8 +76,6 @@ const UNSTORIED = [
   'RowActionsMenu',
   'RowCaret',
   'RowMoreActions',
-  'SearchInput',
-  'SegmentedControl',
   'Select',
   'SelectContent',
   'SelectGroup',
@@ -96,10 +89,6 @@ const UNSTORIED = [
   'SlideOver',
   'Spinner',
   'StandingIcon',
-  'StatChip',
-  'StatChips',
-  'TabPanel',
-  'Tabs',
   'TextArea',
   'TextInput',
   'Toast',
@@ -108,7 +97,7 @@ const UNSTORIED = [
 ];
 
 /** Pinned size. Removing a name means lowering this; adding a name fails. */
-const PINNED_COUNT = 92;
+const PINNED_COUNT = 81;
 
 /** Component name -> source module, from the value (non-type) re-exports in index.ts. */
 function exportedComponents(): Map<string, string> {
