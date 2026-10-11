@@ -22,7 +22,7 @@ import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
 import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
 
 export const CONTACTS_TABS = definePageTabs('/contacts', [
-  { id: 'character', labelKey: 'contacts.tabThisCharacter' },
+  { id: 'character', labelKey: 'contacts.tabContacts' },
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
   { id: 'standings', labelKey: 'contacts.tabStandings' },
 ]);
