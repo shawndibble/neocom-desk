@@ -191,7 +191,7 @@ describe('netWorth', () => {
     ]);
     expect(view.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
     expect(view.table?.rows.map((r) => r.key)).toEqual(['assets', 'sellOrders', 'isk']);
-    expect(view.table?.rows[0]!.cells[3]).toBe('+1K');
+    expect(view.table?.rows[0]!.cells[3]).toEqual({ text: '+1K', tone: 'good' });
     expect(view.rows).toEqual([]);
   });
 
@@ -365,8 +365,8 @@ describe('lp', () => {
     expect(view.number.value).toBe('1.2K');
     expect(view.rows).toEqual([]);
     expect(view.table?.rows.map((r) => r.cells)).toEqual([
-      ['Sisters of EVE', '800', '67%'],
-      [expect.stringContaining('lp.corporation'), '400', '33%'],
+      ['Sisters of EVE', '800', { text: '67%', bar: 800 / 1200 }],
+      [expect.stringContaining('lp.corporation'), '400', { text: '33%', bar: 400 / 1200 }],
     ]);
     if (view.chart?.kind !== 'hbars') throw new Error('hbars');
     expect(view.chart.rows.map((r) => r.share)).toEqual([1, 0.5]);

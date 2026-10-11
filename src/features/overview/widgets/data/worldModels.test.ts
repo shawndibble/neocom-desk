@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BoardStructureSource } from '@/engine/corp/board';
 import { visibleColumns } from '../tableModel';
 import { buildView } from './models';
-import { elapsedShare, shortStructureName } from './worldModels';
+import { elapsedShare, FUEL_BAR_HORIZON_MS, shortStructureName } from './worldModels';
 import type { BuildContext, FeedState, Feeds, KindView, TableCell } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
@@ -117,6 +117,14 @@ describe('industry', () => {
     });
     expect(view.chart.rows[2]!.share).toBeCloseTo(0.5);
     expect(view.chart.rows[2]!.color).toBe('accent');
+  });
+
+  it('draws Done as a bar of the job elapsed share, the text stating the same percent', () => {
+    const view = buildView('industry', feeds(jobs()), ctx());
+    const col = column(view, 'progress');
+    const byKey = Object.fromEntries(view.table!.rows.map((r) => [r.key, r.cells[col]]));
+    expect(byKey['4']).toMatchObject({ text: '50%', bar: 0.5 });
+    expect(byKey['3']).toMatchObject({ text: '100%', bar: 1 });
   });
 
   it('keeps the headline a count and the next clock as the fact it lacks', () => {
@@ -244,6 +252,24 @@ describe('structures', () => {
     expect(states['Lowfuel Keepstar']).toBe('overview.widgets.structures.state.lowFuel');
     expect(states['Offline Athanor']).toBe('overview.widgets.structures.state.offline');
     expect(view.table!.rows.at(-1)!.key).toBe('1');
+  });
+
+  it('draws Fuel left as a bar against the 30-day horizon, and no bar for a dry or stale clock', () => {
+    const view = buildView(
+      'structures',
+      feeds([
+        source(1, 'Efa - Full', { fuelExpiresMs: NOW + 15 * DAY }),
+        source(2, 'Efa - Dry', { fuelExpiresMs: null }),
+      ]),
+      ctx()
+    );
+    const col = column(view, 'fuel');
+    const byName = Object.fromEntries(
+      view.table!.rows.map((r) => [text(r.cells[0]), r.cells[col]])
+    );
+    expect(byName['Full']).toMatchObject({ bar: 15 / 30 });
+    expect(FUEL_BAR_HORIZON_MS).toBe(30 * DAY);
+    expect(typeof byName['Dry']).toBe('string');
   });
 
   it('charts fuel with short names', () => {
@@ -393,6 +419,12 @@ describe('profit (world)', () => {
     const row = view.table!.rows[0]!;
     expect(row.cells[column(view, 'built')]).toBe('5');
     expect(text(row.cells[column(view, 'perUnit')])).toBe('+60');
+    expect(row.cells[column(view, 'perUnit')]).toMatchObject({ tone: 'good' });
+    const loss = buildView('profit', feeds([run('c', DAY, -100, 1, 2)]), ctx({ range: 30 }));
+    expect(loss.table!.rows[0]!.cells[column(loss, 'perUnit')]).toMatchObject({
+      text: '-50',
+      tone: 'bad',
+    });
     if (view.chart?.kind !== 'bars') throw new Error('bars');
     expect(view.chart.values.some((v) => v < 0)).toBe(true);
   });

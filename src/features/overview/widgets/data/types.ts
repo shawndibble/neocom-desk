@@ -83,6 +83,16 @@ export interface ListRow {
  * A table cell: plain text, text with the exact ISK behind it (drawn as an
  * `IskAmount`), or text with a good/caution/bad colour (never the only signal:
  * the text states it) and/or a thin bar (0..1) drawn before it.
+ *
+ * The one shared rule (`cellKit.ts` holds the helpers):
+ * - A signed change is `good` above zero and `bad` below; zero or unknown has
+ *   no tone. The sign in the text stays, so colour is never the only signal.
+ *   A column that only runs one way (income, spending) tones by direction.
+ *   A cell with an `iskAmount` cannot carry a tone.
+ * - A `bar` is only for a real 0..1 quantity (progress, a share of a whole, time
+ *   left of a known span). A count or a bare duration gets no bar.
+ * - The text always states the value; the bar and the colour are decoration.
+ *   `TableBody` reads and announces `text` only.
  */
 export type TableCell =
   | string

@@ -125,10 +125,20 @@ describe('ordersTable', () => {
 
   it('writes vs best from the row gap, signed by which side of the best price it sits, and a dash with no rival price', () => {
     const cell = (key: string) => table.rows.find((r) => r.key === key)!.cells[3];
-    expect(cell('2')).toBe('+5%');
-    expect(cell('3')).toBe('-10%');
+    expect(cell('2')).toEqual({ text: '+5%', tone: 'bad' });
+    expect(cell('3')).toEqual({ text: '-10%', tone: 'bad' });
     expect(cell('1')).toBe('0%');
     expect(cell('5')).toBe('—');
+  });
+
+  it('reddens vs best only when a rival beats the order, whichever way the sign points', () => {
+    const ahead = order({
+      orderId: 8,
+      price: 100,
+      station: { bestPrice: 95, beatsMe: false, gapIsk: 5, gapPct: 5 },
+    });
+    const cell = ordersTable(t, [ahead], NOW, null).rows[0]!.cells[3];
+    expect(cell).toBe('+5%');
   });
 
   it('counts down to expiry and calls a lapsed order expired', () => {
@@ -237,7 +247,7 @@ describe('journalTable', () => {
     expect(table.columns.map((c) => c.key)).toEqual(['type', 'amount', 'when', 'balance']);
     expect(table.rows[0]!.cells).toEqual([
       'Bounty prizes',
-      '+1.5M',
+      { text: '+1.5M', tone: 'good' },
       'common.age.hours{"count":1}',
       { text: '4.8B', iskAmount: 4_800_000_000 },
     ]);
@@ -245,7 +255,7 @@ describe('journalTable', () => {
 
   it('writes a missing balance as a dash and an outflow with its own sign', () => {
     const table = journalTable(t, [entry(4, 3, -2_000_000)], NOW);
-    expect(table.rows[0]!.cells[1]).toBe('-2M');
+    expect(table.rows[0]!.cells[1]).toEqual({ text: '-2M', tone: 'bad' });
     expect(table.rows[0]!.cells[3]).toBe('—');
   });
 });
@@ -313,8 +323,20 @@ describe('wallet flow', () => {
     });
 
     it('splits each type into what came in and went out, and its share of the movement', () => {
-      expect(table.rows[0]!.cells).toEqual(['Bounty prizes', '+900', '900', '0', '64%']);
-      expect(table.rows[1]!.cells).toEqual(['Market transaction', '-300', '100', '400', '36%']);
+      expect(table.rows[0]!.cells).toEqual([
+        'Bounty prizes',
+        { text: '+900', tone: 'good' },
+        { text: '900', tone: 'good' },
+        '0',
+        { text: '64%', bar: 900 / 1400 },
+      ]);
+      expect(table.rows[1]!.cells).toEqual([
+        'Market transaction',
+        { text: '-300', tone: 'bad' },
+        { text: '100', tone: 'good' },
+        { text: '400', tone: 'bad' },
+        { text: '36%', bar: 500 / 1400 },
+      ]);
     });
   });
 
@@ -433,11 +455,11 @@ describe('net worth', () => {
       expect(table.rows[0]!.cells).toEqual([
         'wallet.netWorth.layers.assets',
         { text: '100', iskAmount: 100 },
-        '67%',
+        { text: '67%', bar: 100 / 150 },
         '0',
       ]);
-      expect(table.rows[1]!.cells[3]).toBe('-20');
-      expect(table.rows[2]!.cells[3]).toBe('+20');
+      expect(table.rows[1]!.cells[3]).toEqual({ text: '-20', tone: 'bad' });
+      expect(table.rows[2]!.cells[3]).toEqual({ text: '+20', tone: 'good' });
     });
 
     it('has no change to give from a single day', () => {
@@ -573,12 +595,14 @@ describe('price watch', () => {
     const [near] = priceWatchTable(t, [alert('Near', 'below', 100, 105)]).rows;
     expect(near!.cells).toEqual([
       'Near',
-      '+5%',
+      { text: '+5%', tone: 'caution' },
       { text: '105', iskAmount: 105 },
       'overview.widgets.priceWatch.target.below{"isk":"100"}',
     ]);
     const [far] = priceWatchTable(t, [alert('Far', 'above', 100, 50)]).rows;
     expect(far!.cells[1]).toBe('-50%');
+    const [hit] = priceWatchTable(t, [alert('Hit', 'above', 100, 130, true)]).rows;
+    expect(hit!.cells[1]).toEqual({ text: '+30%', tone: 'good' });
     expect(far!.cells[3]).toBe('overview.widgets.priceWatch.target.above{"isk":"100"}');
   });
 
@@ -600,8 +624,8 @@ describe('loyalty points', () => {
     ]);
     expect(table.columns.map((c) => c.key)).toEqual(['corporation', 'lp', 'share']);
     expect(table.rows.map((r) => r.cells)).toEqual([
-      ['Caldari Navy', '750', '75%'],
-      ['overview.widgets.data.lp.corporation{"id":2}', '250', '25%'],
+      ['Caldari Navy', '750', { text: '75%', bar: 0.75 }],
+      ['overview.widgets.data.lp.corporation{"id":2}', '250', { text: '25%', bar: 0.25 }],
     ]);
   });
 
@@ -610,7 +634,7 @@ describe('loyalty points', () => {
       { name: 'Big', corporationId: 1, points: 100_000 },
       { name: 'Tiny', corporationId: 2, points: 1 },
     ]);
-    expect(table.rows[1]!.cells[2]).toBe('<1%');
+    expect(table.rows[1]!.cells[2]).toMatchObject({ text: '<1%' });
   });
 });
 

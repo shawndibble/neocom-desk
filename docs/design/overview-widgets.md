@@ -86,6 +86,19 @@ column and the "Everything else" phone fold are gone.
   the table gets the narrow budget (two columns at L, four at Full). A table with
   no header labels draws no header row; a row with a `to` is a link with a
   trailing caret.
+- **Table cell tone and bars (one rule).** A signed change is green above zero
+  and red below, with no colour at zero or when unknown, and the sign glyph stays
+  in the text (income and spending columns tone by direction; Orders "vs best" is
+  red only when a rival beats the order; Price watch "Gap" is green once the
+  target is hit and amber within 5% of it; a clone that finishes the queue sooner
+  is green). A thin bar appears only for a real 0..1 quantity: job progress, a
+  share of a whole (Wallet flow, Net worth, LP, Mining yield), and structure fuel
+  against a fixed 30-day horizon (ESI does not give the tank size). A count or a
+  bare duration gets none (Planetary "Ends in" has no known cycle, Stock counts
+  are not a fraction). The text always states the value, so the colour and bar
+  are decoration and the table's text and screen-reader reading are unchanged.
+  The helpers are `signedTone`, `signedCell` and `fractionBar` in
+  `widgets/data/cellKit.ts`.
 - At S the scope chip collapses to an icon with a tooltip, so the title is never
   crushed.
 - **Every Widget always shows its headline number** — a Small Chart still shows

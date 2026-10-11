@@ -42,6 +42,7 @@ import { incursionJumpsWhen, incursionsSeverity, incursionsSummary } from '../..
 import type { IncursionsBoardData } from '../../incursionsBoard';
 import type { IndustryBoardData, PlanetaryBoardData } from '../../boardData';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { fractionBar, signedCell } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
 import { backwardBucketSums } from './chartSeries';
 import type {
@@ -122,8 +123,8 @@ function jobFacts(data: IndustryBoardData, t: Translate, now: number): JobFacts[
   return [...done, ...running];
 }
 
-const percent = (share: number | null) =>
-  share === null ? UNKNOWN : `${Math.round(share * 100)}%`;
+const percent = (share: number | null): TableCell =>
+  share === null ? UNKNOWN : { text: `${Math.round(share * 100)}%`, bar: share };
 
 export const industry: Builder = (feeds, { t, now }) => {
   const feed = feeds.industry;
@@ -395,6 +396,20 @@ export function shortStructureName(name: string): string {
   return cut > 0 && cut + 3 < name.length ? name.slice(cut + 3) : name;
 }
 
+/**
+ * A full tank is not in the data (ESI gives only when the fuel runs out), so the
+ * bar reads against a fixed horizon: 30 days of fuel is a full bar.
+ */
+export const FUEL_BAR_HORIZON_MS = 30 * DAY_MS;
+
+/** The fuel clock's text, with a bar only for a real clock (not "Dry", "Offline" or "Soon"). */
+function fuelCell(item: CorpBoardItem, t: Translate): TableCell {
+  const text = structureWhen(item, t);
+  if (item.timing !== 'timed' || item.withinStaleWindow) return text;
+  const bar = fractionBar(item.remainingMs ?? 0, FUEL_BAR_HORIZON_MS);
+  return bar === undefined ? text : { text, bar };
+}
+
 function structureWhen(item: CorpBoardItem, t: Translate): string {
   if (item.timing === 'passed') return t('overview.board.structureDry');
   if (item.timing === 'untimed') return t('overview.board.structureOffline');
@@ -484,7 +499,7 @@ export const structures: Builder = (feeds, { t, now }) => {
       tone,
       cells: [
         shortStructureName(source.name),
-        fuel ? structureWhen(fuel, t) : UNKNOWN,
+        fuel ? fuelCell(fuel, t) : UNKNOWN,
         state,
         timer && timer.timing === 'timed' ? structureWhen(timer, t) : UNKNOWN,
       ] as TableCell[],
@@ -806,7 +821,9 @@ export const profit: Builder = (feeds, { t, now, range }) => {
         nameOf(typeId),
         iskCell(row.profit),
         formatCompactNumber(row.built),
-        row.built > 0 ? formatIskCompactSigned(row.profit / row.built) : UNKNOWN,
+        row.built > 0
+          ? signedCell(formatIskCompactSigned(row.profit / row.built), row.profit)
+          : UNKNOWN,
       ],
       tone: row.profit < 0 ? 'watch' : 'clear',
     })),
@@ -915,7 +932,9 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
       const cells: TableCell[] = [
         nameOf(typeId),
         iskCell(ore.isk, formatIskCompact(ore.isk)),
-        oreTotal > 0 ? `${sharePct(ore.isk)}%` : UNKNOWN,
+        oreTotal > 0
+          ? { text: `${sharePct(ore.isk)}%`, bar: fractionBar(ore.isk, oreTotal) }
+          : UNKNOWN,
       ];
       if (showUnits) cells.push(ore.units === null ? UNKNOWN : formatCompactNumber(ore.units));
       return { key: String(typeId), cells, tone: 'clear' as DeadlineSeverity };

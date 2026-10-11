@@ -35,13 +35,17 @@ function cellText(cell: TableCell): string {
 
 const CELL_TONE = { good: 'text-success', caution: 'text-warning', bad: 'text-danger' } as const;
 
-function CellValue({ cell }: { cell: TableCell }) {
+/** At Small the bar is half as long: the first column keeps the width, the bar is only decoration. */
+function CellValue({ cell, compact }: { cell: TableCell; compact: boolean }) {
   if (typeof cell === 'string') return <>{cell}</>;
   if ('iskAmount' in cell) return <IskAmount value={cell.iskAmount} decimals={0} />;
   if (cell.bar === undefined) return <>{cell.text}</>;
   return (
     <span className="inline-flex items-center gap-2">
-      <span aria-hidden="true" className="h-1.5 w-12 overflow-hidden rounded-xs bg-line">
+      <span
+        aria-hidden="true"
+        className={cx('h-1.5 overflow-hidden rounded-xs bg-line', compact ? 'w-6' : 'w-12')}
+      >
         <span
           className="block h-full bg-accent"
           style={{ width: `${Math.round(Math.min(1, Math.max(0, cell.bar)) * 100)}%` }}
@@ -64,12 +68,14 @@ function Row({
   columns,
   indexes,
   caret,
+  compact,
 }: {
   row: TableRowModel;
   columns: readonly TableColumn[];
   /** Which of `row.cells` each visible column reads. */
   indexes: readonly number[];
   caret: boolean;
+  compact: boolean;
 }) {
   const toned = row.tone !== undefined && row.tone !== 'clear';
   // The icon (colour plus shape) marks only what needs a decision; a "watch" row just tints its figure.
@@ -131,7 +137,7 @@ function Row({
                 )}
               </span>
             ) : (
-              <CellValue cell={cell} />
+              <CellValue cell={cell} compact={compact} />
             )}
           </td>
         );
@@ -179,7 +185,14 @@ export function TableBody({ table, columnsFor, rowLimit, className }: TableBodyP
         )}
         <tbody>
           {shown.map((row) => (
-            <Row key={row.key} row={row} columns={columns} indexes={indexes} caret={caret} />
+            <Row
+              key={row.key}
+              row={row}
+              columns={columns}
+              indexes={indexes}
+              caret={caret}
+              compact={columnsFor === 'S'}
+            />
           ))}
         </tbody>
       </table>

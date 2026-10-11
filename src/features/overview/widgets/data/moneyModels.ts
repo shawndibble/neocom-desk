@@ -28,7 +28,8 @@ import type {
 import { backwardBucketSums } from './chartSeries';
 import type { NetWorthCharacter } from './kindLoaders';
 import { UNKNOWN } from './builderKit';
-import type { NumberSecondary, TableModel, TableRowModel, Translate } from './types';
+import { fractionBar, signedCell } from './cellKit';
+import type { NumberSecondary, TableCell, TableModel, TableRowModel, Translate } from './types';
 
 const W = 'overview.widgets';
 
@@ -58,6 +59,12 @@ function signedPercent(row: OpenOrderRow): string {
   const gap = Math.round(row.station.gapPct * 10) / 10;
   if (gap === 0) return '0%';
   return `${row.price >= best ? '+' : '-'}${gap}%`;
+}
+
+/** Red when a rival's price beats mine (an undercut or outbid); nothing otherwise, since being ahead needs no flag. */
+function vsBestCell(row: OpenOrderRow): TableCell {
+  const text = signedPercent(row);
+  return row.station.beatsMe ? { text, tone: 'bad' } : text;
 }
 
 /** "Jita IV - Moon 4 - Caldari Navy Assembly Plant" is "Jita IV" on a widget. */
@@ -95,7 +102,7 @@ export function ordersTable(
       `${row.typeName} ×${formatCompactNumber(row.volumeRemain)}`,
       t(`${W}.orders.${row.isBuyOrder ? 'sideBuy' : 'sideSell'}`),
       { text: formatCompactNumber(row.price), iskAmount: row.price },
-      signedPercent(row),
+      vsBestCell(row),
       expiresIn(t, row, now),
       shortStation(t, row.stationName),
     ],
@@ -208,7 +215,7 @@ export function journalTable(
       key: String(entry.id),
       cells: [
         humanizeRefType(entry.ref_type),
-        formatIskCompactSigned(entry.amount ?? 0),
+        signedCell(formatIskCompactSigned(entry.amount ?? 0), entry.amount ?? 0),
         formatAge(Math.max(0, now - Date.parse(entry.date)), t),
         typeof entry.balance === 'number'
           ? { text: formatIskCompact(entry.balance), iskAmount: entry.balance }
@@ -285,6 +292,17 @@ export function flowDiverging(
   };
 }
 
+/** A column that only ever runs one way: ISK in is good, ISK out is bad; zero is plain. */
+function directionCell(text: string, value: number, tone: 'good' | 'bad'): TableCell {
+  return value > 0 ? { text, tone } : text;
+}
+
+/** `part` of `whole` as a whole percent with its bar; the text states the share, the bar only draws it. */
+function shareCell(part: number, whole: number): TableCell {
+  const share = fractionBar(Math.max(0, part), whole);
+  return share === undefined ? '0%' : { text: `${Math.round(share * 100)}%`, bar: share };
+}
+
 /** Per ref type: net, what came in, what went out, and its share of all the ISK that moved. */
 export function flowTable(t: Translate, rows: readonly RefTypeBreakdownRow[]): TableModel {
   const moved = rows.reduce((sum, row) => sum + row.income + row.expense, 0);
@@ -300,10 +318,10 @@ export function flowTable(t: Translate, rows: readonly RefTypeBreakdownRow[]): T
       key: row.refType,
       cells: [
         humanizeRefType(row.refType),
-        formatIskCompactSigned(row.net),
-        formatIskCompact(row.income),
-        formatIskCompact(row.expense),
-        `${moved > 0 ? Math.round(((row.income + row.expense) / moved) * 100) : 0}%`,
+        signedCell(formatIskCompactSigned(row.net), row.net),
+        directionCell(formatIskCompact(row.income), row.income, 'good'),
+        directionCell(formatIskCompact(row.expense), row.expense, 'bad'),
+        shareCell(row.income + row.expense, moved),
       ],
     })),
   };
@@ -427,8 +445,10 @@ export function netWorthTable(
         cells: [
           t(LAYER_LABEL_KEYS[id]),
           { text: formatIskCompact(value), iskAmount: value },
-          `${total > 0 ? Math.round((Math.max(0, value) / total) * 100) : 0}%`,
-          values.length >= 2 ? formatIskCompactSigned(value - values[0]!) : UNKNOWN,
+          shareCell(value, total),
+          values.length >= 2
+            ? signedCell(formatIskCompactSigned(value - values[0]!), value - values[0]!)
+            : UNKNOWN,
         ],
       };
     }),
@@ -551,6 +571,16 @@ function signedPercentOf(ratio: number): string {
   return `${rounded > 0 ? '+' : '-'}${Math.abs(rounded)}%`;
 }
 
+/** Within this fraction of its target a watched price is "close" (amber) until it crosses. */
+export const NEAR_TARGET = 0.05;
+
+/** Green once the target is hit, amber within `NEAR_TARGET` of it, plain beyond. */
+function gapCell(alert: WatchedPrice, ratio: number): TableCell {
+  const text = signedPercentOf(ratio);
+  if (alert.crossed) return { text, tone: 'good' };
+  return Math.abs(ratio) <= NEAR_TARGET ? { text, tone: 'caution' } : text;
+}
+
 /**
  * Each target against the price now: how far the price sits from it. Targets
  * that were hit first, then the nearest to being hit, those with no price yet
@@ -577,9 +607,7 @@ export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): 
         key: `${alert.typeId}:${alert.direction}:${alert.targetPrice}`,
         cells: [
           alert.name,
-          priced
-            ? signedPercentOf((alert.price! - alert.targetPrice) / alert.targetPrice)
-            : UNKNOWN,
+          priced ? gapCell(alert, (alert.price! - alert.targetPrice) / alert.targetPrice) : UNKNOWN,
           alert.price === null
             ? UNKNOWN
             : { text: formatCompactNumber(alert.price), iskAmount: alert.price },
@@ -601,10 +629,11 @@ export function lpTable(
   entries: readonly { corporationId: number; name: string | null; points: number }[]
 ): TableModel {
   const total = entries.reduce((sum, entry) => sum + entry.points, 0);
-  const share = (points: number) => {
-    if (total <= 0) return '0%';
-    const pct = Math.round((points / total) * 100);
-    return pct === 0 && points > 0 ? '<1%' : `${pct}%`;
+  const shareOf = (points: number): TableCell => {
+    const bar = fractionBar(Math.max(0, points), total);
+    if (bar === undefined) return '0%';
+    const pct = Math.round(bar * 100);
+    return { text: pct === 0 && points > 0 ? '<1%' : `${pct}%`, bar };
   };
   return {
     columns: [
@@ -617,7 +646,7 @@ export function lpTable(
       cells: [
         entry.name ?? t(`${W}.data.lp.corporation`, { id: entry.corporationId }),
         formatCompactNumber(entry.points),
-        share(entry.points),
+        shareOf(entry.points),
       ],
     })),
   };
