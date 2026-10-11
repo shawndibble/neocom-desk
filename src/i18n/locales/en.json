@@ -3226,11 +3226,11 @@
         "answer": "Each Wallet journal line links to the contract or item behind it, so a payment can be followed back to its source."
       },
       "marketJumps": {
-        "question": "What will this sell for within 15 jumps?",
+        "question": "What is for sale within 15 jumps?",
         "answer": "Market shows every order for an item with its jump count from the system you pick, so you can see what a trip is worth before you make it."
       },
       "routeSafety": {
-        "question": "Is this route safe tonight?",
+        "question": "Is this route safe right now?",
         "answer": "Route Safety checks the route between two systems and flags the chokepoints on the way."
       },
       "pilot": {

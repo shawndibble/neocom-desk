@@ -43,6 +43,7 @@ import {
   Orders,
   Planetary,
   ReadOnly,
+  Search,
   ScheduledPush,
   Ships,
   Skills,
@@ -76,7 +77,7 @@ interface LandingRow {
 }
 
 /**
- * The feature catalog under the answers, grouped the way the app's own nav
+ * The feature catalog under the question tiles, shown as name chips, grouped the way the app's own nav
  * groups its routes (`Layout.tsx`: Progression / Economy / Social) so the page
  * and the signed-in shell describe the same product in the same order. The
  * nav's ungrouped head — Alerts and Corporation beside Overview — has no label
@@ -129,12 +130,12 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
 ];
 
 /**
- * One captured screen in the "See it in action" gallery: the file under
+ * One captured screen behind a question tile: the file under
  * `public/screenshots/` and the `login.screenshots.*` key its alt text and
- * caption live under. Real captures (the Play Store listing's), not mockups —
- * the hero preview already covers "what it would look like"; this answers
- * "what does it actually look like". WebP sits outside the PWA precache glob,
- * so a signed-in user never downloads them.
+ * enlarged-view caption live under. Real captures filled with sample data, not
+ * mockups — the hero preview already covers "what it would look like"; these
+ * answer "what does it actually look like". WebP sits outside the PWA precache
+ * glob, so a signed-in user never downloads them.
  */
 interface Screenshot {
   file: string;
@@ -237,8 +238,8 @@ const TRUST: LandingRow[] = [
 /**
  * Sample values for the hero preview only — never real character data.
  *
- * The figures are the gallery's own Overview capture (`desktop-overview`), so
- * the hero and the screenshots tell one story: an industry job finishing in
+ * The figures are the first tile's Overview capture (`desktop-overview`), so
+ * the hero and the tiles tell one story: an industry job finishing in
  * 1h 59m as the next deadline, 26 orders needing work, 13 unread alerts.
  */
 const PREVIEW = {
@@ -279,8 +280,8 @@ export function Login() {
   // initializers run once on mount rather than every render.
   const [previewFetchedAt] = useState(() => new Date(Date.now() - 2 * MINUTE_MS));
 
-  // The gallery capture shown enlarged, or null. One modal for the page
-  // rather than one per figure: only one can be open at a time anyway.
+  // The tile capture shown enlarged, or null. One modal for the page
+  // rather than one per tile: only one can be open at a time anyway.
   const [zoomed, setZoomed] = useState<Screenshot | null>(null);
 
   // One Customize permissions dialog for the whole page, opened from either
@@ -503,9 +504,9 @@ export function Login() {
           {/*
           One grid, not a questions list over a separate gallery: each tile is a
           question, the screen that answers it, and one line of why. Selecting
-          the picture enlarges it, as the gallery's captures always did. The
-          picture is a crop (top-aligned, fixed height), so the enlarged view is
-          where the table text becomes readable.
+          the picture enlarges it. The picture is a crop (top-aligned, fixed
+          height), so the enlarged view is where the table text becomes
+          readable.
         */}
           <ul className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-6">
             {TILES.map((tile) => (
@@ -659,8 +660,9 @@ function QuestionTile({ tile, onOpen }: { tile: Tile; onOpen: () => void }) {
         onClick={onOpen}
         aria-label={t('login.screenshotEnlarge', { alt })}
         className={cx(
-          'block h-48 w-full cursor-zoom-in overflow-hidden sm:h-56',
-          focusRingClassName
+          'relative block h-48 w-full cursor-zoom-in overflow-hidden sm:h-56',
+          // Inset: the button clips its own overflow, so an outset ring would be cut off.
+          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent'
         )}
       >
         <img
@@ -672,6 +674,13 @@ function QuestionTile({ tile, onOpen }: { tile: Tile; onOpen: () => void }) {
           decoding="async"
           className={cx('h-full w-full object-cover object-top', interactiveClassName)}
         />
+        {/* DESIGN.md §6c "Magnifier badge": the at-rest cue that the picture opens, since a phone has no cursor. */}
+        <span
+          aria-hidden="true"
+          className="absolute right-2 bottom-2 rounded-xs border border-line bg-bg/80 p-1 text-text"
+        >
+          <Search size={ICON_SIZE.sm} aria-hidden="true" />
+        </span>
       </button>
       <div className="border-t border-line p-4">
         <h3 className="text-base font-semibold text-balance">
