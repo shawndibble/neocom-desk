@@ -137,9 +137,10 @@ test('on a phone M takes the whole row, with no overflow', async ({ page }) => {
   expect(await hasHorizontalOverflow(page)).toBe(false);
 });
 
-test('a widget "Open" link meets the 44px touch floor at 390px', async ({ page }) => {
+test("a widget's title link meets the 44px touch floor at 390px", async ({ page }) => {
   await seedAndOpen(page, 'S', 4, PHONE);
-  const openLink = page.getByRole('link', { name: /^Open .* page$/ }).first();
+  // The title is the link to the kind's page (no separate Open link).
+  const openLink = page.locator('main section h2 a').first();
   await expect(openLink).toBeVisible();
   // Polled: a card remounted as its reads land measures as a null box.
   await expect
