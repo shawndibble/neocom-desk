@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  fetchPilotKillmailHistory,
   fetchPilotKillmails,
   parsePilotKillmails,
   PILOT_KILLMAIL_LIMIT,
+  PILOT_LIST_PAGE_SIZE,
   readKillmailDetail,
   resetPilotKillmailsCache,
 } from './zkillboard';
@@ -131,5 +133,74 @@ describe('fetchPilotKillmails', () => {
     await fetchPilotKillmails(42);
     await fetchPilotKillmails(42);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('fetchPilotKillmailHistory', () => {
+  const fetchMock = vi.fn();
+  const KILLS = 'https://zkillboard.com/api/kills/characterID/42/';
+  const LOSSES = 'https://zkillboard.com/api/losses/characterID/42/';
+  const at = (id: number, time: string) => ({
+    ...INLINE,
+    killmail_id: id,
+    killmail_time: time,
+    zkb: { hash: `h${id}`, totalValue: id },
+  });
+  beforeEach(() => {
+    resetPilotKillmailsCache();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => {
+    fetchMock.mockReset();
+    vi.unstubAllGlobals();
+  });
+  function respond(bodies: Record<string, unknown>) {
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        bodies[url] === undefined
+          ? { ok: false, json: () => Promise.resolve(null) }
+          : { ok: true, json: () => Promise.resolve(bodies[url]) }
+      )
+    );
+  }
+
+  it('merges both lists newest first, uncapped, with the whole record held', async () => {
+    respond({
+      [KILLS]: [at(1, '2026-09-01T00:00:00Z'), at(3, '2026-09-03T00:00:00Z')],
+      [LOSSES]: [at(2, '2026-09-02T00:00:00Z')],
+    });
+    const result = await fetchPilotKillmailHistory(42);
+    expect(result.ok && result.entries.map((e) => [e.killmailId, e.side])).toEqual([
+      [3, 'kill'],
+      [2, 'loss'],
+      [1, 'kill'],
+    ]);
+    expect(result.ok && result.reachesBackTo).toBeNull();
+  });
+
+  it('reports how far back a full page reaches', async () => {
+    const full = Array.from({ length: PILOT_LIST_PAGE_SIZE }, (_, i) =>
+      at(1000 + i, new Date(Date.parse('2026-10-01T00:00:00Z') - i * 3_600_000).toISOString())
+    );
+    respond({ [KILLS]: full, [LOSSES]: [at(5, '2026-01-01T00:00:00Z')] });
+    const result = await fetchPilotKillmailHistory(42);
+    expect(result.ok && result.reachesBackTo).toBe(
+      Date.parse('2026-10-01T00:00:00Z') - (PILOT_LIST_PAGE_SIZE - 1) * 3_600_000
+    );
+  });
+
+  it('shares the cached lists: a second read asks zKillboard nothing', async () => {
+    respond({ [KILLS]: [], [LOSSES]: [] });
+    await fetchPilotKillmailHistory(42);
+    await fetchPilotKillmailHistory(42);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails when a list fails, and when entries carry no time to count by', async () => {
+    respond({ [KILLS]: [] });
+    expect(await fetchPilotKillmailHistory(42)).toEqual({ ok: false });
+    resetPilotKillmailsCache();
+    respond({ [KILLS]: [{ killmail_id: 7, zkb: { hash: 'bb' } }], [LOSSES]: [] });
+    expect(await fetchPilotKillmailHistory(42)).toEqual({ ok: false });
   });
 });

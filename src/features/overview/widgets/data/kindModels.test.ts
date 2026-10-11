@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveWidget } from '../state';
 import { buildView, feedsFor, KIND_FEEDS } from './models';
 import { humanizeRefType } from './kindModels';
-import type { RouteSafetyWidgetData, SurveyWidgetData } from './kindLoaders';
+import type { KillsWidgetData, RouteSafetyWidgetData, SurveyWidgetData } from './kindLoaders';
 import type { BuildContext, FeedState, Feeds } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
@@ -819,5 +819,123 @@ describe('routeSafety', () => {
     expect(resolved.state).toBe('failed');
     expect(resolved.showLastGood).toBe(true);
     expect(failed.number.value).toBe('1');
+  });
+});
+
+describe('kills', () => {
+  const entry = (
+    id: number,
+    agoMs: number,
+    over: Partial<KillsWidgetData['entries'][number]> = {}
+  ): KillsWidgetData['entries'][number] => ({
+    characterId: 91,
+    killmailId: id,
+    side: 'kill',
+    timeMs: NOW - agoMs,
+    systemId: 30000142,
+    shipTypeId: 626,
+    value: 5_000_000,
+    ...over,
+  });
+  const data = (over: Partial<KillsWidgetData> = {}): KillsWidgetData => ({
+    entries: [
+      entry(1, HOUR),
+      entry(2, 2 * DAY, { side: 'loss', value: null }),
+      entry(3, 10 * DAY),
+      entry(4, 40 * DAY),
+      entry(5, HOUR, { characterId: 92 }),
+    ],
+    reach: { 91: null, 92: null },
+    failedIds: [],
+    trackedIds: [91, 92],
+    systemNames: new Map([[30000142, 'Jita']]),
+    typeNames: new Map([[626, 'Vexor']]),
+    fetchedAt: new Date(NOW),
+    ...over,
+  });
+
+  it('reads from its own feed', () => {
+    expect(KIND_FEEDS.kills).toEqual(['kills']);
+  });
+
+  it('counts the header Character’s kills and losses in the range, with the split beneath', () => {
+    const view = buildView('kills', { kills: ok(data()) }, ctx({ range: 7 }));
+    expect(stateOf(view)).toBe('ok');
+    expect(view.number.value).toBe('2');
+    expect(view.number.secondary?.text).toContain('"kills":1');
+    expect(view.number.secondary?.text).toContain('"losses":1');
+    expect(buildView('kills', { kills: ok(data()) }, ctx({ range: 30 })).number.value).toBe('3');
+  });
+
+  it('counts every Character when scoped to all, and a shared killmail once', () => {
+    const shared = data({
+      entries: [
+        entry(1, HOUR),
+        entry(1, HOUR, { characterId: 92 }),
+        entry(2, HOUR, { characterId: 92 }),
+      ],
+    });
+    const view = buildView('kills', { kills: ok(shared) }, ctx({ scopeAll: true }));
+    expect(view.number.value).toBe('2');
+  });
+
+  it('tables ship, system, value and a kill or loss word, newest first, naming what it can', () => {
+    const view = buildView('kills', { kills: ok(data()) }, ctx({ range: 7 }));
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      [
+        'Vexor',
+        'Jita',
+        { text: '5M', iskAmount: 5_000_000 },
+        { text: 'overview.widgets.kills.side.kill', tone: 'good' },
+      ],
+      ['Vexor', 'Jita', '—', { text: 'overview.widgets.kills.side.loss', tone: 'bad' }],
+    ]);
+  });
+
+  it('charts kills and losses per day over the range, with a text summary', () => {
+    const view = buildView('kills', { kills: ok(data()) }, ctx({ range: 7 }));
+    if (view.chart?.kind !== 'bars') throw new Error('bars');
+    expect(view.chart.values).toHaveLength(7);
+    expect(view.chart.values.reduce((a, b) => a + b, 0)).toBe(2);
+    expect(view.chart.summary).toContain('"count":2');
+    expect(view.chart.xStart).toContain('"count":7');
+  });
+
+  it('says how far back zKillboard’s page reaches when it falls short of the range', () => {
+    const view = buildView(
+      'kills',
+      { kills: ok(data({ reach: { 91: NOW - 20 * DAY, 92: null } })) },
+      ctx({ range: 90 })
+    );
+    if (view.chart?.kind !== 'bars') throw new Error('bars');
+    expect(view.chart.note).toContain('noteCovered');
+    expect(view.chart.note).toContain('"covered":20');
+  });
+
+  it('is empty with no kills in range, and when the header Character is not tracked', () => {
+    expect(stateOf(buildView('kills', { kills: ok(data({ entries: [] })) }, ctx()))).toBe('empty');
+    expect(stateOf(buildView('kills', { kills: ok(data()) }, ctx({ activeCharacterId: 7 })))).toBe(
+      'empty'
+    );
+  });
+
+  it('is failed when the header Character could not be read, and when the load fails after a good one', () => {
+    const unread = buildView('kills', { kills: ok(data({ failedIds: [91] })) }, ctx());
+    expect(resolveWidget(unread.status).state).toBe('failed');
+    const failed = buildView(
+      'kills',
+      { kills: { data: data(), error: true, loading: false } },
+      ctx({ range: 7 })
+    );
+    const resolved = resolveWidget(failed.status);
+    expect(resolved.state).toBe('failed');
+    expect(resolved.showLastGood).toBe(true);
+    expect(failed.number.value).toBe('2');
+  });
+
+  it('is loading before the first read', () => {
+    expect(
+      stateOf(buildView('kills', { kills: { data: null, error: false, loading: true } }, ctx()))
+    ).toBe('loading');
   });
 });

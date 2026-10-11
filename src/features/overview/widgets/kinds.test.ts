@@ -143,9 +143,10 @@ describe('widget kind catalogue', () => {
 
   it('marks the three unbuilt kinds as coming soon and the rest as available', () => {
     const soon = WIDGET_KINDS.filter((k) => k.availability === 'comingSoon').map((k) => k.id);
-    expect(soon.sort()).toEqual(['hauling', 'jumpTimers', 'kills']);
+    expect(soon.sort()).toEqual(['hauling', 'jumpTimers']);
     expect(isAddable('wallet')).toBe(true);
     expect(isAddable('routeSafety')).toBe(true);
+    expect(isAddable('kills')).toBe(true);
     expect(isAddable('hauling')).toBe(false);
     expect(isAddable('nope')).toBe(false);
   });

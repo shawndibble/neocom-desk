@@ -3768,6 +3768,15 @@
           "summary_other": "{{count}} player kills in the last 24 hours across {{systems}} systems on the saved route, {{busy}} of them busy (5 or more kills). Busiest hour: {{peak}}. Kills per hour, oldest first: {{hours}}.",
           "unread_one": "{{count}} system could not be read and is not counted.",
           "unread_other": "{{count}} systems could not be read and are not counted."
+        },
+        "kills": {
+          "note": "Kills and losses per day, last {{count}} days",
+          "noteCovered": "Kills and losses per day. zKillboard's latest page reaches back {{covered}} of {{count}} days.",
+          "max": "max {{count}} per day",
+          "xStart": "{{count}} days ago",
+          "xEnd": "today",
+          "summary_one": "{{count}} kill or loss in the last {{range}} days: {{kills}} kills and {{losses}} losses. Busiest day: {{peak}}. Per day, oldest first: {{days}}.",
+          "summary_other": "{{count}} kills and losses in the last {{range}} days: {{kills}} kills and {{losses}} losses. Busiest day: {{peak}}. Per day, oldest first: {{days}}."
         }
       },
       "data": {
@@ -3826,6 +3835,11 @@
           "secondary_other": "{{count}} kills in 24 h",
           "secondaryUnread_one": "{{count}} kill in 24 h · {{unread}} unread",
           "secondaryUnread_other": "{{count}} kills in 24 h · {{unread}} unread"
+        },
+        "kills": {
+          "unit_one": "kill or loss",
+          "unit_other": "kills and losses",
+          "secondary": "{{kills}} kills · {{losses}} losses"
         }
       },
       "training": {
@@ -4150,7 +4164,17 @@
       "kills": {
         "title": "Kills and losses",
         "description": "Your recent kills and losses",
-        "empty": "No recent kills or losses."
+        "empty": "No kills or losses in this range",
+        "col": {
+          "ship": "Ship",
+          "system": "System",
+          "value": "Value",
+          "side": "Result"
+        },
+        "side": {
+          "kill": "Kill",
+          "loss": "Loss"
+        }
       },
       "comingUp": {
         "title": "Coming up",
@@ -4436,6 +4460,9 @@
         },
         "routeSafety": {
           "note": "Efa to Amarr, 14 systems"
+        },
+        "kills": {
+          "note": "Your latest kills and losses"
         }
       }
     },

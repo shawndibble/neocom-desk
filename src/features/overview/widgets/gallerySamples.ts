@@ -360,6 +360,24 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         xEnd: t('overview.widgets.chart.routeSafety.xEnd'),
       },
     },
+    kills: {
+      value: '14',
+      unit: t('overview.widgets.data.kills.unit', { count: 14 }),
+      note: t('overview.gallery.samples.kills.note'),
+      rows: [
+        ['Vexor', 'Efa', '48M'],
+        ['Catalyst', 'Niarja', '12M'],
+        ['Tengu', 'Amarr', '410M'],
+      ],
+      chart: {
+        kind: 'bars',
+        summary: '',
+        values: [0, 2, 1, 0, 3, 1, 4, 0, 1, 2, 0, 0],
+        max: t('overview.widgets.chart.kills.max', { count: 4 }),
+        xStart: t('overview.widgets.chart.kills.xStart', { count: 30 }),
+        xEnd: t('overview.widgets.chart.kills.xEnd'),
+      },
+    },
     planetary: {
       value: '4',
       unit: t('overview.gallery.samples.planetary.unit'),

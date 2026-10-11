@@ -13,6 +13,7 @@ import * as widgetView from './data/useWidgetView';
 import { WidgetGrid } from './WidgetGrid';
 import { Widget } from './Widget';
 import type { Widget as WidgetModel } from './layout';
+import type { KillsEntry } from './data/kindLoaders';
 
 vi.mock('./data/useWidgetView', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./data/useWidgetView')>();
@@ -301,6 +302,59 @@ describe('Route safety widget', () => {
       'href',
       '/travel/route'
     );
+  });
+});
+
+describe('Kills and losses widget', () => {
+  const feed = (store: FeedStore, entries: KillsEntry[], error = false) =>
+    store.set('kills', {
+      data: {
+        entries,
+        reach: { 1: null },
+        failedIds: [],
+        trackedIds: [1],
+        systemNames: new Map([[30000142, 'Jita']]),
+        typeNames: new Map([[626, 'Vexor']]),
+        fetchedAt: new Date(NOW),
+      },
+      error,
+      loading: false,
+    });
+  const kill = (id: number, side: 'kill' | 'loss'): KillsEntry => ({
+    characterId: 1,
+    killmailId: id,
+    side,
+    timeMs: NOW - 3_600_000,
+    systemId: 30000142,
+    shipTypeId: 626,
+    value: 5_000_000,
+  });
+
+  it('draws kills per day with its max and a text equivalent', () => {
+    renderWidget(model({ kind: 'kills', view: 'chart', range: 30, scope: 'all' }), (store) =>
+      feed(store, [kill(1, 'kill'), kill(2, 'loss')])
+    );
+    const region = screen.getByRole('region', { name: 'Kills and losses' });
+    expect(within(region).getByText('max 2 per day')).toBeInTheDocument();
+    expect(within(region).getByText(/2 kills and losses in the last 30 days/)).toBeInTheDocument();
+  });
+
+  it('says No kills or losses in this range when the range holds none', () => {
+    renderWidget(model({ kind: 'kills', range: 7 }), (store) => feed(store, []));
+    const region = screen.getByRole('region', { name: 'Kills and losses' });
+    expect(within(region).getByText('No kills or losses in this range')).toBeInTheDocument();
+  });
+
+  it('says it could not load, keeps the last value and retries', async () => {
+    const user = userEvent.setup();
+    const { refresh } = renderWidget(model({ kind: 'kills', range: 30, scope: 'all' }), (store) =>
+      feed(store, [kill(1, 'kill')], true)
+    );
+    const region = screen.getByRole('region', { name: 'Kills and losses' });
+    expect(within(region).getByRole('alert')).toHaveTextContent('Could not load');
+    expect(within(region).getByText('1').closest('.opacity-45')).not.toBeNull();
+    await user.click(within(region).getByRole('button', { name: 'Retry' }));
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 });
 
