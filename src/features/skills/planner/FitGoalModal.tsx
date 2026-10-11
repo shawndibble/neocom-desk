@@ -7,6 +7,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Button, Modal } from '@/components/ui';
+import { focusRingClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { formatLocalDate } from '@/lib/localDate';
 import type { FitGoalOption } from './fitGoalOptions';
 
@@ -63,7 +65,10 @@ export function FitGoalModal({ open, options, onClose, onPick }: FitGoalModalPro
                   type="button"
                   disabled={option.state === 'loading' || option.state === 'flyable-now'}
                   onClick={() => choose(option)}
-                  className="flex w-full items-center justify-between gap-3 rounded-xs px-2 py-1.5 text-left hover:bg-panel-2 disabled:cursor-default disabled:hover:bg-transparent"
+                  className={cx(
+                    'flex w-full items-center justify-between gap-3 rounded-xs px-2 py-1.5 text-left hover:bg-panel-2 disabled:cursor-default disabled:hover:bg-transparent',
+                    focusRingClassName
+                  )}
                 >
                   <span className="truncate">{option.name}</span>
                   <span className="shrink-0 tabular-nums text-text-dim">
