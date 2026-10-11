@@ -220,6 +220,7 @@ describe('SurveyInfoReadout', () => {
     ]);
     expect(screen.getByRole('link', { name: /example\.com\/x/ })).toBeTruthy();
     expect(container.querySelector('img')).toBeNull();
+    expect(container.textContent).toContain('pic');
   });
 
   it('shows only the rows that were set', () => {

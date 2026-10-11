@@ -43,6 +43,7 @@ const ALLOWED_ELEMENTS = [
   'th',
   'td',
   'input',
+  'img',
 ];
 
 export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
@@ -61,12 +62,14 @@ export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
             ),
           // The panel's title is the h2, so notes headings start a level below it:
           // # and ## read as the larger tier, everything deeper as the smaller.
-          h1: Heading3,
-          h2: Heading3,
-          h3: Heading4,
-          h4: Heading4,
-          h5: Heading4,
-          h6: Heading4,
+          h1: heading('h3', 'text-lg'),
+          h2: heading('h3', 'text-base'),
+          h3: heading('h4', 'text-sm'),
+          h4: heading('h4', 'text-sm'),
+          h5: heading('h4', 'text-sm'),
+          h6: heading('h4', 'text-sm'),
+          // An image never loads: the reader gets its alt text.
+          img: ({ alt }) => <>{alt}</>,
           hr: () => <hr className="border-line" />,
           li: ({ children }) => <li className="has-[input]:list-none">{children}</li>,
           // Task-list boxes are shown, never togglable: a reader can't change a stored note.
@@ -79,7 +82,7 @@ export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
             </blockquote>
           ),
           pre: ({ children }) => (
-            <pre className="overflow-x-auto rounded-xs bg-panel-2 p-2 font-mono text-[0.9em]">
+            <pre className="overflow-x-auto rounded-xs bg-panel-2 p-2 font-mono text-[0.9em] [&>code]:bg-transparent [&>code]:p-0">
               {children}
             </pre>
           ),
@@ -88,12 +91,22 @@ export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
               <table className="border-collapse text-left">{children}</table>
             </div>
           ),
-          th: ({ children }) => (
-            <th className="border border-line px-2 py-1 font-semibold">{children}</th>
+          th: ({ children, style }) => (
+            <th className={`${CELL} font-semibold`} style={style}>
+              {children}
+            </th>
           ),
-          td: ({ children }) => <td className="border border-line px-2 py-1">{children}</td>,
+          td: ({ children, style }) => (
+            <td className={CELL} style={style}>
+              {children}
+            </td>
+          ),
           ul: ({ children }) => <ul className="list-disc pl-5">{children}</ul>,
-          ol: ({ children }) => <ol className="list-decimal pl-5">{children}</ol>,
+          ol: ({ children, start }) => (
+            <ol start={start} className="list-decimal pl-5">
+              {children}
+            </ol>
+          ),
           code: ({ children }) => (
             <code className="rounded-xs bg-panel-2 px-1 font-mono text-[0.9em]">{children}</code>
           ),
@@ -105,10 +118,14 @@ export default function SurveyNotesMarkdown({ notes }: { notes: string }) {
   );
 }
 
-function Heading3({ children }: { children?: ReactNode }) {
-  return <h3 className="text-base font-semibold text-text">{children}</h3>;
-}
+const CELL = 'border border-line px-2 py-1';
 
-function Heading4({ children }: { children?: ReactNode }) {
-  return <h4 className="text-sm font-semibold text-text">{children}</h4>;
+/**
+ * Notes headings sit below the panel's own title (the h2): `#` and `##` render as
+ * h3, deeper ones as h4, each with its own size so the level reads at a glance.
+ */
+function heading(Tag: 'h3' | 'h4', size: string) {
+  return ({ children }: { children?: ReactNode }) => (
+    <Tag className={`${size} font-semibold text-text`}>{children}</Tag>
+  );
 }
