@@ -54,6 +54,7 @@ import type {
   PriceAlertTriggeredFire,
 } from './notificationDiffs';
 import type { StockBelowTargetFire } from './stockTargets/stockAlert';
+import type { IncursionNearbyFire } from './incursions/incursionAlert';
 
 /**
  * Every fire an Occurrence Key can be derived from — the same members as
@@ -84,7 +85,8 @@ export type OccurrenceFire =
   | CorpWalletThresholdFire
   | StructureReinforcementExitFire
   | PriceAlertTriggeredFire
-  | StockBelowTargetFire;
+  | StockBelowTargetFire
+  | IncursionNearbyFire;
 
 const DAY_MS = 86_400_000;
 
@@ -195,6 +197,11 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
         fire.status,
         dayBucket(nowMs),
       ].join(':');
+    // Once per Incursion: its constellation and staging system name it for
+    // as long as it lasts, so no day bucket — an Incursion leaving range and
+    // coming back is the same occurrence, not a second alert.
+    case 'incursionNearby':
+      return [characterId, fire.eventId, fire.constellationId, fire.stagingSystemId].join(':');
     default: {
       const exhaustive: never = fire;
       throw new Error(`occurrenceKey: unhandled Notification Event ${JSON.stringify(exhaustive)}`);
@@ -281,6 +288,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     // An asset list carries no per-item time; the poll that saw the drop is it.
     // falls through
     case 'stockBelowTarget':
+    // The feed carries no spawn time; the poll that saw it in range is it.
+    // falls through
+    case 'incursionNearby':
       return nowMs;
     default: {
       const exhaustive: never = fire;

@@ -140,6 +140,17 @@ import type {
   StockBelowTargetFire,
 } from '@/engine/stockTargets/stockAlert';
 import { useStockLists } from '@/features/stockTargets/stockListsStore';
+import type {
+  IncursionAlertEntry,
+  IncursionAlertSnapshot,
+  IncursionNearbyFire,
+} from '@/engine/incursions/incursionAlert';
+import { INCURSION_STATES } from '@/engine/incursions/incursionRows';
+import { loadCurrentSystemId } from '@/features/route/currentSystem';
+import { loadJumpBasis } from '@/features/route/jumpBasis';
+import { localJumpDistances } from '@/features/route/localRoute';
+import { loadConstellationNames, loadIncursions } from '@/features/travel/incursionsData';
+import { lookupSolarSystem } from '@/sde/solarSystems';
 import { loadStockAlertEntries } from '@/features/stockTargets/stockTargetsData';
 import {
   projectSkillQueue,
@@ -172,6 +183,7 @@ import {
   type PlanetNames,
   type CalendarNames,
   type MemberNames,
+  type IncursionNames,
 } from './domainCopy';
 import {
   NOTIFICATION_EVENT_ENTRIES,
@@ -1718,6 +1730,77 @@ export const stockTargetDomain = defineDomain<
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
 });
 
+/* Incursions: within N jumps ---------------------------------------------- */
+
+function isIncursionAlertEntry(raw: unknown): raw is IncursionAlertEntry {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.constellationId === 'number' &&
+    typeof r.stagingSystemId === 'number' &&
+    (INCURSION_STATES as readonly unknown[]).includes(r.state) &&
+    (r.jumps === null || typeof r.jumps === 'number') &&
+    typeof r.originSystemId === 'number' &&
+    typeof r.withinJumps === 'number'
+  );
+}
+
+/**
+ * An Incursion coming within the pilot's N jumps (issue #3542). One cached
+ * read of the public feed and of the location, and one local pass over the
+ * stargate graph under Route Safety's jump basis — never a route call per
+ * Incursion. Every Incursion in the feed is kept, near or not, each with the
+ * origin and N it was counted under, so the diff can tell a changed frame
+ * from an Incursion coming into range. An input it cannot read skips the
+ * poll (`null`) rather than writing a baseline that would make the next good
+ * poll look like a burst of new arrivals.
+ */
+export const incursionDomain = defineDomain<
+  IncursionAlertEntry,
+  IncursionAlertSnapshot,
+  IncursionNearbyFire,
+  IncursionNames
+>({
+  source: SNAPSHOT_SOURCES.incursions,
+  stateKey: 'notifications.pollerState.incursions',
+  entriesKey: 'entries',
+  isEntry: isIncursionAlertEntry,
+  load: async (characterId) => {
+    const originSystemId = await loadCurrentSystemId(characterId);
+    if (originSystemId === null) return null;
+    const feed = await loadIncursions();
+    if (feed === null) return null;
+    if (feed.entries.length === 0) return [];
+    const { incursionNearbyJumps: withinJumps } = await currentThresholds(characterId);
+    const basis = await loadJumpBasis();
+    const distances = await localJumpDistances(originSystemId, basis.rules, basis.network);
+    if (distances.kind === 'unknown') return null;
+    // Counted exactly as Route Safety's Incursions panel counts them
+    // (`buildIncursionRows`): a state ESI adds later is dropped, not stored.
+    return feed.entries
+      .filter((entry) => (INCURSION_STATES as readonly unknown[]).includes(entry.state))
+      .map((entry) => ({
+        constellationId: entry.constellation_id,
+        stagingSystemId: entry.staging_solar_system_id,
+        state: entry.state,
+        jumps: distances.jumps.get(entry.staging_solar_system_id) ?? null,
+        originSystemId,
+        withinJumps,
+      }));
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  names: async (fire) => {
+    const [constellations, system] = await Promise.all([
+      loadConstellationNames([fire.constellationId]),
+      lookupSolarSystem(fire.stagingSystemId).catch(() => null),
+    ]);
+    return {
+      constellation: constellations.get(fire.constellationId),
+      system: system?.name,
+    };
+  },
+});
+
 /**
  * Every polled domain, in fetch order. One entry here is the whole cost of
  * adding a domain: `foregroundPoller.ts` names none of them.
@@ -1741,6 +1824,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   corpWalletDomain,
   priceAlertDomain,
   stockTargetDomain,
+  incursionDomain,
 ];
 
 const DOMAIN_BY_EVENT: ReadonlyMap<NotificationEventId, PollDomain> = new Map(

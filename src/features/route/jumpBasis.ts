@@ -24,7 +24,8 @@ import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { routeSafetyNetwork } from '@/engine/route/routeSafetyTrip';
 import type { TheraConnection } from '@/engine/route/theraConnections';
-import { useAnsiblexGates } from '@/features/travel/ansiblexGates';
+import { routeHoles } from '@/engine/route/routeHoles';
+import { gatesOf, useAnsiblexGates } from '@/features/travel/ansiblexGates';
 import {
   bridgeEndsFromKey,
   bridgeKey,
@@ -33,9 +34,10 @@ import {
 } from '@/features/travel/routeSafetyKeys';
 import { useRouteHoles } from '@/features/travel/useRouteHoles';
 import { findLocalJumps, type RouteGraphExtras } from './localRoute';
-import { useRouteBridgeQuery } from './routeBridgeSettings';
-import { NO_HOLE_OVERRIDES, useRouteHoleQuery } from './routeHoleSettings';
-import { useRouteQuery, type RouteRules } from './routeRules';
+import { loadTheraConnections } from '@/lib/eveScout';
+import { useRouteBridgeQuery, useRouteBridgesEnabled } from './routeBridgeSettings';
+import { loadRouteHoleQuery, NO_HOLE_OVERRIDES, useRouteHoleQuery } from './routeHoleSettings';
+import { loadRouteRules, useRouteQuery, type RouteRules } from './routeRules';
 
 export interface JumpBasis {
   rules: RouteRules;
@@ -68,10 +70,7 @@ export function useJumpBasis(preferenceOverride?: RoutePreferenceKind | null): J
   const holesKey = holeNetworkKey(holes);
   const bridgesKey = bridges === null ? '' : bridgeKey(bridges);
   // Just the ends: a hole's remaining life never recounts anything.
-  const network = useMemo(
-    () => routeSafetyNetwork(holeEndsFromKey(holesKey), bridgeEndsFromKey(bridgesKey)),
-    [holesKey, bridgesKey]
-  );
+  const network = useMemo(() => networkFromKeys(holesKey, bridgesKey), [holesKey, bridgesKey]);
 
   // An unreachable EVE-Scout is a settled answer (gates only), not a wait.
   const holesSettled = !holeQuery.enabled || holesState.kind !== 'loading';
@@ -85,6 +84,38 @@ export function useJumpBasis(preferenceOverride?: RoutePreferenceKind | null): J
     () => ({ rules, network, key, hydrated, podKillsUnavailable }),
     [rules, network, key, hydrated, podKillsUnavailable]
   );
+}
+
+function networkFromKeys(holesKey: string, bridgesKey: string): RouteGraphExtras {
+  return routeSafetyNetwork(holeEndsFromKey(holesKey), bridgeEndsFromKey(bridgesKey));
+}
+
+/**
+ * The jump basis read once, outside React — the notification poller's copy of
+ * `useJumpBasis` with no preference override, so an alert's jump count is the
+ * one Route Safety draws. An unreachable EVE-Scout counts gates only, as the
+ * hook does.
+ */
+export async function loadJumpBasis(): Promise<Pick<JumpBasis, 'rules' | 'network'>> {
+  const [rules, holeQuery] = await Promise.all([
+    loadRouteRules(),
+    loadRouteHoleQuery(),
+    useRouteBridgesEnabled.getState().hydrate(),
+  ]);
+  const now = Date.now();
+  const holesResult = holeQuery.enabled ? await loadTheraConnections(now) : null;
+  const holes =
+    holesResult?.kind === 'ok'
+      ? routeHoles(holesResult.connections, holeQuery.settings, now)
+      : NO_HOLES;
+  // An unreadable gate list counts gates only, as the hook does while it has none.
+  const bridges = useRouteBridgesEnabled.getState().value
+    ? await gatesOf().catch(() => null)
+    : null;
+  return {
+    rules,
+    network: networkFromKeys(holeNetworkKey(holes), bridges === null ? '' : bridgeKey(bridges)),
+  };
 }
 
 /**

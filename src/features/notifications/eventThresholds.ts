@@ -28,6 +28,8 @@ export interface CharacterEventThresholds {
   corpWalletTransactionCeilingIsk?: number;
   /** Absolute ISK amount a single wallet journal entry must reach to fire `walletBalanceChanged`. */
   walletBalanceChangedThresholdIsk?: number;
+  /** Jumps from the Current System within which an Incursion fires `incursionNearby` (issue #3542) — one of `INCURSION_NEARBY_JUMP_OPTIONS`. */
+  incursionNearbyJumps?: number;
 }
 
 export type ThresholdKey = keyof CharacterEventThresholds;
@@ -48,6 +50,9 @@ export const SKILL_QUEUE_ENDING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 
 /** The lead times `courierDeliveryDue`'s inline control offers (issue #1713), all within the 72-hour Projection Horizon. */
 export const COURIER_DELIVERY_DUE_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
 
+/** How near an Incursion must be for `incursionNearby` (issue #3542): a short hop up to a long trip. */
+export const INCURSION_NEARBY_JUMP_OPTIONS: readonly number[] = [3, 5, 10, 15, 20];
+
 /** A week's warning is the issue's own justification: "a director planning a fuel run wants a week's warning." */
 export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
 export const DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS = 6;
@@ -55,6 +60,8 @@ export const DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS = 6;
 export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
+/** Close enough to fly to on a whim, without an alert for every Incursion in the region. */
+export const DEFAULT_INCURSION_NEARBY_JUMPS = 5;
 /**
  * Matches the roster's own `ENDING_SOON_MS` display constant
  * (`features/skills/queueStatus.ts`) — a pilot's first warning should not
@@ -166,6 +173,16 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       kind: 'iskAmount',
       labelKey: 'settings.notifications.walletBalanceChangedThresholdLabel',
       inputIdPrefix: 'wallet-balance-changed-threshold',
+    },
+  },
+  incursionNearbyJumps: {
+    key: 'incursionNearbyJumps',
+    defaultValue: DEFAULT_INCURSION_NEARBY_JUMPS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.incursionNearbyJumpsLabel',
+      options: INCURSION_NEARBY_JUMP_OPTIONS,
+      optionKey: 'settings.notifications.incursionNearbyJumpsOption',
     },
   },
 };

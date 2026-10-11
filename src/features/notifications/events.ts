@@ -256,6 +256,15 @@ const CATALOG = [
     // Listed counts are the alert: they come from the pilot's own orders.
     scope: requiredScope('getCharacterOrders'),
   },
+  // An Incursion within the pilot's N jumps of their Current System (issue
+  // #3542), counted under Route Safety's route rules. The feed is public;
+  // the location is the one scope it needs, as the Current System does.
+  {
+    id: 'incursionNearby',
+    labelKey: 'settings.notifications.event.incursionNearby',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterLocation'),
+  },
 ] as const satisfies readonly CatalogRow[];
 
 export type NotificationEventId = (typeof CATALOG)[number]['id'];

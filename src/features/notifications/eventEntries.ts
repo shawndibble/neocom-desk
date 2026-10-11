@@ -36,6 +36,11 @@ import {
   type StockBelowTargetFire,
 } from '@/engine/stockTargets/stockAlert';
 import {
+  diffIncursionNearby,
+  type IncursionAlertSnapshot,
+  type IncursionNearbyFire,
+} from '@/engine/incursions/incursionAlert';
+import {
   SKILL_QUEUE_NOTIFICATION_DIFFS,
   diffSpExtractionReady,
   diffCloneJumpReady,
@@ -118,6 +123,8 @@ import {
   corpWalletCopy,
   priceAlertCopy,
   stockBelowTargetCopy,
+  incursionNearbyCopy,
+  type IncursionNames,
   type DomainCopy,
   type NoNames,
   type SkillNames,
@@ -152,7 +159,8 @@ export type AnyNotificationFire =
   | CorpMemberLeftFire
   | CorpWalletThresholdFire
   | PriceAlertTriggeredFire
-  | StockBelowTargetFire;
+  | StockBelowTargetFire
+  | IncursionNearbyFire;
 
 /* -------------------------------------------------------------------------- */
 /* Snapshot sources                                                            */
@@ -193,6 +201,7 @@ export const SNAPSHOT_SOURCES = {
   corpWallet: source<CorpWalletSnapshot>('corpWallet'),
   priceAlert: source<PriceAlertSnapshot>('priceAlert'),
   stockTargets: source<StockAlertSnapshot>('stockTargets'),
+  incursions: source<IncursionAlertSnapshot, IncursionNames>('incursions'),
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -524,6 +533,17 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     copy: stockBelowTargetCopy,
     projection: null,
     thresholds: null,
+    rowHintKey: null,
+  }),
+  incursionNearby: defineEvent({
+    source: SNAPSHOT_SOURCES.incursions,
+    diff: diffIncursionNearby,
+    copy: incursionNearbyCopy,
+    projection: null,
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.incursionNearbyJumps],
+      hintKey: 'settings.notifications.incursionNearbyRouteRulesHint',
+    },
     rowHintKey: null,
   }),
 } satisfies { readonly [K in NotificationEventId]: ErasedEntryFor<K> };

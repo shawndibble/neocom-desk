@@ -280,6 +280,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     cloneJump: async () => [],
     priceAlert: async () => [],
     stockTargets: async () => [],
+    incursions: async () => [],
     marketOrderUndercut: loadMarketOrderUndercut,
   };
   const states: Record<string, DomainPollState> = {
@@ -300,6 +301,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     cloneJump: domainState(undefined, undefined),
     priceAlert: domainState(undefined, undefined),
     stockTargets: domainState(undefined, undefined),
+    incursions: domainState(undefined, undefined),
     marketOrderUndercut: domainState(undefined, undefined),
   };
 
