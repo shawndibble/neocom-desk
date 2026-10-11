@@ -1,4 +1,4 @@
-# Neocom Desk — Ubiquitous Language
+# Neocom Desk — Glossary
 
 ## Glossary
 
@@ -176,7 +176,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Charge Picker**: How a **Fitting**'s weapon group chooses its charge,
   ranking the options by this Fitting's own DPS, range and price, or by
   capacitor effect for a cap booster, or explaining crystals for a mining
-  laser. A faction version that does no more for more ISK is "strictly worse".
+  laser. **Fighting at** restates every figure at one target distance; quick picks name the most damage, the longest reach and the best value. A faction version that does no more for more ISK is "strictly worse" and names the version that beats it.
   Modules whose charges don't shoot (scripts, paste) keep a plain list.
 - **Clock Kind**: Which of the eight sources a **Character Board Item** came
   from. The calendar page's one colour scale names this and nothing else — a
@@ -272,6 +272,7 @@ here — they go one per file in `docs/context/decisions/`.
   lower of the trained level and the active level, each corrected for what the
   training queue has just finished. Trained alone overstates an Alpha-capped
   or lapsed-Omega clone; active alone understates a level just finished.
+  The skill-gate marker deliberately stays on the raw active level.
   Used for PI, industry job time and fees, job slots and clone jump cooldown.
 - **EIV (Estimated Item Value)**: The SCC's reference price for the materials
   a manufacturing job consumes, at ME0 quantities. Used only to size the
@@ -408,7 +409,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Order Depth**: A **Build Opportunities** row's `deep`/`moderate`/`thin`/`unknown` read on how much sell-order ISK sits at the hub against that row's own build cost. `unknown` when the product has no hub sell price, never guessed as thin.
 - **Order Problem**: The one thing wrong with an open order: `belowFloor`, `undercutStation`, `undercutSystem`, `undercutRegion`, `expiringOrStale`, `outbid`, `healthy`, in that precedence. Each order is filed under exactly one, its worst, for grouping; filters match every problem an order has.
 - **Ore Form**: Whether mining ore, moon ore and ice are valued and named as their Compressed or Raw type. A synced setting, Compressed by default; a type with no Compressed counterpart is always Raw. Applies to Unassigned and Outstanding rows only; Paid rows keep the ISK they were paid at.
-- **Reprocessing Yield**: What one type breaks down into when refined, per portion size rather than per unit. Combined with the character's skills into an expected output: ore, ice and moon ore use Reprocessing, Reprocessing Efficiency and their own specialisation skill; scrap uses Scrapmetal Processing only.
+- **Reprocessing Yield**: What one type breaks down into when refined, per portion size rather than per unit. Combined with the character's skills into an expected output: ore, ice and moon ore use Reprocessing, Reprocessing Efficiency and their own specialisation skill; scrap uses Scrapmetal Processing only. Assumes the base 50% station rate (shown as an assumption); structure rate, rigs and standings tax are deliberately not modelled.
 - **Order Slots**: How many market orders a character may keep open at once: a base 5, plus 4 per level of Trade, 8 per Retail, 16 per Wholesale and 32 per Tycoon, so 305 with all four at V. Derived from trained skills, since ESI never reports the ceiling.
 - **Owned-Stock Offer**: A materials row's "Use assets" offer: the owned quantity it would write (detected stock in the owned-stock scope, capped at what the row needs), or none. "Use all" is every row's offer at once; "Use none" clears every row. One rule for a Build Plan and a Build Group alike.
 - **Payee**: Who the Moon Mining Tax ledger owes: user-managed name, default tax %, optional moon/system tag, optional Trade Hub. The tag lets the app suggest the Payee and rate for a future **Mining Ledger Entry** from that system. The Trade Hub is the order book this Payee's ore is valued at (absent means Jita). May also carry `entityId`, the EVE character or corporation the ISK goes to, learned when a **Made Payment** to that recipient is confirmed.
@@ -446,7 +447,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Reaction Location**: A manufacturing-activity **Build Plan**'s second, independent location for reactions, the same shape as **Build Location**, used only when **Include Reactions** is on. Not derived from the plan's primary location; a fresh plan's is pre-filled from the **Remembered Location** for reactions.
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
-- **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap, counted even while it is on cooldown and usable from its cooldown date, not before.
+- **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap, counted even while it is on cooldown and usable from its cooldown date, not before. Plans always use the full count; there is no user override.
 - **Remembered Location**: Where a new **Build Plan** starts. There is one per activity, manufacturing and reaction: the whole location the pilot last set from a Build Plan page (facility, rigs, tax, security band, **Build System** and **Build Location**). Each plan keeps its own location once created. Not a Settings control.
 - **Requested Scopes**: What one authorize round trip asked SSO for, carried on its **Pending Login**. The baseline the login path judges revocation against.
 - **Reset Run**: The unit of planetary work: every colony a pilot resets in one sitting, whose extractor programs therefore come to share an expiry. A colony is what the Colonies table lists; a Reset Run is what a pilot actually goes and does.
@@ -516,7 +517,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Consolidation Plan**: What each Character would have to move to bring their loose stock (not assembled, not inside a container or ship) to one destination station: per-Character packaged m3, trips against the saved **Cargo Space**, and a **Route Safety** link. A volume estimate, never a safety verdict.
 - **Trip Plan**: The suggested load for one trip's **Cargo Space** on one route: a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and an optional ISK budget, with the limit that applied named on each line. A suggestion the user can edit.
 - **Training Progress**: How much SP a Character has already banked toward the level it is training _right now_. Distinct from **Trained Skills**, which is levels finished. Interpolated from the skill queue's training window, as the in-game queue displays it.
-- **Undercut Scope**: Station, system or region: the nested scopes a rival's cheaper order can sit in. A row shows one severity, the tightest scope containing a rival.
+- **Undercut Scope**: Station, system or region: the nested scopes a rival's cheaper order can sit in. A row shows one severity, the tightest scope containing a rival. A scope absent from the result was never checked; a checked scope with no rival is recorded as clean, not absent.
 - **Use-or-Sell Check**: A Build Plan's third read, alongside the **Acquisition Verdict** and **Sale Profitability**: is the stock the player already owns worth more sold than consumed? Compares the plan's profit (which counts owned units as free) against what those units would net if liquidated, on a chosen **Liquidation Basis**.
 - **Verdict Hero**: The first panel of a Build Plan: net profit as one large figure, the margin / ISK-hour / duration / break-even line under it, and the **Acquisition Verdict**, **Sale Profitability** and **Use-or-Sell Check** as three labelled pills.
 - **Liquidation Basis**: How owned materials would be turned into ISK in the **Use-or-Sell Check**: `instant` (fill the hub's standing buy orders, sales tax only) or `order` (list your own stack at the hub's sell price, sales tax plus broker fee). Independent of a plan's material price basis, which is about buying.

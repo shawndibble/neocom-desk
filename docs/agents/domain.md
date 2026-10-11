@@ -19,7 +19,7 @@ Single-context repo:
 
 ```
 /
-├── GLOSSARY.md              glossary only
+├── GLOSSARY.md             glossary only
 ├── docs/
 │   ├── DESIGN.md
 │   ├── ARCHITECTURE.md

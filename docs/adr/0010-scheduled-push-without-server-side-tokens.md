@@ -11,7 +11,7 @@ that polls ESI, because CCP publishes no webhook — not for the endpoints round
 20's Notification Events are synthesized from, and not for
 `/characters/{id}/notifications/` either. A polling backend needs a refresh
 token per Character, which reverses ADR 0001 ("tokens never leave the device")
-and CONTEXT round 20 ("no true server push").
+and GLOSSARY round 20 ("no true server push").
 
 It is worse than a straight reversal. EVE SSO rotates refresh tokens: every
 `grant_type=refresh_token` call may return a new one that must replace the old.

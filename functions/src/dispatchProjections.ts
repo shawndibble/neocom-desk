@@ -28,7 +28,7 @@ export interface StoredProjectionRow extends ProjectionRowInput {
   deviceId?: string;
 }
 
-/** A row still unfired more than this long past its `fireAt` is deleted unsent, not sent late (CONTEXT round 45). */
+/** A row still unfired more than this long past its `fireAt` is deleted unsent, not sent late (GLOSSARY round 45). */
 export const STALE_UNSENT_MS = 7 * 24 * 3_600_000;
 
 /**
@@ -69,7 +69,7 @@ export function isPastRetention(
  * A device token is deleted only when FCM says the token itself is dead or
  * malformed — any other error (rate limiting, a transient server error) leaves
  * it alone, since it says nothing about whether the token is still valid
- * (CONTEXT round 45).
+ * (GLOSSARY round 45).
  *
  * FCM v1 reports a malformed token as `INVALID_ARGUMENT`, which the Admin SDK
  * surfaces as `messaging/invalid-argument` — the same code as a bad payload

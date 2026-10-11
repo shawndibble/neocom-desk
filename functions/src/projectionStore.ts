@@ -251,7 +251,7 @@ export async function dispatchDueProjections(
 
       // Unfired and more than 7 days past fireAt: a device that stopped
       // checking in. A week-late "your skill finished" is worse than
-      // silence (CONTEXT round 45) — delete unsent rather than send.
+      // silence (GLOSSARY round 45) — delete unsent rather than send.
       if (isStaleUnsent(row, now)) {
         await doc.ref.delete();
         return;

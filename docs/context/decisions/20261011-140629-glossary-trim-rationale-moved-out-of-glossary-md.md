@@ -4,7 +4,7 @@ _Recorded 2026-10-11._
 
 GLOSSARY.md entries were cut to plain definitions. The scope decisions and rationale they carried are preserved below, grouped by original term. The full prior text is in git history (`git show b45537f62:CONTEXT.md`).
 
-# Dropped scope decisions / rationale (chunk1)
+## Dropped from the first third of the glossary
 
 - **Account**: Groupings are device-local by decision, not omission. Account-scoped sync is explicitly rejected (not merely unchosen) because EVE SSO has no account id (`sub` is per-Character; `owner` hash changes on transfer), so an account cannot be verified. Recorded in parity plan section 5.7.
 - **Alert**: Grouped by type because a device back from a week away holds hundreds of fires across a dozen-odd types; type is the unit a reader mutes, dismisses or acts on.
@@ -287,7 +287,7 @@ GLOSSARY.md entries were cut to plain definitions. The scope decisions and ratio
 
 - Lives on /industry's Records tab (peer of Build Plans, not a separate route). Per-run table names no Build Plan since a run outlives its plan; clicking a row jumps to the plan only if it still exists. Same "Sold" split button as per-plan panel (Link Past Sale / Watch Open Order / Manual Sale, Delete production run); that is Records' only delete since rows navigate. From/To date-range filter.
 
-# chunk3 dropped scope decisions / rationale
+## Dropped from the last third of the glossary
 
 - **Production Run**: Deleting the Build Plan a run was logged under does not delete the run (the accounting record must outlive the plan, so a blueprint price drift or ME/TE change can never retroactively change booked profit). Deliberately correct-by-construction, not reconstructed from ESI wallet history (automated FIFO matching was rejected; see decisions folder). Each linked sale / watched order is its own synced record, never a field on the run, so two devices linking different sales to one run never collide.
 - **Run Loss**: Reached from the Sold... menu's "Mark as lost...". Insurance payout is either a wallet-journal payout or typed ISK.
@@ -347,3 +347,8 @@ GLOSSARY.md entries were cut to plain definitions. The scope decisions and ratio
 - **Variations**: Sortable table beside Order Book and Price History with Name, Tier, Sell, Buy and a signed "vs item" sell delta.
 - **What We Store**: Registry is REMOTE_COLLECTIONS; each declaration names the line that mentions it, so a newly synced collection fails the suite until the copy covers it. A section a reader can catch overclaiming is worth less than none. Deep link /settings#faq.
 - **What-If Implants**: Per-attribute (not matched-set-only) design added in round 28; stored on the Skill Plan and synced in round 33.
+
+### Charge Picker
+
+- **Fighting at** turns every figure into what lands at one target distance. Quick picks: most damage, longest reach, best value (cheapest per minute within 10% of the most damage). Surfaces: the Add panel's Charges tab and the "Change charge" menu (Ring tile, List row, Offense row). Charges group by type or faction, or plot range against damage.
+- Cap boosters rate charges by capacitor (stable level or time to empty, GJ/s over reloads, boosts per load, ISK per GJ). Mining lasers explain crystals Type A/B/C per ore family instead of ranking them.

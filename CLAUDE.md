@@ -12,7 +12,7 @@ dev`) — Shawn frequently has another agent working there at the same
   commands that must target the main repo, use `git -C <main-repo-path>
 ...` rather than `cd`, so the other agent's working tree isn't disturbed.
 - Architecture map: docs/ARCHITECTURE.md — read before locating or adding features.
-- Read `GLOSSARY.md` first: the glossary. Use its terms exactly.
+- `GLOSSARY.md` is the glossary. Use its terms exactly. Don't read it whole: `grep -n -i "<term>" GLOSSARY.md` for the terms in your task.
 - **Never append a scope decision to `GLOSSARY.md`.** Scope decisions live one
   per file in `docs/context/decisions/`, named `YYYYMMDD-HHMMSS-<slug>.md`.
   Create one with `node scripts/new-decision.mjs "<title>" [--issue <n>]`.
@@ -53,7 +53,7 @@ dev`) — Shawn frequently has another agent working there at the same
   when unrelated. Reproduce with `npx vitest run <path>` and fix it in the same PR.
 - **Tests stay under 10 seconds each.** Make a slow test faster; never raise
   `testTimeout` or add a per-test timeout.
-- Full detail and rationale for the four rules above: `docs/agents/testing-and-ci.md`.
+- Full detail and rationale for the rules above: `docs/agents/testing-and-ci.md`.
 - i18n: all UI strings through i18next (`src/i18n/locales/en.json`). English only for now.
 
 ## Agent skills

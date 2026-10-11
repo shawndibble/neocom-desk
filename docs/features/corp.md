@@ -2,7 +2,7 @@
 
 Corporation section. Four routes under one nav entry (`src/app/navDestinations.ts:133`, `gating: 'corp'`: hidden, never locked). Sub-nav is real routes (`src/features/corp/CorpSubNav.tsx`), each tab shown only if its Corp Capability is held. All four routes `UNGATED` in `src/app/routeScopes.ts:141-165` (the page gate is `useCorpRouteGate`, not a scope gate, so a non-Director is not offered a pointless re-login). `/corp` is not allowed in the phone tab bar (`mobileTab` false; nav hides rather than locks).
 
-Terms per `GLOSSARY.md`: Corp Access, Corp Capability, Corp Role, Corp Board Item, Kind Card, Deadline Strip, Board Severity, Permission, Core Grant. (CONTEXT's Corp Capability entry lists four capabilities; code has seven, see gaps.)
+Terms per `GLOSSARY.md`: Corp Access, Corp Capability, Corp Role, Corp Board Item, Kind Card, Deadline Strip, Board Severity, Permission, Core Grant. (GLOSSARY's Corp Capability entry lists four capabilities; code has seven, see gaps.)
 
 | View     | Route                            | Component                    | Gate                                 | One-liner                                                                                |
 | -------- | -------------------------------- | ---------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------- |
