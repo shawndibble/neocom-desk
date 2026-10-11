@@ -3905,8 +3905,6 @@
       "emptyHint": "This widget has no data for this Character.",
       "remove": "Remove widget",
       "new": "New",
-      "scopeAll": "All characters",
-      "headerCharacterNote": "Shows the header Character only.",
       "openPage": "Open {{title}} page",
       "settingsFor": "Settings for {{title}}",
       "moreRows_one": "+{{count}} more",

@@ -129,13 +129,6 @@ export function kindSumsAcrossCharacters(kind: string): boolean {
   return SUMS_ACROSS.has(kind);
 }
 
-/** Account-wide whatever the scope: their reads never narrow to one Character, so no scope chip applies. */
-const ACCOUNT_WIDE = new Set(['miningTax', 'stock', 'priceWatch', 'incursions']);
-
-export function kindIsAccountWide(kind: string): boolean {
-  return ACCOUNT_WIDE.has(kind);
-}
-
 // --- Helpers ----------------------------------------------------------------
 
 function statusOf(
@@ -154,7 +147,7 @@ function statusOf(
 const NEUTRAL_NUMBER: NumberModel = { value: UNKNOWN, tone: 'clear' };
 
 /** A view with nothing in it yet; every builder starts from this and fills what it has. */
-function blank(to: string, status: WidgetStateInput): KindView {
+function blank(to: string | null, status: WidgetStateInput): KindView {
   return {
     status,
     fetchedAt: null,
@@ -835,8 +828,15 @@ const stock: Builder = (feeds, { t }) => {
   if (!data) return blank(to, statusOf(feed));
   const board = data.board;
   if (board === null) return blank(to, statusOf(feed, { isEmpty: true }));
-  // Counts need the orders list; until it is cached they are unknown, not zero.
-  if (!board.counted) return blank(to, statusOf(feed, { hasData: false, loading: true }));
+  // Counts need the cached orders list. Until it is there they are unknown, not zero, and
+  // that is a settled answer (the loader fills the cache first), never a spinner that could stick.
+  if (!board.counted) {
+    return {
+      ...blank(to, statusOf(feed)),
+      number: { value: UNKNOWN, note: t('overview.board.stockNotCounted'), tone: 'clear' },
+      summary: stockBoardSummary(t, board),
+    };
+  }
   const needing = board.markets.filter(
     (market) => market.summary.out > 0 || market.summary.low > 0
   );
@@ -964,7 +964,7 @@ const BUILDERS: Readonly<Record<string, Builder>> = {
  */
 function placeholder(kind: string): KindView {
   return {
-    ...blank('/overview', {
+    ...blank(null, {
       loading: false,
       needsPermission: false,
       error: false,

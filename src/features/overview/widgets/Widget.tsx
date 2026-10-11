@@ -14,6 +14,9 @@
  */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   Button,
   IconButton,
@@ -145,6 +148,22 @@ function ListBody({ view, size }: { view: KindView; size: WidgetModel['size'] })
   );
 }
 
+/** The fixed scope readout (DESIGN §6c): this widget reads every Character on the device. */
+function AllCharactersReadout() {
+  const total = useLiveQuery(() => db.characters.count(), []);
+  if (!total) return null;
+  return <CharacterScopeReadout scope="all" total={total} />;
+}
+
+/** The same readout in its "Name only" form: All was asked for, but this kind reads one Character. */
+function HeaderCharacterReadout({ characterId }: { characterId: number }) {
+  const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
+  if (!character) return null;
+  return (
+    <CharacterScopeReadout scope="one" characterId={characterId} characterName={character.name} />
+  );
+}
+
 function Skeleton() {
   const { t } = useTranslation();
   const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
@@ -265,22 +284,20 @@ export function Widget({
             {t('overview.widgets.new')}
           </span>
         )}
-        {scope.chip && (
-          <span className="rounded-xs border border-line px-1 text-[0.625rem] whitespace-nowrap text-text-dim">
-            {t('overview.widgets.scopeAll')}
-          </span>
-        )}
+        {scope.chip && <AllCharactersReadout />}
         <span className="flex-1" />
-        <Link
-          to={view.to}
-          aria-label={t('overview.widgets.openPage', { title })}
-          className={entityLinkClassName(
-            'flex min-h-11 items-center gap-0.5 text-xs font-semibold whitespace-nowrap md:min-h-0'
-          )}
-        >
-          {t('overview.board.open')}
-          <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        </Link>
+        {view.to !== null && (
+          <Link
+            to={view.to}
+            aria-label={t('overview.widgets.openPage', { title })}
+            className={entityLinkClassName(
+              'flex min-h-11 items-center gap-0.5 text-xs font-semibold whitespace-nowrap md:min-h-0'
+            )}
+          >
+            {t('overview.board.open')}
+            <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          </Link>
+        )}
         <IconButton
           size="sm"
           variant="plain"
@@ -291,10 +308,10 @@ export function Widget({
         />
       </div>
       <div className="flex-1">{body}</div>
-      {scope.fallbackNote && state === 'ok' && (
-        <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
-          {t('overview.widgets.headerCharacterNote')}
-        </p>
+      {scope.fallbackNote && state === 'ok' && characterId !== null && (
+        <div className="border-t border-line px-3 py-1.5">
+          <HeaderCharacterReadout characterId={characterId} />
+        </div>
       )}
     </section>
   );

@@ -26,6 +26,8 @@ import {
 } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
 import { Button, Spinner } from '@/components/ui';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
@@ -86,7 +88,11 @@ interface BoardProps {
 function Board({ characterId, layout, showNew, onLayoutChange }: BoardProps) {
   const store = useFeedStore();
   const feeds = useSyncExternalStore(store.subscribe, store.get);
-  const headerAll = useOverviewScopeAll((state) => state.value);
+  const scopeAll = useOverviewScopeAll((state) => state.value);
+  // The switcher is not drawn for a lone Character, so All characters must not stay on
+  // (with notes the pilot cannot clear) after an alt is removed.
+  const characterCount = useLiveQuery(() => db.characters.count(), []);
+  const headerAll = scopeAll && (characterCount ?? 0) >= 2;
   const { editing } = useOverviewEdit();
 
   const skills = feeds.skills?.data ?? null;
@@ -185,7 +191,11 @@ export function Overview() {
   if (layout === null) {
     return (
       <div className="mx-auto max-w-6xl space-y-4">
-        <CharacterHeader characterId={activeCharacterId} totalSp={null} unallocatedSp={null} />
+        <CharacterHeader
+          characterId={activeCharacterId}
+          totalSp={getLastKnownSpSummary(activeCharacterId).totalSp}
+          unallocatedSp={getLastKnownSpSummary(activeCharacterId).unallocatedSp}
+        />
         <OverviewSubNav />
         <FirstRun onBasics={() => onLayoutChange(basicsLayout(makeWidgetId))} />
       </div>

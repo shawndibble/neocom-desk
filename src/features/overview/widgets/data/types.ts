@@ -68,8 +68,8 @@ export interface KindView {
   deadlines: BoardDeadline[];
   /** One plain line, for the widget's accessible description. */
   summary: string;
-  /** Where the widget's Open link goes. */
-  to: string;
+  /** Where the widget's Open link goes; null for a kind with no page of its own yet. */
+  to: string | null;
   /** Overrides the kind's own empty message, when the reason is not "nothing there". */
   emptyMessage?: string;
 }

@@ -76,5 +76,18 @@ export function loadOrdersBoard(characterId: number, signal: RouteSnapshotSignal
   );
 }
 
-/** Stock Lists are account-wide: the widget reads the same lists for every Character. */
-export const loadStockBoardFor = async () => ({ board: await loadStockBoard() });
+/**
+ * Stock Lists are account-wide: the widget reads the same lists for every Character.
+ *
+ * The counts read the cached open-orders lists, which the Orders read fills. The old
+ * board always ran that read; a layout with Market stock but no Open orders widget
+ * must not leave the counts unknown for ever, so fill the cache first (a cached,
+ * shared read, so the Orders widget's own load costs nothing extra). A failure here
+ * only leaves the counts unknown, which the widget says.
+ */
+export const loadStockBoardFor = async () => {
+  await import('@/features/market/openOrdersData')
+    .then((m) => m.loadAllCharactersOpenOrders())
+    .catch(() => undefined);
+  return { board: await loadStockBoard() };
+};

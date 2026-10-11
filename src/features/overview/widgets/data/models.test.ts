@@ -220,11 +220,20 @@ describe('stock', () => {
     expect(stateOf(buildView('stock', feeds, ctx()))).toBe('empty');
   });
 
-  it('keeps loading while the orders it counts against are unread', () => {
+  it('says the counts are unknown, as a settled answer and never a spinner, without cached orders', () => {
     const feeds: Feeds = {
       stock: ok({ board: { markets: [], totals: { out: 0, low: 0 }, counted: false } }),
     };
-    expect(stateOf(buildView('stock', feeds, ctx()))).toBe('loading');
+    const view = buildView('stock', feeds, ctx());
+    expect(stateOf(view)).toBe('ok');
+    expect(view.status.loading).toBe(false);
+    expect(view.number.value).toBe('—');
+    expect(view.number.note).toBe('overview.board.stockNotCounted');
+    expect(view.rows).toEqual([]);
+  });
+
+  it('gives a kind with no page of its own no Open link target', () => {
+    expect(buildView('netWorth', {}, ctx()).to).toBeNull();
   });
 
   it('counts out and low, listing the markets that need restocking', () => {

@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { createFeedStore, type FeedStore } from './data/feedStore';
 import { FeedStoreContext } from './data/feedStoreContext';
@@ -192,9 +193,19 @@ describe('Widget header', () => {
     expect(screen.queryByText('New')).not.toBeInTheDocument();
   });
 
-  it('shows an All characters chip when the widget itself reads everyone', () => {
+  it('says All characters, with the count, when the widget itself reads everyone', async () => {
+    await db.characters.clear();
+    await db.characters.bulkPut([
+      { characterId: 1, name: 'One', ownerHash: 'a', addedAt: 1 },
+      { characterId: 2, name: 'Two', ownerHash: 'b', addedAt: 2 },
+    ]);
     renderWidget(model({ kind: 'priceWatch', scope: 'all' }), ready);
-    expect(screen.getByText('All characters')).toBeInTheDocument();
+    expect(await screen.findByText('All characters · 2')).toBeInTheDocument();
+  });
+
+  it('has no Open link for a kind with no page of its own yet', () => {
+    renderWidget(model({ kind: 'netWorth' }), () => undefined);
+    expect(screen.queryByRole('link', { name: /open net worth page/i })).not.toBeInTheDocument();
   });
 
   it('uses the widget own name when it has one', () => {

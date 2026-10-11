@@ -370,7 +370,7 @@ describe('Overview widget grid', () => {
     await waitFor(() => expect(useOverviewScopeAll.getState().value).toBe(true));
     // The wallet cannot sum, so it says it is still one Character's.
     const wallet = await widgetCard('Wallet');
-    expect(await within(wallet).findByText('Shows the header Character only.')).toBeInTheDocument();
+    expect(await within(wallet).findByText('Pilot One only')).toBeInTheDocument();
   });
 });
 
