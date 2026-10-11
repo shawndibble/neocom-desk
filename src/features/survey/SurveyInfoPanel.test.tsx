@@ -171,11 +171,53 @@ describe('SurveyInfoReadout', () => {
     expect(link.getAttribute('target')).toBe('_blank');
     expect(container.querySelectorAll('a')).toHaveLength(1);
     expect(container.querySelector('b')).toBeNull();
-    expect(container.querySelector('h1')).toBeNull();
     expect(container.querySelector('br')).not.toBeNull();
     expect(container.textContent).toContain('<b>not bold</b>');
     expect(container.textContent).toContain('bad');
     expect(container.textContent).toContain('Heading');
+  });
+
+  it('renders headings and horizontal rules, keeping every heading below the panel title', async () => {
+    const { container } = render(
+      <SurveyInfoReadout
+        info={{
+          location: null,
+          notes: '# One\n\n## Two\n\n### Three\n\n---\n\nafter <h1>raw</h1>',
+        }}
+        tax={null}
+      />
+    );
+    expect(await screen.findByRole('heading', { name: 'One' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Two' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Three' })).toBeTruthy();
+    expect(container.querySelector('h1')).toBeNull();
+    expect(container.querySelectorAll('h2')).toHaveLength(1);
+    expect(container.querySelector('hr')).not.toBeNull();
+    expect(screen.queryByRole('heading', { name: 'raw' })).toBeNull();
+    expect(container.textContent).toContain('<h1>raw</h1>');
+  });
+
+  it('renders the rest of a Markdown cheatsheet: strikethrough, tables, quotes, code blocks, task lists, bare links', async () => {
+    const notes = [
+      '~~old~~ and **new**',
+      '> quoted',
+      '```\nblock\n```',
+      '| Ore | Qty |\n|---|---|\n| Veldspar | 5 |',
+      '- [x] done\n- [ ] todo',
+      'see https://example.com/x now',
+      '![pic](https://example.com/p.png)',
+    ].join('\n\n');
+    const { container } = render(<SurveyInfoReadout info={{ location: null, notes }} tax={null} />);
+    expect((await screen.findByText('old')).tagName).toBe('DEL');
+    expect(container.querySelector('blockquote')).not.toBeNull();
+    expect(container.querySelector('pre')).not.toBeNull();
+    expect(container.querySelectorAll('table th')).toHaveLength(2);
+    expect(screen.getByRole('cell', { name: 'Veldspar' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Done' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Not done' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /example\.com\/x/ })).toBeTruthy();
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.textContent).toContain('pic');
   });
 
   it('shows only the rows that were set', () => {
