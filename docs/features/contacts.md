@@ -44,6 +44,7 @@ Code: `src/routes/Contacts.tsx`, `src/routes/contactsColumns.ts`, `src/features/
   - `web: contacts table with avatar, name, organisation and a status tag column, with a search field and filter chips with counts above`
   - `web: table where each row lists the values several accounts hold for the same contact, with a filter showing only rows that differ`
   - `ios: contact list stacked as cards with avatar, name, organisation and a coloured status icon`
+- **Flow queries:** none.
 - **Mobbin won't help with:** EVE standing tiers and colours, NPC standings' effect on fees.
 
 ## Routing and view selection

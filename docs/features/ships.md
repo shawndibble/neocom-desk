@@ -37,6 +37,7 @@ All paths under `src/features/fittings/` unless stated.
   - `web: zoomable pan canvas of connected nodes with a search box that centres and opens the matching node`
   - `web: item detail window with tabs for description, requirements and progress, and a primary add-to-plan button`
   - `ios: achievement list showing earned and locked tiers with a progress bar per item`
+- **Flow queries:** none.
 - **Mobbin won't help with:** the ISIS tree shape, Mastery ladders, faction grid; reference the in-game ISIS window.
 
 ## 1. Routes, URLs, gating

@@ -55,7 +55,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
   - `/wallet/transactions` → `/market/history/transactions` (`Wallet.tsx:522`).
   - Unknown tab segment → default tab `balance` via `TabRoute`.
 - Tab state is a path segment (ADR 0015); `usePageTab(WALLET_TABS)`.
-- Palette: Command Palette matches `Wallet › LP Store` via search keys (`navDestinations.ts:101` comment). LP Store itself is a Market sub-view (`/market/lp-store`, `navDestinations.ts:193`).
+- Palette: Command Palette matches `Wallet › LP Store` via search keys (`navDestinations.ts:101` comment). LP Store itself is a Wallet tab (`/wallet/lp-store`, `WALLET_TABS` in `src/app/pageTabs.ts`; `20261010-200446`, #3527); it was a Market sub-view until then.
 
 ## Data sources and scopes
 
@@ -122,7 +122,7 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 ### Loyalty Points panel
 
 - Header actions: `LpStorePicker` (size sm, always shown, even with no LP: entry to any corp's store, issue #2321) and `TableActionsMenu` (surface `loyalty-points`; only when there are non-Paragon rows).
-- Table columns: Corporation (accent link to `/market/lp-store/<corpId>`, sortable by name), Loyalty Points (right, bold, sortable, default sort desc), caret column. Whole row click navigates to the store. No row menu, no More-actions button (per `Wallet.test.tsx:168`; DESIGN §6c).
+- Table columns: Corporation (accent link to `/wallet/lp-store/<corpId>`, `Wallet.tsx:391`, sortable by name), Loyalty Points (right, bold, sortable, default sort desc), caret column. Whole row click navigates to the store. No row menu, no More-actions button (per `Wallet.test.tsx:168`; DESIGN §6c).
 - Sort in URL (`loyalty.sort`).
 - States: `loyaltyNeedsReauth` → `GrantBanner` (`getCharacterLoyaltyPoints`); no data / only EverMarks → `CachedEmptyState` "No loyalty points …".
 - CSV columns: Corporation (name or `#id`), Loyalty Points.
@@ -131,7 +131,7 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 ### LP Store picker (`features/loyalty/LpStorePicker.tsx`)
 
 - Select-style button; opens a dialog popover with search field pinned above a list of every NPC corp that runs an LP Store (`loadLpCorporations`, SDE). Corps the active Character holds LP with are pinned first with their balance (`lpStorePickerOptions`).
-- Keyboard: focus moves to search input on open; Arrow/Home/End move highlight (`aria-activedescendant`); Enter or click opens `/market/lp-store/:corporationId`; Escape closes and returns focus to trigger. Hand-built ARIA.
+- Keyboard: focus moves to search input on open; Arrow/Home/End move highlight (`aria-activedescendant`); Enter or click opens `/wallet/lp-store/:corporationId`; Escape closes and returns focus to trigger. Hand-built ARIA.
 - Reads cached LP via `loadCharacterLoyaltyPoints`.
 
 ## Proving a payment to someone else (e.g. a corp)
@@ -192,7 +192,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
 - Personal transactions live on Market › History › Transactions (`/market/history/transactions`).
 - Corp wallet `/corp/wallet` (`routes/CorpWallet.tsx`, `features/corp/wallet.ts`): per-division balances/journal/transactions; reuses `JournalTable` and the same column setting. Gated by `canReadWallet` capability. Decision `20260929-131220-corp-wallet-moves-to-the-corp-section`.
-- LP Store pages `/market/lp-store[/:corporationId]` (`routes/LoyaltyStore.tsx`): offers ranked by ISK/LP. Decision `20261002-145653`.
+- LP Store pages `/wallet/lp-store[/:corporationId]` (`routes/LoyaltyStore.tsx`): offers ranked by ISK/LP. A Wallet tab since `20261010-200446` (#3527), which replaced the Market placement of `20261002-145653`.
 - Notification event `walletBalanceChanged` (feed-only default, scope `getCharacterWallet`, `features/notifications/events.ts:191`).
 - Moon Mining Tax payment linking (`features/miningTax/LinkWalletPaymentDialog.tsx`) reads wallet journal.
 
@@ -225,7 +225,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - Wallet alerts key on the journal entry id so the deep link can pulse one row: `docs/context/decisions/20260905-195857-wallet-alerts-key-on-the-journal-entry-not.md`.
 - Corp wallet left Wallet for the Corp section: `20260929-131220-corp-wallet-moves-to-the-corp-section.md`.
 - Personal fills moved to Market › History: `20261001-113143-date-market-order-fills-from-wallet-transactions.md` (reads transactions) and `routes/Wallet.tsx` comments.
-- LP Store lives under Market, balances stay on Wallet: `20261002-145653-lp-store-under-market-pilot-lookup-its-own.md`; picker shape `20260930-144709-select-box-lp-store-picker.md` (still applies to this card; the Market page dropped its picker in `20261009-163837-lp-store-switches-stores-through-its-search-not.md`); loyalty scope gate `20260929-224008-lp-store-browsing-keeps-the-loyalty-scope-gate.md`.
+- LP Store is a Wallet tab beside the balances it spends: `20261010-200446-lp-store-moves-from-market-to-wallet.md` (it replaced the Market placement of `20261002-145653-lp-store-under-market-pilot-lookup-its-own.md`); picker shape `20260930-144709-select-box-lp-store-picker.md` (still applies to this card; the Market page dropped its picker in `20261009-163837-lp-store-switches-stores-through-its-search-not.md`); loyalty scope gate `20260929-224008-lp-store-browsing-keeps-the-loyalty-scope-gate.md`.
 - Character filter sits in the panel header and shrinks to This/All: `20260908-192806-the-character-filter-rides-in-the-panel-header.md`.
 - Route ungated, panel-gated: `src/app/routeScopes.ts:120-123`.
 
@@ -270,21 +270,21 @@ Default Balance; EverMarks + other LP table; LP row link + caret, no row menu; p
 
 ## LP Store: wallet-side hooks (page spec lives in `docs/features/market.md` section 5)
 
-The LP Store page `/market/lp-store[/:corporationId]` (`src/routes/LoyaltyStore.tsx:427`) is Market's, documented in full in `market.md` (offers ranked by ISK/LP, hub and price basis, affordable-only default on, offer detail, LP Value setting, fee-netting profit formula `profit = revenue − salesTax − brokerFee − iskCost − requiredItemsCost − buildCost`). Only the Wallet side is specified here:
+The LP Store page `/wallet/lp-store[/:corporationId]` (`src/routes/LoyaltyStore.tsx`) is a Wallet tab since `20261010-200446` (#3527), but is still documented in full in `market.md` (offers ranked by ISK/LP, hub and price basis, affordable-only default on, offer detail, LP Value setting, fee-netting profit formula `profit = revenue − salesTax − brokerFee − iskCost − requiredItemsCost − buildCost`). Only the Wallet side is specified here:
 
 | Hook                | Code                                                                | Behaviour                                                                                                                                                                                                                                                                                  |
 | ------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| LP table row / name | `Wallet.tsx:330-336`, `:753`                                        | name is accent `Link` to `/market/lp-store/<corporation_id>`; row click does the same; caret closes the row (DESIGN §6c). Show info for the corp is on the store page header, not here                                                                                                     |
+| LP table row / name | `Wallet.tsx:330-336`, `:753`                                        | name is accent `Link` to `/wallet/lp-store/<corporation_id>`; row click does the same; caret closes the row (DESIGN §6c). Show info for the corp is on the store page header, not here                                                                                                     |
 | LP Store picker     | `Wallet.tsx:717` → `LpStorePicker.tsx:51`                           | `corporationName={null}`, size sm, width `w-44`, always rendered, even with 0 LP (issue #2321)                                                                                                                                                                                             |
 | Picker option order | `lpStorePickerOptions.ts`                                           | corps with `loyalty_points > 0` first, highest balance first with the balance shown; rest alphabetical; a typed query uses `rankedSearch` over all corps but held corps stay pinned above; only corps in `lpCorporations.json` appear (Paragon/EverMarks has no store so is never offered) |
 | Picker data         | `LpStorePicker.tsx`                                                 | `loadLpCorporations` (SDE) and `loadCharacterLoyaltyPoints`; failures are swallowed (list stays empty) per `market.md` gaps                                                                                                                                                                |
 | Scope gate          | `routeScopes.ts` (LP store entries ~37-41, 262-263 per `market.md`) | store pages need `esi-characters.read_loyalty.v1` even to browse a store with 0 LP (decision `20260929-224008`); Wallet itself stays ungated and shows a grant banner in the LP panel                                                                                                      |
-| Legacy URLs         | `src/app/legacyPaths.ts`, `App.tsx`                                 | `/wallet/loyalty[/:id]` redirects to `/market/lp-store[/:id]`                                                                                                                                                                                                                              |
-| Command Palette     | `navDestinations.ts:101,193`                                        | "Loyalty points" alias finds the LP Store sub-view                                                                                                                                                                                                                                         |
+| Legacy URLs         | `src/app/legacyPaths.ts`, `App.tsx`                                 | `/wallet/loyalty[/:id]` and `/market/lp-store[/:id]` redirect to `/wallet/lp-store[/:id]`                                                                                                                                                                                                  |
+| Command Palette     | `navDestinations.ts:96`                                             | "Loyalty points" alias finds Wallet › LP Store                                                                                                                                                                                                                                             |
 | Reuse elsewhere     | `features/loyalty/LpStoreLink.tsx:22`                               | icon link used by Appraisal's LP column and Blueprint Acquisition                                                                                                                                                                                                                          |
 | Cached LP for hints | `loyalty.ts:readCachedLoyaltyBalances`                              | palette's LP Stores group reads the cache; empty until the Wallet loyalty view has loaded once                                                                                                                                                                                             |
 
-Interview Qs (LP, wallet side): **Why does Wallet show LP at all if the store moved to Market?** Balances are the character's wallet-like data; shopping is a market errand (`20261002-145653`). **Why is EverMarks not in the LP table?** It is split out into the balance box and has no store. `loyalty.ts:36-43`, `lpStorePickerOptions.ts` header. **What if the loyalty scope was never granted?** Wallet LP panel shows `GrantBanner`; the picker still opens stores but the store page's route gate asks for the grant.
+Interview Qs (LP, wallet side): **Why are LP balances and the LP Store both on Wallet?** The balances live on Balance and the store is where they are spent, so the two sit on one page (`20261010-200446`, which reversed the Market placement of `20261002-145653`). **Why is EverMarks not in the LP table?** It is split out into the balance box and has no store. `loyalty.ts:36-43`, `lpStorePickerOptions.ts` header. **What if the loyalty scope was never granted?** Wallet LP panel shows `GrantBanner`; the picker still opens stores but the store page's route gate asks for the grant.
 
 ## Corp wallet: the shared surface (`/corp/wallet`, full spec in `docs/features/corp.md` section 3)
 

@@ -21,7 +21,7 @@ Related elsewhere: Settings -> Corporation (dark threshold) and Settings -> Perm
 - **Device and cadence:** likely desk-first (unconfirmed). `/corp` is `mobileTab: false` and kept out of the phone rotation (`20260913-095527`), reachable from More. The `structureFuelLow` alert lands on `/corp`; member and wallet-threshold alerts land on Members and Wallet (`notificationOptions.ts`). ESI caches corp data about an hour, so short timers belong to notifications (`20260903-155950`).
 - **Above the fold:** Standing figures (Due soon, Runway, Net over 30 days), then the Deadline Strip, then Kind Cards (Fuel, Timers, Moons, Jobs) with critical rows first (`20260907-101244`, `20261010-162048`).
 - **Not for:** live short timers (notifications); corp industry jobs (Industry Jobs panel, `20260929-102524`); corp contracts (no view exists).
-- **Sources:** `20260903-155950`, `20260907-101244`, `20260903-224842`, `20261010-162048`, `20260903-164718`, `20260929-131220`, `20260913-095527`, `20260903-121925`; #2857, #3123, #3142.
+- **Sources:** `20260903-155950`, `20260907-101244`, `20260903-224842-people-beside-money-on-the-corp-overview`, `20261010-162048`, `20260903-164718`, `20260929-131220`, `20260913-095527`, `20260903-121925`; #2857, #3123, #3142.
 - **Unconfirmed:** desk-first use (the phone-bar exclusion is structural: a hidden route would leave a hole in the bar); that fuel/timers outrank money for most role holders; how often a manager opens it (daily vs on alert); whether Station Managers (no wallet role) need a different top.
 
 ### Mobbin brief

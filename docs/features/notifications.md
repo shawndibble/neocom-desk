@@ -32,14 +32,14 @@ Code: `src/routes/Alerts.tsx`; `src/features/notifications/*` (see below); `src/
 
 ## Purpose and user goal
 
-"Tell me when something in game needs me, even when the app is closed." This doc owns being told: which Notification Events fire, for which Character, through which channel (device pop-up or the in-app Alerts list), and which can reach a closed app via Scheduled Push (ADR 0010; ADR 0009). Its sibling `alerts.md` owns the record of what already fired. Every Character is polled, not only the active one (`20260901-181135`).
+"Tell me when something in game needs me, even when the app is closed." This doc owns being told: which Notification Events fire, for which Character, through which channel (device pop-up or the in-app Alerts list), and which can reach a closed app via Scheduled Push (ADR 0010; ADR 0009). Its sibling `alerts.md` owns the record of what already fired. Every Character is polled, not only the active one (`src/features/notifications/foregroundPoller.ts:268`, "One poll across every character"; `src/routes/Alerts.tsx:11`).
 
 - **Top jobs (ranked):** 1. "Will I be told before my queue, job, extractor or courier runs out, for every Character?" (per-event, per-Character, per-channel toggles and thresholds). 2. "Turn on notifications on this device" (permission prompt, Enable, iOS install-to-home-screen notice). 3. "Why didn't this alert me?" (rows needing a Permission or corp role show why, with Grant, #1525; push-badged events, #2952).
 - **Device and cadence:** both. Phone is the delivery target for push: iOS needs the installed app, Android has the Play Store app, and the Install Prompt is phone-only (`20261002-165619`). Settings are set once and revisited rarely (inferred).
 - **Above the fold (Settings › Notifications):** permission state with Enable, the master switch and the two channel gates, search, then the active Character's section (open by default).
-- **Not for:** reading, dismissing or muting what already fired (`/alerts`, `alerts.md`); instant combat alerts with the app closed (only events whose time is known ahead are pushed, ADR 0010).
+- **Not for:** reading, dismissing or muting what already fired (`/alerts`, `alerts.md`); instant combat alerts with the app closed (only events whose time is known ahead are pushed, ADR 0010); quiet hours or a push digest (#2871, dropped: closed as not planned).
 - **Sources:** ADR 0009, ADR 0010; decisions `20260901-181135`, `20260925-112832`, `20260907-114310`; #1525, #2952, #2844, #2871.
-- **Unconfirmed:** that pilots mainly want the phone buzz rather than the in-app list; set-once cadence; whether quiet hours (#2871, closed) shipped or were dropped.
+- **Unconfirmed:** that pilots mainly want the phone buzz rather than the in-app list; set-once cadence.
 
 ### Mobbin brief
 

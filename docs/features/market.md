@@ -1,6 +1,6 @@
-# Market, LP Store, Contract search: feature inventory
+# Market, Hauling, LP Store, Contract search: feature inventory
 
-Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, Appraisal, Hauling), `/market/lp-store`, and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `CONTEXT.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
+Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, Appraisal), Hauling (now the Travel tab `/travel/hauling`, `20261010-193521`, #3526), LP Store (now the Wallet tab `/wallet/lp-store`, `20261010-200446`, #3527), and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `CONTEXT.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
 
 ## Summary table
 
@@ -15,8 +15,9 @@ Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, 
 | History (orders)     | `/market/history`                                                                    | Expired/cancelled orders                                                                    |
 | Transactions         | `/market/history/transactions`                                                       | Wallet fills with realized margin; reached via History view select (not its own tab button) |
 | Appraisal            | `/market/appraisal`                                                                  | Paste list, price at hub, net/refine/LP, Compare Hubs, share link                           |
-| Hauling              | `/market/hauling`                                                                    | Hub price-gap scan, Trip Plan, Multibuy                                                     |
-| LP Store             | `/market/lp-store[/:corporationId]`                                                  | Market sub-view (nav), own route; ISK/LP ranking                                            |
+| Stock                | `/market/stock[/<list id>]`                                                          | Stock Lists: per-market targets vs listed and in-hangar counts (section 4b)                 |
+| Hauling              | `/travel/hauling` (Travel tab; `/market/hauling` redirects)                          | Hub price-gap scan, Trip Plan, Multibuy; moved to Travel (`20261010-193521`, #3526)         |
+| LP Store             | `/wallet/lp-store[/:corporationId]` (Wallet tab; `/market/lp-store` redirects)       | Own route that draws Wallet's tab bar; ISK/LP ranking (`20261010-200446`, #3527)            |
 | Contract Item search | `/contracts/search/items`                                                            | Public contract lines from shared Firestore snapshot                                        |
 | Courier search       | `/contracts/search/courier`                                                          | Public courier contracts ranked ISK/jump                                                    |
 | Page paste           | `src/app/GlobalPasteRouter.tsx`                                                      | Ctrl/Cmd+V routes EFT fit to Fittings or item list to Appraisal                             |
@@ -46,10 +47,10 @@ Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, 
 
 ## 1. Route, nav, scopes
 
-- Nav: `/market` is an Economy destination, `gating: 'scope'`, `mobileTab: true`, with sub-view `/market/lp-store` (`src/app/navDestinations.ts:185-195`). LP Store lives under Market (decision `20261002-145653-lp-store-under-market-pilot-lookup-its-own`); balances stay on Wallet. `/contracts` is a separate Economy destination (`navDestinations.ts:207`).
-- Tabs rendered in the tab bar: Browser, Open orders, History, Appraisal, Hauling (`Market.tsx:859-865`). `history/transactions` is a sixth `MARKET_TABS` entry (tab id containing `/`) reached only via `HistoryViewSelect` inside History (`pageTabs.ts:115-125`). Re-clicking History while inside it keeps the chosen view (`Market.tsx:855`).
-- Legacy: `/wallet/transactions` -> `/market/history/transactions`; `/wallet/loyalty[/:id]` -> `/market/lp-store[/:id]` (`LegacyPathRedirect`, `src/app/legacyPaths.ts`, `App.tsx:181`); `/orders` retired into Market (note in `routeScopes.ts:52`).
-- Scopes (`src/app/routeScopes.ts`): `/market` UNGATED (`:57`); Open orders/History need `esi-markets.read_character_orders.v1`, Transactions `esi-wallet.read_character_wallet.v1`, each as a panel-level `GrantBanner`; Browser, Appraisal, Hauling need none. `/market/lp-store*` gated on `getCharacterLoyaltyPoints` (`:40,262-263`). `/contracts` UNGATED (`:230`), History tab gates `getCharacterContracts` per tab; search tabs need no scope.
+- Nav: `/market` is an Economy destination, `gating: 'scope'`, `mobileTab: true` (`src/app/navDestinations.ts`). LP Store is no longer under Market: it is a Wallet tab, `/wallet/lp-store` (`WALLET_TABS`, `20261010-200446-lp-store-moves-from-market-to-wallet`, #3527), and Hauling is a Travel tab, `/travel/hauling` (`TRAVEL_TABS`, `20261010-193521-hauling-moves-from-market-to-travel`, #3526). `/contracts` is a separate Economy destination (`navDestinations.ts:207`).
+- Tabs rendered in the tab bar: Browser, Open orders, Stock, History, Appraisal (`MARKET_TABS`, `src/app/pageTabs.ts`). `history/transactions` is a sixth `MARKET_TABS` entry (tab id containing `/`) reached only via `HistoryViewSelect` inside History (`pageTabs.ts:115-125`). Re-clicking History while inside it keeps the chosen view (`Market.tsx:855`).
+- Legacy: `/wallet/transactions` -> `/market/history/transactions`; `/wallet/loyalty[/:id]` -> `/wallet/lp-store[/:id]` (`src/app/legacyPaths.ts`); `/market/lp-store[/:id]` -> `/wallet/lp-store[/:id]` and `/market/hauling` -> `/travel/hauling` (`PAGE_LEGACY_LOCATIONS`, `src/app/pageTabs.ts`); `/orders` retired into Market (note in `routeScopes.ts:52`).
+- Scopes (`src/app/routeScopes.ts`): `/market` UNGATED (`:57`); Open orders/History need `esi-markets.read_character_orders.v1`, Transactions `esi-wallet.read_character_wallet.v1`, each as a panel-level `GrantBanner`; Browser and Appraisal need none (Hauling, now `/travel/hauling`, needs none either). LP Store's gate moved with it: `/wallet/lp-store` and `/wallet/lp-store/:corporationId` use `LP_STORE_REQUIREMENT` (`:245-246`). `/contracts` UNGATED (`:230`), History tab gates `getCharacterContracts` per tab; search tabs need no scope.
 - Page layout: `max-w-[96rem]` on Browser else `max-w-6xl` (`Market.tsx:759`). Header hub picker/refresh described in section 2.1.
 - Held at route level so they survive tab switches: `useAppraisal` (pasted list), `useOrderBookOrchestration` (CompareDrawer and Item Detail read it), Compare Set (`Market.tsx:473,493`).
 
@@ -265,6 +266,8 @@ What: character's buy/sell fills; corp fills live on `/corp/wallet`. `Transactio
 - Location filter remembered device-locally but other filters are not (only URL), so a bare `/market/orders` resets them each launch (`OpenOrdersPanel.tsx:176-192`).
 
 ## 4. Appraisal, Hauling, Compare, Variations, Price History, Quickbar (Market page)
+
+Note: Hauling (subsection 2) is now a Travel tab, `/travel/hauling` (`20261010-193521`, #3526); its spec below predates the move.
 
 Summary table
 
@@ -495,6 +498,8 @@ Issue #3521; scope decision `20261010-182330-stock-targets-v1-scope`; mockup `do
 Known follow-ups: every seller's orders at a structure (opt-in structure-markets grant) for a corp-wide shelf; corp hangars as a source.
 
 ## 5. LP Store
+
+Note: LP Store is now a Wallet tab, `/wallet/lp-store[/:corporationId]` (`20261010-200446`, #3527); the body below predates the move and still says Market.
 
 Summary
 

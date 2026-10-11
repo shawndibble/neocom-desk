@@ -25,6 +25,7 @@ See which alts need attention (queue idle/ending, PI stopped, free job slots, al
 - **Top jobs (ranked):** 1. "Which alt needs attention?" (queue idle or ending, PI stopped, free job slots, alerts). 2. "Switch to that Character and land back where I was" (#1764). 3. "Manage the roster": add, group, star, remove.
 - **Device and cadence:** both. #1764 names "every multi-boxer on a phone" and made Characters a tab-bar choice; the table view scrolls sideways on a phone at the owner's request (`20260909-130638`). Characters answers "how is my whole roster doing", Overview the single Character (same decision). Cadence: likely per session, to pick a Character.
 - **Above the fold:** cards with attention chips (queue, alerts, PI), starred first, active Character marked; search and Add in the header.
+- **Not for:** one Character's full state (Overview); changing a Character's grants (Settings › Permissions).
 - **Sources:** decisions above; #1764, #2318.
 - **Unconfirmed:** per-session cadence; whether the attention scan or the switch is the more common reason to open the page.
 
@@ -37,7 +38,7 @@ See which alts need attention (queue idle/ending, PI stopped, free job slots, al
   - `web: dense table of accounts with a sticky name column, sortable numeric columns and status columns with countdowns`
   - `ios: account switcher list that returns the user to the screen they came from after picking one`
 - **Flow queries:** `web: create a group and move items into it from each card's dropdown`
-- **Mobbin won't help with:** nothing notable.
+- **Mobbin won't help with:** the attention signals themselves: a skill queue idle or ending, PI extractors stopped, free industry job slots. What counts as "needs attention" comes from EVE, not from an analog app.
 
 ## Controls
 

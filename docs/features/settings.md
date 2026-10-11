@@ -20,6 +20,35 @@ Terms per `CONTEXT.md`: Permission, Base Grant, Core Grant, Notification Event, 
 
 Section order/grouping: `src/features/settings/sections.ts:15`. A section added to `SETTINGS_TABS` but not `SETTINGS_GROUPS` is routable but has no rail entry (test walks every id).
 
+## Purpose and user goal per section
+
+| Section                                                  | Goal                                                                                     | Why it exists                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Display                                                  | Make the app readable on this screen/clock                                               | Text scale answers for the screen, time format for how the pilot reads timers; both device-local (decision `20260907-221425`: a preference describing the pilot's play syncs, one describing the machine does not)                                                                                                                       |
+| Permissions                                              | See which ESI Permissions this Character granted and add one without re-doing everything | Incremental auth: sign-in asks the Base Grant; extras (corp, structure markets) are opt-in (`20260924-143410`, `20260903-145528`). Grant = SSO re-auth for that Character with the union of stored scopes plus the group (`app/loginFlow.ts:87`; union keeps existing grants because EVE issues a token with exactly what was requested) |
+| Industry/Market/Mining tax/Characters/Corporation/Travel | Set the assumptions pages start from, once, for every device                             | "Defaults answer for the pilot" (`20260907-221425`); each control defaults to what the app did before it was settable so numbers never move silently                                                                                                                                                                                     |
+| Notifications                                            | Choose which events reach which Character through which channel                          | Two independent channels (Device pop-up, in-app Alerts) so one can be off without touching the other                                                                                                                                                                                                                                     |
+| Data & storage                                           | Fix stale data, update, move to a new device, leave                                      | Clear cache is blunt (ESI is re-derivable); backup solves 20+ alt re-login (ADR 0014); delete-all is the only client-side remote delete (`20260926-223948`)                                                                                                                                                                              |
+| Activity Log                                             | See what the app fetched and how it went (support aid)                                   | Session-only so no token, id or body can persist (`stores/activityLog.ts`)                                                                                                                                                                                                                                                               |
+
+- **Top jobs (ranked):** 1. "Set the assumptions my pages start from, once, for every device" (Defaults, `20260907-221425`). 2. "Choose which events reach me, and how" (Notifications). 3. "Fix, move or leave" (clear cache, backup, delete all data).
+- **Device and cadence:** both, occasional. Phone has its own list-then-drill layout with value summaries (`20260925-120313`); footer page with `mobileTab: false`.
+- **Above the fold:** desktop: the grouped section rail and Display; phone: the grouped list with each section's current value.
+- **Not for:** a page's own settings mid-task (the page settings modal opens the same form, `20261004-155006`); shortcuts, FAQ and support (`/help`).
+- **Sources:** decisions listed under "Decisions and ADRs" below, chiefly `20260907-221425`, `20260925-084119`, `20260925-120313`, `20261004-155006`; ADR 0014.
+- **Unconfirmed:** the job ranking and visit cadence.
+
+### Mobbin brief
+
+- **Fit:** high. A sectioned settings page and a phone list with current values are standard.
+- **Analog apps:** Linear, GitHub, Slack, iOS Settings.
+- **Screen queries:**
+  - `web: settings page with a grouped section sidebar on the left and form panels on the right`
+  - `ios: grouped settings list where each row shows its current value and a chevron`
+  - `web: settings form panel with a note that values are kept across devices`
+- **Flow queries:** none.
+- **Mobbin won't help with:** route rule controls (security penalty, Avoided Systems, holes), ME/TE and the per-Character notification matrix's EVE events.
+
 ## Navigation and shell
 
 | Feature                                                                                                                                                                                                                                                                                                                               | Where                                                                                                                                                        |
@@ -200,35 +229,6 @@ Layout: 2-up grid from `xl`: Clear cache, App updates, Export, Import; then This
 ### Activity Log (`/settings/activity`)
 
 `ActivityLogPanel` `Settings.tsx:156`. In-memory zustand store of the last 100 ESI calls (`MAX_ACTIVITY_ENTRIES`, `stores/activityLog.ts:18`), newest first, never persisted or synced; only endpoint id, Character id, timestamp, outcome. Columns: Endpoint (route, mono), Character (phone-hidden, Show Info link or plain for public calls), Time (full timestamp in chosen time zone), Outcome (success green / authFailure warning / error red). All sortable. Clear log button (disabled when empty, 2 s confirmation). Export menu (`TableActionsMenu`: CSV / Excel / copy for Sheets) once non-empty. Empty state with hint.
-
-## Purpose and user goal per section
-
-| Section                                                  | Goal                                                                                     | Why it exists                                                                                                                                                                                                                                                                                                                            |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Display                                                  | Make the app readable on this screen/clock                                               | Text scale answers for the screen, time format for how the pilot reads timers; both device-local (decision `20260907-221425`: a preference describing the pilot's play syncs, one describing the machine does not)                                                                                                                       |
-| Permissions                                              | See which ESI Permissions this Character granted and add one without re-doing everything | Incremental auth: sign-in asks the Base Grant; extras (corp, structure markets) are opt-in (`20260924-143410`, `20260903-145528`). Grant = SSO re-auth for that Character with the union of stored scopes plus the group (`app/loginFlow.ts:87`; union keeps existing grants because EVE issues a token with exactly what was requested) |
-| Industry/Market/Mining tax/Characters/Corporation/Travel | Set the assumptions pages start from, once, for every device                             | "Defaults answer for the pilot" (`20260907-221425`); each control defaults to what the app did before it was settable so numbers never move silently                                                                                                                                                                                     |
-| Notifications                                            | Choose which events reach which Character through which channel                          | Two independent channels (Device pop-up, in-app Alerts) so one can be off without touching the other                                                                                                                                                                                                                                     |
-| Data & storage                                           | Fix stale data, update, move to a new device, leave                                      | Clear cache is blunt (ESI is re-derivable); backup solves 20+ alt re-login (ADR 0014); delete-all is the only client-side remote delete (`20260926-223948`)                                                                                                                                                                              |
-| Activity Log                                             | See what the app fetched and how it went (support aid)                                   | Session-only so no token, id or body can persist (`stores/activityLog.ts`)                                                                                                                                                                                                                                                               |
-
-- **Top jobs (ranked):** 1. "Set the assumptions my pages start from, once, for every device" (Defaults, `20260907-221425`). 2. "Choose which events reach me, and how" (Notifications). 3. "Fix, move or leave" (clear cache, backup, delete all data).
-- **Device and cadence:** both, occasional. Phone has its own list-then-drill layout with value summaries (`20260925-120313`); footer page with `mobileTab: false`.
-- **Above the fold:** desktop: the grouped section rail and Display; phone: the grouped list with each section's current value.
-- **Not for:** a page's own settings mid-task (the page settings modal opens the same form, `20261004-155006`); shortcuts, FAQ and support (`/help`).
-- **Sources:** decisions listed under "Decisions and ADRs" below, chiefly `20260907-221425`, `20260925-084119`, `20260925-120313`, `20261004-155006`; ADR 0014.
-- **Unconfirmed:** the job ranking and visit cadence.
-
-### Mobbin brief
-
-- **Fit:** high. A sectioned settings page and a phone list with current values are standard.
-- **Analog apps:** Linear, GitHub, Slack, iOS Settings.
-- **Screen queries:**
-  - `web: settings page with a grouped section sidebar on the left and form panels on the right`
-  - `ios: grouped settings list where each row shows its current value and a chevron`
-  - `web: settings form panel with a note that values are kept across devices`
-- **Flow queries:** none.
-- **Mobbin won't help with:** route rule controls (security penalty, Avoided Systems, holes), ME/TE and the per-Character notification matrix's EVE events.
 
 ## Formulas, ranges and edge cases
 
