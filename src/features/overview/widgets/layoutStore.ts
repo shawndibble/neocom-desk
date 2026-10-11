@@ -9,13 +9,15 @@
  * possibly from a newer build. So it KEEPS widgets of kinds it does not know,
  * and any extra fields, untouched: dropping them would rewrite the layout on
  * the next edit and delete a newer build's widgets on every device. It only
- * repairs what it can judge, i.e. fields of kinds it does know.
+ * repairs what it can judge, i.e. fields of kinds it does know. It does not
+ * cap the count either: the 30-widget limit belongs to the add/duplicate
+ * reducers and the Gallery, and truncating here would drop another device's
+ * widgets on the next write.
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { getKind } from './kinds';
 import {
   DEFAULT_RANGE,
-  MAX_WIDGETS,
   WIDGET_RANGES,
   type OverviewLayout,
   type Widget,
@@ -59,7 +61,6 @@ export function parseLayout(raw: unknown): OverviewLayout | null {
     if (!widget || seen.has(widget.id)) continue;
     seen.add(widget.id);
     widgets.push(widget);
-    if (widgets.length >= MAX_WIDGETS) break;
   }
   return {
     ...raw,

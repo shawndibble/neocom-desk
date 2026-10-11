@@ -88,8 +88,8 @@ describe('parseLayout', () => {
     expect(out!.widgets[0].kind).toBe('orders');
   });
 
-  it('caps at the soft limit', () => {
+  it('keeps a synced layout longer than the soft limit; only adding is capped', () => {
     const many = Array.from({ length: MAX_WIDGETS + 8 }, (_, i) => good({ id: `i${i}` }));
-    expect(parseLayout(wrap(...many))!.widgets).toHaveLength(MAX_WIDGETS);
+    expect(parseLayout(wrap(...many))!.widgets).toHaveLength(MAX_WIDGETS + 8);
   });
 });
