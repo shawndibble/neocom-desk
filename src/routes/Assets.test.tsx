@@ -12,6 +12,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useCompareSet } from '@/features/market/compareSet';
 import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/character/assetSortPreference';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
 import { configureClipboard } from '@/lib/clipboard';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { App } from '@/app/App';
@@ -181,6 +182,7 @@ async function resetSession() {
   // starting order of the next one.
   useAssetSort.setState({ value: DEFAULT_ASSET_SORT, hydrated: false });
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
+  useCharacterFilterPicks.setState({ value: {}, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({

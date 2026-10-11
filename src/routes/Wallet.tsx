@@ -39,9 +39,9 @@ import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import {
   useResolvedCharacterFilter,
-  fromStoredCharacterFilterValue,
+  type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
-import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
 import { resolveNames } from '@/features/character/names';
 import type { CachedResult } from '@/esi/cache';
@@ -49,7 +49,7 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
@@ -96,6 +96,7 @@ const EMPTY_FILLS: readonly WalletTransactionCommon[] = [];
  * strips and turns into an active-Character switch.
  */
 const DRILL_PARAM = intParam(0);
+const WALLET_CHARACTER_PARAMS = { char: characterFilterParam('current') };
 const LOYALTY_SORT = { columnId: 'points', direction: 'desc' } as const;
 
 interface Snapshot {
@@ -196,25 +197,20 @@ export function Wallet() {
    * `CharacterFilterControl`.
    *
    * Lives in the `?char=` query param (issue #1302), so it survives a reload
-   * and a pasted link — the codec's own default is the synced setting below,
-   * rebuilt in a `useMemo` whenever that setting changes, so an absent param
-   * reads as whatever Settings' Defaults panel says until the URL overrides
-   * it for this view. Nothing read from the URL is ever written back to the
-   * setting.
+   * and a pasted link. Absent, it reads this page's remembered pick, then the
+   * synced Settings default (`characterFilterPicks.ts`). A link's value is
+   * never remembered; only a change to the control is.
    */
-  const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
-  const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateDefaultCharacterFilter();
-  }, [hydrateDefaultCharacterFilter]);
-  const characterFilterCodec = useMemo(
-    () => characterFilterParam(fromStoredCharacterFilterValue(defaultCharacterFilter)),
-    [defaultCharacterFilter]
+  const rememberedCharacterFilter = useRememberedCharacterFilter<typeof WALLET_CHARACTER_PARAMS>(
+    'wallet',
+    'char'
   );
-  const [walletCharacterFilter, setWalletCharacterFilter] = useUrlParam(
-    'char',
-    characterFilterCodec
+  const [walletParams, setWalletParams] = useRememberedUrlParams(
+    WALLET_CHARACTER_PARAMS,
+    rememberedCharacterFilter
   );
+  const walletCharacterFilter = walletParams.char;
+  const setWalletCharacterFilter = (char: CharacterFilterValue) => setWalletParams({ char });
 
   // A Character named in the URL is the one page subject: the balance panel
   // follows it rather than a stored "all" default.

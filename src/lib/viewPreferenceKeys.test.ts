@@ -23,6 +23,7 @@ const PINNED = [
   'assetsStationSort',
   'calendarHiddenKinds',
   'calendarView',
+  'characterFilterPicks',
   'corp.assetsExpanded',
   'industryLastOpenedPlan',
   'loyaltyStorePriceBasis',

@@ -202,7 +202,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 - Jumps away resolved only for pinned, visible and open locations (bounded fan-out), so off-screen rows have none until scrolled in; unresolved without the location scope.
 - No page-specific keyboard shortcuts documented in Help › Shortcuts; select mode is click/tap only.
 - Help/FAQ say nothing specific about Assets beyond the stored-data list.
-- The Character filter does not remember the last pick. It lives only in `?chars=`; a fresh visit to `/assets` falls back to the synced Settings default (`sync.defaultCharacterFilter`, `current` until changed), and the pick is never written back (`Assets.tsx:686-705`, `characterFilterUrlParam.ts:10-13`). Wallet (`?char=`) and Industry Jobs (`jobs.chars`) behave the same. The owner wants the last pick reopened (owner, 2026-10-11).
+- The Character filter remembers its last pick per page, on this device (`characterFilterPicks.ts`, key `characterFilterPicks`). Order on open: URL value, then this page's pick, then the synced Settings default (first visit only). A link's value is never remembered. Assets, Wallet, Industry Jobs, Opportunities and Open Orders each keep their own.
 
 ## Persistence and sync
 
@@ -274,7 +274,6 @@ Root list and drill-in; total value chip (#1617); focus to heading (#1485); syst
 - Show a volume total per location (m³ already loaded) for hauling.
 - Optional jumps for every location with a background queue and a rate budget.
 - Keyboard shortcuts for select mode and search focus.
-- Remember the last This character / All characters pick and reopen with it (owner wish, 2026-10-11). Default stays This character. One shared remembered value across Assets, Wallet and Industry Jobs, or one per page, is open; the Settings default would then only seed the first visit.
 
 ## Item Detail (Show info) as reached from Assets, fully specified
 
