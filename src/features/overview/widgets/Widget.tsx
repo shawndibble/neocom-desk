@@ -3,11 +3,12 @@
  * Open link, a settings button) over a body that is one of the five Widget
  * States.
  *
- * The body is a Number or a List, and **the headline number is always on
- * screen**: the List view carries it as a line above its rows, and a Chart
- * view (not built yet) falls back to the Number. Every state is drawn for real
- * rather than collapsing to blank: a widget that vanishes when it has nothing
- * to say cannot be told from one that failed to load.
+ * The body is a Number, a Chart or a List, and **the headline number is always
+ * on screen**: the List view carries it as a line above its rows, the Chart
+ * view above its chart, and a kind with no chart falls back to the Number.
+ * Every state is drawn for real rather than collapsing to blank: a widget that
+ * vanishes when it has nothing to say cannot be told from one that failed to
+ * load.
  *
  * No view-cyclers in the header: view switching lives in the settings menu
  * (next stage), so a stray click changes nothing.
@@ -38,7 +39,9 @@ import { useOverviewRefresh } from './data/refreshContext';
 import type { KindView, ListRow, NumberModel } from './data/types';
 import { useWidgetView } from './data/useWidgetView';
 import { getKind } from './kinds';
-import type { Widget as WidgetModel } from './layout';
+import { Chart } from './charts/Chart';
+import { showsInNumberView } from './charts/sizing';
+import { DEFAULT_RANGE, type Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
 import { resolveWidget } from './state';
 import { rowsForSize } from './sizes';
@@ -148,6 +151,32 @@ function ListBody({ view, size }: { view: KindView; size: WidgetModel['size'] })
   );
 }
 
+/**
+ * The Chart view: the headline stays on screen above the chart (a Small chart
+ * still shows its value), the chart's caption and hidden text summary below.
+ * A kind with no chart for this data falls back to the Number, never a blank.
+ */
+function ChartBody({ view, size }: { view: KindView; size: WidgetModel['size'] }) {
+  if (!view.chart) return <NumberBody model={view.number} />;
+  return (
+    <div>
+      <NumberBody model={view.number} />
+      <Chart model={view.chart} size={size} className="px-3 pb-2.5" />
+    </div>
+  );
+}
+
+/** The Number view: from Medium up it also carries the kind's mini chart under the figure (donuts stay in the Chart view). */
+function NumberChartBody({ view, size }: { view: KindView; size: WidgetModel['size'] }) {
+  const mini = view.chart && size !== 'S' && showsInNumberView(view.chart) ? view.chart : null;
+  return (
+    <div>
+      <NumberBody model={view.number} />
+      {mini && <Chart model={mini} size="S" className="px-3 pb-2.5" />}
+    </div>
+  );
+}
+
 /** The fixed scope readout (DESIGN §6c): this widget reads every Character on the device. */
 function AllCharactersReadout() {
   const total = useLiveQuery(() => db.characters.count(), []);
@@ -190,7 +219,11 @@ export function Widget({
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(TICK_MS);
   const scope = scopePresentation(widget.kind, widget.scope, headerAll);
-  const view = useWidgetView(widget.kind, scope.scopeAll);
+  const view = useWidgetView(
+    widget.kind,
+    scope.scopeAll,
+    kind?.hasRange ? (widget.range ?? DEFAULT_RANGE) : undefined
+  );
   const { state, showLastGood } = resolveWidget(view.status);
 
   // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.
@@ -260,9 +293,10 @@ export function Widget({
     body =
       widget.view === 'list' ? (
         <ListBody view={view} size={widget.size} />
+      ) : widget.view === 'chart' ? (
+        <ChartBody view={view} size={widget.size} />
       ) : (
-        // Number, and Chart until charts land: the headline is the one thing every view shows.
-        <NumberBody model={view.number} />
+        <NumberChartBody view={view} size={widget.size} />
       );
   }
 
