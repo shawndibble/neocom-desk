@@ -5,7 +5,7 @@
  * any more. It is still read, for two things: `widgets/migrate.ts` turns it
  * (with the card order) into the first Overview Layout of a pilot who used the
  * old board, and a non-empty list is how the page knows that pilot is
- * returning (the New tags apply to them).
+ * returning.
  *
  * The key stays on the synced-settings allow-list and `parse` keeps keys this
  * build has no meaning for: the value merges last-write-wins as a whole, so a

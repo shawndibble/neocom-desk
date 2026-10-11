@@ -301,7 +301,7 @@ describe('Overview widget grid', () => {
     expect(await within(wallet).findByText('1.2M')).toBeInTheDocument();
     const training = await widgetCard('Training');
     expect(await within(training).findByText(/Gunnery/)).toBeInTheDocument();
-    // A pilot with no old board settings is first run: no New tags.
+    // Nothing on the board carries a New tag: every widget is new.
     expect(screen.queryByText('New')).not.toBeInTheDocument();
   });
 

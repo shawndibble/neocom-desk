@@ -56,7 +56,7 @@ function renderWidget(
     <MemoryRouter>
       <FeedStoreContext.Provider value={store}>
         <OverviewRefreshContext.Provider value={{ epoch: 0, refresh }}>
-          <Widget widget={widget} showNew={false} onRemove={onRemove} {...props} />
+          <Widget widget={widget} onRemove={onRemove} {...props} />
         </OverviewRefreshContext.Provider>
       </FeedStoreContext.Provider>
     </MemoryRouter>
@@ -201,10 +201,10 @@ describe('Widget states', () => {
   });
 
   it('draws a kind that is coming soon as empty, never a spinner', () => {
-    renderWidget(model({ kind: 'routeSafety' }), () => undefined);
-    const region = screen.getByRole('region', { name: 'Route safety' });
+    renderWidget(model({ kind: 'hauling' }), () => undefined);
+    const region = screen.getByRole('region', { name: 'Hauling' });
     expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(within(region).getByText('There is no saved route.')).toBeInTheDocument();
+    expect(within(region).getByText('There are no hauls to show.')).toBeInTheDocument();
   });
 });
 
@@ -281,6 +281,45 @@ describe('Widget charts', () => {
   });
 });
 
+describe('Route safety widget', () => {
+  const day = (store: FeedStore, over: Record<string, unknown> = {}) =>
+    store.set('routeSafety', {
+      data: {
+        hasRoute: true,
+        href: '/travel/route?from=1&stops=3',
+        systems: [
+          { systemId: 1, name: 'Efa', kills: [] },
+          { systemId: 2, name: 'Niarja', kills: [Date.now() - 60_000, Date.now() - 120_000] },
+        ],
+        fetchedAt: new Date(),
+        ...over,
+      },
+      error: false,
+      loading: false,
+    });
+
+  it('draws kills per hour with its max, its range and a text equivalent', () => {
+    renderWidget(model({ kind: 'routeSafety', view: 'chart' }), (store) => day(store));
+    const region = screen.getByRole('region', { name: 'Route safety' });
+    expect(within(region).getByText('max 2 per hour')).toBeInTheDocument();
+    expect(within(region).getByText('24 h ago')).toBeInTheDocument();
+    expect(within(region).getByText(/2 player kills in the last 24 hours/)).toBeInTheDocument();
+    expect(within(region).getByText('0')).toBeInTheDocument();
+  });
+
+  it('says No saved route, with a link to Route Safety, when none was drawn', () => {
+    renderWidget(model({ kind: 'routeSafety', view: 'chart' }), (store) =>
+      day(store, { hasRoute: false, href: null, systems: [] })
+    );
+    const region = screen.getByRole('region', { name: 'Route safety' });
+    expect(within(region).getByText('No saved route')).toBeInTheDocument();
+    expect(within(region).getByRole('link', { name: 'Open Route Safety' })).toHaveAttribute(
+      'href',
+      '/travel/route'
+    );
+  });
+});
+
 describe('Widget header', () => {
   const ready = (store: FeedStore) =>
     store.set('priceAlerts', {
@@ -301,13 +340,8 @@ describe('Widget header', () => {
       loading: false,
     });
 
-  it('shows the New tag only for a new kind, and only to a returning pilot', () => {
-    renderWidget(model({ kind: 'priceWatch' }), ready, { showNew: true });
-    expect(screen.getByText('New')).toBeInTheDocument();
-  });
-
-  it('shows no New tag for a first-run layout', () => {
-    renderWidget(model({ kind: 'priceWatch' }), ready, { showNew: false });
+  it('draws no New tag: every widget is new', () => {
+    renderWidget(model({ kind: 'priceWatch' }), ready);
     expect(screen.queryByText('New')).not.toBeInTheDocument();
   });
 
@@ -322,8 +356,8 @@ describe('Widget header', () => {
   });
 
   it('has no title link for a kind with no page of its own yet', () => {
-    renderWidget(model({ kind: 'routeSafety' }), () => undefined);
-    expect(screen.queryByRole('link', { name: /route safety/i })).not.toBeInTheDocument();
+    renderWidget(model({ kind: 'hauling' }), () => undefined);
+    expect(screen.queryByRole('link', { name: /hauling/i })).not.toBeInTheDocument();
   });
 
   it('uses the widget own name when it has one', () => {
@@ -364,7 +398,6 @@ describe('WidgetGrid', () => {
               model({ id: 'b', kind: 'fromTheFuture' }),
               model({ id: 'c', kind: 'mail', size: 'F' }),
             ]}
-            showNew={false}
             onRemove={() => undefined}
           />
         </FeedStoreContext.Provider>
@@ -382,7 +415,6 @@ describe('WidgetGrid', () => {
       <MemoryRouter>
         <WidgetGrid
           widgets={[]}
-          showNew={false}
           onRemove={() => undefined}
           onAdd={onAdd}
           onRoles={() => undefined}
@@ -398,11 +430,7 @@ describe('WidgetGrid', () => {
   it('says so when none of the stored widgets can be drawn', () => {
     render(
       <MemoryRouter>
-        <WidgetGrid
-          widgets={[model({ kind: 'fromTheFuture' })]}
-          showNew={false}
-          onRemove={() => undefined}
-        />
+        <WidgetGrid widgets={[model({ kind: 'fromTheFuture' })]} onRemove={() => undefined} />
       </MemoryRouter>
     );
     expect(screen.getByText('There are no widgets to show on this Overview.')).toBeInTheDocument();

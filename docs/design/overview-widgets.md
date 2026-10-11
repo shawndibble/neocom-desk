@@ -137,8 +137,8 @@ Esc / outside click closes.
 ## 6. Gallery
 
 Drawer (desktop, right, 460px) / sheet (phone). Search box, category chips
-(All, Recently added — only for returning pilots —, then the categories).
-Each item: name, **New** tag, description, an Add / **Add another** button, and
+(All, then the categories).
+Each item: name, description, an Add / **Add another** button, and
 a real Medium-size preview of the widget (desktop only). Categories:
 Character · Money and market · Industry and mining · Planets and structures ·
 Space and travel · Messages and schedule.
@@ -196,7 +196,7 @@ Grid & widgets
 - [ ] E1 Overview renders a Widget grid from a persisted Overview Layout.
 - [ ] E2 Sizes S/M/L/Full set row width (4 / 3 / 2 / 1 per row on a 1440px desktop); order = screen order, no holes.
 - [ ] E3 Views Number/Chart/Table per kind, each kind opening in its default view; headline number always visible.
-- [ ] E4 Widget header: one compact line: title as the page link with a chevron (plain when the kind has no page), New tag (returning only), scope chip, ⋯.
+- [ ] E4 Widget header: one compact line: title as the page link with a chevron (plain when the kind has no page), scope chip, ⋯.
 - [ ] E5 ⋯ menu: view, character, range, rename, duplicate, top, bottom, phone, remove; Esc/outside closes.
 - [ ] E6 Same kind addable twice.
 - [ ] E7 Widget states: loading, needs permission (Grant access), failed (Retry + last good), empty (Remove).
@@ -249,7 +249,8 @@ across Characters · whether other alert types than danger raise the banner.
 ## 12. Implementation decisions (settled after reading the code)
 
 - **Unavailable in v1** (shown in the Gallery marked "Coming soon", not addable):
-  routeSafety, kills, jumpTimers (no jump-fatigue ESI endpoint).
+  kills, jumpTimers (no jump-fatigue ESI endpoint). routeSafety and hauling
+  shipped in #3578 and #3579.
   Each needs a follow-up ticket; listed in the PR.
 - **Reduced kinds:** `sp` is Number/Table only (no SP history store); `priceWatch`
   is Number/Table only (the poller keeps no price history, so no sparkline);

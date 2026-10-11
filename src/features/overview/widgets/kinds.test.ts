@@ -101,7 +101,15 @@ describe('widget kind catalogue', () => {
     // Not everything is a Number: some answer best as a chart, some as a table.
     for (const id of ['training', 'sp', 'location', 'miningTax'])
       expect(view(id), id).toBe('number');
-    for (const id of ['wallet', 'walletFlow', 'netWorth', 'lp', 'profit', 'miningYield']) {
+    for (const id of [
+      'wallet',
+      'walletFlow',
+      'netWorth',
+      'lp',
+      'profit',
+      'miningYield',
+      'routeSafety',
+    ]) {
       expect(view(id), id).toBe('chart');
     }
     for (const id of [
@@ -133,11 +141,12 @@ describe('widget kind catalogue', () => {
     }
   });
 
-  it('marks the three unbuilt kinds as coming soon and the rest as available', () => {
+  it('marks the two unbuilt kinds as coming soon and the rest as available', () => {
     const soon = WIDGET_KINDS.filter((k) => k.availability === 'comingSoon').map((k) => k.id);
-    expect(soon.sort()).toEqual(['jumpTimers', 'kills', 'routeSafety']);
+    expect(soon.sort()).toEqual(['jumpTimers', 'kills']);
     expect(isAddable('wallet')).toBe(true);
-    expect(isAddable('routeSafety')).toBe(false);
+    expect(isAddable('routeSafety')).toBe(true);
+    expect(isAddable('kills')).toBe(false);
     expect(isAddable('nope')).toBe(false);
   });
 

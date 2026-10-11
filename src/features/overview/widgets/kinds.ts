@@ -34,8 +34,6 @@ export interface WidgetKindDef {
   defaultView: WidgetView;
   /** Whether the kind reads a time window (7 / 30 / 90 days). */
   hasRange: boolean;
-  /** Shown with a "New" tag to returning pilots. */
-  isNew: boolean;
   /** ESI endpoints the kind needs, for the "needs permission" state. */
   endpoints: readonly EsiEndpointId[];
   emptyMessageKey: string;
@@ -52,7 +50,6 @@ interface Spec {
   view: WidgetView;
   size: WidgetSize;
   range?: true;
-  isNew?: true;
   soon?: true;
   endpoints: readonly EsiEndpointId[];
 }
@@ -77,7 +74,6 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'number',
     size: 'S',
-    isNew: true,
     endpoints: ['getCharacterLocation', 'getCharacterShip'],
   },
   jumpTimers: {
@@ -85,7 +81,6 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'number',
     size: 'S',
-    isNew: true,
     soon: true,
     endpoints: ['getCharacterClones'],
   },
@@ -94,7 +89,6 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'table',
     size: 'M',
-    isNew: true,
     endpoints: [
       'getCharacterClones',
       'getCharacterSkills',
@@ -117,7 +111,6 @@ const SPECS: Record<string, Spec> = {
     view: 'chart',
     size: 'M',
     range: true,
-    isNew: true,
     endpoints: ['getCharacterWallet', 'getCharacterWalletJournal'],
   },
   netWorth: {
@@ -125,7 +118,6 @@ const SPECS: Record<string, Spec> = {
     views: NCT,
     view: 'chart',
     size: 'M',
-    isNew: true,
     endpoints: ['getCharacterWallet', 'getCharacterAssets', 'getCharacterOrders'],
   },
   orders: {
@@ -140,7 +132,6 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'table',
     size: 'M',
-    isNew: true,
     endpoints: [],
   },
   stock: {
@@ -148,7 +139,6 @@ const SPECS: Record<string, Spec> = {
     views: NCT,
     view: 'table',
     size: 'M',
-    isNew: true,
     endpoints: ['getCharacterOrders'],
   },
   lp: {
@@ -156,7 +146,6 @@ const SPECS: Record<string, Spec> = {
     views: NCT,
     view: 'chart',
     size: 'M',
-    isNew: true,
     endpoints: ['getCharacterLoyaltyPoints'],
   },
   miningTax: {
@@ -179,7 +168,6 @@ const SPECS: Record<string, Spec> = {
     view: 'chart',
     size: 'M',
     range: true,
-    isNew: true,
     endpoints: [],
   },
   miningYield: {
@@ -188,7 +176,6 @@ const SPECS: Record<string, Spec> = {
     view: 'chart',
     size: 'M',
     range: true,
-    isNew: true,
     endpoints: ['getCharacterMining'],
   },
   survey: {
@@ -196,7 +183,6 @@ const SPECS: Record<string, Spec> = {
     views: NCT,
     view: 'number',
     size: 'M',
-    isNew: true,
     endpoints: [],
   },
   planetary: {
@@ -225,16 +211,13 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'table',
     size: 'S',
-    isNew: true,
     endpoints: [],
   },
   routeSafety: {
     category: 'space',
     views: NCT,
-    view: 'number',
+    view: 'chart',
     size: 'M',
-    isNew: true,
-    soon: true,
     endpoints: [],
   },
   hauling: {
@@ -242,7 +225,6 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'number',
     size: 'M',
-    isNew: true,
     endpoints: [],
   },
   kills: {
@@ -251,7 +233,6 @@ const SPECS: Record<string, Spec> = {
     view: 'number',
     size: 'M',
     range: true,
-    isNew: true,
     soon: true,
     endpoints: [],
   },
@@ -287,7 +268,6 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(SPECS).map(
   defaultSize: s.size,
   defaultView: s.view,
   hasRange: s.range === true,
-  isNew: s.isNew === true,
   endpoints: s.endpoints,
   emptyMessageKey: `overview.widgets.${id}.empty`,
   availability: s.soon ? 'comingSoon' : 'available',

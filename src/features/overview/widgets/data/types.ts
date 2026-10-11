@@ -37,6 +37,7 @@ import type {
   MiningYieldWidgetData,
   NetWorthWidgetData,
   ProfitWidgetData,
+  RouteSafetyWidgetData,
 } from './kindLoaders';
 
 /** The narrow slice of i18next's `t` the adapters need. */
@@ -108,6 +109,12 @@ export interface TableColumn {
   align?: 'start' | 'end';
   /** Which columns survive a narrow widget: lower is kept longer (default: the column's position). */
   priority?: number;
+  /**
+   * The one column that takes the leftover width and truncates, for a long free-text column
+   * (a mail subject). Without it the first column does; with it the first column only keeps
+   * what its text needs, up to a cap.
+   */
+  grow?: boolean;
 }
 
 export interface TableRowModel {
@@ -197,6 +204,7 @@ export interface FeedMap {
   hauling: HaulingWidgetData;
   clones: ClonesWidgetData;
   location: LocationWidgetData;
+  routeSafety: RouteSafetyWidgetData;
 }
 
 export type FeedId = keyof FeedMap;

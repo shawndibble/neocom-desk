@@ -49,6 +49,7 @@ import {
   loadNetWorthWidget,
   loadProfitWidget,
   loadHaulingWidget,
+  loadRouteSafetyWidget,
   loadSurveyWidget,
 } from './kindLoaders';
 import { feedsFor } from './models';
@@ -224,6 +225,14 @@ function Source({ feed }: { feed: FeedId }) {
     case 'location':
       return (
         <SnapshotSource feed="location" load={loadLocationWidget} cacheKey="overview:location" />
+      );
+    case 'routeSafety':
+      return (
+        <SnapshotSource
+          feed="routeSafety"
+          load={loadRouteSafetyWidget}
+          cacheKey="overview:route-safety"
+        />
       );
     case 'incursions':
       return <IncursionsSource />;

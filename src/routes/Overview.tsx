@@ -55,11 +55,10 @@ function Centered({ children }: { children: ReactNode }) {
 interface BoardProps {
   characterId: number;
   layout: OverviewLayout;
-  showNew: boolean;
 }
 
 /** Everything below the providers: the header, sub-nav and grid. */
-function Board({ characterId, layout, showNew }: BoardProps) {
+function Board({ characterId, layout }: BoardProps) {
   const edit = useOverviewEdit();
   const { editing } = edit;
   const isPhone = useIsPhone();
@@ -89,14 +88,13 @@ function Board({ characterId, layout, showNew }: BoardProps) {
       ) : (
         <WidgetGrid
           widgets={layout.widgets}
-          showNew={showNew}
           editing={editing}
           onRemove={edit.remove}
           onAdd={() => setGalleryOpen(true)}
           onRoles={() => setRolesOpen(true)}
         />
       )}
-      <Gallery open={galleryOpen} onClose={() => setGalleryOpen(false)} showNew={showNew} />
+      <Gallery open={galleryOpen} onClose={() => setGalleryOpen(false)} />
       <RoleChooserDialog
         open={rolesOpen}
         onClose={() => setRolesOpen(false)}
@@ -118,8 +116,8 @@ export function Overview() {
   const layoutHydrated = useOverviewLayout((state) => state.hydrated);
   const hydrateLayout = useOverviewLayout((state) => state.hydrate);
   const setLayout = useOverviewLayout((state) => state.setValue);
-  // The old board's two settings: read for a returning pilot's first layout,
-  // and to know whether the New tags apply. Only their read side is kept.
+  // The old board's two settings: read for a returning pilot's first layout.
+  // Only their read side is kept.
   const hidden = useOverviewHiddenCards((state) => state.value);
   const hiddenHydrated = useOverviewHiddenCards((state) => state.hydrated);
   const hydrateHidden = useOverviewHiddenCards((state) => state.hydrate);
@@ -195,7 +193,7 @@ export function Overview() {
     <OverviewRefreshProvider>
       <OverviewEditProvider layout={layout} onLayoutChange={onLayoutChange}>
         <WidgetDataProvider kinds={kinds}>
-          <Board characterId={activeCharacterId} layout={layout} showNew={returning} />
+          <Board characterId={activeCharacterId} layout={layout} />
         </WidgetDataProvider>
       </OverviewEditProvider>
     </OverviewRefreshProvider>

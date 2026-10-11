@@ -12,8 +12,9 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { LayerId } from '@/engine/netWorth/series';
+import { summarizeRouteKills, type KillLevel } from '@/engine/route/routeKillTrend';
 import type { ChartColor, StackPart } from '../charts/types';
-import { blank, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { hbarsFromRows } from './chartBuilders';
 import { clonesTable, locationTable } from './characterTables';
 import {
@@ -43,6 +44,7 @@ export const KIND_FEED_LISTS: Readonly<Record<string, readonly FeedId[]>> = {
   location: ['location'],
   survey: ['survey'],
   hauling: ['hauling'],
+  routeSafety: ['routeSafety'],
 };
 
 /** Where each net worth layer sits in the bar and which series hue it keeps (the Net Worth page's). */
@@ -504,6 +506,84 @@ const location: Builder = (feeds, { t }) => {
   };
 };
 
+// --- Route safety -------------------------------------------------------------------
+
+const ROUTE_SAFETY_PATH = '/travel/route';
+
+/** Conditions, never verdicts: a busy system is one with many kills, not an unsafe one. */
+const routeSafety: Builder = (feeds, { t, now }) => {
+  const feed = feeds.routeSafety;
+  const data = feed?.data ?? null;
+  if (!data) return blank(ROUTE_SAFETY_PATH, statusOf(feed));
+  const to = data.href ?? ROUTE_SAFETY_PATH;
+  const trend = summarizeRouteKills(data.systems, now);
+  const levelWord = (level: KillLevel) => t(`${W}.routeSafety.level.${level}`);
+  const base = {
+    ...blank(to, statusOf(feed, { isEmpty: !data.hasRoute })),
+    emptyLinkLabel: t(`${W}.routeSafety.emptyLink`),
+    fetchedAt: data.fetchedAt,
+  };
+  if (trend.known === 0) return base;
+  const secondary = {
+    text:
+      trend.unknown > 0
+        ? t(`${D}.routeSafety.secondaryUnread`, { count: trend.total, unread: trend.unknown })
+        : t(`${D}.routeSafety.secondary`, { count: trend.total }),
+  };
+  const peak = Math.max(0, ...(trend.hourly ?? []));
+  const unreadNote =
+    trend.unknown > 0 ? ` ${t(`${C}.routeSafety.unread`, { count: trend.unknown })}` : '';
+  const summary = t(`${C}.routeSafety.summary`, {
+    count: trend.total,
+    systems: trend.known,
+    busy: trend.busy,
+    peak,
+    hours: (trend.hourly ?? []).join(', '),
+  });
+  return {
+    ...base,
+    number: {
+      value: count(trend.busy),
+      unit: t(`${D}.routeSafety.unit`, { count: trend.busy }),
+      secondary,
+      tone: 'clear',
+    },
+    rows: [],
+    table: {
+      columns: [
+        { key: 'system', label: t(`${W}.routeSafety.col.system`), priority: 0 },
+        { key: 'kills', label: t(`${W}.routeSafety.col.kills`), align: 'end', priority: 1 },
+        { key: 'level', label: t(`${W}.routeSafety.col.level`), priority: 2 },
+      ],
+      rows: trend.rows.map((row) => ({
+        key: String(row.systemId),
+        cells: [
+          row.name,
+          row.count === null ? UNKNOWN : count(row.count),
+          row.level === null
+            ? UNKNOWN
+            : row.level === 'busy'
+              ? { text: levelWord(row.level), tone: 'caution' }
+              : levelWord(row.level),
+        ],
+      })),
+    },
+    summary: `${summary}${unreadNote}`,
+    chart:
+      trend.hourly && trend.total > 0
+        ? {
+            kind: 'bars',
+            values: trend.hourly,
+            max: t(`${C}.routeSafety.max`, { count: peak }),
+            xStart: t(`${C}.routeSafety.xStart`),
+            xEnd: t(`${C}.routeSafety.xEnd`),
+            note: t(`${C}.routeSafety.note`),
+            summary: `${summary}${unreadNote}`,
+          }
+        : undefined,
+  };
+};
+
 export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   walletFlow,
   netWorth,
@@ -512,4 +592,5 @@ export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   location,
   survey,
   hauling,
+  routeSafety,
 };
