@@ -14,11 +14,14 @@ here — they go one per file in `docs/context/decisions/`.
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
 - **Alert**: One fired Notification Event as it appears in the Notification
-  Feed and on `/alerts`. Grouped there by _type_ — the `eveType` for an EVE
+  Feed and in the bell panel (`/alerts` redirects to the Overview with the
+  panel open). Grouped there by _type_ — the `eveType` for an EVE
   notification, the event id otherwise — because a device back from a week
   away holds hundreds of fires across a dozen-odd types, and the type is the
-  unit a reader mutes, dismisses or acts on. Distinct from the browser
-  notification the same fire may also raise: two delivery channels, one event.
+  unit a reader mutes, dismisses, acknowledges or acts on. A danger type that
+  nobody has acknowledged also raises the **Danger banner**. Distinct from the
+  browser notification the same fire may also raise: two delivery channels,
+  one event.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
 - **Appraisal**: A Market page tab that prices a pasted pile of items — loot,
   a haul, a shopping list, or a whole EFT ship fit (issue #1026), whose hull
@@ -32,6 +35,26 @@ here — they go one per file in `docs/context/decisions/`.
   again ("where is this pile worth the most") from either of the above, and
   not the **Compare** drawer under another name: it shares no state or code
   path with it and never touches the **Compare Set**.
+- **Danger banner**: The red strip under the Overview's sub-nav while an unacknowledged danger
+  **Alert** exists (a structure under attack, a Corp kick): "Danger", the
+  title, the detail and its age, with View and Acknowledge. Acknowledge is
+  Dismiss for the whole danger type (a synced `dismissedAt`), so the strip
+  and the bell panel never disagree about what is outstanding. Also drawn
+  on a phone. Nothing else raises it.
+- **Gallery**: The Overview's "Add a widget" drawer (a bottom sheet on a phone): search
+  and category chips over the **Widget Kind** catalogue, each kind with its
+  description, an Add (or Add another, the same kind may appear more than
+  once) button and, on a desktop, an inert Medium-size preview of the real
+  **Widget** on sample figures. A kind not built yet reads "Coming soon" and
+  cannot be added; at 30 **Widgets** every kind reads "Limit reached". New
+  tags and "Recently added" are for a returning pilot only.
+- **Overview Layout**: The ordered list of **Widgets** on the Overview, with each one's size,
+  view, rename, character scope, range and whether it shows on a phone. One
+  per pilot, not per Character, synced as a whole (last write wins) like the
+  other account preferences; **absent** means first run, so the Role chooser
+  asks. Customize snapshots it: Done keeps the edits, Cancel puts the
+  snapshot back exactly. A returning pilot's first layout is migrated from
+  the old hidden-card and card-order settings.
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
@@ -479,6 +502,12 @@ here — they go one per file in `docs/context/decisions/`.
   rather than as a matched return trip. A haul with an end nothing local places
   has **no lane to look up** — stated as such, never as a count of zero, which
   would read as "nobody is hauling back" where the truth is "we cannot tell".
+- **Role**: A first-run answer to "What do you do in EVE?" (Trader, Industrialist,
+  Planetary industry, Miner, Fighter, Explorer and hauler) that maps to a
+  set of **Widget Kinds**. Several can be picked; the union, plus Wallet,
+  Training, Coming up and Mail which are always in, becomes the first
+  **Overview Layout**. Reachable later as Customize > Start from a role.
+  Not a **Corp Role**, which is a permission in the game.
 - **Route Safety**: Travel's view of a stargate route — every system on it, in
   order, with its security, region, the last hour of jumps and ship, pod and
   NPC kills ESI reports, and a mark on any **Gank Chokepoint**. Each system
@@ -497,6 +526,10 @@ here — they go one per file in `docs/context/decisions/`.
   and none is in J-space. A figure still loading or unavailable never counts
   as zero, so such a system never folds. Named for the figures, never a
   verdict on the systems.
+- **Size**: A **Widget**'s width on the Overview: S, M, L or Full, a share of one row
+  (a third, a half, two thirds, the whole), not a height: its content sets
+  that. Size also sets how much a **View** shows (list rows, chart height).
+  On a phone Small sits two across and every other size takes the row.
 - **Stop**: one of up to ten systems a Route Safety trip visits after its
   start (the **Current System** unless the link names another), kept in the
   link in the order typed. Optimize stop order may fly them in a cheaper
@@ -517,6 +550,10 @@ here — they go one per file in `docs/context/decisions/`.
   this device's list — found by a character's structure search or pasted —
   each as one jump, shown as its own row and as a dashed-edged **Route
   strip** cell. Decision `20261003-204009`.
+- **View**: How a **Widget** draws its data: Number, Chart or List, whichever its
+  **Widget Kind** has. The headline number is on screen in every view; List
+  is also the text equivalent of a Chart. Chosen in the widget's settings
+  menu, never by a glyph in its header.
 - **Way to fly**: one way a **Leg** can be flown, listed beside its rows:
   Gates only (always), Via Thera / Via Turnur (when that hub has a
   qualifying hole), Via Ansiblex (with Use jump bridges on, when a known
@@ -1115,6 +1152,20 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `1,254,000,000` both render `1.25B`-ish) safe to accept. See
   `docs/context/decisions/` for the rule the rollout follows.
 - **Shared jump cooldown**: The single clone-jump cooldown a Character has, common to every Jump Clone (not per clone); the Clones page states it once.
+- **Widget**: One tile on the Overview: an instance of a **Widget Kind** with its own
+  **Size**, **View**, optional rename, character scope and range. The same
+  kind may appear more than once. Always in one of five **Widget States**.
+- **Widget Kind**: An entry in the catalogue of what the Overview can show (Wallet, Orders,
+  Planetary...): its title and description, category, which **Views** it
+  has, default **Size**, whether it has a range, the ESI permission it needs
+  and its empty message. `src/features/overview/widgets/kinds.ts`. A kind
+  that is not built yet is "coming soon": listed in the **Gallery**, not
+  addable.
+- **Widget State**: Which of five things a **Widget** is showing: loading (a skeleton),
+  needs permission (the ESI permission by name, with Grant access), failed
+  (Could not load, the last good value dimmed, Retry), empty (the kind's
+  own message, with Remove widget) or ok. `resolveWidgetState` in
+  `src/features/overview/widgets/state.ts`.
 - **Worn clone**: The clone a Character is in right now, whose implants are the Character's fitted implants; listed on the Clones page as "Wearing now" and distinct from its Jump Clones.
 - **Clone Jump Ready**: Fires once when a Character's jump-clone cooldown ends — `last_clone_jump_date` plus `24 - ` the Effective Skill Level of Infomorph Synchronizing hours (level 0 when skills can't be read, so late, never early). A Scheduled Push event. A Character who has never jumped never fires (issue #2316).
 - **Courier Delivery Due**: Fires once an accepted courier contract's deliver-by deadline (`engine/courierDeadline.ts`, never `date_expired`) falls within a Character's configured lead time (`courierDeliveryDueLeadHours`, default 6h) — a Scheduled Push warning ahead of **Contract Failed**, which only arrives after the collateral is already forfeited. Only contracts the Character themselves accepted; a deadline already past fires nothing (issue #1713).
@@ -1207,13 +1258,14 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   a CPU optimisation, is what drove EVE University's worked "one extractor
   feeds three Basic Facilities" ratio: it is storage-overflow-driven. A layout
   can clear the Pin Budget and still stall.
-- **Triage Board**: What `/overview` is — not a dashboard of figures but an
-  answer to "is there anything I have to do before I log off", one card per
-  domain, each linking to the page that fixes it. Its organising rule: numbers
-  where the items are interchangeable, rows only where each item is genuinely
-  its own thing. Distinct from the **Corp Ops Board** (`/corp`), which answers
-  the same question for a corporation and shares the severity ladder but not
-  the layout.
+- **Triage Board**: The Overview as it was before the widget grid: a fixed
+  board with one card per domain and an Alerts column, answering "is there
+  anything I have to do before I log off". Retired. The question is now
+  answered by the header's Next deadline chip, the **Danger banner** and the
+  tone of each **Widget**; the Overview is an **Overview Layout** the pilot
+  builds. Distinct from the **Corp Ops Board** (`/corp`), which answers the
+  same question for a corporation and shares the severity ladder but not the
+  layout.
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
 - **Hauling Opportunities**: The Travel page's Hauling tab (`/travel/hauling`; moved from Market, where `/market/hauling` now redirects): items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list — see `docs/context/decisions/` (Hauling Opportunities v1 scope).
 - **Selling into buy orders**: (`instant` mode in code.) The **Hauling Opportunities** mode that sells the cargo instantly into the destination hub station's standing buy orders instead of listing it: priced at what those orders actually pay, after sales tax only, sized to the depth both books stay profitable to, with no **Days to Sell** or demand. `walkInstant` in `src/engine/market/haulingMarket.ts`.
