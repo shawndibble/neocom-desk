@@ -4118,7 +4118,15 @@
       "rate": "Tax rate, percent",
       "open": "Manage Taxes",
       "manage": "Manage Taxes",
-      "failed": "Couldn't save that Payee. Try again."
+      "needLogin": "Login to access",
+      "failed": "Couldn't save that Payee. Try again.",
+      "addPayee": {
+        "title": "Add Payee",
+        "confirm": "Add {{name}} as a Payee at {{pct}}%?",
+        "body": "{{name}} isn't one of your Payees yet. Add them so you can assign this ore's tax to them on the Tax tab.",
+        "submit": "Add Payee",
+        "skip": "Open without adding"
+      }
     },
     "info": {
       "title": "Additional information",
@@ -4126,6 +4134,7 @@
       "locationPlaceholder": "System, station or structure",
       "setWaypoint": "Set waypoint",
       "setWaypointTo": "Set waypoint to {{placeName}}",
+      "needLogin": "Login to set waypoint",
       "notes": "Notes",
       "notesPlaceholder": "Anything the fleet should know, such as where to dock",
       "kind": {

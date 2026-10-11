@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { createPayee } from '@/features/miningTax/payees';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { MoonTaxReadout, MoonTaxRow } from './MoonTaxRow';
 
 const { setSurveyTax } = vi.hoisted(() => ({ setSurveyTax: vi.fn() }));
@@ -121,17 +122,67 @@ describe('MoonTaxRow', () => {
 });
 
 describe('MoonTaxReadout', () => {
-  it('shows the rate and who gets it, with a link to the Tax tab and nothing to edit', () => {
-    render(
-      <MemoryRouter>
-        <MoonTaxReadout tax={{ name: 'Moon Corp', pct: 8 }} />
+  function renderReadout() {
+    return render(
+      <MemoryRouter initialEntries={['/s/abc123XYZ']}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <>
+                <MoonTaxReadout tax={{ name: 'Moon Corp', pct: 8 }} />
+                <Where />
+              </>
+            }
+          />
+        </Routes>
       </MemoryRouter>
     );
+  }
+
+  afterEach(() => useActiveCharacter.setState({ activeCharacterId: null, hydrated: true }));
+
+  it('shows the rate and who gets it, and logged out disables Manage Taxes with why', () => {
+    useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
+    renderReadout();
     expect(screen.getByText('8%')).toBeTruthy();
     expect(screen.getByText('Moon Corp').className).not.toContain('text-accent');
-    expect(screen.queryByRole('button')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Manage Taxes' }).getAttribute('href')).toBe(
-      '/mining/tax'
-    );
+    expect(screen.queryByRole('textbox')).toBeNull();
+    const manage = screen.getByRole('button', { name: 'Manage Taxes' }) as HTMLButtonElement;
+    expect(manage.disabled).toBe(true);
+    expect(screen.getByText('Login to access')).toBeTruthy();
+  });
+
+  it("opens the Tax tab on the viewer's own Payee by that name, keeping their rate", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    const mine = await createPayee(7, { name: 'moon corp', defaultTaxPct: 5 });
+    renderReadout();
+    expect(screen.queryByText('Login to access')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(await db.payees.toArray()).toEqual([mine]);
+  });
+
+  it('asks before adding a missing Payee, then adds it at the survey rate and opens the tab', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    renderReadout();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
+    await screen.findByText('Add Moon Corp as a Payee at 8%?');
+    expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Payee' }));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
+    expect(await db.payees.toArray()).toMatchObject([
+      { characterId: 7, name: 'Moon Corp', defaultTaxPct: 8 },
+    ]);
+  });
+
+  it('opens the tab without adding when the viewer declines', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    renderReadout();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open without adding' }));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
+    expect(await db.payees.count()).toBe(0);
   });
 });

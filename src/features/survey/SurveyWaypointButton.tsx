@@ -4,16 +4,21 @@
  * order book). The button is the same one the Moon tax row's "Manage Taxes"
  * uses, on its right on a wide screen and wrapping under the location on a
  * phone. Without a Character, or without the waypoint scope, it is disabled
- * with the reason under it rather than a click that fails. The status lines
- * take the whole row, so the caller's row wraps them under the button.
+ * with the reason under it rather than a click that fails; logged out, the
+ * reason is the same short "Login to…" line Manage Taxes shows. The status
+ * lines take the whole row, so the caller's row wraps them under the button.
  */
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useSetDestination } from '@/features/travel/useSetDestination';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 
 export function SurveyWaypointButton({ location }: { location: { id: number; name: string } }) {
   const { t } = useTranslation();
-  const { blockedReason, sending, outcome, send } = useSetDestination(location.id, location.name);
+  const loggedOut = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null)) === null;
+  const destination = useSetDestination(location.id, location.name);
+  const { sending, outcome, send } = destination;
+  const blockedReason = loggedOut ? t('survey.info.needLogin') : destination.blockedReason;
   return (
     <>
       <Button
