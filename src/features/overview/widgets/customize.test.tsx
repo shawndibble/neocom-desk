@@ -253,6 +253,19 @@ describe('Widget menu', () => {
     expect(seen.current.widgets.find((x) => x.id === 'c')?.showOnPhone).toBe(false);
   });
 
+  it('disables Duplicate at the 30 widget limit', async () => {
+    const full: OverviewLayout = {
+      version: 1,
+      widgets: Array.from({ length: MAX_WIDGETS }, (_, i) => w(`x${i}`, 'mail')),
+    };
+    const { user } = setup({ initial: full });
+    await user.click(screen.getAllByRole('button', { name: 'Settings for Mail' })[0]);
+    expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+  });
+
   it('renames through a dialog and clears the name when emptied', async () => {
     const { user, seen } = setup();
     await user.click(screen.getByRole('button', { name: 'Settings for Wallet' }));

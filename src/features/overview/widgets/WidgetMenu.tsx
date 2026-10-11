@@ -30,7 +30,13 @@ import * as Icon from '@/components/ui/icons';
 import { kindSumsAcrossCharacters } from './data/models';
 import { useOverviewEdit } from './editContext';
 import { getKind } from './kinds';
-import { WIDGET_RANGES, type Widget, type WidgetRange, type WidgetScope } from './layout';
+import {
+  MAX_WIDGETS,
+  WIDGET_RANGES,
+  type Widget,
+  type WidgetRange,
+  type WidgetScope,
+} from './layout';
 import type { WidgetView } from './kinds';
 
 function RenameDialog({
@@ -172,7 +178,10 @@ export function WidgetMenu({ widget }: { widget: Widget }) {
           <DropdownMenuItem onSelect={() => run(() => setRenaming(true))}>
             {t('overview.menu.rename')}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => edit.duplicate(widget.id)}>
+          <DropdownMenuItem
+            disabled={edit.layout.widgets.length >= MAX_WIDGETS}
+            onSelect={() => edit.duplicate(widget.id)}
+          >
             {t('overview.menu.duplicate')}
           </DropdownMenuItem>
           <DropdownMenuItem disabled={index <= 0} onSelect={() => edit.moveEdge(widget.id, 'top')}>

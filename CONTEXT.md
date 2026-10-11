@@ -35,26 +35,6 @@ here — they go one per file in `docs/context/decisions/`.
   again ("where is this pile worth the most") from either of the above, and
   not the **Compare** drawer under another name: it shares no state or code
   path with it and never touches the **Compare Set**.
-- **Danger banner**: The red strip under the Overview's sub-nav while an unacknowledged danger
-  **Alert** exists (a structure under attack, a Corp kick): "Danger", the
-  title, the detail and its age, with View and Acknowledge. Acknowledge is
-  Dismiss for the whole danger type (a synced `dismissedAt`), so the strip
-  and the bell panel never disagree about what is outstanding. Also drawn
-  on a phone. Nothing else raises it.
-- **Gallery**: The Overview's "Add a widget" drawer (a bottom sheet on a phone): search
-  and category chips over the **Widget Kind** catalogue, each kind with its
-  description, an Add (or Add another, the same kind may appear more than
-  once) button and, on a desktop, an inert Medium-size preview of the real
-  **Widget** on sample figures. A kind not built yet reads "Coming soon" and
-  cannot be added; at 30 **Widgets** every kind reads "Limit reached". New
-  tags and "Recently added" are for a returning pilot only.
-- **Overview Layout**: The ordered list of **Widgets** on the Overview, with each one's size,
-  view, rename, character scope, range and whether it shows on a phone. One
-  per pilot, not per Character, synced as a whole (last write wins) like the
-  other account preferences; **absent** means first run, so the Role chooser
-  asks. Customize snapshots it: Done keeps the edits, Cancel puts the
-  snapshot back exactly. A returning pilot's first layout is migrated from
-  the old hidden-card and card-order settings.
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
@@ -301,6 +281,12 @@ here — they go one per file in `docs/context/decisions/`.
   forward): a rejected send surfaces ESI's own error text and points the
   pilot at the in-game client instead.
 - **Damage Profile**: The mix of EM, Thermal, Kinetic and Explosive damage a **Fitting**'s tank is measured against — uniform, one pure type, a common NPC faction's average, or one the pilot defines. Changes EHP, never raw HP or resists — except that a running Reactive Armor Hardener adapts its own (and so the armor layer's) resists to it, shown labelled as adapted. Distinct from a **Target Profile**, which is about what the Fitting shoots at.
+- **Danger banner**: The red strip under the Overview's sub-nav while an unacknowledged danger
+  **Alert** exists (a structure under attack, a Corp kick): "Danger", the
+  title, the detail and its age, with View and Acknowledge. Acknowledge is
+  Dismiss for the whole danger type (a synced `dismissedAt`), so the strip
+  and the bell panel never disagree about what is outstanding. Also drawn
+  on a phone. Nothing else raises it.
 - **Dark**: A member with no login for the corp's inactivity span or more —
   the pilot's own setting (14/30/60/90 days), defaulting to
   `DARK_AFTER_DAYS` (30). `engine/corp/members.ts` still owns the default and
@@ -390,6 +376,13 @@ here — they go one per file in `docs/context/decisions/`.
   the Notification Feed already shows as delivered (Occurrence Key, round
   44/#360).
 - **Freshness Window** (round 25): how long a cached row is served without asking ESI again. Ten minutes for a Character's own data, a day for game constants. Distinct from **Data Age**, which reports how old the shown data is; the window decides whether to go and get newer.
+- **Gallery**: The Overview's "Add a widget" drawer (a bottom sheet on a phone): search
+  and category chips over the **Widget Kind** catalogue, each kind with its
+  description, an Add (or Add another, the same kind may appear more than
+  once) button and, on a desktop, an inert Medium-size preview of the real
+  **Widget** on sample figures. A kind not built yet reads "Coming soon" and
+  cannot be added; at 30 **Widgets** every kind reads "Limit reached". New
+  tags and "Recently added" are for a returning pilot only.
 - **Gank Chokepoint**: one of the named systems haulers are most often killed in — Uedama, Sivala, Aufay, Balle, Tama, Rancer, Ahbazon. A property of _traffic_, not of security status: these are what every profitable route funnels through, and Uedama and Balle both show as ordinary 0.5 systems. An explicit list rather than a derived rule, because the map does not imply it. An endpoint in one is marked on the row; a route _through_ one is named in the haul detail, which is the only place the path is worked out. States where a haul goes, never that anything will happen to the hauler there.
 - **Goal Plan**: the PI Plan tab's answer to "here are my colonies and the products I want per day — what does each colony do?". Goals (products at a units/day rate) are expanded into demand, and a greedy solver assigns each enabled colony a role — extract one or two P0 types and refine them to P1 on the spot, host the P2+ factories, or sit idle — fitted against that colony's own CPU/Powergrid. Measured against the **Baseline**: every colony selling the best P1 it can make by itself. The plan's **Lift** is its net ISK minus the Baseline, so extracted P0 is never priced at zero and a plan that earns less than doing nothing clever says so. What it cannot cover is a **Shortfall**, of one of two kinds that call for different fixes: a **Type gap** (no enabled colony's planet type yields that P0 — add a planet of a listed type) and a **Budget gap** (colonies that could yield it are full — re-target one, or buy). Its output is a change list against what each colony runs today (keep / re-target / convert to factory), never a fresh layout.
 - **Chain estimate**: a P3 or P4's ISK a day as a whole multi-planet chain: the Goal Plan's solver run on new planets the pilot would add, at the one-planet ranking's own assumptions (rate, Command Center level, link cost, customs, sell market). Always labelled "multi-planet, needs hauling" and an estimate, and never ranked against one-planet figures, picks or totals, except in Plan's opt-in **Bigger chain** section, which compares it with the one-planet pick on as many free slots. See decisions 20261006-095530 and 20261006-154532.
@@ -502,12 +495,6 @@ here — they go one per file in `docs/context/decisions/`.
   rather than as a matched return trip. A haul with an end nothing local places
   has **no lane to look up** — stated as such, never as a count of zero, which
   would read as "nobody is hauling back" where the truth is "we cannot tell".
-- **Role**: A first-run answer to "What do you do in EVE?" (Trader, Industrialist,
-  Planetary industry, Miner, Fighter, Explorer and hauler) that maps to a
-  set of **Widget Kinds**. Several can be picked; the union, plus Wallet,
-  Training, Coming up and Mail which are always in, becomes the first
-  **Overview Layout**. Reachable later as Customize > Start from a role.
-  Not a **Corp Role**, which is a permission in the game.
 - **Route Safety**: Travel's view of a stargate route — every system on it, in
   order, with its security, region, the last hour of jumps and ship, pod and
   NPC kills ESI reports, and a mark on any **Gank Chokepoint**. Each system
@@ -526,10 +513,6 @@ here — they go one per file in `docs/context/decisions/`.
   and none is in J-space. A figure still loading or unavailable never counts
   as zero, so such a system never folds. Named for the figures, never a
   verdict on the systems.
-- **Size**: A **Widget**'s width on the Overview: S, M, L or Full, a share of one row
-  (a third, a half, two thirds, the whole), not a height: its content sets
-  that. Size also sets how much a **View** shows (list rows, chart height).
-  On a phone Small sits two across and every other size takes the row.
 - **Stop**: one of up to ten systems a Route Safety trip visits after its
   start (the **Current System** unless the link names another), kept in the
   link in the order typed. Optimize stop order may fly them in a cheaper
@@ -550,10 +533,6 @@ here — they go one per file in `docs/context/decisions/`.
   this device's list — found by a character's structure search or pasted —
   each as one jump, shown as its own row and as a dashed-edged **Route
   strip** cell. Decision `20261003-204009`.
-- **View**: How a **Widget** draws its data: Number, Chart or List, whichever its
-  **Widget Kind** has. The headline number is on screen in every view; List
-  is also the text equivalent of a Chart. Chosen in the widget's settings
-  menu, never by a glyph in its header.
 - **Way to fly**: one way a **Leg** can be flown, listed beside its rows:
   Gates only (always), Via Thera / Via Turnur (when that hub has a
   qualifying hole), Via Ansiblex (with Use jump bridges on, when a known
@@ -790,6 +769,13 @@ here — they go one per file in `docs/context/decisions/`.
   this ceiling, so it is derived from trained skills
   (`src/engine/market/orderSlots.ts`) and shown as the denominator of the
   Overview's Open orders tile.
+- **Overview Layout**: The ordered list of **Widgets** on the Overview, with each one's size,
+  view, rename, character scope, range and whether it shows on a phone. One
+  per pilot, not per Character, synced as a whole (last write wins) like the
+  other account preferences; **absent** means first run, so the Role chooser
+  asks. Customize snapshots it: Done keeps the edits, Cancel puts the
+  snapshot back exactly. A returning pilot's first layout is migrated from
+  the old hidden-card and card-order settings.
 - **Owned-Stock Offer**: A materials row's "Use assets" offer — the
   owned quantity it would write (detected stock in the owned-stock scope,
   capped at what the row needs), or none: a Blueprint Acquisition row, no
@@ -1023,6 +1009,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   the list, so the Triage Board groups them into one row rather than one per
   colony (`engine/pi/colonyBatches.ts`). A colony is what the Colonies table
   lists; a Reset Run is what a pilot actually goes and does.
+- **Role**: A first-run answer to "What do you do in EVE?" (Trader, Industrialist,
+  Planetary industry, Miner, Fighter, Explorer and hauler) that maps to a
+  set of **Widget Kinds**. Several can be picked; the union, plus Wallet,
+  Training, Coming up and Mail which are always in, becomes the first
+  **Overview Layout**. Reachable later as Customize > Start from a role.
+  Not a **Corp Role**, which is a permission in the game.
 - **Roster Baseline**: The member list one observer last saw, per Character,
   device-local and never synced. Each observer keeps its own; the baseline
   records what _that_ observer has already reported.
@@ -1152,20 +1144,6 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `1,254,000,000` both render `1.25B`-ish) safe to accept. See
   `docs/context/decisions/` for the rule the rollout follows.
 - **Shared jump cooldown**: The single clone-jump cooldown a Character has, common to every Jump Clone (not per clone); the Clones page states it once.
-- **Widget**: One tile on the Overview: an instance of a **Widget Kind** with its own
-  **Size**, **View**, optional rename, character scope and range. The same
-  kind may appear more than once. Always in one of five **Widget States**.
-- **Widget Kind**: An entry in the catalogue of what the Overview can show (Wallet, Orders,
-  Planetary...): its title and description, category, which **Views** it
-  has, default **Size**, whether it has a range, the ESI permission it needs
-  and its empty message. `src/features/overview/widgets/kinds.ts`. A kind
-  that is not built yet is "coming soon": listed in the **Gallery**, not
-  addable.
-- **Widget State**: Which of five things a **Widget** is showing: loading (a skeleton),
-  needs permission (the ESI permission by name, with Grant access), failed
-  (Could not load, the last good value dimmed, Retry), empty (the kind's
-  own message, with Remove widget) or ok. `resolveWidgetState` in
-  `src/features/overview/widgets/state.ts`.
 - **Worn clone**: The clone a Character is in right now, whose implants are the Character's fitted implants; listed on the Clones page as "Wearing now" and distinct from its Jump Clones.
 - **Clone Jump Ready**: Fires once when a Character's jump-clone cooldown ends — `last_clone_jump_date` plus `24 - ` the Effective Skill Level of Infomorph Synchronizing hours (level 0 when skills can't be read, so late, never early). A Scheduled Push event. A Character who has never jumped never fires (issue #2316).
 - **Courier Delivery Due**: Fires once an accepted courier contract's deliver-by deadline (`engine/courierDeadline.ts`, never `date_expired`) falls within a Character's configured lead time (`courierDeliveryDueLeadHours`, default 6h) — a Scheduled Push warning ahead of **Contract Failed**, which only arrives after the collateral is already forfeited. Only contracts the Character themselves accepted; a deadline already past fires nothing (issue #1713).
@@ -1184,6 +1162,10 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `docs/context/decisions/20260923-230312-skill-queue-ending-notification.md`
   for why no separate "Skill Plan step completed" event exists alongside it
   (issue #1410).
+- **Size**: A **Widget**'s width on the Overview: S, M, L or Full, a share of one row
+  (a third, a half, two thirds, the whole), not a height: its content sets
+  that. Size also sets how much a **View** shows (list rows, chart height).
+  On a phone Small sits two across and every other size takes the row.
 - **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Signalled for a **Published Snapshot**, where a long window encodes a publish cadence, so a mounted view re-reads the fresher rows. Silent for a game constant: its long window asserts the value cannot change, so the lapsed row is shown at once and the refresh lands for the next read without re-rendering anything. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
   manager acts on — clocks due inside a day, Runway, 30-day net — beside the
@@ -1310,6 +1292,10 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   signed "vs <item>" sell delta, the item's own prices above it — for price
   comparison; falls back to its Market Group siblings when it has no
   variation data.
+- **View**: How a **Widget** draws its data: Number, Chart or List, whichever its
+  **Widget Kind** has. The headline number is on screen in every view; List
+  is also the text equivalent of a Chart. Chosen in the widget's settings
+  menu, never by a glyph in its header.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in
   their own words, what leaves their device. Not documentation — a
   **commitment**: the **Synced Collection** registry's `REMOTE_COLLECTIONS` is
@@ -1320,3 +1306,17 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   section a reader can catch overclaiming is worth less than none. Deep-linkable
   at `/settings#faq`.
 - **What-If Implants**: Optimizer override that assumes a hypothetical implant set instead of the clone's current implants. Five independent per-attribute bonuses (+0..+5 each), since EVE's attribute hardwirings are per slot — a clone can run +4 PER / +5 INT / +3 MEM and nothing in WIL or CHA. The matched sets (+1..+5 in every slot) remain one-click **presets** over those five values; see round 28. Stored on the Skill Plan and synced with it (round 33).
+- **Widget**: One tile on the Overview: an instance of a **Widget Kind** with its own
+  **Size**, **View**, optional rename, character scope and range. The same
+  kind may appear more than once. Always in one of five **Widget States**.
+- **Widget Kind**: An entry in the catalogue of what the Overview can show (Wallet, Orders,
+  Planetary...): its title and description, category, which **Views** it
+  has, default **Size**, whether it has a range, the ESI permission it needs
+  and its empty message. `src/features/overview/widgets/kinds.ts`. A kind
+  that is not built yet is "coming soon": listed in the **Gallery**, not
+  addable.
+- **Widget State**: Which of five things a **Widget** is showing: loading (a skeleton),
+  needs permission (the ESI permission by name, with Grant access), failed
+  (Could not load, the last good value dimmed, Retry), empty (the kind's
+  own message, with Remove widget) or ok. `resolveWidgetState` in
+  `src/features/overview/widgets/state.ts`.
