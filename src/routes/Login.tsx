@@ -687,9 +687,9 @@ function PreviewWidget({ title, children }: { title: string; children: ReactNode
       aria-label={title}
       className="flex min-w-0 flex-col rounded-xs border border-line bg-panel"
     >
-      <h2 className="truncate border-b border-line px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase">
+      <p className="truncate border-b border-line px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase">
         {title}
-      </h2>
+      </p>
       <div className="grid gap-0.5 px-3 py-2.5">{children}</div>
     </section>
   );
