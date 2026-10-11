@@ -32,7 +32,7 @@ import type { NotificationEventId } from './events';
 const ICON_URL = '/icons/icon-192.png';
 const BADGE_URL = '/icons/badge-96.png';
 
-/** Where each event's notification lands. Falls back to the Alerts page. */
+/** Where each event's notification lands. Falls back to `/alerts`, which redirects to the Overview's alerts panel. */
 export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   skillLevelComplete: '/skills/trained',
   characterNotTraining: '/skills/trained',
@@ -167,7 +167,7 @@ const highlightRow: SubjectUrl = (base, subjectId) =>
  *
  * Which field of the fire is the subject lives on the event's poll domain
  * (`domainCopy.ts`'s `subjectOf`, issue #1249); only the URL shape is here,
- * because the Service Worker (`pushHandler.ts`) and the Alerts page build
+ * because the Service Worker (`pushHandler.ts`) and the bell panel build
  * URLs from a stored event id and must not import the poll registry.
  * `pollDomains.test.ts` pins the two to the same set of events.
  */

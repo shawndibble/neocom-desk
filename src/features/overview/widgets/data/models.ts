@@ -95,7 +95,7 @@ const STOCK_PATH = '/market/stock';
 
 // --- Which reads a kind needs ------------------------------------------------
 
-/** Kind -> the feeds it reads. A kind absent here has no data yet (the next stage fills it). */
+/** Kind -> the feeds it reads. A kind absent here reads no feed and draws without data. */
 export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = {
   wallet: ['wallet', 'journal'],
   training: ['skills'],

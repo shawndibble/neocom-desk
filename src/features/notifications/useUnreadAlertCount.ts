@@ -1,6 +1,6 @@
 /**
- * How many alerts the Alerts page would show right now — the number the rail's
- * badge and the Overview's alerts column both carry.
+ * How many alerts the bell panel would show right now — the number the bell's
+ * badge carries.
  *
  * The same figure `refreshAppBadge` puts on the installed app's icon, and
  * deliberately so: two places claiming to count "unread alerts" and

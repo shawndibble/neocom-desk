@@ -396,7 +396,7 @@ export const MoonMining = withWeight(Moon);
  */
 export const Notifications = withWeight(Bell);
 /**
- * Where a feature's own preferences live — the Alerts page's shortcut into
+ * Where a feature's own preferences live — the bell panel's shortcut into
  * Settings, say, or a page header's gear that opens its settings modal. The
  * destination, not an action, so it is never the glyph on a
  * button that changes something.

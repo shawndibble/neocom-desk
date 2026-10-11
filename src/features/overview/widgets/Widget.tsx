@@ -10,8 +10,8 @@
  * vanishes when it has nothing to say cannot be told from one that failed to
  * load.
  *
- * No view-cyclers in the header: view switching lives in the settings menu
- * (next stage), so a stray click changes nothing.
+ * No view-cyclers in the header: view switching lives in the settings menu, so
+ * a stray click changes nothing.
  */
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
