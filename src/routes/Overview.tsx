@@ -320,7 +320,7 @@ export function Overview() {
     cacheKey: 'overview:moon-chunks',
   });
   const corpAccess = useCorpAccess();
-  // Read by `IncursionsBoardSource`, mounted only while the card is on.
+  // Read by `IncursionsBoardSource`, mounted only while the card is on; null when off.
   const [incursions, setIncursions] = useState<IncursionsBoardData | null>(null);
   const [incursionsRefresh, setIncursionsRefresh] = useState(0);
   const { hydrated, activeCharacterId } = walletSnapshot;

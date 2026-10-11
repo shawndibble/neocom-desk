@@ -745,7 +745,8 @@ export function PriceAlertsCard({
  * The nearest Incursions from the pilot's Current System, off by default
  * (`hiddenCards.ts`). Each row opens Route Safety with its staging system as a
  * stop. No severity word in the header: a nearby Incursion is a condition, not
- * something the board can call clear or urgent.
+ * something the board can call clear or urgent. Rows carry `clear` only
+ * because a `TriageRow` must carry a tone; it is the neutral one.
  */
 export function IncursionsCard({ data }: { data: IncursionsBoardData | null }) {
   const { t } = useTranslation();
@@ -798,14 +799,17 @@ export function IncursionsCard({ data }: { data: IncursionsBoardData | null }) {
                   when={incursionJumpsWhen(t, row, ready.jumpsStatus)}
                   subject={system}
                   detail={
-                    <>
-                      <span className={`font-semibold ${INCURSION_STATE_TONE[row.state]}`}>
-                        {state}
-                      </span>
-                      {` · ${constellation}`}
-                    </>
+                    <Trans
+                      i18nKey="overview.board.incursionsDetail"
+                      values={{ state, constellation }}
+                      components={{
+                        state: (
+                          <span className={`font-semibold ${INCURSION_STATE_TONE[row.state]}`} />
+                        ),
+                      }}
+                    />
                   }
-                  detailLabel={`${state} · ${constellation}`}
+                  detailLabel={t('overview.board.incursionsDetailLabel', { state, constellation })}
                   to={routeToHref(row.stagingSystemId)}
                 />
               );

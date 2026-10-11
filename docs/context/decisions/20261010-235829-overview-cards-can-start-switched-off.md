@@ -19,6 +19,8 @@ _Recorded 2026-10-10 · issue #3541._
   that mounts only while the card is on. They are three fetches nobody asked
   for.
 - **The Incursions card states conditions, not verdicts.** Its header has no
-  severity word and every row is `clear`, because a nearby Incursion is
-  nothing the board should call urgent. It uses Route Safety's loader and jump
-  basis (#3540), so the card and the panel never disagree about a distance.
+  severity word, because a nearby Incursion is nothing the board should call
+  urgent. Every row still carries `clear`: the card uses `TriageRow`, which
+  requires a tone, and `clear` is the neutral one, not a verdict on the site.
+  The card and Route Safety's panel read through one hook (`useIncursions`,
+  #3540), so they never disagree about a distance.

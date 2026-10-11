@@ -3608,6 +3608,10 @@
       "incursionsNearest_other": "{{count}} active · nearest {{system}}, {{jumps}}",
       "incursionsActive_one": "{{count}} active in total",
       "incursionsActive_other": "{{count}} active in total",
+      "incursionsNoOrigin_one": "{{count}} active · set your current system for jumps",
+      "incursionsNoOrigin_other": "{{count}} active · set your current system for jumps",
+      "incursionsDetail": "<state>{{state}}</state> · {{constellation}}",
+      "incursionsDetailLabel": "{{state}} · {{constellation}}",
       "incursionsNone": "No incursions active",
       "incursionsFailed": "Incursion feed unreadable",
       "priceAlertTarget": {

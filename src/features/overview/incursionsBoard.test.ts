@@ -63,9 +63,15 @@ describe('incursionsSummary', () => {
     );
   });
 
-  it('only counts them when there is no distance to give', () => {
+  it('says why there is no distance without a current system', () => {
     expect(
       incursionsSummary(t, data({ rows: [row(30002813, null)], jumpsStatus: 'no-origin' }))
+    ).toBe('overview.board.incursionsNoOrigin(count=1)');
+  });
+
+  it('only counts them when the distance could not be counted', () => {
+    expect(
+      incursionsSummary(t, data({ rows: [row(30002813, null)], jumpsStatus: 'unknown' }))
     ).toBe('overview.board.incursionsActive(count=1)');
   });
 

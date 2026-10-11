@@ -45,6 +45,10 @@ export function incursionsSummary(t: Translate, data: IncursionsBoardData | null
   const nearest = data.rows[0];
   if (nearest === undefined) return t('overview.board.incursionsNone');
   if (nearest.jumps === null) {
+    // Say why there is no distance, as the card does, rather than leave it out.
+    if (data.jumpsStatus === 'no-origin') {
+      return t('overview.board.incursionsNoOrigin', { count: data.rows.length });
+    }
     return t('overview.board.incursionsActive', { count: data.rows.length });
   }
   return t('overview.board.incursionsNearest', {
@@ -56,7 +60,11 @@ export function incursionsSummary(t: Translate, data: IncursionsBoardData | null
   });
 }
 
-/** Never above clear: nothing about a nearby Incursion is the pilot's to act on. */
+/**
+ * Never above clear: nothing about a nearby Incursion is the pilot's to act
+ * on. `clear` is the board's neutral tone here, the one a `TriageRow` must
+ * carry, not a verdict on the site.
+ */
 export function incursionsSeverity(data: IncursionsBoardData | null): DeadlineSeverity | null {
   return data?.status === 'ready' ? 'clear' : null;
 }

@@ -1,26 +1,20 @@
 /**
  * The Incursions card's reads, mounted only while the card is switched on:
  * the pilot's location, their jump basis and the public feed are three
- * fetches a board that never shows the card has no business making.
+ * fetches a board that never shows the card has no business making. A
+ * component rather than a hook on the route, because the reads it gates
+ * (`useCurrentSystem`, the jump basis) start on mount and take no flag.
  *
- * The same loader and jump basis Route Safety's "Incursions near you" uses
- * (#3540) — `loadIncursions` and `useJumpRangeFilter` — so the card and the
- * panel can never disagree about a distance. Renders nothing; it reports up
- * to the route, which needs the rows for the folded phone line as well as the
- * card.
+ * The same read Route Safety's "Incursions near you" uses (`useIncursions`,
+ * #3540). Renders nothing; it reports up to the route, which needs the rows
+ * for the folded phone line as well as the card, and reports `null` when it
+ * unmounts so a card switched back on never shows the last session's feed.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { buildIncursionRows } from '@/engine/incursions/incursionRows';
-import { useCurrentSystem, useJumpRangeFilter } from '@/features/route/currentSystem';
+import { useEffect, useMemo } from 'react';
+import { useCurrentSystem } from '@/features/route/currentSystem';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
-import {
-  loadConstellationNames,
-  loadIncursions,
-  type IncursionsFeed,
-} from '@/features/travel/incursionsData';
+import { useIncursions } from '@/features/travel/useIncursions';
 import type { IncursionsBoardData } from './incursionsBoard';
-
-const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
 export function IncursionsBoardSource({
   refreshKey,
@@ -28,34 +22,13 @@ export function IncursionsBoardSource({
 }: {
   /** Bumped by the board's Refresh: re-reads the feed. */
   refreshKey: number;
-  onChange: (data: IncursionsBoardData) => void;
+  /** Must be stable (a state setter): it is an effect dependency. */
+  onChange: (data: IncursionsBoardData | null) => void;
 }) {
   const current = useCurrentSystem();
-  const { jumps, jumpsStatus } = useJumpRangeFilter(current, 'any');
+  const { feed, rows, constellationNames, jumpsStatus } = useIncursions(current, refreshKey);
   const systems = useSolarSystemIndex();
-  const [feed, setFeed] = useState<IncursionsFeed | null | undefined>(undefined);
-  const [constellationNames, setConstellationNames] = useState(NO_NAMES);
 
-  useEffect(() => {
-    let live = true;
-    void loadIncursions().then((result) => {
-      if (!live) return;
-      setFeed(result);
-      if (result) {
-        void loadConstellationNames(result.entries.map((e) => e.constellation_id)).then((n) => {
-          if (live) setConstellationNames(n);
-        });
-      }
-    });
-    return () => {
-      live = false;
-    };
-  }, [refreshKey]);
-
-  const rows = useMemo(
-    () => (feed ? buildIncursionRows(feed.entries, jumpsStatus === 'ready' ? jumps : null) : []),
-    [feed, jumps, jumpsStatus]
-  );
   const systemNames = useMemo(
     () =>
       new Map(
@@ -71,6 +44,7 @@ export function IncursionsBoardSource({
   useEffect(() => {
     onChange({ status, rows, jumpsStatus, systemNames, constellationNames });
   }, [onChange, status, rows, jumpsStatus, systemNames, constellationNames]);
+  useEffect(() => () => onChange(null), [onChange]);
 
   return null;
 }
