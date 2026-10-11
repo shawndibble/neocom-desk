@@ -862,7 +862,10 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   goal has no date to rank by, so it never counts as "next." See
   `docs/context/decisions/` for why this doesn't reuse **Remap Marker**
   storage: a marker is an entry-list _position_, while a milestone means "when
-  these skills are done, wherever they end up."
+  these skills are done, wherever they end up." A Plan Milestone can also come
+  from a saved Fitting (a _fit goal_, `fittingId` set): its anchor is the latest
+  step the Fitting's hull, modules, charges, drones and fighters need, kept
+  current as the Fitting or the plan order changes (`engine/fitGoal.ts`).
 - **Plan Setup**: The folded block of a Build Plan's inputs — runs, ME/TE, build location, facility, rig, tax, trade hub, material price basis — read as a row of chips until "Edit setup" opens the controls. The same fields as before; only their default visibility changed (see docs/context/decisions, 2026-09-06 verdict-first).
 - **Dismissed delivery**: A delivered manufacturing or reaction job in the Jobs panel's History segment that the pilot marked "won't be logged". It stops counting as "not logged" everywhere (panel, Build Plan badge) and loses its Log production prompt, but stays listed, marked Dismissed, and can be restored.
 - **Production Log**: The cross-plan, cross-item realized-profit rollup
