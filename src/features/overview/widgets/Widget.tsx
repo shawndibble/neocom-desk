@@ -60,6 +60,8 @@ export interface WidgetProps {
   editControls?: ReactNode;
   /** Draw this sample instead of the live read: the Gallery's inert preview. */
   previewView?: KindView;
+  /** The Gallery's preview already sits under the kind's name: draw the body alone, no header. */
+  hideHeader?: boolean;
   /** The empty state's Remove widget. */
   onRemove: (id: string) => void;
 }
@@ -232,6 +234,7 @@ function WidgetFrame({
   headerStart,
   editControls,
   view,
+  hideHeader = false,
   onRemove,
 }: Omit<WidgetProps, 'previewView'> & { view: KindView }) {
   const { t } = useTranslation();
@@ -325,34 +328,36 @@ function WidgetFrame({
         editing ? 'border-dashed border-line-bright' : 'border-line'
       )}
     >
-      <div className="flex min-h-11 items-center gap-1.5 border-b border-line pr-1 pl-2.5 md:min-h-8">
-        {headerStart}
-        <h2 className="min-w-0 text-[0.6875rem] font-semibold tracking-widest uppercase">
-          {view.to !== null ? (
-            <Tooltip content={t('overview.widgets.opensPage', { title })}>
-              <Link
-                to={view.to}
-                className={entityLinkClassName(
-                  'flex min-h-11 min-w-0 items-center gap-0.5 text-text md:min-h-8'
-                )}
-              >
-                <span className="min-w-0 truncate">{title}</span>
-                <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
-              </Link>
-            </Tooltip>
-          ) : (
-            <span className="block truncate text-text">{title}</span>
+      {!hideHeader && (
+        <div className="flex min-h-11 items-center gap-1.5 border-b border-line pr-1 pl-2.5 md:min-h-8">
+          {headerStart}
+          <h2 className="min-w-0 text-[0.6875rem] font-semibold tracking-widest uppercase">
+            {view.to !== null ? (
+              <Tooltip content={t('overview.widgets.opensPage', { title })}>
+                <Link
+                  to={view.to}
+                  className={entityLinkClassName(
+                    'flex min-h-11 min-w-0 items-center gap-0.5 text-text md:min-h-8'
+                  )}
+                >
+                  <span className="min-w-0 truncate">{title}</span>
+                  <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+                </Link>
+              </Tooltip>
+            ) : (
+              <span className="block truncate text-text">{title}</span>
+            )}
+          </h2>
+          {showNew && kind.isNew && (
+            <span className="rounded-xs bg-accent px-1.5 text-[0.5625rem] font-bold tracking-widest text-accent-contrast uppercase">
+              {t('overview.widgets.new')}
+            </span>
           )}
-        </h2>
-        {showNew && kind.isNew && (
-          <span className="rounded-xs bg-accent px-1.5 text-[0.5625rem] font-bold tracking-widest text-accent-contrast uppercase">
-            {t('overview.widgets.new')}
-          </span>
-        )}
-        {scope.chip && <AllCharactersReadout compact={widget.size === 'S'} />}
-        <span className="flex-1" />
-        {menu}
-      </div>
+          {scope.chip && <AllCharactersReadout compact={widget.size === 'S'} />}
+          <span className="flex-1" />
+          {menu}
+        </div>
+      )}
       <div className="flex-1">{body}</div>
       {editControls}
       {scope.fallbackNote && state === 'ok' && characterId !== null && (

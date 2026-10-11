@@ -4041,7 +4041,16 @@
       "addAnotherLabel": "Add another {{title}}",
       "limit": "Limit reached",
       "comingSoon": "Coming soon",
-      "new": "New"
+      "new": "New",
+      "subtitle": "{{total}} widgets · {{onBoard}} on your Overview",
+      "chipCount_one": "{{count}} widget",
+      "chipCount_other": "{{count}} widgets",
+      "facts": "Views and default size",
+      "sizeBadge": "Size {{size}}",
+      "onBoard": "On your Overview ×{{count}}",
+      "added": "Added",
+      "noMatchHint": "Try another word, or clear the search to see every widget.",
+      "clearSearch": "Clear search"
     },
     "roles": {
       "title": "What do you do in EVE?",
