@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -12,6 +12,12 @@ interface CharacterHeaderProps {
   totalSp: number | null;
   /** ESI's unallocated_sp; null while loading, or when unavailable. */
   unallocatedSp: number | null;
+  /**
+   * Page-specific controls, drawn after the SP chips and before the bell. Only
+   * the Overview passes it (the Character switcher, Next deadline, Refresh and
+   * Customize).
+   */
+  actions?: ReactNode;
 }
 
 /**
@@ -24,10 +30,12 @@ interface CharacterHeaderProps {
  * block jumping in and out as you moved between tabs was the actual complaint.
  * The character's name is the `<h1>` — one per route, as before.
  *
- * It takes no controls slot on purpose. Everything above the tab strip is the
- * same on every tab, full stop; a view's `DataAgeBadge` and its Refresh belong
- * to the data they describe, so they sit in that view's `Panel` toolbar below
- * the tabs — which is where Overview's own panel badges already were.
+ * It has no controls of its own: everything above the tab strip is the same on
+ * every tab. A view's `DataAgeBadge` and its Refresh belong to the data they
+ * describe, so they sit in that view's `Panel` toolbar below the tabs. The one
+ * exception is the Overview, whose widgets are the page: its header hosts the
+ * Character switcher, Next deadline chip, data age, Refresh and Customize through
+ * `actions`. Clones and Employment History pass nothing.
  *
  * Identity is read here rather than passed in: it is the same on every tab and
  * comes from local state (Dexie) plus a session store, so threading it through
@@ -35,7 +43,12 @@ interface CharacterHeaderProps {
  * an ESI read whose freshness belongs to the view's own load/refresh cycle —
  * see `characterSp.ts` for what the two scope-light tabs feed it.
  */
-export function CharacterHeader({ characterId, totalSp, unallocatedSp }: CharacterHeaderProps) {
+export function CharacterHeader({
+  characterId,
+  totalSp,
+  unallocatedSp,
+  actions,
+}: CharacterHeaderProps) {
   const { t } = useTranslation();
   const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
   const publicInfo = usePublicInfo((state) => state.byCharacterId[characterId]);
@@ -97,6 +110,7 @@ export function CharacterHeader({ characterId, totalSp, unallocatedSp }: Charact
         <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />
         <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />
       </StatChips>
+      {actions}
       {/* This header stands in for `PageHeader` on Overview, Clones and Employment History. */}
       <AlertsBell />
     </header>
