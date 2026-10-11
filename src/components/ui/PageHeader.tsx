@@ -7,7 +7,9 @@ import { PageViewPicker } from './PageViewPicker';
 import { usesViewPicker, type PageViews } from './viewPicker';
 
 interface PageHeaderProps {
-  /** Already-translated page title. Rendered as the route's one `<h1>`. */
+  /**
+   * @summary Already-translated page title, rendered as the route's one `<h1>`.
+   */
   title: string;
   /**
    * Sits immediately after the title, sharing its baseline: the view's
@@ -20,7 +22,7 @@ interface PageHeaderProps {
    * `Assets.tsx`, `OverviewTab.tsx`).
    */
   meta?: ReactNode;
-  /** Right-aligned control cluster. `IconButton`s, in the order they're used. */
+  /** @summary Right-aligned control cluster of `IconButton`s, in the order they're used. */
   actions?: ReactNode;
   /**
    * A route's sub-navigation, on the title's own line instead of below it.
@@ -65,6 +67,8 @@ interface PageHeaderProps {
  * Character's own portrait below `md`. A route with one Character to offer,
  * and so no filter control, has nothing to name here either — the bottom
  * tab bar's More sheet is still a phone's route to Characters either way.
+ *
+ * @summary A route's top line: the one `<h1>`, its data age beside it, and the page controls at the right.
  */
 export function PageHeader({
   title,

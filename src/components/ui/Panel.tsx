@@ -2,6 +2,9 @@ import { forwardRef, type CSSProperties, type ReactNode, type RefObject } from '
 
 interface PanelProps {
   /** Usually text; a title the pilot can edit in place (a Survey's name) passes its own control. */
+  /**
+   * @summary The panel heading, rendered as an `<h2>`.
+   */
   title?: ReactNode;
   /**
    * Exposes the title's own `<h2>` node (tabbable via `tabIndex={-1}` whenever
@@ -11,6 +14,7 @@ interface PanelProps {
    * header renders exactly as before.
    */
   headingRef?: RefObject<HTMLHeadingElement | null>;
+  /** @summary Right-aligned controls in the header row, usually `IconButton`s. */
   actions?: ReactNode;
   /**
    * Sits to the left of the title, inside the same left-hand group. For a
@@ -57,7 +61,7 @@ interface PanelProps {
    * tab's phone view toggle, which needs the row to be tappable at all.
    */
   actionsFill?: boolean;
-  /** Set false for flush content like tables. */
+  /** @summary Set false for flush content like tables; the body then has no inner padding. */
   padded?: boolean;
   /**
    * Makes the content wrapper itself a `flex min-h-0 flex-1 flex-col` box
@@ -90,6 +94,8 @@ interface PanelProps {
  * a ref instead doesn't work: it silently breaks that Panel's own
  * `position: sticky` (confirmed — a wrapper div, even with no styling of its
  * own, defeats it).
+ *
+ * @summary The bordered surface every page section sits in: optional title row with meta and actions, then the body.
  */
 export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
   {

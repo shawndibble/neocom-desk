@@ -256,9 +256,13 @@ export interface DataTableGroupBy<T> {
 }
 
 interface DataTableProps<T> {
+  /** @summary Column definitions: header text, cell renderer and optional sort value. */
   columns: readonly DataTableColumn<T>[];
+  /** @summary The data to show; one entry per table row. */
   rows: readonly T[];
   /**
+   * @summary Stable unique key per row.
+   *
    * Must be unique across `rows` — React reconciles on it, and duplicates
    * leave rows from a previous render stranded in the table. `index` is
    * there for rows that carry no identity of their own: a public contract
@@ -300,7 +304,7 @@ interface DataTableProps<T> {
    * passes both for the same key.
    */
   selectedRowKey?: string | number | null;
-  /** Accessible name for the table. */
+  /** @summary Accessible name for the table. */
   label: string;
   className?: string;
   /** Column and direction to sort by before any header click. Column must declare `sortValue`. */
@@ -851,6 +855,8 @@ export function DataTableSortPicker<T>({
  * pure CSS — the markup below is what every width renders. Because that CSS
  * makes the elements `display: block`, which strips their implicit ARIA
  * roles, each one states its table role explicitly.
+ *
+ * @summary The dense, sortable table every list page uses; collapses to labelled cards on a phone.
  */
 export function DataTable<T>({
   columns,
