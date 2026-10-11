@@ -171,11 +171,30 @@ describe('SurveyInfoReadout', () => {
     expect(link.getAttribute('target')).toBe('_blank');
     expect(container.querySelectorAll('a')).toHaveLength(1);
     expect(container.querySelector('b')).toBeNull();
-    expect(container.querySelector('h1')).toBeNull();
     expect(container.querySelector('br')).not.toBeNull();
     expect(container.textContent).toContain('<b>not bold</b>');
     expect(container.textContent).toContain('bad');
     expect(container.textContent).toContain('Heading');
+  });
+
+  it('renders headings and horizontal rules, keeping every heading below the panel title', async () => {
+    const { container } = render(
+      <SurveyInfoReadout
+        info={{
+          location: null,
+          notes: '# One\n\n## Two\n\n### Three\n\n---\n\nafter <h1>raw</h1>',
+        }}
+        tax={null}
+      />
+    );
+    expect(await screen.findByRole('heading', { name: 'One' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Two' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Three' })).toBeTruthy();
+    expect(container.querySelector('h1')).toBeNull();
+    expect(container.querySelectorAll('h2')).toHaveLength(1);
+    expect(container.querySelector('hr')).not.toBeNull();
+    expect(screen.queryByRole('heading', { name: 'raw' })).toBeNull();
+    expect(container.textContent).toContain('<h1>raw</h1>');
   });
 
   it('shows only the rows that were set', () => {
