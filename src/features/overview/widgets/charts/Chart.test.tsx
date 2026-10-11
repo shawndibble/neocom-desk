@@ -1,7 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Chart } from './Chart';
-import { showsInNumberView } from './sizing';
 import type { ChartModel } from './types';
 
 const MODELS: Record<string, ChartModel> = {
@@ -117,13 +116,5 @@ describe('Chart', () => {
     expect(render(<Chart model={model} size="M" />).container.querySelectorAll('i')).toHaveLength(
       6
     );
-  });
-});
-
-describe('showsInNumberView', () => {
-  it('keeps the donut for the Chart view only', () => {
-    expect(showsInNumberView(MODELS.donut!)).toBe(false);
-    expect(showsInNumberView(MODELS.bars!)).toBe(true);
-    expect(showsInNumberView(MODELS.stack!)).toBe(true);
   });
 });

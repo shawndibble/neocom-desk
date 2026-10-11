@@ -229,7 +229,7 @@ describe('stock', () => {
     expect(stateOf(view)).toBe('ok');
     expect(view.status.loading).toBe(false);
     expect(view.number.value).toBe('—');
-    expect(view.number.note).toBe('overview.board.stockNotCounted');
+    expect(view.number.secondary?.text).toBe('overview.board.stockNotCounted');
     expect(view.rows).toEqual([]);
   });
 
@@ -249,7 +249,7 @@ describe('stock', () => {
       }),
     };
     const view = buildView('stock', feeds, ctx());
-    expect(view.number.value).toBe('2');
+    expect(view.number.value).toBe('3');
     expect(view.number.tone).toBe('warning');
     expect(view.rows).toHaveLength(1);
     expect(view.rows[0].title).toBe('Jita IV');
@@ -281,7 +281,7 @@ describe('training', () => {
     ];
     const view = buildView('training', { skills: skills(queue) as never }, ctx());
     expect(view.number.value).toBe('4h 0m');
-    expect(view.number.note).toContain('Gunnery');
+    expect(view.number.secondary?.text).toContain('Gunnery');
     expect(view.deadlines).toEqual([
       { at: finish, note: 'overview.board.nextSkill', severity: 'clear', to: '/skills/plans' },
     ]);
@@ -324,7 +324,7 @@ describe('comingUp', () => {
     };
     const view = buildView('comingUp', feeds, ctx());
     expect(view.number.value).toBe('2h 0m');
-    expect(view.number.note).toBe('Fleet op');
+    expect(view.number.secondary?.text).toBe('Fleet op');
     expect(view.deadlines[0].at).toBe(NOW + 2 * HOUR);
   });
 });
@@ -430,5 +430,138 @@ describe('sp', () => {
       title: 'skills.unallocatedSp',
       value: (1_450_000).toLocaleString(),
     });
+  });
+});
+
+describe('the Number view says one new thing', () => {
+  const summary = (over: Record<string, number>) => ({
+    out: 0,
+    low: 0,
+    ok: 0,
+    over: 0,
+    readyToList: 0,
+    costToFill: 0,
+    ...over,
+  });
+  const stockFeeds = (totals: { out: number; low: number }, costToFill = 0): Feeds => ({
+    stock: ok({
+      board: {
+        markets: [
+          { listId: 'a', name: 'Jita IV - Moon 4', summary: summary({ ...totals, costToFill }) },
+        ],
+        totals,
+        counted: true,
+      } as never,
+    }),
+  });
+
+  it('mail names the newest sender instead of repeating the unread count', () => {
+    const feeds: Feeds = {
+      mail: ok({
+        unread: 3,
+        recent: [{ mailId: 1, subject: 'Hi', from: 'Aria', atMs: NOW - 2 * HOUR }],
+        needsReauth: false,
+        fetchedAt: new Date(NOW),
+      }),
+    };
+    const view = buildView('mail', feeds, ctx());
+    expect(view.number.secondary?.text).toContain('overview.widgets.mail.latest');
+    expect(view.number.secondary?.text).toContain('Aria');
+    expect(view.summary).toContain('mailUnread');
+  });
+
+  it('mail has no secondary with nothing to name', () => {
+    const feeds: Feeds = {
+      mail: ok({ unread: 0, recent: [], needsReauth: false, fetchedAt: new Date(NOW) }),
+    };
+    expect(buildView('mail', feeds, ctx()).number.secondary).toBeUndefined();
+  });
+
+  it('mining tax gives the age of the debt, not the amount again', () => {
+    const data = {
+      unpaidIsk: 10_900_000,
+      oldestUnpaidDays: 13,
+      payeeCount: 2,
+      unassignedCount: 0,
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    };
+    const view = buildView('miningTax', { mining: ok(data) as never }, ctx());
+    expect(view.number.secondary?.text).toContain('"days":13');
+    expect(view.number.secondary?.text).not.toContain('miningUnpaid');
+  });
+
+  it('price watch names the nearest target that has not been hit', () => {
+    const alerts = [
+      { typeId: 1, name: 'Tritanium', targetPrice: 4, direction: 'below', price: 3, crossed: true },
+      {
+        typeId: 2,
+        name: 'Nocxium',
+        targetPrice: 100,
+        direction: 'above',
+        price: 87,
+        crossed: false,
+      },
+      { typeId: 3, name: 'PLEX', targetPrice: 100, direction: 'above', price: 40, crossed: false },
+    ];
+    const view = buildView(
+      'priceWatch',
+      { priceAlerts: ok({ alerts, checkedAt: NOW }) as never },
+      ctx()
+    );
+    expect(view.number.secondary?.text).toContain('Nocxium');
+    expect(view.number.secondary?.text).toContain('"pct":13');
+  });
+
+  it('price watch has no secondary when every price is unknown or crossed', () => {
+    const alerts = [
+      { typeId: 1, name: 'Tritanium', targetPrice: 4, direction: 'below', price: 3, crossed: true },
+    ];
+    const view = buildView(
+      'priceWatch',
+      { priceAlerts: ok({ alerts, checkedAt: NOW }) as never },
+      ctx()
+    );
+    expect(view.number.secondary).toBeUndefined();
+  });
+
+  it('industry gives the next job to finish, not the ready count again', () => {
+    const jobs = [
+      { job_id: 1, activity_id: 1, runs: 2, end_date: new Date(NOW - HOUR).toISOString() },
+      { job_id: 2, activity_id: 1, runs: 6, end_date: new Date(NOW + 5 * HOUR).toISOString() },
+    ];
+    const feeds: Feeds = {
+      industry: ok({
+        jobs,
+        productNames: new Map([[2, 'Vexor']]),
+        needsReauth: false,
+        fetchedAt: new Date(NOW),
+      }) as never,
+    };
+    const view = buildView('industry', feeds, ctx());
+    expect(view.number.secondary?.text).toContain('overview.widgets.industry.next');
+    expect(view.number.secondary?.text).toContain('5h');
+  });
+
+  it('stock leads with the shortfall and prices it', () => {
+    const view = buildView('stock', stockFeeds({ out: 0, low: 2 }, 35_000_000), ctx());
+    expect(view.number.value).toBe('2');
+    expect(view.number.tone).toBe('warning');
+    expect(view.number.secondary?.text).toContain('stockToSource');
+  });
+
+  it('stock with nothing short is a plain zero, not a warning', () => {
+    const view = buildView('stock', stockFeeds({ out: 0, low: 0 }), ctx());
+    expect(view.number.value).toBe('0');
+    expect(view.number.tone).toBe('clear');
+    expect(view.number.secondary).toBeUndefined();
+  });
+
+  it('never tones a zero headline, whatever the domain severity says', () => {
+    const feeds: Feeds = {
+      mail: ok({ unread: 0, recent: [], needsReauth: false, fetchedAt: new Date(NOW) }),
+    };
+    const view = buildView('mail', feeds, ctx());
+    expect(view.number.tone).toBe('clear');
   });
 });

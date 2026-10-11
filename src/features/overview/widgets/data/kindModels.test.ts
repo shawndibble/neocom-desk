@@ -280,7 +280,7 @@ describe('miningYield', () => {
       }),
     };
     const view = buildView('miningYield', feeds, ctx({ range: 30 }));
-    expect(view.number.note).toContain('sinceNote');
+    expect(view.number.secondary?.text).toContain('bestDay');
     expect(view.chart?.note).toContain('noteSince');
   });
 
@@ -363,7 +363,7 @@ describe('clones', () => {
       ctx()
     );
     expect(view.number.value).toBe('Jita Alpha');
-    expect(view.number.note).toContain('"duration":"3d');
+    expect(view.number.secondary?.text).toContain('"duration":"3d');
     expect(view.rows.map((r) => r.title)).toEqual([
       expect.stringContaining('current'),
       'Jita Alpha',
@@ -402,7 +402,7 @@ describe('clones', () => {
       },
       ctx()
     );
-    expect(view.number.note).toBe('clones.verdict.notePaused');
+    expect(view.number.secondary?.text).toBe('clones.verdict.notePaused');
   });
 
   it('needs the grant, and is empty with no jump clones', () => {
@@ -443,7 +443,7 @@ describe('location', () => {
       ctx()
     );
     expect(view.number.value).toBe('Jita');
-    expect(view.number.note).toBe('Muninn');
+    expect(view.number.secondary?.text).toBe('Muninn');
     expect(view.number.unit).toContain('"value":"0.9"');
     expect(view.rows.map((r) => r.key)).toEqual(['system', 'ship']);
   });

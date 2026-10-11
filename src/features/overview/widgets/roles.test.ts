@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAddable } from './kinds';
+import { getKind, isAddable } from './kinds';
 import {
   BASE_KINDS,
   ROLES,
@@ -59,7 +59,7 @@ describe('buildLayoutFromRoles', () => {
     const l = buildLayoutFromRoles(['trader'], ids());
     expect(new Set(l.widgets.map((w) => w.id)).size).toBe(l.widgets.length);
     const orders = l.widgets.find((w) => w.kind === 'orders')!;
-    expect(orders).toMatchObject({ size: 'M', view: 'number', scope: 'header', showOnPhone: true });
+    expect(orders).toMatchObject({ size: 'L', view: 'table', scope: 'header', showOnPhone: true });
   });
 
   it('ignores an unknown role and with no roles is just the basics', () => {
@@ -94,15 +94,17 @@ describe('defaultLayout', () => {
     for (const w of l.widgets) expect(isAddable(w.kind)).toBe(true);
   });
 
-  it('uses the mockup sizes and views, within each kind views', () => {
+  it('opens every widget at its kind default size and view', () => {
+    for (const w of defaultLayout().widgets) {
+      const def = getKind(w.kind)!;
+      expect(w, w.kind).toMatchObject({ size: def.defaultSize, view: def.defaultView });
+    }
     const by = Object.fromEntries(defaultLayout().widgets.map((w) => [w.kind, w]));
-    expect(by.wallet).toMatchObject({ size: 'S', view: 'number' });
-    expect(by.netWorth).toMatchObject({ size: 'S', view: 'chart' });
-    expect(by.orders).toMatchObject({ size: 'M', view: 'chart' });
-    expect(by.industry).toMatchObject({ size: 'M', view: 'list' });
-    expect(by.comingUp).toMatchObject({ size: 'S', view: 'number' });
-    // priceWatch has no Chart view, so the mockup's chart falls back to List.
-    expect(by.priceWatch).toMatchObject({ size: 'M', view: 'list' });
+    expect(by.wallet).toMatchObject({ size: 'S', view: 'chart' });
+    expect(by.netWorth).toMatchObject({ size: 'M', view: 'chart' });
+    expect(by.industry).toMatchObject({ size: 'M', view: 'table' });
+    expect(by.training).toMatchObject({ size: 'S', view: 'number' });
+    expect(by.priceWatch).toMatchObject({ size: 'M', view: 'table' });
   });
 
   it('has unique ids and is deterministic', () => {

@@ -22,11 +22,7 @@ import {
   sortJobsBySoonest,
   summarizeJobs,
 } from '@/features/industry/jobs';
-import {
-  buildOpenOrderRows,
-  needsAttentionCount,
-  openOrderProblemCounts,
-} from '@/features/market/openOrdersModel';
+import { buildOpenOrderRows, openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import { openOrdersHref } from '@/features/market/openOrdersFilter';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import { stockBoardSeverity } from '@/features/stockTargets/stockBoard';
@@ -75,7 +71,9 @@ import {
   structuresSeverity,
   structuresView,
 } from '../../corpCards';
+import type { MailBoardData, MiningTaxBoardData, PriceAlertsBoardData } from '../../boardData';
 import { incursionJumpsWhen, incursionsSeverity, incursionsSummary } from '../../incursionsBoard';
+import type { IncursionsBoardData } from '../../incursionsBoard';
 import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import {
   hbarsFromRows,
@@ -87,7 +85,16 @@ import {
 } from './chartBuilders';
 import { dailyBalanceSeries } from './chartSeries';
 import { KIND_BUILDERS, KIND_FEED_LISTS } from './kindModels';
-import type { BuildContext, FeedId, Feeds, KindView, ListRow, Translate } from './types';
+import type {
+  BuildContext,
+  FeedId,
+  Feeds,
+  KindView,
+  ListRow,
+  NumberModel,
+  NumberSecondary,
+  Translate,
+} from './types';
 
 /** The Contracts History table filtered to accepted contracts, the courier hauls the widget counts. */
 export const CONTRACTS_IN_PROGRESS_HREF = '/contracts/history?history.status=in_progress';
@@ -243,7 +250,6 @@ const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
       ...base,
       number: {
         value: t('overview.widgets.training.idle'),
-        note: t('overview.board.notTraining'),
         tone: notTrainingAlert ? 'warning' : 'clear',
       },
       rows,
@@ -251,7 +257,6 @@ const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
     };
   }
   const finish = finishOf(active);
-  const queued = rows.length;
   const segments = queueSegments(sorted, now);
   return {
     ...base,
@@ -271,12 +276,12 @@ const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
       ) ?? undefined,
     number: {
       value: finish === null ? UNKNOWN : formatCountdown(Math.max(0, finish - now) / 1000),
-      note: [
-        nameOf(active.skill_id),
-        queued > 1 ? t('overview.board.queued', { count: queued }) : null,
-      ]
-        .filter(Boolean)
-        .join(' · '),
+      secondary: {
+        text: t('overview.widgets.training.skillLevel', {
+          name: nameOf(active.skill_id),
+          level: active.finished_level,
+        }),
+      },
       tone: 'clear',
     },
     rows,
@@ -347,7 +352,7 @@ const sp: Builder = (feeds, { t }) => {
         : {
             value: formatCompactNumber(total),
             unit: t('overview.widgets.sp.unit'),
-            note: spExtractionSummary(t, extraction),
+            secondary: { text: spExtractionSummary(t, extraction) },
             tone: spExtractionSeverity(extraction) ?? 'clear',
           },
     rows,
@@ -372,7 +377,7 @@ const comingUp: Builder = (feeds, { t, now }) => {
     number: next
       ? {
           value: formatCountdown((next.atMs - now) / 1000),
-          note: next.title,
+          secondary: { text: next.title },
           tone: comingUpSeverity(data, now) ?? 'clear',
         }
       : NEUTRAL_NUMBER,
@@ -397,6 +402,18 @@ const comingUp: Builder = (feeds, { t, now }) => {
   };
 };
 
+/** The newest message's sender and age: a fact the unread count does not carry. */
+function latestMail(t: Translate, now: number, data: MailBoardData): NumberSecondary | undefined {
+  const latest = data.recent[0];
+  if (!latest || !latest.from) return undefined;
+  return {
+    text: t('overview.widgets.mail.latest', {
+      from: latest.from,
+      age: ageText(t, now, latest.atMs),
+    }),
+  };
+}
+
 const mail: Builder = (feeds, { t, now }) => {
   const feed = feeds.mail;
   const data = feed?.data ?? null;
@@ -408,7 +425,7 @@ const mail: Builder = (feeds, { t, now }) => {
     number: {
       value: count(data.unread),
       unit: t('overview.widgets.mail.unit'),
-      note: mailSummary(t, data),
+      secondary: latestMail(t, now, data),
       tone: mailSeverity(data) ?? 'clear',
     },
     rows: data.recent.map((item) => ({
@@ -492,14 +509,10 @@ const orders: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
     number: {
       value: count(undercut),
       unit: t('overview.board.undercut'),
-      note: [
-        t('overview.board.ordersMeta', { count: needsAttentionCount(rows) }),
+      secondary:
         maxOrders !== null
-          ? t('overview.board.slotsUsed', { used: rows.length, total: maxOrders })
-          : null,
-      ]
-        .filter(Boolean)
-        .join(' · '),
+          ? { text: t('overview.board.slotsUsed', { used: rows.length, total: maxOrders }) }
+          : undefined,
       tone: undercut === 0 && severity !== 'critical' ? 'clear' : (severity ?? 'clear'),
     },
     rows: list,
@@ -545,7 +558,7 @@ const contracts: Builder = (feeds, { t, now }) => {
     number: {
       value: count(summary.inProgress),
       unit: t('overview.widgets.contracts.unit'),
-      note: note ?? t('overview.board.contractsNothingDue'),
+      secondary: { text: note ?? t('overview.board.contractsNothingDue') },
       tone: contractsSeverity(data) ?? 'clear',
     },
     rows: list,
@@ -604,13 +617,27 @@ const industry: Builder = (feeds, { t, now }) => {
   }
   const nextJobMs = running.length > 0 ? Date.parse(running[0].end_date) : Number.NaN;
   const ready = summary.done > 0;
+  // The headline is a count; the next clock is the fact it lacks.
+  const nextJobSecondary = (): NumberSecondary | undefined => {
+    const next = running[0];
+    if (!next) return undefined;
+    return {
+      text: t('overview.widgets.industry.next', {
+        name: t('overview.board.jobSubject', {
+          name: data.productNames.get(next.job_id) ?? t('overview.board.unknownProduct'),
+          count: next.runs,
+        }),
+        duration: formatDuration(secondsRemaining(next, now)),
+      }),
+    };
+  };
   return {
     ...blank(to, statusOf(feed, { needsPermission: data.needsReauth, isEmpty: jobs.length === 0 })),
     fetchedAt: data.fetchedAt,
     number: {
       value: count(ready ? summary.done : summary.running),
       unit: t(ready ? 'overview.widgets.industry.ready' : 'overview.widgets.industry.running'),
-      note: industrySummary(t, data, now),
+      secondary: nextJobSecondary(),
       tone: industrySeverity(jobs, data.needsReauth, now),
     },
     rows: list,
@@ -642,7 +669,7 @@ const planetary: Builder = (feeds, { t, now }) => {
     number: {
       value: count(data.colonyCount),
       unit: t('overview.widgets.planetary.unit'),
-      note: planetarySummary(t, data),
+      secondary: { text: planetarySummary(t, data) },
       tone: planetarySeverity(data) ?? 'clear',
     },
     rows: data.batches.map((batch) => ({
@@ -688,6 +715,17 @@ const planetary: Builder = (feeds, { t, now }) => {
   };
 };
 
+/** The headline is the ISK owed; how long it has been owed is the fact it lacks. */
+function miningTaxSecondary(t: Translate, data: MiningTaxBoardData): NumberSecondary | undefined {
+  if (data.unpaidIsk > 0 && data.oldestUnpaidDays !== null) {
+    return { text: t('overview.widgets.miningTax.oldest', { days: data.oldestUnpaidDays }) };
+  }
+  if (data.unpaidIsk <= 0 && data.unassignedCount > 0) {
+    return { text: t('overview.board.miningUnassigned', { count: data.unassignedCount }) };
+  }
+  return undefined;
+}
+
 const miningTax: Builder = (feeds, { t }) => {
   const feed = feeds.mining;
   const data = feed?.data ?? null;
@@ -700,7 +738,7 @@ const miningTax: Builder = (feeds, { t }) => {
       value: formatIskCompact(data.unpaidIsk),
       iskAmount: data.unpaidIsk,
       unit: t('overview.board.iskUnpaid'),
-      note: miningTaxSummary(t, data),
+      secondary: miningTaxSecondary(t, data),
       tone: miningTaxSeverity(data) ?? 'clear',
     },
     rows: [
@@ -740,6 +778,37 @@ function structureWhen(item: CorpBoardItem, t: Translate): string {
   return formatDuration(Math.max(0, item.remainingMs ?? 0) / 1000);
 }
 
+/**
+ * The lowest fuel clock leads (the question a pilot asks of a fleet of
+ * structures); with no fuel clock it falls back to the reinforcement count. A
+ * zero count is never toned: a warning beside "0 Timers" contradicts itself.
+ */
+function structuresNumber(
+  t: Translate,
+  items: readonly CorpBoardItem[],
+  timers: number,
+  tone: DeadlineSeverity
+): NumberModel {
+  const lowest = items
+    .filter((item) => item.kind === 'structureFuel' && item.timing === 'timed')
+    .sort((a, b) => (a.remainingMs ?? 0) - (b.remainingMs ?? 0))[0];
+  if (lowest) {
+    return {
+      value: formatDuration(Math.max(0, lowest.remainingMs ?? 0) / 1000),
+      unit: t('overview.widgets.structures.fuelLeft'),
+      secondary: {
+        text: timers > 0 ? t('overview.board.structuresTimers', { count: timers }) : lowest.subject,
+      },
+      tone,
+    };
+  }
+  return {
+    value: count(timers),
+    unit: t('overview.board.reinforced'),
+    tone: timers > 0 ? tone : 'clear',
+  };
+}
+
 const structures: Builder = (feeds, { t, now }) => {
   const feed = feeds.structures;
   const raw = feed?.data ?? null;
@@ -766,12 +835,7 @@ const structures: Builder = (feeds, { t, now }) => {
   return {
     ...blank(to, statusOf(feed, { isEmpty: view.structureCount === 0 })),
     fetchedAt: view.fetchedAt,
-    number: {
-      value: count(counts.timers),
-      unit: t('overview.board.reinforced'),
-      note: structuresSummary(t, view),
-      tone: structuresSeverity(view) ?? 'clear',
-    },
+    number: structuresNumber(t, items, counts.timers, structuresSeverity(view) ?? 'clear'),
     rows: flagged.map((item) => ({
       key: item.id,
       title: item.subject,
@@ -841,13 +905,12 @@ const moonChunks: Builder = (feeds, { t, now }) => {
         ? {
             value: count(ready),
             unit: t('overview.widgets.moonChunks.ready'),
-            note: moonChunksSummary(t, data, now),
             tone: moonChunksSeverity(data, now) ?? 'clear',
           }
         : {
             value: formatCountdown(Math.max(0, nextChunk.deadlineMs - now) / 1000),
             unit: t('overview.widgets.moonChunks.untilNext'),
-            note: moonChunksSummary(t, data, now),
+            secondary: { text: nextChunk.subject },
             tone: moonChunksSeverity(data, now) ?? 'clear',
           },
     rows: chunks.map((chunk) => ({
@@ -886,13 +949,19 @@ const stock: Builder = (feeds, { t }) => {
   if (!board.counted) {
     return {
       ...blank(to, statusOf(feed)),
-      number: { value: UNKNOWN, note: t('overview.board.stockNotCounted'), tone: 'clear' },
+      number: {
+        value: UNKNOWN,
+        secondary: { text: t('overview.board.stockNotCounted') },
+        tone: 'clear',
+      },
       summary: stockBoardSummary(t, board),
     };
   }
   const needing = board.markets.filter(
     (market) => market.summary.out > 0 || market.summary.low > 0
   );
+  const shortfall = board.totals.out + board.totals.low;
+  const cost = board.markets.reduce((sum, market) => sum + market.summary.costToFill, 0);
   const detail = (summary: (typeof board.markets)[number]['summary']) =>
     [
       summary.readyToList > 0 && t('overview.board.stockReady', { count: summary.readyToList }),
@@ -903,11 +972,15 @@ const stock: Builder = (feeds, { t }) => {
       .join(' · ');
   return {
     ...blank(to, statusOf(feed)),
+    // The shortfall (out plus low) is the count to act on; "0 out" beside "2 low" hid it.
     number: {
-      value: count(board.totals.out),
-      unit: t('overview.board.stockOut'),
-      note: t('overview.widgets.stock.low', { count: board.totals.low }),
-      tone: stockBoardSeverity(board) ?? 'clear',
+      value: count(shortfall),
+      unit: t('overview.widgets.stock.short'),
+      secondary:
+        cost > 0
+          ? { text: t('overview.board.stockToSource', { isk: formatIskCompact(cost) }) }
+          : undefined,
+      tone: shortfall > 0 ? (stockBoardSeverity(board) ?? 'clear') : 'clear',
     },
     rows: needing.map((market) => {
       const out = market.summary.out > 0;
@@ -947,6 +1020,23 @@ const stock: Builder = (feeds, { t }) => {
   };
 };
 
+/** The closest target not yet crossed, by how far its price still is: the fact the hit count lacks. */
+function nearestAlert(t: Translate, data: PriceAlertsBoardData): NumberSecondary | undefined {
+  let best: { name: string; gap: number } | null = null;
+  for (const alert of data.alerts) {
+    if (alert.crossed || alert.price === null || alert.targetPrice <= 0) continue;
+    const gap = Math.abs(alert.price - alert.targetPrice) / alert.targetPrice;
+    if (best === null || gap < best.gap) best = { name: alert.name, gap };
+  }
+  if (best === null) return undefined;
+  return {
+    text: t('overview.widgets.priceWatch.nearest', {
+      name: best.name,
+      pct: Math.max(1, Math.round(best.gap * 100)),
+    }),
+  };
+}
+
 const priceWatch: Builder = (feeds, { t }) => {
   const feed = feeds.priceAlerts;
   const data = feed?.data ?? null;
@@ -958,7 +1048,7 @@ const priceWatch: Builder = (feeds, { t }) => {
     number: {
       value: count(crossed),
       unit: t('overview.board.priceAlertsHit'),
-      note: priceAlertsSummary(t, data),
+      secondary: nearestAlert(t, data),
       tone: priceAlertsSeverity(data) ?? 'clear',
     },
     rows: data.alerts.map((alert) => ({
@@ -975,6 +1065,20 @@ const priceWatch: Builder = (feeds, { t }) => {
   };
 };
 
+/** The nearest staging system and its distance, when there is one: the fact the active count lacks. */
+function nearestIncursion(t: Translate, data: IncursionsBoardData): NumberSecondary | undefined {
+  const nearest = data.rows[0];
+  if (!nearest || nearest.jumps === null) return undefined;
+  return {
+    text: t('overview.widgets.incursions.nearest', {
+      system:
+        data.systemNames.get(nearest.stagingSystemId) ??
+        t('travel.stops.unnamed', { id: nearest.stagingSystemId }),
+      jumps: incursionJumpsWhen(t, nearest, data.jumpsStatus),
+    }),
+  };
+}
+
 const incursions: Builder = (feeds, { t }) => {
   const feed = feeds.incursions;
   const data = feed?.data ?? null;
@@ -985,7 +1089,7 @@ const incursions: Builder = (feeds, { t }) => {
     number: {
       value: count(data.rows.length),
       unit: t('overview.widgets.incursions.unit'),
-      note: incursionsSummary(t, data),
+      secondary: nearestIncursion(t, data),
       tone: incursionsSeverity(data) ?? 'clear',
     },
     rows: data.rows.map((row) => {
@@ -1053,7 +1157,18 @@ function placeholder(kind: string): KindView {
 export function buildView(kind: string, feeds: Feeds, ctx: BuildContext): KindView {
   const builder = BUILDERS[kind];
   if (!builder) return placeholder(kind);
-  return builder(feeds, ctx);
+  return zeroIsClear(builder(feeds, ctx));
+}
+
+/**
+ * A count of zero is never a warning: "⚠ 0 Timers" contradicts itself. The
+ * tone follows the figure, so a zero headline draws plain whatever a builder's
+ * severity ladder said about the rest of the domain.
+ */
+function zeroIsClear(view: KindView): KindView {
+  const { number } = view;
+  if (number.value !== '0' || number.tone === 'clear') return view;
+  return { ...view, number: { ...number, tone: 'clear' } };
 }
 
 /** Whether `kind` is in the catalogue at all (a kind from a newer build is not). */

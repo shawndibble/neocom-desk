@@ -11,7 +11,8 @@ checklist in §9 is what the implementation is verified against.
 The Overview is the pilot's own summary of what matters to them. It stops being
 a fixed board of 13 domain cards plus an Alerts column and becomes a **grid of
 Widgets the pilot chooses, sizes, orders, renames and removes**. Each Widget can
-be drawn as a **Number**, a **Chart** or a **List** (where it has them). The
+be drawn as a **Number**, a **Chart** or a **Table** (where it has them), and each
+kind opens in the view that answers its question best (appendix A). The
 alerts feature moves out of the page into a **bell in every page header** and a
 **danger banner** on the Overview.
 
@@ -26,8 +27,10 @@ point.
 - **Widget Kind** — an entry in the catalogue (Wallet, Orders, Planetary…).
   Declares its title, category, which views it has, its default size, which
   settings apply (range), its ESI permission, its empty message.
-- **View** — Number / Chart / List. A Widget shows one. List is also the text
-  equivalent of a Chart.
+- **View** — Number / Chart / Table. A Widget shows one. Number is a figure and
+  at most one secondary line, never a chart. Table is also the text equivalent
+  of a Chart, and at Large and Full the Chart view shows it beside the chart.
+  Each kind has a default view (appendix A); a stored layout keeps its own.
 - **Size** — S / M / L / Full: a share of one row's width (¼, ⅓, ½, whole), not
   a height. Content sets height.
 - **Overview Layout** — the ordered list of Widgets and their settings. One per
@@ -72,19 +75,34 @@ column and the "Everything else" phone fold are gone.
   On the 1152px content column of a 1440px desktop that is **four S, three M,
   two L or one Full per row**; a narrower window wraps to fewer across at each
   size's minimum width, and rows share their leftover equally.
-- Size also sets how much a view shows: list rows S3 / M4 / L6 / Full10; chart
-  height 44 / 70 / 100px; Number view at M+ adds a mini chart under the figure.
+- Size also sets how much a view shows: table rows S4 / M5 / L8 / Full12; chart
+  height 44 / 70 / 100px. The **Number view is only a number**: the headline plus
+  at most one `secondary` line (a direction glyph, then text, coloured by good or
+  bad for the pilot, one line at every size, never restating the headline). A
+  zero count never carries a warning.
+- **Table columns by size.** A kind declares ordered columns with a `priority`
+  (name first, then the key value). S shows the name and the best-priority
+  column, M up to four by priority, L and Full all. Beside a chart at L and Full
+  the table gets the narrow budget (two columns at L, four at Full). A table with
+  no header labels draws no header row; a row with a `to` is a link with a
+  trailing caret.
+- At S the scope chip collapses to an icon with a tooltip, so the title is never
+  crushed.
 - **Every Widget always shows its headline number** — a Small Chart still shows
   the value above the chart.
 - Phone: same list and order; S two across, M/L/Full full width. A Widget can be
   set **Hide on phone**.
 - Each Widget header: title (micro), optional **New** tag, optional character
-  scope chip ("All characters"), **Open ›** link to its page, **⋯ menu**.
+  scope chip ("All characters"; an icon with a tooltip at S), **⋯ menu**. The
+  **title is the link** to the kind's page (entity link, trailing chevron, tooltip
+  "Opens the X page"); a kind with no page has a plain title. One compact line
+  (about 32px on desktop, 44px on a phone for the touch target); no separate
+  Open link, and the card itself is not clickable.
 - No Widget header carries glyph view-cyclers; view switching lives in ⋯.
 
 ### Widget ⋯ menu
 
-View (Number/Chart/List, only the ones the kind has) · Character (Header / All)
+View (Number/Chart/Table, only the ones the kind has) · Character (Header / All)
 · Range (7d/30d/90d, only for kinds with a range) · Name (rename) · Duplicate ·
 Move to top · Move to bottom · Show on phone (On/Off) · Remove from Overview.
 Esc / outside click closes.
@@ -139,7 +157,7 @@ hauling, incursions, location.
 Honest and accessible: Orders chart is Not-undercut vs Undercut (expiring is a
 separate count); Wallet flow is Income vs Spending bars; Net worth stack has no
 red and a legend in bar order; bars carry a max and a time range; every chart
-has a visually hidden text summary and its List view is the table; colour is
+has a visually hidden text summary and its Table view is the table; colour is
 never the only signal.
 
 ### Alerts (global)
@@ -164,8 +182,8 @@ never the only signal.
 Grid & widgets
 - [ ] E1 Overview renders a Widget grid from a persisted Overview Layout.
 - [ ] E2 Sizes S/M/L/Full set row width (4 / 3 / 2 / 1 per row on a 1440px desktop); order = screen order, no holes.
-- [ ] E3 Views Number/Chart/List per kind; headline number always visible.
-- [ ] E4 Widget header: title, New tag (returning only), scope chip, Open link, ⋯.
+- [ ] E3 Views Number/Chart/Table per kind, each kind opening in its default view; headline number always visible.
+- [ ] E4 Widget header: one compact line: title as the page link with a chevron (plain when the kind has no page), New tag (returning only), scope chip, ⋯.
 - [ ] E5 ⋯ menu: view, character, range, rename, duplicate, top, bottom, phone, remove; Esc/outside closes.
 - [ ] E6 Same kind addable twice.
 - [ ] E7 Widget states: loading, needs permission (Grant access), failed (Retry + last good), empty (Remove).
@@ -220,8 +238,8 @@ across Characters · whether other alert types than danger raise the banner.
 - **Unavailable in v1** (shown in the Gallery marked "Coming soon", not addable):
   survey, routeSafety, hauling, kills, jumpTimers (no jump-fatigue ESI endpoint).
   Each needs a follow-up ticket; listed in the PR.
-- **Reduced kinds:** `sp` is Number/List only (no SP history store); `priceWatch`
-  is Number/List only (the poller keeps no price history, so no sparkline);
+- **Reduced kinds:** `sp` is Number/Table only (no SP history store); `priceWatch`
+  is Number/Table only (the poller keeps no price history, so no sparkline);
   `wallet` Chart uses the journal-derived daily balance; `netWorth` has the four
   layers the app records (ISK, assets, escrow, sell orders) — no Contracts layer.
 - **Acknowledge = dismiss.** Acknowledging a danger Alert dismisses its feed
@@ -245,3 +263,38 @@ across Characters · whether other alert types than danger raise the banner.
   `null`; `parse` keeps unknown kinds and fields (forward compatible); first run =
   `null` after hydration. Returning pilots with old hidden/order keys are
   migrated.
+
+## Appendix A. Default view and size per kind
+
+The owner's rule: not every widget opens as a Number. A kind opens in the view
+that answers its question; every kind still offers the other views it has.
+`kinds.ts` is the source of truth (`defaultView`, `defaultSize`); roles,
+Reset and the Gallery all follow it. A saved layout keeps the view it stored
+(the old `list` reads as `table`).
+
+| Kind | Default view | Default size | Views offered |
+|---|---|---|---|
+| training | Number | S | Number, Chart, Table |
+| sp | Number | S | Number, Table |
+| location | Number | S | Number, Table |
+| clones | Table | M | Number, Table |
+| wallet | Chart | S | Number, Chart, Table |
+| walletFlow | Chart | M | Number, Chart, Table |
+| netWorth | Chart | M | Number, Chart, Table |
+| orders | Table | L | Number, Chart, Table |
+| priceWatch | Table | M | Number, Table |
+| stock | Table | M | Number, Chart, Table |
+| lp | Chart | M | Number, Chart, Table |
+| miningTax | Number | S | Number, Table |
+| industry | Table | M | Number, Chart, Table |
+| profit | Chart | M | Number, Chart, Table |
+| miningYield | Chart | M | Number, Chart, Table |
+| planetary | Table | M | Number, Chart, Table |
+| structures | Table | M | Number, Chart, Table |
+| moonChunks | Table | M | Number, Table |
+| incursions | Table | S | Number, Table |
+| comingUp | Table | M | Number, Table |
+| contracts | Table | M | Number, Table |
+| mail | Table | M | Number, Table |
+
+Coming-soon kinds open as a Number until they are built.

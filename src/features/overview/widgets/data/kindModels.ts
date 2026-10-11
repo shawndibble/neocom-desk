@@ -18,7 +18,7 @@ import type { ChartColor, StackPart } from '../charts/types';
 import { blank, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { hbarsFromRows } from './chartBuilders';
 import { backwardBucketSums, journalCoverageDays, withinRange } from './chartSeries';
-import type { FeedId, ListRow } from './types';
+import type { FeedId, ListRow, NumberModel } from './types';
 
 const DAY_MS = 86_400_000;
 const D = 'overview.widgets.data';
@@ -86,7 +86,6 @@ const walletFlow: Builder = (feeds, { t, now, range }) => {
       value: formatIskCompactSigned(flow.net),
       iskAmount: flow.net,
       unit: t('overview.isk'),
-      note: t(`${D}.walletFlow.note`, { income, spending }),
       tone: 'clear',
     },
     rows,
@@ -169,7 +168,6 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
       value: formatIskCompact(total),
       iskAmount: total,
       unit: t('overview.isk'),
-      note: t(`${D}.netWorth.asOf`, { day }),
       tone: 'clear',
     },
     rows: shown.map(({ id }) => ({
@@ -224,7 +222,6 @@ const profit: Builder = (feeds, { t, now, range }) => {
       iskAmount: row.profit,
       tone: 'clear',
     }));
-  const open = inRange.filter((run) => run.status !== 'closed').length;
   const summary = t(`${C}.profit.summary`, {
     total: formatIskCompactSigned(total),
     runs: inRange.length,
@@ -237,7 +234,6 @@ const profit: Builder = (feeds, { t, now, range }) => {
       value: formatIskCompactSigned(total),
       iskAmount: total,
       unit: t('overview.isk'),
-      note: t(`${D}.profit.note`, { runs: inRange.length, open, range }),
       tone: 'clear',
     },
     rows,
@@ -318,10 +314,13 @@ const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCharacterI
       value: formatIskCompact(average),
       iskAmount: average,
       unit: t(`${D}.miningYield.unit`),
-      note:
-        covered.historyStartsInRange !== null
-          ? t(`${D}.miningYield.sinceNote`, { date: covered.historyStartsInRange })
-          : t(`${D}.miningYield.note`, { days: covered.daysWithData, range }),
+      // The headline is the average; the best day is the fact it lacks. The history caveat lives in the chart caption.
+      secondary:
+        Math.max(...values) > 0
+          ? {
+              text: t(`${D}.miningYield.bestDay`, { value: formatIskCompact(Math.max(...values)) }),
+            }
+          : undefined,
       tone: 'clear',
     },
     rows: oreRows,
@@ -356,17 +355,32 @@ const lp: Builder = (feeds, { t }) => {
   const total = data.entries.reduce((sum, entry) => sum + entry.points, 0);
   const nameOf = (entry: (typeof data.entries)[number]) =>
     entry.name ?? t(`${D}.lp.corporation`, { id: entry.corporationId });
-  const everMarks = data.everMarks > 0 ? t(`${D}.lp.everMarks`, { count: data.everMarks }) : null;
-  const note = [t(`${D}.lp.corporations`, { count: data.entries.length }), everMarks]
-    .filter(Boolean)
-    .join(' · ');
+  const largest = data.entries.reduce<(typeof data.entries)[number] | null>(
+    (top, entry) => (top === null || entry.points > top.points ? entry : top),
+    null
+  );
+  const note = t(`${D}.lp.corporations`, { count: data.entries.length });
   return {
     ...blank(
       to,
       statusOf(feed, { needsPermission: data.needsReauth, isEmpty: data.entries.length === 0 })
     ),
     fetchedAt: data.fetchedAt,
-    number: { value: formatCompactNumber(total), unit: t(`${D}.lp.unit`), note, tone: 'clear' },
+    number: {
+      value: formatCompactNumber(total),
+      unit: t(`${D}.lp.unit`),
+      // One corporation is the whole total: naming it would restate the headline.
+      secondary:
+        largest && data.entries.length > 1
+          ? {
+              text: t(`${D}.lp.largest`, {
+                name: nameOf(largest),
+                value: formatCompactNumber(largest.points),
+              }),
+            }
+          : undefined,
+      tone: 'clear',
+    },
     rows: data.entries.map((entry) => ({
       key: String(entry.corporationId),
       title: nameOf(entry),
@@ -407,7 +421,11 @@ const clones: Builder = (feeds, { t }) => {
   };
   if (data.note !== null) {
     const note = t(`clones.verdict.note${CLONE_NOTE_KEY[data.note]}`);
-    return { ...base, number: { value: UNKNOWN, note, tone: 'clear' }, summary: note };
+    return {
+      ...base,
+      number: { value: UNKNOWN, secondary: { text: note }, tone: 'clear' },
+      summary: note,
+    };
   }
   const labelOf = (row: (typeof data.rows)[number]) =>
     row.label ??
@@ -416,14 +434,19 @@ const clones: Builder = (feeds, { t }) => {
       : t(`${D}.clones.cloneId`, { id: String(row.id) }));
   const best = data.rows.find((row) => row.id === data.bestId);
   const bestLabel = best ? labelOf(best) : UNKNOWN;
-  const number =
+  // "Stay put" is the whole answer; only a jump has a saving worth a second line.
+  const number: NumberModel =
     data.verdict === 'jump' && data.savedSeconds !== null
       ? {
           value: bestLabel,
-          note: t(`${D}.clones.sooner`, { duration: formatDuration(data.savedSeconds) }),
-          tone: 'clear' as const,
+          secondary: {
+            text: t(`${D}.clones.sooner`, { duration: formatDuration(data.savedSeconds) }),
+            direction: 'down',
+            tone: 'good',
+          },
+          tone: 'clear',
         }
-      : { value: t(`${D}.clones.stay`), note: t(`${D}.clones.stayNote`), tone: 'clear' as const };
+      : { value: t(`${D}.clones.stay`), tone: 'clear' };
   const rows: ListRow[] = data.rows.map((row) => {
     const delta = row.deltaSeconds;
     return {
@@ -441,7 +464,12 @@ const clones: Builder = (feeds, { t }) => {
       tone: 'clear',
     };
   });
-  return { ...base, number, rows, summary: `${number.value}. ${number.note}` };
+  return {
+    ...base,
+    number,
+    rows,
+    summary: [number.value, number.secondary?.text].filter(Boolean).join('. '),
+  };
 };
 
 // --- Location and ship ----------------------------------------------------------------
@@ -485,7 +513,12 @@ const location: Builder = (feeds, { t }) => {
       })
     ),
     number: system
-      ? { value: systemName, unit: security, note: data.shipName ?? undefined, tone: 'clear' }
+      ? {
+          value: systemName,
+          unit: security,
+          secondary: data.shipName ? { text: data.shipName } : undefined,
+          tone: 'clear',
+        }
       : NEUTRAL_NUMBER,
     rows,
     summary: [systemName, data.shipName].filter(Boolean).join(', '),

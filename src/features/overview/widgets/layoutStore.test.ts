@@ -58,11 +58,22 @@ describe('parseLayout', () => {
 
   it('repairs an invalid size or view to the kind default', () => {
     const out = parseLayout(wrap(good({ size: 'XXL', view: 'hologram' })));
-    expect(out!.widgets[0]).toMatchObject({ size: 'M', view: 'number' });
+    expect(out!.widgets[0]).toMatchObject({ size: 'L', view: 'table' });
   });
 
   it('repairs a view the kind does not have', () => {
     const out = parseLayout(wrap(good({ kind: 'sp', size: 'S', view: 'chart' })));
+    expect(out!.widgets[0].view).toBe('number');
+  });
+
+  it('reads a stored list view as the table it was renamed to', () => {
+    const out = parseLayout(wrap(good({ view: 'list' })));
+    expect(out!.widgets[0].view).toBe('table');
+  });
+
+  it('keeps a stored view even when the kind now defaults to another', () => {
+    // Orders defaults to Table now; a pilot who chose Number keeps it.
+    const out = parseLayout(wrap(good({ view: 'number' })));
     expect(out!.widgets[0].view).toBe('number');
   });
 

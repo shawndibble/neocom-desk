@@ -3,7 +3,7 @@
  * each one brings. Pure data plus the builders that turn an answer (or none)
  * into an Overview Layout.
  */
-import { isAddable, type WidgetKindId, type WidgetSize, type WidgetView } from './kinds';
+import { isAddable, type WidgetKindId } from './kinds';
 import { MAX_WIDGETS, newWidget, type MakeId, type OverviewLayout, type Widget } from './layout';
 
 export const ROLE_IDS = [
@@ -62,31 +62,25 @@ export function basicsLayout(makeId: MakeId = seqId('r')): OverviewLayout {
 }
 
 /**
- * The board a pilot gets from Reset: the mockup's default, minus kinds that are
- * not built yet. Sizes and views are the mockup's, except Price watch, which has
- * no Chart view (the poller keeps no price history) and so opens as a List.
+ * The board a pilot gets from Reset: the mockup's order, minus kinds that are
+ * not built yet. Each widget opens at its kind's own default size and view
+ * (`kinds.ts`), so Reset and a fresh add agree.
  */
-const DEFAULT_BOARD: readonly [WidgetKindId, WidgetSize, WidgetView][] = [
-  ['wallet', 'S', 'number'],
-  ['training', 'S', 'number'],
-  ['netWorth', 'S', 'chart'],
-  ['orders', 'M', 'chart'],
-  ['industry', 'M', 'list'],
-  ['planetary', 'M', 'chart'],
-  ['profit', 'M', 'chart'],
-  ['priceWatch', 'M', 'list'],
-  ['comingUp', 'S', 'number'],
-  ['mail', 'S', 'number'],
-  ['lp', 'S', 'number'],
-  ['stock', 'M', 'chart'],
+const DEFAULT_BOARD: readonly WidgetKindId[] = [
+  'wallet',
+  'training',
+  'netWorth',
+  'orders',
+  'industry',
+  'planetary',
+  'profit',
+  'priceWatch',
+  'comingUp',
+  'mail',
+  'lp',
+  'stock',
 ];
 
 export function defaultLayout(makeId: MakeId = seqId('d')): OverviewLayout {
-  const widgets: Widget[] = [];
-  for (const [kind, size, view] of DEFAULT_BOARD) {
-    if (!isAddable(kind)) continue;
-    const w = newWidget(kind, makeId());
-    if (w) widgets.push({ ...w, size, view });
-  }
-  return { version: 1, widgets };
+  return fromKinds(DEFAULT_BOARD, makeId);
 }

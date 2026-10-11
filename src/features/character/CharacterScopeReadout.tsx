@@ -13,10 +13,17 @@ import * as Icon from '@/components/ui/icons';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 
-export type CharacterScopeReadoutProps =
+export type CharacterScopeReadoutProps = (
   | { scope: 'all'; total: number; missing?: readonly string[] }
   | { scope: 'one'; characterId: number; characterName: string }
-  | { scope: 'corp'; division: string };
+  | { scope: 'corp'; division: string }
+) & {
+  /**
+   * Just the glyph, with the words as its accessible name and tooltip: for a
+   * header with no room to spell the scope out (a Small widget's title bar).
+   */
+  compact?: boolean;
+};
 
 export function CharacterScopeReadout(props: CharacterScopeReadoutProps) {
   const { t } = useTranslation();
@@ -38,6 +45,21 @@ export function CharacterScopeReadout(props: CharacterScopeReadoutProps) {
     hint = t('character.scope.missing', { names: props.missing.join(', ') });
   } else {
     label = t('character.scope.all', { count: props.total });
+  }
+  if (props.compact) {
+    const name = hint ? `${label}. ${hint}` : label;
+    return (
+      <Tooltip content={name}>
+        <span
+          tabIndex={0}
+          role="group"
+          aria-label={name}
+          className="inline-flex shrink-0 items-center text-text-dim"
+        >
+          {glyph}
+        </span>
+      </Tooltip>
+    );
   }
   const readout = (
     <span

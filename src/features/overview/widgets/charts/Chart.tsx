@@ -3,7 +3,7 @@
  *
  * The drawing is aria-hidden and the model's `summary` is visually hidden
  * text beside it, so a screen reader gets the same figures the eye does (the
- * List view is the table behind it). Hand-built SVG/CSS on purpose: Overview
+ * Table view is the table behind it). Hand-built SVG/CSS on purpose: Overview
  * sits in the signed-in shell chunk, which must never pull in a chart library.
  */
 import { cx } from '@/lib/cx';

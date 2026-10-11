@@ -82,21 +82,33 @@ describe('Widget states', () => {
     expect(region).toHaveAttribute('aria-busy', 'false');
     expect(within(region).getByText('7')).toBeInTheDocument();
     expect(within(region).getByText('unread')).toBeInTheDocument();
-    expect(within(region).getByRole('link', { name: 'Open Mail page' })).toHaveAttribute(
-      'href',
-      '/mail'
-    );
+    expect(within(region).getByRole('link', { name: 'Mail' })).toHaveAttribute('href', '/mail');
   });
 
-  it('keeps the headline above the rows in List view and counts what the size hides', () => {
-    renderWidget(model({ view: 'list', size: 'S' }), (store) =>
+  it('keeps the headline above the rows in Table view and counts what the size hides', () => {
+    renderWidget(model({ view: 'table', size: 'S' }), (store) =>
       store.set('mail', { data: mailData(9, 5), error: false, loading: false })
     );
     const region = screen.getByRole('region', { name: 'Mail' });
     expect(within(region).getByText('9')).toBeInTheDocument();
-    // A Small shows three rows and says how many more there are.
-    expect(within(region).getAllByText(/^Subject \d$/)).toHaveLength(3);
-    expect(within(region).getByText('+2 more')).toBeInTheDocument();
+    // A Small shows four rows and says how many more there are.
+    expect(within(region).getAllByText(/^Subject \d$/)).toHaveLength(4);
+    expect(within(region).getByText('+1 more')).toBeInTheDocument();
+  });
+
+  it('shows the name and the key value only at Small', () => {
+    renderWidget(model({ view: 'table', size: 'S' }), (store) =>
+      store.set('mail', { data: mailData(2, 2), error: false, loading: false })
+    );
+    expect(screen.queryByText('Sender 1')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Mail' }).querySelectorAll('td')).toHaveLength(4);
+  });
+
+  it('shows the sender as a third column at Medium', () => {
+    renderWidget(model({ view: 'table', size: 'M' }), (store) =>
+      store.set('mail', { data: mailData(2, 2), error: false, loading: false })
+    );
+    expect(screen.getByText('Sender 1')).toBeInTheDocument();
   });
 
   it('draws a Chart view as the Number for a kind with no chart', () => {
@@ -196,8 +208,8 @@ describe('Widget charts', () => {
   it('keeps the headline above the chart in the Chart view, with a hidden text summary and a legend', () => {
     renderWidget(model({ kind: 'netWorth', view: 'chart', size: 'L' }), netWorthFeed);
     const region = screen.getByRole('region', { name: 'Net worth' });
-    // The headline note is the number's own; the chart is drawn beneath it.
-    expect(within(region).getAllByText('As of 2026-10-10').length).toBeGreaterThan(0);
+    // The "as of" day is the chart's caption now, not a line under the number.
+    expect(within(region).getAllByText(/2026-10-10/).length).toBeGreaterThan(0);
     // The legend names every layer in bar order, so colour is never the only signal.
     expect(legend(region)).toEqual(['Assets 29B', 'Sell orders 6B', 'ISK 4B']);
     const summary = region.querySelector('p.sr-only');
@@ -205,14 +217,34 @@ describe('Widget charts', () => {
     expect(summary?.closest('[aria-hidden="true"]')).toBeNull();
   });
 
-  it('adds the mini chart under the figure in the Number view from Medium up', () => {
-    renderWidget(model({ kind: 'netWorth', view: 'number', size: 'M' }), netWorthFeed);
-    expect(legend(screen.getByRole('region', { name: 'Net worth' }))).toHaveLength(3);
+  it('draws a number and nothing else in the Number view, at every size', () => {
+    for (const size of ['S', 'M', 'L'] as const) {
+      renderWidget(
+        model({ id: 'n' + size, kind: 'netWorth', view: 'number', size, title: 'Net ' + size }),
+        netWorthFeed
+      );
+      const region = screen.getByRole('region', { name: 'Net ' + size });
+      expect(legend(region), size).toHaveLength(0);
+      expect(region.querySelector('svg:not([aria-hidden="true"])'), size).toBeNull();
+      expect(region.querySelector('p.sr-only'), size).toBeNull();
+    }
   });
 
-  it('draws only the headline in the Number view at Small', () => {
-    renderWidget(model({ kind: 'netWorth', view: 'number', size: 'S' }), netWorthFeed);
-    expect(legend(screen.getByRole('region', { name: 'Net worth' }))).toHaveLength(0);
+  it('puts the table beside the chart at Large, and not at Medium', () => {
+    renderWidget(
+      model({ id: 'l', kind: 'netWorth', view: 'chart', size: 'L', title: 'Large' }),
+      netWorthFeed
+    );
+    renderWidget(
+      model({ id: 'm', kind: 'netWorth', view: 'chart', size: 'M', title: 'Medium' }),
+      netWorthFeed
+    );
+    expect(
+      within(screen.getByRole('region', { name: 'Large' })).getByRole('table')
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Medium' })).queryByRole('table')
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -256,11 +288,9 @@ describe('Widget header', () => {
     expect(await screen.findByText('All characters · 2')).toBeInTheDocument();
   });
 
-  it('has no Open link for a kind with no page of its own yet', () => {
+  it('has no title link for a kind with no page of its own yet', () => {
     renderWidget(model({ kind: 'survey' }), () => undefined);
-    expect(
-      screen.queryByRole('link', { name: /open mining survey page/i })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /mining survey/i })).not.toBeInTheDocument();
   });
 
   it('uses the widget own name when it has one', () => {

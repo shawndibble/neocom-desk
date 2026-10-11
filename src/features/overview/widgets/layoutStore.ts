@@ -38,7 +38,9 @@ function parseWidget(raw: unknown): Widget | null {
 
   const out: Record<string, unknown> = { ...raw };
   if (!SIZES.includes(raw.size as never)) out.size = def.defaultSize;
-  if (!def.views.includes(raw.view as never)) out.view = def.defaultView;
+  // The List view became Table: a layout saved before the rename keeps its choice.
+  if (raw.view === 'list') out.view = 'table';
+  if (!def.views.includes(out.view as never)) out.view = def.defaultView;
   if (raw.scope !== 'header' && raw.scope !== 'all') out.scope = 'header';
   if (typeof raw.showOnPhone !== 'boolean') out.showOnPhone = true;
   if (typeof raw.title !== 'string') delete out.title;

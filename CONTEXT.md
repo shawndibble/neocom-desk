@@ -1165,7 +1165,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Size**: A **Widget**'s width on the Overview: S, M, L or Full, a share of one row
   (a quarter, a third, a half, the whole: four Small, three Medium,
   two Large or one Full across a desktop row), not a height: its content sets
-  that. Size also sets how much a **View** shows (list rows, chart height).
+  that. Size also sets how much a **View** shows (table rows, chart height).
   On a phone Small sits two across and every other size takes the row.
 - **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Signalled for a **Published Snapshot**, where a long window encodes a publish cadence, so a mounted view re-reads the fresher rows. Silent for a game constant: its long window asserts the value cannot change, so the lapsed row is shown at once and the refresh lands for the next read without re-rendering anything. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
@@ -1293,9 +1293,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   signed "vs <item>" sell delta, the item's own prices above it — for price
   comparison; falls back to its Market Group siblings when it has no
   variation data.
-- **View**: How a **Widget** draws its data: Number, Chart or List, whichever its
-  **Widget Kind** has. The headline number is on screen in every view; List
-  is also the text equivalent of a Chart. Chosen in the widget's settings
+- **View**: How a **Widget** draws its data: Number, Chart or Table, whichever its
+  **Widget Kind** has, and each kind opens in the one that answers its question
+  best. The headline number is on screen in every view; Number is a figure and at
+  most one secondary line (never a chart); Table is also the text equivalent of a
+  Chart, and sits beside it at Large and Full. Chosen in the widget's settings
   menu, never by a glyph in its header.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in
   their own words, what leaves their device. Not documentation — a
