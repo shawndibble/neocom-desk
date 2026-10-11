@@ -5,7 +5,7 @@ Routes `/login` (`src/routes/Login.tsx`), `/callback` (`src/routes/Callback.tsx`
 | Feature                                         | Where                                                                       |
 | ----------------------------------------------- | --------------------------------------------------------------------------- |
 | Landing page for signed-out users               | `Login.tsx`                                                                 |
-| "Log in with EVE Online" button                 | `EveSsoButton` in `Login.tsx`                                                 |
+| "Log in with EVE Online" button                 | `EveSsoButton` in `Login.tsx`                                               |
 | Custom permissions dialog                       | `CustomizePermissionsDialog.tsx`                                            |
 | SSO redirect, PKCE, state                       | `session.ts startLogin`, `sso.ts buildAuthorizeUrl`                         |
 | Callback: exchange, error panel, one auto retry | `Callback.tsx`                                                              |

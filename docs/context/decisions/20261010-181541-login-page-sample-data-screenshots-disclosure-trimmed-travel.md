@@ -2,7 +2,6 @@
 
 _Recorded 2026-10-10._
 
-
 Supersedes the "real captures" and disclosure points of
 `20260924-165646-login-page-drops-the-read-only-claim-and.md`.
 
