@@ -396,7 +396,7 @@ export default defineConfig({
     // machine. CI runners are small enough (2-4 cores) that the default is
     // already fine there, so only cap it locally.
     ...(process.env.GITHUB_ACTIONS === 'true' ? {} : { maxWorkers: 2 }),
-    coverage: { reporter: ['text', 'html'] },
+    coverage: { reporter: ['text', 'html'], exclude: ['src/mockups/**', '**/*.stories.tsx'] },
     // Suppresses passing-test noise, keeps full detail on failures — cuts
     // `test:run` output (read by CI logs and every agent tool call alike)
     // without losing anything actually diagnostic. An explicit `reporters`
