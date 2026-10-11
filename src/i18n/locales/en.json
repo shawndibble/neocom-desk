@@ -3964,11 +3964,8 @@
       "noWidgets": "There are no widgets to show on this Overview."
     },
     "header": {
-      "allCharacters": "All characters",
-      "allCharactersCount_one": "All characters · {{count}}",
-      "allCharactersCount_other": "All characters · {{count}}",
-      "switchLabel": "Character: {{name}}",
       "next": "Next",
+      "nextGoTo": "Opens the page for {{note}}",
       "updated": "Updated",
       "customize": "Customize"
     },

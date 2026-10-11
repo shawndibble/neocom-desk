@@ -56,13 +56,7 @@ function renderWidget(
     <MemoryRouter>
       <FeedStoreContext.Provider value={store}>
         <OverviewRefreshContext.Provider value={{ epoch: 0, refresh }}>
-          <Widget
-            widget={widget}
-            showNew={false}
-            headerAll={false}
-            onRemove={onRemove}
-            {...props}
-          />
+          <Widget widget={widget} showNew={false} onRemove={onRemove} {...props} />
         </OverviewRefreshContext.Provider>
       </FeedStoreContext.Provider>
     </MemoryRouter>
@@ -308,7 +302,6 @@ describe('WidgetGrid', () => {
               model({ id: 'c', kind: 'mail', size: 'F' }),
             ]}
             showNew={false}
-            headerAll={false}
             onRemove={() => undefined}
           />
         </FeedStoreContext.Provider>
@@ -327,7 +320,6 @@ describe('WidgetGrid', () => {
         <WidgetGrid
           widgets={[]}
           showNew={false}
-          headerAll={false}
           onRemove={() => undefined}
           onAdd={onAdd}
           onRoles={() => undefined}
@@ -346,7 +338,6 @@ describe('WidgetGrid', () => {
         <WidgetGrid
           widgets={[model({ kind: 'fromTheFuture' })]}
           showNew={false}
-          headerAll={false}
           onRemove={() => undefined}
         />
       </MemoryRouter>

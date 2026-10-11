@@ -14,7 +14,6 @@ import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { useOverviewCardOrder } from '@/features/overview/cardOrder';
 import { OVERVIEW_HIDDEN_CARDS_KEY, useOverviewHiddenCards } from '@/features/overview/hiddenCards';
 import { OVERVIEW_LAYOUT_KEY, useOverviewLayout } from '@/features/overview/widgets/layoutStore';
-import { useOverviewScopeAll } from '@/features/overview/widgets/scope';
 import type { OverviewLayout, Widget } from '@/features/overview/widgets/layout';
 import { priceAlertDomain } from '@/features/notifications/pollDomains';
 import {
@@ -210,7 +209,6 @@ beforeEach(async () => {
   useOverviewHiddenCards.setState({ value: [], hydrated: false });
   useOverviewCardOrder.setState({ value: [], hydrated: false });
   useOverviewLayout.setState({ value: null, hydrated: false });
-  useOverviewScopeAll.setState({ value: false, hydrated: false });
   priceAlertDomain.store.setState({ value: {}, hydrated: false });
   useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
   useSpExtractionThresholdSp.setState({ value: 500_000, hydrated: false });
@@ -310,8 +308,10 @@ describe('Overview widget grid', () => {
   it('offers the training finish as the header Next deadline', async () => {
     await seedLayout(widget('b', 'training', { size: 'S' }));
     render(<App />);
-    const chip = await screen.findByRole('link', { name: /next skill finishes/i });
-    expect(chip).toHaveAttribute('href', '/skills/plans');
+    const next = await screen.findByRole('link', { name: /next skill finishes/i });
+    expect(next).toHaveAttribute('href', '/skills/plans');
+    // A real button-styled link, not static text.
+    expect(next).toHaveClass('border', 'rounded-xs');
   });
 
   it('turns a returning pilot hidden-card list into a layout, saved once', async () => {
@@ -381,8 +381,22 @@ describe('Overview widget grid', () => {
     await waitFor(async () => expect(await storedKinds()).toEqual(['wallet']));
   });
 
-  it('turns All characters on from the header switcher, and says what cannot sum', async () => {
-    const user = userEvent.setup();
+  it("keeps a widget's All characters scope, and says what cannot sum", async () => {
+    await db.characters.put({
+      characterId: OTHER_ID,
+      name: 'Pilot Two',
+      ownerHash: 'oh2',
+      addedAt: 2,
+    });
+    await seedLayout(widget('w', 'wallet', { size: 'S', scope: 'all' }));
+    render(<App />);
+
+    // The wallet cannot sum, so it says it is still one Character's.
+    const wallet = await widgetCard('Wallet');
+    expect(await within(wallet).findByText('Pilot One only')).toBeInTheDocument();
+  });
+
+  it('draws no Character switcher in the header, and no Total SP chip', async () => {
     await db.characters.put({
       characterId: OTHER_ID,
       name: 'Pilot Two',
@@ -392,13 +406,14 @@ describe('Overview widget grid', () => {
     await seedLayout(widget('w', 'wallet', { size: 'S' }));
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: /character: pilot one/i }));
-    await user.click(await screen.findByRole('menuitemradio', { name: /all characters/i }));
-
-    await waitFor(() => expect(useOverviewScopeAll.getState().value).toBe(true));
-    // The wallet cannot sum, so it says it is still one Character's.
-    const wallet = await widgetCard('Wallet');
-    expect(await within(wallet).findByText('Pilot One only')).toBeInTheDocument();
+    await widgetCard('Wallet');
+    const main = within(screen.getByRole('main'));
+    expect(main.queryByRole('button', { name: /character: /i })).not.toBeInTheDocument();
+    expect(main.queryByText('Total SP')).not.toBeInTheDocument();
+    expect(main.getByText('Unallocated SP')).toBeInTheDocument();
+    // The data age and Refresh sit in the identity block beside the name.
+    const heading = main.getByRole('heading', { level: 1 });
+    expect(heading.parentElement).toContainElement(main.getByRole('button', { name: 'Refresh' }));
   });
 });
 

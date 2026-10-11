@@ -80,4 +80,38 @@ describe('CharacterHeader', () => {
       screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
     ).toEqual(['Alerts, none waiting']);
   });
+
+  it('on the Overview drops Total SP, keeps Unallocated SP, and draws the aside beside the name', async () => {
+    render(
+      <CharacterHeader
+        characterId={CHARACTER_ID}
+        totalSp={82_865_296}
+        unallocatedSp={719_732}
+        overview
+        aside={<span>aside-slot</span>}
+        actions={<button type="button">actions-slot</button>}
+      />
+    );
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Mero Otichoda' });
+
+    expect(screen.queryByText('Total SP')).not.toBeInTheDocument();
+    expect(screen.getByText('719,732')).toBeInTheDocument();
+    expect(heading.parentElement).toContainElement(screen.getByText('aside-slot'));
+    expect(screen.getByRole('button', { name: 'actions-slot' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Alerts/ })).toBeInTheDocument();
+  });
+
+  it('off the Overview ignores aside and actions: the tabs share one fixed header', async () => {
+    render(
+      <CharacterHeader
+        characterId={CHARACTER_ID}
+        totalSp={1}
+        unallocatedSp={2}
+        aside={<span>aside-slot</span>}
+      />
+    );
+    await screen.findByRole('heading', { level: 1, name: 'Mero Otichoda' });
+    expect(screen.queryByText('aside-slot')).not.toBeInTheDocument();
+    expect(screen.getByText('Total SP')).toBeInTheDocument();
+  });
 });

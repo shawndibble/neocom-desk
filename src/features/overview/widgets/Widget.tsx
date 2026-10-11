@@ -50,8 +50,6 @@ export interface WidgetProps {
   widget: WidgetModel;
   /** Draw the New tag on kinds that are new: only for a pilot who had the old board. */
   showNew: boolean;
-  /** The header switcher is on All characters. */
-  headerAll: boolean;
   /** The pilot is customizing: a dashed edge; the controls arrive as `headerStart` and `editControls`. */
   editing?: boolean;
   /** The settings menu (its own trigger, so Radix owns focus and Esc); absent in the Gallery's preview. */
@@ -227,7 +225,7 @@ export function Widget(props: WidgetProps) {
 function LiveWidget(props: WidgetProps) {
   const { widget } = props;
   const kind = getKind(widget.kind);
-  const scope = scopePresentation(widget.kind, widget.scope, props.headerAll);
+  const scope = scopePresentation(widget.kind, widget.scope);
   const view = useWidgetView(
     widget.kind,
     scope.scopeAll,
@@ -239,7 +237,6 @@ function LiveWidget(props: WidgetProps) {
 function WidgetFrame({
   widget,
   showNew,
-  headerAll,
   editing = false,
   menu,
   headerStart,
@@ -252,7 +249,7 @@ function WidgetFrame({
   const { refresh } = useOverviewRefresh();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(TICK_MS);
-  const scope = scopePresentation(widget.kind, widget.scope, headerAll);
+  const scope = scopePresentation(widget.kind, widget.scope);
   const { state, showLastGood } = resolveWidget(view.status);
 
   // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.

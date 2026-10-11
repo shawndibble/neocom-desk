@@ -13,8 +13,8 @@
  * card-order settings for a returning pilot, or the first-run prompt), mounts
  * the page's reads once above the grid, and hands the header its controls.
  *
- * Scoped to the header Character; All characters is an Overview-only choice in
- * the header switcher, honoured by the widgets whose reads can sum.
+ * Scoped to the active Character; each widget's own menu may widen it to All
+ * characters, honoured by the kinds whose reads can sum.
  */
 import {
   useCallback,
@@ -27,8 +27,6 @@ import {
 } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
 import { Spinner } from '@/components/ui';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
@@ -36,7 +34,7 @@ import { DangerBanner } from '@/features/notifications/DangerBanner';
 import { getLastKnownSpSummary } from '@/stores/characterSp';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { OverviewHeader } from '@/features/overview/OverviewHeader';
+import { OverviewControls, OverviewDataAge } from '@/features/overview/OverviewHeader';
 import { useOverviewCardOrder } from '@/features/overview/cardOrder';
 import { useOverviewHiddenCards } from '@/features/overview/hiddenCards';
 import { useFeedStore } from '@/features/overview/widgets/data/feedStoreContext';
@@ -53,7 +51,6 @@ import { OverviewEditProvider } from '@/features/overview/widgets/OverviewEditPr
 import { PhoneCustomizeList } from '@/features/overview/widgets/PhoneCustomizeList';
 import { RoleChooser, RoleChooserDialog } from '@/features/overview/widgets/RoleChooser';
 import { useFirstRunReady } from '@/features/overview/widgets/useFirstRunReady';
-import { useOverviewScopeAll } from '@/features/overview/widgets/scope';
 import { distinctKinds, visibleWidgets } from '@/features/overview/widgets/visibility';
 import { WidgetGrid } from '@/features/overview/widgets/WidgetGrid';
 
@@ -74,11 +71,6 @@ interface BoardProps {
 function Board({ characterId, layout, showNew }: BoardProps) {
   const store = useFeedStore();
   const feeds = useSyncExternalStore(store.subscribe, store.get);
-  const scopeAll = useOverviewScopeAll((state) => state.value);
-  // The switcher is not drawn for a lone Character, so All characters must not stay on
-  // (with notes the pilot cannot clear) after an alt is removed.
-  const characterCount = useLiveQuery(() => db.characters.count(), []);
-  const headerAll = scopeAll && (characterCount ?? 0) >= 2;
   const edit = useOverviewEdit();
   const { editing } = edit;
   const isPhone = useIsPhone();
@@ -94,7 +86,9 @@ function Board({ characterId, layout, showNew }: BoardProps) {
         characterId={characterId}
         totalSp={skills?.totalSp ?? lastKnownSp.totalSp}
         unallocatedSp={skills?.skillsResult?.data?.unallocated_sp ?? lastKnownSp.unallocatedSp}
-        actions={<OverviewHeader widgets={layout.widgets} />}
+        overview
+        aside={<OverviewDataAge widgets={layout.widgets} />}
+        actions={<OverviewControls widgets={layout.widgets} />}
       />
       <OverviewSubNav />
       <DangerBanner />
@@ -107,7 +101,6 @@ function Board({ characterId, layout, showNew }: BoardProps) {
         <WidgetGrid
           widgets={layout.widgets}
           showNew={showNew}
-          headerAll={headerAll}
           editing={editing}
           onRemove={edit.remove}
           onAdd={() => setGalleryOpen(true)}
@@ -144,18 +137,14 @@ export function Overview() {
   const order = useOverviewCardOrder((state) => state.value);
   const orderHydrated = useOverviewCardOrder((state) => state.hydrated);
   const hydrateOrder = useOverviewCardOrder((state) => state.hydrate);
-  const scopeHydrated = useOverviewScopeAll((state) => state.hydrated);
-  const hydrateScope = useOverviewScopeAll((state) => state.hydrate);
 
   useEffect(() => {
     void hydrateLayout();
     void hydrateHidden();
     void hydrateOrder();
-    void hydrateScope();
-  }, [hydrateLayout, hydrateHidden, hydrateOrder, hydrateScope]);
+  }, [hydrateLayout, hydrateHidden, hydrateOrder]);
 
-  const hydrated =
-    activeHydrated && layoutHydrated && hiddenHydrated && orderHydrated && scopeHydrated;
+  const hydrated = activeHydrated && layoutHydrated && hiddenHydrated && orderHydrated;
   const returning = isReturningPilot(hidden, order);
   // An absent layout is a first run only once a second device's pull has had its say.
   const firstRunReady = useFirstRunReady(hydrated);
@@ -207,6 +196,7 @@ export function Overview() {
       <div className="mx-auto max-w-6xl space-y-4">
         <CharacterHeader
           characterId={activeCharacterId}
+          overview
           totalSp={getLastKnownSpSummary(activeCharacterId).totalSp}
           unallocatedSp={getLastKnownSpSummary(activeCharacterId).unallocatedSp}
         />

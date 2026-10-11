@@ -47,13 +47,7 @@ function Preview({ kind }: { kind: WidgetKindDef }) {
   return (
     // Inert: a picture of the widget, not one. Nothing in it takes focus or a click.
     <div aria-hidden="true" inert className="pointer-events-none mt-2 flex select-none">
-      <Widget
-        widget={widget}
-        showNew={false}
-        headerAll={false}
-        onRemove={noop}
-        previewView={view}
-      />
+      <Widget widget={widget} showNew={false} onRemove={noop} previewView={view} />
     </div>
   );
 }

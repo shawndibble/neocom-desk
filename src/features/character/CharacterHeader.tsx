@@ -13,10 +13,14 @@ interface CharacterHeaderProps {
   /** ESI's unallocated_sp; null while loading, or when unavailable. */
   unallocatedSp: number | null;
   /**
-   * Page-specific controls, drawn after the SP chips and before the bell. Only
-   * the Overview passes it (the Character switcher, Next deadline, Refresh and
-   * Customize).
+   * The Overview's layout: Total SP is dropped (a Skill points widget carries
+   * it), the bell sits top right on the Unallocated SP line, and `aside` and
+   * `actions` are drawn. Clones and Employment History leave it off.
    */
+  overview?: boolean;
+  /** Overview only: beside the name (data age and Refresh); wraps under it when the name is long. */
+  aside?: ReactNode;
+  /** Overview only: the controls row under the identity (the Next deadline and Customize). */
   actions?: ReactNode;
 }
 
@@ -30,12 +34,16 @@ interface CharacterHeaderProps {
  * block jumping in and out as you moved between tabs was the actual complaint.
  * The character's name is the `<h1>` — one per route, as before.
  *
- * It has no controls of its own: everything above the tab strip is the same on
- * every tab. A view's `DataAgeBadge` and its Refresh belong to the data they
- * describe, so they sit in that view's `Panel` toolbar below the tabs. The one
- * exception is the Overview, whose widgets are the page: its header hosts the
- * Character switcher, Next deadline chip, data age, Refresh and Customize through
- * `actions`. Clones and Employment History pass nothing.
+ * It has no controls of its own on Clones and Employment History: everything
+ * above the tab strip is the same on every tab, and a view's `DataAgeBadge`
+ * and Refresh belong to the data they describe, so they sit in that view's
+ * `Panel` toolbar below the tabs. The exception is the Overview (`overview`),
+ * whose widgets are the page: its header carries the data age and Refresh
+ * beside the name (`aside`), the Unallocated SP chip with the bell at the top
+ * right, and a controls row (`actions`: Next deadline, Customize). Total SP is
+ * not drawn there; a Skill points widget carries it. Switching Character is the
+ * rail footer's and the command palette's job.
+ *
  *
  * Identity is read here rather than passed in: it is the same on every tab and
  * comes from local state (Dexie) plus a session store, so threading it through
@@ -47,6 +55,8 @@ export function CharacterHeader({
   characterId,
   totalSp,
   unallocatedSp,
+  overview = false,
+  aside,
   actions,
 }: CharacterHeaderProps) {
   const { t } = useTranslation();
@@ -64,8 +74,12 @@ export function CharacterHeader({
   const sp = (value: number | null): string =>
     value === null ? t('common.unknown') : value.toLocaleString();
 
+  // On the Overview the chips drop to their own line on a phone (order-1) so the
+  // bell stays top right beside the identity; from `md` they sit left of the bell.
+  const chipsClassName = overview ? 'order-1 basis-full md:order-none md:basis-auto' : undefined;
+
   return (
-    <header className="flex flex-wrap items-center gap-3">
+    <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
       <CharacterAvatar
         characterId={characterId}
         size="lg"
@@ -80,12 +94,15 @@ export function CharacterHeader({
       */}
       <div className="min-w-0 flex-1 basis-48">
         {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
-        <h1
-          tabIndex={-1}
-          className="truncate text-xl font-semibold tracking-widest uppercase focus:outline-none"
-        >
-          {character?.name ?? t('common.unknown')}
-        </h1>
+        <div className="flex flex-wrap items-center gap-x-3">
+          <h1
+            tabIndex={-1}
+            className="max-w-full min-w-0 truncate text-xl font-semibold tracking-widest uppercase focus:outline-none"
+          >
+            {character?.name ?? t('common.unknown')}
+          </h1>
+          {overview && aside}
+        </div>
         <p className="truncate text-xs text-text-dim">
           {publicInfo?.corporationName && publicInfo.corporationId !== undefined ? (
             <CorporationLink id={publicInfo.corporationId}>
@@ -106,13 +123,13 @@ export function CharacterHeader({
           )}
         </p>
       </div>
-      <StatChips>
-        <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />
+      <StatChips className={chipsClassName}>
+        {!overview && <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />}
         <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />
       </StatChips>
-      {actions}
       {/* This header stands in for `PageHeader` on Overview, Clones and Employment History. */}
       <AlertsBell />
+      {overview && actions && <div className="order-2 min-w-0 basis-full">{actions}</div>}
     </header>
   );
 }
