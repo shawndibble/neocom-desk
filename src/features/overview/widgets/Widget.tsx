@@ -1,6 +1,6 @@
 /**
- * One tile on the Overview: a header (title, New tag, character scope chip, an
- * Open link, a settings button) over a body that is one of the five Widget
+ * One tile on the Overview: a header (the title, which is the link to the
+ * widget's page, a New tag, a character scope chip, a settings button) over a body that is one of the five Widget
  * States.
  *
  * The body is a Number, a Chart or a Table, and **the headline number is always
@@ -203,7 +203,7 @@ function Skeleton() {
 
 /**
  * The live read lives in its own component so the Gallery's preview, which
- * brings its own sample , never mounts  and so never
+ * supplies its own sample view, renders `WidgetFrame` directly and so never
  * starts a live builder per previewed kind.
  */
 export function Widget(props: WidgetProps) {

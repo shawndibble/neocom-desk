@@ -235,7 +235,7 @@ describe('stock', () => {
     expect(view.rows).toEqual([]);
   });
 
-  it('gives a kind with no page of its own no Open link target', () => {
+  it('gives a kind with no page of its own no title link target', () => {
     expect(buildView('survey', {}, ctx()).to).toBeNull();
   });
 

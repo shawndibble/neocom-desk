@@ -75,7 +75,7 @@ export interface ListRow {
   value: string;
   iskAmount?: number;
   tone: DeadlineSeverity;
-  /** Set only when the row leads somewhere narrower than the widget's own Open link. */
+  /** Set only when the row leads somewhere narrower than the widget's own title link. */
   to?: string;
 }
 
@@ -114,7 +114,7 @@ export interface TableRowModel {
   cells: TableCell[];
   /** A severity dot before the first cell; absent or `clear` draws none. */
   tone?: DeadlineSeverity;
-  /** Set only when the row leads somewhere narrower than the widget's own Open link. */
+  /** Set only when the row leads somewhere narrower than the widget's own title link. */
   to?: string;
 }
 
@@ -140,7 +140,7 @@ export interface KindView {
   deadlines: BoardDeadline[];
   /** One plain line, for the widget's accessible description. */
   summary: string;
-  /** Where the widget's Open link goes; null for a kind with no page of its own yet. */
+  /** Where the widget's title link goes; null for a kind with no page of its own yet. */
   to: string | null;
   /** Overrides the kind's own empty message, when the reason is not "nothing there". */
   emptyMessage?: string;

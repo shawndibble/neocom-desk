@@ -6,7 +6,7 @@
  * label), tabular numerals, numeric columns right-aligned, a severity icon
  * before the first cell of a toned row, the first column truncated, and the
  * whole row a link when it has a `to` (the trailing caret is the §6c cue).
- * No row buttons and no other chrome: the widget's Open link and the row's own
+ * No row buttons and no other chrome: the widget's title link and the row's own
  * link are the only ways out. Columns are chosen by `visibleColumns` from the
  * width budget the caller passes, never from the viewport.
  */
