@@ -129,6 +129,8 @@ export const CONTRACTS_TABS = definePageTabs(
 export const MARKET_TABS = definePageTabs('/market', [
   { id: 'browser', labelKey: 'market.sections.browser' },
   { id: 'orders', labelKey: 'market.sections.openOrders' },
+  // `stock/<list id>` opens one market's Stock List.
+  { id: 'stock', labelKey: 'market.sections.stock', deep: true },
   { id: 'history', labelKey: 'market.sections.history' },
   { id: 'history/transactions', labelKey: 'market.sections.transactions' },
   { id: 'appraisal', labelKey: 'market.sections.appraisal' },
@@ -148,7 +150,6 @@ export const ASSETS_TABS = definePageTabs('/assets', [
   { id: 'items', labelKey: 'assets.tabs.items', deep: true },
   { id: 'ships', labelKey: 'assets.tabs.ships' },
   { id: 'move', labelKey: 'assets.tabs.move' },
-  { id: 'targets', labelKey: 'assets.tabs.targets' },
 ]);
 
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {

@@ -1,68 +1,80 @@
 /**
- * The Overview's Stock card: the pilot's last-viewed **Stock List**, worst
- * first, counted from cached assets and orders like the below-target alert —
- * the landing page never fans out a live asset read.
+ * The Overview's Stock card: every market the pilot stocks, worst first,
+ * counted from cached assets and orders like the below-target alert — the
+ * landing page never fans out a live asset read.
  */
-import {
-  buildStockRows,
-  summarizeStock,
-  type StockRow,
-  type StockSummary,
-} from '@/engine/stockTargets/stockRows';
+import { rankMarkets } from '@/engine/stockTargets/markets';
+import { buildStockRows, summarizeStock, type StockSummary } from '@/engine/stockTargets/stockRows';
 import type { DeadlineSeverity } from '@/engine/severity';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-import { useSelectedStockList, useStockLists } from './stockListsStore';
+import { useStockLists } from './stockListsStore';
 import { loadStockAlertEntries } from './stockTargetsData';
 
-export interface StockBoardData {
-  listName: string;
-  rows: StockRow[];
-  names: Map<number, string>;
+export interface StockBoardMarket {
+  listId: string;
+  name: string;
   summary: StockSummary;
-  /** False before any asset list is cached: the counts are then unknown, not zero. */
+}
+
+export interface StockBoardData {
+  /** Worst first. */
+  markets: StockBoardMarket[];
+  totals: { out: number; low: number };
+  /** False before any order list is cached: the counts are then unknown, not zero. */
   counted: boolean;
 }
 
-/** Null when the pilot has no Stock List, which is also what keeps the card off the board. */
+/** Null when the pilot stocks no market, which is also what keeps the card off the board. */
 export async function loadStockBoard(): Promise<StockBoardData | null> {
-  await Promise.all([
-    useStockLists.getState().hydrate(),
-    useSelectedStockList.getState().hydrate(),
-    useMarketHub.getState().hydrate(),
-  ]);
+  await Promise.all([useStockLists.getState().hydrate(), useMarketHub.getState().hydrate()]);
   const lists = useStockLists.getState().value;
-  const selectedId = useSelectedStockList.getState().value;
-  const list = lists.find((l) => l.id === selectedId) ?? lists[0];
-  if (!list) return null;
+  if (lists.length === 0) return null;
   const hub = getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
-  const typeIds = list.items.map((item) => item.typeId);
+  const typeIds = [...new Set(lists.flatMap((list) => list.items.map((item) => item.typeId)))];
   const [entries, prices] = await Promise.all([
-    loadStockAlertEntries([list]),
+    loadStockAlertEntries(lists),
     getHubPrices(hub, typeIds).catch(() => new Map<number, { sellMin: number | null }>()),
   ]);
-  const counted = entries.every((entry) => entry.onHand !== null);
-  const rows = counted
-    ? buildStockRows(
-        entries.map((entry) => ({
-          typeId: entry.typeId,
-          target: entry.target,
-          onHand: entry.onHand ?? 0,
-          price: prices.get(entry.typeId)?.sellMin ?? null,
-        }))
-      )
-    : [];
+  const counted = entries.every((entry) => entry.listed !== null);
+  const markets = lists.map((list) => {
+    const rows = counted
+      ? buildStockRows(
+          entries
+            .filter((entry) => entry.listId === list.id)
+            .map((entry) => ({
+              typeId: entry.typeId,
+              target: entry.target,
+              listed: entry.listed ?? 0,
+              inHangar: entry.inHangar,
+              price: prices.get(entry.typeId)?.sellMin ?? null,
+            }))
+        )
+      : [];
+    return { listId: list.id, name: list.name, summary: summarizeStock(rows) };
+  });
+  const ranked = rankMarkets(
+    markets.map((market) => ({
+      ...market,
+      items: 0,
+      out: market.summary.out,
+      low: market.summary.low,
+      readyToList: market.summary.readyToList,
+      costToFill: market.summary.costToFill,
+    }))
+  ).map(({ listId, name, summary }) => ({ listId, name, summary }));
   return {
-    listName: list.name,
-    rows,
-    names: new Map(entries.map((entry) => [entry.typeId, entry.name])),
-    summary: summarizeStock(rows),
+    markets: ranked,
+    totals: {
+      out: markets.reduce((sum, market) => sum + market.summary.out, 0),
+      low: markets.reduce((sum, market) => sum + market.summary.low, 0),
+    },
     counted,
   };
 }
 
 export function stockBoardSeverity(data: StockBoardData | null): DeadlineSeverity | null {
   if (data === null || !data.counted) return null;
-  return data.summary.out > 0 || data.summary.low > 0 ? 'warning' : 'clear';
+  return data.totals.out > 0 || data.totals.low > 0 ? 'warning' : 'clear';
 }

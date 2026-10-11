@@ -1,9 +1,10 @@
 /**
- * The rows of a **Stock List**: each **Stock Target** against what is on hand,
- * its **Shortfall**, the cost to fill it, and a status word (CONTEXT.md).
+ * The rows of a **Stock List**: each **Stock Target** against what the pilot
+ * has listed at the market, its **Shortfall**, how much of that the hangar there
+ * covers, the cost to source the rest, and a status word (CONTEXT.md).
  *
- * Pure: on-hand quantities and prices are read by the feature layer and passed
- * in, so the same rows drive the Targets tab, the Overview card and the
+ * Pure: quantities and prices are read by the feature layer and passed
+ * in, so the same rows drive the Stock tab, the Overview card and the
  * below-target alert without any of them disagreeing about what "low" means.
  */
 
@@ -18,17 +19,25 @@ export const STOCK_STATUSES: readonly StockStatus[] = ['out', 'low', 'ok', 'over
 export interface StockRowInput {
   typeId: number;
   target: number;
-  onHand: number;
+  /** Units the pilot has listed for sale at the market: what the status is measured by. */
+  listed: number;
+  /** Units in the pilot's hangars at the market's station, ready to list. */
+  inHangar: number;
   /** ISK per unit, or null when no price is known. */
   price: number | null;
 }
 
 export interface StockRow extends StockRowInput {
+  /** Stock Target minus listed. */
   shortfall: number;
-  /** On hand over Stock Target; above 1 when over. */
+  /** The part of the Shortfall the hangar at the market covers. */
+  fromHangar: number;
+  /** The rest of the Shortfall: to buy, build or haul in. */
+  toSource: number;
+  /** Listed over Stock Target; above 1 when over. */
   fill: number;
   status: StockStatus;
-  /** Shortfall times price. Zero when nothing is short; null when short and unpriced. */
+  /** What is still to source, times price. Zero when nothing is; null when unpriced. */
   costToFill: number | null;
 }
 
@@ -37,29 +46,37 @@ export interface StockSummary {
   low: number;
   ok: number;
   over: number;
-  /** Sum of the known costs to fill; unpriced shortfalls are counted separately. */
+  /** Items whose hangar stock at the market can cover some of the Shortfall. */
+  readyToList: number;
+  /** Sum of the known costs to fill; unpriced ones are counted separately. */
   costToFill: number;
   unpricedShort: number;
 }
 
-export function stockStatus(onHand: number, target: number): StockStatus {
-  if (onHand <= 0) return 'out';
-  if (onHand < target * LOW_FILL_RATIO) return 'low';
-  if (onHand > target) return 'over';
+export function stockStatus(listed: number, target: number): StockStatus {
+  if (listed <= 0) return 'out';
+  if (listed < target * LOW_FILL_RATIO) return 'low';
+  if (listed > target) return 'over';
   return 'ok';
 }
 
 function toRow(input: StockRowInput): StockRow {
-  const onHand = Math.max(0, input.onHand);
-  const shortfall = Math.max(0, input.target - onHand);
+  const listed = Math.max(0, input.listed);
+  const inHangar = Math.max(0, input.inHangar);
+  const shortfall = Math.max(0, input.target - listed);
+  const fromHangar = Math.min(shortfall, inHangar);
+  const toSource = shortfall - fromHangar;
   let costToFill: number | null = 0;
-  if (shortfall > 0) costToFill = input.price === null ? null : shortfall * input.price;
+  if (toSource > 0) costToFill = input.price === null ? null : toSource * input.price;
   return {
     ...input,
-    onHand,
+    listed,
+    inHangar,
     shortfall,
-    fill: onHand / input.target,
-    status: stockStatus(onHand, input.target),
+    fromHangar,
+    toSource,
+    fill: listed / input.target,
+    status: stockStatus(listed, input.target),
     costToFill,
   };
 }
@@ -89,9 +106,18 @@ export function buildStockRows(inputs: readonly StockRowInput[]): StockRow[] {
 }
 
 export function summarizeStock(rows: readonly StockRow[]): StockSummary {
-  const summary: StockSummary = { out: 0, low: 0, ok: 0, over: 0, costToFill: 0, unpricedShort: 0 };
+  const summary: StockSummary = {
+    out: 0,
+    low: 0,
+    ok: 0,
+    over: 0,
+    readyToList: 0,
+    costToFill: 0,
+    unpricedShort: 0,
+  };
   for (const row of rows) {
     summary[row.status] += 1;
+    if (row.fromHangar > 0) summary.readyToList += 1;
     if (row.costToFill === null) summary.unpricedShort += 1;
     else summary.costToFill += row.costToFill;
   }
@@ -99,20 +125,20 @@ export function summarizeStock(rows: readonly StockRow[]): StockSummary {
 }
 
 export interface BuilderSplit {
-  /** Short rows the pilot holds a blueprint for. */
+  /** Rows still to source that the pilot holds a blueprint for. */
   buildable: StockRow[];
-  /** Short rows with no blueprint: build after getting one, or buy. */
+  /** Rows still to source with no blueprint: build after getting one, or buy. */
   needsBlueprintOrBuy: StockRow[];
 }
 
-/** The Builder view's two groups. Rows that are not short belong to neither. */
+/** The Builder view's two groups. Rows the listings or the hangar cover belong to neither. */
 export function splitForBuilders(
   rows: readonly StockRow[],
   canBuild: (typeId: number) => boolean
 ): BuilderSplit {
   const split: BuilderSplit = { buildable: [], needsBlueprintOrBuy: [] };
   for (const row of rows) {
-    if (row.shortfall <= 0) continue;
+    if (row.toSource <= 0) continue;
     (canBuild(row.typeId) ? split.buildable : split.needsBlueprintOrBuy).push(row);
   }
   return split;

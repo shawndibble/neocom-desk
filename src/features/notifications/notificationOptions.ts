@@ -98,7 +98,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // not `HIGHLIGHT_PARAM`: Market Browser selects an item by that param on
   // load rather than pulsing a table row.
   priceAlertTriggered: '/market/browser',
-  stockBelowTarget: '/assets/targets',
+  stockBelowTarget: '/market/stock',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';

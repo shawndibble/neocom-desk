@@ -1,6 +1,6 @@
 /**
- * **Stock Lists** — named sets of **Stock Targets** (CONTEXT.md) — and the
- * pure edits the Targets tab and the "Set stock target…" dialog make to them.
+ * **Stock Lists** — a market's named set of **Stock Targets** (CONTEXT.md) —
+ * and the pure edits the Stock tab and the "Set stock target…" dialog make to them.
  *
  * The stored value is whatever the last device to sync wrote, possibly an
  * older build, so `parseStockLists` keeps every usable list and drops only
@@ -16,11 +16,8 @@ export interface StockTarget {
 export interface StockList {
   id: string;
   name: string;
-  /**
-   * The station or structure the stock is counted at, or null to count it
-   * anywhere the pilot's Characters hold it.
-   */
-  locationId: number | null;
+  /** The station or structure the pilot sells at: the market this list stocks. */
+  locationId: number;
   items: StockTarget[];
 }
 
@@ -51,10 +48,12 @@ function usableList(raw: unknown): StockList | null {
   const { id, name, locationId, items } = raw as Record<string, unknown>;
   if (typeof id !== 'string' || id === '') return null;
   if (typeof name !== 'string' || name.trim() === '') return null;
+  const market = positiveInteger(locationId);
+  if (market === null) return null;
   return {
     id,
     name: name.trim(),
-    locationId: positiveInteger(locationId),
+    locationId: market,
     items: usableTargets(items),
   };
 }
@@ -78,14 +77,21 @@ function updateList(
   return lists.map((list) => (list.id === listId ? update(list) : list));
 }
 
-/** A blank name is ignored: `parseStockLists` would drop the list on the next read. */
+/**
+ * A blank name is ignored: `parseStockLists` would drop the list on the next
+ * read. Starting Stock Targets (from the pilot's current listings) are cleaned
+ * the same way a stored list is.
+ */
 export function addStockList(
   lists: readonly StockList[],
-  list: { id: string; name: string }
+  list: { id: string; name: string; locationId: number; items?: readonly StockTarget[] }
 ): StockList[] {
   const name = list.name.trim();
   if (name === '') return [...lists];
-  return [...lists, { id: list.id, name, locationId: null, items: [] }];
+  return [
+    ...lists,
+    { id: list.id, name, locationId: list.locationId, items: usableTargets(list.items ?? []) },
+  ];
 }
 
 export function renameStockList(
@@ -105,7 +111,7 @@ export function removeStockList(lists: readonly StockList[], listId: string): St
 export function setStockListLocation(
   lists: readonly StockList[],
   listId: string,
-  locationId: number | null
+  locationId: number
 ): StockList[] {
   return updateList(lists, listId, (list) => ({ ...list, locationId }));
 }

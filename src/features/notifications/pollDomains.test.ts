@@ -1477,13 +1477,13 @@ describe('copy wiring', () => {
 });
 
 describe('stockTargetDomain (issue #3521)', () => {
-  const ASSETS_SCOPE = 'esi-assets.read_assets.v1';
+  const ORDERS_SCOPE = 'esi-markets.read_character_orders.v1';
   const token = (characterId: number) => ({
     characterId,
     accessToken: 'a',
     refreshToken: 'r',
     expiresAt: 0,
-    scopes: [ASSETS_SCOPE],
+    scopes: [ORDERS_SCOPE],
   });
 
   beforeEach(async () => {
@@ -1491,7 +1491,9 @@ describe('stockTargetDomain (issue #3521)', () => {
     await db.esiCache.clear();
     vi.mocked(loadTypeNames).mockResolvedValue(new Map([[16240, 'Catalyst']]));
     useStockLists.setState({
-      value: [{ id: 'efa', name: 'Efa', locationId: null, items: [{ typeId: 16240, target: 40 }] }],
+      value: [
+        { id: 'efa', name: 'Efa', locationId: 60003760, items: [{ typeId: 16240, target: 40 }] },
+      ],
       hydrated: true,
       hydrate: async () => {},
     });
@@ -1503,7 +1505,7 @@ describe('stockTargetDomain (issue #3521)', () => {
     expect(await stockTargetDomain.load(1)).toHaveLength(1);
   });
 
-  it("counts every Character's cached assets and never reads ESI", async () => {
+  it("counts every Character's cached orders and hangars at the market, and never reads ESI", async () => {
     await db.tokens.bulkPut([token(1), token(2)]);
     await db.characters.bulkPut([
       { characterId: 1, name: 'A', ownerHash: 'a', addedAt: 0 },
@@ -1518,7 +1520,15 @@ describe('stockTargetDomain (issue #3521)', () => {
       location_flag: 'Hangar',
       is_singleton: false,
     };
+    const order = {
+      order_id: 5,
+      type_id: 16240,
+      location_id: 60003760,
+      volume_remain: 7,
+      is_buy_order: false,
+    };
     await db.esiCache.put({ characterId: 2, key: 'assets', value: [asset], fetchedAt: 1 });
+    await db.esiCache.put({ characterId: 1, key: 'orders', value: [order], fetchedAt: 1 });
     expect(await stockTargetDomain.load(1)).toEqual([
       {
         listId: 'efa',
@@ -1526,15 +1536,16 @@ describe('stockTargetDomain (issue #3521)', () => {
         typeId: 16240,
         name: 'Catalyst',
         target: 40,
-        onHand: 12,
+        listed: 7,
+        inHangar: 12,
       },
     ]);
   });
 
-  it('reads on hand as unknown, not zero, before any asset list is cached', async () => {
+  it('reads listed as unknown, not zero, before any order list is cached', async () => {
     await db.tokens.put(token(1));
     expect(await stockTargetDomain.load(1)).toEqual([
-      expect.objectContaining({ typeId: 16240, onHand: null }),
+      expect.objectContaining({ typeId: 16240, listed: null }),
     ]);
   });
 });

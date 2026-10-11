@@ -1674,18 +1674,19 @@ function isStockAlertEntry(raw: unknown): raw is StockAlertEntry {
     typeof r.typeId === 'number' &&
     typeof r.name === 'string' &&
     typeof r.target === 'number' &&
-    (r.onHand === null || typeof r.onHand === 'number')
+    (r.listed === null || typeof r.listed === 'number') &&
+    typeof r.inHangar === 'number'
   );
 }
 
 /**
  * The one Character the lists' alerts are filed under. Stock Lists are
- * account-wide and count every Character's assets, so polling them under each
+ * account-wide and count every Character's orders, so polling them under each
  * Character would fire one alert per Character for a single empty shelf. The
- * lowest id with the assets scope is stable for as long as the roster is.
+ * lowest id with the orders scope is stable for as long as the roster is.
  */
 async function stockAlertOwner(): Promise<number | null> {
-  const scope = ESI_REGISTRY.getCharacterAssets.scope;
+  const scope = ESI_REGISTRY.getCharacterOrders.scope;
   const tokens = await db.tokens.toArray();
   const ids = tokens
     .filter((token) => (token.scopes ?? []).includes(scope))
@@ -1695,8 +1696,9 @@ async function stockAlertOwner(): Promise<number | null> {
 }
 
 /**
- * Stock List items dropping to Low or Out (issue #3521), counted from the
- * cached asset and order lists only — never a live fetch inside the poll.
+ * A market's listed amount of an item dropping to Low or Out (issue #3521),
+ * counted from the cached order and asset lists only — never a live fetch
+ * inside the poll.
  */
 export const stockTargetDomain = defineDomain<
   StockAlertEntry,

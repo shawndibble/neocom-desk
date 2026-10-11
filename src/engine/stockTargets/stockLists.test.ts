@@ -14,7 +14,7 @@ import {
 const efa: StockList = {
   id: 'a',
   name: 'Efa Market',
-  locationId: null,
+  locationId: 1035466617946,
   items: [{ typeId: 16242, target: 40 }],
 };
 
@@ -23,8 +23,9 @@ describe('parseStockLists', () => {
     expect(
       parseStockLists([
         efa,
-        { id: '', name: 'No id', locationId: null, items: [] },
-        { id: 'b', name: '   ', locationId: null, items: [] },
+        { id: '', name: 'No id', locationId: 1, items: [] },
+        { id: 'b', name: '   ', locationId: 1, items: [] },
+        { id: 'c', name: 'No market', locationId: null, items: [] },
         'junk',
       ])
     ).toEqual([efa]);
@@ -46,9 +47,8 @@ describe('parseStockLists', () => {
     expect(parsed?.[0].items).toEqual([{ typeId: 16242, target: 40 }]);
   });
 
-  it('reads a missing or bad location as anywhere', () => {
-    const parsed = parseStockLists([{ id: 'a', name: 'X', items: [], locationId: 'nope' }]);
-    expect(parsed?.[0].locationId).toBeNull();
+  it('drops a list with no usable market', () => {
+    expect(parseStockLists([{ id: 'a', name: 'X', items: [], locationId: 'nope' }])).toEqual([]);
   });
 
   it('is null for something that is not a list at all', () => {
@@ -57,14 +57,28 @@ describe('parseStockLists', () => {
 });
 
 describe('list edits', () => {
-  it('adds a list with a trimmed name and no Stock Targets', () => {
-    expect(addStockList([], { id: 'a', name: '  Efa Market ' })).toEqual([
-      { id: 'a', name: 'Efa Market', locationId: null, items: [] },
+  it('adds a list for a market with a trimmed name', () => {
+    expect(addStockList([], { id: 'a', name: '  Efa Market ', locationId: 7 })).toEqual([
+      { id: 'a', name: 'Efa Market', locationId: 7, items: [] },
     ]);
   });
 
+  it('can start a list with Stock Targets, cleaned like a stored list', () => {
+    const [list] = addStockList([], {
+      id: 'a',
+      name: 'Efa',
+      locationId: 7,
+      items: [
+        { typeId: 34, target: 5 },
+        { typeId: 34, target: 9 },
+        { typeId: 35, target: 0 },
+      ],
+    });
+    expect(list.items).toEqual([{ typeId: 34, target: 5 }]);
+  });
+
   it('ignores a blank name on add and on rename', () => {
-    expect(addStockList([], { id: 'a', name: ' ' })).toEqual([]);
+    expect(addStockList([], { id: 'a', name: ' ', locationId: 7 })).toEqual([]);
     expect(renameStockList([efa], 'a', '')).toEqual([efa]);
   });
 
@@ -73,7 +87,7 @@ describe('list edits', () => {
     expect(removeStockList([efa], 'a')).toEqual([]);
   });
 
-  it('sets where the stock is counted', () => {
+  it('moves a list to another market', () => {
     expect(setStockListLocation([efa], 'a', 60003760)[0].locationId).toBe(60003760);
   });
 });

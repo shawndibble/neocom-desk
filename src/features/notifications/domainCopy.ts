@@ -516,13 +516,15 @@ export const stockBelowTargetCopy: DomainCopy<StockBelowTargetFire, NoNames> = {
     title: fired('stockBelowTarget', fire.status === 'out' ? 'outTitle' : 'lowTitle', {
       item: fire.name,
     }),
-    body: fired('stockBelowTarget', 'body', {
+    // Stock waiting in the hangar there is the quickest restock, so the alert says so.
+    body: fired('stockBelowTarget', fire.inHangar > 0 ? 'bodyHangar' : 'body', {
       list: fire.listName,
-      onHand: fire.onHand.toLocaleString(),
+      listed: fire.listed.toLocaleString(),
       target: fire.target.toLocaleString(),
+      hangar: fire.inHangar.toLocaleString(),
     }),
   }),
-  // No subject: the Targets tab opens on the pilot's last list, with no row to select.
+  // No subject: the alert opens the Stock tab's market list, which puts the worst market first.
 };
 
 /* Price alerts ------------------------------------------------------------ */

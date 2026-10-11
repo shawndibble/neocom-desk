@@ -221,7 +221,7 @@ export function priceAlertsSummary(t: Translate, data: PriceAlertsBoardData | nu
 
 export function stockBoardSummary(t: Translate, data: StockBoardData | null): string {
   if (data === null || !data.counted) return t(CHECKING);
-  const { out, low } = data.summary;
+  const { out, low } = data.totals;
   if (out > 0 || low > 0) return t('overview.board.stockSummary', { out, low });
   return t('overview.board.stockAllStocked');
 }

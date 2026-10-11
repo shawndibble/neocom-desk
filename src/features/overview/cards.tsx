@@ -54,8 +54,8 @@ import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
-import type { StockRow } from '@/engine/stockTargets/stockRows';
-import { StockStatusPill } from '@/features/stockTargets/StockStatus';
+import type { StockSummary } from '@/engine/stockTargets/stockRows';
+import { StockNeedPill } from '@/features/stockTargets/StockStatus';
 import { stockBoardSeverity, type StockBoardData } from '@/features/stockTargets/stockBoard';
 import type { CorpBoardItem } from '@/engine/corp/board';
 import { structureStateLabel } from '@/features/corp/boardSources';
@@ -742,32 +742,48 @@ export function PriceAlertsCard({
 // --- Stock -----------------------------------------------------------------
 
 /**
- * The last-viewed Stock List's Out and Low counts, its cost to fill and its
- * worst items (issue #3521). Absent from the board, and from the edit menu,
- * until the pilot has a Stock List.
+ * The markets the pilot stocks that need restocking, worst first, with their
+ * Out and Low totals (issue #3521). A fully stocked market is only counted in
+ * the footer. Absent from the board, and from the edit menu, until the pilot
+ * stocks a market.
  */
-const STOCK_TARGETS_PATH = '/assets/targets';
+const STOCK_PATH = '/market/stock';
 
 export function StockCard({ data }: { data: StockBoardData | null }) {
   const { t } = useTranslation();
-  const short = data?.rows.filter((row) => row.shortfall > 0).slice(0, ROW_LIMIT) ?? [];
-  const nameOf = (row: StockRow) => data?.names.get(row.typeId) ?? `#${row.typeId}`;
+  const needing =
+    data?.markets.filter((market) => market.summary.out > 0 || market.summary.low > 0) ?? [];
+  const shown = needing.slice(0, ROW_LIMIT);
+  const stocked = (data?.markets.length ?? 0) - needing.length;
+  const detail = (summary: StockSummary) =>
+    [
+      summary.readyToList > 0 && t('overview.board.stockReady', { count: summary.readyToList }),
+      summary.costToFill > 0 &&
+        t('overview.board.stockToSource', { isk: formatIskCompact(summary.costToFill) }),
+    ]
+      .filter(Boolean)
+      .join(' · ');
   return (
     <BoardCard
-      title={
-        data ? t('overview.board.stockFor', { list: data.listName }) : t('overview.board.stock')
+      title={t('overview.board.stock')}
+      meta={
+        <SeverityWord
+          severity={stockBoardSeverity(data)}
+          warningLabel="overview.board.word.restock"
+        />
       }
-      meta={<SeverityWord severity={stockBoardSeverity(data)} />}
-      to={STOCK_TARGETS_PATH}
+      to={STOCK_PATH}
       openLabel={t('overview.board.open')}
       footer={
         data === null
           ? t('overview.board.checking')
           : !data.counted
             ? t('overview.board.stockNotCounted')
-            : t('overview.board.stockCostToFill', {
-                isk: formatIskCompact(data.summary.costToFill),
-              })
+            : needing.length === 0
+              ? t('overview.board.stockAllStocked')
+              : stocked > 0
+                ? t('overview.board.stockMoreStocked', { count: stocked })
+                : undefined
       }
     >
       {data === null || !data.counted ? (
@@ -777,37 +793,37 @@ export function StockCard({ data }: { data: StockBoardData | null }) {
           <TileRow>
             <NumberTile
               label={t('overview.board.stockOut')}
-              value={data.summary.out}
-              severity="warning"
+              value={data.totals.out}
+              severity="critical"
             />
             <NumberTile
               label={t('overview.board.stockLow')}
-              value={data.summary.low}
-              severity="watch"
+              value={data.totals.low}
+              severity="warning"
             />
           </TileRow>
-          {short.length === 0 ? (
+          {shown.length === 0 ? (
             <CardEmpty>{t('overview.board.stockAllStocked')}</CardEmpty>
           ) : (
             <ul>
-              {short.map((row) => (
-                <TriageRow
-                  key={row.typeId}
-                  severity={row.status === 'out' ? 'warning' : 'watch'}
-                  when={<StockStatusPill status={row.status} />}
-                  whenLabel={t(`stockTargets.status.${row.status}`)}
-                  subject={nameOf(row)}
-                  detail={t('overview.board.stockRowDetail', {
-                    onHand: row.onHand.toLocaleString(),
-                    target: row.target.toLocaleString(),
-                  })}
-                  detailLabel={t('overview.board.stockRowDetail', {
-                    onHand: row.onHand.toLocaleString(),
-                    target: row.target.toLocaleString(),
-                  })}
-                  to={STOCK_TARGETS_PATH}
-                />
-              ))}
+              {shown.map((market) => {
+                const out = market.summary.out > 0;
+                const word = out
+                  ? t('stockTargets.need.out', { count: market.summary.out })
+                  : t('stockTargets.need.low', { count: market.summary.low });
+                return (
+                  <TriageRow
+                    key={market.listId}
+                    severity={out ? 'critical' : 'warning'}
+                    when={<StockNeedPill need={out ? 'out' : 'low'}>{word}</StockNeedPill>}
+                    whenLabel={word}
+                    subject={market.name}
+                    detail={detail(market.summary)}
+                    detailLabel={detail(market.summary)}
+                    to={`${STOCK_PATH}/${market.listId}`}
+                  />
+                );
+              })}
             </ul>
           )}
         </>

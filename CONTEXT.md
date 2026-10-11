@@ -1142,18 +1142,20 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   layers on top of the chosen sort key rather than replacing it. User-created
   content, not view state: nothing clears a star but the user, except a star
   whose Character has left the device.
-- **Stock List**: A named set of **Stock Targets** a pilot wants kept on hand
-  — a market they stock, a doctrine's spares — shown on Assets › Targets
-  (issue #3521). Account-wide: it counts every Character's hangars and own
-  sell orders, anywhere or at one station or structure. Shared by link as a
-  copy, never with the sender's counts.
+- **Stock List**: A market the pilot stocks: the station or structure they
+  sell at, and the **Stock Targets** it should have listed. Shown on
+  Market › Stock (issue #3521). Account-wide: it counts every Character's
+  own sell orders at that market (listed) and their hangars at the same
+  station or structure (ready to list). Shared by link as a copy, never with
+  the sender's counts. In the UI it is called a "market".
 - **Stock Target**: One item on a **Stock List** with the whole number of
-  units to keep on hand. Always written in full, never a bare "target", so
-  it cannot be read as a **Target Profile**. Its status is Out (none on
-  hand), Low (under half), OK, or Over.
-- **Shortfall**: How many units a **Stock Target** is short (target minus on
-  hand, never below zero). Cost to fill is the Shortfall at the hub's lowest
-  sell price; the Builder view sizes Build Plan runs to cover it.
+  units to keep listed. Always written in full, never a bare "target", so it
+  cannot be read as a **Target Profile**. Its status is measured by what is
+  listed: Out (none listed), Low (under half), OK, or Over.
+- **Shortfall**: How many units a **Stock Target** is short (target minus
+  listed, never below zero). The part the hangar at the market covers is
+  "ready to list"; the rest is "to buy or build", and only that part is
+  priced (hub lowest sell) and sized into Build Plan runs by the Builder view.
 - **Stopped**: A PI program (extraction or production) whose run has ended —
   the wording used everywhere the extraction/production "program has ended"
   condition shows up: the Overview PI card, the Colonies attention chip and

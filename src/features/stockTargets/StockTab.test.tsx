@@ -1,29 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { buildStockRows } from '@/engine/stockTargets/stockRows';
 import type { StockList } from '@/engine/stockTargets/stockLists';
 import { encodeStockListShare } from '@/engine/stockTargets/stockListShare';
 import { ItemActionsContext, type ItemActions } from '@/features/market/itemActions';
 import { useSelectedStockList, useStockLists } from './stockListsStore';
-import { StockTargetsTab } from './StockTargetsTab';
+import { StockTab } from './StockTab';
 
 const CATALYST = 16240;
 const PASTE = 28668;
 const WARRIOR = 2488;
+const EFA = 1035466617946;
+const AMARR = 60008494;
 
 vi.mock('./stockTargetsData', () => ({
   loadStockTargetsData: vi.fn(async (list: StockList) => {
-    const onHand: Record<number, number> = { [CATALYST]: 0, [PASTE]: 310, [WARRIOR]: 188 };
+    const listed: Record<number, number> = { [CATALYST]: 0, [PASTE]: 310, [WARRIOR]: 188 };
+    const inHangar: Record<number, number> = { [CATALYST]: 12 };
     const price: Record<number, number> = { [CATALYST]: 1_050_000, [PASTE]: 2100, [WARRIOR]: 4200 };
     return {
       rows: buildStockRows(
         list.items.map((item) => ({
           typeId: item.typeId,
           target: item.target,
-          onHand: onHand[item.typeId] ?? 0,
+          listed: listed[item.typeId] ?? 0,
+          inHangar: inHangar[item.typeId] ?? 0,
           price: price[item.typeId] ?? null,
         }))
       ),
@@ -32,13 +36,31 @@ vi.mock('./stockTargetsData', () => ({
         [PASTE, 'Nanite Repair Paste'],
         [WARRIOR, 'Warrior II'],
       ]),
-      counts: new Map(),
       incompleteCharacters: [],
       oldestFetchedAt: null,
-      locations: [],
       groups: new Map(),
+      place: { name: 'Efa VI - Corp Market', kind: 'structure', systemName: 'Efa', security: 0.4 },
     };
   }),
+  loadStockMarkets: vi.fn(async (lists: StockList[]) => ({
+    markets: lists
+      .map((list) => ({
+        listId: list.id,
+        name: list.name,
+        items: list.items.length,
+        out: list.id === 'amarr' ? 2 : 0,
+        low: 0,
+        readyToList: 0,
+        costToFill: 0,
+        unpricedShort: 0,
+        place: null,
+      }))
+      .sort((a, b) => b.out - a.out),
+    incompleteCharacters: [],
+    oldestFetchedAt: null,
+  })),
+  loadSellLocations: vi.fn(async () => []),
+  loadListedAtMarket: vi.fn(async () => []),
 }));
 
 const showInfo = vi.fn();
@@ -54,19 +76,27 @@ const actions: ItemActions = {
 const efa: StockList = {
   id: 'efa',
   name: 'Efa Market',
-  locationId: null,
+  locationId: EFA,
   items: [
     { typeId: WARRIOR, target: 200 },
     { typeId: PASTE, target: 1500 },
     { typeId: CATALYST, target: 40 },
   ],
 };
+const amarr: StockList = {
+  id: 'amarr',
+  name: 'Amarr Shop',
+  locationId: AMARR,
+  items: [{ typeId: CATALYST, target: 5 }],
+};
 
-function renderTab(path = '/assets/targets') {
+function renderTab(path = '/market/stock') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <ItemActionsContext.Provider value={actions}>
-        <StockTargetsTab activeCharacterId={1} />
+        <Routes>
+          <Route path="/market/*" element={<StockTab activeCharacterId={1} />} />
+        </Routes>
       </ItemActionsContext.Provider>
     </MemoryRouter>
   );
@@ -81,18 +111,20 @@ beforeEach(() => {
   showInfo.mockReset();
 });
 
-describe('StockTargetsTab', () => {
-  it('invites a first list when there is none', async () => {
+describe('StockTab', () => {
+  it('invites a first market when there is none', async () => {
     seed([]);
     renderTab();
-    expect(await screen.findByText('No stock lists yet')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'New list…' })).toBeInTheDocument();
+    expect(await screen.findByText('No markets yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New market…' })).toBeInTheDocument();
   });
 
-  it('lists the Stock Targets worst first with a status word on each', async () => {
+  it('opens the only market directly, worst first, with how to restock each item', async () => {
     seed([efa]);
     renderTab();
     const table = await screen.findByRole('table', { name: 'Stock targets' });
+    expect(screen.getByRole('heading', { name: 'Efa Market' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /All markets/ })).not.toBeInTheDocument();
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows.map((row) => within(row).getAllByRole('cell')[0].textContent)).toEqual([
       'Catalyst',
@@ -100,21 +132,23 @@ describe('StockTargetsTab', () => {
       'Warrior II',
     ]);
     expect(within(rows[0]).getByText('Out')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('List 12 from hangar')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('Buy or build 28')).toBeInTheDocument();
     expect(within(rows[1]).getByText('Low')).toBeInTheDocument();
     expect(within(rows[2]).getByText('OK')).toBeInTheDocument();
-    // One out, one low: both summary chips read "1 item".
-    expect(screen.getAllByText('1 item', { selector: 'span' })).toHaveLength(2);
   });
 
-  it('narrows the table to one status from its chip', async () => {
+  it('narrows the table to one status, or to what the hangar can restock', async () => {
     seed([efa]);
     renderTab();
     const table = await screen.findByRole('table', { name: 'Stock targets' });
-    await userEvent.click(
-      within(screen.getByRole('group', { name: 'Status' })).getByRole('button', { name: /Low/ })
-    );
+    const chips = screen.getByRole('group', { name: 'Status' });
+    await userEvent.click(within(chips).getByRole('button', { name: /Low/ }));
     await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(2));
     expect(within(table).getByText('Nanite Repair Paste')).toBeInTheDocument();
+    await userEvent.click(within(chips).getByRole('button', { name: /Ready to list/ }));
+    await waitFor(() => expect(within(table).getByText('Catalyst')).toBeInTheDocument());
+    expect(within(table).getAllByRole('row')).toHaveLength(2);
   });
 
   it('edits a Stock Target in place', async () => {
@@ -140,19 +174,33 @@ describe('StockTargetsTab', () => {
     expect(showInfo).toHaveBeenCalledWith(WARRIOR, 'Warrior II');
   });
 
-  it('saves a copy of a shared list from its link', async () => {
+  it('lists several markets worst first, and opens one with a way back', async () => {
+    seed([efa, amarr]);
+    renderTab();
+    const table = await screen.findByRole('table', { name: 'Markets' });
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(within(rows[0]).getByText('Amarr Shop')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('2 out')).toBeInTheDocument();
+    await userEvent.click(within(rows[1]).getByRole('link', { name: 'Efa Market' }));
+    expect(await screen.findByRole('heading', { name: 'Efa Market' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /All markets/ })).toBeInTheDocument();
+  });
+
+  it('saves a copy of a shared market from its link', async () => {
     seed([]);
     const code = encodeStockListShare({
       name: 'Efa Market',
+      locationId: EFA,
       items: [{ typeId: CATALYST, target: 40 }],
     });
-    renderTab(`/assets/targets?list=${code}`);
+    renderTab(`/market/stock?list=${code}`);
     await userEvent.click(await screen.findByRole('button', { name: 'Save a copy' }));
     await waitFor(() => expect(useStockLists.getState().value).toHaveLength(1));
     expect(useStockLists.getState().value[0]).toMatchObject({
       name: 'Efa Market',
+      locationId: EFA,
       items: [{ typeId: CATALYST, target: 40 }],
     });
-    expect(screen.queryByRole('region', { name: 'Shared stock list' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Shared market' })).not.toBeInTheDocument();
   });
 });

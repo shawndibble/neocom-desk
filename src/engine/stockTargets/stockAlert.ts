@@ -1,6 +1,7 @@
 /**
- * The below-target alert: fires when an item on a **Stock List** drops into
- * Low, or from Low to Out, between two foreground polls.
+ * The below-target alert: fires when an item's listed amount at a market drops
+ * into Low, or from Low to Out, between two foreground polls, usually because
+ * the pilot's orders sold.
  *
  * Edge-triggered like `diffPriceAlertTriggered`: a Low item stays Low for many
  * polls, so only the crossing reports. The identity is (list, type, Stock
@@ -16,8 +17,10 @@ export interface StockAlertEntry {
   typeId: number;
   name: string;
   target: number;
-  /** Null when no Character's assets are cached yet: never guessed as zero. */
-  onHand: number | null;
+  /** Units listed at the market. Null when nothing is cached yet: never guessed as zero. */
+  listed: number | null;
+  /** Units in the hangar at the market's station, for the alert to point at. */
+  inHangar: number;
 }
 
 export interface StockAlertSnapshot {
@@ -33,7 +36,8 @@ export interface StockBelowTargetFire {
   typeId: number;
   name: string;
   target: number;
-  onHand: number;
+  listed: number;
+  inHangar: number;
   status: Extract<StockStatus, 'low' | 'out'>;
 }
 
@@ -50,12 +54,12 @@ export function diffStockBelowTarget(
   const prevByKey = new Map(prev.entries.map((entry) => [key(entry), entry]));
   const fires: StockBelowTargetFire[] = [];
   for (const entry of next.entries) {
-    if (entry.onHand === null) continue;
-    const status = stockStatus(entry.onHand, entry.target);
+    if (entry.listed === null) continue;
+    const status = stockStatus(entry.listed, entry.target);
     if (status !== 'low' && status !== 'out') continue;
     const before = prevByKey.get(key(entry));
-    if (before === undefined || before.onHand === null) continue;
-    if (SEVERITY[stockStatus(before.onHand, before.target)] >= SEVERITY[status]) continue;
+    if (before === undefined || before.listed === null) continue;
+    if (SEVERITY[stockStatus(before.listed, before.target)] >= SEVERITY[status]) continue;
     fires.push({
       eventId: 'stockBelowTarget',
       characterId,
@@ -64,7 +68,8 @@ export function diffStockBelowTarget(
       typeId: entry.typeId,
       name: entry.name,
       target: entry.target,
-      onHand: entry.onHand,
+      listed: entry.listed,
+      inHangar: entry.inHangar,
       status,
     });
   }

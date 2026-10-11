@@ -135,7 +135,7 @@ export function StockManagerTable({
     const index = rows.findIndex((row) => row.typeId === typeId);
     onRemove(typeId);
     focusAfterCommit(editButton(rows[index + 1]?.typeId), editButton(rows[index - 1]?.typeId), () =>
-      document.querySelector<HTMLElement>('[data-stock-list-picker]')
+      document.querySelector<HTMLElement>('[data-stock-market-title]')
     );
   }
 
@@ -168,27 +168,50 @@ export function StockManagerTable({
       sortValue: (row) => row.target,
     },
     {
-      id: 'onHand',
-      header: t('stockTargets.table.onHand'),
+      id: 'listed',
+      header: t('stockTargets.table.listed'),
       align: 'right',
-      headerCellClassName: 'sm:w-28',
+      headerCellClassName: 'sm:w-24',
       className: 'tabular-nums',
-      stackAffix: { after: ` ${t('stockTargets.table.onHandAffix')}` },
-      render: (row) => row.onHand.toLocaleString(),
-      sortValue: (row) => row.onHand,
+      stackAffix: { after: ` ${t('stockTargets.table.listedAffix')}` },
+      render: (row) => row.listed.toLocaleString(),
+      sortValue: (row) => row.listed,
+    },
+    {
+      id: 'inHangar',
+      header: t('stockTargets.table.inHangar'),
+      align: 'right',
+      headerCellClassName: 'sm:w-24',
+      className: 'tabular-nums',
+      stackAffix: { after: ` ${t('stockTargets.table.inHangarAffix')}` },
+      render: (row) =>
+        row.inHangar > 0 ? (
+          row.inHangar.toLocaleString()
+        ) : (
+          <span data-dense-omit className="text-text-dim">
+            0
+          </span>
+        ),
+      sortValue: (row) => row.inHangar,
     },
     {
       id: 'fill',
       header: '',
-      headerCellClassName: 'sm:w-32',
+      headerCellClassName: 'sm:w-28',
       stackEdge: 'below',
-      render: (row) => <StockFillBar status={row.status} fill={row.fill} />,
+      render: (row) => (
+        <StockFillBar
+          status={row.status}
+          fill={row.fill}
+          hangarFill={row.fromHangar / row.target}
+        />
+      ),
     },
     {
       id: 'shortfall',
       header: t('stockTargets.table.shortfall'),
       align: 'right',
-      headerCellClassName: 'sm:w-28',
+      headerCellClassName: 'sm:w-20',
       className: 'tabular-nums',
       stackAffix: { before: `${t('stockTargets.table.shortfallAffix')} ` },
       render: (row) =>
@@ -202,10 +225,35 @@ export function StockManagerTable({
       sortValue: (row) => row.shortfall,
     },
     {
+      id: 'restock',
+      header: t('stockTargets.table.restock'),
+      render: (row) =>
+        row.shortfall === 0 ? (
+          <span data-dense-omit className="text-text-dim">
+            —
+          </span>
+        ) : (
+          <span className="flex flex-col">
+            {row.fromHangar > 0 && (
+              <span className="text-accent">
+                {t('stockTargets.table.fromHangar', { n: row.fromHangar.toLocaleString() })}
+              </span>
+            )}
+            {row.toSource > 0 && (
+              <span className="text-text-dim">
+                {t('stockTargets.table.toSource', { n: row.toSource.toLocaleString() })}
+              </span>
+            )}
+          </span>
+        ),
+      sortValue: (row) => row.fromHangar,
+    },
+    {
       id: 'cost',
       header: t('stockTargets.table.costToFill'),
+      headerTooltip: t('stockTargets.table.costHint'),
       align: 'right',
-      headerCellClassName: 'sm:w-32',
+      headerCellClassName: 'sm:w-24',
       className: 'tabular-nums whitespace-nowrap',
       render: (row) =>
         row.costToFill === null ? (

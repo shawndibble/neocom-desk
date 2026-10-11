@@ -673,7 +673,7 @@ export function Overview() {
     {
       key: 'stock',
       placement: 'card',
-      to: '/assets/targets',
+      to: '/market/stock',
       // Off the board until the pilot keeps a Stock List: a card about an
       // empty feature would only say "set one up".
       available: stockSnapshot.data !== null,

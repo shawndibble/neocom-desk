@@ -1,12 +1,13 @@
 /**
- * The Builder view: only what is short, split by whether the active
- * Character holds a blueprint for it, and one action that turns the
- * buildable part into a Build Group sized to cover each Shortfall.
+ * The Builder view: only what a market still needs once the hangar stock
+ * there is listed, split by whether the active Character holds a blueprint
+ * for it, and one action that turns the buildable part into a Build Group
+ * sized to cover each.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Button, DataTable, Panel, Spinner, type DataTableColumn } from '@/components/ui';
+import { Button, DataTable, Panel, Spinner, Tooltip, type DataTableColumn } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { db } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -46,6 +47,7 @@ export function StockBuilderView({
   viewSwitch: ReactNode;
 }) {
   const { t } = useTranslation();
+  const headingId = useId();
   const navigate = useNavigate();
   const { showInfo } = useItemActions();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
@@ -141,7 +143,7 @@ export function StockBuilderView({
             mostRecentlyUpdatedPlan(plans),
             facilityDefaults,
             {
-              runs: runsToCover(row.shortfall, unitsPerRun),
+              runs: runsToCover(row.toSource, unitsPerRun),
               assumedMe,
               assumedTe,
               buildGroupId,
@@ -178,14 +180,14 @@ export function StockBuilderView({
       sortValue: (row) => nameOf(row.typeId),
     },
     {
-      id: 'shortfall',
-      header: t('stockTargets.table.shortfall'),
+      id: 'toBuild',
+      header: t('stockTargets.builder.toBuild'),
       align: 'right',
       headerCellClassName: 'sm:w-28',
       className: 'tabular-nums',
-      stackAffix: { after: ` ${t('stockTargets.builder.shortAffix')}` },
-      render: (row) => row.shortfall.toLocaleString(),
-      sortValue: (row) => row.shortfall,
+      stackAffix: { after: ` ${t('stockTargets.builder.toBuildAffix')}` },
+      render: (row) => row.toSource.toLocaleString(),
+      sortValue: (row) => row.toSource,
     },
     {
       id: 'blueprint',
@@ -249,21 +251,34 @@ export function StockBuilderView({
   const sectionHeadingClassName =
     'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
+  // Build Groups belong to one Character: with none active the action explains itself (§7).
+  const addButton = (className: string) => {
+    const label = t('stockTargets.builder.addToGroup', { count: split.buildable.length });
+    return activeCharacterId === null ? (
+      <Tooltip content={t('stockTargets.builder.needsCharacter')}>
+        <Button variant="primary" aria-disabled className={className}>
+          {label}
+        </Button>
+      </Tooltip>
+    ) : (
+      <Button
+        variant="primary"
+        loading={busy}
+        className={className}
+        onClick={() => setNaming(true)}
+      >
+        {label}
+      </Button>
+    );
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         {viewSwitch}
         <span className="flex-1" />
-        {split.buildable.length > 0 && (
-          <Button
-            variant="primary"
-            loading={busy}
-            disabled={activeCharacterId === null}
-            onClick={() => setNaming(true)}
-          >
-            {t('stockTargets.builder.addToGroup', { count: split.buildable.length })}
-          </Button>
-        )}
+        {/* Beside the switch on desktop; a phone gets it full width under the lists. */}
+        {split.buildable.length > 0 && addButton('hidden sm:inline-flex')}
       </div>
       {split.buildable.length === 0 && split.needs.length === 0 ? (
         <p className="rounded-xs border border-dashed border-line px-3 py-3 text-sm text-text-dim">
@@ -271,8 +286,8 @@ export function StockBuilderView({
         </p>
       ) : (
         <>
-          <section aria-labelledby="stock-builder-can" className="space-y-2">
-            <h2 id="stock-builder-can" className={sectionHeadingClassName}>
+          <section aria-labelledby={`${headingId}-can`} className="space-y-2">
+            <h2 id={`${headingId}-can`} className={sectionHeadingClassName}>
               {t('stockTargets.builder.canBuild', { count: split.buildable.length })}
             </h2>
             {split.buildable.length > 0 ? (
@@ -286,13 +301,14 @@ export function StockBuilderView({
             )}
           </section>
           {split.needs.length > 0 && (
-            <section aria-labelledby="stock-builder-needs" className="space-y-2">
-              <h2 id="stock-builder-needs" className={sectionHeadingClassName}>
+            <section aria-labelledby={`${headingId}-needs`} className="space-y-2">
+              <h2 id={`${headingId}-needs`} className={sectionHeadingClassName}>
                 {t('stockTargets.builder.needs', { count: split.needs.length })}
               </h2>
               {table(split.needs, t('stockTargets.builder.needsLabel'), false)}
             </section>
           )}
+          {split.buildable.length > 0 && addButton('w-full sm:hidden')}
         </>
       )}
       {naming && (
