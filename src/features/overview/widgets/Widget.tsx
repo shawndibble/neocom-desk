@@ -30,6 +30,7 @@ import {
   entityLinkClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
 import { cx } from '@/lib/cx';
 import { formatAge } from '@/lib/age';
@@ -85,7 +86,6 @@ function SecondaryLine({ secondary }: { secondary: NumberSecondary }) {
   const Glyph = secondary.direction ? DIRECTION_GLYPH[secondary.direction] : null;
   return (
     <p
-      title={secondary.text}
       className={cx(
         'flex min-w-0 items-center gap-1 text-[0.8125rem]',
         secondary.tone ? SECONDARY_TONE[secondary.tone] : 'text-text-dim'
@@ -125,7 +125,15 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
 }
 
 /** The Table view: the headline, then the kind's table at this size's rows and columns. */
-function TableViewBody({ view, size }: { view: KindView; size: WidgetModel['size'] }) {
+function TableViewBody({
+  view,
+  size,
+  title,
+}: {
+  view: KindView;
+  size: WidgetModel['size'];
+  title: string;
+}) {
   return (
     <div>
       {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
@@ -134,6 +142,7 @@ function TableViewBody({ view, size }: { view: KindView; size: WidgetModel['size
         table={tableOf(view)}
         columnsFor={size}
         rowLimit={TABLE_ROWS[size]}
+        ariaLabel={title}
         className="border-t border-line"
       />
     </div>
@@ -147,7 +156,15 @@ function TableViewBody({ view, size }: { view: KindView; size: WidgetModel['size
  * phone), with no toggle: the View menu is the only switcher. A kind with no
  * chart for this data falls back to the Number, never a blank.
  */
-function ChartBody({ view, size }: { view: KindView; size: WidgetModel['size'] }) {
+function ChartBody({
+  view,
+  size,
+  title,
+}: {
+  view: KindView;
+  size: WidgetModel['size'];
+  title: string;
+}) {
   if (!view.chart) return <NumberBody model={view.number} />;
   const table = size === 'L' || size === 'F' ? tableOf(view) : null;
   const beside = table !== null && table.rows.length > 0;
@@ -165,6 +182,7 @@ function ChartBody({ view, size }: { view: KindView; size: WidgetModel['size'] }
             table={table}
             columnsFor={size === 'F' ? 'M' : 'S'}
             rowLimit={size === 'F' ? 8 : 5}
+            ariaLabel={title}
             className="border-t border-line md:min-w-0 md:flex-1 md:border-t-0 md:border-l"
           />
         )}
@@ -311,9 +329,9 @@ function WidgetFrame({
   } else {
     body =
       widget.view === 'table' ? (
-        <TableViewBody view={view} size={widget.size} />
+        <TableViewBody view={view} size={widget.size} title={title} />
       ) : widget.view === 'chart' ? (
-        <ChartBody view={view} size={widget.size} />
+        <ChartBody view={view} size={widget.size} title={title} />
       ) : (
         <NumberBody model={view.number} />
       );
@@ -329,7 +347,12 @@ function WidgetFrame({
       )}
     >
       {!hideHeader && (
-        <div className="flex min-h-11 items-center gap-1.5 border-b border-line pr-1 pl-2.5 md:min-h-8">
+        <div
+          className={cx(
+            'flex items-center gap-1.5 border-b border-line pr-1 pl-2.5',
+            tappableRowClassName
+          )}
+        >
           {headerStart}
           <h2 className="min-w-0 text-[0.6875rem] font-semibold tracking-widest uppercase">
             {view.to !== null ? (
@@ -337,7 +360,7 @@ function WidgetFrame({
                 <Link
                   to={view.to}
                   className={entityLinkClassName(
-                    'flex min-h-11 min-w-0 items-center gap-0.5 text-text md:min-h-8'
+                    cx('flex min-w-0 items-center gap-0.5 text-text', tappableRowClassName)
                   )}
                 >
                   <span className="min-w-0 truncate">{title}</span>

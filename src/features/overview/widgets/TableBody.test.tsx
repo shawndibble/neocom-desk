@@ -17,13 +17,14 @@ const table: TableModel = {
       cells: ['Alpha', { text: '+5M', tone: 'good' }, { text: '40%', bar: 0.4 }],
     },
     { key: 'b', cells: ['Beta', { text: '-2M', tone: 'bad' }, '0%'] },
+    { key: 'c', cells: ['Gamma', { text: '0.4', tone: 'caution' }, '9%'] },
   ],
 };
 
-const renderTable = () =>
+const renderTable = (model: TableModel = table) =>
   render(
     <MemoryRouter>
-      <TableBody table={table} columnsFor="L" rowLimit={10} />
+      <TableBody table={model} columnsFor="L" rowLimit={10} ariaLabel="Sample" />
     </MemoryRouter>
   );
 
@@ -40,5 +41,23 @@ describe('TableBody cell tone and bar', () => {
     const bars = container.querySelectorAll('[aria-hidden="true"] > [style]');
     expect(bars).toHaveLength(1);
     expect((bars[0] as HTMLElement).style.width).toBe('40%');
+  });
+
+  it('adds the tone as a hidden word to an unsigned cell, and not to a signed one', () => {
+    renderTable();
+    expect(screen.getByRole('cell', { name: '0.4 caution' })).toHaveClass('text-warning');
+    expect(screen.getByRole('cell', { name: '+5M' })).toBeInTheDocument();
+  });
+
+  it('names the table and makes the first cell a row header when there is no header row', () => {
+    renderTable({
+      columns: [
+        { key: 'name', label: '', priority: 0 },
+        { key: 'v', label: '', align: 'end', priority: 1 },
+      ],
+      rows: [{ key: 'a', cells: ['Alpha', '5'] }],
+    });
+    expect(screen.getByRole('table', { name: 'Sample' })).toBeInTheDocument();
+    expect(screen.getByRole('rowheader', { name: 'Alpha' })).toBeInTheDocument();
   });
 });

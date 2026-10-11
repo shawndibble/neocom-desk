@@ -4170,6 +4170,11 @@
       "new": "New",
       "opensPage": "Opens the {{title}} page",
       "settingsFor": "Settings for {{title}}",
+      "tone": {
+        "good": "good",
+        "caution": "caution",
+        "bad": "bad"
+      },
       "moreRows_one": "+{{count}} more",
       "moreRows_other": "+{{count}} more",
       "noWidgets": "There are no widgets to show on this Overview."

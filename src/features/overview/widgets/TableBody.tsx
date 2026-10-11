@@ -12,12 +12,14 @@
  */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { IskAmount, RowCaret, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
 import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { cx } from '@/lib/cx';
 import type { TableCell, TableColumn, TableModel, TableRowModel } from './data/types';
 import type { WidgetSize } from './kinds';
+import { fractionBar, type CellTone } from './data/cellKit';
 import { visibleColumns } from './tableModel';
 
 export interface TableBodyProps {
@@ -26,12 +28,23 @@ export interface TableBodyProps {
   columnsFor: WidgetSize;
   /** The most rows to draw; the rest become a "+N more" line. */
   rowLimit: number;
+  /** The table's accessible name: the widget's title. */
+  ariaLabel?: string;
   className?: string;
 }
 
 function cellText(cell: TableCell): string {
   return typeof cell === 'string' ? cell : cell.text;
 }
+
+/** A cell that already starts with a sign says which way it went without its colour. */
+const SIGNS = [String.fromCharCode(43), String.fromCharCode(45), String.fromCharCode(0x2212)];
+
+const TONE_WORD: Record<CellTone, (t: TFunction) => string> = {
+  good: (t) => t('overview.widgets.tone.good'),
+  caution: (t) => t('overview.widgets.tone.caution'),
+  bad: (t) => t('overview.widgets.tone.bad'),
+};
 
 const CELL_TONE = { good: 'text-success', caution: 'text-warning', bad: 'text-danger' } as const;
 
@@ -48,7 +61,7 @@ function CellValue({ cell, compact }: { cell: TableCell; compact: boolean }) {
       >
         <span
           className="block h-full bg-accent"
-          style={{ width: `${Math.round(Math.min(1, Math.max(0, cell.bar)) * 100)}%` }}
+          style={{ width: `${Math.round((fractionBar(cell.bar, 1) ?? 0) * 100)}%` }}
         />
       </span>
       {cell.text}
@@ -56,12 +69,12 @@ function CellValue({ cell, compact }: { cell: TableCell; compact: boolean }) {
   );
 }
 
-function cellToneClass(cell: TableCell): string | undefined {
-  if (typeof cell === 'string' || !('tone' in cell) || cell.tone === undefined) return undefined;
-  return CELL_TONE[cell.tone];
+function cellTone(cell: TableCell): CellTone | undefined {
+  if (typeof cell === 'string' || !('tone' in cell)) return undefined;
+  return cell.tone;
 }
 
-const cellPad = 'pl-3 first:pl-3 last:pr-3';
+const cellPad = 'pl-3 last:pr-3';
 
 function Row({
   row,
@@ -69,6 +82,7 @@ function Row({
   indexes,
   caret,
   compact,
+  rowHeader,
 }: {
   row: TableRowModel;
   columns: readonly TableColumn[];
@@ -76,7 +90,10 @@ function Row({
   indexes: readonly number[];
   caret: boolean;
   compact: boolean;
+  /** No header row: the first cell names the row for a screen reader. */
+  rowHeader: boolean;
 }) {
+  const { t } = useTranslation();
   const toned = row.tone !== undefined && row.tone !== 'clear';
   // The icon (colour plus shape) marks only what needs a decision; a "watch" row just tints its figure.
   const flagged = row.tone === 'warning' || row.tone === 'critical';
@@ -94,22 +111,26 @@ function Row({
         if (cell === undefined) return <td key={column.key} className={cellPad} />;
         const first = i === 0;
         const text = cellText(cell);
-        const cellTone = cellToneClass(cell);
+        const tone = cellTone(cell);
+        const toneClass = tone === undefined ? undefined : CELL_TONE[tone];
+        const Cell = first && rowHeader ? 'th' : 'td';
         return (
-          <td
+          <Cell
+            scope={first && rowHeader ? 'row' : undefined}
             key={column.key}
             className={cx(
               cellPad,
               'py-0.5 text-[0.8125rem] tabular-nums',
               first ? 'w-full max-w-0' : 'whitespace-nowrap',
               column.align === 'end' && 'text-right',
+              Cell === 'th' && 'text-left',
               first && 'font-semibold',
-              !first && column.align !== 'end' && !cellTone && 'text-text-dim',
+              !first && column.align !== 'end' && !toneClass && 'text-text-dim',
               !first &&
                 column.align === 'end' &&
-                !cellTone &&
+                !toneClass &&
                 (toned && row.tone ? SEVERITY_TEXT[row.tone] : 'text-text'),
-              !first && cellTone
+              !first && toneClass
             )}
           >
             {first ? (
@@ -121,7 +142,6 @@ function Row({
                   <RowTappableContext.Provider value>
                     <Link
                       to={row.to}
-                      title={text}
                       className={cx(
                         'min-w-0 truncate outline-none after:absolute after:inset-0 after:content-[""]',
                         'focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent'
@@ -131,15 +151,21 @@ function Row({
                     </Link>
                   </RowTappableContext.Provider>
                 ) : (
-                  <span className="min-w-0 truncate" title={text}>
-                    {text}
-                  </span>
+                  <span className="min-w-0 truncate">{text}</span>
                 )}
               </span>
             ) : (
-              <CellValue cell={cell} compact={compact} />
+              <>
+                <CellValue cell={cell} compact={compact} />
+                {tone !== undefined && !SIGNS.some((sign) => text.startsWith(sign)) && (
+                  <>
+                    {' '}
+                    <span className="sr-only">{TONE_WORD[tone](t)}</span>
+                  </>
+                )}
+              </>
             )}
-          </td>
+          </Cell>
         );
       })}
       {caret && (
@@ -151,7 +177,7 @@ function Row({
   );
 }
 
-export function TableBody({ table, columnsFor, rowLimit, className }: TableBodyProps) {
+export function TableBody({ table, columnsFor, rowLimit, ariaLabel, className }: TableBodyProps) {
   const { t } = useTranslation();
   const columns = visibleColumns(table.columns, columnsFor);
   const indexes = columns.map((column) => table.columns.indexOf(column));
@@ -162,7 +188,7 @@ export function TableBody({ table, columnsFor, rowLimit, className }: TableBodyP
   const caret = shown.some((row) => row.to !== undefined);
   return (
     <div className={className}>
-      <table className="w-full border-collapse">
+      <table aria-label={ariaLabel} className="w-full border-collapse">
         {hasHeader && (
           <thead>
             <tr className="border-b border-line">
@@ -192,6 +218,7 @@ export function TableBody({ table, columnsFor, rowLimit, className }: TableBodyP
               indexes={indexes}
               caret={caret}
               compact={columnsFor === 'S'}
+              rowHeader={!hasHeader}
             />
           ))}
         </tbody>
