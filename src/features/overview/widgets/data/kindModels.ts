@@ -30,6 +30,7 @@ import type { FeedId, ListRow, NumberModel } from './types';
 
 const D = 'overview.widgets.data';
 const C = 'overview.widgets.chart';
+const W = 'overview.widgets';
 
 /** Kind -> the feeds it reads, for the kinds in this file. */
 export const KIND_FEED_LISTS: Readonly<Record<string, readonly FeedId[]>> = {
@@ -40,6 +41,7 @@ export const KIND_FEED_LISTS: Readonly<Record<string, readonly FeedId[]>> = {
   clones: ['clones'],
   walletFlow: ['journal'],
   location: ['location'],
+  survey: ['survey'],
 };
 
 /** Where each net worth layer sits in the bar and which series hue it keeps (the Net Worth page's). */
@@ -240,6 +242,62 @@ const lp: Builder = (feeds, { t }) => {
   };
 };
 
+// --- Mining survey ------------------------------------------------------------------
+
+const SURVEY_CHART_ROWS = 6;
+const SURVEY_PATH = '/mining/survey';
+
+const survey: Builder = (feeds, { t }) => {
+  const feed = feeds.survey;
+  const data = feed?.data ?? null;
+  if (!data) return blank(SURVEY_PATH, statusOf(feed));
+  const best = data.ores[0];
+  const place = data.location ?? UNKNOWN;
+  const note = t(`${C}.survey.note`);
+  return {
+    ...blank(SURVEY_PATH, statusOf(feed, { isEmpty: best === undefined })),
+    emptyLinkLabel: t(`${W}.survey.emptyLink`),
+    fetchedAt: data.fetchedAt,
+    number: best
+      ? {
+          value: formatIskCompact(best.iskPerM3),
+          unit: t(`${D}.survey.unit`),
+          secondary: {
+            text:
+              data.location === null
+                ? best.ore
+                : t(`${D}.survey.secondary`, { ore: best.ore, place: data.location }),
+          },
+          tone: 'clear',
+        }
+      : NEUTRAL_NUMBER,
+    rows: [],
+    table: {
+      columns: [
+        { key: 'ore', label: t(`${W}.survey.col.ore`), priority: 0 },
+        { key: 'location', label: t(`${W}.survey.col.location`), priority: 2 },
+        { key: 'iskPerM3', label: t(`${W}.survey.col.iskPerM3`), align: 'end', priority: 1 },
+      ],
+      rows: data.ores.map((o) => ({
+        key: o.ore,
+        cells: [o.ore, place, formatIskCompact(o.iskPerM3)],
+      })),
+    },
+    summary: note,
+    chart:
+      hbarsFromRows(
+        t,
+        data.ores.slice(0, SURVEY_CHART_ROWS).map((o) => ({
+          key: o.ore,
+          label: o.ore,
+          value: o.iskPerM3,
+          text: formatIskCompact(o.iskPerM3),
+        })),
+        note
+      ) ?? undefined,
+  };
+};
+
 // --- Best clone ---------------------------------------------------------------------
 
 /** The nearest jump clone and how much later it would finish: the one fact "Stay put" does not carry. */
@@ -399,4 +457,5 @@ export const KIND_BUILDERS: Readonly<Record<string, Builder>> = {
   lp,
   clones,
   location,
+  survey,
 };

@@ -3755,6 +3755,9 @@
           "note": "ISK mined per day",
           "noteSince": "ISK mined per day (saved history starts {{date}})",
           "average": "avg {{value}}/day"
+        },
+        "survey": {
+          "note": "ISK per m³ by ore, best first"
         }
       },
       "data": {
@@ -3801,6 +3804,10 @@
           "systemId": "System #{{id}}",
           "security": "Security {{value}}",
           "securityLabel": "Security"
+        },
+        "survey": {
+          "unit": "ISK/m³",
+          "secondary": "{{ore}} at {{place}}"
         }
       },
       "training": {
@@ -4015,7 +4022,13 @@
       "survey": {
         "title": "Mining survey",
         "description": "The best ores in your latest survey",
-        "empty": "There is no survey yet."
+        "empty": "No survey yet",
+        "col": {
+          "ore": "Ore",
+          "location": "Location",
+          "iskPerM3": "ISK/m³"
+        },
+        "emptyLink": "Open Mining Survey"
       },
       "planetary": {
         "title": "Planetary",
@@ -4391,6 +4404,9 @@
           "payday": "Payday",
           "corp": "Corp",
           "contract": "Re: contract"
+        },
+        "survey": {
+          "note": "Veldspar Prime at Efa IV"
         }
       }
     },

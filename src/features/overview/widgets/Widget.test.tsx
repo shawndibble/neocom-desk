@@ -168,11 +168,27 @@ describe('Widget states', () => {
     expect(onRemove).toHaveBeenCalledWith('w1');
   });
 
-  it('draws a kind that is coming soon as empty, never a spinner', () => {
-    renderWidget(model({ kind: 'survey' }), () => undefined);
+  it('links the Mining survey empty state to the Mining Survey tab', () => {
+    renderWidget(model({ kind: 'survey' }), (store) =>
+      store.set('survey', {
+        data: { hasSurvey: false, location: null, ores: [], fetchedAt: null },
+        error: false,
+        loading: false,
+      })
+    );
     const region = screen.getByRole('region', { name: 'Mining survey' });
+    expect(within(region).getByText('No survey yet')).toBeInTheDocument();
+    expect(within(region).getByRole('link', { name: 'Open Mining Survey' })).toHaveAttribute(
+      'href',
+      '/mining/survey'
+    );
+  });
+
+  it('draws a kind that is coming soon as empty, never a spinner', () => {
+    renderWidget(model({ kind: 'routeSafety' }), () => undefined);
+    const region = screen.getByRole('region', { name: 'Route safety' });
     expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(within(region).getByText('There is no survey yet.')).toBeInTheDocument();
+    expect(within(region).getByText('There is no saved route.')).toBeInTheDocument();
   });
 });
 
@@ -290,8 +306,8 @@ describe('Widget header', () => {
   });
 
   it('has no title link for a kind with no page of its own yet', () => {
-    renderWidget(model({ kind: 'survey' }), () => undefined);
-    expect(screen.queryByRole('link', { name: /mining survey/i })).not.toBeInTheDocument();
+    renderWidget(model({ kind: 'routeSafety' }), () => undefined);
+    expect(screen.queryByRole('link', { name: /route safety/i })).not.toBeInTheDocument();
   });
 
   it('uses the widget own name when it has one', () => {

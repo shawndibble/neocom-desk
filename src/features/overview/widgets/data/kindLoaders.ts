@@ -12,6 +12,7 @@
 import { db } from '@/db';
 import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
 import { layerValues, type LayerValues } from '@/engine/netWorth/series';
+import type { BestOre } from '@/engine/survey/bestOres';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import type { CachedResult } from '@/esi/cache';
@@ -310,5 +311,63 @@ export async function loadLocationWidget(characterId: number): Promise<LocationW
         : { id: systemId, name: system?.name ?? null, security: system?.security ?? null },
     shipTypeId,
     shipName,
+  };
+}
+
+// --- Mining survey -------------------------------------------------------------
+
+export interface SurveyWidgetData {
+  /** False when this device tracks no survey, or its share link has expired. */
+  hasSurvey: boolean;
+  /** Where the survey was taken, when its owner said. */
+  location: string | null;
+  /** Ores left in the latest scan, best ISK per m³ first. */
+  ores: BestOre[];
+  fetchedAt: Date | null;
+}
+
+const NO_SURVEY: SurveyWidgetData = { hasSurvey: false, location: null, ores: [], fetchedAt: null };
+
+/**
+ * The best ores in the survey this device is tracking. A survey is a Firestore
+ * share link and its prices are a market read, so all of it is behind
+ * `import()`. A failed read throws, which keeps the last good figure on show.
+ */
+export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
+  const { useCurrentSurveyId } = await import('@/features/survey/surveyPref');
+  await useCurrentSurveyId.getState().hydrate();
+  const id = useCurrentSurveyId.getState().value;
+  if (id === null) return NO_SURVEY;
+  const { loadSurvey } = await import('@/features/survey/surveyStore');
+  const survey = await loadSurvey(id);
+  if (!survey.ok) {
+    if (survey.reason === 'failed') throw new Error('Survey could not be read');
+    return NO_SURVEY;
+  }
+  const [
+    { useMarketHub },
+    { DEFAULT_TRADE_HUB, getTradeHub },
+    { loadOrePrices },
+    { countedScans },
+    { bestOres },
+  ] = await Promise.all([
+    import('@/features/market/hub'),
+    import('@/market/hubs'),
+    import('@/features/survey/orePrices'),
+    import('@/engine/survey/series'),
+    import('@/engine/survey/bestOres'),
+  ]);
+  await useMarketHub.getState().hydrate();
+  const hub = getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
+  const scans = countedScans(survey.scans, survey.ignored);
+  const { prices } = await loadOrePrices(
+    scans.flatMap((s) => s.rocks.map((r) => r.ore)),
+    hub
+  );
+  return {
+    hasSurvey: true,
+    location: survey.info?.location?.name ?? null,
+    ores: bestOres(scans, prices),
+    fetchedAt: new Date(),
   };
 }

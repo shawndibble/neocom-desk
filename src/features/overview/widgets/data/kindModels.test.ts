@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveWidget } from '../state';
 import { buildView, feedsFor, KIND_FEEDS } from './models';
 import { humanizeRefType } from './kindModels';
+import type { SurveyWidgetData } from './kindLoaders';
 import type { BuildContext, FeedState, Feeds } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
@@ -667,5 +668,63 @@ describe('location table', () => {
     expect(view.table?.rows.map((r) => r.key)).toEqual(['system', 'security', 'ship']);
     expect(view.table?.rows[1]?.cells[1]).toMatchObject({ tone });
     expect(view.table?.rows[0]?.cells).toEqual([expect.any(String), 'Sys']);
+  });
+});
+
+describe('survey', () => {
+  const data = (over: Partial<SurveyWidgetData> = {}): SurveyWidgetData => ({
+    hasSurvey: true,
+    location: 'Efa',
+    ores: [
+      { ore: 'Arkonor', iskPerM3: 6400, volume: 400, rocks: 2 },
+      { ore: 'Veldspar', iskPerM3: 1200, volume: 900, rocks: 5 },
+    ],
+    fetchedAt: new Date(NOW),
+    ...over,
+  });
+
+  it('reads from its own feed and links to the Mining Survey tab', () => {
+    expect(KIND_FEEDS.survey).toEqual(['survey']);
+    expect(buildView('survey', { survey: ok(data()) }, ctx()).to).toBe('/mining/survey');
+  });
+
+  it('leads with the best ore, tables every ore and charts them best first', () => {
+    const view = buildView('survey', { survey: ok(data()) }, ctx());
+    expect(stateOf(view)).toBe('ok');
+    expect(view.number.value).toBe('6.4K');
+    expect(view.number.secondary?.text).toContain('Arkonor');
+    expect(view.number.secondary?.text).toContain('Efa');
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      ['Arkonor', 'Efa', '6.4K'],
+      ['Veldspar', 'Efa', '1.2K'],
+    ]);
+    if (view.chart?.kind !== 'hbars') throw new Error('hbars');
+    expect(view.chart.rows.map((r) => r.share)).toEqual([1, 1200 / 6400]);
+  });
+
+  it('names just the ore when the survey has no location', () => {
+    const view = buildView('survey', { survey: ok(data({ location: null })) }, ctx());
+    expect(view.number.secondary?.text).toBe('Arkonor');
+  });
+
+  it('is empty with no survey or no priced ore', () => {
+    const none = data({ hasSurvey: false, ores: [], location: null });
+    expect(stateOf(buildView('survey', { survey: ok(none) }, ctx()))).toBe('empty');
+    expect(stateOf(buildView('survey', { survey: ok(data({ ores: [] })) }, ctx()))).toBe('empty');
+  });
+
+  it('is loading before the first read and failed, keeping the last value, when a read fails', () => {
+    expect(
+      stateOf(buildView('survey', { survey: { data: null, error: false, loading: true } }, ctx()))
+    ).toBe('loading');
+    const failed = buildView(
+      'survey',
+      { survey: { data: data(), error: true, loading: false } },
+      ctx()
+    );
+    const resolved = resolveWidget(failed.status);
+    expect(resolved.state).toBe('failed');
+    expect(resolved.showLastGood).toBe(true);
+    expect(failed.number.value).toBe('6.4K');
   });
 });

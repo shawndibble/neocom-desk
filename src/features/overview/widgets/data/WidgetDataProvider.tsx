@@ -48,6 +48,7 @@ import {
   loadMiningYieldWidget,
   loadNetWorthWidget,
   loadProfitWidget,
+  loadSurveyWidget,
 } from './kindLoaders';
 import { feedsFor } from './models';
 import { useOverviewRefresh } from './refreshContext';
@@ -195,6 +196,8 @@ function Source({ feed }: { feed: FeedId }) {
           cacheKey="overview:moon-chunks"
         />
       );
+    case 'survey':
+      return <SnapshotSource feed="survey" load={loadSurveyWidget} cacheKey="overview:survey" />;
     case 'journal':
       return <SnapshotSource feed="journal" load={loadJournalPanel} cacheKey="overview:journal" />;
     case 'netWorth':

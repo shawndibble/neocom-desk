@@ -6,12 +6,9 @@
  * the hub setting falls back to Jita and Fuzzwork needs no login.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { getHubPrices } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { loadCompressedOreTypeIds, loadOreAndIceTypeIds, loadTypes } from '@/sde/loadSde';
-import { oreFormTypeId } from '@/engine/miningTax/oreForm';
 import { useMarketHub } from '@/features/market/hub';
-import { readCompressedOre } from '@/features/miningTax/oreForm';
+import { loadOrePrices } from './orePrices';
 
 export interface OrePrices {
   /** Ore name as the scanner prints it -> ISK per unit; empty until loaded or when unreachable. */
@@ -41,27 +38,7 @@ export function useOrePrices(oreNames: readonly string[]): OrePrices {
     let cancelled = false;
     void (async () => {
       try {
-        const [types, oreIds, compressedByRaw, compressed] = await Promise.all([
-          loadTypes(),
-          loadOreAndIceTypeIds(),
-          loadCompressedOreTypeIds(),
-          readCompressedOre(),
-        ]);
-        const wanted = new Set(key.split('\n'));
-        const rawByName = new Map<string, number>();
-        for (const id of oreIds) {
-          const name = types[String(id)]?.name;
-          if (name !== undefined && wanted.has(name)) rawByName.set(name, id);
-        }
-        const priced = new Map(
-          [...rawByName].map(([n, id]) => [n, oreFormTypeId(id, compressedByRaw, compressed)])
-        );
-        const aggregates = await getHubPrices(hub, [...new Set(priced.values())]);
-        const prices = new Map<string, number>();
-        for (const [name, typeId] of priced) {
-          const buy = aggregates.get(typeId)?.buyMax;
-          if (buy) prices.set(name, buy);
-        }
+        const { prices, compressed } = await loadOrePrices(key.split('\n'), hub);
         if (!cancelled) setLoaded({ key, hubId: hub.id, prices, compressed });
       } catch {
         // Keep what was shown: a transient failure shouldn't blank the ISK figures.

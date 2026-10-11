@@ -32,6 +32,7 @@ import type {
   JournalData,
   LocationWidgetData,
   LpWidgetData,
+  SurveyWidgetData,
   MiningYieldWidgetData,
   NetWorthWidgetData,
   ProfitWidgetData,
@@ -144,6 +145,8 @@ export interface KindView {
   to: string | null;
   /** Overrides the kind's own empty message, when the reason is not "nothing there". */
   emptyMessage?: string;
+  /** Text for a link from the empty state to `to`, for a kind whose page is where its data gets made. */
+  emptyLinkLabel?: string;
   /**
    * The kind's chart, when it has one and the data to draw it. Only the Chart
    * view draws it (the Number view is a number, never a mini chart); at Large
@@ -189,6 +192,7 @@ export interface FeedMap {
   profit: ProfitWidgetData;
   miningYield: MiningYieldWidgetData;
   lp: LpWidgetData;
+  survey: SurveyWidgetData;
   clones: ClonesWidgetData;
   location: LocationWidgetData;
 }
