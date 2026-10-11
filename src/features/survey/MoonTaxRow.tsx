@@ -22,10 +22,18 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, Modal, TextInput } from '@/components/ui';
 import { InfoRow } from './InfoRow';
+import { blockedButtonClassName, blockedReasonClassName } from './blockedActionStyles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import { createPayee, loadPayees } from '@/features/miningTax/payees';
-import { ensurePayee, findPayeeByName, MINING_TAX_HREF, parseTaxPct } from './moonTaxPayee';
+import {
+  ensurePayee,
+  findPayeeByName,
+  initialTaxDraft,
+  MINING_TAX_HREF,
+  parseTaxPct,
+  type TaxDraft,
+} from './moonTaxPayee';
 import { setSurveyTax, type SurveyTaxShare } from './surveyStore';
 
 /** The stored survey this row publishes its tax to, and what is already stored there. */
@@ -35,16 +43,29 @@ export interface TaxSurvey {
   published: SurveyTaxShare | null;
 }
 
-export function MoonTaxRow({ characterId, survey }: { characterId: number; survey?: TaxSurvey }) {
+export function MoonTaxRow({
+  characterId,
+  survey,
+  draft,
+  onDraftChange,
+}: {
+  characterId: number;
+  survey?: TaxSurvey;
+  /**
+   * The draft, when the panel holds it, so a template can fill it. Without
+   * these the row keeps its own.
+   */
+  draft?: TaxDraft;
+  onDraftChange?: (draft: TaxDraft) => void;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const listId = useId();
   // Starts blank unless this survey already stored a tax: nothing carries over
   // from the last survey, so the pilot sets it for each field they want it on.
-  const [saved, setSaved] = useState(() => ({
-    name: survey?.published?.name ?? '',
-    pct: survey?.published ? String(survey.published.pct) : '',
-  }));
+  const [own, setOwn] = useState(() => initialTaxDraft(survey?.published));
+  const saved = draft ?? own;
+  const setSaved = onDraftChange ?? setOwn;
   const payees = useLiveQuery(() => loadPayees(characterId), [characterId]) ?? [];
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -163,7 +184,7 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
 /**
  * The read-only line, for everyone but the owner (in the app or on the public
  * page): the rate and who gets it, as the owner set them, and Manage Taxes into
- * the Tax tab. Logged out it is disabled with "Login to access" under it, like
+ * the Tax tab. Logged out it is disabled with "Log in to access" right under it, like
  * Set waypoint. Logged in, a Payee of the viewer's by that name (any case) is
  * handed to the tab as is, keeping the viewer's own rate; without one, the
  * viewer is asked whether to add it at the owner's rate first. Declining still
@@ -225,28 +246,30 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
 
   return (
     <InfoRow label={t('survey.moonTax.label')}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
         <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xl font-semibold">
           <span className="tabular-nums">{tax.pct}%</span>
           <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
           <span className="min-w-0 [overflow-wrap:anywhere]">{tax.name}</span>
         </p>
-        <Button
-          size="sm"
-          className="touch:min-h-11 sm:ml-auto"
-          // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
-          aria-disabled={loggedOut || undefined}
-          aria-describedby={loggedOut ? hintId : undefined}
-          loading={busy && !addPayeeOpen}
-          onClick={() => void open()}
-        >
-          {t('survey.moonTax.manage')}
-        </Button>
-        {loggedOut && (
-          <span id={hintId} className="w-full text-xs text-text-dim">
-            {t('survey.moonTax.needLogin')}
-          </span>
-        )}
+        <div className={blockedButtonClassName}>
+          <Button
+            size="sm"
+            className="touch:min-h-11"
+            // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
+            aria-disabled={loggedOut || undefined}
+            aria-describedby={loggedOut ? hintId : undefined}
+            loading={busy && !addPayeeOpen}
+            onClick={() => void open()}
+          >
+            {t('survey.moonTax.manage')}
+          </Button>
+          {loggedOut && (
+            <span id={hintId} className={blockedReasonClassName}>
+              {t('survey.moonTax.needLogin')}
+            </span>
+          )}
+        </div>
         {failed && !addPayeeOpen && (
           <span role="alert" className="w-full text-xs text-danger">
             {t('survey.moonTax.failed')}

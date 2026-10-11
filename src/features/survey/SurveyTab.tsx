@@ -31,6 +31,9 @@ import { SurveyNameTitle } from './SurveyNameTitle';
 import { SurveyPicker } from './SurveyPicker';
 import { SurveyOwnerChange } from './SurveyOwnerChange';
 import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
+import { SurveyStartTemplates } from './SurveyStartTemplates';
+import { useSurveyTemplates } from './surveyTemplates';
+import { writeTemplateToSurvey } from './surveyTemplateWrite';
 import { stashPendingScan, takePendingScan } from './pendingScan';
 import { hasSubmittedScan, noteSubmittedScan } from './submitted';
 import { submitterName } from './submitterName';
@@ -82,6 +85,15 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
 
   const { state, refresh } = useSurvey(hydrated ? currentId : null);
 
+  // The template picked on the empty page, filled into the survey the first scan starts.
+  const templates = useSurveyTemplates((s) => s.value);
+  const hydrateTemplates = useSurveyTemplates((s) => s.hydrate);
+  useEffect(() => {
+    void hydrateTemplates();
+  }, [hydrateTemplates]);
+  const [startTemplateId, setStartTemplateId] = useState<string | null>(null);
+  const startTemplate = templates.find((template) => template.id === startTemplateId);
+
   // A survey in view is one the pilot has now created or opened.
   useEffect(() => {
     if (currentId !== null && state.status === 'ready') void noteSurvey(currentId);
@@ -107,11 +119,14 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
       const started = await startSurvey({ characterId, ownerName });
       // Scan first, so the new survey's first load already has it.
       await addSurveyScan({ id: started.id, text, expiresAt: started.expiresAt, by: ownerName });
+      // Best effort: a template that fails to write leaves the panel blank, as without one.
+      if (startTemplate) await writeTemplateToSurvey(started, startTemplate).catch(() => undefined);
+      setStartTemplateId(null);
       noteSubmittedScan();
       await setCurrentId(started.id);
       return 'ok';
     },
-    [characterId, setCurrentId]
+    [characterId, setCurrentId, startTemplate]
   );
 
   const add = useCallback(
@@ -330,6 +345,15 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               }
               url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
               expiresAt={expiresAt}
+              emptyExtra={
+                currentId === null && characterId !== null ? (
+                  <SurveyStartTemplates
+                    templates={templates}
+                    selectedId={startTemplate?.id ?? null}
+                    onSelect={setStartTemplateId}
+                  />
+                ) : undefined
+              }
               footerActions={
                 currentId === null
                   ? undefined
