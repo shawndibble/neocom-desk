@@ -19,8 +19,11 @@ const freePort = () =>
     });
   });
 
-const port = await freePort();
+// STORYBOOK_PORT pins the port so `.mcp.json` (which reads the same variable)
+// finds this worktree's Storybook; unset, the OS hands out a free one.
+const port = Number(process.env.STORYBOOK_PORT) || (await freePort());
 console.log(`Storybook: http://localhost:${port}/`);
+console.log(`MCP: http://localhost:${port}/mcp`);
 console.log(`Components manifest: http://localhost:${port}/manifests/components.json`);
 
 const bin = fileURLToPath(

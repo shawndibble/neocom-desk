@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { EmptyState } from './EmptyState';
 import { Button } from './Button';
+import * as Icon from './icons';
 
 const meta = {
   title: 'ui/EmptyState',
@@ -24,3 +25,11 @@ export const WithAction: Story = {
     action: <Button variant="primary">New plan</Button>,
   },
 };
+
+/** @summary Decorative icon (§4): a faint glyph above the title; `aria-hidden`. */
+export const WithIcon: Story = {
+  args: { title: 'No alerts', hint: 'Price alerts you set show up here.', icon: <Icon.Pending /> },
+};
+
+/** @summary Title only: the shortest form, for a small panel. */
+export const TitleOnly: Story = { args: { title: 'No orders' } };

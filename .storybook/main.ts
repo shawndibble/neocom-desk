@@ -2,7 +2,9 @@ import type { StorybookConfig } from '@storybook/react-vite';
 
 const config: StorybookConfig = {
   stories: ['../src/**/*.stories.@(ts|tsx)'],
-  addons: ['@storybook/addon-docs'],
+  // addon-mcp serves `/mcp` while `storybook dev` runs — an optional extra for
+  // interactive Claude sessions (see docs/DESIGN.md); never loaded by CI.
+  addons: ['@storybook/addon-docs', '@storybook/addon-mcp'],
   framework: '@storybook/react-vite',
   // `/manifests/components.json` — the component catalogue agents read.
   features: { componentsManifest: true },
