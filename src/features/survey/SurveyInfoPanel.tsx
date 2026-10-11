@@ -10,13 +10,14 @@
  * whole panel is left out when the starter set none of them. Both start blank
  * for each survey; only what the survey itself stored comes back.
  *
- * Notes are plain text on purpose (`whitespace-pre-line`, never markup): anyone
- * holding the link reads them.
+ * The editor's box is plain text; readers get the notes as a small, safe slice
+ * of Markdown (`SurveyNotes`), since anyone holding the link reads them.
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel, TextArea } from '@/components/ui';
 import { InfoRow } from './InfoRow';
+import { SurveyNotes } from './SurveyNotes';
 import { MoonTaxReadout, MoonTaxRow, type TaxSurvey } from './MoonTaxRow';
 import { SurveyLocationPicker } from './SurveyLocationPicker';
 import { SurveyWaypointButton } from './SurveyWaypointButton';
@@ -89,11 +90,11 @@ export function SurveyInfoEditor({
           </div>
         </InfoRow>
         {moon && <MoonTaxRow characterId={characterId} survey={survey} />}
-        <InfoRow label={t('survey.info.notes')}>
+        <InfoRow label={t('survey.info.notesEditor')}>
           <TextArea
             rows={3}
             maxLength={MAX_SURVEY_NOTES}
-            aria-label={t('survey.info.notes')}
+            aria-label={t('survey.info.notesEditor')}
             placeholder={t('survey.info.notesPlaceholder')}
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
@@ -135,7 +136,7 @@ export function SurveyInfoReadout({
         {tax !== null && <MoonTaxReadout tax={tax} />}
         {notes !== '' && (
           <InfoRow label={t('survey.info.notes')}>
-            <p className="whitespace-pre-line [overflow-wrap:anywhere]">{notes}</p>
+            <SurveyNotes notes={notes} />
           </InfoRow>
         )}
       </div>

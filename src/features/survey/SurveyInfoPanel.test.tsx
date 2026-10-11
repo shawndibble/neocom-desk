@@ -45,7 +45,7 @@ describe('SurveyInfoEditor', () => {
     const order = [
       screen.getByText('Location'),
       screen.getByTestId('tax-edit'),
-      screen.getByText('Notes'),
+      screen.getByText('Notes (markdown supported)'),
     ];
     order.forEach((node, i) => {
       if (i > 0) {
@@ -82,7 +82,7 @@ describe('SurveyInfoEditor', () => {
         moon={false}
       />
     );
-    const notes = screen.getByLabelText('Notes');
+    const notes = screen.getByLabelText('Notes (markdown supported)');
     fireEvent.change(notes, { target: { value: 'Dock at the refinery.  ' } });
     expect(setSurveyInfo).not.toHaveBeenCalled();
     fireEvent.blur(notes);
@@ -106,7 +106,7 @@ describe('SurveyInfoEditor', () => {
         moon={false}
       />
     );
-    fireEvent.blur(screen.getByLabelText('Notes'));
+    fireEvent.blur(screen.getByLabelText('Notes (markdown supported)'));
     expect(setSurveyInfo).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('clear'));
     await waitFor(() =>
@@ -122,7 +122,7 @@ describe('SurveyInfoEditor', () => {
   it('tries again on the next blur after a failed store', async () => {
     setSurveyInfo.mockRejectedValueOnce(new Error('offline'));
     render(<SurveyInfoEditor characterId={7} survey={SURVEY} moon={false} />);
-    const notes = screen.getByLabelText('Notes');
+    const notes = screen.getByLabelText('Notes (markdown supported)');
     fireEvent.change(notes, { target: { value: 'Fleet on Mining.' } });
     fireEvent.blur(notes);
     await waitFor(() => expect(setSurveyInfo).toHaveBeenCalledTimes(1));
@@ -141,20 +141,41 @@ describe('SurveyInfoReadout', () => {
     expect(emptied.container.firstChild).toBeNull();
   });
 
-  it('shows the location with a waypoint button, the tax and the notes as plain text', () => {
+  it('shows the location with a waypoint button, the tax and the notes', async () => {
     render(
       <SurveyInfoReadout
-        info={{ location: { id: 30001, name: 'Efa' }, notes: 'Line one\n<b>not bold</b>' }}
+        info={{ location: { id: 30001, name: 'Efa' }, notes: 'Dock at the **refinery**' }}
         tax={{ name: 'Moon Corp', pct: 8 }}
       />
     );
     expect(screen.getByText('Efa')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Set waypoint to Efa' })).toBeTruthy();
     expect(screen.getByTestId('tax-readout')).toBeTruthy();
-    const notes = screen.getByText(/Line one/);
-    expect(notes.textContent).toBe('Line one\n<b>not bold</b>');
-    expect(notes.querySelector('b')).toBeNull();
-    expect(notes.className).toContain('whitespace-pre-line');
+    const bold = await screen.findByText('refinery');
+    expect(bold.tagName).toBe('STRONG');
+  });
+
+  it('renders the notes as Markdown but never raw HTML or unsafe links', async () => {
+    const { container } = render(
+      <SurveyInfoReadout
+        info={{
+          location: null,
+          notes:
+            'Line one\nLine two <b>not bold</b>\n\n- [site](https://example.com)\n- [bad](javascript:alert(1))\n\n# Heading',
+        }}
+        tax={null}
+      />
+    );
+    const link = await screen.findByRole('link', { name: /site/ });
+    expect(link.getAttribute('href')).toBe('https://example.com');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(container.querySelectorAll('a')).toHaveLength(1);
+    expect(container.querySelector('b')).toBeNull();
+    expect(container.querySelector('h1')).toBeNull();
+    expect(container.querySelector('br')).not.toBeNull();
+    expect(container.textContent).toContain('<b>not bold</b>');
+    expect(container.textContent).toContain('bad');
+    expect(container.textContent).toContain('Heading');
   });
 
   it('shows only the rows that were set', () => {

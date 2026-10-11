@@ -4127,6 +4127,7 @@
       "setWaypoint": "Set waypoint",
       "setWaypointTo": "Set waypoint to {{placeName}}",
       "notes": "Notes",
+      "notesEditor": "Notes (markdown supported)",
       "notesPlaceholder": "Anything the fleet should know, such as where to dock",
       "kind": {
         "system": "System",
