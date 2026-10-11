@@ -147,11 +147,15 @@ describe('Login', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows screenshots, each with alt text, lazily loaded', async () => {
+  it('pairs every question with a screenshot, each with alt text, lazily loaded', async () => {
     renderLogin();
-    const gallery = within(await screen.findByRole('region', { name: /see it in action/i }));
-    const images = gallery.getAllByRole('img');
-    expect(images).toHaveLength(19);
+    const grid = within(
+      await screen.findByRole('region', { name: /the questions it exists to answer/i })
+    );
+    const images = grid.getAllByRole('img');
+    // One capture per tile, and one tile per heading.
+    expect(images).toHaveLength(grid.getAllByRole('heading', { level: 3 }).length);
+    expect(images).toHaveLength(10);
     for (const image of images) {
       expect(image.getAttribute('alt')).toBeTruthy();
       expect(image).toHaveAttribute('loading', 'lazy');
