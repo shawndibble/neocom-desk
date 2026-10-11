@@ -54,6 +54,9 @@ import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
+import type { StockSummary } from '@/engine/stockTargets/stockRows';
+import { StockNeedPill } from '@/features/stockTargets/StockStatus';
+import { stockBoardSeverity, type StockBoardData } from '@/features/stockTargets/stockBoard';
 import type { CorpBoardItem } from '@/engine/corp/board';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import {
@@ -730,6 +733,102 @@ export function PriceAlertsCard({
               />
             ))}
           </ul>
+        </>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Stock -----------------------------------------------------------------
+
+/**
+ * The markets the pilot stocks that need restocking, worst first, with their
+ * Out and Low totals (issue #3521). A fully stocked market is only counted in
+ * the footer. Absent from the board, and from the edit menu, until the pilot
+ * stocks a market.
+ */
+const STOCK_PATH = '/market/stock';
+
+export function StockCard({ data }: { data: StockBoardData | null }) {
+  const { t } = useTranslation();
+  const needing =
+    data?.markets.filter((market) => market.summary.out > 0 || market.summary.low > 0) ?? [];
+  const shown = needing.slice(0, ROW_LIMIT);
+  const stocked = (data?.markets.length ?? 0) - needing.length;
+  const detail = (summary: StockSummary) =>
+    [
+      summary.readyToList > 0 && t('overview.board.stockReady', { count: summary.readyToList }),
+      summary.costToFill > 0 &&
+        t('overview.board.stockToSource', { isk: formatIskCompact(summary.costToFill) }),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  return (
+    <BoardCard
+      title={t('overview.board.stock')}
+      meta={
+        <SeverityWord
+          severity={stockBoardSeverity(data)}
+          warningLabel="overview.board.word.restock"
+        />
+      }
+      to={STOCK_PATH}
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : !data.counted
+            ? t('overview.board.stockNotCounted')
+            : needing.length === 0
+              ? t('overview.board.stockAllStocked')
+              : stocked > 0
+                ? t('overview.board.stockMoreStocked', { count: stocked })
+                : undefined
+      }
+    >
+      {data === null || !data.counted ? (
+        <CardEmpty>
+          {t(data === null ? 'overview.board.checking' : 'overview.board.stockNotCounted')}
+        </CardEmpty>
+      ) : (
+        <>
+          <TileRow>
+            <NumberTile
+              label={t('overview.board.stockOut')}
+              value={data.totals.out}
+              severity="critical"
+            />
+            <NumberTile
+              label={t('overview.board.stockLow')}
+              value={data.totals.low}
+              severity="warning"
+            />
+          </TileRow>
+          {shown.length === 0 ? (
+            <CardEmpty>{t('overview.board.stockAllStocked')}</CardEmpty>
+          ) : (
+            <ul>
+              {shown.map((market) => {
+                const out = market.summary.out > 0;
+                const word = out
+                  ? t('stockTargets.need.out', { count: market.summary.out })
+                  : t('stockTargets.need.low', { count: market.summary.low });
+                return (
+                  <TriageRow
+                    key={market.listId}
+                    severity={out ? 'critical' : 'warning'}
+                    when={<StockNeedPill need={out ? 'out' : 'low'}>{word}</StockNeedPill>}
+                    whenLabel={word}
+                    // "Amarr VIII (Oris) - Emperor Family Academy" reads as its first part on a card.
+                    subject={market.name.split(' - ')[0]}
+                    detail={detail(market.summary)}
+                    detailLabel={detail(market.summary)}
+                    to={`${STOCK_PATH}/${encodeURIComponent(market.listId)}`}
+                  />
+                );
+              })}
+            </ul>
+          )}
         </>
       )}
     </BoardCard>

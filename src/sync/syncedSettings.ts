@@ -239,6 +239,16 @@
 // last hour). All "set to another value, never unset", so the tombstone-expiry
 // edge does not bite them either.
 //
+// sync.stockLists (issue #3521): every Stock List, its name, where it is
+// counted and its Stock Targets, as one array — the Build Groups shape above
+// and for the same reason (an unbounded key space against an exact-match
+// allow-list; no firestore.rules clause to deploy by hand). Account-wide, not
+// keyed per Character: the lists count every Character's assets, so whichever
+// Character is active sees the same lists. The LWW clobber this accepts costs
+// at most an edit made on two devices before either synced. Never deleted via
+// deleteSyncedSetting: removing a list rewrites the array. No `legacyKey`: new.
+// See features/stockTargets/stockListsStore.ts.
+//
 // sync.surveyHistory: the Mining Survey short links the pilot created or opened
 // in the app, as {id, addedAt, name?} entries — the link ids and the pilot's
 // own name for each (capped at 40 characters, so 30 entries stay a few KB), so
@@ -299,6 +309,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
   'sync.structureBrokerFees',
+  'sync.stockLists',
   'sync.surveyHistory',
   'sync.targetSkillPlan',
 ];

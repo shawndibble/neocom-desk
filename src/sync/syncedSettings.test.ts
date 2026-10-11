@@ -52,6 +52,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
   'sync.structureBrokerFees',
+  'sync.stockLists',
   'sync.surveyHistory',
   'sync.targetSkillPlan',
 ];

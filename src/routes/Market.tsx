@@ -69,6 +69,7 @@ import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/c
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
+import { StockTab } from '@/features/stockTargets/StockTab';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
@@ -346,6 +347,7 @@ export function Market() {
     tabs: [
       { id: 'browser', label: t('market.sections.browser') },
       { id: 'orders', label: t('market.sections.openOrders') },
+      { id: 'stock', label: t('market.sections.stock') },
       { id: 'history', label: t('market.sections.history') },
       { id: 'appraisal', label: t('market.sections.appraisal') },
     ],
@@ -954,6 +956,7 @@ export function Market() {
           labelled={!usesViewPicker(marketViews.tabs.length, isPhone)}
         >
           {tab === 'orders' && <OpenOrdersPanel />}
+          {tab === 'stock' && <StockTab activeCharacterId={activeCharacterId} />}
 
           {tab === 'history' && (
             <OrderHistoryPanel

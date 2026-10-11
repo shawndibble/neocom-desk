@@ -1,6 +1,6 @@
 # Market, LP Store, Contract search: feature inventory
 
-Scope: `/market` (Browser, Open orders, History, History > Transactions, Appraisal, Hauling), `/market/lp-store`, and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `CONTEXT.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
+Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, Appraisal, Hauling), `/market/lp-store`, and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `CONTEXT.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
 
 ## Summary table
 
@@ -448,6 +448,28 @@ Observed gaps: alerts exist only for pinned items and require an active characte
 
 `src/app/GlobalPasteRouter.tsx`, mounted in Layout. Ctrl/Cmd+V anywhere not in a field and with no overlay open: `pasteDestination` (`engine/import/pasteDestination`) classifies the clipboard as an EFT fit (-> `FITTINGS_PATH` with `fittingLoadText`) or an item list (-> `/market/appraisal` with `appraiseText`); anything else is ignored. No confirm step; parsers and catalogue load lazily on first paste. Decisions: `20261001-211035-...`, `20261002-133425-...`.
 Observed gaps: no visible hint of the shortcut outside Help shortcuts; a failed classification gives no feedback.
+
+## 4b. Stock (`/market/stock`, Stock Lists)
+
+Issue #3521; scope decision `20261010-182330-stock-targets-v1-scope`; mockup `docs/design/mockups/stock-targets/`. A tab entry with `deep: true`: `/market/stock` lists the markets the pilot stocks (or opens the only one), `/market/stock/<list id>` opens one. Entry `features/stockTargets/StockTab.tsx`. Terms per `CONTEXT.md`: **Stock List** (a "market" in the UI), **Stock Target**, **Shortfall**.
+
+| Piece                                      | Where                                                                     | Notes                                                                                                                                                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Markets (synced setting `sync.stockLists`) | `stockTargets/stockListsStore.ts`, `engine/stockTargets/stockLists.ts`    | each list has a required `locationId` (station or structure); a stored list without one is dropped on read                                                                                                        |
+| Market list (landing, 2+ markets)          | `StockMarketsList.tsx`, `engine/stockTargets/markets.ts`                  | worst first (most Out, most Low, cost); Items, Out, Low, Ready to list, To buy or build, a need pill; row opens the market                                                                                        |
+| Counts                                     | `stockTargetsData.ts`, `engine/stockTargets/onHand.ts`                    | Listed = every Character's own sell orders at the market; In hangar = their `detectOwnedStock` placements at the same location id; incomplete Characters named, counts then a floor                               |
+| Rows, status, summary                      | `engine/stockTargets/stockRows.ts`                                        | status by Listed: Out, Low (`LOW_FILL_RATIO`), OK, Over; Shortfall split into from-hangar and to-source; cost = to-source × hub lowest sell                                                                       |
+| Manager view                               | `StockMarketPage.tsx`, `StockManagerTable.tsx`                            | Target (edit in place), Listed, In hangar, bar (solid listed, hatched hangar), Short, Restock ("List N from hangar", "Buy or build N"), Cost, Status; status + "Ready to list" + market group chips               |
+| Builder view                               | `StockBuilderView.tsx`, `engine/stockTargets/builder.ts`                  | only what is left to source after the hangar, split by whether the active Character holds a blueprint; "Add N to a Build Group…" sizes runs to cover it                                                           |
+| Market menu (⋮)                            | `StockMarketPage.tsx`                                                     | New market…, Add everything I sell here, Rename…, Change market…, Delete…                                                                                                                                         |
+| New / Change market                        | `MarketDialog.tsx`                                                        | picker: places with the pilot's sell orders first, then NPC stations (snapshot) and structures (ESI search, 3+ letters, search scope); new market can start from the items sold there, target = amount listed now |
+| Add items… / Paste a list…                 | `StockListDialogs.tsx`                                                    | search one item at a time, or an Appraisal-format paste                                                                                                                                                           |
+| Set stock target…                          | `StockTargetDialog.tsx`, item menu everywhere                             | pick a market, quantity, Remove from list; with no market, points to Market › Stock                                                                                                                               |
+| Share link                                 | `engine/stockTargets/stockListShare.ts`                                   | `?list=<code>` (v2: name, market, targets); a banner offers "Save a copy"; the sender's counts never travel                                                                                                       |
+| Alert `stockBelowTarget`                   | `pollDomains.ts` `stockTargetDomain`, `engine/stockTargets/stockAlert.ts` | cache-only; filed under the lowest Character id with the orders scope; fires when Listed drops into Low or Low → Out, and says how many wait in the hangar there                                                  |
+| Overview Stock card                        | `overview/cards.tsx` `StockCard`, `stockTargets/stockBoard.ts`            | absent until a market exists; markets needing restock, worst first, each linking to its page; cache-only counts                                                                                                   |
+
+Known follow-ups: every seller's orders at a structure (opt-in structure-markets grant) for a corp-wide shelf; corp hangars as a source.
 
 ## 5. LP Store
 

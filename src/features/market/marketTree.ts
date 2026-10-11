@@ -101,7 +101,7 @@ export interface SearchCategorySummary {
 }
 
 /** Walks up to the top-level category; stops on a cycle rather than looping. */
-function rootOf(id: number, groupsById: ReadonlyMap<number, MarketGroupNode>): number {
+export function rootOf(id: number, groupsById: ReadonlyMap<number, MarketGroupNode>): number {
   const seen = new Set<number>();
   let cur = id;
   for (;;) {

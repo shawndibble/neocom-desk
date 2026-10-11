@@ -18,12 +18,14 @@ import {
   corpRosterDomain,
   corpWalletDomain,
   priceAlertDomain,
+  stockTargetDomain,
   deriveMarketOrderEntries,
   domainForEvent,
   renderNotification,
   notificationSubjectId,
 } from './pollDomains';
 import { SUBJECT_ROUTED_EVENT_IDS } from './notificationOptions';
+import { useStockLists } from '@/features/stockTargets/stockListsStore';
 import { eventEntry } from './eventEntries';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { resolveNames } from '@/features/character/names';
@@ -69,6 +71,7 @@ import type {
 vi.mock('@/features/character/contracts', () => ({ loadContracts: vi.fn() }));
 vi.mock('@/features/character/wallet', () => ({ loadWalletJournalWithStatus: vi.fn() }));
 vi.mock('@/features/character/orders', () => ({
+  KEYS: { open: 'orders', history: 'orders:history' },
   loadOrders: vi.fn(),
   loadOrderHistory: vi.fn(),
 }));
@@ -194,6 +197,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       corpRoster: ['corpMemberJoined', 'corpMemberLeft'],
       corpWallet: ['corpWalletThreshold'],
       priceAlert: ['priceAlertTriggered'],
+      stockTargets: ['stockBelowTarget'],
     });
   });
 
@@ -1394,6 +1398,7 @@ describe('copy wiring', () => {
           memberCharacterId: 1,
           orderId: 1,
           division: 1,
+          locationId: 1,
         } as never) !== undefined
     );
     expect([...routed].sort()).toEqual([...SUBJECT_ROUTED_EVENT_IDS].sort());
@@ -1469,5 +1474,89 @@ describe('copy wiring', () => {
       'Kestrel'
     );
     expect(copy).toEqual({ title: 'New mail', body: 'Kestrel has new mail.' });
+  });
+});
+
+describe('stockTargetDomain (issue #3521)', () => {
+  const ORDERS_SCOPE = 'esi-markets.read_character_orders.v1';
+  const token = (characterId: number) => ({
+    characterId,
+    accessToken: 'a',
+    refreshToken: 'r',
+    expiresAt: 0,
+    scopes: [ORDERS_SCOPE],
+  });
+
+  beforeEach(async () => {
+    await db.tokens.clear();
+    await db.esiCache.clear();
+    vi.mocked(loadTypeNames).mockResolvedValue(new Map([[16240, 'Catalyst']]));
+    useStockLists.setState({
+      value: [
+        { id: 'efa', name: 'Efa', locationId: 60003760, items: [{ typeId: 16240, target: 40 }] },
+      ],
+      hydrated: true,
+      hydrate: async () => {},
+    });
+  });
+
+  it('files the account-wide lists under one Character only, so one shelf fires once', async () => {
+    await db.tokens.bulkPut([token(2), token(1)]);
+    expect(await stockTargetDomain.load(2)).toEqual([]);
+    expect(await stockTargetDomain.load(1)).toHaveLength(1);
+  });
+
+  it("counts every Character's cached orders and hangars at the market, and never reads ESI", async () => {
+    await db.tokens.bulkPut([token(1), token(2)]);
+    await db.characters.bulkPut([
+      { characterId: 1, name: 'A', ownerHash: 'a', addedAt: 0 },
+      { characterId: 2, name: 'B', ownerHash: 'b', addedAt: 0 },
+    ]);
+    const asset = {
+      item_id: 9,
+      type_id: 16240,
+      quantity: 12,
+      location_id: 60003760,
+      location_type: 'station',
+      location_flag: 'Hangar',
+      is_singleton: false,
+    };
+    const order = {
+      order_id: 5,
+      type_id: 16240,
+      location_id: 60003760,
+      volume_remain: 7,
+      is_buy_order: false,
+    };
+    await db.esiCache.put({ characterId: 2, key: 'assets', value: [asset], fetchedAt: 1 });
+    await db.esiCache.put({ characterId: 1, key: 'orders', value: [order], fetchedAt: 1 });
+    await db.esiCache.put({ characterId: 2, key: 'orders', value: [], fetchedAt: 1 });
+    expect(await stockTargetDomain.load(1)).toEqual([
+      {
+        listId: 'efa',
+        listName: 'Efa',
+        locationId: 60003760,
+        typeId: 16240,
+        name: 'Catalyst',
+        target: 40,
+        listed: 7,
+        inHangar: 12,
+      },
+    ]);
+  });
+
+  it('reads listed as unknown while any selling Character has no cached orders', async () => {
+    await db.tokens.bulkPut([token(1), token(2)]);
+    await db.esiCache.put({ characterId: 1, key: 'orders', value: [], fetchedAt: 1 });
+    expect(await stockTargetDomain.load(1)).toEqual([
+      expect.objectContaining({ typeId: 16240, listed: null }),
+    ]);
+  });
+
+  it('reads listed as unknown, not zero, before any order list is cached', async () => {
+    await db.tokens.put(token(1));
+    expect(await stockTargetDomain.load(1)).toEqual([
+      expect.objectContaining({ typeId: 16240, listed: null }),
+    ]);
   });
 });

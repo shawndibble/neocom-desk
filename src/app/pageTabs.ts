@@ -137,6 +137,8 @@ export const CONTRACTS_TABS = definePageTabs(
 export const MARKET_TABS = definePageTabs('/market', [
   { id: 'browser', labelKey: 'market.sections.browser' },
   { id: 'orders', labelKey: 'market.sections.openOrders' },
+  // `stock/<list id>` opens one market's Stock List.
+  { id: 'stock', labelKey: 'market.sections.stock', deep: true },
   { id: 'history', labelKey: 'market.sections.history' },
   { id: 'history/transactions', labelKey: 'market.sections.transactions' },
   { id: 'appraisal', labelKey: 'market.sections.appraisal' },

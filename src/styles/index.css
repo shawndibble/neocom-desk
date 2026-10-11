@@ -1244,6 +1244,19 @@
   }
 
   /*
+   * A Stock List row's bar: the hangar stock at the market that could be
+   * listed, drawn after the solid listed part (features/stockTargets). The same
+   * hard-stop hatch, so "not on sale yet" reads apart from the status colour.
+   */
+  .stock-bar-hangar {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--color-line-bright) 0 2px,
+      transparent 2px 4px
+    );
+  }
+
+  /*
    * The one row a notification sent the reader to
    * (`features/market/TransactionsPanel.tsx`). Three slow washes of accent
    * behind an otherwise ordinary row: enough to catch the eye on arrival,
