@@ -199,15 +199,17 @@ Any survivor that adds a tab, adds a page, or reshapes an existing one gets
 mockups before it gets a ticket. A survivor that only deepens existing math
 skips this step.
 
-Use the `design` skill, constrained to the tokens and components in
-`docs/DESIGN.md` and the primitives in `src/components/ui/` — a mockup inventing
-its own visual language is not an integration plan. Show the feature in place:
-surrounding navigation, the empty state, and the populated state. Publish it and
-link the artifact URL from the ticket, the way `.out-of-scope/` entries do.
+Build the mockup as a Storybook story, not HTML, `ui-ux-pro-max:design` or the
+Artifact design quickstart: follow `docs/design/mockups/README.md`. Look
+primitives up first with `npm run ui:catalog <Name>`; wrap anything new in
+`<NewComponent>`. Show the feature in place: surrounding navigation, the empty
+state, and the populated state. Shoot it with
+`npm run ui:shot -- mockups-<page>--<story>` and link the published PNG README
+from the ticket.
 
 **Also describe the layout in words in the ticket body.** The link can rot and
 an unattended run can fail to publish; a ticket whose mockup exists only as a
-URL is a ticket that may arrive empty.
+link is a ticket that may arrive empty.
 
 ## 6. File the tickets
 
@@ -262,7 +264,7 @@ industry-focused players can use it
 **Hostile review:** verdict, the objections raised, and how the proposal answers
 them — including any objection overruled by repo evidence
 
-**Mockups:** artifact URL, plus the layout described in words
+**Mockups:** link to the PNG README in `docs/design/mockups/`, plus the layout described in words
 ```
 
 ## 7. Update the ledger — curate, don't append

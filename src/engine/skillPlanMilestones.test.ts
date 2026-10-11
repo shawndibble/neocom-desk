@@ -14,6 +14,16 @@ function milestone(overrides: Partial<PlanMilestone> = {}): PlanMilestone {
 }
 
 describe('milestoneStates', () => {
+  it('orphans a fit goal whose Fitting was deleted, even with its anchor still scheduled', () => {
+    const stepByKey = new Map([[stepKey({ skillTypeID: 100, level: 4 }), step(100, 4, 3600)]]);
+    const fitGoal = milestone({ fittingId: 'fit-1' });
+    const [gone] = milestoneStates(stepByKey, START, [fitGoal], new Map(), new Set(['fit-1']));
+    expect(gone.state).toBe('orphaned');
+    expect(gone.finish).toBeNull();
+    const [kept] = milestoneStates(stepByKey, START, [fitGoal], new Map(), new Set(['fit-2']));
+    expect(kept.state).toBe('projected');
+  });
+
   it("projects the anchor step's cumulative finish", () => {
     const stepByKey = new Map([[stepKey({ skillTypeID: 100, level: 4 }), step(100, 4, 3600)]]);
     const [status] = milestoneStates(stepByKey, START, [milestone()], new Map());

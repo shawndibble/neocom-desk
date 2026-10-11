@@ -30,6 +30,29 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 | Re-login, offline, truncated, stale-link states            | `Assets.tsx:1691-1722,1939`                 |                                                                                                                                                                                                |
 | Command Palette "Assets" group                             | `features/commandPalette/assetsProvider.ts` | item → `/assets/items?q=`                                                                                                                                                                      |
 
+## Purpose and user goal
+
+"Where is my stuff, and what is it worth?" Assets is the Character's (and, while searching, the account's) inventory across New Eden: Items finds a thing and drills into stations, ships and containers; Ships lists hulls; Move plans hauling scattered stock to one place (`20261009-110609`, `20261007-175555`, #2947).
+
+- **Top jobs (ranked):** 1. "Where is item X, and on which Character?" (search, cross-Character `?chars=`, palette "Assets" group) 2. "What do I have at this station, and how far is it?" (location list with pins, jumps away, value) 3. "How do I get it all to one place?" (Move). Ranking is inferred, see Unconfirmed.
+- **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11); select mode copies items out for the client. Phone parity: not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); drill-down lives in the URL so phone Back steps up a level (`src/engine/assetPath.ts:1-14`); phone layout fixes (#2989, #3240). On demand: no alert links here.
+- **Above the fold:** search box and Character filter, opening on This character (the Character being played; owner, 2026-10-11), with All characters one switch away; total value; pinned locations first with item count, value, jumps and security.
+- **Not for:** keeping a market stocked (Market › Stock, `20261010-182330`); fitting a ship (Fittings, via Open in Fittings); market pricing (values are a rough average price).
+- **Sources:** owner, 2026-10-11 (active Character by default, toggle to swap, remember the last pick; desktop use); `20261009-110609`, `20261007-175555`, `20260831-230742`, `20261008-010431`, `20261010-182330`; #2846, #2936, #2947, #2989, #3240.
+- **Unconfirmed:** the job ranking; that "where is it" outranks "what is it worth"; how often Move is used.
+
+### Mobbin brief
+
+- **Fit:** medium. Search across folders, drill-down with breadcrumbs, bulk select and an inventory value total are generic file-manager and inventory patterns; jumps away and a hauling plan are EVE-specific.
+- **Analog apps:** Google Drive, Dropbox, Sortly, Shopify (inventory), Steam (inventory).
+- **Screen queries:**
+  - `web: file browser with a breadcrumb path, folder rows showing item count and size, and a search box that flattens results across folders`
+  - `web: list in select mode with checkboxes and a bulk action bar`
+  - `web: account switcher in a page header that scopes a list to one profile or all profiles`
+  - `ios: inventory list grouped by location with total value per location and a pinned group at the top`
+- **Flow queries:** `web: pick items and a destination, then see a move plan with trips and totals`.
+- **Mobbin won't help with:** jumps away under a route preference, security status, ship fitting contents and cargo-trip maths; reference the EVE client Asset window and EVE route tools.
+
 ## Route, nav, gating
 
 - Nav: `/assets`, `group: 'economy'`, `gating: 'scope'`, `mobileTab: true`.
@@ -179,6 +202,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 - Jumps away resolved only for pinned, visible and open locations (bounded fan-out), so off-screen rows have none until scrolled in; unresolved without the location scope.
 - No page-specific keyboard shortcuts documented in Help › Shortcuts; select mode is click/tap only.
 - Help/FAQ say nothing specific about Assets beyond the stored-data list.
+- The Character filter remembers its last pick per page, on this device (`characterFilterPicks.ts`, key `characterFilterPicks`). Order on open: URL value, then this page's pick, then the synced Settings default (first visit only). A link's value is never remembered. Assets, Wallet, Industry Jobs, Opportunities and Open Orders each keep their own.
 
 ## Persistence and sync
 

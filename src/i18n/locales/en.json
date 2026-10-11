@@ -2215,6 +2215,20 @@
       "save": "Save",
       "cancel": "Cancel"
     },
+    "fitGoal": {
+      "add": "Add fit goal…",
+      "title": "Fit goal",
+      "empty": "No saved fittings yet.",
+      "loading": "Checking…",
+      "flyableNow": "Flyable now",
+      "flyableOn": "Flyable on {{date}}",
+      "notByEnd_one": "Not by end of plan · {{count}} skill level missing",
+      "notByEnd_other": "Not by end of plan · {{count}} skill levels missing",
+      "confirm_one": "{{name}} needs {{count}} skill level the plan doesn’t train. Add it, with its prerequisites?",
+      "confirm_other": "{{name}} needs {{count}} skill levels the plan doesn’t train. Add them, with their prerequisites?",
+      "confirmAdd": "Add and set goal",
+      "flyable": "Flyable {{date}}"
+    },
     "jumpToAdded": "Jump to it",
     "certified": {
       "title": "New certified plan",
@@ -4662,16 +4676,6 @@
     "copyFailed": "Couldn't copy",
     "copyLink": "Copy link",
     "moreCopy": "More copy options",
-    "yourShare": "You mined {{volume}} m³ of these ores in {{system}}",
-    "yourShareWithPercent": "You mined {{volume}} m³ of these ores in {{system}} · {{percent}}% of what's been mined",
-    "yourShareTooltipLabel": "About your share",
-    "yourShareTooltip": "From your mining ledger, which counts whole days (EVE time) in one system and runs a few minutes behind the game. Ore you mined there before the first scan counts too.",
-    "minedIn": "Systems you mined in",
-    "changeSystem": "Change system",
-    "systemLabel": "Solar system",
-    "systemPlaceholder": "System name",
-    "systemPrompt": "Name the system this survey is in to see how much of it you mined.",
-    "systemNotFound": "No system by that name.",
     "copiedLink": "Link copied",
     "newSurvey": "New survey",
     "markCleared": "Mark field cleared",
@@ -4702,7 +4706,15 @@
       "rate": "Tax rate, percent",
       "open": "Manage Taxes",
       "manage": "Manage Taxes",
-      "failed": "Couldn't save that Payee. Try again."
+      "needLogin": "Login to access",
+      "failed": "Couldn't save that Payee. Try again.",
+      "addPayee": {
+        "title": "Add Payee",
+        "confirm": "Add {{name}} as a Payee at {{pct}}%?",
+        "body": "{{name}} isn't one of your Payees yet. Add them so you can assign this ore's tax to them on the Tax tab.",
+        "submit": "Add Payee",
+        "skip": "Open without adding"
+      }
     },
     "info": {
       "title": "Additional information",
@@ -4710,6 +4722,7 @@
       "locationPlaceholder": "System, station or structure",
       "setWaypoint": "Set waypoint",
       "setWaypointTo": "Set waypoint to {{placeName}}",
+      "needLogin": "Login to set waypoint",
       "notes": "Notes",
       "notesPlaceholder": "Anything the fleet should know, such as where to dock",
       "kind": {
@@ -9337,7 +9350,7 @@
     "piExpiringLabel": "Warn me an extractor is expiring",
     "piExpiringHint": "How far ahead the Colonies list flags an extractor — and sorts it to the top.",
     "defaultCharacterFilterLabel": "Default characters shown",
-    "defaultCharacterFilterHint": "Which character(s) Wallet Balance and Industry's Active Jobs open on by default.",
+    "defaultCharacterFilterHint": "The starting choice for the This character / All characters filter. Each page then remembers the last pick you made on it.",
     "spExtractionEnabledLabel": "SP extraction monitoring",
     "spExtractionEnabledHint": "Flags a character on the Characters table, and alerts you, once they've banked enough spare skill points to safely use a Skill Extractor. Off by default.",
     "spExtractionThresholdLabel": "SP extraction threshold",

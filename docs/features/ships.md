@@ -18,6 +18,28 @@ User goal (Ship Tree): "which hulls can I fly, how long until I can, what Master
 
 All paths under `src/features/fittings/` unless stated.
 
+## Purpose and user goal
+
+"Which hulls can I fly, and how long until I can fly the one I want?" The Ship Tree copies the in-game ISIS tree and every mark on it is the pilot's own progress; it sits beside Fittings because clicking a hull leads to fitting it (`20260926-135538`). The Fittings tab is covered in `fittings.md`.
+
+- **Top jobs (ranked):** 1. "Can this Character fly hull X, and if not, how long?" 2. "What Mastery do I have, and what do I add to my Skill Plan for the next tier?" 3. "What comes next in this line, and do I own its blueprint?"
+- **Device and cadence:** desktop primary (owner, 2026-10-11): a pan/zoom map and a Ship Info window. Phone parity: pinch zoom exists (`20260927-100237`) and Ships has `mobileTab: true` (`src/app/navDestinations.ts:166`), though every page but Alerts, Corp, Help and Settings has that flag, so it is weak evidence. Cadence: occasional, when picking a next ship.
+- **Above the fold:** the faction's tree with flyable hulls lit and the search box; in Ship Info: can fly / time to fly, Mastery, Add tier N to plan.
+- **Not for:** building or tuning a fit (Fittings tab); editing the plan itself (Skills).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `20260926-135538`, `20260927-100237`, ADR 0015; #2652, #2146.
+- **Unconfirmed:** occasional cadence; the ranking of jobs 2 and 3.
+
+### Mobbin brief
+
+- **Fit:** low: the tree layout and palette are EVE-specific by decision; only search, the detail window and progress badges are generic.
+- **Analog apps:** Duolingo, Steam, Google Maps, Apple Fitness.
+- **Screen queries:**
+  - `web: zoomable pan canvas of connected nodes with a search box that centres and opens the matching node`
+  - `web: item detail window with tabs for description, requirements and progress, and a primary add-to-plan button`
+  - `ios: achievement list showing earned and locked tiers with a progress bar per item`
+- **Flow queries:** none.
+- **Mobbin won't help with:** the ISIS tree shape, Mastery ladders, faction grid; reference the in-game ISIS window.
+
 ## 1. Routes, URLs, gating
 
 - Tabs are path segments (ADR 0015, `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`). `SHIPS_TABS` (`shipsTabs.ts`, base `/ships`): `fittings` (default, first), `tree`, and standalone `fittings/edit` (the editor; not in the bar). Unknown segment -> default tab (`Ships.test.tsx:103`).

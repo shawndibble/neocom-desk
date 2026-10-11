@@ -18,6 +18,27 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 | Loading / error per group | "Searching..." row; "Couldn't load these results" in that group only                 | `usePaletteSearch.ts`                                               |
 | Result count (a11y)       | polite live region                                                                   | `CommandPalette.tsx`                                                |
 
+## Purpose and user goal
+
+"Take me to X." One box to go anywhere without learning the nav: a page or tab, another Character, an owned asset, an item, an LP Store or a contact (#2318).
+
+- **Top jobs (ranked):** 1. "Go to that page or tab by name." 2. "Switch to that Character." 3. "Where is this item, across my Characters?" (assets, market items).
+- **Device and cadence:** desktop primary (owner, 2026-10-11), by keyboard chord, many times a session (inferred). Phone parity: the More sheet's search field opens it (`20261002-145653-go-to-button-opens-the-command-palette`); phone use is one-off lookups (owner, 2026-10-11), so the palette matters little there.
+- **Above the fold:** n/a. Moment of use: mid-session, opened by Ctrl/Cmd K or Go to; the search field and the first group of results.
+- **Not for:** filtering the page underneath (its own search box does that, footer `commandPalette.scopeNote`).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); #2318; decisions `20260929-235256` (superseded), `20261002-145653-go-to-button-opens-the-command-palette`.
+- **Unconfirmed:** usage cadence.
+
+### Mobbin brief
+
+- **Fit:** high. Command palettes and quick switchers are a standard pattern.
+- **Analog apps:** Linear, Raycast, Slack (quick switcher), Notion.
+- **Screen queries:**
+  - `web: command palette modal with one search field and results grouped under headings for pages, commands and people`
+  - `ios: full-screen search with results grouped by type`
+- **Flow queries:** none.
+- **Mobbin won't help with:** nothing notable.
+
 ## Opening and closing
 
 - Chord: `isModChord(event, apple, 'k')` - exactly one modifier per platform (Cmd on Apple, Ctrl elsewhere), Alt and Shift disqualify (`shortcuts.ts`). `preventDefault` stops the browser's own Ctrl+K. Listener is always attached (not part of the single-key shortcut table, so unaffected by WCAG 2.1.4 considerations) and fires from inside inputs.

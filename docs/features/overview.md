@@ -18,6 +18,27 @@ Route `/overview` (`src/routes/Overview.tsx`). Landing page for a signed-in Char
 
 Scope: active Character, except Alerts (device-wide feed), Structures and Moon extractions (the Character's corp via roles), and Mining tax (all Characters, see gaps).
 
+A quick glance between sessions; during a session the pilot sits on the page they need, not here (owner, 2026-10-11).
+
+- **Top jobs (ranked):** 1. "What is on a clock, and what runs out first?" (Next deadline leads the summary strip). 2. "Which of my things need attention now?" (card severity: undercut orders, finished jobs, colony resets, overdue couriers). 3. "What is training now, and what trains next in the coming days?" (summary strip; the current skill and maybe the next couple, owner, 2026-10-11), plus the wallet figure.
+- **Device and cadence:** desktop primary (owner, 2026-10-11); a glance between sessions, as the landing page (`App.tsx` `Root`, `Callback.tsx`), not a page kept open during play. Phone parity: first of the default tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts`), with a phone-only layout (two full cards in pilot order, the rest folded, `PHONE_FULL_COUNT`).
+- **Above the fold:** Character header, summary strip (next deadline, training with the next skills, wallet, Data Age, Refresh), then the first cards in pilot order; the Alerts column from `xl`. Everything readable in one look, each figure a link to the page that acts on it.
+- **Not for:** fixing things (each card links to the page that does); the history of what fired (`/alerts`); other Characters' boards (per active Character, except the cards noted above).
+- **Sources:** owner, 2026-10-11 (between-session glance, desktop primary, current and next skills); decisions `20260907-153621`, `20260929-114130`, `20260929-145533`, `20261010-235829`, `20260929-140431`, `20260925-203743`; #1731.
+- **Unconfirmed:** the ranking of jobs 2 and 3.
+
+### Mobbin brief
+
+- **Fit:** high. A summary strip over a grid of status cards the user can hide and reorder is a common dashboard pattern.
+- **Analog apps:** Copilot Money, Robinhood, Apple Health (Summary), GitHub (home).
+- **Screen queries:**
+  - `web: personal dashboard with a strip of key figures above a grid of cards, each with counts and a link to its page`
+  - `web: summary cell showing the item in progress with a countdown and the next two queued items with their finish dates`
+  - `web: customize dashboard popover with checkboxes and drag handles to hide and reorder cards`
+  - `ios: home summary with two cards shown in full and the rest folded into one list`
+- **Flow queries:** none.
+- **Mobbin won't help with:** card contents (PI reset runs, structure fuel and reinforcement, moon chunks, SP extraction). Reference the EVE client's own windows for these.
+
 ## Controls
 
 Layout order: `CharacterHeader`, `OverviewSubNav`, `SummaryStrip`, "all cards hidden" notice, card grid (+ alerts column from `xl`). Grid `sm:grid-cols-2`; from `xl` a `2fr/1fr` split; below `xl` alerts stack under cards (`Overview.tsx:812`).
@@ -109,7 +130,9 @@ Page ungated; see card table. Missing scope: that card goes warning with a re-lo
 - SP extraction card has `loading: false` always.
 - Board omits `deepCompetition`/`structureCompetition` the Orders page uses (`Overview.tsx:338-345`), so its counts come from narrower input.
 - One Refresh for all 12 snapshots; no per-card refresh.
+- Training now shows only the active skill, its time left and a queued count (`SummaryStrip.tsx`); the next skills and their finish dates are not shown, though the owner wants the current skill "and maybe the next couple in the coming days" here (owner, 2026-10-11).
 
 ## Improvement ideas
 
+- Training now: list the next two or three queued skills with finish dates under the active one (owner, 2026-10-11).
 - Per-card refresh and age; skip fetching hidden cards; inline "show N more"; label or scope the Mining tax card; loading state and deep links for SP/Mining/Contracts tiles.

@@ -27,6 +27,7 @@ export function fittingRequirementTypeIds(fitting: Fitting): number[] {
     if (module.chargeTypeId !== undefined) ids.add(module.chargeTypeId);
   }
   for (const drone of fitting.drones) ids.add(drone.typeId);
+  for (const fighter of fitting.fighters ?? []) ids.add(fighter.typeId);
   return [...ids];
 }
 

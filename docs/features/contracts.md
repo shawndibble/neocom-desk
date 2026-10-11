@@ -26,6 +26,30 @@ User goal by tab:
 | PLEX-ask pricing                                    | `engine/contracts/contractSearch.ts`, `features/market/plexPrice.ts`        | converts PLEX ask to ISK at the global-market sell price                           |
 | Notifications                                       | `features/notifications/events.ts:165-195`                                  | contract accepted/completed/failed, courier delivery due                           |
 
+## Purpose and user goal
+
+"Is anyone selling this on contract for less?" Courier hauls are a distant second (owner, 2026-10-11). The per-tab goals at the top of this file stand. Search is the landing tab because "the public corpus is the thing pilots open Contracts _to use_", while History is "a look-up-what-happened list consulted occasionally" (`20260912-200030`). Items opens on a search prompt, not a table (`20261007-161833`, #2921).
+
+- **Top jobs (ranked):** 1. "Where is the cheapest public listing of this item?" (Item search; used far more than Courier, owner, 2026-10-11) 2. "What happened to my contract, and when must I deliver?" (History) 3. "Which courier contracts pay best per jump without a trap?" (Courier, `20260912-141100`, `20260912-172628`). Courier ranks low: the owner knows nobody using it and opens it only to verify features (owner, 2026-10-11).
+- **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11); the contract detail copies a contract id for the client. Phone parity: not a default phone tab (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); search tabs have dense phone cards and a filter sheet (Mobile vs desktop summary below). Alerts land on History: `contractAccepted`, `courierDeliveryDue` → `/contracts/history` (`notificationOptions.ts`).
+- **Above the fold:** Items: search box and filter bar, then cheapest offers with price, location and jumps, with the snapshot's Data Age (up to 30 min old). History: own contracts with status and deadline. Courier: hauls ranked by ISK/jump with risk markers; it should not compete with Item search for space or entry points.
+- **Not for:** blueprint copies (Industry › BPC Sourcing reads the same snapshot); live order-book prices (Market › Browser); moving own stock (Assets › Move); hub-to-hub trade runs (Travel › Hauling).
+- **Sources:** owner, 2026-10-11 (Item search far above Courier, desktop use); `20260912-200030`, `20261007-161833`, `20260912-141100`, `20260912-172628`, `20260912-200442`, ADR 0013; #908, #2921.
+- **Unconfirmed:** search cadence (assumed on demand, not routine); that History is mostly reached from alerts and the wallet journal link.
+
+### Mobbin brief
+
+- **Fit:** medium. Search-first marketplace results with filters and a detail modal are generic; courier ranking by pay per jump and route risk is EVE-specific.
+- **Analog apps:** eBay, Facebook Marketplace, Uber Freight, DAT Load Board, Upwork (job board).
+- **Screen queries:**
+  - `web: marketplace search page with an empty-state prompt before a query and a filter bar of price, location and distance`
+  - `web: marketplace results table sorted by lowest price with location, distance and a listing-detail modal`
+  - `web: my orders history table with status chips and a deadline countdown column`
+  - `web: load board table of shipping jobs ranked by pay per mile with origin, destination and risk badges per row`
+  - `ios: listing detail sheet with item contents, price and seller location`
+- **Flow queries:** none.
+- **Mobbin won't help with:** jump counts under Travel rules, security bands, player-structure strand risk, collateral-to-reward ratios and multi-type contract contents; reference the EVE client contract search window.
+
 ## Route, tabs, URL
 
 - Tab ids are full path suffixes: `search/items`, `search/courier`, `history`; `/contracts/search` alone names no tab and redirects to Items (`pageTabs.ts:96-110`). Old Search-tab links still open.

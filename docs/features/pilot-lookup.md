@@ -2,7 +2,7 @@
 
 Travel tab `/travel/pilot`. Find one pilot by name; see identity from public ESI and all-time + recent killboard figures from zKillboard. A Travel tab again (scope decision `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`, which supersedes the own-page half of `20261002-145653-lp-store-under-market-pilot-lookup-its-own`). Origin: issue #2331 (stats), #2332 (recent kills/fits), decision `20260929-234357`.
 
-Glossary (CONTEXT.md): **Pilot Lookup** - portrait, corporation, alliance, character age from public ESI; all-time kills, losses, ISK, solo kills, danger and gang ratios, most-used hulls from zKillboard; newest 25 kills and losses, each expanding to the victim's fit with Open in Fittings (killmail read only then). Numbers, never a verdict: no pilot is called hostile or safe. "No zKillboard history" and "zKillboard couldn't be reached" are different answers.
+Glossary (CONTEXT.md): **Pilot Lookup** - portrait, corporation, alliance, character age from public ESI; all-time kills, losses, ISK, solo kills, danger and gang ratios, most-used hulls from zKillboard; newest 25 kills and losses, each expanding to the victim's fit with Open in Fittings (killmail read only then). A Threat badge beside the name (here and on every Local list row); beyond that, numbers: no pilot is called hostile or safe. "No zKillboard history" and "zKillboard couldn't be reached" are different answers.
 
 ## Feature summary
 
@@ -24,6 +24,28 @@ Glossary (CONTEXT.md): **Pilot Lookup** - portrait, corporation, alliance, chara
 | Shared D-Scan link                  | D-Scan view (share button)                   | Stores the raw scan (max 50,000 chars) as a `dscan` Share Link, 7 days, no revoke (#2943). `/s/<id>` shows the same `FleetBoard`; Open Neocom Desk returns to `/pilot-lookup?share=<id>` and re-pastes it (`sharedDscanSeed.ts`)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Show Info Character tab             | `PublicInfoModal`                            | Same `PilotProfileView` reused (corp/alliance switch tabs)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Command palette                     | Ctrl/Cmd+K                                   | Page entry only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+## Purpose and user goal
+
+Answer "who is this pilot and what have they done" from facts: identity (public ESI) plus all-time and recent killboard figures (zKillboard). Typical goals: check a stranger before a contract, trade or fleet invite; share a link to a pilot. It used to never label a pilot (decision `20260912-172628`); `20261008-181210-pilot-profile-and-local-list-state-a-threat` superseded that with the Threat verdict badge (Dangerous, Active, Low threat, Inactive). The badge has no green level and never calls a pilot safe; the copy guard in `PilotLookupPanel.test.tsx` still forbids "safe", "hostile" and "avoid".
+
+- **Top jobs (ranked):** 1. "Am I in danger, and what should I watch?" (a pasted D-Scan opens with the Danger read, `20261009-111531`). 2. "Who is in Local, and which of them kill in this kind of space?" (pasted Local list, `20261007-224716`, #2863). 3. "Who is this one pilot?" (name lookup, profile, #2331).
+- **Device and cadence:** desktop primary, with the EVE client open beside it: D-Scan and Local lists are copied from the client and pasted here (owner, 2026-10-11). Several times in a play session (inferred: Scan age turns to a warning after 2 minutes, `20261009-111531`). The phone is for one-off lookups of a friend or a pilot by name (job 3; owner, 2026-10-11); Pilot Lookup is not in the default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts`).
+- **Above the fold:** the search and paste box; then, for a D-Scan, the Danger read (level, sentence, Watch these); for a Local list, the grouped rows with Threat badges; for one pilot, identity and the Threat band (on a phone, the name box and this profile are the whole job).
+- **Not for:** route conditions (Route Safety, `travel.md`); a corporation or alliance (Show Info).
+- **Sources:** owner, 2026-10-11 (desktop primary beside the client; phone for one-off friend or pilot lookups); #2331, #2332, #2863, #2943; decisions `20260929-234357`, `20261007-224716`, `20261009-111531`, `20261008-181210`, `20261008-222917`; CONTEXT.md Threat, Danger read.
+- **Unconfirmed:** the job ranking.
+
+### Mobbin brief
+
+- **Fit:** low to medium. A player profile with stats and a match list is generic; the Danger read, Local grouping and D-Scan Fleet board are EVE-specific.
+- **Analog apps:** Truecaller, Steam, Chess.com, Strava.
+- **Screen queries:**
+  - `web: player profile with avatar, team, an all-time stats line, ratio meters and a recent matches list that expands per match`
+  - `web: pasted list of names checked into grouped rows, each with a risk badge and counts`
+  - `ios: caller lookup result with a risk level badge and a one-line reason`
+- **Flow queries:** none.
+- **Mobbin won't help with:** the Danger read, Fleet board and victim fits. Reference zKillboard, dscan.info and the EVE client's D-Scan and Local windows.
 
 ## Access, routing, scopes
 
@@ -106,10 +128,6 @@ Shared with `PublicInfoModal`'s Character tab (`src/components/PublicInfoModal.t
 - `parsePilotStats`: defensive parse; `{"error":"Invalid type or id"}` or zero kills + losses = `no-history`; any other error body = failure; `iskEfficiency = destroyed / (destroyed + lost)`, null when no ISK moved; zero counts missing from the body read as 0 (`zkillboard.ts:166`).
 - `parsePilotKillmails`, `readKillmailDetail`: drop entries without id/hash; final blow = flagged attacker else first listed.
 - `killFigures`: tile data + tones (`zkillFigures.ts`). Danger/gang meters quote zKillboard's own scales (decisions `20261002-145207`; colour `20261009-092214`, which replaced `20261002-163430`).
-
-## Purpose and user goal
-
-Answer "who is this pilot and what have they done" from facts: identity (public ESI) plus all-time and recent killboard figures (zKillboard). Typical goals: check a stranger before a contract, trade or fleet invite; share a link to a pilot. It never labels a pilot (decision `20260912-172628`; asserted by `PilotLookupPanel.test.tsx:210`).
 
 ## Where it lives
 

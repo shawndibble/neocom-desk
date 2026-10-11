@@ -6,8 +6,11 @@ import { STAT_CHIP_TONE_TEXT_CLASS, type StatChipTone } from './statChipTone';
 export type { StatChipTone };
 
 interface StatChipProps {
+  /** @summary Already-translated uppercase micro-heading. */
   label: string;
+  /** @summary The figure or text shown after the label. */
   value: ReactNode;
+  /** @summary Colour of the value: `default`, or a status tone. */
   tone?: StatChipTone;
   className?: string;
   /** One-line plain-language explanation, rendered as a small "?" tooltip next to the label. */
@@ -22,6 +25,8 @@ interface StatChipProps {
 /**
  * A static label + value readout. It has no border or fill: a box means
  * "you can click this" (DESIGN.md §6), and a chip can't be clicked.
+ *
+ * @summary A static label and value readout (ISK balance, SP, a count); no box, because it can't be clicked.
  */
 export function StatChip({
   label,
@@ -69,6 +74,8 @@ export function StatChip({
  * off the left side just there (4px out, room for a focus outline) and
  * nothing else, so a value's outline and an over-wide chip stay visible. Put
  * only readouts in a strip; a control beside it goes in the parent row.
+ *
+ * @summary A wrapping strip of `StatChip`s with a hairline between neighbours.
  */
 export function StatChips({
   dense = false,

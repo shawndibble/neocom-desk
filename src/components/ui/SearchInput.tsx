@@ -19,6 +19,8 @@ interface SearchInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, '
  * Market, Skills and the two pickers. The size is fixed at `md` rather than
  * exposed as a prop: a search box is the primary affordance of whatever panel
  * it heads, and there is no panel where it should be the compact one.
+ *
+ * @summary The one search box: a magnifier and a fixed `md` height; use it for every filter-as-you-type field.
  */
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(function SearchInput(
   { className = '', inputClassName, ...rest },

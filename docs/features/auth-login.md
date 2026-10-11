@@ -15,9 +15,27 @@ Routes `/login` (`src/routes/Login.tsx`), `/callback` (`src/routes/Callback.tsx`
 | Re-auth / grant for known Character             | `loginFlow.ts beginEveLogin`, `app/grantAction.ts`, `AuthFailureNotice.tsx` |
 | Root gate                                       | `Root`, `RequireCharacter`                                                  |
 
-## Purpose / user goal
+## Purpose and user goal
 
 Sign in with EVE SSO (first Character, or add an alt), choose how much to grant, recover from failures, and understand what the app asks for before consenting.
+
+- **Top jobs (ranked):** 1. "What will this do for me, and is it safe to give it my EVE login?" (the page sells the shipped product, `20260907-010343`; trust cards list the five writes, `20260924-165646`; the fifth, Autopilot waypoints, is `20261003-175151`). 2. "Log in, or add an alt." 3. "Grant only what I am comfortable with" (Customize permissions, `20260924-143410`).
+- **Device and cadence:** desktop primary, since the app is used mainly at the desk beside the EVE client (owner, 2026-10-11); once per Character. Phone parity: the Play Store variant is a bare phone screen (`isPlayStoreApp`). New visitors land here from `/`.
+- **Above the fold:** heading, tagline, Log in with EVE Online, the custom-permissions link, then the preview board.
+- **Not for:** changing grants later (Settings › Permissions); logging out (Settings › Data & storage).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); decisions `20260907-010343`, `20260924-165646`, `20260924-143410`, `20260925-182747`, `20260909-101500`, `20261003-175151`; ADR 0001; #295, #649, #1522, #1771.
+- **Unconfirmed:** none.
+
+### Mobbin brief
+
+- **Fit:** high. A landing hero with one sign-in button, an OAuth consent chooser and a sign-in error page are generic.
+- **Analog apps:** Linear, Copilot Money, Robinhood, Notion.
+- **Screen queries:**
+  - `web: product landing page with a headline, one sign-in button and a product preview below`
+  - `web: permission chooser dialog with required items locked and optional items as checkboxes`
+  - `web: sign-in error page with the reason and a try again button`
+- **Flow queries:** `web: sign up with a third-party account through a consent step and land on the dashboard`.
+- **Mobbin won't help with:** EVE SSO scopes and what each Permission reads.
 
 ## Login page controls and content
 

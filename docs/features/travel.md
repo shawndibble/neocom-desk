@@ -1,10 +1,10 @@
 # Travel (Route Safety, Thera / Turnur, Travel Settings)
 
-Progression group page `/travel` (last in the group). Three tabs (`TRAVEL_TABS`, `src/app/pageTabs.ts`): Route Safety (`/travel/route`, default for bare `/travel`), Thera / Turnur (`/travel/thera`) and Pilot Lookup (`/travel/pilot`, see `docs/features/pilot-lookup.md`). Settings > Travel edits the same stores as the Route rules panel.
+Progression group page `/travel` (last in the group). Four tabs (`TRAVEL_TABS`, `src/app/pageTabs.ts`): Route Safety (`/travel/route`, default for bare `/travel`), Thera / Turnur (`/travel/thera`), Pilot Lookup (`/travel/pilot`, see `docs/features/pilot-lookup.md`) and Hauling (`/travel/hauling`, spec in `docs/features/market.md` §4). Settings > Travel edits the same stores as the Route rules panel.
 
 Glossary terms (CONTEXT.md): Route Safety, Route strip, Quiet stretch, Stop, Leg, Hole jump, Ansiblex, Way to fly, Pinned way, Avoided Systems, Route Preference, Travel Settings, Jump Basis, Gank Chokepoint, Current System.
 
-Principle in every scope decision: conditions, never verdicts (`20260912-172628`). No system, route or way is called safe/unsafe/better. Unknown is never zero.
+Principle in every Route Safety scope decision: conditions, never verdicts (`20260912-172628`). No system, route or way is called safe/unsafe/better. (Pilot Lookup has since gained a Threat verdict, `20261008-181210`; it still has no safe level.) Unknown is never zero.
 
 ## Feature summary
 
@@ -33,6 +33,31 @@ Principle in every scope decision: conditions, never verdicts (`20260912-172628`
 | Set waypoint / View route menu items | Market + BPC row menus, order detail                   | One-place autopilot destination via `postAutopilotWaypoint`.                                                                                                     |
 | Travel Settings                      | Settings > Travel                                      | Preference, penalty, avoid rules, wormhole/bridge defaults, Avoided Systems.                                                                                     |
 | Command palette                      | Ctrl/Cmd+K                                             | Only generic Pages entries; no travel commands.                                                                                                                  |
+
+## Purpose and user goal
+
+"What is on my way, and how do I get there?" A pilot about to fly (a hauling or buying run, a trip through several Stops, a hop through Thera or Turnur) checks the last hour's kills and jumps along the route, chooses how to fly each Leg, then sends the Stops to the game's autopilot. Travel became in scope with #2328 (`20260929-234357`); Route Safety states conditions, never verdicts (`20260912-172628`). Pilot Lookup's Threat badge is a verdict (`20261008-181210`), but it has no green level and never calls a pilot safe, so nothing on Travel is called safe or unsafe.
+
+Hauling is also a Travel tab (`/travel/hauling`, moved from Market by `20261010-193521-hauling-moves-from-market-to-travel`, #3526); its spec still lives in `market.md` §4.
+
+- **Top jobs (ranked):** 1. "What happened along this route in the last hour?" (kills, jumps, Gank Chokepoints per system; #2328). 2. "What is the best order and way to fly my Stops, and does a Thera/Turnur hole or Ansiblex cut it short?" (#2475, `20261003-173108`, #2330). 3. "Put this route in my autopilot" (Set waypoints, `20261003-175151`).
+- **Device and cadence:** desktop primary, planned with the EVE client open beside it, then Set waypoints sends the route to the client (owner, 2026-10-11). The phone is for one-off route viewing (owner, 2026-10-11): phone-specific fixes #2519 and #2591 and dense phone route cards serve it, though Travel is not in the default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts`: Overview, Skills, Industry, Market). Used per trip, not daily (inferred).
+- **Above the fold:** Stops (From, Stops; one line on a phone), facts chips (jumps, security counts, last-hour kills, chokepoints), Route strip, Set waypoints, then the first route rows. Route rules can sit below. On a phone, a viewed route reads without editing: facts chips and Route strip first.
+- **Not for:** a "safe/unsafe" rating (never given); who is in Local (Pilot Lookup tab, `pilot-lookup.md`); the in-game avoidance list (ESI cannot read it, so Avoided Systems are entered by hand, `20260930-153212`).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off route viewing); #2328, #2330, #2475, #3540, #2519, #2591; decisions `20260929-234357`, `20260912-172628`, `20261003-173108`, `20261003-175151`, `20260930-153212`.
+- **Unconfirmed:** per-trip cadence; the ranking of Set waypoints above Thera / Turnur and Incursions near you.
+
+### Mobbin brief
+
+- **Fit:** medium. A trip planner with reorderable stops, a list of route options and a filterable live table are common patterns; the security-coloured Route strip, hole rows and kill heat are EVE-specific.
+- **Analog apps:** Google Maps, Citymapper, Waze, Flighty.
+- **Screen queries:**
+  - `web: multi-stop trip planner with a reorderable stop list beside a route summary and collapsible legs`
+  - `web: route options panel comparing alternative ways to travel one leg with time and transfers for each`
+  - `web: sortable table of live departures with filter selects above and a time-remaining column`
+  - `ios: route overview with a row of trip facts above a scrolling list of places along the way`
+- **Flow queries:** `web: add several stops to a trip, reorder them for the shortest route, then send the route to a phone`.
+- **Mobbin won't help with:** the Route strip, security bands, wormhole signatures and Ansiblex bridges, kill heat and chokepoints. Reference the EVE client's route and autopilot panel, Dotlan, EVE-Scout and zKillboard instead.
 
 ## Routing, access, scopes
 

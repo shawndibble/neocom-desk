@@ -1,0 +1,48 @@
+import { useState } from 'react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { Tabs, TabPanel } from './Tabs';
+import { useTabsId } from './tabPanel';
+
+const tabs = [
+  { id: 'open', label: 'Open' },
+  { id: 'history', label: 'History' },
+];
+
+const meta = {
+  title: 'ui/Tabs',
+  component: Tabs,
+  tags: ['autodocs'],
+  args: { tabs, value: 'open', label: 'Orders', tabsId: 'story', onChange: () => {} },
+  render: function Render(args) {
+    const tabsId = useTabsId();
+    const [value, setValue] = useState(args.value);
+    return (
+      <>
+        <Tabs {...args} tabsId={tabsId} value={value} onChange={setValue} />
+        <TabPanel tabsId={tabsId} tabId={value} className="pt-3 text-sm">
+          {args.tabs.find((tab) => tab.id === value)?.label} content
+        </TabPanel>
+      </>
+    );
+  },
+} satisfies Meta<typeof Tabs>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/** @summary Two peer views on one page; the selected tab has an accent underline. */
+export const Basic: Story = {};
+
+/** @summary More tabs than fit: the bar scrolls sideways instead of squeezing. Shown at 390 wide. */
+export const OverflowOnPhone: Story = {
+  args: {
+    tabs: ['Overview', 'Skills', 'Implants', 'Standings', 'Contracts', 'Wallet', 'Loyalty'].map(
+      (label) => ({ id: label.toLowerCase(), label })
+    ),
+    value: 'overview',
+  },
+  globals: { viewport: { value: 'phone390', isRotated: false } },
+};
+
+/** @summary Manual activation: arrows move focus only, Enter or Space selects. Use when `onChange` navigates. */
+export const ManualActivation: Story = { args: { activation: 'manual' } };

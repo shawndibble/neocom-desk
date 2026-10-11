@@ -46,7 +46,7 @@ import { neighbourFocusCandidates, planRowHandle } from './focusNeighbour';
 import { MarketGroupLink } from './MarketGroupLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
-import { findRemovalBlockers, planEntryKey } from '@/engine/plan';
+import { findRemovalBlockers, normalizePlanWithBoundaries, planEntryKey } from '@/engine/plan';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import {
   milestoneKey,
@@ -80,7 +80,17 @@ import type {
   PlanStep,
   TrainedSkill,
 } from '@/engine/types';
-import { addMilestone, removeMilestone, renameMilestone } from './milestones';
+import { evaluateFitGoal } from '@/engine/fitGoal';
+import { FitGoalModal } from './FitGoalModal';
+import { fitGoalOptions, type FitGoalOption } from './fitGoalOptions';
+import {
+  addMilestone,
+  reanchorFitGoals,
+  removeMilestone,
+  renameMilestone,
+  upsertFitGoal,
+} from './milestones';
+import { useFitGoalNeeds } from './useFitGoalNeeds';
 import { MilestoneModal } from './MilestoneModal';
 import type {
   PlanBooster,
@@ -367,6 +377,8 @@ export function PlanEditor({
     | { mode: 'rename'; id: string; currentName: string }
     | null
   >(null);
+  // The fit-goal picker (issue #3564): open while a saved Fitting is being chosen.
+  const [fitGoalOpen, setFitGoalOpen] = useState(false);
   // The entry pending a remove confirmation (#408) — an in-app Modal rather
   // than removing on click, matching the pattern PlanList already uses for
   // deleting a whole plan (CONTEXT.md's "an in-app Modal replacing
@@ -703,9 +715,50 @@ export function PlanEditor({
   // Plan Milestone (CONTEXT.md) statuses against the current schedule —
   // recomputed whenever the schedule or the milestones themselves change, the
   // same dependency shape as every other schedule-derived value above.
+  const trackedFittingIds = useMemo(
+    () => (plan.milestones ?? []).flatMap((m) => (m.fittingId === undefined ? [] : [m.fittingId])),
+    [plan.milestones]
+  );
+  const fitGoalData = useFitGoalNeeds(characterId, trackedFittingIds, fitGoalOpen);
+  // Needs the plan can't schedule (catalog-unknown skills) are left out, so a
+  // Fitting using one still resolves instead of staying "missing" forever.
+  const fitNeeds = useMemo(
+    () =>
+      new Map(
+        [...fitGoalData.needs].map(([id, need]) => [
+          id,
+          {
+            ...need,
+            needed: need.needed.filter((entry) => catalog.engineSkills.has(entry.skillTypeID)),
+          },
+        ])
+      ),
+    [fitGoalData.needs, catalog.engineSkills]
+  );
+  const trainedLevels = useMemo(
+    () => new Map([...trainedSkills].map(([id, skill]) => [id, skill.level])),
+    [trainedSkills]
+  );
+  // A fit goal reads orphaned once its Fitting is deleted, or once the plan no
+  // longer covers what the Fitting needs (an edit added a module, an entry went).
+  const goneFittingIds = useMemo(
+    () =>
+      new Set(
+        trackedFittingIds.filter((id) => {
+          if (fitGoalData.savedIds && !fitGoalData.savedIds.has(id)) return true;
+          const need = fitNeeds.get(id);
+          return (
+            need !== undefined &&
+            evaluateFitGoal(need.needed, trainedLevels, scheduled).state === 'missing'
+          );
+        })
+      ),
+    [trackedFittingIds, fitGoalData.savedIds, fitNeeds, trainedLevels, scheduled]
+  );
   const milestoneStatuses = useMemo(
-    () => milestoneStates(stepByKey, startDate, plan.milestones ?? [], trainedSkills),
-    [stepByKey, startDate, plan.milestones, trainedSkills]
+    () =>
+      milestoneStates(stepByKey, startDate, plan.milestones ?? [], trainedSkills, goneFittingIds),
+    [stepByKey, startDate, plan.milestones, trainedSkills, goneFittingIds]
   );
   const milestoneStatusByKey = useMemo(() => {
     const map = new Map<StepKey, MilestoneStatus>();
@@ -1470,6 +1523,50 @@ export function PlanEditor({
     [plan.milestones, onUpdate]
   );
 
+  const fitGoalPickerOptions = useMemo(
+    () =>
+      fitGoalOpen
+        ? fitGoalOptions(
+            fitGoalData.records,
+            fitNeeds,
+            trainedLevels,
+            scheduled,
+            stepByKey,
+            startDate
+          )
+        : [],
+    [fitGoalOpen, fitGoalData.records, fitNeeds, trainedLevels, scheduled, stepByKey, startDate]
+  );
+
+  // Keeps each fit goal on the latest step its Fitting needs: follows a
+  // Fitting edit, a rename and a reorder. Only writes when something moved.
+  useEffect(() => {
+    if (!plan.milestones?.some((m) => m.fittingId !== undefined)) return;
+    const next = reanchorFitGoals(plan.milestones, fitNeeds, trainedLevels, scheduled);
+    if (next !== plan.milestones) void onUpdate({ milestones: [...(next ?? [])] });
+  }, [plan.milestones, fitNeeds, trainedLevels, scheduled, onUpdate]);
+
+  /** FitGoalModal's pick: add the Fitting's missing skills (prerequisites follow), then anchor its goal. */
+  function pickFitGoal(option: FitGoalOption) {
+    const need = fitNeeds.get(option.id);
+    if (!need || option.state === 'flyable-now' || option.state === 'loading') return;
+    const entries =
+      option.state === 'missing' ? (appendImport(editable, option.toAdd).entries ?? []) : null;
+    const known = (entries ?? plan.entries).filter((e) => catalog.engineSkills.has(e.skillTypeID));
+    let steps: PlanStep[];
+    try {
+      steps = normalizePlanWithBoundaries(known, catalog.engineSkills, trainedSkills).steps;
+    } catch {
+      return;
+    }
+    const goal = evaluateFitGoal(need.needed, trainedLevels, steps);
+    if (!goal.anchor) return;
+    onUpdate({
+      ...(entries ? { entries } : {}),
+      milestones: upsertFitGoal(plan.milestones, { id: option.id, name: need.name }, goal.anchor),
+    });
+  }
+
   /** MilestoneModal's Save, for both 'add' and 'rename'. */
   function submitMilestoneModal(name: string) {
     if (!milestoneModal) return;
@@ -2162,6 +2259,11 @@ export function PlanEditor({
         {/* Plan Milestones (CONTEXT.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here
             instead of vanishing silently. */}
+        <div>
+          <Button size="sm" onClick={() => setFitGoalOpen(true)}>
+            {t('plans.fitGoal.add')}
+          </Button>
+        </div>
         {orphanedMilestones.length > 0 && (
           <div className="flex flex-wrap gap-2 text-xs">
             {orphanedMilestones.map((status) => (
@@ -2570,6 +2672,12 @@ export function PlanEditor({
         }}
       />
 
+      <FitGoalModal
+        open={fitGoalOpen}
+        options={fitGoalPickerOptions}
+        onClose={() => setFitGoalOpen(false)}
+        onPick={pickFitGoal}
+      />
       <MilestoneModal
         open={milestoneModal !== null}
         initialName={milestoneModal?.mode === 'rename' ? milestoneModal.currentName : undefined}

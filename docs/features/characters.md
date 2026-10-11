@@ -22,6 +22,24 @@ Route `/characters` (`src/routes/Characters.tsx`). The roster of every Character
 
 See which alts need attention (queue idle/ending, PI stopped, free job slots, alerts) and jump to one; manage the roster. Decisions: `20260907-092320-starred-characters-on-the-characters-page.md`, `20260909-130638-characters-table-view-mobile-scroll-roster-overview-split.md`, `20260925-230353-character-cards-gain-a-non-zero-attention-chip.md`, `20260927-071415-characters-table-gets-a-group-column-and-remove.md`, `20261005-202754-characters-table-remove-folds-into-the-row-menu.md`, `20260926-220722-character-removal-leaves-remote-data-to-the-inactivity.md`, `20260829-094708-multi-character-from-day-one.md`.
 
+- **Top jobs (ranked):** 1. "Which alt needs attention?" (queue idle or ending, PI stopped, free job slots, alerts). The attention scan in the table is the main reason to open the page: someone with 20 Characters scrolls the list and sees what is going on with each (owner, 2026-10-11). 2. "Switch to that Character and land back where I was" (#1764). 3. "Manage the roster": add, group, star, remove.
+- **Device and cadence:** desktop primary (owner, 2026-10-11). Phone parity: #1764 names "every multi-boxer on a phone" and made Characters a tab-bar choice; the table view scrolls sideways on a phone at the owner's request (`20260909-130638`). Characters answers "how is my whole roster doing", Overview the single Character (same decision). Cadence: likely per session.
+- **Above the fold:** the table: one dense row per Character with its attention columns (training, open job slots, PI, alerts), sticky name, sortable, scrollable for 20+ Characters; search and Add in the header. Cards are the default view (`Characters.tsx:1751`) and the choice is remembered per device (`charactersViewMode`), so a first visit opens on cards, not the scan view.
+- **Not for:** one Character's full state (Overview); changing a Character's grants (Settings › Permissions).
+- **Sources:** owner, 2026-10-11 (attention scan in the table is the main reason; desktop use); decisions above; #1764, #2318.
+- **Unconfirmed:** per-session cadence.
+
+### Mobbin brief
+
+- **Fit:** medium: an account roster with status chips, grouping and a switcher is generic; the attention signals are EVE-specific.
+- **Analog apps:** Vercel (projects dashboard), Netflix (profile picker), Slack (workspace switcher), Google (account switcher).
+- **Screen queries:**
+  - `web: dense table of accounts with a sticky name column, sortable numeric columns and status columns with countdowns`
+  - `web: grid of account cards each with avatar, name, organisation and status chips, starred cards first, with search and filter chips above`
+  - `ios: account switcher list that returns the user to the screen they came from after picking one`
+- **Flow queries:** `web: create a group and move items into it from each card's dropdown`
+- **Mobbin won't help with:** the attention signals themselves: a skill queue idle or ending, PI extractors stopped, free industry job slots. What counts as "needs attention" comes from EVE, not from an analog app.
+
 ## Controls
 
 Header: Refresh all icon (tooltip "Pulls live data for every character. This may take a moment for a large roster."; `aria-disabled` + spinner while running, guard in handler); Add split button: "Add" (icon only below `sm`) -> `beginAddCharacterLogin()` (whole Base Grant, not unioned with the active Character, #295); caret menu "Add with specific permissions..." -> `CustomizePermissionsDialog` (`auth-login.md`).
@@ -94,7 +112,9 @@ Modal copy states local deletion and that the synced copy stays. `removeCharacte
 - Row-menu "Alerts" sets active Character then opens a device-wide page without preselecting the alerts Character filter.
 - Refresh all shows one spinner only; no per-Character progress or failure marker (`handleRefreshAll`).
 - Re-adding an existing Character is a plain re-login with no account-wide backfill by design (`addCharacter.ts`).
+- Cards are the default view (`Characters.tsx:1751`), though the table's attention scan is the main reason to open the page (owner, 2026-10-11).
 
 ## Improvement ideas
 
+- Consider Table as the default view on desktop, or at some roster size (owner, 2026-10-11: the table scan is the main job).
 - Bulk select (group/remove/star), drag ordering, per-Character refresh and failure markers, Alpha/Omega and location on cards, sync groups and stars across devices.

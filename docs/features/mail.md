@@ -24,6 +24,28 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref
 | Data Age badge    | Header meta, from headers fetch                                                                     | `Mail.tsx:547`                                  |
 | Re-login banner   | 401/403 on mail endpoints                                                                           | `GrantBanner`                                   |
 
+## Purpose and user goal
+
+"Did anything come in that I need to read or answer?" A two-pane EVE mail client (`20260901-172427-mail-page-rebuild`). Replies, not compose-new, because answering a received mail is what pilots asked for (`20260921-014556`); one inbox over every Character is the headline ask from other tools (#2867).
+
+- **Top jobs (ranked):** 1. "What is unread, on which Character?" 2. "Read it." 3. "Reply or forward."
+- **Device and cadence:** desktop primary; reading at length is a desk session (owner, 2026-10-11). Phone parity: the `newMail` Notification Event routes here (`notifications.md`), so a tapped push opens it. Cadence: when new mail arrives.
+- **Above the fold:** folder chips with unread counts and search, then the list newest first with unread dots; on desktop the reader beside it.
+- **Not for:** writing new mail, mailing lists, labels (in game).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); `20260901-172427-mail-page-rebuild`, `20260907-125125` (both files), `20260921-014556`, `20260910-103051`; #155, #2867.
+- **Unconfirmed:** that most visits come from a notification.
+
+### Mobbin brief
+
+- **Fit:** high: almost all of it is a standard mail client.
+- **Analog apps:** Gmail, Superhuman, Apple Mail, Outlook, Hey.
+- **Screen queries:**
+  - `web: two-pane email client with folder filter chips and unread counts above a message list, the selected message open in a reading pane on the right`
+  - `web: unified inbox across several accounts with an account switcher showing an unread count per account`
+  - `ios: inbox list with unread dots, sender, subject and date, opening a message full screen with reply and forward buttons`
+- **Flow queries:** `ios: reply to an email inline with quoted text and an auto-saved draft`
+- **Mobbin won't help with:** EVE mail markup and sender standing tags.
+
 ## Page and states
 
 - Route `/mail`, no sub-tabs. Not in `PAGE_TABS`. Scope gate from `src/app/routeScopes.ts:204`: endpoints `getCharacterMailHeaders`, `getCharacterMail`, `postUniverseNames`; strings key `mail`.
