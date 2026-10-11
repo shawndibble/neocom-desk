@@ -208,7 +208,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - No page-specific keyboard shortcuts; only global `W`.
 - Help/FAQ (`features/help`, `features/faq`) say nothing about the Wallet page beyond the "what we store" list (wallet is among API-derived data cached locally, `settings.faq.store.local.esi`).
 - `/wallet` opens on Balance (first `WALLET_TABS` entry, `src/app/pageTabs.ts:99-106`), though the Journal is the main reason to open Wallet (owner, 2026-10-11).
-- The Character filter does not remember the last pick: it lives only in `?char=` and falls back to the Settings default on the next visit; nothing writes the pick back (`Wallet.tsx:200-216`, `characterFilterUrlParam.ts:10-13`). Same on Assets and Industry Jobs.
+- The Character filter remembers its last pick per page, on this device (`characterFilterPicks.ts`, key `characterFilterPicks`). Order on open: URL value, then this page's pick, then the synced Settings default (first visit only). A link's value is never remembered.
 
 ## Persistence and sync
 

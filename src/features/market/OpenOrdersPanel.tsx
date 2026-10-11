@@ -97,6 +97,7 @@ import {
   type OpenOrdersFilter,
   type OpenOrdersSort,
 } from './openOrdersFilter';
+import { useCharacterFilterPick } from '@/features/character/characterFilterPicks';
 import { useOpenOrdersLocationFilterPref } from './openOrdersLocationFilterPref';
 import { buildOpenOrdersView, isGroupFolded } from './openOrdersView';
 import type { OrderProblem } from '@/engine/market/orderProblems';
@@ -193,17 +194,39 @@ export function OpenOrdersPanel() {
   useEffect(() => {
     void hydrateRememberedLocationIds();
   }, [hydrateRememberedLocationIds]);
+  // `orders.characters` remembers the This character / All characters pick the
+  // same way the other pages do, then the synced Settings default. `'current'`
+  // is `[activeCharacterId]` here, so it keeps following the active Character.
+  const { pick: rememberedCharacterPick, remember: rememberCharacterPick } =
+    useCharacterFilterPick('orders');
+  const rememberedCharacterIds = useMemo<readonly number[]>(
+    () =>
+      rememberedCharacterPick === 'current' && activeCharacterId !== null
+        ? [activeCharacterId]
+        : [],
+    [rememberedCharacterPick, activeCharacterId]
+  );
   const remembered = useMemo(
     () => ({
-      values: { 'orders.locations': rememberedLocationIds },
+      values: {
+        'orders.locations': rememberedLocationIds,
+        'orders.characters': rememberedCharacterIds,
+      },
       remember: (patch: Partial<UrlParamValues<typeof OPEN_ORDERS_FILTER_PARAMS>>) => {
-        if (!('orders.locations' in patch)) return;
-        void useOpenOrdersLocationFilterPref
-          .getState()
-          .setValue(patch['orders.locations'] as readonly number[]);
+        if ('orders.locations' in patch) {
+          void useOpenOrdersLocationFilterPref
+            .getState()
+            .setValue(patch['orders.locations'] as readonly number[]);
+        }
+        const characterIds = patch['orders.characters'] as readonly number[] | undefined;
+        if (characterIds) {
+          void rememberCharacterPick(
+            characterIds.length === 1 && characterIds[0] === activeCharacterId ? 'current' : 'all'
+          );
+        }
       },
     }),
-    [rememberedLocationIds]
+    [rememberedLocationIds, rememberedCharacterIds, rememberCharacterPick, activeCharacterId]
   );
   const [params, setParams] = useRememberedUrlParams(OPEN_ORDERS_FILTER_PARAMS, remembered);
   const filter = useMemo(

@@ -57,17 +57,16 @@ import {
 import { MovePlanTab } from '@/features/assets/MovePlanTab';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
-  fromStoredCharacterFilterValue,
   useResolvedCharacterFilter,
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
-import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { MyShipsView } from '@/features/character/MyShipsView';
-import { useUrlParams } from '@/lib/useUrlState';
+import { useRememberedUrlParams } from '@/lib/useUrlState';
 import { boolParam, textParam } from '@/lib/urlState';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
@@ -156,6 +155,12 @@ const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_PARAM = textParam();
 const ALL_ITEMS_PARAM = boolParam();
 const MIN_VALUE_PARAM = textParam();
+const ASSETS_VIEW_PARAMS = {
+  q: SEARCH_PARAM,
+  all: ALL_ITEMS_PARAM,
+  min: MIN_VALUE_PARAM,
+  chars: characterFilterParam('current'),
+};
 
 /**
  * A drill-down href that keeps the page's whole query string: its filters
@@ -684,26 +689,15 @@ export function Assets() {
   const { search: query } = useLocation();
 
   // Cross-character search (issue #746, replacing issue #85's binary toggle):
-  // `'current'` by default (today's old off-state, no extra fan-out), or
-  // `'all'` once the pilot asks via `CharacterFilterControl` — same picker
-  // Wallet Balance and Industry Active Jobs already use. The URL wins;
-  // absent, the synced Settings default applies. Nothing here is written
-  // back to that setting.
-  const defaultCharacterFilter = useDefaultCharacterFilter((s) => s.value);
-  const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateDefaultCharacterFilter();
-  }, [hydrateDefaultCharacterFilter]);
-  const viewParams = useMemo(
-    () => ({
-      q: SEARCH_PARAM,
-      all: ALL_ITEMS_PARAM,
-      min: MIN_VALUE_PARAM,
-      chars: characterFilterParam(fromStoredCharacterFilterValue(defaultCharacterFilter)),
-    }),
-    [defaultCharacterFilter]
+  // `'current'` (today's old off-state, no extra fan-out) or `'all'` once the
+  // pilot asks via `CharacterFilterControl`. The URL wins; absent, this page's
+  // remembered pick, then the synced Settings default. A link's value is never
+  // remembered; only a change to the control is.
+  const rememberedCharacterFilter = useRememberedCharacterFilter<typeof ASSETS_VIEW_PARAMS>(
+    'assets',
+    'chars'
   );
-  const [view, setView] = useUrlParams(viewParams);
+  const [view, setView] = useRememberedUrlParams(ASSETS_VIEW_PARAMS, rememberedCharacterFilter);
   const search = view.q;
   const setSearch = (q: string) => setView({ q });
   const searchActive = search.trim().length > 0;

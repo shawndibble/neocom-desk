@@ -10,6 +10,7 @@ import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import type { TypeMap } from '@/sde/types';
@@ -111,6 +112,7 @@ async function seed() {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
+  useCharacterFilterPicks.setState({ value: {}, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({

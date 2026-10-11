@@ -424,8 +424,7 @@ Realized profit (`engine/industry/realizedProfit.ts`): total cost = material + j
 - Jobs list has no history, no row action beyond Log production, no ETA/queue planning.
 - Records has no item/plan search, no Character-account total, and no corp dimension.
 - Ranking on Market-Wide can silently omit products whose prices failed (unpriced material excluded, not listed).
-- The Jobs Character filter does not remember the last pick: it lives only in `jobs.chars` and falls back to the Settings default on the next visit; nothing writes it back (`ActiveJobsPanel.tsx:280-296`, `characterFilterUrlParam.ts:10-13`). Same on Assets and Wallet.
-- Opportunities' Character filter ignores the Settings default: it is hard-coded to `current` (`OpportunitiesPanel.tsx:120`, `opps.chars`), unlike the Jobs panel.
+- The Character filter remembers its last pick per page, on this device (`characterFilterPicks.ts`, key `characterFilterPicks`). Order on open: URL value, then this page's pick, then the synced Settings default (first visit only). A link's value is never remembered. Jobs and Opportunities each keep their own.
 
 ## 20. Improvement ideas
 

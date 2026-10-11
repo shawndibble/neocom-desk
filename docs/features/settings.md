@@ -141,11 +141,11 @@ Same form lives in the Tax tab's settings modal; there the auto-continue toggle 
 
 ### Characters (`/settings/characters`)
 
-| Setting                                                                 | Control                                                                                                              | Default   | Key                                                                              | Sync |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------- | ---- |
-| Default character filter (Wallet Balance, Industry Active Jobs, Assets) | `CharacterFilterControl` field: This character / All characters (`'current' \| 'all'`, `characterFilterValue.ts:21`) | `current` | `sync.defaultCharacterFilter` (legacy `number[]` still readable, reads as `all`) | Yes  |
-| SP extraction monitoring (Characters table SP-ready column + alert)     | checkbox                                                                                                             | off       | `sync.spExtractionMonitoringEnabled`                                             | Yes  |
-| Spare-SP threshold (only when enabled)                                  | number, step 500,000, min 500,000, rounds to int, ignores <=0                                                        | 500,000   | `sync.spExtractionThresholdSp`                                                   | Yes  |
+| Setting                                                                                                                                                               | Control                                                                                                              | Default   | Key                                                                              | Sync |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------- | ---- |
+| Default character filter (first-visit choice for Wallet Balance, Industry Active Jobs and Opportunities, Assets, Open Orders; each page then remembers its last pick) | `CharacterFilterControl` field: This character / All characters (`'current' \| 'all'`, `characterFilterValue.ts:21`) | `current` | `sync.defaultCharacterFilter` (legacy `number[]` still readable, reads as `all`) | Yes  |
+| SP extraction monitoring (Characters table SP-ready column + alert)                                                                                                   | checkbox                                                                                                             | off       | `sync.spExtractionMonitoringEnabled`                                             | Yes  |
+| Spare-SP threshold (only when enabled)                                                                                                                                | number, step 500,000, min 500,000, rounds to int, ignores <=0                                                        | 500,000   | `sync.spExtractionThresholdSp`                                                   | Yes  |
 
 Hint: SP above the 5,000,000 floor counts; one extractor = 500,000 SP.
 
@@ -349,7 +349,7 @@ Rate limits: Settings makes no ESI calls except corp roles (cached 1 h) and Upda
 - Corp pages ignore the time-format preference in places (Members "Joined" uses `toLocaleDateString`; Deadline Strip buckets local days).
 - Foreground poller cadence in code is 5 min (`foregroundPoller.ts:59`) vs the "ten-minute cadence" quoted in decision `20260903-155950` (stale text).
 - No test exercises a cross-device pull re-rendering an already-open Settings form (only store-level pull test in `useSyncedSetting.test.ts`).
-- The default Character filter is the only memory the Character filter has: a pick on Assets, Wallet or Industry Jobs lives in that page's URL and is never written back (`characterFilterUrlParam.ts:10-13`), so the next visit reopens on this default, not the last pick. Opportunities ignores the default (`OpportunitiesPanel.tsx:120`). The owner wants the last pick remembered (owner, 2026-10-11; see `assets.md`).
+- The default Character filter only seeds a page's first visit. After that each page (Assets, Wallet, Industry Jobs, Opportunities, Open Orders) remembers its own last pick on this device (`characterFilterPicks.ts`); the URL still wins.
 
 ## Improvement ideas
 

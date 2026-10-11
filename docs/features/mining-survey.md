@@ -4,18 +4,17 @@ Route `/mining/survey` (the third Mining tab) and, for anyone with the link, `/s
 
 User goal: paste the in-game Survey Scanner results and see how much of the field is mined, how fast, and when it will be gone; post that to fleet chat in one tap; let other pilots watch and keep it updated, with no login.
 
-| Piece                                       | Where                                                                                 |
-| ------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Tab, adopts `?survey=<id>`, routed paste    | `src/features/survey/SurveyTab.tsx`                                                   |
-| Board: stats, charts, ores, buttons         | `SurveyBoard.tsx`                                                                     |
-| Charts (lazy Recharts): volume by ore, rate | `SurveyCharts.tsx`, `surveyTones.ts`                                                  |
-| Public page, listens for paste itself       | `SurveyShareScreen.tsx`, case `survey` in `src/routes/SharedLink.tsx`                 |
-| Store, polling hook, current-survey pref    | `surveyStore.ts`, `useSurvey.ts`, `surveyPref.ts`                                     |
-| Parse, series maths, chat message, ticks    | `src/engine/survey/`                                                                  |
-| Your share: ledger read, system pref, line  | `yourShare.ts` (engine), `useYourShare.ts`, `surveySystemPref.ts`, `YourShareRow.tsx` |
-| Copy chat message split button              | `SurveyCopyButton.tsx`                                                                |
-| Paste routing                               | `survey` detector in `src/engine/import/pasteDestination.ts`                          |
-| Rules and TTL                               | `firestore.rules` (`shares/{id}/surveyScans`), `firestore.indexes.json`               |
+| Piece                                       | Where                                                                   |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| Tab, adopts `?survey=<id>`, routed paste    | `src/features/survey/SurveyTab.tsx`                                     |
+| Board: stats, charts, ores, buttons         | `SurveyBoard.tsx`                                                       |
+| Charts (lazy Recharts): volume by ore, rate | `SurveyCharts.tsx`, `surveyTones.ts`                                    |
+| Public page, listens for paste itself       | `SurveyShareScreen.tsx`, case `survey` in `src/routes/SharedLink.tsx`   |
+| Store, polling hook, current-survey pref    | `surveyStore.ts`, `useSurvey.ts`, `surveyPref.ts`                       |
+| Parse, series maths, chat message, ticks    | `src/engine/survey/`                                                    |
+| Copy chat message split button              | `SurveyCopyButton.tsx`                                                  |
+| Paste routing                               | `survey` detector in `src/engine/import/pasteDestination.ts`            |
+| Rules and TTL                               | `firestore.rules` (`shares/{id}/surveyScans`), `firestore.indexes.json` |
 
 ## Purpose and user goal
 
