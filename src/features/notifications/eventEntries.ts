@@ -31,6 +31,11 @@
  * React, DOM, Dexie or fetch here either.
  */
 import {
+  diffStockBelowTarget,
+  type StockAlertSnapshot,
+  type StockBelowTargetFire,
+} from '@/engine/stockTargets/stockAlert';
+import {
   SKILL_QUEUE_NOTIFICATION_DIFFS,
   diffSpExtractionReady,
   diffCloneJumpReady,
@@ -112,6 +117,7 @@ import {
   corpRosterCopy,
   corpWalletCopy,
   priceAlertCopy,
+  stockBelowTargetCopy,
   type DomainCopy,
   type NoNames,
   type SkillNames,
@@ -145,7 +151,8 @@ export type AnyNotificationFire =
   | CorpMemberJoinedFire
   | CorpMemberLeftFire
   | CorpWalletThresholdFire
-  | PriceAlertTriggeredFire;
+  | PriceAlertTriggeredFire
+  | StockBelowTargetFire;
 
 /* -------------------------------------------------------------------------- */
 /* Snapshot sources                                                            */
@@ -185,6 +192,7 @@ export const SNAPSHOT_SOURCES = {
   corpRoster: source<CorpRosterSnapshot, MemberNames>('corpRoster'),
   corpWallet: source<CorpWalletSnapshot>('corpWallet'),
   priceAlert: source<PriceAlertSnapshot>('priceAlert'),
+  stockTargets: source<StockAlertSnapshot>('stockTargets'),
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -506,6 +514,14 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     source: SNAPSHOT_SOURCES.priceAlert,
     diff: diffPriceAlertTriggered,
     copy: priceAlertCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  stockBelowTarget: defineEvent({
+    source: SNAPSHOT_SOURCES.stockTargets,
+    diff: diffStockBelowTarget,
+    copy: stockBelowTargetCopy,
     projection: null,
     thresholds: null,
     rowHintKey: null,

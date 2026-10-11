@@ -22,6 +22,7 @@ import { usePiPlannable } from '@/features/pi/usePiPlannable';
 import { piPlanHref } from '@/features/pi/piPlanLink';
 import { useCompareSet } from './compareSet';
 import { useItemActions } from './itemActions';
+import { StockTargetDialog } from '@/features/stockTargets/StockTargetDialog';
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
@@ -41,6 +42,8 @@ export interface ItemContextMenuProps {
   onCompareVariations?: () => void;
   /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
   onViewInIndustryAsMaterial?: () => void;
+  /** Leaves out "Set stock target…" where the page already edits the Stock Target in place (Assets › Targets). */
+  hideStockTarget?: boolean;
   /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
   extraItems?: ReactNode;
   /** A right-click or hold on a link in the row stays the browser's (`RowActionsMenu`'s `linksKeepBrowserMenu`). */
@@ -138,7 +141,7 @@ export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
  * family it lands in. `onAlertRequest` opens the caller's own
  * `PriceAlertDialog`.
  *
- * Add to Quickbar, show info, add to Compare, view in
+ * Add to Quickbar, set a price alert or a stock target, show info, add to Compare, view in
  * Market, copy name, jump to a Build Plan, jump to a PI Plan.
  *
  * The PI action asks for itself rather than going through the page's Item
@@ -150,7 +153,11 @@ export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
  * have expected otherwise. Nothing renders while the answer is unknown, so
  * the row never appears under a cursor already in the menu.
  */
-function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): ReactNode {
+function useItemMenuItems(
+  props: ItemMenuProps,
+  onAlertRequest: () => void,
+  onStockTargetRequest: () => void
+): ReactNode {
   const {
     typeId,
     itemName,
@@ -190,6 +197,9 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
         </DisabledMenuItem>
       )}
       <PriceAlertMenuItem typeId={typeId} available={canAddToQuickbar} onSelect={onAlertRequest} />
+      {!props.hideStockTarget && (
+        <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
+      )}
       <ShowInfoMenuItem typeId={typeId} itemName={itemName} />
       <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
         {t('market.contextMenu.addToCompare')}
@@ -235,7 +245,12 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
 export function ItemContextMenu(props: ItemContextMenuProps) {
   const { typeId, itemName, linksKeepBrowserMenu, children } = props;
   const [alertOpen, setAlertOpen] = useState(false);
-  const items = useItemMenuItems(props, () => setAlertOpen(true));
+  const [stockOpen, setStockOpen] = useState(false);
+  const items = useItemMenuItems(
+    props,
+    () => setAlertOpen(true),
+    () => setStockOpen(true)
+  );
   const { requestBlueprints } = useItemActions();
 
   return (
@@ -253,6 +268,13 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       {alertOpen && (
         <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
       )}
+      {stockOpen && (
+        <StockTargetDialog
+          typeId={typeId}
+          itemName={itemName}
+          onClose={() => setStockOpen(false)}
+        />
+      )}
     </>
   );
 }
@@ -266,7 +288,12 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
 export function ItemMoreActions(props: ItemMenuProps) {
   const { typeId, itemName } = props;
   const [alertOpen, setAlertOpen] = useState(false);
-  const items = useItemMenuItems(props, () => setAlertOpen(true));
+  const [stockOpen, setStockOpen] = useState(false);
+  const items = useItemMenuItems(
+    props,
+    () => setAlertOpen(true),
+    () => setStockOpen(true)
+  );
 
   return (
     <>
@@ -275,6 +302,13 @@ export function ItemMoreActions(props: ItemMenuProps) {
       </RowActionsContext.Provider>
       {alertOpen && (
         <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
+      )}
+      {stockOpen && (
+        <StockTargetDialog
+          typeId={typeId}
+          itemName={itemName}
+          onClose={() => setStockOpen(false)}
+        />
       )}
     </>
   );

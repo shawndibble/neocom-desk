@@ -107,6 +107,8 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   // fixing it (issue #1423) — same tier as the fuel/wallet standing faults
   // above, not critical.
   marketOrderUndercut: 'warning',
+  // A shelf running empty (issue #3521): a standing fault, not yet a loss.
+  stockBelowTarget: 'warning',
   // Waiting on you, but nothing is burning.
   spExtractionReady: 'watch',
   industryJobComplete: 'watch',

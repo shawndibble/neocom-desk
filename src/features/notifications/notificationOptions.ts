@@ -98,6 +98,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // not `HIGHLIGHT_PARAM`: Market Browser selects an item by that param on
   // load rather than pulsing a table row.
   priceAlertTriggered: '/market/browser',
+  stockBelowTarget: '/market/stock',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';
@@ -183,6 +184,9 @@ const SUBJECT_URLS: Partial<Record<NotificationEventId, SubjectUrl>> = {
   // The item itself, selected via Market Browser's own `?type=` param rather
   // than a pulsed table row — there is no table on arrival to pulse.
   priceAlertTriggered: (base, subjectId) => withParam(base, 'type', String(subjectId)),
+  // The market the item ran low at, by its station or structure: the Stock
+  // tab's `?market=` opens the list kept there.
+  stockBelowTarget: (base, subjectId) => withParam(base, 'market', String(subjectId)),
   // The wallet division the threshold tripped on, selected via Corp Wallet's
   // own `?division=` param — the balance or journal it is about is that
   // division's.

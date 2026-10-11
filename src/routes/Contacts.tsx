@@ -1070,15 +1070,19 @@ export function Contacts() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  // One Character's roster has nothing to compare against, so no "Across characters" tab.
+  // `across` is a scope of the contacts list, picked by the header's This character /
+  // All characters control, not a tab of its own (its path stays, so links keep working).
+  const shownTab = tab === 'standings' ? 'standings' : 'character';
   const tabBar = (
     <Tabs
       tabsId={tabsId}
       label={t('contacts.title')}
-      value={view === 'across' ? 'across' : tab === 'standings' ? 'standings' : 'character'}
-      onChange={(id) => setTab(id as typeof tab)}
+      value={shownTab}
+      onChange={(id) =>
+        setTab(id === 'character' && view === 'across' ? 'across' : (id as typeof tab))
+      }
       tabs={tabBarTabs(CONTACTS_TABS)
-        .filter((item) => item.id !== 'across' || acrossLists.length > 1)
+        .filter((item) => item.id !== 'across')
         .map((item) => ({ id: item.id, label: t(item.labelKey) }))}
     />
   );
@@ -1132,7 +1136,7 @@ export function Contacts() {
 
       {tabBar}
 
-      <TabPanel tabsId={tabsId} tabId={tab} className="space-y-4">
+      <TabPanel tabsId={tabsId} tabId={shownTab} className="space-y-4">
         {tab === 'standings' ? (
           standings.content
         ) : (

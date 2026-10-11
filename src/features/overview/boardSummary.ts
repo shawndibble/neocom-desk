@@ -20,6 +20,7 @@
  * `alertGroupLabel` is, because a row that returned a key would leave each
  * call site to remember which of these need a `count` and which do not.
  */
+import type { StockBoardData } from '@/features/stockTargets/stockBoard';
 import { formatIskCompact } from '@/lib/isk';
 import { isJobDone } from '@/features/industry/jobs';
 import { needsAttentionCount, openOrderProblemCounts } from '@/features/market/openOrdersModel';
@@ -216,6 +217,13 @@ export function priceAlertsSummary(t: Translate, data: PriceAlertsBoardData | nu
     return t('overview.board.priceAlertsWatching', { count: data.alerts.length });
   }
   return t('overview.board.priceAlertsNone');
+}
+
+export function stockBoardSummary(t: Translate, data: StockBoardData | null): string {
+  if (data === null || !data.counted) return t(CHECKING);
+  const { out, low } = data.totals;
+  if (out > 0 || low > 0) return t('overview.board.stockSummary', { out, low });
+  return t('overview.board.stockAllStocked');
 }
 
 export function structuresSummary(t: Translate, data: StructuresView | null): string {

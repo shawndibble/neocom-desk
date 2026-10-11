@@ -106,6 +106,7 @@ import {
   StructuresCard,
   PriceAlertsCard,
   IncursionsCard,
+  StockCard,
   SpExtractionCard,
   EverythingElseCard,
   IndustryCard,
@@ -150,6 +151,7 @@ import {
   ordersSummary,
   planetarySummary,
   priceAlertsSummary,
+  stockBoardSummary,
   spExtractionSummary,
 } from '@/features/overview/boardSummary';
 import { severityForRemaining, worstSeverity } from '@/engine/severity';
@@ -158,6 +160,10 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { isJobDone } from '@/features/industry/jobs';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { sortQueueEntries, selectActiveEntryFromSorted, selectQueueDepth } from './overviewQueue';
+import { loadStockBoard, stockBoardSeverity } from '@/features/stockTargets/stockBoard';
+
+/** Stock Lists are account-wide: the card reads the same lists for every Character. */
+const loadStockBoardFor = () => loadStockBoard();
 
 /** A card as the route declares it: the layout's spec plus what the page renders. */
 interface RouteCard extends BoardCardSpec {
@@ -312,6 +318,9 @@ export function Overview() {
   });
   const priceAlertsSnapshot = useRouteSnapshot(loadPriceAlertsBoard, undefined, {
     cacheKey: 'overview:price-alerts',
+  });
+  const stockSnapshot = useRouteSnapshot(loadStockBoardFor, undefined, {
+    cacheKey: 'overview:stock',
   });
   const structuresSnapshot = useRouteSnapshot(loadStructuresBoard, undefined, {
     cacheKey: 'overview:structures',
@@ -682,6 +691,18 @@ export function Overview() {
       render: () => <IncursionsCard data={incursions} />,
     },
     {
+      key: 'stock',
+      placement: 'card',
+      to: '/market/stock',
+      // Off the board until the pilot keeps a Stock List: a card about an
+      // empty feature would only say "set one up".
+      available: stockSnapshot.data !== null,
+      severity: stockBoardSeverity(stockSnapshot.data),
+      summary: stockBoardSummary(t, stockSnapshot.data),
+      loading: stockSnapshot.loading,
+      render: () => <StockCard data={stockSnapshot.data} />,
+    },
+    {
       key: 'alerts',
       placement: 'column',
       to: '/alerts',
@@ -797,6 +818,7 @@ export function Overview() {
             calendarSnapshot,
             mailSnapshot,
             priceAlertsSnapshot,
+            stockSnapshot,
             structuresSnapshot,
             moonSnapshot,
           ]) {

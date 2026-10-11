@@ -196,6 +196,7 @@ describe('loadAllCharactersAssets (issue #181)', () => {
 
     expect(entries.map((e) => e.characterId).sort()).toEqual([CHAR_ID, OTHER_ID, THIRD_ID]);
     expect(entries.every((e) => e.truncated === false)).toBe(true);
+    expect(entries.every((e) => e.fetchedAt instanceof Date)).toBe(true);
     expect(skipped).toEqual([]);
   });
 

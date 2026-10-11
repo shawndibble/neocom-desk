@@ -1,6 +1,6 @@
 # Contacts
 
-`/contacts` (This character) and `/contacts/across` (All characters). Nav: Social group, scope-gated, phone tab, `tablessNav` (the nav and command palette list the page only; the two views are one in-page control). Read-only view of the in-game contact list with standings, affiliation, labels, blocked/watched flags, plus a cross-Character comparison. No add/edit/delete contact, no standings editing.
+`/contacts` (This character) and `/contacts/across` (All characters). Nav: Social group, scope-gated, phone tab, `tablessNav` (the nav and command palette list the page only; the This character / All characters scope is one in-page control, not tabs; the tab bar is just Contacts and Standings). Read-only view of the in-game contact list with standings, affiliation, labels, blocked/watched flags, plus a cross-Character comparison. No add/edit/delete contact, no standings editing.
 
 User goal: "who do I have standing with, who is blocked/watched, and do my alts agree?"
 

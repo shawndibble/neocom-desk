@@ -27,6 +27,7 @@ export const OVERVIEW_CARD_KEYS = [
   'mail',
   'priceAlerts',
   'incursions',
+  'stock',
   'alerts',
 ] as const;
 
@@ -49,6 +50,7 @@ export const OVERVIEW_CARD_LABEL: Record<OverviewCardKey, string> = {
   mail: 'overview.board.mail',
   priceAlerts: 'overview.board.priceAlerts',
   incursions: 'overview.board.incursions',
+  stock: 'overview.board.stock',
   alerts: 'overview.board.alerts',
 };
 
