@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -49,14 +49,27 @@ function renderPage(path = '/communities') {
   );
 }
 
-beforeEach(async () => {
+async function seed() {
   Object.values(store).forEach((fn) => fn.mockReset());
   store.loadMyCommunities.mockResolvedValue([]);
   store.loadCommunityMembers.mockResolvedValue(members);
   await db.characters.clear();
   await db.characters.put({ characterId: ME, name: 'Me', ownerHash: 'h', addedAt: 1 });
   useActiveCharacter.setState({ activeCharacterId: ME, hydrated: true });
-});
+}
+
+// The worker's first render of the page, its dialogs and its Toast pays the
+// cold module load; do it once here, under its own timeout, so it never lands
+// on whichever test happens to run first.
+beforeAll(async () => {
+  await seed();
+  store.loadMyCommunities.mockResolvedValue([community()]);
+  const view = renderPage('/communities?community=c1');
+  await screen.findByRole('button', { name: c.copyLink });
+  view.unmount();
+}, 30_000);
+
+beforeEach(seed);
 
 describe('Communities page', () => {
   it('shows the empty state when the Character is in no Community', async () => {
