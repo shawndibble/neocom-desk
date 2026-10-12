@@ -44,6 +44,7 @@ import type { CharacterFilterValue } from '@/features/character/characterFilterV
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { loadContacts } from '@/features/character/contacts';
 import { MailComposeBox } from '@/features/character/MailComposeBox';
+import { MailBodyView } from '@/features/character/MailBodyView';
 import {
   buildContactStandingIndex,
   type ContactStandingIndex,
@@ -1137,7 +1138,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                       shipped at the smallest size in the dimmest readable
                       tier. `break-words` so an unbroken URL cannot push the
                       pane sideways. */}
-                  <p className="text-sm whitespace-pre-wrap text-text break-words">{bodyText}</p>
+                  <MailBodyView text={bodyText} />
 
                   {composeKind !== null && selectedRow !== null && (
                     <MailComposeBox
