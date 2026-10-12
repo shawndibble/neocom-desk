@@ -27,11 +27,15 @@ export function usePublishSharedLibraries(
       sweeping = true;
       try {
         const { publishAllSharedLibraries } = await import('./libraryPush');
+        const { syncAllSharedPlans } = await import('./sharedPlans');
         const ordered = [...characterIds].sort(
           (a, b) => Number(a === activeCharacterId) - Number(b === activeCharacterId)
         );
         for (const id of ordered) {
-          if (await hasShareSelections([id])) await publishAllSharedLibraries(id);
+          if (await hasShareSelections([id])) {
+            await publishAllSharedLibraries(id);
+            await syncAllSharedPlans(id);
+          }
         }
       } catch {
         // Offline or signed out: the next sweep retries.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -25,6 +25,14 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import { newPlan } from './newPlan';
 import { certifiedPlanRecord, type TrainedLevels } from './certifiedPlan';
 import { CertifiedPlanDialog } from './CertifiedPlanDialog';
+import type { PlanEntry } from '@/engine/types';
+
+// Firebase stays out of the Skills bundle until a pilot opens the Community browse.
+const CommunityPlansDialog = lazy(() =>
+  import('@/features/communities/CommunityPlansDialog').then((m) => ({
+    default: m.CommunityPlansDialog,
+  }))
+);
 import type { CertifiedPlan } from '@/sde/types';
 import { PlanList, type PlanRowStats } from './PlanList';
 import { schedulePlan, type PlanScheduleInputs } from './planSchedule';
@@ -146,6 +154,10 @@ export function PlanListPane({
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [certifiedOpen, setCertifiedOpen] = useState(false);
+  // `?browse=community` (the Community page's link) opens the browse straight away.
+  const [communityOpen, setCommunityOpen] = useState(
+    () => new URLSearchParams(location.search).get('browse') === 'community'
+  );
   const newPlanMenu = useOpenAfterMenu();
 
   // Named after the certified plan already, so no rename-on-arrival flag.
@@ -164,6 +176,17 @@ export function PlanListPane({
     await db.skillPlans.add(plan);
     syncAfterEdit();
     setCertifiedOpen(false);
+    navigate(`/skills/plans/${plan.id}`);
+  }
+
+  async function handleCreateFromCommunity(shared: { name: string; entries: PlanEntry[] }) {
+    const plan = {
+      ...newPlan(activeCharacterId, shared.name, remapInfo?.available ?? 0),
+      entries: shared.entries,
+    };
+    await db.skillPlans.add(plan);
+    syncAfterEdit();
+    setCommunityOpen(false);
     navigate(`/skills/plans/${plan.id}`);
   }
 
@@ -240,6 +263,9 @@ export function PlanListPane({
               <DropdownMenuItem onSelect={() => newPlanMenu.run(() => setCertifiedOpen(true))}>
                 {t('plans.fromCertifiedItem')}
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => newPlanMenu.run(() => setCommunityOpen(true))}>
+                {t('plans.fromCommunityItem')}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -253,6 +279,15 @@ export function PlanListPane({
           }
           onClose={() => setCertifiedOpen(false)}
         />
+      )}
+      {communityOpen && (
+        <Suspense fallback={null}>
+          <CommunityPlansDialog
+            characterId={activeCharacterId}
+            onCopy={(shared) => void handleCreateFromCommunity(shared)}
+            onClose={() => setCommunityOpen(false)}
+          />
+        </Suspense>
       )}
       {showImplantsNote && (
         <div className="border-b border-line px-3 empty:hidden">

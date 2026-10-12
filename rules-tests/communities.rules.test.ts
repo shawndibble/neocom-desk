@@ -283,6 +283,80 @@ describe('join requests', () => {
   });
 });
 
+describe('shared Skill Plans', () => {
+  const PLAN_1 = `${C}/skillPlans/char:1~plan-a1`;
+  const plan = (over: Record<string, unknown> = {}) => ({
+    ownerHash: 'hash-1',
+    ownerUid: 'char:1',
+    name: 'Marauder',
+    entries: [3300, 5, 1, 3301, 3, 2],
+    sourceUpdatedAt: 1000,
+    updatedAt: serverTimestamp(),
+    ...over,
+  });
+
+  it('lets a Member list and read them, and nobody else', async () => {
+    const member = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(getDocs(collection(member, `${C}/skillPlans`)));
+    const outsider = characterAuth(env, 3, 'hash-3').firestore();
+    await assertFails(getDocs(collection(outsider, `${C}/skillPlans`)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), PLAN_1)));
+  });
+
+  it('lets a Member write, re-push and delete their own', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertSucceeds(setDoc(doc(db, PLAN_1), plan()));
+    await assertSucceeds(setDoc(doc(db, PLAN_1), plan({ sourceUpdatedAt: 2000 })));
+    await assertSucceeds(deleteDoc(doc(db, PLAN_1)));
+  });
+
+  it('denies writing or deleting under another Member’s id', async () => {
+    const db = characterAuth(env, 2, 'hash-2').firestore();
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ ownerHash: 'hash-2', ownerUid: 'char:2' })));
+    await assertFails(deleteDoc(doc(db, PLAN_1)));
+  });
+
+  it('denies an id that is not <uid>~<plan id>', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, `${C}/skillPlans/plain`), plan()));
+    await assertFails(setDoc(doc(db, `${C}/skillPlans/char:1~a~b`), plan()));
+    await assertFails(setDoc(doc(db, `${C}/skillPlans/char:1~`), plan()));
+  });
+
+  it('denies a non-Member and a transferred Character writing', async () => {
+    await assertFails(
+      setDoc(
+        doc(characterAuth(env, 3, 'hash-3').firestore(), `${C}/skillPlans/char:3~p`),
+        plan({ ownerHash: 'hash-3', ownerUid: 'char:3' })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(characterAuth(env, 1, 'hash-1-new-owner').firestore(), PLAN_1),
+        plan({ ownerHash: 'hash-1-new-owner' })
+      )
+    );
+  });
+
+  it('denies a forged owner, extra fields and a forged time', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ ownerHash: 'forged' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ ownerUid: 'char:2' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ notes: 'private' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ updatedAt: 5 })));
+  });
+
+  it('denies an empty or oversized name, entries that are not whole triples, and wrong types', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ name: '' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ name: 'x'.repeat(201) })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ entries: [1, 2] })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ entries: new Array(1503).fill(1) })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ entries: 'nope' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ sourceUpdatedAt: 'now' })));
+  });
+});
+
 describe('shared Fittings', () => {
   const FIT_1 = `${C}/fittings/char:1~saved-a1`;
   const fit = (over: Record<string, unknown> = {}) => ({

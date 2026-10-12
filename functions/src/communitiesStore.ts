@@ -36,6 +36,7 @@ import {
 const LIBRARY_COLLECTION = 'library';
 const REQUESTS_COLLECTION = 'requests';
 const FITTINGS_COLLECTION = 'fittings';
+const SKILL_PLANS_COLLECTION = 'skillPlans';
 
 /** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */
 export interface CallerCharacter {
@@ -369,7 +370,7 @@ export async function decideJoinRequest(
 
 /**
  * Everything one Member shared into a Community: their blueprint library
- * chunks and their shared Fittings (issue #3605). Every delete-on-leave path
+ * chunks, their shared Fittings (issue #3605) and their shared Skill Plans. Every delete-on-leave path
  * goes through this so a new kind of shared data can't be missed in one.
  */
 async function deleteMemberShares(db: Firestore, communityId: string, uid: string): Promise<void> {
@@ -378,9 +379,13 @@ async function deleteMemberShares(db: Firestore, communityId: string, uid: strin
     .collection(FITTINGS_COLLECTION)
     .where('ownerUid', '==', uid)
     .get();
+  const plans = await communityRef(db, communityId)
+    .collection(SKILL_PLANS_COLLECTION)
+    .where('ownerUid', '==', uid)
+    .get();
   const writer = db.bulkWriter();
   // Awaited, so a delete that fails after its retries fails the leave rather than orphaning a readable copy.
-  const deletes = fittings.docs.map((fitting) => writer.delete(fitting.ref));
+  const deletes = [...fittings.docs, ...plans.docs].map((shared) => writer.delete(shared.ref));
   await writer.close();
   await Promise.all(deletes);
 }
