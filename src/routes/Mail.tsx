@@ -260,7 +260,7 @@ interface MailViewProps {
   scopeControl: ReactNode;
 }
 
-/** Mail's two-pane client for one scope: list beside reading pane, each scrolling independently (GLOSSARY.md round 18). */
+/** Mail's two-pane client for one scope: list beside reading pane, the list scrolls on its own, the reading pane grows with the page (docs/context/decisions/20261012-161659-mail-reading-pane-scrolls-with-the-page-not.md). */
 function MailView({ scope, scopeControl }: MailViewProps) {
   const { t } = useTranslation();
   const isAll = scope === 'all';
@@ -1076,7 +1076,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                   <EmptyState title={t('mail.emptyTitle')} className="py-4" />
                 </div>
               ) : (
-                <div className="min-w-0 space-y-2 overflow-x-auto text-xs">
+                <div className="min-w-0 space-y-2 text-xs">
                   <h3
                     ref={(el) => {
                       readerHeadingRef.current = el;

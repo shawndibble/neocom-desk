@@ -11,7 +11,7 @@ import { cx } from '@/lib/cx';
 export function MailBodyView({ text }: { text: string }) {
   const blocks = useMemo(() => splitMailBody(text), [text]);
   return (
-    <div className="text-sm text-text break-words space-y-2">
+    <div className="min-w-0 space-y-2 overflow-x-auto text-sm text-text break-words">
       {blocks.map((block, index) =>
         block.kind === 'text' ? (
           <p key={index} className="whitespace-pre-wrap">
