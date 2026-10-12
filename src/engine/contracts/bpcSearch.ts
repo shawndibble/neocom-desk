@@ -111,7 +111,7 @@ function priceForMaxFilter(row: BpcContractRow): number | null {
 }
 
 /** Where a unified row came from. `market` = a region's BPO sell order (issue #1241); `lp` = a blueprint copy an LP store the pilot holds points with hands out. */
-export type BpcSearchSource = 'contract' | 'owned' | 'market' | 'lp';
+export type BpcSearchSource = 'contract' | 'owned' | 'market' | 'lp' | 'community';
 
 /** The fields `filterBpcSearchRows`/`ownedBlueprintToSearchRow` need out of a character's owned blueprint (ESI's `CharacterBlueprint`) — kept local to this module rather than importing the ESI type, so `src/engine` stays decoupled from `src/esi`. */
 export interface OwnedBlueprintInput {
@@ -213,6 +213,29 @@ export type BpcSearchRow =
       locationName: null;
       space: null;
       systemId: null;
+    }
+  | {
+      /** A Shared Blueprint a Community Member holds (issue #3602): free to the buyer, a BPO is "ask <name> to copy". */
+      source: 'community';
+      typeId: number;
+      me: number;
+      te: number;
+      /** -1 for a Shared BPO, else the copy's runs left. */
+      runs: number;
+      quantity: number;
+      /** Always 0: nothing is listed or bought. */
+      price: 0;
+      memberUid: string;
+      memberName: string;
+      communityNames: string[];
+      stale: boolean;
+      asOf: number | null;
+      /** The Member's station or structure, by name; its system is in `systemName`. No ids are shared, so a Region, Space or Jump Range filter drops the row. */
+      locationName: string;
+      systemName: string;
+      regionId: null;
+      space: null;
+      systemId: null;
     };
 
 /**
@@ -284,6 +307,42 @@ export function lpOfferToSearchRow(offer: LpOfferInput): BpcSearchRow {
     lpPriced: offer.lpPriced,
     regionId: null,
     locationName: null,
+    space: null,
+    systemId: null,
+  };
+}
+
+/** A Community Offer (`buildCommunityOffers`) as a BPC Sourcing row. */
+export function communityOfferToSearchRow(offer: {
+  uid: string;
+  memberName: string;
+  typeId: number;
+  me: number;
+  te: number;
+  runs: number;
+  quantity: number;
+  communityNames: string[];
+  stale: boolean;
+  asOf: number | null;
+  locationName: string;
+  systemName: string;
+}): BpcSearchRow {
+  return {
+    source: 'community',
+    typeId: offer.typeId,
+    me: offer.me,
+    te: offer.te,
+    runs: offer.runs,
+    quantity: offer.quantity,
+    price: 0,
+    memberUid: offer.uid,
+    memberName: offer.memberName,
+    communityNames: offer.communityNames,
+    stale: offer.stale,
+    asOf: offer.asOf,
+    locationName: offer.locationName,
+    systemName: offer.systemName,
+    regionId: null,
     space: null,
     systemId: null,
   };
