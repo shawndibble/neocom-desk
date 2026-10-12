@@ -68,25 +68,38 @@ export function ShareFittingsTab({
     setLoaded(next);
   }, []);
 
-  const load = useCallback(async () => {
-    const mine = ++loads.current;
-    try {
-      const [fittings, allExcluded, shared] = await Promise.all([
-        collectFittingsToShare(characterId),
-        loadFittingsAll(characterId, communityId),
-        loadMySharedFittingKeys(characterId, communityId),
-      ]);
+  const fetchAll = useCallback(async (): Promise<Loaded> => {
+    const [fittings, allExcluded, shared] = await Promise.all([
+      collectFittingsToShare(characterId),
+      loadFittingsAll(characterId, communityId),
+      loadMySharedFittingKeys(characterId, communityId),
+    ]);
+    return { fittings, allExcluded, shared };
+  }, [characterId, communityId]);
+
+  // Only the newest load may write: one for another Community, or one a
+  // failed change asked for later, must not be overwritten by an older answer.
+  const settle = useCallback(
+    (mine: number, next: Loaded | null) => {
       if (mine !== loads.current) return;
-      apply({ fittings, allExcluded, shared });
-      setLoadFailed(false);
-    } catch {
-      if (mine === loads.current) setLoadFailed(true);
-    }
-  }, [characterId, communityId, apply]);
+      if (next) apply(next);
+      setLoadFailed(next === null);
+    },
+    [apply]
+  );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    const mine = ++loads.current;
+    fetchAll().then(
+      (next) => settle(mine, next),
+      () => settle(mine, null)
+    );
+  }, [fetchAll, settle]);
+
+  const reload = useCallback(async () => {
+    const mine = ++loads.current;
+    settle(mine, await fetchAll().catch(() => null));
+  }, [fetchAll, settle]);
 
   /**
    * Runs one change after the one before, each from the state the one before
@@ -102,7 +115,7 @@ export function ShareFittingsTab({
         apply(await change(current));
       } catch {
         setNotice(t('communities.fittings.failed'));
-        await load();
+        await reload();
       }
     });
     return queue.current;
