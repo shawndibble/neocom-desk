@@ -35,7 +35,9 @@ export function Communities() {
     list: CommunitySummary[];
   } | null>(null);
   const communities = loaded && loaded.characterId === characterId ? loaded.list : null;
-  const [failed, setFailed] = useState(false);
+  // Tagged like `loaded`: one Character's failure is not another's.
+  const [failedFor, setFailedFor] = useState<number | null>(null);
+  const failed = failedFor === characterId;
   const [creating, setCreating] = useState(false);
 
   // Bumped after a change, to refetch the list.
@@ -50,9 +52,9 @@ export function Communities() {
         const list = await loadMyCommunities(characterId);
         if (cancelled) return;
         setLoaded({ characterId, list });
-        setFailed(false);
+        setFailedFor(null);
       } catch {
-        if (!cancelled) setFailed(true);
+        if (!cancelled) setFailedFor(characterId);
       }
     })();
     return () => {
@@ -94,9 +96,8 @@ export function Communities() {
               <li key={community.id}>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 py-2 text-left text-xs hover:bg-surface-2"
+                  className="flex w-full items-center gap-2 py-2 text-left text-xs hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                   aria-current={community.id === selected?.id ? 'true' : undefined}
-                  aria-label={t('communities.select', { name: community.name })}
                   onClick={() => open(community.id)}
                 >
                   <span className="min-w-0 flex-1 truncate font-medium">{community.name}</span>
@@ -117,10 +118,21 @@ export function Communities() {
 
       {selected && (
         <CommunityDetail
-          key={selected.id}
+          key={`${characterId}:${selected.id}`}
           community={selected}
           characterId={characterId}
           onChanged={() => refresh()}
+          onPatch={(patch) =>
+            setLoaded(
+              (prev) =>
+                prev && {
+                  ...prev,
+                  list: prev.list.map((community) =>
+                    community.id === selected.id ? { ...community, ...patch } : community
+                  ),
+                }
+            )
+          }
           onGone={() => {
             open(null);
             refresh();

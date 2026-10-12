@@ -256,19 +256,32 @@ export async function transferAdmin(
   communityId: string,
   newAdminUid: string
 ): Promise<void> {
-  const community = await requireAdmin(db, communityId, caller);
-  const target = await memberRef(db, communityId, newAdminUid).get();
-  const decision = decideTransferAdmin({
-    adminUid: community.get('adminUid'),
-    callerUid: caller.uid,
-    targetUid: newAdminUid,
-    targetIsCurrentMember: target.exists,
+  // One transaction, so the heir can't leave between the check and the
+  // hand-over and strand the Community with an admin who is not a Member.
+  await db.runTransaction(async (tx) => {
+    const community = await tx.get(communityRef(db, communityId));
+    if (!community.exists) throw new HttpsError('not-found', 'Community not found');
+    const callerMember = await tx.get(memberRef(db, communityId, caller.uid));
+    const target = await tx.get(memberRef(db, communityId, newAdminUid));
+    if (
+      community.get('adminUid') !== caller.uid ||
+      !callerMember.exists ||
+      callerMember.get('ownerHash') !== caller.ownerHash
+    ) {
+      fail('not-admin');
+    }
+    const decision = decideTransferAdmin({
+      adminUid: community.get('adminUid'),
+      callerUid: caller.uid,
+      targetUid: newAdminUid,
+      targetIsMember: target.exists,
+    });
+    if (decision === 'already-admin') {
+      throw new HttpsError('failed-precondition', 'That Character is already the admin');
+    }
+    if (decision !== 'ok') fail(decision);
+    tx.update(community.ref, { adminUid: newAdminUid });
   });
-  if (decision === 'already-admin') {
-    throw new HttpsError('failed-precondition', 'That Character is already the admin');
-  }
-  if (decision !== 'ok') fail(decision);
-  await community.ref.update({ adminUid: newAdminUid });
 }
 
 /** Revoking leaves no working link until the admin regenerates one. */

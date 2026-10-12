@@ -28,7 +28,7 @@ export function CreateCommunityDialog({
   const trimmed = name.trim();
 
   async function submit() {
-    if (!trimmed) return;
+    if (!trimmed || !characterName || working) return;
     setWorking(true);
     setError(null);
     try {
@@ -78,7 +78,13 @@ export function CreateCommunityDialog({
           <Button size="sm" disabled={working} onClick={onClose}>
             {t('communities.cancel')}
           </Button>
-          <Button variant="primary" size="sm" type="submit" loading={working} disabled={!trimmed}>
+          <Button
+            variant="primary"
+            size="sm"
+            type="submit"
+            loading={working}
+            disabled={!trimmed || !characterName}
+          >
             {t('communities.createAction')}
           </Button>
         </div>

@@ -43,11 +43,15 @@ export function CommunityDetail({
   community,
   characterId,
   onChanged,
+  onPatch,
   onGone,
 }: {
   community: CommunitySummary;
   characterId: number;
+  /** Refetch the list in the background. */
   onChanged: () => void;
+  /** Apply a known result at once, so the view never waits on the refetch to stop offering admin controls. */
+  onPatch: (patch: Partial<CommunitySummary>) => void;
   /** The Community no longer lists this Character (left, or deleted). */
   onGone: () => void;
 }) {
@@ -116,7 +120,10 @@ export function CommunityDetail({
                   size="sm"
                   variant="primary"
                   onClick={() =>
-                    void writeToClipboard(inviteUrl).then(() => setCopied(t('communities.copied')))
+                    void writeToClipboard(inviteUrl).then(
+                      () => setCopied(t('communities.copied')),
+                      () => setCopied(t('communities.copyFailed'))
+                    )
                   }
                 >
                   {t('communities.copyLink')}
@@ -204,7 +211,8 @@ export function CommunityDetail({
         danger={false}
         onClose={close}
         onConfirm={async () => {
-          await regenerateInvite(characterId, community.id);
+          const { inviteCode } = await regenerateInvite(characterId, community.id);
+          onPatch({ inviteCode });
           onChanged();
         }}
       />
@@ -216,6 +224,7 @@ export function CommunityDetail({
         onClose={close}
         onConfirm={async () => {
           await revokeInvite(characterId, community.id);
+          onPatch({ inviteCode: null });
           onChanged();
         }}
       />
@@ -252,6 +261,7 @@ export function CommunityDetail({
         onConfirm={async () => {
           if (dialog?.kind !== 'remove') return;
           await removeMember(characterId, community.id, dialog.member.uid);
+          onPatch({ memberCount: Math.max(0, community.memberCount - 1) });
           changed();
         }}
       />
@@ -267,6 +277,7 @@ export function CommunityDetail({
         onConfirm={async () => {
           if (dialog?.kind !== 'makeAdmin') return;
           await transferAdmin(characterId, community.id, dialog.member.uid);
+          onPatch({ adminUid: dialog.member.uid });
           onChanged();
         }}
       />

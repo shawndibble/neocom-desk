@@ -148,14 +148,14 @@ export function decideRemoveMember(state: {
 
 export type TransferAdminDecision = 'ok' | 'not-admin' | 'already-admin' | 'not-a-member';
 
-/** The new admin must already be a Member, under their current ownerHash. */
+/** The new admin must already be a Member (a Member doc exists for them). */
 export function decideTransferAdmin(state: {
   adminUid: string;
   callerUid: string;
   targetUid: string;
-  targetIsCurrentMember: boolean;
+  targetIsMember: boolean;
 }): TransferAdminDecision {
   if (state.callerUid !== state.adminUid) return 'not-admin';
   if (state.targetUid === state.adminUid) return 'already-admin';
-  return state.targetIsCurrentMember ? 'ok' : 'not-a-member';
+  return state.targetIsMember ? 'ok' : 'not-a-member';
 }

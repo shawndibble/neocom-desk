@@ -136,13 +136,13 @@ describe('decideTransferAdmin', () => {
     adminUid: 'char:1',
     callerUid: 'char:1',
     targetUid: 'char:2',
-    targetIsCurrentMember: true,
+    targetIsMember: true,
   };
   it('lets only the admin hand over, to another current Member', () => {
     expect(decideTransferAdmin(base)).toBe('ok');
     expect(decideTransferAdmin({ ...base, callerUid: 'char:2' })).toBe('not-admin');
     expect(decideTransferAdmin({ ...base, targetUid: 'char:1' })).toBe('already-admin');
-    expect(decideTransferAdmin({ ...base, targetIsCurrentMember: false })).toBe('not-a-member');
+    expect(decideTransferAdmin({ ...base, targetIsMember: false })).toBe('not-a-member');
   });
   it('parses like remove-member input', () => {
     expect(parseTransferAdminInput({ communityId: 'c1', memberUid: 'char:2' })).toEqual({
