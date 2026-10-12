@@ -6,8 +6,19 @@ import '@/i18n';
 import en from '@/i18n/locales/en.json';
 import { db } from '@/db';
 import { clearLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
+import { loadShareSelection } from '@/features/communities/shareSelection';
 import { CommunityJoin } from './CommunityJoin';
 
+vi.mock('@/features/communities/useOwnedBlueprintTypes', () => ({
+  useOwnedBlueprintTypes: () => ({
+    status: 'ready',
+    groups: [{ id: 1, name: 'Ships', parentId: null }],
+    owned: [
+      { typeId: 10, name: 'Rifter Blueprint', marketGroupId: 1 },
+      { typeId: 11, name: 'Merlin Blueprint', marketGroupId: 1 },
+    ],
+  }),
+}));
 const store = vi.hoisted(() => ({ previewInvite: vi.fn(), joinCommunity: vi.fn() }));
 vi.mock('@/features/communities/communityStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/communities/communityStore')>()),
@@ -117,10 +128,28 @@ describe('Community invite page', () => {
       store.joinCommunity.mockResolvedValue({ communityId: 'c1', alreadyMember: false });
       const user = userEvent.setup();
       renderPage();
-      await user.click(await screen.findByRole('button', { name: /Join with 1 Character/ }));
+      await user.click(await screen.findByRole('button', { name: /Join and share/ }));
       await waitFor(() => expect(store.joinCommunity).toHaveBeenCalledWith(1, 'CODE1', 'Pilot 1'));
       expect(store.joinCommunity).toHaveBeenCalledTimes(1);
       expect(await screen.findByText('communities page')).toBeInTheDocument();
+    });
+
+    it('shares nothing by default, and joins sharing what was chosen', async () => {
+      store.joinCommunity.mockResolvedValue({ communityId: 'c1', alreadyMember: false });
+      const user = userEvent.setup();
+      renderPage();
+      expect(
+        await screen.findByRole('button', { name: 'Join and share 0 blueprints' })
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Choose what to share \(0\)/ }));
+      await user.click(await screen.findByRole('button', { name: en.communities.share.all }));
+      const join = await screen.findByRole('button', {
+        name: 'Join and share 2 blueprints',
+      });
+      await user.click(join);
+      await waitFor(async () =>
+        expect([...(await loadShareSelection(1, 'c1'))].sort()).toEqual([10, 11])
+      );
     });
 
     it('stays on the page and names the cap when a join is refused', async () => {
@@ -130,7 +159,7 @@ describe('Community invite page', () => {
       });
       const user = userEvent.setup();
       renderPage();
-      await user.click(await screen.findByRole('button', { name: /Join with 1 Character/ }));
+      await user.click(await screen.findByRole('button', { name: /Join and share/ }));
       expect(await screen.findByText(j.full)).toBeInTheDocument();
       expect(screen.queryByText('communities page')).not.toBeInTheDocument();
     });

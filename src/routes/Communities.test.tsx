@@ -127,7 +127,8 @@ describe('Communities page', () => {
       await screen.findByRole('button', { name: c.copyLink });
       await clickCopy();
       expect(writer).toHaveBeenCalledWith(expect.stringContaining('/communities/join/CODE123'));
-      expect(screen.getByText(c.copied)).toBeInTheDocument();
+      // The Toast also feeds a live region, so the text can appear twice.
+      expect(screen.getAllByText(c.copied).length).toBeGreaterThan(0);
       configureClipboard(null);
     });
 

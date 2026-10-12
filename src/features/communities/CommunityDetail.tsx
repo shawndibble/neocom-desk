@@ -15,6 +15,8 @@ import { NOTICE_MS } from '@/components/ui/useTimedToast';
 import { writeToClipboard } from '@/lib/clipboard';
 import { uidForCharacter } from '@/sync/uid';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ShareSelectionDialog } from './ShareSelectionDialog';
+import { loadShareSelection } from './shareSelection';
 import {
   communityInviteUrl,
   deleteCommunity,
@@ -62,7 +64,19 @@ export function CommunityDetail({
   const [membersFailed, setMembersFailed] = useState(false);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [sharedCount, setSharedCount] = useState<number | null>(null);
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadShareSelection(characterId, community.id).then((saved) => {
+      if (!cancelled) setSharedCount(saved.size);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [characterId, community.id]);
 
   // Bumped after a change that alters the Member list, to refetch it.
   const [reload, setReload] = useState(0);
@@ -83,6 +97,7 @@ export function CommunityDetail({
     };
   }, [characterId, community.id, community.memberCount, reload]);
 
+  const myName = members?.find((member) => member.uid === myUid)?.characterName ?? '';
   const inviteUrl = community.inviteCode ? communityInviteUrl(community.inviteCode) : null;
   const close = () => setDialog(null);
   const changed = () => {
@@ -146,6 +161,20 @@ export function CommunityDetail({
           )}
         </section>
       )}
+
+      <section
+        className="mb-4 flex flex-wrap items-center gap-2"
+        aria-label={t('communities.share.legend')}
+      >
+        <p className="text-xs text-text-dim">
+          {sharedCount !== null &&
+            myName !== '' &&
+            t('communities.share.summary', { count: sharedCount, name: myName })}
+        </p>
+        <Button size="sm" onClick={() => setSharing(true)}>
+          {t('communities.share.choose')}
+        </Button>
+      </section>
 
       <h3 className="mb-1 text-xs font-semibold">{t('communities.members')}</h3>
       {membersFailed ? (
@@ -280,6 +309,14 @@ export function CommunityDetail({
           onPatch({ adminUid: dialog.member.uid });
           onChanged();
         }}
+      />
+      <ShareSelectionDialog
+        open={sharing}
+        characterId={characterId}
+        characterName={myName}
+        communityId={community.id}
+        onClose={() => setSharing(false)}
+        onSaved={setSharedCount}
       />
       {copied && <Toast message={copied} onClose={() => setCopied(null)} />}
     </Panel>
