@@ -20,6 +20,9 @@ const store = vi.hoisted(() => ({
   removeMember: vi.fn(),
   transferAdmin: vi.fn(),
   loadMailInviteStatus: vi.fn(),
+  loadJoinRequests: vi.fn(),
+  setRequireApproval: vi.fn(),
+  decideJoinRequest: vi.fn(),
 }));
 vi.mock('@/features/communities/communityStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/communities/communityStore')>()),
@@ -55,6 +58,11 @@ function renderPage(path = '/communities') {
  * reads the Toast synchronously. The notice lasts 2.5s, so polling for it
  * (`findByText`) can lose to a starved CI worker; nothing here waits on a timer.
  */
+/** The admin's invite controls live on the Invites tab. */
+async function openInvites() {
+  fireEvent.click(await screen.findByRole('tab', { name: c.tabs.invites }));
+}
+
 async function clickCopy() {
   fireEvent.click(screen.getByRole('button', { name: c.copyLink }));
   await act(async () => {
@@ -67,6 +75,7 @@ async function seed() {
   store.loadMyCommunities.mockResolvedValue([]);
   store.loadCommunityMembers.mockResolvedValue(members);
   store.loadMailInviteStatus.mockResolvedValue({ remaining: 20, sent: [] });
+  store.loadJoinRequests.mockResolvedValue([]);
   await db.characters.clear();
   await db.characters.put({ characterId: ME, name: 'Me', ownerHash: 'h', addedAt: 1 });
   useActiveCharacter.setState({ activeCharacterId: ME, hydrated: true });
@@ -81,6 +90,7 @@ beforeAll(async () => {
   configureClipboard(async () => {});
   const view = renderPage('/communities?community=c1');
   // Copy raises the page's Toast, the one piece the other tests meet cold.
+  await openInvites();
   await screen.findByRole('button', { name: c.copyLink });
   await clickCopy();
   view.unmount();
@@ -126,6 +136,7 @@ describe('Communities page', () => {
       const writer = vi.fn(async () => {});
       configureClipboard(writer);
       renderPage('/communities?community=c1');
+      await openInvites();
       await screen.findByRole('button', { name: c.copyLink });
       await clickCopy();
       expect(writer).toHaveBeenCalledWith(expect.stringContaining('/communities/join/CODE123'));
@@ -139,6 +150,7 @@ describe('Communities page', () => {
       store.revokeInvite.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
+      await openInvites();
       await user.click(await screen.findByRole('button', { name: c.regenerate }));
       const regen = await screen.findByRole('dialog');
       await user.click(within(regen).getByRole('button', { name: c.regenerateAction }));
@@ -153,9 +165,59 @@ describe('Communities page', () => {
     it('offers only Regenerate once the link is revoked', async () => {
       store.loadMyCommunities.mockResolvedValue([community({ inviteCode: null })]);
       renderPage('/communities?community=c1');
+      await openInvites();
       expect(await screen.findByText(c.inviteOff)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: c.copyLink })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: c.regenerate })).toBeInTheDocument();
+    });
+
+    it('turns approval for new Members on and off from the Invites tab', async () => {
+      store.setRequireApproval.mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      renderPage('/communities?community=c1');
+      await openInvites();
+      const approve = await screen.findByRole('checkbox', { name: new RegExp(c.approval.title) });
+      expect(approve).not.toBeChecked();
+      await user.click(approve);
+      await waitFor(() => expect(store.setRequireApproval).toHaveBeenCalledWith(ME, 'c1', true));
+      await waitFor(() => expect(approve).toBeChecked());
+    });
+
+    it('lists the Characters waiting to join, and accepts or declines each', async () => {
+      store.loadJoinRequests.mockResolvedValue([
+        { uid: 'char:50', characterName: 'Newbie', requestedAt: 1 },
+        { uid: 'char:51', characterName: 'Other', requestedAt: 2 },
+      ]);
+      store.decideJoinRequest.mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      renderPage('/communities?community=c1');
+      const tab = await screen.findByRole('tab', { name: /2 waiting/ });
+      await user.click(tab);
+      const row = (await screen.findByText('Newbie')).closest('li')!;
+      await user.click(within(row).getByRole('button', { name: c.requests.accept }));
+      await waitFor(() =>
+        expect(store.decideJoinRequest).toHaveBeenCalledWith(ME, 'c1', 'char:50', true)
+      );
+      const other = (await screen.findByText('Other')).closest('li')!;
+      await user.click(within(other).getByRole('button', { name: c.requests.decline }));
+      await waitFor(() =>
+        expect(store.decideJoinRequest).toHaveBeenCalledWith(ME, 'c1', 'char:51', false)
+      );
+    });
+
+    it('names the cap when accepting is refused', async () => {
+      store.loadJoinRequests.mockResolvedValue([
+        { uid: 'char:50', characterName: 'Newbie', requestedAt: 1 },
+      ]);
+      store.decideJoinRequest.mockRejectedValue({
+        code: 'functions/resource-exhausted',
+        details: { reason: 'community-full' },
+      });
+      const user = userEvent.setup();
+      renderPage('/communities?community=c1');
+      await user.click(await screen.findByRole('tab', { name: /1 waiting/ }));
+      await user.click(await screen.findByRole('button', { name: c.requests.accept }));
+      expect(await screen.findByText(c.requests.full)).toBeInTheDocument();
     });
 
     it('removes another Member from their ⋮ menu, and gives the admin row none', async () => {
@@ -205,6 +267,8 @@ describe('Communities page', () => {
       store.leaveCommunity.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
+      await screen.findByRole('tab', { name: c.members });
+      expect(screen.queryByRole('tab', { name: c.tabs.invites })).not.toBeInTheDocument();
       await user.click(await screen.findByRole('tab', { name: en.communities.members }));
       await screen.findByText('Friend');
       expect(screen.queryByRole('button', { name: c.copyLink })).not.toBeInTheDocument();

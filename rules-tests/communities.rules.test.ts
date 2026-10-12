@@ -48,6 +48,11 @@ beforeEach(async () => {
       code: 'CODE',
       updatedAt: 1,
     });
+    await setDoc(doc(db, `${C}/requests/char:9`), {
+      ownerHash: 'hash-9',
+      characterName: 'Nine',
+      requestedAt: 1,
+    });
     await setDoc(doc(db, `${C}/mailInvites/42`), {
       adminUid: 'char:1',
       targetName: 'Bob',
@@ -246,6 +251,35 @@ describe('mail invites', () => {
     const db = characterAuth(env, 1, 'hash-1-new-owner').firestore();
     await assertFails(getDoc(doc(db, `${C}/mailInvites/42`)));
     await assertFails(getDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-12')));
+  });
+});
+
+describe('join requests', () => {
+  it('lets the admin read the Characters waiting to join', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertSucceeds(getDoc(doc(db, `${C}/requests/char:9`)));
+    await assertSucceeds(getDocs(collection(db, `${C}/requests`)));
+  });
+
+  it('hides them from other Members, non-Members and the waiting Character', async () => {
+    const member = characterAuth(env, 2, 'hash-2').firestore();
+    await assertFails(getDoc(doc(member, `${C}/requests/char:9`)));
+    await assertFails(getDocs(collection(member, `${C}/requests`)));
+    const waiting = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(getDoc(doc(waiting, `${C}/requests/char:9`)));
+  });
+
+  it('denies every client write, the admin’s and the requester’s included', async () => {
+    const admin = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(admin, `${C}/requests/char:8`), { characterName: 'x' }));
+    await assertFails(deleteDoc(doc(admin, `${C}/requests/char:9`)));
+    const waiting = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(setDoc(doc(waiting, `${C}/requests/char:9`), { characterName: 'x' }));
+  });
+
+  it('denies a transferred admin Character the old admin’s requests', async () => {
+    const db = characterAuth(env, 1, 'hash-1-new-owner').firestore();
+    await assertFails(getDoc(doc(db, `${C}/requests/char:9`)));
   });
 });
 

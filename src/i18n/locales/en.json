@@ -7890,7 +7890,24 @@
     "tabs": {
       "label": "Community",
       "blueprints": "Blueprints",
-      "fittings": "Fittings"
+      "fittings": "Fittings",
+      "invites": "Invites"
+    },
+    "approval": {
+      "title": "Approve new Members",
+      "hint": "Anyone who joins by the link waits on the Members tab until you let them in. A Character you mail an invite to goes straight in.",
+      "failed": "Couldn't change that. Try again."
+    },
+    "requests": {
+      "title": "Waiting to join",
+      "heading_one": "Waiting to join · {{count}}",
+      "heading_other": "Waiting to join · {{count}}",
+      "tab": "Members · {{count}} waiting",
+      "accept": "Accept",
+      "decline": "Decline",
+      "full": "This Community is full, so nobody more can be let in.",
+      "tooMany": "That Character is already in 10 Communities.",
+      "failed": "Couldn't update that request. Try again."
     },
     "blueprints": {
       "shareAll": "Share all my blueprints",
@@ -7929,6 +7946,7 @@
       "joinAction_other": "Join and share {{count}} blueprints",
       "joined": "Joined",
       "alreadyMember": "Already a Member",
+      "pending": "Request sent. The admin has to let this Character in.",
       "full": "This Community is full.",
       "tooMany": "This Character is already in 10 Communities.",
       "failed": "Could not join. Try again.",

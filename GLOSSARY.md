@@ -206,6 +206,7 @@ here — they go one per file in `docs/context/decisions/`.
   Distinct from a **Build Group**, which groups plans, not people. The UI
   says "Communities"; the bare word "Group" stays unused here because it
   already names the Build Group.
+- **Join Request**: A Character that followed a **Community**'s invite link while the admin has "Approve new Members" on, and is waiting to be let in. It is not a **Member** and sees and shares nothing until the admin accepts it. A Character the admin mailed an invite to skips it. Distinct from a mail invite, which the admin sends.
 - **Community Library**: A **Community** page tab listing every blueprint
   against the **Members** who share it, with a "missing from the Community"
   filter. Its rows are every blueprint reachable by any route — market,

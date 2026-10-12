@@ -37,6 +37,12 @@ export interface RemoveMemberInput extends CommunityIdInput {
   memberUid: string;
 }
 export type TransferAdminInput = RemoveMemberInput;
+export interface RequireApprovalInput extends CommunityIdInput {
+  requireApproval: boolean;
+}
+export interface JoinRequestDecisionInput extends RemoveMemberInput {
+  accept: boolean;
+}
 
 function record(data: unknown): Record<string, unknown> {
   if (typeof data !== 'object' || data === null) {
@@ -177,6 +183,29 @@ export function parseRemoveMemberInput(data: unknown): RemoveMemberInput {
   return { communityId: docId(d.communityId, 'communityId'), memberUid };
 }
 
+export function parseRequireApprovalInput(data: unknown): RequireApprovalInput {
+  const input = record(data);
+  if (typeof input.requireApproval !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'requireApproval must be true or false');
+  }
+  return {
+    communityId: docId(input.communityId, 'communityId'),
+    requireApproval: input.requireApproval,
+  };
+}
+
+export function parseJoinRequestDecisionInput(data: unknown): JoinRequestDecisionInput {
+  const input = record(data);
+  if (typeof input.accept !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'accept must be true or false');
+  }
+  return {
+    communityId: docId(input.communityId, 'communityId'),
+    memberUid: docId(input.memberUid, 'memberUid'),
+    accept: input.accept,
+  };
+}
+
 export function parseTransferAdminInput(data: unknown): TransferAdminInput {
   return parseRemoveMemberInput(data);
 }
@@ -193,15 +222,61 @@ export function decideCreate(joinedCount: number): CreateDecision {
 }
 
 export type JoinDecision =
-  'ok' | 'invalid-invite' | 'already-member' | 'community-full' | 'too-many-communities';
+  | 'ok'
+  | 'needs-approval'
+  | 'invalid-invite'
+  | 'already-member'
+  | 'community-full'
+  | 'too-many-communities';
 
+/**
+ * A join by link. When the Community approves new Members the join waits for
+ * the admin, unless the admin mailed that Character an invite (`preApproved`).
+ * The caps are checked first, so nobody queues into a Community that could not
+ * take them.
+ */
 export function decideJoin(state: {
   inviteMatches: boolean;
   alreadyMember: boolean;
   memberCount: number;
   joinedCount: number;
+  requiresApproval?: boolean;
+  preApproved?: boolean;
 }): JoinDecision {
   if (!state.inviteMatches) return 'invalid-invite';
+  if (state.alreadyMember) return 'already-member';
+  if (state.memberCount >= MAX_COMMUNITY_MEMBERS) return 'community-full';
+  if (state.joinedCount >= MAX_COMMUNITIES_PER_CHARACTER) return 'too-many-communities';
+  if (state.requiresApproval && !state.preApproved) return 'needs-approval';
+  return 'ok';
+}
+
+/**
+ * Whether a mailed invite lets a Character past "Approve new Members". It must
+ * have gone out (not just been reserved), come from the Community's current
+ * admin, and not been used to join already, so a Member who was removed or
+ * left cannot come back on it.
+ */
+export function isPreApproved(
+  invite: { adminUid: string; sentAt: number | null; consumedAt: number | null } | null,
+  currentAdminUid: string
+): boolean {
+  return (
+    invite !== null &&
+    invite.sentAt !== null &&
+    invite.consumedAt === null &&
+    invite.adminUid === currentAdminUid
+  );
+}
+
+export type AdmitDecision = 'ok' | 'already-member' | 'community-full' | 'too-many-communities';
+
+/** The admin accepted a waiting request: the same caps as a join, no invite to match. */
+export function decideAdmit(state: {
+  alreadyMember: boolean;
+  memberCount: number;
+  joinedCount: number;
+}): AdmitDecision {
   if (state.alreadyMember) return 'already-member';
   if (state.memberCount >= MAX_COMMUNITY_MEMBERS) return 'community-full';
   if (state.joinedCount >= MAX_COMMUNITIES_PER_CHARACTER) return 'too-many-communities';

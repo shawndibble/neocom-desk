@@ -36,7 +36,11 @@ type PreviewState =
   | { status: 'gone' }
   | { status: 'unavailable' };
 
-type JoinResult = 'joined' | 'alreadyMember' | 'full' | 'tooMany' | 'failed';
+type JoinResult = 'joined' | 'alreadyMember' | 'pending' | 'full' | 'tooMany' | 'failed';
+
+/** A result that is not a problem: the Character is in, or waiting for the admin. */
+const isFine = (result: JoinResult) =>
+  result === 'joined' || result === 'alreadyMember' || result === 'pending';
 
 const BLUEPRINTS = ['getCharacterBlueprints'] as const;
 
@@ -122,6 +126,17 @@ export function CommunityJoin() {
     for (const character of chosen) {
       try {
         const joined = await joinCommunity(character.characterId, code, character.name);
+        if (joined.pending) {
+          // Waiting for the admin: keep the choice so the library publishes once
+          // they let this Character in, but there is no Community to open yet.
+          await saveShareSelection(
+            character.characterId,
+            joined.communityId,
+            shares[character.characterId] ?? new Set()
+          ).catch(() => undefined);
+          next[character.characterId] = 'pending';
+          continue;
+        }
         communityId = joined.communityId;
         joinedIds.push(character.characterId);
         // An untouched picker on a re-join must not wipe the choice saved before.
@@ -268,16 +283,8 @@ export function CommunityJoin() {
                           )}
                           {result && (
                             <span
-                              role={
-                                result === 'joined' || result === 'alreadyMember'
-                                  ? 'status'
-                                  : 'alert'
-                              }
-                              className={
-                                result === 'joined' || result === 'alreadyMember'
-                                  ? 'text-text-dim'
-                                  : 'text-danger'
-                              }
+                              role={isFine(result) ? 'status' : 'alert'}
+                              className={isFine(result) ? 'text-text-dim' : 'text-danger'}
                             >
                               {t(`communities.join.${result}`)}
                             </span>
