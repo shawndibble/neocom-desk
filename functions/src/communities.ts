@@ -34,6 +34,7 @@ export interface CommunityIdInput {
 export interface RemoveMemberInput extends CommunityIdInput {
   memberUid: string;
 }
+export type TransferAdminInput = RemoveMemberInput;
 
 function record(data: unknown): Record<string, unknown> {
   if (typeof data !== 'object' || data === null) {
@@ -89,6 +90,10 @@ export function parseRemoveMemberInput(data: unknown): RemoveMemberInput {
   return { communityId: docId(d.communityId, 'communityId'), memberUid };
 }
 
+export function parseTransferAdminInput(data: unknown): TransferAdminInput {
+  return parseRemoveMemberInput(data);
+}
+
 /** 128 random bits, URL-safe: the invite link is the only gate to a Community. */
 export function newInviteCode(): string {
   return randomBytes(16).toString('base64url');
@@ -138,5 +143,19 @@ export function decideRemoveMember(state: {
 }): RemoveMemberDecision {
   if (state.callerUid !== state.adminUid) return 'not-admin';
   if (state.targetUid === state.adminUid) return 'cannot-remove-admin';
+  return state.targetIsMember ? 'ok' : 'not-a-member';
+}
+
+export type TransferAdminDecision = 'ok' | 'not-admin' | 'already-admin' | 'not-a-member';
+
+/** The new admin must already be a Member (a Member doc exists for them). */
+export function decideTransferAdmin(state: {
+  adminUid: string;
+  callerUid: string;
+  targetUid: string;
+  targetIsMember: boolean;
+}): TransferAdminDecision {
+  if (state.callerUid !== state.adminUid) return 'not-admin';
+  if (state.targetUid === state.adminUid) return 'already-admin';
   return state.targetIsMember ? 'ok' : 'not-a-member';
 }

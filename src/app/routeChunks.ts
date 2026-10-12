@@ -129,6 +129,7 @@ export const loadAssets = named(() => import('@/routes/Assets'), 'Assets');
 export const loadMail = named(() => import('@/routes/Mail'), 'Mail');
 export const loadCalendar = named(() => import('@/routes/Calendar'), 'Calendar');
 export const loadContracts = named(() => import('@/routes/Contracts'), 'Contracts');
+export const loadCommunities = named(() => import('@/routes/Communities'), 'Communities');
 export const loadContacts = named(() => import('@/routes/Contacts'), 'Contacts');
 export const loadTravel = named(() => import('@/routes/Travel'), 'Travel');
 export const loadEmploymentHistory = named(
@@ -184,6 +185,7 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/assets': loadAssets,
   '/mail': loadMail,
   '/calendar': loadCalendar,
+  '/communities': loadCommunities,
   '/contracts': loadContracts,
   '/bpc-contracts': loadIndustry,
   '/contacts': loadContacts,

@@ -58,6 +58,7 @@ const ROUTE_TITLE_KEYS = {
   '/contracts': ['contracts.title'],
   // A redirect into Industry's BPC tab; titled only because every route must be.
   '/bpc-contracts': ['nav.industry'],
+  '/communities': ['communities.title'],
   '/contacts': ['contacts.title'],
   '/travel': ['travel.title'],
   '/pilot-lookup': ['nav.pilotLookup'],

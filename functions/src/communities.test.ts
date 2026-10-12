@@ -6,6 +6,8 @@ import {
   decideJoin,
   decideLeave,
   decideRemoveMember,
+  decideTransferAdmin,
+  parseTransferAdminInput,
   newInviteCode,
   parseCommunityIdInput,
   parseCreateInput,
@@ -126,5 +128,27 @@ describe('decideRemoveMember', () => {
     expect(decideRemoveMember({ ...base, callerUid: 'char:2' })).toBe('not-admin');
     expect(decideRemoveMember({ ...base, targetUid: 'char:1' })).toBe('cannot-remove-admin');
     expect(decideRemoveMember({ ...base, targetIsMember: false })).toBe('not-a-member');
+  });
+});
+
+describe('decideTransferAdmin', () => {
+  const base = {
+    adminUid: 'char:1',
+    callerUid: 'char:1',
+    targetUid: 'char:2',
+    targetIsMember: true,
+  };
+  it('lets only the admin hand over, to another current Member', () => {
+    expect(decideTransferAdmin(base)).toBe('ok');
+    expect(decideTransferAdmin({ ...base, callerUid: 'char:2' })).toBe('not-admin');
+    expect(decideTransferAdmin({ ...base, targetUid: 'char:1' })).toBe('already-admin');
+    expect(decideTransferAdmin({ ...base, targetIsMember: false })).toBe('not-a-member');
+  });
+  it('parses like remove-member input', () => {
+    expect(parseTransferAdminInput({ communityId: 'c1', memberUid: 'char:2' })).toEqual({
+      communityId: 'c1',
+      memberUid: 'char:2',
+    });
+    expect(() => parseTransferAdminInput({ communityId: 'c1', memberUid: 'bob' })).toThrow();
   });
 });
