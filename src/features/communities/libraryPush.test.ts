@@ -148,8 +148,8 @@ describe('removeSharedLibraries', () => {
   it('deletes every chunk in every Community and zeroes the stamp', async () => {
     getDocs
       .mockResolvedValueOnce({ docs: [{ id: 'c1' }, { id: 'c2' }] })
-      .mockResolvedValueOnce({ docs: [{ ref: 'r0' }, { ref: 'r1' }] })
-      .mockResolvedValueOnce({ docs: [{ ref: 'r2' }] })
+      .mockResolvedValueOnce({ docs: [{ ref: 'r0' }, { ref: 'r1' }], size: 2 })
+      .mockResolvedValueOnce({ docs: [{ ref: 'r2' }], size: 1 })
       // the second listCommunityIds call inside the loop is not made: ids are read once
       .mockResolvedValue({ docs: [] });
     await removeSharedLibraries(1);
