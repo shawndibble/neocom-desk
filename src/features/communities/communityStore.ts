@@ -8,6 +8,8 @@
  */
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
+import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
+import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
@@ -76,6 +78,28 @@ export async function loadCommunityMembers(
       libraryAsOf: libraryAsOf(entry.data()),
     }))
     .sort((a, b) => a.characterName.localeCompare(b.characterName));
+}
+
+/** Every listed Member's shared blueprints, for the Community Library. A Member with none yields an empty list. */
+export async function loadMemberLibraries(
+  characterId: number,
+  communityId: string,
+  memberUids: readonly string[]
+): Promise<MemberLibrary[]> {
+  await ensureSignedIn(characterId);
+  const db = getSyncFirestore();
+  return Promise.all(
+    memberUids.map(async (uid) => {
+      const chunks = await getDocs(
+        collection(db, 'communities', communityId, 'members', uid, 'library')
+      );
+      const items = chunks.docs.flatMap((chunk) => {
+        const list = chunk.data().items;
+        return Array.isArray(list) ? (list as SharedBlueprint[]) : [];
+      });
+      return { uid, items };
+    })
+  );
 }
 
 /** The pushed-at stamp, only while the Member shares anything (a cleared library has chunkCount 0). */
