@@ -14,6 +14,7 @@ function cellsOf(line: string): string[] | null {
   const cells = line
     .trim()
     .split(/\t+| {2,}/)
+    .map((c) => c.trim())
     .filter((c) => c !== '');
   return cells.length >= MIN_CELLS ? cells : null;
 }
@@ -64,5 +65,15 @@ export function splitMailBody(text: string): MailBodyBlock[] {
     i = end;
   }
   flushProse();
-  return blocks;
+  return blocks.some((b) => b.kind === 'table') ? trimProseEdges(blocks) : blocks;
+}
+
+// Around a table the blocks' own spacing supplies the gap, so a prose block's
+// leading and trailing blank lines would only double it.
+function trimProseEdges(blocks: MailBodyBlock[]): MailBodyBlock[] {
+  return blocks.flatMap((b): MailBodyBlock[] => {
+    if (b.kind === 'table') return [b];
+    const text = b.text.replace(/^(?:[ \t]*\n)+|(?:\n[ \t]*)+$/g, '');
+    return text.trim() === '' ? [] : [{ kind: 'text', text }];
+  });
 }

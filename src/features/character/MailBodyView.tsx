@@ -20,12 +20,25 @@ export function MailBodyView({ text }: { text: string }) {
         ) : (
           <div key={index} className="overflow-x-auto">
             <table className="border-collapse tabular-nums">
+              <thead>
+                <tr className="border-b border-line text-text-dim">
+                  {block.rows[0].map((cell, c) => (
+                    <th
+                      key={c}
+                      scope="col"
+                      className={cx(
+                        'py-0.5 pr-4 last:pr-0 font-normal whitespace-nowrap',
+                        block.align[c] === 'right' ? 'text-right' : 'text-left'
+                      )}
+                    >
+                      {cell}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
               <tbody>
-                {block.rows.map((row, r) => (
-                  <tr
-                    key={r}
-                    className={r === 0 ? 'border-b border-line text-text-dim' : undefined}
-                  >
+                {block.rows.slice(1).map((row, r) => (
+                  <tr key={r}>
                     {row.map((cell, c) => (
                       <td
                         key={c}

@@ -46,7 +46,7 @@ describe('splitMailBody', () => {
     expect(table.rows).toHaveLength(4);
   });
 
-  it('keeps prose around the table and drops only the blank lines inside it', () => {
+  it('keeps prose around the table and trims the blank lines around it', () => {
     const blocks = splitMailBody(MOON);
     expect(blocks[0]).toEqual({ kind: 'text', text: 'Greetings Pilots,\n' });
     expect(blocks[2]).toEqual({
@@ -59,6 +59,12 @@ describe('splitMailBody', () => {
     const table = splitMailBody(MOON)[1];
     if (table.kind !== 'table') throw new Error('expected table');
     expect(table.align).toEqual(['left', 'right', 'right', 'right', 'right', 'right', 'right']);
+  });
+
+  it('trims cells when tabs and spaces are mixed', () => {
+    const table = splitMailBody('A \tB\t C\n1\t2 \t3')[0];
+    if (table.kind !== 'table') throw new Error('expected table');
+    expect(table.rows[0]).toEqual(['A', 'B', 'C']);
   });
 
   it('splits on tabs too', () => {
