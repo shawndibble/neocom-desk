@@ -750,4 +750,24 @@ describe('Community Offers (issue #3603)', () => {
     });
     expect(result.line).toEqual({ unitPrice: null, owned: false });
   });
+
+  it('a shared BPO beats a shared BPC at the same tier', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [],
+      communityOffers: [
+        {
+          me: 10,
+          te: 20,
+          runs: 5,
+          quantity: 1,
+          price: 0,
+          community: { memberName: 'Copy', stale: false },
+        },
+        { me: 10, te: 20, runs: -1, quantity: 1, price: 0, community: shared },
+      ],
+    });
+    expect(result.line).toMatchObject({ community: shared });
+    expect(result.purchasedRuns).toBe(Infinity);
+  });
 });

@@ -75,8 +75,8 @@ export type HubPricingSources = Pick<
 /** What `pricingSourcesForHub` reads. Corp blueprints may be withheld, which reads as unavailable. */
 export type HubPricingSourceArgs = Pick<
   BuildPlanPricingInputs,
-  'assumedMe' | 'includeBlueprintCost' | 'standings' | 'bpcRows'
-> & { corpBlueprints?: CorpBlueprintSource; communityRows?: readonly BpcSearchRow[] };
+  'assumedMe' | 'includeBlueprintCost' | 'standings' | 'bpcRows' | 'communityRows'
+> & { corpBlueprints?: CorpBlueprintSource };
 
 const NO_BPC_ROWS: readonly BpcContractRow[] = [];
 
@@ -211,7 +211,6 @@ function offersFor(
   return lookup;
 }
 
-const NO_COMMUNITY_ROWS: readonly BpcSearchRow[] = [];
 const communityOffersCache = new WeakMap<
   readonly BpcSearchRow[],
   NonNullable<HubPricingSources['communityOffersFor']>
@@ -258,6 +257,6 @@ export function pricingSourcesForHub(
     standing: tradeHubStanding(inputs.standings, hub.id),
     bpcOffersFor: offersFor(inputs.bpcRows, hub.regionId),
     bpcLastResortOffersFor: offersFor(inputs.bpcRows, hub.regionId, true),
-    communityOffersFor: communityOffersForRows(inputs.communityRows ?? NO_COMMUNITY_ROWS),
+    communityOffersFor: communityOffersForRows(inputs.communityRows),
   };
 }

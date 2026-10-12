@@ -677,6 +677,13 @@ export interface AcquisitionCommunitySource {
   stale: boolean;
 }
 
+/** The ME/TE tier a Blueprint Acquisition row resolved to, and the Member it comes from when a Community Offer. */
+export type AcquisitionTier = {
+  me: number;
+  te: number;
+  community?: AcquisitionCommunitySource;
+};
+
 /** What a Blueprint Acquisition row (issue #838) reports, at whatever node resolved it. */
 export interface AcquisitionLine {
   /** ISK to cover the shortfall at the resolved tier; ignored when `owned`. */
@@ -726,7 +733,7 @@ export interface MaterialCostLine extends EffectiveMaterial {
    * owned-stock offer (`ownedStockOffer.ts`) and no place in the multibuy
    * text.
    */
-  acquisitionTier?: { me: number; te: number; community?: AcquisitionCommunitySource };
+  acquisitionTier?: AcquisitionTier;
 }
 
 export type BuildRecommendation = 'build' | 'buy' | 'unknown';

@@ -212,9 +212,13 @@ function usableOffers(offers: readonly BpcOffer[], allowFree = false): BpcOffer[
 function cheapestToCover(offers: readonly BpcOffer[], shortfall: number): BpcOffer | null {
   let best: BpcOffer | null = null;
   let bestCost = Infinity;
+  let bestCapacity = 0;
   for (const offer of offers) {
-    const cost = shortfallCost(Math.max(1, shortfall), offerToExtend(offer));
-    if (cost < bestCost) {
+    const extend = offerToExtend(offer);
+    const cost = shortfallCost(Math.max(1, shortfall), extend);
+    // A tie goes to the larger capacity: a free original outlasts a free copy for later nodes.
+    if (cost < bestCost || (cost === bestCost && extend.capacityRuns > bestCapacity)) {
+      bestCapacity = extend.capacityRuns;
       best = offer;
       bestCost = cost;
     }

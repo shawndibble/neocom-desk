@@ -14,7 +14,7 @@ import { applyCostIndexOverride } from './costIndexOverride';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
+import type { BpcContractRow, BpcSearchRow } from '@/engine/contracts/bpcSearch';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import {
   autoBuildHere,
@@ -43,7 +43,7 @@ import {
   type RecipeSources,
 } from './recipes';
 import { planOwnedBlueprints, reactionFacilityFor, resolveTopLevelTier } from './resolveBuildPlan';
-import { offersForRegion } from './buildPlanPricingInputs';
+import { communityOffersForRows, offersForRegion } from './buildPlanPricingInputs';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 
 interface ResolvedMember {
@@ -187,7 +187,9 @@ export async function applyGroupAutoBuild(
   /** BPC Sourcing rows (all regions) — narrowed to each member's own Trade Hub region. */
   bpcRows: readonly BpcContractRow[] = [],
   /** `useIncludeBlueprintCost` — whether a cost-effective verdict counts the blueprint purchase, as the member's own total does. */
-  includeBlueprintCost = true
+  includeBlueprintCost = true,
+  /** Community Offers (issue #3603): free Shared Blueprints, region-agnostic. */
+  communityRows: readonly BpcSearchRow[] = []
 ): Promise<Map<string, Set<number>>> {
   const members = plans.flatMap((plan) => {
     const member = resolveMember(plan, catalog);
@@ -229,6 +231,7 @@ export async function applyGroupAutoBuild(
           offersFor: offersForRegion(bpcRows, hub.regionId),
           extraOffersFor: blueprintPurchaseOffersFor,
           lastResortOffersFor: offersForRegion(bpcRows, hub.regionId, true),
+          communityOffersFor: communityOffersForRows(communityRows),
           hubPrices: snapshot.hubPrices,
           sourcing: member.plan.materialSourcing,
         },
