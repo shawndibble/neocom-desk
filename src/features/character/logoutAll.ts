@@ -11,18 +11,24 @@ import { db } from '@/db';
 import { signOutOfSync } from '@/sync';
 import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
 import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
-import { flushSync, removeCharacter } from './removeCharacter';
+import { flushSync, removeCharacter, removeSharedBlueprints } from './removeCharacter';
 
 /**
  * @param syncConfigured Whether sync is set up here — gate on
  *   `isSyncConfigured()` at the call site. When true, each Character gets a
  *   last push first, and the Firebase session (which persists on disk) is
  *   signed out at the end.
+ * @param removeShared Also delete what each Character shared with its
+ *   Communities (issue #3600); the prompt defaults this to yes.
  * @returns How many Characters were logged out.
  */
-export async function logoutAllCharacters(syncConfigured: boolean): Promise<number> {
+export async function logoutAllCharacters(
+  syncConfigured: boolean,
+  removeShared = false
+): Promise<number> {
   const characters = await db.characters.toArray();
   const ids = characters.map((character) => character.characterId);
+  if (removeShared) await removeSharedBlueprints(ids);
   if (syncConfigured) await flushSync(ids);
   for (const id of ids) {
     await removeCharacter(id, false);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
 import { CharacterSharePicker } from './SharePicker';
+import { publishSharedLibrary } from './libraryPush';
 import { loadShareSelection, saveShareSelection } from './shareSelection';
 
 /**
@@ -47,6 +48,8 @@ export function ShareSelectionDialog({
     setFailed(false);
     try {
       await saveShareSelection(characterId, communityId, draft);
+      // Publish now rather than at the next sweep; a failure is retried then.
+      void publishSharedLibrary(characterId, communityId);
       onSaved(draft.size);
       onClose();
     } catch {

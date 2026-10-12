@@ -95,6 +95,7 @@ import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
+import { RemoveSharedOption } from '@/features/communities/RemoveSharedOption';
 import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
@@ -977,6 +978,8 @@ export function Characters() {
     id: number;
     name: string;
   } | null>(null);
+  /** Also delete this Character's Shared Blueprints from its Communities (issue #3600). */
+  const [removeShared, setRemoveShared] = useState(true);
   /** The Character whose removal just failed — rolled back whole, so it is still listed. */
   const [removeFailedName, setRemoveFailedName] = useState<string | null>(null);
   useEffect(() => {
@@ -1265,6 +1268,7 @@ export function Characters() {
   }
 
   function requestRemoveCharacter(characterId: number, name: string) {
+    setRemoveShared(true);
     setRemovingCharacter({ id: characterId, name });
   }
 
@@ -1281,7 +1285,7 @@ export function Characters() {
       cardId ? document.querySelector<HTMLElement>(`[data-character-select="${cardId}"]`) : null;
     setRemovingCharacter(null);
     try {
-      await removeCharacterAfterSync(id, isSyncConfigured());
+      await removeCharacterAfterSync(id, isSyncConfigured(), removeShared);
       useAuthFailure.getState().dismissNeedsLogin(id);
       // The dialog has closed by now, so this isn't overridden by its focus return.
       focusAfterCommit(
@@ -1938,6 +1942,13 @@ export function Characters() {
         <p className="text-xs text-text-dim">
           {removingCharacter && t('characters.removeConfirm', { name: removingCharacter.name })}
         </p>
+        {removingCharacter && (
+          <RemoveSharedOption
+            characterIds={[removingCharacter.id]}
+            checked={removeShared}
+            onChange={setRemoveShared}
+          />
+        )}
         <div className="mt-3 flex justify-end gap-2">
           <Button size="sm" onClick={() => setRemovingCharacter(null)}>
             {t('characters.cancel')}
