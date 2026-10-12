@@ -81,6 +81,28 @@ async function call<In, Out>(characterId: number, name: string, data: In): Promi
   return result.data;
 }
 
+export interface InvitePreview {
+  name: string;
+  adminName: string;
+  memberCount: number;
+}
+
+/** The invite page's preview. Needs no session: a visitor has not signed in yet. */
+export async function previewInvite(inviteCode: string): Promise<InvitePreview> {
+  const result = await httpsCallable<{ inviteCode: string }, InvitePreview>(
+    getSyncFunctions(),
+    'previewCommunityCallable'
+  )({ inviteCode });
+  return result.data;
+}
+
+export function joinCommunity(characterId: number, inviteCode: string, characterName: string) {
+  return call<
+    { inviteCode: string; characterName: string },
+    { communityId: string; alreadyMember: boolean }
+  >(characterId, 'joinCommunityCallable', { inviteCode, characterName });
+}
+
 export function createCommunity(characterId: number, name: string, characterName: string) {
   return call<{ name: string; characterName: string }, { communityId: string; inviteCode: string }>(
     characterId,

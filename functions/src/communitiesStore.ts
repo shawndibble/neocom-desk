@@ -46,10 +46,14 @@ function fail(decision: string): never {
     case 'too-many-communities':
       throw new HttpsError(
         'resource-exhausted',
-        `A Character can belong to at most ${MAX_COMMUNITIES_PER_CHARACTER} Communities`
+        `A Character can belong to at most ${MAX_COMMUNITIES_PER_CHARACTER} Communities`,
+        { reason: 'too-many-communities' }
       );
     case 'community-full':
-      throw new HttpsError('resource-exhausted', 'This Community is full');
+      // `details.reason` lets the join page tell the two caps apart without parsing prose.
+      throw new HttpsError('resource-exhausted', 'This Community is full', {
+        reason: 'community-full',
+      });
     case 'invalid-invite':
       throw new HttpsError('not-found', 'Invite link is not valid');
     case 'not-admin':
@@ -97,6 +101,34 @@ async function pruneDanglingIndex(db: Firestore, uid: string): Promise<void> {
     .docs) {
     if (!(await communityRef(db, entry.id).get()).exists) await entry.ref.delete();
   }
+}
+
+export interface InvitePreview {
+  name: string;
+  adminName: string;
+  memberCount: number;
+}
+
+/**
+ * What the invite page shows before sign-in: name, admin and Member count.
+ * Callable without a session, so it returns only these three public facts —
+ * never the invite code, the admin's uid or any Member beyond the admin's name.
+ * An unknown or revoked code is the same not-found a join gives.
+ */
+export async function previewCommunity(db: Firestore, inviteCode: string): Promise<InvitePreview> {
+  const found = await db
+    .collection(COMMUNITIES_COLLECTION)
+    .where('inviteCode', '==', inviteCode)
+    .limit(1)
+    .get();
+  if (found.empty) fail('invalid-invite');
+  const community = found.docs[0];
+  const admin = await memberRef(db, community.id, community.get('adminUid')).get();
+  return {
+    name: String(community.get('name') ?? ''),
+    adminName: String(admin.get('characterName') ?? ''),
+    memberCount: Number(community.get('memberCount') ?? 0),
+  };
 }
 
 export async function createCommunity(

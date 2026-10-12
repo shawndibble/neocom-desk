@@ -77,6 +77,16 @@ export function parseJoinInput(data: unknown): JoinCommunityInput {
   };
 }
 
+export interface PreviewInviteInput {
+  inviteCode: string;
+}
+
+export function parsePreviewInput(data: unknown): PreviewInviteInput {
+  return {
+    inviteCode: boundedString(record(data).inviteCode, 'inviteCode', MAX_INVITE_CODE_LENGTH),
+  };
+}
+
 export function parseCommunityIdInput(data: unknown): CommunityIdInput {
   return { communityId: docId(record(data).communityId, 'communityId') };
 }
