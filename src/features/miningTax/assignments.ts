@@ -205,6 +205,11 @@ export interface CombinedMemberValues {
 export interface UpdateCombinedInput {
   payeeId: string;
   taxPct: number;
+  /**
+   * The "Moon / structure" label for every day (blank removes it). Omitted
+   * leaves each day's stored label as it is.
+   */
+  label?: string;
   /** Each member's own figures, keyed by Assignment id. A member missing here keeps its stored ones. */
   members: Readonly<Record<string, CombinedMemberValues>>;
 }
@@ -233,6 +238,11 @@ export async function updateCombinedAssignments(
       ...(values ? { estimatedValue: values.estimatedValue, taxOwed: values.taxOwed } : {}),
       updatedAt: now,
     };
+    if (input.label !== undefined) {
+      const label = normalizeLabel(input.label);
+      if (label) next.label = label;
+      else delete next.label;
+    }
     if (values) {
       if (values.oreLineValues !== undefined) next.oreLineValues = values.oreLineValues;
       else delete next.oreLineValues;
