@@ -361,39 +361,43 @@ function FireRow({
   return (
     <li
       data-fire-id={fire.id}
-      className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-line py-1 last:border-b-0 min-h-11 md:min-h-0"
+      className="flex items-start gap-x-2 border-b border-line py-1 last:border-b-0 min-h-11 md:min-h-0"
     >
-      <Link
-        to={notificationUrlForSubject(
-          fire.eventId,
-          fire.subjectId ?? fire.typeId,
-          fire.characterId
-        )}
-        onClick={onNavigate}
-        className="min-w-0 flex-1 basis-48 rounded-xs text-xs text-text-dim hover:text-text hover:underline"
-      >
-        {body}
-      </Link>
-      {showCharacter && (
-        <CharacterLink
-          id={fire.characterId}
-          className="max-w-24 shrink-0 truncate text-[0.6875rem] font-medium"
+      {/* The × sits outside the wrapping text block so it stays top-right when the body wraps. */}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 self-center">
+        <Link
+          to={notificationUrlForSubject(
+            fire.eventId,
+            fire.subjectId ?? fire.typeId,
+            fire.characterId
+          )}
+          onClick={onNavigate}
+          className="min-w-0 flex-1 basis-48 rounded-xs text-xs text-text-dim hover:text-text hover:underline"
         >
-          {characterName}
-        </CharacterLink>
-      )}
-      <time
-        dateTime={fired.toISOString()}
-        className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim"
-      >
-        {formatAge(Math.max(0, now - fire.firedAt), t)}
-      </time>
+          {body}
+        </Link>
+        {showCharacter && (
+          <CharacterLink
+            id={fire.characterId}
+            className="max-w-24 shrink-0 truncate text-[0.6875rem] font-medium"
+          >
+            {characterName}
+          </CharacterLink>
+        )}
+        <time
+          dateTime={fired.toISOString()}
+          className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim"
+        >
+          {formatAge(Math.max(0, now - fire.firedAt), t)}
+        </time>
+      </div>
       <IconButton
         icon={<Icon.Close />}
         label={t('alerts.panel.dismissFire', { body })}
         variant="plain"
         size={buttonSize}
         onClick={onDismiss}
+        className="shrink-0"
       />
     </li>
   );
