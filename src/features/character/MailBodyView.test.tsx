@@ -15,4 +15,13 @@ describe('MailBodyView', () => {
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.getByText('Just a note.')).toBeInTheDocument();
   });
+
+  it('pads a column the same in every row, whether or not the row is the longest', () => {
+    render(<MailBodyView text={'A    B    C    D\nx    1    2    3\ny    4    5'} />);
+    // Padding that depends on being the row's last cell shifts a short row's
+    // numbers out from under the longer row's in the same column.
+    expect(screen.getByRole('cell', { name: '2' }).className).toBe(
+      screen.getByRole('cell', { name: '5' }).className
+    );
+  });
 });
