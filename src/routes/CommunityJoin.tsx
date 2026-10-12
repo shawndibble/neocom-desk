@@ -20,6 +20,7 @@ import {
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { CharacterSharePicker } from '@/features/communities/SharePicker';
+import { publishSharedLibrary } from '@/features/communities/libraryPush';
 import { saveShareSelection } from '@/features/communities/shareSelection';
 import { callableErrorCode, callableErrorReason } from '@/features/communities/callableError';
 import {
@@ -132,6 +133,7 @@ export function CommunityJoin() {
             joined.communityId,
             chosenIds ?? new Set()
           ).catch(() => undefined);
+          void publishSharedLibrary(character.characterId, joined.communityId);
         }
         next[character.characterId] = joined.alreadyMember ? 'alreadyMember' : 'joined';
       } catch (err) {

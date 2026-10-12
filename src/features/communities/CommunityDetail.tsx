@@ -12,6 +12,8 @@ import {
   useTimedToast,
 } from '@/components/ui';
 import { NOTICE_MS } from '@/components/ui/useTimedToast';
+import { isLibraryStale } from '@/engine/communities/sharedLibrary';
+import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
 import { uidForCharacter } from '@/sync/uid';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -60,6 +62,8 @@ export function CommunityDetail({
   const { t } = useTranslation();
   const admin = isCommunityAdmin(community, characterId);
   const myUid = uidForCharacter(characterId);
+  // Read once per mount: "as of" ages and the 30-day stale line need no ticking.
+  const [now] = useState(() => Date.now());
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
   const [membersFailed, setMembersFailed] = useState(false);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -188,12 +192,26 @@ export function CommunityDetail({
           {members.map((member) => {
             const isSelf = member.uid === myUid;
             const isAdminRow = member.uid === community.adminUid;
+            const stale = isLibraryStale(member.libraryAsOf, now);
             const row = (
-              <li key={member.uid} className="flex items-center gap-2 py-1.5 text-xs">
+              <li
+                key={member.uid}
+                className={`flex items-center gap-2 py-1.5 text-xs ${stale ? 'opacity-60' : ''}`}
+              >
                 <span className="min-w-0 flex-1 truncate">
                   {member.characterName}
                   {isSelf && <span className="ml-1 text-text-dim">({t('communities.you')})</span>}
+                  {member.libraryAsOf !== null && (
+                    <span className="ml-1 text-text-dim">
+                      {t('communities.asOf', { age: formatAge(now - member.libraryAsOf, t) })}
+                    </span>
+                  )}
                 </span>
+                {stale && (
+                  <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
+                    {t('communities.staleBadge')}
+                  </span>
+                )}
                 {isAdminRow && (
                   <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
                     {t('communities.adminBadge')}

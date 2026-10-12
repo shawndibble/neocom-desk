@@ -25,6 +25,8 @@ export interface CommunityMember {
   uid: string;
   characterName: string;
   joinedAt: number;
+  /** When the Member's Shared Blueprints were last refreshed; null when it shares none. */
+  libraryAsOf: number | null;
 }
 
 /** Where an invite link lands. The join page is its own ticket; this is its one address. */
@@ -71,8 +73,16 @@ export async function loadCommunityMembers(
       uid: entry.id,
       characterName: String(entry.data().characterName ?? ''),
       joinedAt: Number(entry.data().joinedAt ?? 0),
+      libraryAsOf: libraryAsOf(entry.data()),
     }))
     .sort((a, b) => a.characterName.localeCompare(b.characterName));
+}
+
+/** The pushed-at stamp, only while the Member shares anything (a cleared library has chunkCount 0). */
+function libraryAsOf(data: Record<string, unknown>): number | null {
+  const stamp = data.pushedAt as { toMillis?: () => number } | undefined;
+  if (!stamp?.toMillis || !Number(data.chunkCount ?? 0)) return null;
+  return stamp.toMillis();
 }
 
 async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
