@@ -33,7 +33,8 @@ const hauledBy = (hauls: Haul[], unfit: never[] = []) => ({
   hull,
   trips: hauls.length,
   unfitCount: unfit.length,
-  pickups: [{ characterId: 1, locationId: 60003760, hauls, unfit }],
+  tooBigCount: 0,
+  pickups: [{ characterId: 1, locationId: 60003760, hauls, unfit, tooBigShips: [] }],
 });
 
 const plan = {
@@ -42,7 +43,16 @@ const plan = {
       characterId: 1,
       name: 'Alice',
       totalM3: 150,
-      pickups: [{ locationId: 60003760, lines: [], ships: [], unknownVolume: [], totalM3: 150 }],
+      pickups: [
+        {
+          locationId: 60003760,
+          lines: [],
+          ships: [],
+          packed: [],
+          unknownVolume: [],
+          totalM3: 150,
+        },
+      ],
     },
   ],
   totals: {
@@ -91,6 +101,7 @@ describe('PlanResult', () => {
           onBack={vi.fn()}
           onDone={vi.fn()}
           onPackShip={vi.fn()}
+          onUnpackShip={vi.fn()}
           rigsOf={() => 0}
           canPack={() => true}
           name={() => 'Tritanium'}
@@ -130,6 +141,7 @@ describe('PlanResult', () => {
           onBack={vi.fn()}
           onDone={vi.fn()}
           onPackShip={vi.fn()}
+          onUnpackShip={vi.fn()}
           rigsOf={() => 0}
           canPack={() => true}
           name={() => 'Tritanium'}
@@ -171,6 +183,7 @@ describe('PlanResult', () => {
             locationId: 60003760,
             hauls: [haul],
             unfit: [{ typeId: 28661, quantity: 1, unitM3: 50_000 }],
+            tooBigShips: [],
           },
         ],
       },
@@ -191,6 +204,7 @@ describe('PlanResult', () => {
           onBack={vi.fn()}
           onDone={vi.fn()}
           onPackShip={vi.fn()}
+          onUnpackShip={vi.fn()}
           rigsOf={() => 0}
           canPack={() => true}
           name={(typeId) =>
@@ -237,6 +251,7 @@ describe('PlanResult', () => {
           onBack={vi.fn()}
           onDone={vi.fn()}
           onPackShip={vi.fn()}
+          onUnpackShip={vi.fn()}
           rigsOf={() => 0}
           canPack={() => true}
           name={() => 'Tritanium'}
@@ -246,6 +261,70 @@ describe('PlanResult', () => {
       </MemoryRouter>
     );
     expect(screen.getByText(/leaves 1 stack behind/)).toBeTruthy();
+  });
+
+  it('lists a packed ship with Fly instead, and flags one too big for the hauler', async () => {
+    const onUnpackShip = vi.fn();
+    const tooBigPlan = {
+      ...plan,
+      perCharacter: [
+        {
+          ...plan.perCharacter[0],
+          pickups: [
+            {
+              ...plan.perCharacter[0].pickups[0],
+              packed: [{ itemId: 9, typeId: 47466 }],
+            },
+          ],
+        },
+      ],
+      suggested: {
+        ...hauledBy([cargoHaul(100)]),
+        tooBigCount: 1,
+        pickups: [
+          {
+            characterId: 1,
+            locationId: 60003760,
+            hauls: [cargoHaul(100)],
+            unfit: [],
+            tooBigShips: [{ typeId: 47466, quantity: 1, unitM3: 50_000 }],
+          },
+        ],
+      },
+    } as MovePlan;
+    render(
+      <MemoryRouter>
+        <PlanResult
+          state={{
+            plan: tooBigPlan,
+            destinationSystem: null,
+            destinationStation: 'Amarr VIII',
+            pickupSystems: new Map(),
+          }}
+          scope={{ characters: [], activeCharacterId: null } as never}
+          compareOpen={false}
+          headingRef={{ current: null }}
+          onToggleCompare={vi.fn()}
+          onBack={vi.fn()}
+          onDone={vi.fn()}
+          onPackShip={vi.fn()}
+          onUnpackShip={onUnpackShip}
+          rigsOf={() => 0}
+          canPack={() => true}
+          name={(typeId) => (typeId === 47466 ? 'Praxis' : 'Tritanium')}
+          placeLabel={() => 'Jita 4-4'}
+          hueOf={() => 0}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(/1 packed ship is too big for Badger/)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Too big to carry/ })).toBeTruthy();
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Fly Praxis instead of packing it' }));
+    expect(onUnpackShip).toHaveBeenCalledWith(9);
+    // 1 haul + 1 forced flight
+    expect(screen.getByText('trips').parentElement?.textContent).toBe('2trips');
   });
 
   describe('Pack instead', () => {
@@ -267,6 +346,7 @@ describe('PlanResult', () => {
             onBack={vi.fn()}
             onDone={vi.fn()}
             onPackShip={onPackShip}
+            onUnpackShip={vi.fn()}
             rigsOf={() => rigs}
             canPack={() => true}
             name={() => 'Badger'}
@@ -320,6 +400,7 @@ describe('PlanResult', () => {
             onBack={vi.fn()}
             onDone={vi.fn()}
             onPackShip={vi.fn()}
+            onUnpackShip={vi.fn()}
             rigsOf={() => 0}
             canPack={() => true}
             name={() => 'Badger'}
@@ -381,6 +462,7 @@ describe('PlanResult', () => {
             onBack={vi.fn()}
             onDone={vi.fn()}
             onPackShip={() => setPacked(true)}
+            onUnpackShip={() => setPacked(false)}
             rigsOf={() => rigs}
             canPack={() => true}
             name={() => 'Badger'}

@@ -38,6 +38,8 @@ export interface MovePickupGroup {
   lines: ConsolidationLine[];
   /** Assembled ships to fly out. */
   ships: { itemId: number; typeId: number }[];
+  /** Assembled ships the user chose to haul packaged; their volume is in `lines`. */
+  packed: { itemId: number; typeId: number }[];
   /** Types with no known packaged volume, excluded from every total. */
   unknownVolume: { typeId: number; quantity: number }[];
   totalM3: number;
@@ -56,8 +58,10 @@ export interface PickupHauls {
   characterId: number;
   locationId: number;
   hauls: Haul[];
-  /** Stacks whose single unit is bigger than the hull's biggest hold. */
+  /** Non-ship stacks whose single unit is bigger than the hull's biggest hold. */
   unfit: PackLine[];
+  /** Packed ships bigger than the hull's biggest hold: they have to be flown. */
+  tooBigShips: PackLine[];
 }
 
 export interface HaulerOption {
@@ -67,6 +71,8 @@ export interface HaulerOption {
   pickups: PickupHauls[];
   /** Stacks this hull cannot carry at all; a hull with any ranks behind every one with none. */
   unfitCount: number;
+  /** Packed ships this hull cannot carry; each is a flight of its own. */
+  tooBigCount: number;
 }
 
 export interface MovePlan {
@@ -83,7 +89,7 @@ export interface MovePlan {
     /** Trips with the suggested hauler; null without a suggestion. */
     trips: number | null;
   };
-  /** Fewest left-behind stacks, then fewest hauls, then smallest hull; null with nothing to haul or no hulls. */
+  /** Fewest left-behind stacks, then fewest hauls plus forced flights, then smallest hull; null with nothing to haul or no hulls. */
   suggested: HaulerOption | null;
   /** Every hull, best first, for the "Compare haulers" disclosure. */
   comparison: HaulerOption[];
@@ -92,6 +98,7 @@ export interface MovePlan {
 interface PickupAccumulator {
   quantities: Map<number, number>;
   ships: MovePickupGroup['ships'];
+  packed: MovePickupGroup['ships'];
 }
 
 export function planMove(input: {
@@ -118,14 +125,18 @@ export function planMove(input: {
       const packed = isShip && input.packedShipIds?.has(a.itemId) === true;
       if (!isShip && !isHangarStock(a)) continue;
       let group = groups.get(a.locationId);
-      if (!group) groups.set(a.locationId, (group = { quantities: new Map(), ships: [] }));
+      if (!group)
+        groups.set(a.locationId, (group = { quantities: new Map(), ships: [], packed: [] }));
       if (isShip && !packed) group.ships.push({ itemId: a.itemId, typeId: a.typeId });
-      else group.quantities.set(a.typeId, (group.quantities.get(a.typeId) ?? 0) + a.quantity);
+      else if (packed) {
+        group.packed.push({ itemId: a.itemId, typeId: a.typeId });
+        group.quantities.set(a.typeId, (group.quantities.get(a.typeId) ?? 0) + a.quantity);
+      } else group.quantities.set(a.typeId, (group.quantities.get(a.typeId) ?? 0) + a.quantity);
     }
     if (groups.size === 0) continue;
 
     const pickups: MovePickupGroup[] = [];
-    for (const [locationId, { quantities, ships }] of groups) {
+    for (const [locationId, { quantities, ships, packed }] of groups) {
       const all = [...quantities].map(([typeId, quantity]) =>
         consolidationLine(typeId, quantity, input.unitM3)
       );
@@ -136,10 +147,12 @@ export function planMove(input: {
         .map(({ typeId, quantity }) => ({ typeId, quantity }))
         .sort((a, b) => a.typeId - b.typeId);
       ships.sort((a, b) => a.itemId - b.itemId);
+      packed.sort((a, b) => a.itemId - b.itemId);
       pickups.push({
         locationId,
         lines,
         ships,
+        packed,
         unknownVolume,
         totalM3: lines.reduce((sum, l) => sum + (l.m3 ?? 0), 0),
       });
@@ -169,25 +182,43 @@ export function planMove(input: {
               quantity: l.quantity,
               unitM3: l.m3! / l.quantity,
             }));
+          const { hauls, unfit } = packHauls(lines, hull.holds);
+          // A packed ship that fits no hold is flown instead; loose packaged stock cannot be.
+          const tooBigShips: PackLine[] = [];
+          const stillUnfit: PackLine[] = [];
+          for (const u of unfit) {
+            const packedHere = p.packed.filter((s) => s.typeId === u.typeId).length;
+            const flown = Math.min(u.quantity, packedHere);
+            if (flown > 0) tooBigShips.push({ ...u, quantity: flown });
+            if (u.quantity > flown) stillUnfit.push({ ...u, quantity: u.quantity - flown });
+          }
           return {
             characterId: c.characterId,
             locationId: p.locationId,
-            ...packHauls(lines, hull.holds),
+            hauls,
+            unfit: stillUnfit,
+            tooBigShips,
           };
         })
       );
       comparison.push({
         hull,
-        pickups: packed.filter((p) => p.hauls.length > 0 || p.unfit.length > 0),
+        pickups: packed.filter(
+          (p) => p.hauls.length > 0 || p.unfit.length > 0 || p.tooBigShips.length > 0
+        ),
         trips: packed.reduce((sum, p) => sum + p.hauls.length, 0),
         unfitCount: packed.reduce((sum, p) => sum + p.unfit.length, 0),
+        tooBigCount: packed.reduce(
+          (sum, p) => sum + p.tooBigShips.reduce((n, u) => n + u.quantity, 0),
+          0
+        ),
       });
     }
   }
   comparison.sort(
     (a, b) =>
       a.unfitCount - b.unfitCount ||
-      a.trips - b.trips ||
+      a.trips + a.tooBigCount - (b.trips + b.tooBigCount) ||
       a.hull.capacityM3 - b.hull.capacityM3 ||
       a.hull.typeId - b.hull.typeId
   );

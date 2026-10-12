@@ -326,6 +326,16 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
   }
 
+  /** Flies this packed ship after all, and re-plans without its volume. */
+  function unpackShip(itemId: number) {
+    const base = planBase.current;
+    if (!base) return;
+    const next = new Set(packed);
+    next.delete(itemId);
+    setPacked(next);
+    setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
+  }
+
   const name = (typeId: number) => loaded?.typeNames.get(typeId) ?? `#${typeId}`;
   const placeLabel = (id: number) => loaded?.places.get(id) ?? String(id);
   const hueOf = (id: number) => loaded?.hues.get(id) ?? 0;
@@ -372,6 +382,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
             }}
             onDone={onClose}
             onPackShip={packShip}
+            onUnpackShip={unpackShip}
             rigsOf={(itemId) => loaded.rigs.get(itemId) ?? 0}
             canPack={(typeId) => loaded.unitM3.has(typeId)}
             name={name}
