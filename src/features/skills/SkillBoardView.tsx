@@ -25,7 +25,6 @@ export function GroupTile({
   expanded,
   matchCount,
   trailing,
-  controlsId,
   onToggle,
 }: {
   group: BoardGroup;
@@ -33,21 +32,24 @@ export function GroupTile({
   matchCount?: number;
   /** The training chip, when the skill in training is in this group. */
   trailing?: ReactNode;
-  controlsId: string;
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
   const trainedShare = group.total === 0 ? 0 : (group.trained / group.total) * 100;
-  const queuedShare = group.total === 0 ? 0 : (group.queued / group.total) * 100;
+  // A trained skill with a higher level queued is in both counts; the queued
+  // segment only ever fills the untrained remainder, so the bar never overshoots.
+  const queuedShare =
+    group.total === 0 ? 0 : Math.min((group.queued / group.total) * 100, 100 - trainedShare);
   return (
     <button
       type="button"
       aria-expanded={expanded}
-      aria-controls={controlsId}
-      disabled={matchCount !== undefined}
+      // Not `disabled`: that would drop the tile from the tab order while a
+      // search is open. The search already expands what matches, so a toggle is a no-op.
+      aria-disabled={matchCount !== undefined || undefined}
       onClick={onToggle}
       className={cx(
-        'flex min-h-11 w-full scroll-mt-14 items-center gap-3 rounded-xs border border-line bg-panel/85 p-3 text-left disabled:hover:bg-panel/85',
+        'flex min-h-11 w-full scroll-mt-14 items-center gap-3 rounded-xs border border-line bg-panel/85 p-3 text-left aria-disabled:cursor-default aria-disabled:hover:bg-panel/85',
         rowInteractiveClassName,
         focusRingInsetClassName,
         expanded && 'border-accent-dim'
@@ -79,7 +81,7 @@ export function GroupTile({
 }
 
 /** "Need book": the skill is not in the character's skills, so its book is still to buy and inject. */
-export function NeedBookMarker() {
+function NeedBookMarker() {
   const { t } = useTranslation();
   return (
     <span className="shrink-0 rounded-xs border border-warning/50 px-1.5 py-0.5 text-[0.6875rem] whitespace-nowrap text-warning">

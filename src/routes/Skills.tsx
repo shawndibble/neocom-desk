@@ -547,63 +547,55 @@ export function Skills() {
               className="py-8"
             />
           ) : (
-            <>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {groups.map((group) => {
-                  if (searching && !filterResult.visibleGroupNames.has(group.groupName))
-                    return null;
-                  const expanded = searching || expandedGroups.has(group.groupName);
-                  const groupHasTraining =
-                    training !== null &&
-                    group.skills.some((skill) => skill.skillTypeID === training.skillTypeID);
-                  const skillsToShow = searching
-                    ? (filterResult.matchedSkillsByGroup.get(group.groupName) ?? [])
-                    : group.skills;
-                  const listId = `skills-group-${group.groupName.replace(/\W+/g, '-')}`;
-                  return (
-                    <section key={group.groupName} className={expanded ? 'col-span-full' : ''}>
-                      <h2>
-                        <GroupTile
-                          group={group}
-                          expanded={expanded}
-                          matchCount={searching ? skillsToShow.length : undefined}
-                          trailing={groupHasTraining ? trainingChip : null}
-                          controlsId={listId}
-                          onToggle={() => toggleGroup(group.groupName)}
-                        />
-                      </h2>
-                      {expanded && (
-                        <ul
-                          id={listId}
-                          className="mt-1 divide-y divide-line rounded-xs border border-line bg-panel/85 px-3"
-                        >
-                          {skillsToShow.map((skill) => (
-                            <SkillBoardRow
-                              key={skill.skillTypeID}
-                              skill={skill}
-                              selected={selectedSkillTypeID === skill.skillTypeID}
-                              plannedLevel={plannedLevels.get(skill.skillTypeID) ?? null}
-                              trainingChip={
-                                training?.skillTypeID === skill.skillTypeID ? trainingChip : null
-                              }
-                              buttonRef={(el) => {
-                                if (el) rowButtons.current.set(skill.skillTypeID, el);
-                                else rowButtons.current.delete(skill.skillTypeID);
-                              }}
-                              onSelect={() =>
-                                setSelectedSkillTypeID((current) =>
-                                  current === skill.skillTypeID ? null : skill.skillTypeID
-                                )
-                              }
-                            />
-                          ))}
-                        </ul>
-                      )}
-                    </section>
-                  );
-                })}
-              </div>
-            </>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {groups.map((group) => {
+                if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;
+                const expanded = searching || expandedGroups.has(group.groupName);
+                const groupHasTraining =
+                  training !== null &&
+                  group.skills.some((skill) => skill.skillTypeID === training.skillTypeID);
+                const skillsToShow = searching
+                  ? (filterResult.matchedSkillsByGroup.get(group.groupName) ?? [])
+                  : group.skills;
+                return (
+                  <section key={group.groupName} className={expanded ? 'col-span-full' : ''}>
+                    <h2>
+                      <GroupTile
+                        group={group}
+                        expanded={expanded}
+                        matchCount={searching ? skillsToShow.length : undefined}
+                        trailing={groupHasTraining ? trainingChip : null}
+                        onToggle={() => toggleGroup(group.groupName)}
+                      />
+                    </h2>
+                    {expanded && (
+                      <ul className="mt-1 divide-y divide-line rounded-xs border border-line bg-panel/85 px-3">
+                        {skillsToShow.map((skill) => (
+                          <SkillBoardRow
+                            key={skill.skillTypeID}
+                            skill={skill}
+                            selected={selectedSkillTypeID === skill.skillTypeID}
+                            plannedLevel={plannedLevels.get(skill.skillTypeID) ?? null}
+                            trainingChip={
+                              training?.skillTypeID === skill.skillTypeID ? trainingChip : null
+                            }
+                            buttonRef={(el) => {
+                              if (el) rowButtons.current.set(skill.skillTypeID, el);
+                              else rowButtons.current.delete(skill.skillTypeID);
+                            }}
+                            onSelect={() =>
+                              setSelectedSkillTypeID((current) =>
+                                current === skill.skillTypeID ? null : skill.skillTypeID
+                              )
+                            }
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
           )}
         </>
       )}

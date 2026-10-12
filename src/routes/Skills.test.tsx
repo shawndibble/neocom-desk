@@ -635,6 +635,10 @@ describe('Skills', () => {
       within(screen.getByRole('button', { name: /^Gunnery/ })).getByText('1 match')
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Spaceship Command/ })).not.toBeInTheDocument();
+    // Still in the tab order while searching: aria-disabled, not disabled.
+    const tile = screen.getByRole('button', { name: /^Gunnery/ });
+    expect(tile).toHaveAttribute('aria-disabled', 'true');
+    expect(tile).toBeEnabled();
   });
 
   it('announces the match count, and no matches, for a search', async () => {
