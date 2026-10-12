@@ -116,7 +116,13 @@ function LibraryGroup({
                               { name: member.characterName }
                             )}
                           >
-                            {holder.hasOriginal ? '●' : '○'}
+                            <span aria-hidden="true" className="text-[0.6875rem] font-medium">
+                              {t(
+                                holder.hasOriginal
+                                  ? 'communities.library.bpo'
+                                  : 'communities.library.bpc'
+                              )}
+                            </span>
                           </span>
                         )}
                       </span>
@@ -312,7 +318,10 @@ export function CommunityLibrary({
                         : `${member.characterName} · ${t('communities.asOf', { age: formatAge(now - member.libraryAsOf, t) })}`
                   }
                 >
-                  <button type="button" className="grid w-8 place-items-center py-1">
+                  <button
+                    type="button"
+                    className="grid w-8 place-items-center py-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                  >
                     <MemberDot member={member} stale={stale} />
                     <span className="sr-only">{member.characterName}</span>
                   </button>

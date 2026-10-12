@@ -7693,7 +7693,7 @@
     "library": {
       "tab": "Library",
       "tabsLabel": "Community views",
-      "legend": "● shares the original (BPO), ○ shares copies only. Stale Members are greyed.",
+      "legend": "BPO: shares the original. BPC: shares copies only. Stale Members are greyed.",
       "filterLabel": "Show blueprints",
       "missingCommunity": "Missing from the Community",
       "ownedByMe": "Owned by me",
@@ -7707,6 +7707,8 @@
       "nobody": "Nobody",
       "holdsOriginal": "{{name}} shares the original",
       "holdsCopies": "{{name}} shares copies",
+      "bpo": "BPO",
+      "bpc": "BPC",
       "sharesNothing": "shares nothing",
       "stale": "{{name}} (stale, as of {{age}})",
       "count_one": "{{count}} blueprint",
