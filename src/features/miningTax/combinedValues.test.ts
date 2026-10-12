@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
-import { combinedDayValues, combinedLineDefaults, dayTotalValues } from './combinedValues';
+import {
+  combinedDayValues,
+  combinedLineDefaults,
+  dayTaxValues,
+  dayTotalValues,
+} from './combinedValues';
 
 const Z = 45490;
 const B = 45492;
@@ -83,5 +88,19 @@ describe('dayTotalValues', () => {
       estimatedValue: 2000,
       taxOwed: 100,
     });
+  });
+});
+
+describe('dayTaxValues', () => {
+  it('derives the whole-ISK value from a typed tax and keeps that tax exactly', () => {
+    expect(dayTaxValues(100, 5)).toEqual({ estimatedValue: 2000, taxOwed: 100 });
+  });
+
+  it('rounds the value to whole ISK without moving the typed tax', () => {
+    expect(dayTaxValues(100, 7)).toEqual({ estimatedValue: 1429, taxOwed: 100 });
+  });
+
+  it('has no value to derive at a 0% rate', () => {
+    expect(dayTaxValues(100, 0)).toBeNull();
   });
 });

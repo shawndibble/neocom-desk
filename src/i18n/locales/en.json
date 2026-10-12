@@ -5501,6 +5501,7 @@
       "paidHint_other": "Paid. Saving corrects all {{count}} days — the entry stays paid and its recorded payment stays linked.",
       "oreValueLabel": "{{name}} value on {{date}}",
       "dayValueLabel": "Estimated value on {{date}}",
+      "dayTaxLabel": "Tax owed on {{date}}",
       "taxAt": "Tax {{pct}}%",
       "save_one": "Save",
       "save_other": "Save all {{count}} days"
