@@ -4,9 +4,24 @@
  * `fittingSpec`). Only an explicit save writes here — editing never does — and
  * deletes go through `markFittingDeleted` so the removal propagates.
  */
+import { isSyncConfigured } from '@/app/syncStatus';
 import { db, type FittingRecord } from '@/db';
 import { markFittingDeleted, scheduleSync } from '@/sync';
 import { clampFittingDescription } from './saveToEve';
+
+/**
+ * A saved Fitting that is shared to a Community follows its owner's saves and
+ * deletes (issue #3605). Loaded on demand so Firebase stays out of this chunk,
+ * and never awaited: the local write is the save, the shared copy catches up.
+ */
+type SharedFittingsModule = typeof import('@/features/communities/sharedFittings');
+let sharedModule: Promise<SharedFittingsModule> | undefined;
+
+function followInCommunities(run: (shared: SharedFittingsModule) => Promise<void>) {
+  if (!isSyncConfigured()) return;
+  sharedModule ??= import('@/features/communities/sharedFittings');
+  void sharedModule.then(run).catch(() => undefined);
+}
 
 export function loadFittings(characterId: number): Promise<FittingRecord[]> {
   return db.fittings.where('characterId').equals(characterId).toArray();
@@ -38,6 +53,7 @@ export async function saveFitting(
   };
   await db.fittings.put(record);
   scheduleSync(characterId);
+  followInCommunities((shared) => shared.followSavedFitting(characterId, record));
   return record;
 }
 
@@ -78,4 +94,5 @@ export function setFittingNotes(fitting: FittingRecord, notes: string): Promise<
 
 export async function deleteFitting(fitting: FittingRecord): Promise<void> {
   await markFittingDeleted(fitting.characterId, fitting.id);
+  followInCommunities((shared) => shared.unshareDeletedFitting(fitting.characterId, fitting.id));
 }

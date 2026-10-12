@@ -18,11 +18,23 @@ import { flushSync, removeCharacter } from './removeCharacter';
  *   `isSyncConfigured()` at the call site. When true, each Character gets a
  *   last push first, and the Firebase session (which persists on disk) is
  *   signed out at the end.
+ * @param removeSharedFittings Take each Character's shared Fittings out of its
+ *   Communities first (issue #3605); needs `syncConfigured`, and runs while the
+ *   Characters can still sign in. Best effort: a failure never blocks the logout.
  * @returns How many Characters were logged out.
  */
-export async function logoutAllCharacters(syncConfigured: boolean): Promise<number> {
+export async function logoutAllCharacters(
+  syncConfigured: boolean,
+  removeSharedFittings = false
+): Promise<number> {
   const characters = await db.characters.toArray();
   const ids = characters.map((character) => character.characterId);
+  if (syncConfigured && removeSharedFittings) {
+    const shared = await import('@/features/communities/sharedFittings').catch(() => null);
+    if (shared) {
+      await Promise.allSettled(ids.map((id) => shared.unshareAllFittingsEverywhere(id)));
+    }
+  }
   if (syncConfigured) await flushSync(ids);
   for (const id of ids) {
     await removeCharacter(id, false);

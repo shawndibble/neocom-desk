@@ -7,6 +7,7 @@
 //   communities/{id}                              name, adminUid, inviteCode, memberCount, createdAt
 //   communities/{id}/members/{uid}                ownerHash, characterName, joinedAt (+ client-written pushedAt/libraryHash/chunkCount)
 //   communities/{id}/members/{uid}/library/{n}    chunk of Shared Blueprints, written by the Member
+//   communities/{id}/fittings/{uid~key}           one shared Fitting (issue #3605), written by the Member
 //   characters/{uid}/communities/{id}             the Character's membership index
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
@@ -31,6 +32,7 @@ import {
 } from './communities.js';
 
 const LIBRARY_COLLECTION = 'library';
+const FITTINGS_COLLECTION = 'fittings';
 
 /** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */
 export interface CallerCharacter {
@@ -200,7 +202,7 @@ export async function joinCommunity(
   if (existing.exists && existing.get('ownerHash') !== caller.ownerHash) {
     await removeMemberData(db, ref.id, caller.uid);
   } else if (!existing.exists) {
-    await db.recursiveDelete(memberRef(db, ref.id, caller.uid).collection(LIBRARY_COLLECTION));
+    await deleteMemberShares(db, ref.id, caller.uid);
   }
 
   return db.runTransaction(async (tx) => {
@@ -237,6 +239,22 @@ export async function joinCommunity(
 }
 
 /**
+ * Everything one Member shared into a Community: their blueprint library
+ * chunks and their shared Fittings (issue #3605). Every delete-on-leave path
+ * goes through this so a new kind of shared data can't be missed in one.
+ */
+async function deleteMemberShares(db: Firestore, communityId: string, uid: string): Promise<void> {
+  await db.recursiveDelete(memberRef(db, communityId, uid).collection(LIBRARY_COLLECTION));
+  const fittings = await communityRef(db, communityId)
+    .collection(FITTINGS_COLLECTION)
+    .where('ownerUid', '==', uid)
+    .get();
+  const writer = db.bulkWriter();
+  for (const fitting of fittings.docs) void writer.delete(fitting.ref);
+  await writer.close();
+}
+
+/**
  * Deletes one Member's shared data and membership. The Member doc, index doc
  * and count go first, in one transaction: with the Member doc gone the rules
  * stop the Member writing another chunk, so the library sweep after it can't
@@ -258,7 +276,7 @@ export async function removeMemberData(
     }
     tx.delete(indexCollection(db, uid).doc(communityId));
   });
-  await db.recursiveDelete(memberRef(db, communityId, uid).collection(LIBRARY_COLLECTION));
+  await deleteMemberShares(db, communityId, uid);
 }
 
 export async function leaveCommunity(

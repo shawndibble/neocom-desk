@@ -39,6 +39,15 @@ beforeEach(async () => {
     await setDoc(doc(db, MEMBER_1), { ownerHash: 'hash-1', joinedAt: 1, characterName: 'One' });
     await setDoc(doc(db, MEMBER_2), { ownerHash: 'hash-2', joinedAt: 1, characterName: 'Two' });
     await setDoc(doc(db, `${MEMBER_1}/library/0`), { ownerHash: 'hash-1', items: [{ typeId: 1 }] });
+    await setDoc(doc(db, `${C}/fittings/char:1~saved-a1`), {
+      ownerHash: 'hash-1',
+      ownerUid: 'char:1',
+      source: 'saved',
+      name: 'Cheap Rifter',
+      hull: 'Rifter',
+      code: 'CODE',
+      updatedAt: 1,
+    });
     await setDoc(doc(db, `${C}/mailInvites/42`), {
       adminUid: 'char:1',
       targetName: 'Bob',
@@ -237,5 +246,90 @@ describe('mail invites', () => {
     const db = characterAuth(env, 1, 'hash-1-new-owner').firestore();
     await assertFails(getDoc(doc(db, `${C}/mailInvites/42`)));
     await assertFails(getDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-12')));
+  });
+});
+
+describe('shared Fittings', () => {
+  const FIT_1 = `${C}/fittings/char:1~saved-a1`;
+  const fit = (over: Record<string, unknown> = {}) => ({
+    ownerHash: 'hash-1',
+    ownerUid: 'char:1',
+    source: 'saved',
+    name: 'Rifter',
+    hull: 'Rifter',
+    code: 'CODE',
+    updatedAt: serverTimestamp(),
+    ...over,
+  });
+
+  it('lets a Member list and read them, and nobody else', async () => {
+    const member = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(getDoc(doc(member, FIT_1)));
+    await assertSucceeds(getDocs(collection(member, `${C}/fittings`)));
+    const outsider = characterAuth(env, 3, 'hash-3').firestore();
+    await assertFails(getDoc(doc(outsider, FIT_1)));
+    await assertFails(getDocs(collection(outsider, `${C}/fittings`)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), FIT_1)));
+  });
+
+  it('denies a transferred Character the old membership', async () => {
+    const db = characterAuth(env, 2, 'hash-2-new-owner').firestore();
+    await assertFails(getDocs(collection(db, `${C}/fittings`)));
+  });
+
+  it('lets a Member write, re-push and delete their own, saved or in-game', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertSucceeds(setDoc(doc(db, FIT_1), fit()));
+    await assertSucceeds(setDoc(doc(db, `${C}/fittings/char:1~game-987`), fit({ source: 'game' })));
+    await assertSucceeds(deleteDoc(doc(db, FIT_1)));
+  });
+
+  it('denies writing or deleting under another Member’s id', async () => {
+    const db = characterAuth(env, 2, 'hash-2').firestore();
+    await assertFails(setDoc(doc(db, FIT_1), fit({ ownerHash: 'hash-2', ownerUid: 'char:2' })));
+    await assertFails(
+      setDoc(doc(db, `${C}/fittings/char:1~saved-new`), fit({ ownerHash: 'hash-2' }))
+    );
+    await assertFails(deleteDoc(doc(db, FIT_1)));
+  });
+
+  it('denies an id that is not <uid>~<source>-<key>', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, `${C}/fittings/plain`), fit()));
+    await assertFails(setDoc(doc(db, `${C}/fittings/char:1~other-1`), fit()));
+    await assertFails(setDoc(doc(db, `${C}/fittings/char:1~game-1`), fit({ source: 'saved' })));
+    await assertFails(setDoc(doc(db, `${C}/fittings/char:1~saved-1~x`), fit()));
+  });
+
+  it('denies a non-Member and a transferred Character writing', async () => {
+    await assertFails(
+      setDoc(
+        doc(characterAuth(env, 3, 'hash-3').firestore(), `${C}/fittings/char:3~saved-1`),
+        fit({ ownerHash: 'hash-3', ownerUid: 'char:3' })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(characterAuth(env, 1, 'hash-1-new-owner').firestore(), FIT_1),
+        fit({ ownerHash: 'hash-1-new-owner' })
+      )
+    );
+  });
+
+  it('denies a forged ownerHash or ownerUid, extra fields (notes), and a forged time', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, FIT_1), fit({ ownerHash: 'forged' })));
+    await assertFails(setDoc(doc(db, FIT_1), fit({ ownerUid: 'char:2' })));
+    await assertFails(setDoc(doc(db, FIT_1), fit({ notes: 'private' })));
+    await assertFails(setDoc(doc(db, FIT_1), fit({ updatedAt: 5 })));
+  });
+
+  it('denies empty or oversized names and codes, and wrong types', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, FIT_1), fit({ name: '' })));
+    await assertFails(setDoc(doc(db, FIT_1), fit({ name: 'x'.repeat(201) })));
+    await assertFails(setDoc(doc(db, FIT_1), fit({ code: '' })));
+    await assertFails(setDoc(doc(db, FIT_1), fit({ code: 'x'.repeat(90001) })));
+    await assertFails(setDoc(doc(db, FIT_1), fit({ hull: 7 })));
   });
 });

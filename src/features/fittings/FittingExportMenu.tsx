@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -18,6 +19,8 @@ interface Props {
   price: Appraisal | null;
   /** The pilot's active clone, left off the multibuy list (`useFittingExport`). */
   cloneImplants?: readonly number[];
+  /** "Share to Community" and its notice, for a saved Fitting (`useEditorShare`). */
+  share?: { items: ReactNode; notice: string | null };
 }
 
 /** The notice a copy leaves, announced politely. */
@@ -42,9 +45,11 @@ export function FittingExportItems({
     openManufacturePlan,
   },
   price,
+  share,
 }: {
   actions: FittingExport;
   price: Appraisal | null;
+  share?: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
@@ -69,6 +74,7 @@ export function FittingExportItems({
       <DropdownMenuItem onSelect={() => void openManufacturePlan()}>
         {t('fittings.export.manufacturePlan')}
       </DropdownMenuItem>
+      {share}
       <DropdownMenuSeparator />
       <div className="px-2 py-1.5 text-xs text-text-dim">
         {price ? (
@@ -92,18 +98,18 @@ export function FittingExportItems({
  * an in-game chat link or a multibuy list, and see the Fitting's Jita price
  * with a way into Appraisal for the same list.
  */
-export function FittingExportMenu({ fitting, price, cloneImplants }: Props) {
+export function FittingExportMenu({ fitting, price, cloneImplants, share }: Props) {
   const { t } = useTranslation();
   const actions = useFittingExport(fitting, cloneImplants);
   return (
     <div className="flex items-center gap-2">
-      <FittingExportNotice notice={actions.notice} />
+      <FittingExportNotice notice={actions.notice ?? share?.notice ?? null} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button>{t('fittings.export.button')}</Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
-          <FittingExportItems actions={actions} price={price} />
+          <FittingExportItems actions={actions} price={price} share={share?.items} />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

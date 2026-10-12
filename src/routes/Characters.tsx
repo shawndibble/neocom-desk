@@ -94,6 +94,7 @@ import { type QueueState } from '@/features/skills/queueStatus';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
+import { RemoveSharedFittingsOption } from '@/features/communities/RemoveSharedFittingsOption';
 import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
 import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
@@ -977,6 +978,8 @@ export function Characters() {
     id: number;
     name: string;
   } | null>(null);
+  // The logout prompt's "also remove my shared Fittings", on unless the pilot clears it.
+  const [removeSharedFittings, setRemoveSharedFittings] = useState(true);
   /** The Character whose removal just failed — rolled back whole, so it is still listed. */
   const [removeFailedName, setRemoveFailedName] = useState<string | null>(null);
   useEffect(() => {
@@ -1281,6 +1284,12 @@ export function Characters() {
       cardId ? document.querySelector<HTMLElement>(`[data-character-select="${cardId}"]`) : null;
     setRemovingCharacter(null);
     try {
+      // Before the login goes: removing a shared Fitting is signed as this Character.
+      if (isSyncConfigured() && removeSharedFittings) {
+        await import('@/features/communities/sharedFittings')
+          .then((shared) => shared.unshareAllFittingsEverywhere(id))
+          .catch(() => undefined);
+      }
       await removeCharacterAfterSync(id, isSyncConfigured());
       useAuthFailure.getState().dismissNeedsLogin(id);
       // The dialog has closed by now, so this isn't overridden by its focus return.
@@ -1938,6 +1947,12 @@ export function Characters() {
         <p className="text-xs text-text-dim">
           {removingCharacter && t('characters.removeConfirm', { name: removingCharacter.name })}
         </p>
+        {isSyncConfigured() && (
+          <RemoveSharedFittingsOption
+            checked={removeSharedFittings}
+            onChange={setRemoveSharedFittings}
+          />
+        )}
         <div className="mt-3 flex justify-end gap-2">
           <Button size="sm" onClick={() => setRemovingCharacter(null)}>
             {t('characters.cancel')}

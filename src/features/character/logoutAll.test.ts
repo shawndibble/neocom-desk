@@ -21,6 +21,11 @@ vi.mock('@/features/notifications/projectionUpload', () => ({
   unregisterProjectionRegistration: pushMock.unregisterProjectionRegistration,
 }));
 
+const sharedMock = vi.hoisted(() => ({
+  unshareAllFittingsEverywhere: vi.fn<(characterId: number) => Promise<void>>(async () => {}),
+}));
+vi.mock('@/features/communities/sharedFittings', () => sharedMock);
+
 async function seedCharacter(characterId: number): Promise<void> {
   await db.characters.put({
     characterId,
@@ -166,5 +171,36 @@ describe('logoutAllCharacters', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('takes each Character’s shared Fittings out of its Communities first, when asked', async () => {
+    await seedCharacter(1);
+    await seedCharacter(2);
+    sharedMock.unshareAllFittingsEverywhere.mockImplementation(async () => {
+      // The login must still be there to sign the removal.
+      expect(await db.tokens.count()).toBe(2);
+    });
+
+    await logoutAllCharacters(true, true);
+
+    expect(sharedMock.unshareAllFittingsEverywhere.mock.calls.map(([id]) => id).sort()).toEqual([
+      1, 2,
+    ]);
+    expect(await db.characters.count()).toBe(0);
+  });
+
+  it('leaves shared Fittings alone unless asked, and without sync', async () => {
+    await seedCharacter(1);
+    await logoutAllCharacters(true);
+    await seedCharacter(1);
+    await logoutAllCharacters(false, true);
+    expect(sharedMock.unshareAllFittingsEverywhere).not.toHaveBeenCalled();
+  });
+
+  it('still logs out when removing the shared Fittings fails', async () => {
+    await seedCharacter(1);
+    sharedMock.unshareAllFittingsEverywhere.mockRejectedValue(new Error('offline'));
+    await logoutAllCharacters(true, true);
+    expect(await db.characters.count()).toBe(0);
   });
 });
