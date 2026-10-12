@@ -220,9 +220,37 @@ describe('planMove', () => {
       const result = praxisPlan([small, mastodon]);
       expect(result.suggested?.hull.typeId).toBe(12747);
       const bad = result.comparison.find((o) => o.hull.typeId === 1)!;
-      expect(bad.unfitCount).toBe(1);
-      expect(bad.pickups[0].unfit).toEqual([{ typeId: PRAXIS, quantity: 1, unitM3: 50_000 }]);
-      expect(result.comparison[0].unfitCount).toBe(0);
+      expect(bad.tooBigCount).toBe(1);
+      expect(bad.pickups[0].tooBigShips).toEqual([{ typeId: PRAXIS, quantity: 1, unitM3: 50_000 }]);
+      expect(result.comparison[0].tooBigCount).toBe(0);
+    });
+
+    it('lists the ships the user chose to pack on their pickup', () => {
+      const result = praxisPlan([mastodon]);
+      expect(result.perCharacter[0].pickups[0].packed).toEqual([{ itemId: 9, typeId: PRAXIS }]);
+      expect(result.perCharacter[0].pickups[0].ships).toEqual([]);
+    });
+
+    it('a packed ship too big for the hauler must be flown: flagged, not left behind', () => {
+      const small = hull(1, 30_000); // 50k packaged never fits a 30k hold
+      const result = praxisPlan([small]);
+      const option = result.suggested!;
+      expect(option.tooBigCount).toBe(1);
+      expect(option.unfitCount).toBe(0);
+      expect(option.pickups[0].tooBigShips).toEqual([
+        { typeId: PRAXIS, quantity: 1, unitM3: 50_000 },
+      ]);
+      expect(option.pickups[0].unfit).toEqual([]);
+    });
+
+    it('counts a forced flight as a trip and ranks the hauler that carries it first', () => {
+      const small = hull(1, 30_000);
+      const result = praxisPlan([small, mastodon]);
+      expect(result.suggested?.hull.typeId).toBe(12747);
+      expect(result.comparison.map((o) => [o.hull.typeId, o.trips + o.tooBigCount])).toEqual([
+        [12747, 1],
+        [1, 2], // 1 haul for the loose stock + 1 forced flight
+      ]);
     });
 
     it('does not make a haul out of zero-volume stock', () => {

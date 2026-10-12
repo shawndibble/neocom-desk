@@ -5709,7 +5709,13 @@
       "leavesBehind_one": "leaves {{count}} stack behind",
       "leavesBehind_other": "leaves {{count}} stacks behind",
       "shareOfLoadHauls_one": "{{percent}}% of the load · {{count}} haul",
-      "shareOfLoadHauls_other": "{{percent}}% of the load · {{count}} hauls"
+      "shareOfLoadHauls_other": "{{percent}}% of the load · {{count}} hauls",
+      "packed": "Packed",
+      "flyInstead": "Fly instead",
+      "flyInsteadAria": "Fly {{ship}} instead of packing it",
+      "tooBigHeading": "Too big to carry · fly these yourself",
+      "tooBigWarning_one": "{{count}} packed ship is too big for {{hull}}. Fly it yourself.",
+      "tooBigWarning_other": "{{count}} packed ships are too big for {{hull}}. Fly them yourself."
     },
     "title": "Assets",
     "treeLabel": "Character assets",

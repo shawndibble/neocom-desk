@@ -46,6 +46,8 @@ interface PlanResultProps {
   onDone: () => void;
   /** Haul this ship (itemID) packaged instead of flying it. */
   onPackShip: (itemId: number) => void;
+  /** Fly a packed ship (itemID) after all. */
+  onUnpackShip: (itemId: number) => void;
   /** Rigs fitted to a ship; packing it means unfitting them, which destroys them. */
   rigsOf: (itemId: number) => number;
   /** Whether the ship type has a packaged volume to plan with. */
@@ -69,6 +71,7 @@ export function PlanResult({
   onBack,
   onDone,
   onPackShip,
+  onUnpackShip,
   rigsOf,
   canPack,
   name,
@@ -127,7 +130,9 @@ export function PlanResult({
   /** Ships flown out: each is a flight of its own, outside the hauler's trips. */
   const flown = pickups.flatMap((p) => p.ships);
   /** Every flown ship is a trip of its own on top of the hauls. */
-  const withShips = (hauls: number) => hauls + totals.shipsToFly;
+  const withShips = (hauls: number, tooBig = 0) => hauls + totals.shipsToFly + tooBig;
+  /** Packed ships the suggested hauler cannot carry: flown, so each is a flight. */
+  const tooBig = plan.suggested?.tooBigCount ?? 0;
   const leavesBehind = (count: number) => t('assets.movePlan.leavesBehind', { count });
   const alternatives = plan.comparison.filter((o) => o.hull.typeId !== plan.suggested?.hull.typeId);
 
@@ -142,9 +147,9 @@ export function PlanResult({
       {plan.suggested ? (
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3">
           <div className="row-span-2 min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">
-            {withShips(plan.suggested.trips)}
+            {withShips(plan.suggested.trips, tooBig)}
             <small className="mt-0.5 block text-xs font-semibold tracking-wide uppercase">
-              {t('assets.movePlan.tripsLabel', { count: withShips(plan.suggested.trips) })}
+              {t('assets.movePlan.tripsLabel', { count: withShips(plan.suggested.trips, tooBig) })}
             </small>
           </div>
           <p className="m-0 flex flex-wrap items-center gap-2 font-bold">
@@ -157,8 +162,8 @@ export function PlanResult({
             <span className="text-xs font-normal text-text-dim tabular-nums">
               {[
                 t('assets.movePlan.haulCount', { count: plan.suggested.trips }),
-                totals.shipsToFly > 0 &&
-                  t('assets.movePlan.shipFlightCount', { count: totals.shipsToFly }),
+                totals.shipsToFly + tooBig > 0 &&
+                  t('assets.movePlan.shipFlightCount', { count: totals.shipsToFly + tooBig }),
               ]
                 .filter(Boolean)
                 .join(' + ')}
@@ -169,7 +174,7 @@ export function PlanResult({
               {alternatives.slice(0, INLINE_ALTERNATIVES).map((o) => (
                 <li key={o.hull.typeId}>
                   <b className="font-semibold text-text">{o.hull.name}</b>{' '}
-                  {t('assets.movePlan.tripCount', { count: withShips(o.trips) })}
+                  {t('assets.movePlan.tripCount', { count: withShips(o.trips, o.tooBigCount) })}
                   {o.unfitCount > 0 && ` · ${leavesBehind(o.unfitCount)}`}
                 </li>
               ))}
@@ -203,12 +208,18 @@ export function PlanResult({
           <ul className="text-text-dim">
             {plan.comparison.map((o) => (
               <li key={o.hull.typeId}>
-                {o.hull.name} · {t('assets.movePlan.tripCount', { count: withShips(o.trips) })}
+                {o.hull.name} ·{' '}
+                {t('assets.movePlan.tripCount', { count: withShips(o.trips, o.tooBigCount) })}
                 {o.unfitCount > 0 && ` · ${leavesBehind(o.unfitCount)}`}
               </li>
             ))}
           </ul>
         </Disclosure>
+      )}
+      {plan.suggested && tooBig > 0 && (
+        <p className="m-0 text-sm font-semibold text-warning">
+          {t('assets.movePlan.tooBigWarning', { hull: plan.suggested.hull.name, count: tooBig })}
+        </p>
       )}
       {plan.suggested && plan.suggested.unfitCount > 0 && (
         <p className="m-0 text-sm font-semibold text-warning">
@@ -318,6 +329,24 @@ export function PlanResult({
                           qty={`× ${u.quantity.toLocaleString()}`}
                           trailing={t('assets.movePlan.volumeUnknown')}
                           dim
+                        />
+                      ))}
+                      {p.packed.map((s) => (
+                        <PlanLine
+                          key={s.itemId}
+                          name={name(s.typeId)}
+                          qty={<span className="text-text-dim">{t('assets.movePlan.packed')}</span>}
+                          trailing={
+                            <Button
+                              size="sm"
+                              aria-label={t('assets.movePlan.flyInsteadAria', {
+                                ship: name(s.typeId),
+                              })}
+                              onClick={() => onUnpackShip(s.itemId)}
+                            >
+                              {t('assets.movePlan.flyInstead')}
+                            </Button>
+                          }
                         />
                       ))}
                       {p.ships.map((s) => (

@@ -55,6 +55,24 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
             ))}
         </section>
       ))}
+      {pickup.tooBigShips.length > 0 && (
+        <section className="flex flex-col gap-1">
+          <h4 className="m-0 text-xs font-semibold tracking-wide text-warning uppercase">
+            {t('assets.movePlan.tooBigHeading')}
+          </h4>
+          <ul className="m-0 flex list-none flex-col p-0">
+            {pickup.tooBigShips.map((u) => (
+              <PlanLine
+                key={u.typeId}
+                name={name(u.typeId)}
+                qty={`× ${u.quantity.toLocaleString()}`}
+                trailing={t('assets.movePlan.unfitLine', { unit: formatCubicMetres(u.unitM3) })}
+                dim
+              />
+            ))}
+          </ul>
+        </section>
+      )}
       {pickup.unfit.length > 0 && (
         <section className="flex flex-col gap-1">
           <h4 className="m-0 text-xs font-semibold tracking-wide text-warning uppercase">
