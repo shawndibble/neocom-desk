@@ -223,7 +223,7 @@ export default function NetWorthChart(props: NetWorthChartProps) {
                 <Area
                   key={id}
                   isAnimationActive={false}
-                  type="stepAfter"
+                  type="linear"
                   stackId="net-worth"
                   dataKey={`values.${id}`}
                   name={t(LAYER_LABEL_KEYS[id])}
