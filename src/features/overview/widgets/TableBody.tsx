@@ -262,7 +262,7 @@ function SortableLabel({
   );
 }
 
-/** Rows-per-page choice, a range, and paired carets (§6c's pager cue). */
+/** Rows-per-page choice, a range, and paired carets (§6c's "Paired carets in IconButtons" cue). */
 function Pager({
   page,
   total,
@@ -330,10 +330,17 @@ export function TableBody({
   // The page is remembered with the page size it was chosen under, so a size change
   // starts over on page 1 without an effect to reset it.
   const [pageState, setPageState] = useState({ page: 1, perPage: paging?.rowsPerPage });
+  // A sort on a column this width has dropped is ignored, so the rows never sit in an order
+  // no visible header explains; choosing it again (wider) picks it back up.
+  const activeSort = sort && columns.some((column) => column.key === sort.columnId) ? sort : null;
   const sorted = useMemo(() => {
-    const index = sort ? table.columns.findIndex((column) => column.key === sort.columnId) : -1;
-    return sort && index >= 0 ? sortTableRows(table.rows, index, sort.direction) : table.rows;
-  }, [table, sort]);
+    const index = activeSort
+      ? table.columns.findIndex((column) => column.key === activeSort.columnId)
+      : -1;
+    return activeSort && index >= 0
+      ? sortTableRows(table.rows, index, activeSort.direction)
+      : table.rows;
+  }, [table, activeSort]);
 
   // A pageable table is never cut at the size's row limit; it shows everything, a page at a time
   // once there are more rows than the smallest page.
@@ -359,7 +366,7 @@ export function TableBody({
           <thead>
             <tr className="border-b border-line">
               {columns.map((column, i) => {
-                const direction = sort?.columnId === column.key ? sort.direction : null;
+                const direction = activeSort?.columnId === column.key ? activeSort.direction : null;
                 return (
                   <th
                     key={column.key}
