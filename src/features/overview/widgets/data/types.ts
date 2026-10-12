@@ -119,11 +119,18 @@ export interface TableColumn {
    */
   grow?: boolean;
   /**
-   * Drawn only when the widget itself is at least 28rem wide (a container query, so it
-   * follows the widget, not the viewport). A column the row reads fine without, such as an
-   * order's side or station, so a phone keeps the first column's text instead of squeezing it.
+   * Hidden until the table's own box is at least 28rem across (a container query on the
+   * table wrapper, so it follows the box, not the viewport). For a column the row reads fine
+   * without, such as an order's side or station, so a narrow box keeps the first column's text.
+   * This is a second, CSS-only way to drop a column beside `priority` and the size's budget.
    */
-  wide?: boolean;
+  hideNarrow?: boolean;
+  /**
+   * On the first column: never narrower than 7rem, however many other columns are drawn.
+   * Opt-in, because a floor can push a table past its widget: set it only where the first
+   * column's text is the point (an item name) and the other columns are few.
+   */
+  nameFloor?: boolean;
 }
 
 export interface TableRowModel {

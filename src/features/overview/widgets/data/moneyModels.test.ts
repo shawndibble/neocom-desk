@@ -111,7 +111,11 @@ describe('ordersTable', () => {
   });
 
   it('drops the side and station on a narrow widget so the item name keeps its width', () => {
-    expect(table.columns.filter((c) => c.wide).map((c) => c.key)).toEqual(['side', 'station']);
+    expect(table.columns.filter((c) => c.hideNarrow).map((c) => c.key)).toEqual([
+      'side',
+      'station',
+    ]);
+    expect(table.columns.filter((c) => c.nameFloor).map((c) => c.key)).toEqual(['item']);
   });
 
   it('sorts the worst problem first, then by ISK tied up', () => {

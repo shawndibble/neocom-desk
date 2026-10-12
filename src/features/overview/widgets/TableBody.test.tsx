@@ -28,6 +28,37 @@ const renderTable = (model: TableModel = table) =>
     </MemoryRouter>
   );
 
+describe('TableBody narrow-box rules', () => {
+  const model: TableModel = {
+    columns: [
+      { key: 'item', label: 'Item', priority: 0, nameFloor: true },
+      { key: 'price', label: 'Price', align: 'end', priority: 1 },
+      { key: 'station', label: 'Station', priority: 2, hideNarrow: true },
+    ],
+    rows: [{ key: 'a', cells: ['Wyvern', '310M', 'Amarr VIII'] }],
+  };
+
+  it('hides a hideNarrow column until the box is wide, header and cell alike', () => {
+    renderTable(model);
+    expect(screen.getByRole('columnheader', { name: 'Station' })).toHaveClass(
+      'hidden',
+      '@md:table-cell'
+    );
+    expect(screen.getByRole('cell', { name: 'Amarr VIII' })).toHaveClass(
+      'hidden',
+      '@md:table-cell'
+    );
+    expect(screen.getByRole('cell', { name: '310M' })).not.toHaveClass('hidden');
+  });
+
+  it('floors the first column only when it opts in', () => {
+    renderTable(model);
+    expect(screen.getByRole('cell', { name: /Wyvern/ })).toHaveClass('min-w-28');
+    renderTable(table);
+    expect(screen.getByRole('cell', { name: /Alpha/ })).not.toHaveClass('min-w-28');
+  });
+});
+
 describe('TableBody cell tone and bar', () => {
   it('keeps the text next to the tone and the bar, so colour is never the only signal', () => {
     renderTable();

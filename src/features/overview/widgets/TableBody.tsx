@@ -8,7 +8,10 @@
  * whole row a link when it has a `to` (the trailing caret is the §6c cue).
  * No row buttons and no other chrome: the widget's title link and the row's own
  * link are the only ways out. Columns are chosen by `visibleColumns` from the
- * width budget the caller passes, never from the viewport.
+ * width budget the caller passes, never from the viewport. The one other way a
+ * column goes is `hideNarrow`: CSS hides it while this table's own box is under
+ * 28rem (a container query, so a phone's full-width widget drops it and a
+ * half-width one on a desktop does too).
  */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -76,8 +79,8 @@ function cellTone(cell: TableCell): CellTone | undefined {
 
 const cellPad = 'pl-3 last:pr-3';
 
-/** A `wide` column is hidden until its widget is 28rem across (see `TableColumn.wide`). */
-const WIDE_ONLY = 'hidden @md:table-cell';
+/** A `hideNarrow` column is hidden until the table is 28rem across (see `TableColumn.hideNarrow`). */
+const HIDE_NARROW = 'hidden @md:table-cell';
 
 function Row({
   row,
@@ -126,13 +129,13 @@ function Row({
             key={column.key}
             className={cx(
               cellPad,
-              column.wide && WIDE_ONLY,
+              column.hideNarrow && HIDE_NARROW,
               'py-0.5 text-[0.8125rem] tabular-nums',
               column.key === growKey
                 ? 'w-full max-w-0 truncate whitespace-nowrap'
                 : first
                   ? growKey === undefined
-                    ? 'w-full max-w-0 min-w-28'
+                    ? cx('w-full max-w-0', column.nameFloor && 'min-w-28')
                     : 'max-w-40'
                   : 'whitespace-nowrap',
               column.align === 'end' && 'text-right',
@@ -212,7 +215,7 @@ export function TableBody({ table, columnsFor, rowLimit, ariaLabel, className }:
                   scope="col"
                   className={cx(
                     cellPad,
-                    column.wide && WIDE_ONLY,
+                    column.hideNarrow && HIDE_NARROW,
                     'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',
                     i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left'
                   )}
