@@ -159,6 +159,8 @@ export function SplitDialog({
     <Modal
       open={open}
       onClose={onClose}
+      // Typed input or a half-finished choice: a stray backdrop click must not throw it away.
+      dismissOnOutsidePress={false}
       title={t('miningTax.splitTitle', { date: row.entry.date, system: systemName })}
     >
       <div className="space-y-3 text-sm">

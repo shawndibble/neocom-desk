@@ -405,3 +405,19 @@ describe('RowDetailModal — price breakdown', () => {
     expect(screen.queryByRole('button', { name: 'More actions for this entry' })).toBeNull();
   });
 });
+
+describe('RowDetailModal backdrop dismissal', () => {
+  it('ignores a backdrop click while the Assign form is showing', () => {
+    const onClose = vi.fn();
+    renderModal('unassigned', null, undefined, vi.fn(), { onClose });
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps backdrop dismissal for a summary view', () => {
+    const onClose = vi.fn();
+    renderModal('needs-review', null, undefined, vi.fn(), { onClose });
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

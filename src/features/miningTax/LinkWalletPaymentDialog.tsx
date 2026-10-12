@@ -200,7 +200,12 @@ export function LinkWalletPaymentDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('miningTax.linkWallet.title')}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      dismissOnOutsidePress={false}
+      title={t('miningTax.linkWallet.title')}
+    >
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">
           {t('miningTax.linkWallet.subtitle', { payee: payee.name, count: owed.length })}

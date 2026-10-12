@@ -253,6 +253,7 @@ export function RowDetailModal({
     <Modal
       open={open}
       onClose={onClose}
+      dismissOnOutsidePress={status !== 'unassigned'}
       placement={isPhone ? 'sheet' : 'center'}
       titleActions={moreMenu || undefined}
       title={

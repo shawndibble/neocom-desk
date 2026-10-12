@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { BulkDismissDialog } from './BulkDismissDialog';
@@ -47,5 +47,26 @@ describe('BulkDismissDialog — a failed save', () => {
     expect(onDismissed).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Dismiss 1' })).toBeEnabled();
+  });
+});
+
+describe('BulkDismissDialog — dismissal', () => {
+  it('ignores a backdrop click but closes from Cancel', async () => {
+    const onClose = vi.fn();
+    render(
+      <BulkDismissDialog
+        open
+        onClose={onClose}
+        rows={[ROW]}
+        systemNames={new Map([[30000142, 'Jita']])}
+        estimatedValueOf={() => 1_000}
+        showCharacter={false}
+        onDismissed={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(onClose).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

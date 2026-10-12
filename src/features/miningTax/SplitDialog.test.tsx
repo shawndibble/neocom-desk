@@ -198,3 +198,19 @@ describe('SplitDialog — the same Payee at a second rate', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
+
+describe('SplitDialog — dismissal', () => {
+  it('ignores a backdrop click, so a half-made split is not lost', () => {
+    const onClose = vi.fn();
+    renderDialog({ onClose });
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still closes from Cancel', async () => {
+    const onClose = vi.fn();
+    renderDialog({ onClose });
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

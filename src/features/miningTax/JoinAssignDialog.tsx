@@ -172,7 +172,12 @@ export function JoinAssignDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('miningTax.joinTitle')}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      dismissOnOutsidePress={false}
+      title={t('miningTax.joinTitle')}
+    >
       <div className="space-y-3 text-sm">
         <div className="space-y-1">
           <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
