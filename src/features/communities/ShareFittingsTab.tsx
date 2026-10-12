@@ -19,6 +19,12 @@ const ROW_LIMIT = 100;
 
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
+/** The source and key a `fittingChoiceKey` was made from. */
+function keyOf(choiceKey: string): Pick<SharedFittingInput, 'source' | 'key'> {
+  const source = choiceKey.startsWith('game-') ? 'game' : 'saved';
+  return { source, key: choiceKey.slice(source.length + 1) };
+}
+
 function namedLike(inputs: readonly SharedFittingInput[], needle: string): SharedFittingInput[] {
   return inputs.filter((input) => input.name.toLowerCase().includes(needle)).sort(byName);
 }
@@ -54,6 +60,7 @@ export function ShareFittingsTab({
   const [notice, setNotice] = useState<string | null>(null);
   const latest = useRef<Loaded | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
+  const loads = useRef(0);
 
   const apply = useCallback((next: Loaded | null) => {
     latest.current = next;
@@ -61,16 +68,18 @@ export function ShareFittingsTab({
   }, []);
 
   const load = useCallback(async () => {
+    const mine = ++loads.current;
     try {
       const [fittings, allExcluded, shared] = await Promise.all([
         collectFittingsToShare(characterId),
         loadFittingsAll(characterId, communityId),
         loadMySharedFittingKeys(characterId, communityId),
       ]);
+      if (mine !== loads.current) return;
       apply({ fittings, allExcluded, shared });
       setLoadFailed(false);
     } catch {
-      setLoadFailed(true);
+      if (mine === loads.current) setLoadFailed(true);
     }
   }, [characterId, communityId, apply]);
 
@@ -100,14 +109,17 @@ export function ShareFittingsTab({
 
   const fittings = useMemo(() => loaded?.fittings ?? [], [loaded]);
   const needle = query.trim().toLowerCase();
-  const sharedRows = useMemo(
-    () =>
-      namedLike(
-        fittings.filter((input) => loaded?.shared.has(fittingChoiceKey(input))),
-        needle
-      ),
-    [fittings, loaded, needle]
-  );
+  const unavailable = t('communities.fittings.unavailable');
+  const sharedRows = useMemo(() => {
+    if (!loaded) return [];
+    const local = new Map(fittings.map((input) => [fittingChoiceKey(input), input]));
+    // A Fitting the Community holds but this device no longer has (deleted in
+    // game, scope lost) still gets a row, so it can still be stopped.
+    const rows = [...loaded.shared].map(
+      (key) => local.get(key) ?? { ...keyOf(key), name: unavailable, code: '' }
+    );
+    return namedLike(rows, needle);
+  }, [fittings, loaded, needle, unavailable]);
   const addable = useMemo(
     () =>
       loaded && loaded.allExcluded === null && needle !== ''
@@ -126,7 +138,7 @@ export function ShareFittingsTab({
       </p>
     );
   }
-  if (loaded === null) return <Spinner size="sm" label={t('communities.loading')} />;
+  if (loaded === null) return <Spinner size="sm" label={t('communities.fittings.loading')} />;
   if (fittings.length === 0 && loaded.shared.size === 0) {
     return <EmptyState title={t('communities.fittings.noFittings')} />;
   }
@@ -135,7 +147,14 @@ export function ShareFittingsTab({
 
   async function turnOn(current: Loaded): Promise<Loaded> {
     await saveFittingsAll(characterId, communityId, new Set());
-    await shareFittings(characterId, communityId, current.fittings);
+    try {
+      await shareFittings(characterId, communityId, current.fittings);
+    } catch (error) {
+      // Some may have gone up: they stay listed and can be stopped, but the
+      // switch goes back off so the rest can be added by hand.
+      await saveFittingsAll(characterId, communityId, null);
+      throw error;
+    }
     return {
       ...current,
       allExcluded: new Set(),
@@ -227,7 +246,7 @@ export function ShareFittingsTab({
       {sharedRows.length === 0 ? (
         <EmptyState
           title={
-            needle === '' ? t('communities.fittings.noneShared') : t('communities.share.noMatch')
+            needle === '' ? t('communities.fittings.noneShared') : t('communities.fittings.noMatch')
           }
         />
       ) : (

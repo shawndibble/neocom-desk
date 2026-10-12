@@ -111,6 +111,29 @@ describe('ShareFittingsTab', () => {
     await waitFor(async () => expect(await loadFittingsAll(1, 'c1')).toBeNull());
   });
 
+  it('lists a shared Fitting this device no longer has, so it can still be stopped', async () => {
+    store.shared = new Set(['game-404']);
+    const user = userEvent.setup();
+    render(<ShareFittingsTab characterId={1} communityId="c1" />);
+    const row = (await screen.findByText(f.unavailable)).closest('li')!;
+    await user.click(within(row).getByRole('button', { name: f.stop }));
+    expect(store.unshareFitting).toHaveBeenCalledWith(
+      1,
+      'c1',
+      expect.objectContaining({ source: 'game', key: '404' })
+    );
+  });
+
+  it('switches share-all back off when switching it on fails part-way', async () => {
+    store.shareFittings.mockRejectedValue(new Error('offline'));
+    const user = userEvent.setup();
+    render(<ShareFittingsTab characterId={1} communityId="c1" />);
+    await user.click(await screen.findByRole('checkbox', { name: f.shareAll }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(f.failed);
+    expect(await loadFittingsAll(1, 'c1')).toBeNull();
+    expect(screen.getByRole('checkbox', { name: f.shareAll })).not.toBeChecked();
+  });
+
   it('reloads the truth when an update fails', async () => {
     store.shared = new Set(['saved-a']);
     store.unshareFitting.mockRejectedValue(new Error('offline'));
