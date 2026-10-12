@@ -109,9 +109,12 @@ function LibraryGroup({
                           <span
                             className={staleUids.has(member.uid) ? 'opacity-60' : ''}
                             role="img"
-                            aria-label={t('communities.library.holds', {
-                              name: member.characterName,
-                            })}
+                            aria-label={t(
+                              holder.hasOriginal
+                                ? 'communities.library.holdsOriginal'
+                                : 'communities.library.holdsCopies',
+                              { name: member.characterName }
+                            )}
                           >
                             {holder.hasOriginal ? '●' : '○'}
                           </span>
