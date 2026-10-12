@@ -1,6 +1,7 @@
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import {
   addShared,
@@ -10,6 +11,7 @@ import {
   stopSharing,
   type ShareChoice,
 } from '@/engine/communities/shareMode';
+import { bpcSourcingCommunityHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { ConfirmDialog } from './ConfirmDialog';
 import { publishSharedLibrary } from './libraryPush';
 import { loadShareChoice, saveShareChoice } from './shareSelection';
@@ -155,6 +157,12 @@ export function ShareBlueprintsTab({
           {t('communities.blueprints.openLibrary')}
         </Button>
       </div>
+      <p className="text-xs">
+        <Link to={bpcSourcingCommunityHref()} className={inlineLinkClassName}>
+          {t('communities.blueprints.browse')}
+        </Link>
+        <span className="text-text-dim"> · {t('communities.blueprints.browseHint')}</span>
+      </p>
       <SearchInput
         className="w-full"
         value={query}

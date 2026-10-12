@@ -7896,6 +7896,8 @@
       "shareAll": "Share all my blueprints",
       "allShared": "All {{count}} shared, including ones you get later",
       "openLibrary": "Open the Community Library",
+      "browse": "Browse every shared blueprint in BPC Sourcing",
+      "browseHint": "Your blueprints and your Communities' shared ones only, no market, contract or LP store offers.",
       "filter": "Search your shared blueprints",
       "search": "Search your blueprints to share",
       "addable": "Add to what you share",

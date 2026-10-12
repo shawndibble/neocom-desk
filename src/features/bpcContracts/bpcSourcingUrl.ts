@@ -74,3 +74,15 @@ export function bpcSourcingHref(blueprintTypeId: number): string {
   if (typeParam !== null) params.set('sourcing.type', typeParam);
   return `${tabPath(INDUSTRY_TABS, 'sourcing')}?${params.toString()}`;
 }
+
+/**
+ * BPC Sourcing narrowed to the pilot's own blueprints and the ones their
+ * Communities share: no contract, market or LP store rows. The Community
+ * page's "Browse every blueprint" link.
+ */
+export function bpcSourcingCommunityHref(): string {
+  const params = new URLSearchParams();
+  const sources = BPC_SOURCING_PARAMS['sourcing.src'].serialize(new Set(['community', 'owned']));
+  if (sources !== null) params.set('sourcing.src', sources);
+  return `${tabPath(INDUSTRY_TABS, 'sourcing')}?${params.toString()}`;
+}
