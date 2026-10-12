@@ -19,6 +19,7 @@ const store = vi.hoisted(() => ({
   regenerateInvite: vi.fn(),
   removeMember: vi.fn(),
   transferAdmin: vi.fn(),
+  loadMailInviteStatus: vi.fn(),
 }));
 vi.mock('@/features/communities/communityStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/communities/communityStore')>()),
@@ -65,6 +66,7 @@ async function seed() {
   Object.values(store).forEach((fn) => fn.mockReset());
   store.loadMyCommunities.mockResolvedValue([]);
   store.loadCommunityMembers.mockResolvedValue(members);
+  store.loadMailInviteStatus.mockResolvedValue({ remaining: 20, sent: [] });
   await db.characters.clear();
   await db.characters.put({ characterId: ME, name: 'Me', ownerHash: 'h', addedAt: 1 });
   useActiveCharacter.setState({ activeCharacterId: ME, hydrated: true });
