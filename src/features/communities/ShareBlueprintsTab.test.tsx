@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import en from '@/i18n/locales/en.json';
 import { db } from '@/db';
@@ -26,7 +27,11 @@ const b = en.communities.blueprints;
 
 function renderTab() {
   const onOpenLibrary = vi.fn();
-  render(<ShareBlueprintsTab characterId={1} communityId="c1" onOpenLibrary={onOpenLibrary} />);
+  render(
+    <MemoryRouter>
+      <ShareBlueprintsTab characterId={1} communityId="c1" onOpenLibrary={onOpenLibrary} />
+    </MemoryRouter>
+  );
   return { onOpenLibrary };
 }
 
@@ -102,6 +107,12 @@ describe('ShareBlueprintsTab', () => {
     await waitFor(async () =>
       expect(await loadShareChoice(1, 'c1')).toEqual({ all: true, excluded: new Set([10, 20]) })
     );
+  });
+
+  it('links to BPC Sourcing narrowed to the Community and owned sources', async () => {
+    renderTab();
+    const link = await screen.findByRole('link', { name: b.browse });
+    expect(link).toHaveAttribute('href', '/industry/sourcing?sourcing.src=community%2Cowned');
   });
 
   it('opens the Community Library', async () => {
