@@ -65,7 +65,6 @@ import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
 import { Backpack } from '@phosphor-icons/react/dist/csr/Backpack';
 import { CaretUp } from '@phosphor-icons/react/dist/csr/CaretUp';
 import { Crosshair } from '@phosphor-icons/react/dist/csr/Crosshair';
-import { Diamond } from '@phosphor-icons/react/dist/csr/Diamond';
 import { DotsSixVertical } from '@phosphor-icons/react/dist/csr/DotsSixVertical';
 import { DotsThree } from '@phosphor-icons/react/dist/csr/DotsThree';
 import { DotsThreeVertical } from '@phosphor-icons/react/dist/csr/DotsThreeVertical';
@@ -129,11 +128,12 @@ import { Wallet as WalletGlyph } from '@phosphor-icons/react/dist/csr/Wallet';
 import { Warning } from '@phosphor-icons/react/dist/csr/Warning';
 import { WarningOctagon } from '@phosphor-icons/react/dist/csr/WarningOctagon';
 import { X } from '@phosphor-icons/react/dist/csr/X';
+import IconBase from '@phosphor-icons/react/dist/lib/IconBase';
 import type {
   Icon as PhosphorIcon,
   IconProps as PhosphorIconProps,
 } from '@phosphor-icons/react/dist/lib/types';
-import type { ComponentType } from 'react';
+import { type ComponentType, forwardRef } from 'react';
 // Every icon renders at `ICON_WEIGHT` unless told otherwise. It lives in
 // `iconWeights.ts` (import it from there) because `vite.config.ts` reads the
 // same file, and a React module can't be loaded there.
@@ -155,6 +155,39 @@ export const ICON_SIZE = {
   /** 1.5rem — navigation affordances that carry a whole row, e.g. breadcrumb back. */
   lg: '1.5rem',
 } as const;
+
+/**
+ * Phosphor ships no pickaxe, so this one is drawn to its grid: 256 viewBox,
+ * round caps, and the same 12-unit stroke as the `light` weight (20 for
+ * `fill`). Goes through `IconBase` so colour, size and mirroring behave like
+ * every other glyph.
+ */
+const PICKAXE_STROKE: Record<AllowedIconWeight, number> = { light: 12, fill: 20 };
+const Pickaxe: PhosphorIcon = forwardRef<SVGSVGElement, PhosphorIconProps>((props, ref) => (
+  <IconBase
+    ref={ref}
+    {...props}
+    weights={
+      new Map(
+        (Object.keys(PICKAXE_STROKE) as AllowedIconWeight[]).map((w) => [
+          w,
+          <g
+            key={w}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={PICKAXE_STROKE[w]}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M40 216 186 70" />
+            <path d="M112 48Q212 44 208 144" />
+          </g>,
+        ])
+      )
+    }
+  />
+));
+Pickaxe.displayName = 'Pickaxe';
 
 function withWeight(Glyph: PhosphorIcon): ComponentType<IconProps> {
   function Wrapped({ size = ICON_SIZE.md, weight = ICON_WEIGHT, ...rest }: IconProps) {
@@ -443,7 +476,7 @@ export const NavCorp = withWeight(Buildings);
 export const NavSkills = withWeight(GraduationCap);
 export const NavIndustry = withWeight(Factory);
 export const NavShips = withWeight(RocketLaunch);
-export const NavMining = withWeight(Diamond);
+export const NavMining = withWeight(Pickaxe);
 export const NavPlanetaryIndustry = withWeight(Planet);
 export const NavMarket = withWeight(ChartLineUp);
 export const NavWallet = withWeight(WalletGlyph);
