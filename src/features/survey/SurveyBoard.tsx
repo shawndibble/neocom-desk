@@ -178,9 +178,13 @@ export function SurveyBoard({
       <Panel
         title={panelTitle ?? t('survey.title')}
         meta={
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <DataAgeBadge date={new Date(summary.lastAt)} />
-            <span className="hidden text-xs text-text-dim md:inline">
+          // Gives up space before the name does: the one-line height drops a wrapped scan count out of
+          // view whole, and the huge shrink factor makes this the first thing the header squeezes.
+          <span className="flex h-5 min-w-0 shrink-[1000] flex-wrap items-center gap-x-3 overflow-hidden">
+            <span className="shrink-0">
+              <DataAgeBadge date={new Date(summary.lastAt)} />
+            </span>
+            <span className="text-xs whitespace-nowrap text-text-dim">
               {t('survey.scanCount', { count: scans.length })}
             </span>
           </span>
