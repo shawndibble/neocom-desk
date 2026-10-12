@@ -35,6 +35,7 @@ import { resolveBlueprintPlacement } from '@/features/industry/ownedBlueprints';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
+import { listCommunityIds } from './communityStore';
 import { loadShareChoice } from './shareSelection';
 
 /**
@@ -58,13 +59,6 @@ const inFlight = new Map<
 
 function memberRef(communityId: string, uid: string) {
   return doc(getSyncFirestore(), 'communities', communityId, 'members', uid);
-}
-
-/** The Communities a Character belongs to, from its own membership index. */
-export async function listCommunityIds(characterId: number): Promise<string[]> {
-  const uid = await ensureSignedIn(characterId);
-  const index = await getDocs(collection(getSyncFirestore(), 'characters', uid, 'communities'));
-  return index.docs.map((entry) => entry.id);
 }
 
 /**

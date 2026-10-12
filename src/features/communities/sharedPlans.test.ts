@@ -19,7 +19,7 @@ vi.mock('firebase/firestore/lite', () => ({
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
 vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: async () => 'char:1' }));
-vi.mock('./libraryPush', () => ({ listCommunityIds: async () => ['c1'] }));
+vi.mock('./communityStore', () => ({ listCommunityIds: async () => ['c1'] }));
 
 import { db } from '@/db';
 import { loadCommunityPlans, loadMySharedPlans, sharePlan, syncSharedPlans } from './sharedPlans';
@@ -131,6 +131,26 @@ describe('syncSharedPlans', () => {
     expect(setDoc.mock.calls[0]![0]).toEqual({ path: 'communities/c1/skillPlans/char:1~edited' });
     expect(deleteDoc).toHaveBeenCalledTimes(1);
     expect(deleteDoc.mock.calls[0]![0]).toEqual({ path: 'communities/c1/skillPlans/char:1~gone' });
+  });
+
+  it('takes down the copy of a shared plan that can no longer be shared, and keeps going', async () => {
+    const many = Array.from({ length: 501 }, (_, i) => ({ skillTypeID: i + 1, targetLevel: 1 }));
+    await db.skillPlans.bulkPut([
+      { id: 'big', characterId: 1, name: 'B', entries: many, remapCount: 0, updatedAt: 200 },
+      { id: 'edited', characterId: 1, name: 'E', entries: [], remapCount: 0, updatedAt: 200 },
+    ]);
+    getDocs.mockResolvedValue({
+      docs: [
+        docOf('char:1~big', { sourceUpdatedAt: 100 }),
+        docOf('char:1~edited', { sourceUpdatedAt: 100 }),
+      ],
+    });
+    deleteDoc.mockRejectedValueOnce(new Error('offline'));
+    await syncSharedPlans(1, 'c1');
+    expect(deleteDoc.mock.calls[0]![0]).toEqual({ path: 'communities/c1/skillPlans/char:1~big' });
+    // The failed delete did not stop the next plan from being refreshed.
+    expect(setDoc).toHaveBeenCalledTimes(1);
+    expect(setDoc.mock.calls[0]![0]).toEqual({ path: 'communities/c1/skillPlans/char:1~edited' });
   });
 
   it('does nothing when the Character has shared no plan here', async () => {

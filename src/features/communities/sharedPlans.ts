@@ -36,7 +36,7 @@ import {
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
-import { listCommunityIds } from './libraryPush';
+import { listCommunityIds } from './communityStore';
 import { markPlansShared } from './shareSelection';
 
 const MAX_NAME_LENGTH = 200;
@@ -144,8 +144,21 @@ export async function syncSharedPlans(characterId: number, communityId: string):
     const local = await localDb.skillPlans.where('characterId').equals(characterId).toArray();
     const { push, remove } = planSyncActions(local, shared);
     const byId = new Map(local.map((plan) => [plan.id, plan]));
-    for (const planId of push) await sharePlan(characterId, communityId, byId.get(planId)!);
-    for (const planId of remove) await unsharePlan(characterId, communityId, planId);
+    // One failing action must not stop the rest of the sweep.
+    for (const planId of push) {
+      try {
+        // A plan that can no longer be shared (edited past the cap) must not
+        // keep an old copy up: the Community would read it as current.
+        if (!(await sharePlan(characterId, communityId, byId.get(planId)!))) {
+          await unsharePlan(characterId, communityId, planId);
+        }
+      } catch {
+        // Retried by the next sweep.
+      }
+    }
+    for (const planId of remove) {
+      await unsharePlan(characterId, communityId, planId).catch(() => undefined);
+    }
   } catch {
     // Best effort.
   }

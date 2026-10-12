@@ -158,6 +158,15 @@ export function PlanListPane({
   const [communityOpen, setCommunityOpen] = useState(
     () => new URLSearchParams(location.search).get('browse') === 'community'
   );
+  const copyingFromCommunity = useRef(false);
+
+  function closeCommunity() {
+    setCommunityOpen(false);
+    // The link's own param must not reopen the dialog on a back or a remount.
+    if (new URLSearchParams(location.search).has('browse')) {
+      navigate({ pathname: location.pathname }, { replace: true });
+    }
+  }
   const newPlanMenu = useOpenAfterMenu();
 
   // Named after the certified plan already, so no rename-on-arrival flag.
@@ -180,14 +189,21 @@ export function PlanListPane({
   }
 
   async function handleCreateFromCommunity(shared: { name: string; entries: PlanEntry[] }) {
-    const plan = {
-      ...newPlan(activeCharacterId, shared.name, remapInfo?.available ?? 0),
-      entries: shared.entries,
-    };
-    await db.skillPlans.add(plan);
-    syncAfterEdit();
-    setCommunityOpen(false);
-    navigate(`/skills/plans/${plan.id}`);
+    // A second click while the first is still adding must not make a second plan.
+    if (copyingFromCommunity.current) return;
+    copyingFromCommunity.current = true;
+    try {
+      const plan = {
+        ...newPlan(activeCharacterId, shared.name, remapInfo?.available ?? 0),
+        entries: shared.entries,
+      };
+      await db.skillPlans.add(plan);
+      syncAfterEdit();
+      setCommunityOpen(false);
+      navigate(`/skills/plans/${plan.id}`);
+    } finally {
+      copyingFromCommunity.current = false;
+    }
   }
 
   const characters = useLiveQuery(async () => db.characters.toArray(), []);
@@ -285,7 +301,7 @@ export function PlanListPane({
           <CommunityPlansDialog
             characterId={activeCharacterId}
             onCopy={(shared) => void handleCreateFromCommunity(shared)}
-            onClose={() => setCommunityOpen(false)}
+            onClose={closeCommunity}
           />
         </Suspense>
       )}

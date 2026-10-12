@@ -50,6 +50,13 @@ export function isCommunityAdmin(community: CommunitySummary, characterId: numbe
   return community.adminUid === uidForCharacter(characterId);
 }
 
+/** The Communities a Character belongs to, from its own membership index. */
+export async function listCommunityIds(characterId: number): Promise<string[]> {
+  const uid = await ensureSignedIn(characterId);
+  const index = await getDocs(collection(getSyncFirestore(), 'characters', uid, 'communities'));
+  return index.docs.map((entry) => entry.id);
+}
+
 export async function loadMyCommunities(characterId: number): Promise<CommunitySummary[]> {
   const uid = await ensureSignedIn(characterId);
   const db = getSyncFirestore();
