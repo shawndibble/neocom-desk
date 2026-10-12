@@ -67,6 +67,25 @@ jobs:
       - run: npm ci
       - run: npm run test:run -- --shard=${{ matrix.shard }}/4
 
+  # Firestore rules tests (rules-tests/): run against the Firestore emulator,
+  # which needs a JRE. Kept out of `test-shard` so `npm run test:run` never
+  # needs Java. Not yet a required context in the `main` ruleset.
+  rules:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run test:rules
+
   # The name the `main` ruleset requires. See the `e2e` job below for the full
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
   # the required context, so this turns the four results back into it.
