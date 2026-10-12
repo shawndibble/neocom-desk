@@ -10,6 +10,7 @@
  * market data (`loadMarketSnapshots`) — the same reason `useComparedBuildResults.ts`
  * sits here instead of the engine.
  */
+import { applyCostIndexOverride } from './costIndexOverride';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -205,7 +206,10 @@ export async function applyGroupAutoBuild(
   const picks = new Map<string, Set<number>>();
   await Promise.all(
     members.map(async (member, index) => {
-      const snapshot = await snapshots[index]!.snapshot;
+      const snapshot = applyCostIndexOverride(
+        await snapshots[index]!.snapshot,
+        member.plan.costIndexOverridePct
+      )!;
       const reactionSnapshot = await snapshots[index]!.reactionSnapshot;
       const blueprintPurchaseOffersFor = await snapshots[index]!.blueprintOffers;
       // Same gate as the member's own page (`resolveBuildPlan`'s

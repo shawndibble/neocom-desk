@@ -124,6 +124,32 @@ describe('resolveBuildPlan', () => {
   const branchingPrices = snapshot({ 1: 1000, 300: 100, 310: 100, 400: 50, 34: 5 });
   const branchingPlan = plan({ buildHere: [300, 310, 400] });
 
+  describe('cost index override', () => {
+    const src = sources(catalogOf([entry(100, 1, [{ typeID: 34, quantity: 10 }])]), {
+      ownedBlueprints: [owned(100, 1)],
+    });
+    const prices = snapshot({ 1: 1000, 34: 5 }, 0.01);
+
+    it("prices the job fee from the plan's override instead of the snapshot's index", () => {
+      const esi = resolveBuildPlan(plan(), src, { snapshot: prices }).result;
+      const overridden = resolveBuildPlan(plan({ costIndexOverridePct: 10 }), src, {
+        snapshot: prices,
+      }).result;
+
+      expect(overridden?.profit).toBeLessThan(esi?.profit ?? 0);
+    });
+
+    it('prices a plan whose snapshot has no index at all once an override is set', () => {
+      const offline = { ...prices, systemCostIndex: null };
+
+      expect(resolveBuildPlan(plan(), src, { snapshot: offline }).makeOrBuyContext).toBeNull();
+      expect(
+        resolveBuildPlan(plan({ costIndexOverridePct: 4 }), src, { snapshot: offline })
+          .makeOrBuyContext
+      ).not.toBeNull();
+    });
+  });
+
   it('resolves the same owned BPC tier claim every time it is called (fresh tier pools per call)', () => {
     const src = sources(catalogOf([entry(100, 1, [{ typeID: 34, quantity: 10 }])]), {
       ownedBlueprints: [owned(100, 1)],

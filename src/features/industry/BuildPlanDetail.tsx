@@ -63,6 +63,19 @@ import {
   rememberActivityLocations,
 } from './facilityDefaults';
 import { rememberedLocationsFromEdit } from './rememberLocationFromEdit';
+import {
+  applyCostIndexOverride,
+  costIndexMemoryKey,
+  costIndexSource,
+  parseCostIndexPct,
+} from './costIndexOverride';
+import {
+  forgetFacility,
+  memoryFromPlan,
+  patchFromMemory,
+  recallFacility,
+  rememberFacility,
+} from './facilityMemory';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -154,6 +167,7 @@ export type PlanPatch = Partial<
     | 'buildLocationId'
     | 'buildLocationName'
     | 'facilityTaxPct'
+    | 'costIndexOverridePct'
     | 'materialPriceBasis'
     | 'ownedStockScope'
     | 'includeCorpAssets'
@@ -525,10 +539,35 @@ export function BuildPlanDetail({
   // the "prices unavailable" warning on every fresh load before the first
   // response landed.
   const {
-    snapshot,
+    snapshot: esiSnapshot,
     fetchedAt,
     loading: pricesLoading,
   } = useMarketSnapshot(hub, typeIds, buildSystem?.id, activity, refreshTick);
+  // The pilot's own cost index outranks ESI's — the only one there is in
+  // J-Space. Everything below reads this; `esiSnapshot` is for asking what ESI
+  // itself could not supply.
+  const snapshot = useMemo(
+    () => applyCostIndexOverride(esiSnapshot, plan.costIndexOverridePct),
+    [esiSnapshot, plan.costIndexOverridePct]
+  );
+  const costIndexMissing = esiSnapshot?.systemCostIndexMissing === true;
+
+  // A plan that opens at a J-Space facility the pilot already described (a new
+  // plan starts at the remembered location) gets that description back without
+  // a pick.
+  const memoryKey = costIndexMemoryKey(plan);
+  useEffect(() => {
+    if (!costIndexMissing || plan.costIndexOverridePct !== undefined || memoryKey === null) return;
+    let cancelled = false;
+    void recallFacility(plan).then((memory) => {
+      if (cancelled || memory?.costIndexPct === undefined) return;
+      editPlan({ costIndexOverridePct: memory.costIndexPct });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the facility and the missing flag only
+  }, [costIndexMissing, memoryKey, plan.costIndexOverridePct]);
 
   // The Reaction Location's own cost index — a second, independent fetch
   // (issue #698): sharing `snapshot` would charge a reaction job at the
@@ -1028,12 +1067,51 @@ export function BuildPlanDetail({
    * plan of that activity starts. Edits that touch no location fields
    * remember nothing, so this is safe for every control on the page.
    */
-  function update(patch: PlanPatch) {
+  function update(patch: PlanPatch, { moved = false }: { moved?: boolean } = {}) {
     editPlan(patch);
+    if (!moved) rememberFacilityFromEdit(patch);
     const remembered = rememberedLocationsFromEdit(plan, patch, activity);
     if (remembered.manufacturing || remembered.reaction) {
       void rememberActivityLocations(remembered);
     }
+  }
+
+  /**
+   * Saves what the pilot just set for this facility — rigs, tax and, where ESI
+   * has none, the cost index — so any other plan built there starts with it
+   * (`facilityMemory.ts`). A cleared index is forgotten, so a deliberate clear
+   * is not undone by the recall on the next visit.
+   */
+  function rememberFacilityFromEdit(patch: PlanPatch) {
+    const next = { ...plan, ...patch };
+    if ('costIndexOverridePct' in patch && patch.costIndexOverridePct === undefined) {
+      void forgetFacility(next, 'costIndexPct');
+    }
+    const touched =
+      'rigFit' in patch ||
+      'rigLevel' in patch ||
+      'facilityTaxPct' in patch ||
+      patch.costIndexOverridePct !== undefined;
+    if (!touched) return;
+    const memory = memoryFromPlan(next);
+    if (!costIndexMissing) delete memory.costIndexPct;
+    if (Object.keys(memory).length > 0) void rememberFacility(next, memory);
+  }
+
+  /**
+   * Moves the plan to another place, then fills in what the pilot already told
+   * the app about it. The override is tied to the system it was read for, so it
+   * is dropped first; the recall may bring one back for the new place. Skips
+   * `rememberFacilityFromEdit`: the plan still carries the old place's rigs for
+   * a moment, and filing those under the new one would poison it.
+   */
+  function movePlan(patch: PlanPatch) {
+    update({ ...patch, costIndexOverridePct: undefined }, { moved: true });
+    void recallFacility({ ...plan, ...patch }).then((memory) => {
+      if (!memory) return;
+      const facility = patch.facility ?? plan.facility;
+      update(patchFromMemory(memory, facility), { moved: true });
+    });
   }
 
   function changeSourcing(edits: readonly SourcingPatchEntry[]) {
@@ -1406,7 +1484,7 @@ export function BuildPlanDetail({
                     security: t(`industry.${plan.security}`),
                   })}
                   selectedLabel={buildLocationName}
-                  onPick={(option) => update(buildLocationPatch(option))}
+                  onPick={(option) => movePlan(buildLocationPatch(option))}
                 >
                   <label className="flex flex-col gap-1 text-xs">
                     {t('industry.facility')}
@@ -1415,7 +1493,7 @@ export function BuildPlanDetail({
                       onValueChange={(value) => {
                         const facility = value as FacilityKind;
                         const structure = FACILITY_PRESETS[facility].structure;
-                        update({
+                        movePlan({
                           facility,
                           ...clearedBuildLocation,
                           ...(structure
@@ -1447,7 +1525,7 @@ export function BuildPlanDetail({
                     hubSystemName={hub.systemName}
                     securityLabel={t(`industry.${plan.security}`)}
                     onChange={(system) =>
-                      update({
+                      movePlan({
                         buildSystemId: system?.id,
                         buildSystemName: system?.name,
                         ...clearedBuildLocation,
@@ -1532,6 +1610,50 @@ export function BuildPlanDetail({
                         parse={(raw) => parseTaxPct(plan.facilityTaxPct ?? 0, raw)}
                         onCommit={(facilityTaxPct) => update({ facilityTaxPct })}
                       />
+                    </div>
+                  )}
+
+                  {/* Only where ESI has no index for the Build location (J-Space) or
+                    the pilot has already typed one: elsewhere ESI's figure is right
+                    and a field would only invite overriding it. */}
+                  {(costIndexMissing || plan.costIndexOverridePct !== undefined) && (
+                    <div className="flex flex-col gap-1 text-xs">
+                      <span className="flex items-center gap-1">
+                        <label htmlFor="build-plan-cost-index">
+                          {t('industry.costIndexOverride')}
+                        </label>
+                        <InfoTooltip
+                          label={t('industry.costIndexOverrideTooltipLabel')}
+                          content={t('industry.costIndexOverrideTooltip')}
+                        />
+                      </span>
+                      <SourcingInput
+                        id="build-plan-cost-index"
+                        value={plan.costIndexOverridePct}
+                        label={t('industry.costIndexOverride')}
+                        inputMode="decimal"
+                        widthClassName="w-full"
+                        placeholder="0"
+                        mine={costIndexSource(snapshot, plan.costIndexOverridePct) === 'override'}
+                        describedBy={
+                          costIndexMissing && plan.costIndexOverridePct === undefined
+                            ? 'build-plan-cost-index-note'
+                            : undefined
+                        }
+                        parse={(raw) => {
+                          const parsed = parseCostIndexPct(raw);
+                          // Blank clears, unreadable keeps what was there.
+                          return parsed === undefined
+                            ? plan.costIndexOverridePct
+                            : (parsed ?? undefined);
+                        }}
+                        onCommit={(costIndexOverridePct) => update({ costIndexOverridePct })}
+                      />
+                      {costIndexMissing && plan.costIndexOverridePct === undefined && (
+                        <p id="build-plan-cost-index-note" className="text-warning">
+                          {t('industry.costIndexMissingNote')}
+                        </p>
+                      )}
                     </div>
                   )}
 

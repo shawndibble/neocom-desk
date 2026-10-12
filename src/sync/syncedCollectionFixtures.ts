@@ -67,6 +67,7 @@ export const FULL_BUILD_PLAN: Required<Omit<BuildPlanRecord, 'rigLevel'>> = {
   buildLocationId: 1035466617946,
   buildLocationName: 'K2-18 R&D',
   facilityTaxPct: 1.5,
+  costIndexOverridePct: 3.2,
   materialPriceBasis: 'buy',
   materialSourcing: { 34: { ownedQuantity: 500, overridePrice: 6.5 } },
   ownedStockScope: {

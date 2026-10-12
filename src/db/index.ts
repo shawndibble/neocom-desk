@@ -304,6 +304,14 @@ export interface BuildPlanRecord {
   /** Facility tax, percent of EIV. Structures only — NPC station tax is fixed. */
   facilityTaxPct?: number;
   /**
+   * The Build location's job cost index as the pilot read it in the in-game
+   * industry window, in percent. Replaces the ESI figure — the only source for
+   * a J-Space system, which ESI lists no index for. Tied to the build system,
+   * so changing the location drops it (see `facilityMemory.ts` for how it comes
+   * back when the same facility is picked again).
+   */
+  costIndexOverridePct?: number;
+  /**
    * Which side of the hub's order book this plan's materials are bought at:
    * `'sell'` (fill the lowest sell orders, pay now) or `'buy'` (place buy
    * orders and wait). Additive and unindexed, so no schema version bump —

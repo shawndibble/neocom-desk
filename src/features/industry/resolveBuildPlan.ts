@@ -24,6 +24,7 @@
  * error comes back as `{ result: null, error }`, same as `computeBuildPlan`,
  * which stays the engine-adapter step underneath (clamps, NPC tax, try/catch).
  */
+import { applyCostIndexOverride } from './costIndexOverride';
 import i18n from '@/i18n';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { BuildPlanRecord } from '@/db';
@@ -193,7 +194,9 @@ export function resolveBuildPlan(
   prices: BuildPlanPrices,
   options: ResolveBuildPlanOptions = {}
 ): ResolvedBuildPlan {
-  const { snapshot } = prices;
+  // The pilot's own cost index outranks ESI's (absent for J-Space), applied
+  // here once so the page, Compare and every Group Rollup price the same fee.
+  const snapshot = applyCostIndexOverride(prices.snapshot, plan.costIndexOverridePct);
   const ownedBlueprints = planOwnedBlueprints(
     plan,
     sources.ownedBlueprints,
