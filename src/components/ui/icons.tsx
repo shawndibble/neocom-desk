@@ -65,6 +65,7 @@ import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
 import { Backpack } from '@phosphor-icons/react/dist/csr/Backpack';
 import { CaretUp } from '@phosphor-icons/react/dist/csr/CaretUp';
 import { Crosshair } from '@phosphor-icons/react/dist/csr/Crosshair';
+import { SketchLogo } from '@phosphor-icons/react/dist/csr/SketchLogo';
 import { DotsSixVertical } from '@phosphor-icons/react/dist/csr/DotsSixVertical';
 import { DotsThree } from '@phosphor-icons/react/dist/csr/DotsThree';
 import { DotsThreeVertical } from '@phosphor-icons/react/dist/csr/DotsThreeVertical';
@@ -128,12 +129,11 @@ import { Wallet as WalletGlyph } from '@phosphor-icons/react/dist/csr/Wallet';
 import { Warning } from '@phosphor-icons/react/dist/csr/Warning';
 import { WarningOctagon } from '@phosphor-icons/react/dist/csr/WarningOctagon';
 import { X } from '@phosphor-icons/react/dist/csr/X';
-import IconBase from '@phosphor-icons/react/dist/lib/IconBase';
 import type {
   Icon as PhosphorIcon,
   IconProps as PhosphorIconProps,
 } from '@phosphor-icons/react/dist/lib/types';
-import { type ComponentType, forwardRef } from 'react';
+import type { ComponentType } from 'react';
 // Every icon renders at `ICON_WEIGHT` unless told otherwise. It lives in
 // `iconWeights.ts` (import it from there) because `vite.config.ts` reads the
 // same file, and a React module can't be loaded there.
@@ -155,39 +155,6 @@ export const ICON_SIZE = {
   /** 1.5rem — navigation affordances that carry a whole row, e.g. breadcrumb back. */
   lg: '1.5rem',
 } as const;
-
-/**
- * Phosphor ships no pickaxe, so this one is drawn to its grid: 256 viewBox,
- * round caps, and the same 12-unit stroke as the `light` weight (20 for
- * `fill`). Goes through `IconBase` so colour, size and mirroring behave like
- * every other glyph.
- */
-const PICKAXE_STROKE: Record<AllowedIconWeight, number> = { light: 12, fill: 20 };
-const Pickaxe: PhosphorIcon = forwardRef<SVGSVGElement, PhosphorIconProps>((props, ref) => (
-  <IconBase
-    ref={ref}
-    {...props}
-    weights={
-      new Map(
-        (Object.keys(PICKAXE_STROKE) as AllowedIconWeight[]).map((w) => [
-          w,
-          <g
-            key={w}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={PICKAXE_STROKE[w]}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M40 216 186 70" />
-            <path d="M112 48Q212 44 208 144" />
-          </g>,
-        ])
-      )
-    }
-  />
-));
-Pickaxe.displayName = 'Pickaxe';
 
 function withWeight(Glyph: PhosphorIcon): ComponentType<IconProps> {
   function Wrapped({ size = ICON_SIZE.md, weight = ICON_WEIGHT, ...rest }: IconProps) {
@@ -292,8 +259,12 @@ export const SeverityClear = withWeight(CheckCircle);
 export const Close = withWeight(X);
 /** Edit a name in place — the rename affordance on a saved-plan row. */
 export const Rename = withWeight(PencilSimple);
-/** Choose which cards a board shows — the Overview's edit menu. */
+/** Customize the Overview: the header's button that starts editing the widget grid. */
 export const EditBoard = withWeight(PencilSimple);
+/** Put another widget on the Overview (the edit bar's and the empty board's Add widget). */
+export const AddWidget = withWeight(Plus);
+/** Take a widget off the Overview while customizing: the one-click remove, undoable. */
+export const RemoveWidget = withWeight(Minus);
 /**
  * Grab a row to drag it. The six-dot grip is the near-universal handle mark,
  * and DESIGN.md §5 wants an SVG here rather than the `⠿` braille dingbat the
@@ -320,7 +291,7 @@ export const ImportClipboard = withWeight(Clipboard);
 export const OptimizeRemaps = withWeight(Sliders);
 /** Drop a remap marker at the current end of the queue (#224 icon-only toolbar). */
 export const AddMarker = withWeight(Flag);
-/** Pins a named goal ("Fly Loki") to a plan entry row — CONTEXT.md "Plan Milestone". Same glyph as `AddMarker`, named for the goal-marking sense rather than the remap sense. */
+/** Pins a named goal ("Fly Loki") to a plan entry row — GLOSSARY.md "Plan Milestone". Same glyph as `AddMarker`, named for the goal-marking sense rather than the remap sense. */
 export const Milestone = withWeight(Flag);
 /** Tune remaps against the plan's existing markers (#224 icon-only toolbar). */
 export const OptimizeAtMarkers = withWeight(Target);
@@ -334,7 +305,7 @@ export const Build = withWeight(Hammer);
 export const Buy = withWeight(ShoppingCart);
 /** A build plan material this character is better off reacting than buying (issue #460) — its own glyph, not the manufacturing hammer or the planetary globe. */
 export const Reaction = withWeight(Flask);
-/** Promote a derived prereq row into a real Skill Plan entry (CONTEXT.md "Prereq Promotion"). */
+/** Promote a derived prereq row into a real Skill Plan entry (GLOSSARY.md "Prereq Promotion"). */
 export const AddToPlan = withWeight(Plus);
 /** Append a new row to an editable list, e.g. another Booster (#1407). */
 export const AddRow = withWeight(Plus);
@@ -395,7 +366,7 @@ export const PiSkyhook = withWeight(ArrowLineUp);
 /** Mail, calendar and contacts, grouped as one row. */
 export const Social = withWeight(EnvelopeSimple);
 /**
- * The four System Label mail folders (CONTEXT.md), as the glyphs that let a
+ * The four System Label mail folders (GLOSSARY.md), as the glyphs that let a
  * mail row say which folder it is in without spending a hue on it — see
  * `docs/context/decisions/` (Mail rows go two-line). Corp reuses
  * `Corporation` below rather than taking a fifth glyph: it is the same
@@ -425,7 +396,7 @@ export const MoonMining = withWeight(Moon);
  */
 export const Notifications = withWeight(Bell);
 /**
- * Where a feature's own preferences live — the Alerts page's shortcut into
+ * Where a feature's own preferences live — the bell panel's shortcut into
  * Settings, say, or a page header's gear that opens its settings modal. The
  * destination, not an action, so it is never the glyph on a
  * button that changes something.
@@ -433,7 +404,7 @@ export const Notifications = withWeight(Bell);
 export const Settings = withWeight(Gear);
 /**
  * Clear every alert currently listed. A double check, not a bin: dismissal is
- * a flag and the rows stay stored (CONTEXT.md, Notification Feed) — a delete
+ * a flag and the rows stay stored (GLOSSARY.md, Notification Feed) — a delete
  * glyph would promise a destruction that does not happen.
  */
 export const DismissAll = withWeight(Checks);
@@ -476,7 +447,7 @@ export const NavCorp = withWeight(Buildings);
 export const NavSkills = withWeight(GraduationCap);
 export const NavIndustry = withWeight(Factory);
 export const NavShips = withWeight(RocketLaunch);
-export const NavMining = withWeight(Pickaxe);
+export const NavMining = withWeight(SketchLogo);
 export const NavPlanetaryIndustry = withWeight(Planet);
 export const NavMarket = withWeight(ChartLineUp);
 export const NavWallet = withWeight(WalletGlyph);
