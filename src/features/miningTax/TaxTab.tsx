@@ -2098,6 +2098,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             systemName={systemName(editTarget)}
             systemSecurity={systemSecurityOf(editTarget)}
             payees={allPayees}
+            assignments={everyAssignment}
             typeNames={data.typeNames}
             pricesFor={pricesFor}
             onSaved={() => {

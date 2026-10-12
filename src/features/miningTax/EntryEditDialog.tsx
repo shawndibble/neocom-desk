@@ -12,7 +12,7 @@ import {
   IskInput,
   TextInput,
 } from '@/components/ui';
-import type { PayeeRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import * as Icon from '@/components/ui/icons';
@@ -28,6 +28,8 @@ import {
 } from './combinedValues';
 import { useMiningTaxOreValueMode } from './oreValueMode';
 import { LedgerActionError } from './LedgerActionError';
+import { LabelField } from './LabelField';
+import { labelSuggestions } from './assignmentLabel';
 
 interface EntryEditDialogProps {
   open: boolean;
@@ -37,6 +39,8 @@ interface EntryEditDialogProps {
   systemName: string;
   systemSecurity: number | null | undefined;
   payees: readonly PayeeRecord[];
+  /** Every assignment, for the label suggestions (labels already used for this payee and system). */
+  assignments?: readonly MiningTaxAssignmentRecord[];
   typeNames: ReadonlyMap<number, string>;
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   onSaved: () => void;
@@ -118,6 +122,7 @@ export function EntryEditDialog({
   systemName,
   systemSecurity,
   payees,
+  assignments = [],
   typeNames,
   pricesFor,
   onSaved,
@@ -139,6 +144,8 @@ export function EntryEditDialog({
   const multiDay = current.length > 1;
   const [payeeId, setPayeeId] = useState<string | undefined>(first?.payeeId);
   const [taxPct, setTaxPct] = useState(String(first?.taxPct ?? ''));
+  // Every day of an entry shares payee and terms, so one label covers them all.
+  const [label, setLabel] = useState(first?.label ?? '');
   // Per day, per ore type: the pilot's own whole-ISK figure as `IskInput`
   // reports it (plain digits). Absent or blank means "untouched".
   const [overrides, setOverrides] = useState<Record<string, Record<number, string>>>({});
@@ -201,7 +208,7 @@ export function EntryEditDialog({
       () =>
         editEntry(
           current.map((m) => m.assignment),
-          { payeeId, taxPct: pct, members: Object.fromEntries(values) }
+          { payeeId, taxPct: pct, label, members: Object.fromEntries(values) }
         ),
       onSaved
     );
@@ -268,6 +275,14 @@ export function EntryEditDialog({
             />
           </div>
         </div>
+
+        <LabelField
+          value={label}
+          onChange={setLabel}
+          suggestions={
+            payeeId && first ? labelSuggestions(assignments, payeeId, first.solarSystemId) : []
+          }
+        />
 
         {current.map((member) => {
           const { assignment } = member;
