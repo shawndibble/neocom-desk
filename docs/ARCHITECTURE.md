@@ -373,6 +373,16 @@ fetch+memoize the built JSON once per session.
   `where('ownerHash', '==', current)` to compensate. Removing a Character
   deletes nothing remote: the `purgeStaleAccounts` Cloud Function (admin SDK,
   not bound by these rules) clears an account after 90 days without a sync.
+- Communities (issue #3596, ADR 0018) are the third kind of Firebase data,
+  next to per-character sync data and public caches: membership-gated shared
+  data (`communities/{id}`, its `members/{uid}`, and each Member's chunked
+  `library/{n}` of Shared Blueprints). Rules let Members read; a Member writes
+  only their own chunks and pushed-at stamp. Create/join/leave/remove/revoke/
+  regenerate/delete are callables (`functions/src/communities*.ts`) because
+  the 100-Member and 10-Communities caps and delete-on-leave can't be rules.
+  `purgeStaleAccounts` also removes a stale Character from its Communities (a
+  stale admin takes the Community with it). `characters/{uid}/communities/{id}`
+  is the Character's membership index.
 - Firestore rules tests live in `rules-tests/` (`@firebase/rules-unit-testing`,
   `vitest.rules.config.ts`) and run only via `npm run test:rules`, which starts
   the Firestore emulator (needs a JRE; CI's `rules` job installs Java 21). They
