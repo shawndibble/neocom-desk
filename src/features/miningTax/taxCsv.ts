@@ -33,6 +33,7 @@ export function taxCsvColumns(
     { header: t('miningTax.dateColumn'), value: dateLabel },
     { header: t('miningTax.systemColumn'), value: systemName },
     { header: t('miningTax.payeeColumn'), value: payeeName },
+    { header: t('miningTax.labelColumn'), value: (dr) => dr.assignment?.label ?? null },
     { header: t('miningTax.estimatedValueColumn'), value: estimatedValue },
     { header: t('miningTax.taxOwedColumn'), value: taxOwed },
     {

@@ -154,8 +154,8 @@ describe('restoring an existing-format backup file', () => {
    */
   const LEGACY_OMISSIONS: Partial<Record<keyof typeof FULL_RECORDS, string[]>> = {
     // oreLineValues (grilling session, 2026-09-27) and rawOrePriced (Ore Form,
-    // 2026-10-06) postdate this fixture.
-    miningTaxAssignments: ['oreLineValues', 'rawOrePriced'],
+    // 2026-10-06) and label (Moon / structure) postdate this fixture.
+    miningTaxAssignments: ['oreLineValues', 'rawOrePriced', 'label'],
     // sourceJobId (Job History, #2866) postdates this fixture.
     productionRuns: ['sourceJobId'],
   };

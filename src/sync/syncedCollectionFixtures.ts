@@ -208,6 +208,7 @@ export const FULL_MINING_TAX_ASSIGNMENT: Required<MiningTaxAssignmentRecord> = {
   },
   oreLineValues: { 45490: 4_800_000 },
   rawOrePriced: true,
+  label: 'Athanor at Moon 3',
   updatedAt: UPDATED_AT,
 };
 

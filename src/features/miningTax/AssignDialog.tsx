@@ -24,6 +24,7 @@ import { hubForPayee } from './pricing';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
 import { useLedgerAction } from './useLedgerAction';
+import { LabelField } from './LabelField';
 import { LedgerActionError } from './LedgerActionError';
 
 interface AssignDialogProps {
@@ -161,6 +162,7 @@ export function AssignDialog({
     new Set(oreLines.map((line) => line.typeId))
   );
   const [markPaid, setMarkPaid] = useState(false);
+  const [label, setLabel] = useState('');
   const { pending: saving, error: saveError, run } = useLedgerAction();
   // Empty means "track the computed default"; any other string is a pilot
   // override that stops following `taxPct`/line-selection changes until
@@ -264,6 +266,7 @@ export function AssignDialog({
           estimatedValue,
           taxOwed,
           markPaid,
+          label,
         }),
       onAssigned
     );
@@ -420,6 +423,8 @@ export function AssignDialog({
           />
         </div>
       </div>
+
+      <LabelField value={label} onChange={setLabel} />
 
       <label className={`flex items-center gap-2 text-sm ${tappableRowClassName}`}>
         <Checkbox checked={markPaid} onChange={(e) => setMarkPaid(e.target.checked)} />

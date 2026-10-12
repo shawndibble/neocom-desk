@@ -296,6 +296,7 @@ export function RowDetailModal({
               <>
                 {' · '}
                 {assignment.taxPct}%{' · '}
+                {assignment.label && `${assignment.label} · `}
                 {t('miningTax.detail.valueLine', { value: formatIsk(estimatedValue) })}
               </>
             )}

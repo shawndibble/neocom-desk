@@ -31,6 +31,7 @@ describe('taxCsvColumns', () => {
       'miningTax.dateColumn',
       'miningTax.systemColumn',
       'miningTax.payeeColumn',
+      'miningTax.labelColumn',
       'miningTax.estimatedValueColumn',
       'miningTax.taxOwedColumn',
       'miningTax.statusColumn',
@@ -44,12 +45,19 @@ describe('taxCsvColumns', () => {
   });
 
   it('exports raw ISK numbers and the translated status', () => {
-    const values = taxCsvColumns(t, context).map((c) => c.value(displayRow()));
+    const values = taxCsvColumns(t, context).map((c) =>
+      c.value(
+        displayRow({
+          assignment: { id: 'a', payeeId: 'p', status: 'outstanding', label: 'Athanor' },
+        } as unknown as Partial<DisplayRow>)
+      )
+    );
     expect(values).toEqual([
       'Miner One',
       '2026-09-04',
       'Jita',
       'Corp Tax',
+      'Athanor',
       1234567.5,
       123456.75,
       'miningTax.status.outstanding',
@@ -62,7 +70,7 @@ describe('taxCsvColumns', () => {
       taxCsvColumns(t, { ...context, showCharacter: false, taxOwed: () => null })
     );
     expect(csv.split('\r\n')[1]).toBe(
-      '"2026-09-04","Jita","Corp Tax",1234567.5,,"miningTax.status.unassigned"'
+      '"2026-09-04","Jita","Corp Tax",,1234567.5,,"miningTax.status.unassigned"'
     );
   });
 });
