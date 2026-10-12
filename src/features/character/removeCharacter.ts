@@ -10,6 +10,7 @@
 // a Character they still hold — there is no signal to detect it from, so it
 // needs its own explicit entry point.
 
+import { deleteShareSelections } from '@/features/communities/shareSelection';
 import { db } from '@/db';
 import { purgeCharacterCacheOrSuppress, purgeSharedStructureCache } from '@/esi/cachePurge';
 import { clearCharacterSyncBookkeeping, triggerSync } from '@/sync';
@@ -99,6 +100,7 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       // counts the whole table — leaving an app-icon count nothing can dismiss.
       await deleteFeedForCharacter(characterId);
       await clearCharacterSyncBookkeeping(characterId);
+      await deleteShareSelections(characterId);
     }
   );
   await refreshAppBadge();

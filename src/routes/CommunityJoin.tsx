@@ -19,6 +19,8 @@ import {
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
+import { CharacterSharePicker } from '@/features/communities/SharePicker';
+import { saveShareSelection } from '@/features/communities/shareSelection';
 import { callableErrorCode, callableErrorReason } from '@/features/communities/callableError';
 import {
   joinCommunity,
@@ -88,6 +90,10 @@ export function CommunityJoin() {
   });
   const [unchecked, setUnchecked] = useState<ReadonlySet<number>>(new Set());
   const [results, setResults] = useState<Record<number, JoinResult>>({});
+  // Per Character: the blueprint type ids to share. Nothing until chosen.
+  const [shares, setShares] = useState<Record<number, ReadonlySet<number>>>({});
+  const [pickerFor, setPickerFor] = useState<number | null>(null);
+  const sharedCount = (id: number) => shares[id]?.size ?? 0;
   const [working, setWorking] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
   const joinPath = `/communities/join/${code}`;
@@ -105,6 +111,7 @@ export function CommunityJoin() {
 
   const eligible = (characters ?? []).filter((c) => withBlueprints?.has(c.characterId));
   const chosen = eligible.filter((c) => !unchecked.has(c.characterId));
+  const totalShared = chosen.reduce((sum, c) => sum + sharedCount(c.characterId), 0);
 
   async function join() {
     setWorking(true);
@@ -116,6 +123,11 @@ export function CommunityJoin() {
         const joined = await joinCommunity(character.characterId, code, character.name);
         communityId = joined.communityId;
         joinedIds.push(character.characterId);
+        await saveShareSelection(
+          character.characterId,
+          joined.communityId,
+          shares[character.characterId] ?? new Set()
+        );
         next[character.characterId] = joined.alreadyMember ? 'alreadyMember' : 'joined';
       } catch (err) {
         next[character.characterId] =
@@ -194,56 +206,87 @@ export function CommunityJoin() {
                     const ok = withBlueprints?.has(character.characterId) ?? false;
                     const result = results[character.characterId];
                     return (
-                      <li
-                        key={character.characterId}
-                        className={`flex items-center gap-2 py-1.5 text-xs ${tappableRowClassName}`}
-                      >
-                        <label
-                          className={`flex min-w-0 flex-1 items-center gap-2 ${tappableRowClassName}`}
+                      <li key={character.characterId}>
+                        <div
+                          className={`flex flex-wrap items-center gap-2 py-1.5 text-xs ${tappableRowClassName}`}
                         >
-                          <Checkbox
-                            checked={ok && !unchecked.has(character.characterId)}
-                            disabled={!ok || working}
-                            aria-describedby={
-                              withBlueprints !== undefined && !ok
-                                ? `needs-${character.characterId}`
-                                : undefined
-                            }
-                            onChange={(event) =>
-                              setUnchecked((prev) => {
-                                const next = new Set(prev);
-                                if (event.target.checked) next.delete(character.characterId);
-                                else next.add(character.characterId);
-                                return next;
-                              })
-                            }
-                          />
-                          <CharacterAvatar characterId={character.characterId} size="sm" />
-                          <span className="min-w-0 flex-1 truncate">{character.name}</span>
-                        </label>
-                        {withBlueprints !== undefined && !ok && (
-                          <>
-                            <span id={`needs-${character.characterId}`} className="text-text-dim">
-                              {t('communities.join.needsPermission')}
-                            </span>
-                            <Button size="sm" onClick={() => grant(character.characterId)}>
-                              {t('communities.join.grant')}
-                            </Button>
-                          </>
-                        )}
-                        {result && (
-                          <span
-                            role={
-                              result === 'joined' || result === 'alreadyMember' ? 'status' : 'alert'
-                            }
-                            className={
-                              result === 'joined' || result === 'alreadyMember'
-                                ? 'text-text-dim'
-                                : 'text-danger'
-                            }
+                          <label
+                            className={`flex min-w-0 flex-1 items-center gap-2 ${tappableRowClassName}`}
                           >
-                            {t(`communities.join.${result}`)}
-                          </span>
+                            <Checkbox
+                              checked={ok && !unchecked.has(character.characterId)}
+                              disabled={!ok || working}
+                              aria-describedby={
+                                withBlueprints !== undefined && !ok
+                                  ? `needs-${character.characterId}`
+                                  : undefined
+                              }
+                              onChange={(event) =>
+                                setUnchecked((prev) => {
+                                  const next = new Set(prev);
+                                  if (event.target.checked) next.delete(character.characterId);
+                                  else next.add(character.characterId);
+                                  return next;
+                                })
+                              }
+                            />
+                            <CharacterAvatar characterId={character.characterId} size="sm" />
+                            <span className="min-w-0 flex-1 truncate">{character.name}</span>
+                          </label>
+                          {ok && (
+                            <Button
+                              size="sm"
+                              aria-expanded={pickerFor === character.characterId}
+                              disabled={working}
+                              onClick={() =>
+                                setPickerFor(
+                                  pickerFor === character.characterId ? null : character.characterId
+                                )
+                              }
+                            >
+                              {t('communities.share.chooseCount', {
+                                count: sharedCount(character.characterId),
+                              })}
+                            </Button>
+                          )}
+                          {withBlueprints !== undefined && !ok && (
+                            <>
+                              <span id={`needs-${character.characterId}`} className="text-text-dim">
+                                {t('communities.join.needsPermission')}
+                              </span>
+                              <Button size="sm" onClick={() => grant(character.characterId)}>
+                                {t('communities.join.grant')}
+                              </Button>
+                            </>
+                          )}
+                          {result && (
+                            <span
+                              role={
+                                result === 'joined' || result === 'alreadyMember'
+                                  ? 'status'
+                                  : 'alert'
+                              }
+                              className={
+                                result === 'joined' || result === 'alreadyMember'
+                                  ? 'text-text-dim'
+                                  : 'text-danger'
+                              }
+                            >
+                              {t(`communities.join.${result}`)}
+                            </span>
+                          )}
+                        </div>
+                        {ok && pickerFor === character.characterId && (
+                          <div className="pb-2 pl-2">
+                            <CharacterSharePicker
+                              characterId={character.characterId}
+                              selected={shares[character.characterId] ?? new Set()}
+                              disabled={working}
+                              onChange={(next) =>
+                                setShares((prev) => ({ ...prev, [character.characterId]: next }))
+                              }
+                            />
+                          </div>
                         )}
                       </li>
                     );
@@ -256,7 +299,7 @@ export function CommunityJoin() {
                     disabled={chosen.length === 0}
                     onClick={() => void join()}
                   >
-                    {t('communities.join.joinAction', { count: chosen.length })}
+                    {t('communities.join.joinAction', { count: totalShared })}
                   </Button>
                   <Button onClick={logIn} disabled={loggingIn || working}>
                     {t('communities.join.another')}
