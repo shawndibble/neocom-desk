@@ -26,6 +26,7 @@ import {
   selectBlueprintTier,
   tierOptions,
   type BpcOffer,
+  type SelectBlueprintTierInputs,
   type OwnedBlueprintPool,
 } from '@/engine/industry/blueprintAcquisition';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -73,6 +74,8 @@ export interface BlueprintAcquisitionSources {
   extraOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** Offers priced from only when nothing else prices the blueprint (other regions' contracts). */
   lastResortOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
+  /** Community Offers (issue #3603): free, named for the Member. Never a source for a reaction. */
+  communityOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** Hub sell prices, for a BPO's own ordinary sell price when no BPC offer covers it. */
   hubPrices: HubPrices;
   /**
@@ -278,7 +281,7 @@ export function acquisitionForLookup(
     const sizing = sizeRuns(needed, blueprint.products[0]?.quantity ?? 0);
     if (!sizing) return null;
     const neededRuns = sizing.runs;
-    const tierInputs = {
+    const tierInputs: SelectBlueprintTierInputs = {
       ownedCopies: pooledOwnedCopies(
         ownedCopiesFor(blueprintTypeID, sources.ownedBlueprints),
         pool
@@ -290,6 +293,8 @@ export function acquisitionForLookup(
       lastResortOffers: purchasable(
         acquisitionSources.lastResortOffersFor?.(blueprintTypeID) ?? []
       ),
+      // A Member's reaction formula cannot be copied, so none is ever offered.
+      communityOffers: isReaction ? [] : acquisitionSources.communityOffersFor?.(blueprintTypeID),
       bpoSellPrice: acquisitionSources.hubPrices[blueprintTypeID] ?? null,
       assumedMeForUnowned: sources.assumedMeForUnowned ?? 0,
     };

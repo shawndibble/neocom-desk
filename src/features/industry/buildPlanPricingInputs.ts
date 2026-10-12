@@ -23,7 +23,13 @@
  */
 import { useEffect, useMemo } from 'react';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
-import { effectivePrice, type BpcContractRow } from '@/engine/contracts/bpcSearch';
+import { isSyncConfigured } from '@/app/syncStatus';
+import {
+  effectivePrice,
+  type BpcContractRow,
+  type BpcSearchRow,
+} from '@/engine/contracts/bpcSearch';
+import { useCommunityBlueprintOffers } from '@/features/bpcContracts/useCommunityBlueprintOffers';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import type { TradeHub } from '@/market/hubs';
 import {
@@ -50,6 +56,8 @@ export interface BuildPlanPricingInputs {
   standings: TradeHubStandingsMap;
   /** BPC Sourcing's public-contract rows, every region; empty until loaded or when not synced. */
   bpcRows: readonly BpcContractRow[];
+  /** Community Offers (issue #3603): Shared Blueprints from the Character's Communities; empty until loaded or with none. */
+  communityRows: readonly BpcSearchRow[];
 }
 
 /** The part of `BuildPlanSources` this module supplies for one plan. */
@@ -61,12 +69,13 @@ export type HubPricingSources = Pick<
   | 'standing'
   | 'bpcOffersFor'
   | 'bpcLastResortOffersFor'
+  | 'communityOffersFor'
 >;
 
 /** What `pricingSourcesForHub` reads. Corp blueprints may be withheld, which reads as unavailable. */
 export type HubPricingSourceArgs = Pick<
   BuildPlanPricingInputs,
-  'assumedMe' | 'includeBlueprintCost' | 'standings' | 'bpcRows'
+  'assumedMe' | 'includeBlueprintCost' | 'standings' | 'bpcRows' | 'communityRows'
 > & { corpBlueprints?: CorpBlueprintSource };
 
 const NO_BPC_ROWS: readonly BpcContractRow[] = [];
@@ -150,12 +159,24 @@ export function useBuildPlanPricingInputs(characterId: number | null): BuildPlan
   const corpBlueprints = useCorpOwnedBlueprints();
   const standings = useTradeHubStandings(characterId);
   const bpcRows = useBpcContractRows(characterId);
+  const { rows: communityRows } = useCommunityBlueprintOffers({
+    characterId,
+    enabled: isSyncConfigured(),
+  });
   const hydrated = assumedMeHydrated && includeBlueprintCostHydrated;
 
   // One object per distinct state: every surface's pricing memo keys on it.
   return useMemo(
-    () => ({ hydrated, assumedMe, includeBlueprintCost, corpBlueprints, standings, bpcRows }),
-    [hydrated, assumedMe, includeBlueprintCost, corpBlueprints, standings, bpcRows]
+    () => ({
+      hydrated,
+      assumedMe,
+      includeBlueprintCost,
+      corpBlueprints,
+      standings,
+      bpcRows,
+      communityRows,
+    }),
+    [hydrated, assumedMe, includeBlueprintCost, corpBlueprints, standings, bpcRows, communityRows]
   );
 }
 
@@ -190,6 +211,40 @@ function offersFor(
   return lookup;
 }
 
+const communityOffersCache = new WeakMap<
+  readonly BpcSearchRow[],
+  NonNullable<HubPricingSources['communityOffersFor']>
+>();
+
+/**
+ * Community Offers per blueprint type, free (0 ISK) and named for the Member.
+ * Region-agnostic: a Member's station carries no region id. Cached per rows
+ * array so a memo keyed on the lookup only re-runs when the offers change.
+ */
+export function communityOffersForRows(
+  rows: readonly BpcSearchRow[]
+): NonNullable<HubPricingSources['communityOffersFor']> {
+  const cached = communityOffersCache.get(rows);
+  if (cached) return cached;
+  const byType = new Map<number, BpcOffer[]>();
+  for (const row of rows) {
+    if (row.source !== 'community') continue;
+    const list = byType.get(row.typeId) ?? [];
+    list.push({
+      me: row.me,
+      te: row.te,
+      runs: row.runs,
+      quantity: row.quantity,
+      price: 0,
+      community: { memberName: row.memberName, stale: row.stale },
+    });
+    byType.set(row.typeId, list);
+  }
+  const lookup = (blueprintTypeID: number) => byType.get(blueprintTypeID) ?? [];
+  communityOffersCache.set(rows, lookup);
+  return lookup;
+}
+
 /** One plan's share of the pricing inputs, for the plan's own Trade Hub. */
 export function pricingSourcesForHub(
   inputs: HubPricingSourceArgs,
@@ -202,5 +257,6 @@ export function pricingSourcesForHub(
     standing: tradeHubStanding(inputs.standings, hub.id),
     bpcOffersFor: offersFor(inputs.bpcRows, hub.regionId),
     bpcLastResortOffersFor: offersFor(inputs.bpcRows, hub.regionId, true),
+    communityOffersFor: communityOffersForRows(inputs.communityRows),
   };
 }

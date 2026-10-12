@@ -1030,7 +1030,17 @@ export function MaterialsTable({
         )}
         {!inline && material.acquisitionTier && (
           <span className="text-[0.6875rem] text-text-dim">
-            {t('industry.blueprintAcquisitionTier', material.acquisitionTier)}
+            {material.acquisitionTier.community
+              ? t(
+                  material.acquisitionTier.community.stale
+                    ? 'industry.blueprintAcquisitionTierStale'
+                    : 'industry.blueprintAcquisitionTierCommunity',
+                  {
+                    ...material.acquisitionTier,
+                    name: material.acquisitionTier.community.memberName,
+                  }
+                )
+              : t('industry.blueprintAcquisitionTier', material.acquisitionTier)}
           </span>
         )}
       </span>

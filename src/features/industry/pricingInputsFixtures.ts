@@ -18,4 +18,5 @@ export const PRICING_INPUTS_FIXTURE: BuildPlanPricingInputs = {
   corpBlueprints: { blueprints: [], available: false, incomplete: false },
   standings: new Map(),
   bpcRows: [],
+  communityRows: [],
 };

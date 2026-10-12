@@ -86,6 +86,8 @@ export interface BuildPlanSources {
   bpcLastResortOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** Region market sell orders and LP Store redemptions, as offers (`useBlueprintPurchaseOffers`). */
   blueprintPurchaseOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
+  /** Community Offers (issue #3603): free Shared Blueprints, named for the Member. */
+  communityOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** `useIncludeBlueprintCost`: off still resolves each tier, but prices no acquisition line. */
   includeBlueprintCost: boolean;
 }
@@ -211,6 +213,7 @@ export function resolveBuildPlan(
       offersFor: sources.bpcOffersFor,
       extraOffersFor: sources.blueprintPurchaseOffersFor,
       lastResortOffersFor: sources.bpcLastResortOffersFor,
+      communityOffersFor: sources.communityOffersFor,
       hubPrices: snapshot?.hubPrices ?? {},
       sourcing: plan.materialSourcing,
     },

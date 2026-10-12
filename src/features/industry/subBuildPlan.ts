@@ -29,7 +29,7 @@
 import { mergeCostLines } from '@/engine/industry/mergeCostLines';
 import type { ResolvedMaterial, ResolvedSubBuild } from '@/engine/industry/materialResolution';
 import { resolvedSubBuildSeconds } from '@/engine/industry/materialResolution';
-import type { MaterialCostLine } from '@/engine/industry/types';
+import type { AcquisitionTier, MaterialCostLine } from '@/engine/industry/types';
 
 /** One row of the materials table: a material, summed over every place the plan needs it. */
 export interface MaterialTableRow extends MaterialCostLine {
@@ -48,7 +48,7 @@ export interface MaterialTableRow extends MaterialCostLine {
    * silently let a merged Blueprint Acquisition row back into the shopping
    * list.
    */
-  acquisitionTier?: { me: number; te: number };
+  acquisitionTier?: AcquisitionTier;
 }
 
 /**
