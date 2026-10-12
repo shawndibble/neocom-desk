@@ -29,6 +29,7 @@ import {
   resizeWidgetUndoable,
   restoreLayout,
   setRange,
+  setRowsPerPage,
   setScope,
   setShowOnPhone,
   setView,
@@ -192,6 +193,7 @@ export function OverviewEditProvider({
       setView: (id, view) => commit(setView(layoutRef.current, id, view)),
       setScope: (id, scope) => commit(setScope(layoutRef.current, id, scope)),
       setRange: (id, range) => commit(setRange(layoutRef.current, id, range)),
+      setRowsPerPage: (id, rows) => commit(setRowsPerPage(layoutRef.current, id, rows)),
       rename: (id, title) => commit(renameWidget(layoutRef.current, id, title)),
       setShowOnPhone: (id, show) => commit(setShowOnPhone(layoutRef.current, id, show)),
     };

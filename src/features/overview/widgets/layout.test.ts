@@ -16,6 +16,7 @@ import {
   resizeWidgetUndoable,
   restoreLayout,
   setRange,
+  setRowsPerPage,
   setScope,
   setShowOnPhone,
   setView,
@@ -25,6 +26,7 @@ import {
   type OverviewLayout,
   type Widget,
 } from './layout';
+import { DEFAULT_ROWS_PER_PAGE } from './tableSortPage';
 
 function counter(prefix = 'w') {
   let n = 0;
@@ -184,6 +186,25 @@ describe('setRange', () => {
     const l = layoutOf(w('a', 'wallet', { range: 30 }), w('b', 'orders'));
     expect(setRange(l, 'a', 7).widgets[0].range).toBe(7);
     expect(setRange(l, 'b', 7)).toBe(l);
+  });
+});
+
+describe('setRowsPerPage', () => {
+  it('stores a non-default page size and drops the field when it goes back to the default', () => {
+    const l = layoutOf(w('a', 'orders'));
+    const five = setRowsPerPage(l, 'a', 5);
+    expect(five.widgets[0].rowsPerPage).toBe(5);
+    const back = setRowsPerPage(five, 'a', DEFAULT_ROWS_PER_PAGE);
+    expect('rowsPerPage' in back.widgets[0]).toBe(false);
+  });
+
+  it('returns the same layout when nothing changes or the size is not offered', () => {
+    const l = layoutOf(w('a', 'orders', { rowsPerPage: 25 }));
+    expect(setRowsPerPage(l, 'a', 25)).toBe(l);
+    const plain = layoutOf(w('a', 'orders'));
+    expect(setRowsPerPage(plain, 'a', DEFAULT_ROWS_PER_PAGE)).toBe(plain);
+    expect(setRowsPerPage(l, 'a', 7 as never)).toBe(l);
+    expect(setRowsPerPage(l, 'missing', 5)).toBe(l);
   });
 });
 

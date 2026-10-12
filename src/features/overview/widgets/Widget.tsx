@@ -44,7 +44,9 @@ import { Chart } from './charts/Chart';
 import { DEFAULT_RANGE, type Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
 import { resolveWidget } from './state';
-import { TableBody } from './TableBody';
+import { TableBody, type TableBodyProps } from './TableBody';
+import { useOverviewEdit } from './editContext';
+import { DEFAULT_ROWS_PER_PAGE } from './tableSortPage';
 import { TABLE_ROWS, tableOf } from './tableModel';
 
 export interface WidgetProps {
@@ -127,10 +129,12 @@ function TableViewBody({
   view,
   size,
   title,
+  paging,
 }: {
   view: KindView;
   size: WidgetModel['size'];
   title: string;
+  paging: TableBodyProps['paging'];
 }) {
   return (
     <div>
@@ -140,6 +144,7 @@ function TableViewBody({
         table={tableOf(view)}
         columnsFor={size}
         rowLimit={TABLE_ROWS[size]}
+        paging={paging}
         ariaLabel={title}
         className="border-t border-line"
       />
@@ -255,6 +260,7 @@ function WidgetFrame({
   const { t } = useTranslation();
   const kind = getKind(widget.kind);
   const { refresh } = useOverviewRefresh();
+  const { setRowsPerPage } = useOverviewEdit();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(TICK_MS);
   const scope = scopePresentation(widget.kind, widget.scope);
@@ -331,7 +337,15 @@ function WidgetFrame({
   } else {
     body =
       widget.view === 'table' ? (
-        <TableViewBody view={view} size={widget.size} title={title} />
+        <TableViewBody
+          view={view}
+          size={widget.size}
+          title={title}
+          paging={{
+            rowsPerPage: widget.rowsPerPage ?? DEFAULT_ROWS_PER_PAGE,
+            onRowsPerPage: (rows) => setRowsPerPage(widget.id, rows),
+          }}
+        />
       ) : widget.view === 'chart' ? (
         <ChartBody view={view} size={widget.size} title={title} />
       ) : (

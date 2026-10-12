@@ -209,7 +209,7 @@ export function RowDetailModal({
         {t('miningTax.joinAction')}
       </DropdownMenuItem>
     ),
-    onSplit && (status === 'outstanding' || status === 'paid' || status === 'needs-review') && (
+    onSplit && (status === 'outstanding' || status === 'paid') && (
       <DropdownMenuItem key="split" onSelect={onSplit}>
         {t('miningTax.detail.splitAction')}
       </DropdownMenuItem>
@@ -454,6 +454,11 @@ export function RowDetailModal({
             {status === 'needs-review' && (
               <Button variant="primary" disabled={busy} onClick={onResolve}>
                 {t('miningTax.resolveConfirm')}
+              </Button>
+            )}
+            {status === 'needs-review' && onSplit && (
+              <Button disabled={busy} onClick={onSplit}>
+                {t('miningTax.detail.reviewSplitAction')}
               </Button>
             )}
             <div className="flex">

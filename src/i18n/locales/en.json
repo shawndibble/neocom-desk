@@ -4312,6 +4312,15 @@
       },
       "moreRows_one": "+{{count}} more",
       "moreRows_other": "+{{count}} more",
+      "table": {
+        "sortBy": "Sort by {{column}}",
+        "sortedAsc": "{{column}}, sorted ascending",
+        "sortedDesc": "{{column}}, sorted descending",
+        "rowsPerPage": "Rows per page",
+        "previousPage": "Previous page",
+        "nextPage": "Next page",
+        "pageStatus": "{{from}}–{{to}} of {{count}}"
+      },
       "noWidgets": "There are no widgets to show on this Overview."
     },
     "header": {
@@ -5579,6 +5588,7 @@
     "detail": {
       "linkWalletPayment": "Link a wallet payment…",
       "splitAction": "Split between Payees…",
+      "reviewSplitAction": "Give new ore to another Payee…",
       "moreLabel": "More actions for this entry",
       "unassignAction": "Unassign…",
       "valueLine": "Est. value {{value}} ISK on the day mined",
