@@ -27,7 +27,7 @@ export function MailBodyView({ text }: { text: string }) {
                       key={c}
                       scope="col"
                       className={cx(
-                        'py-0.5 pr-4 last:pr-0 font-normal whitespace-nowrap',
+                        'py-0.5 pl-4 first:pl-0 font-normal whitespace-nowrap',
                         block.align[c] === 'right' ? 'text-right' : 'text-left'
                       )}
                     >
@@ -43,7 +43,7 @@ export function MailBodyView({ text }: { text: string }) {
                       <td
                         key={c}
                         className={cx(
-                          'py-0.5 pr-4 last:pr-0 whitespace-nowrap',
+                          'py-0.5 pl-4 first:pl-0 whitespace-nowrap',
                           block.align[c] === 'right' && 'text-right'
                         )}
                       >
