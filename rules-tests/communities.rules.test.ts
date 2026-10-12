@@ -39,6 +39,15 @@ beforeEach(async () => {
     await setDoc(doc(db, MEMBER_1), { ownerHash: 'hash-1', joinedAt: 1, characterName: 'One' });
     await setDoc(doc(db, MEMBER_2), { ownerHash: 'hash-2', joinedAt: 1, characterName: 'Two' });
     await setDoc(doc(db, `${MEMBER_1}/library/0`), { ownerHash: 'hash-1', items: [{ typeId: 1 }] });
+    await setDoc(doc(db, `${C}/mailInvites/42`), {
+      adminUid: 'char:1',
+      targetName: 'Bob',
+      day: '2026-10-12',
+    });
+    await setDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-12'), {
+      count: 3,
+      ownerHash: 'hash-1',
+    });
     await setDoc(doc(db, 'characters/char:1/communities/c1'), {
       ownerHash: 'hash-1',
       communityId: 'c1',
@@ -191,5 +200,42 @@ describe('library chunks', () => {
     await assertFails(
       setDoc(doc(db, `${MEMBER_1}/library/1`), { ownerHash: 'hash-1-new-owner', items: [] })
     );
+  });
+});
+
+describe('mail invites', () => {
+  it('lets the admin read the invites sent and their own daily count', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertSucceeds(getDoc(doc(db, `${C}/mailInvites/42`)));
+    await assertSucceeds(getDocs(collection(db, `${C}/mailInvites`)));
+    await assertSucceeds(getDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-12')));
+  });
+
+  it('hides them from other Members, non-Members and another Character’s quota', async () => {
+    const member = characterAuth(env, 2, 'hash-2').firestore();
+    await assertFails(getDoc(doc(member, `${C}/mailInvites/42`)));
+    await assertFails(getDocs(collection(member, `${C}/mailInvites`)));
+    await assertFails(getDoc(doc(member, 'characters/char:1/mailInviteQuota/2026-10-12')));
+    const outsider = characterAuth(env, 3, 'hash-3').firestore();
+    await assertFails(getDoc(doc(outsider, `${C}/mailInvites/42`)));
+  });
+
+  it('denies every client write, the admin’s included', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, `${C}/mailInvites/43`), { adminUid: 'char:1' }));
+    await assertFails(updateDoc(doc(db, `${C}/mailInvites/42`), { sentAt: 1 }));
+    await assertFails(deleteDoc(doc(db, `${C}/mailInvites/42`)));
+    await assertFails(
+      setDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-13'), { count: 0 })
+    );
+    await assertFails(
+      updateDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-12'), { count: 0 })
+    );
+  });
+
+  it('denies a transferred Character the old admin’s invites', async () => {
+    const db = characterAuth(env, 1, 'hash-1-new-owner').firestore();
+    await assertFails(getDoc(doc(db, `${C}/mailInvites/42`)));
+    await assertFails(getDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-12')));
   });
 });

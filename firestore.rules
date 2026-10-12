@@ -111,6 +111,15 @@ service cloud.firestore {
       // this Character belongs to, written only by the Community callables
       // (admin SDK). The Character may read its own; it backs the
       // 10-Communities cap and purgeStaleAccounts's cleanup.
+      // Mail invites an admin sent today, by UTC day (issue #3604): a count
+      // the Community callables keep. The Character may read its own, to show
+      // how many are left.
+      match /mailInviteQuota/{day} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow write: if false;
+      }
+
       match /communities/{communityId} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();
@@ -461,6 +470,15 @@ service cloud.firestore {
 
       allow get: if isMember();
       allow list, write: if false;
+
+      // Mail invites sent from this Community (issue #3604), one doc per
+      // invited Character: only the admin reads them, only the callables write.
+      match /mailInvites/{targetId} {
+        allow get, list: if isMember()
+          && get(/databases/$(database)/documents/communities/$(communityId)).data.adminUid
+            == request.auth.uid;
+        allow write: if false;
+      }
 
       match /members/{memberUid} {
         function isSelf() {

@@ -4,6 +4,15 @@ import {
   MAX_COMMUNITY_MEMBERS,
   decideCreate,
   decideJoin,
+  decideMailInvite,
+  decideMailRelease,
+  MAIL_MAX_ATTEMPTS_PER_TARGET,
+  MAIL_RELEASE_BUDGET_PER_DAY,
+  MAIL_RELEASE_WINDOW_MS,
+  MAIL_RESERVATION_STALE_MS,
+  MAX_MAIL_INVITES_PER_DAY,
+  parseMailInviteInput,
+  utcDayKey,
   decideLeave,
   decideRemoveMember,
   decideTransferAdmin,
@@ -160,5 +169,67 @@ describe('parsePreviewInput', () => {
     for (const bad of [undefined, {}, { inviteCode: '' }, { inviteCode: 'x'.repeat(65) }]) {
       expect(() => parsePreviewInput(bad)).toThrow();
     }
+  });
+});
+
+describe('mail invites', () => {
+  it('parses a target Character id and name', () => {
+    expect(
+      parseMailInviteInput({ communityId: 'c1', targetCharacterId: 42, targetName: ' Bob ' })
+    ).toEqual({ communityId: 'c1', targetCharacterId: 42, targetName: 'Bob' });
+    for (const bad of [
+      { communityId: 'c1', targetCharacterId: 0, targetName: 'Bob' },
+      { communityId: 'c1', targetCharacterId: 1.5, targetName: 'Bob' },
+      { communityId: 'c1', targetCharacterId: '42', targetName: 'Bob' },
+      { communityId: 'c1', targetCharacterId: 42, targetName: '' },
+      { communityId: 'a/b', targetCharacterId: 42, targetName: 'Bob' },
+    ]) {
+      expect(() => parseMailInviteInput(bad)).toThrow();
+    }
+  });
+
+  it('counts a day in UTC', () => {
+    expect(utcDayKey(Date.UTC(2026, 9, 12, 23, 59, 59))).toBe('2026-10-12');
+    expect(utcDayKey(Date.UTC(2026, 9, 13, 0, 0, 0))).toBe('2026-10-13');
+  });
+
+  const NOW = 10_000_000;
+  const reserved = (
+    over: Partial<{ sentAt: number | null; reservedAt: number; attempts: number }> = {}
+  ) => ({ sentAt: null, reservedAt: NOW, attempts: 1, ...over });
+
+  it('allows up to the daily cap', () => {
+    const state = { existing: null, now: NOW };
+    expect(decideMailInvite({ ...state, dailyCount: MAX_MAIL_INVITES_PER_DAY - 1 })).toBe('ok');
+    expect(decideMailInvite({ ...state, dailyCount: MAX_MAIL_INVITES_PER_DAY })).toBe('daily-cap');
+  });
+
+  it('reports a repeat target before the cap', () => {
+    expect(
+      decideMailInvite({
+        dailyCount: MAX_MAIL_INVITES_PER_DAY,
+        existing: reserved({ sentAt: 1 }),
+        now: NOW,
+      })
+    ).toBe('already-invited');
+  });
+
+  it('lets a stale unconfirmed reservation be taken again, a few times, never a sent one', () => {
+    const later = NOW + MAIL_RESERVATION_STALE_MS;
+    const at = (existing: ReturnType<typeof reserved>, now: number) =>
+      decideMailInvite({ dailyCount: 5, existing, now });
+    expect(at(reserved(), NOW + 1000)).toBe('already-invited');
+    expect(at(reserved(), later)).toBe('retake');
+    expect(at(reserved({ attempts: MAIL_MAX_ATTEMPTS_PER_TARGET }), later)).toBe('already-invited');
+    expect(at(reserved({ sentAt: 1 }), later)).toBe('already-invited');
+  });
+
+  it('refunds only a fresh, unconfirmed reservation, within a small daily budget', () => {
+    const at = (existing: ReturnType<typeof reserved>, refundsToday: number, now: number) =>
+      decideMailRelease({ existing, refundsToday, now });
+    expect(at(reserved(), 0, NOW + 1000)).toBe('refund');
+    expect(at(reserved(), 0, NOW + MAIL_RELEASE_WINDOW_MS + 1)).toBe('keep');
+    expect(at(reserved({ sentAt: 5 }), 0, NOW)).toBe('keep');
+    expect(at(reserved(), MAIL_RELEASE_BUDGET_PER_DAY, NOW)).toBe('keep');
   });
 });

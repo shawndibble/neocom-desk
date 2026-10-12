@@ -16,7 +16,7 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { renameSurvey, useSurveyHistory } from './surveyHistory';
 
 const editableTitleClassName = cx(
-  'relative -mx-1 inline-flex max-w-full min-w-0 items-center gap-1 rounded-xs border border-transparent px-1 tracking-widest uppercase hover:border-line-bright hover:bg-panel-2 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""]',
+  'relative flex w-full min-w-0 items-center gap-1 rounded-xs border border-transparent px-1 tracking-widest uppercase hover:border-line-bright hover:bg-panel-2 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""]',
   interactiveClassName,
   focusRingClassName
 );
