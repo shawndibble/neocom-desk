@@ -4,6 +4,7 @@ import {
   MAX_COMMUNITY_MEMBERS,
   decideCreate,
   decideAdmit,
+  isPreApproved,
   decideJoin,
   decideMailInvite,
   decideMailRelease,
@@ -137,6 +138,26 @@ describe('decideJoin', () => {
     it('still refuses a revoked invite first', () => {
       expect(decideJoin({ ...gated, inviteMatches: false })).toBe('invalid-invite');
     });
+  });
+});
+
+describe('isPreApproved (a mailed invite standing in for approval)', () => {
+  const sent = { adminUid: 'char:1', sentAt: 5, consumedAt: null };
+
+  it('counts a sent invite from the current admin', () => {
+    expect(isPreApproved(sent, 'char:1')).toBe(true);
+  });
+  it('does not count a reservation the mail never went out for', () => {
+    expect(isPreApproved({ ...sent, sentAt: null }, 'char:1')).toBe(false);
+  });
+  it('does not count an invite from a former admin', () => {
+    expect(isPreApproved(sent, 'char:2')).toBe(false);
+  });
+  it('is spent once the Character has joined on it, so leaving or removal does not keep it open', () => {
+    expect(isPreApproved({ ...sent, consumedAt: 9 }, 'char:1')).toBe(false);
+  });
+  it('is not there when no invite was ever mailed', () => {
+    expect(isPreApproved(null, 'char:1')).toBe(false);
   });
 });
 

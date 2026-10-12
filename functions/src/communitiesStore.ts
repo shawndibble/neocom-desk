@@ -26,6 +26,7 @@ import {
   MAX_MAIL_INVITES_PER_DAY,
   decideRemoveMember,
   decideAdmit,
+  isPreApproved,
   decideTransferAdmin,
   newInviteCode,
   type CreateCommunityInput,
@@ -200,9 +201,7 @@ export async function joinCommunity(
   const ref = found.docs[0].ref;
   await pruneDanglingIndex(db, caller.uid);
   await clearStaleMemberData(db, ref.id, caller.uid, caller.ownerHash);
-  // The admin mailing this Character an invite is the approval already.
-  const mailed = await mailInviteRef(db, ref.id, characterIdOf(caller.uid)).get();
-  const preApproved = mailed.exists && mailed.get('sentAt') != null;
+  const mailInvite = mailInviteRef(db, ref.id, characterIdOf(caller.uid));
 
   return db.runTransaction(async (tx) => {
     // Re-read inside the transaction: the invite may have been revoked, or
@@ -211,6 +210,19 @@ export async function joinCommunity(
     const member = await tx.get(memberRef(db, ref.id, caller.uid));
     const joined = await tx.get(
       indexCollection(db, caller.uid).limit(MAX_COMMUNITIES_PER_CHARACTER)
+    );
+    // The admin mailing this Character an invite is the approval already, once.
+    const mailed = await tx.get(mailInvite);
+    const preApproved = isPreApproved(
+      mailed.exists
+        ? {
+            adminUid: String(mailed.get('adminUid') ?? ''),
+            sentAt: typeof mailed.get('sentAt') === 'number' ? mailed.get('sentAt') : null,
+            consumedAt:
+              typeof mailed.get('consumedAt') === 'number' ? mailed.get('consumedAt') : null,
+          }
+        : null,
+      String(community.get('adminUid') ?? '')
     );
     const decision = decideJoin({
       inviteMatches: community.exists && community.get('inviteCode') === input.inviteCode,
@@ -237,6 +249,7 @@ export async function joinCommunity(
       characterName: input.characterName,
     });
     tx.delete(requestRef(db, ref.id, caller.uid));
+    if (preApproved) tx.update(mailInvite, { consumedAt: Date.now() });
     return { communityId: ref.id, alreadyMember: false };
   });
 }
@@ -320,8 +333,14 @@ export async function decideJoinRequest(
   }
   const waiting = await request.get();
   if (!waiting.exists) return;
+  // A Member already holds this Character: the request is stale (the Character
+  // was sold, or it joined another way). Drop it; never evict the Member.
+  if ((await memberRef(db, communityId, requestUid).get()).exists) {
+    await request.delete();
+    return;
+  }
   await pruneDanglingIndex(db, requestUid);
-  await clearStaleMemberData(db, communityId, requestUid, String(waiting.get('ownerHash')));
+  await deleteMemberShares(db, communityId, requestUid);
   await db.runTransaction(async (tx) => {
     const [current, member, joined, stillWaiting] = await Promise.all([
       tx.get(community.ref),
@@ -387,6 +406,7 @@ export async function removeMemberData(
       if (community.exists) tx.update(community.ref, { memberCount: FieldValue.increment(-1) });
     }
     tx.delete(indexCollection(db, uid).doc(communityId));
+    tx.delete(requestRef(db, communityId, uid));
   });
   await deleteMemberShares(db, communityId, uid);
 }

@@ -251,6 +251,24 @@ export function decideJoin(state: {
   return 'ok';
 }
 
+/**
+ * Whether a mailed invite lets a Character past "Approve new Members". It must
+ * have gone out (not just been reserved), come from the Community's current
+ * admin, and not been used to join already, so a Member who was removed or
+ * left cannot come back on it.
+ */
+export function isPreApproved(
+  invite: { adminUid: string; sentAt: number | null; consumedAt: number | null } | null,
+  currentAdminUid: string
+): boolean {
+  return (
+    invite !== null &&
+    invite.sentAt !== null &&
+    invite.consumedAt === null &&
+    invite.adminUid === currentAdminUid
+  );
+}
+
 export type AdmitDecision = 'ok' | 'already-member' | 'community-full' | 'too-many-communities';
 
 /** The admin accepted a waiting request: the same caps as a join, no invite to match. */

@@ -80,6 +80,8 @@ export function CommunityDetail({
     'blueprints'
   );
   const [requests, setRequests] = useState<JoinRequest[]>([]);
+  // Admin-only tabs fall back to Blueprints if the admin role moved to someone else.
+  const shownTab = tab === 'invites' && !admin ? 'blueprints' : tab;
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
 
   // Bumped after a change that alters the Member list, to refetch it.
@@ -170,21 +172,21 @@ export function CommunityDetail({
               },
               ...(admin ? [{ id: 'invites', label: t('communities.tabs.invites') }] : []),
             ]}
-            value={tab}
+            value={shownTab}
             onChange={(id) => setTab(id as 'blueprints' | 'fittings' | 'members' | 'invites')}
             label={t('communities.tabs.label')}
             className="mb-2"
           />
-          <TabPanel tabsId={tabsId} tabId={tab}>
-            {tab === 'blueprints' ? (
+          <TabPanel tabsId={tabsId} tabId={shownTab}>
+            {shownTab === 'blueprints' ? (
               <ShareBlueprintsTab
                 characterId={characterId}
                 communityId={community.id}
                 onOpenLibrary={() => setTab('library')}
               />
-            ) : tab === 'fittings' ? (
+            ) : shownTab === 'fittings' ? (
               <ShareFittingsTab characterId={characterId} communityId={community.id} />
-            ) : tab === 'invites' ? (
+            ) : shownTab === 'invites' ? (
               <CommunityInvites
                 community={community}
                 characterId={characterId}
