@@ -23,7 +23,11 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: async () => 'uid1' }));
 vi.mock('@/db', () => ({
   db: { characters: { get: async () => ({ characterId: 1, ownerHash: 'owner-1' }) } },
 }));
-vi.mock('./shareSelection', () => ({ loadShareSelection: async () => new Set([100]) }));
+const choice = vi.hoisted(() => ({
+  current: { all: false, allowed: new Set([100]) } as
+    { all: false; allowed: Set<number> } | { all: true; excluded: Set<number> },
+}));
+vi.mock('./shareSelection', () => ({ loadShareChoice: async () => choice.current }));
 vi.mock('@/features/industry/data', () => ({
   loadCharacterBlueprints: async () => ({
     cached: {
@@ -77,6 +81,19 @@ function memberDoc(data: Record<string, unknown> | null) {
 describe('publishSharedLibrary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    choice.current = { all: false, allowed: new Set([100]) };
+  });
+
+  it('under share-all also publishes a blueprint that was never picked, minus exclusions', async () => {
+    choice.current = { all: true, excluded: new Set([200]) };
+    memberDoc({ ownerHash: 'owner-1' });
+    await publishSharedLibrary(1, 'c1');
+    expect((setDoc.mock.calls[0]![1] as { items: unknown[] }).items).toEqual(published);
+    choice.current = { all: true, excluded: new Set() };
+    await publishSharedLibrary(1, 'c1');
+    expect(
+      (setDoc.mock.calls[1]![1] as { items: { typeId: number }[] }).items.map((i) => i.typeId)
+    ).toEqual([100, 200]);
   });
 
   it('writes the selected blueprints only, then stamps the Member doc', async () => {

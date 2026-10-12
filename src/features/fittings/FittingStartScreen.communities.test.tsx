@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -134,12 +134,15 @@ describe('Share to Community', () => {
     renderScreen();
     await userEvent.click(await screen.findByRole('button', { name: 'More actions for Kite' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Share to Pals' }));
-    expect(shared.toggleShare).toHaveBeenCalledWith(
-      7,
-      'c1',
-      { source: 'saved', key: 'r1' },
-      { name: 'Kite', code },
-      false
+    // The menu runs onSelect after the click settles, so wait for it.
+    await waitFor(() =>
+      expect(shared.toggleShare).toHaveBeenCalledWith(
+        7,
+        'c1',
+        { source: 'saved', key: 'r1' },
+        { name: 'Kite', code },
+        false
+      )
     );
   });
 
@@ -148,12 +151,15 @@ describe('Share to Community', () => {
     renderScreen();
     await userEvent.click(await screen.findByRole('button', { name: 'More actions for Kite' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Stop sharing in Pals' }));
-    expect(shared.toggleShare).toHaveBeenCalledWith(
-      7,
-      'c1',
-      { source: 'saved', key: 'r1' },
-      { name: 'Kite', code },
-      true
+    // The menu runs onSelect after the click settles, so wait for it.
+    await waitFor(() =>
+      expect(shared.toggleShare).toHaveBeenCalledWith(
+        7,
+        'c1',
+        { source: 'saved', key: 'r1' },
+        { name: 'Kite', code },
+        true
+      )
     );
   });
 
@@ -163,12 +169,15 @@ describe('Share to Community', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'More actions for Kite' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Share to Community' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Share to Crew' }));
-    expect(shared.toggleShare).toHaveBeenCalledWith(
-      7,
-      'c2',
-      { source: 'saved', key: 'r1' },
-      { name: 'Kite', code },
-      false
+    // The menu runs onSelect after the click settles, so wait for it.
+    await waitFor(() =>
+      expect(shared.toggleShare).toHaveBeenCalledWith(
+        7,
+        'c2',
+        { source: 'saved', key: 'r1' },
+        { name: 'Kite', code },
+        false
+      )
     );
   });
 });

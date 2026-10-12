@@ -22,9 +22,8 @@ import { uidForCharacter } from '@/sync/uid';
 import { CommunityLibrary } from './CommunityLibrary';
 import { ConfirmDialog } from './ConfirmDialog';
 import { MailInvitePanel } from './MailInvitePanel';
-import { ShareFittingsPanel } from './ShareFittingsPanel';
-import { ShareSelectionDialog } from './ShareSelectionDialog';
-import { loadShareSelection } from './shareSelection';
+import { ShareFittingsTab } from './ShareFittingsTab';
+import { ShareBlueprintsTab } from './ShareBlueprintsTab';
 import {
   communityInviteUrl,
   deleteCommunity,
@@ -74,21 +73,9 @@ export function CommunityDetail({
   const [membersFailed, setMembersFailed] = useState(false);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
   const tabsId = useTabsId();
-  const [tab, setTab] = useState<'members' | 'library'>('members');
-  const [sharedCount, setSharedCount] = useState<number | null>(null);
+  const [tab, setTab] = useState<'blueprints' | 'fittings' | 'members' | 'library'>('blueprints');
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadShareSelection(characterId, community.id).then((saved) => {
-      if (!cancelled) setSharedCount(saved.size);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, community.id]);
 
   // Bumped after a change that alters the Member list, to refetch it.
   const [reload, setReload] = useState(0);
@@ -109,7 +96,6 @@ export function CommunityDetail({
     };
   }, [characterId, community.id, community.memberCount, reload]);
 
-  const myName = members?.find((member) => member.uid === myUid)?.characterName ?? '';
   const inviteUrl = community.inviteCode ? communityInviteUrl(community.inviteCode) : null;
   const close = () => setDialog(null);
   const changed = () => {
@@ -177,35 +163,11 @@ export function CommunityDetail({
         </>
       )}
 
-      <section
-        className="mb-4 flex flex-wrap items-center gap-2"
-        aria-label={t('communities.share.legend')}
-      >
-        <p className="text-xs text-text-dim">
-          {sharedCount !== null &&
-            myName !== '' &&
-            t('communities.share.summary', { count: sharedCount, name: myName })}
-        </p>
-        <Button size="sm" onClick={() => setSharing(true)}>
-          {t('communities.share.choose')}
-        </Button>
-      </section>
-
-      <ShareFittingsPanel characterId={characterId} communityId={community.id} />
-
-      <Tabs
-        tabsId={tabsId}
-        tabs={[
-          { id: 'members', label: t('communities.members') },
-          { id: 'library', label: t('communities.library.tab') },
-        ]}
-        value={tab}
-        onChange={(id) => setTab(id as 'members' | 'library')}
-        label={t('communities.library.tabsLabel')}
-        className="mb-2"
-      />
-      <TabPanel tabsId={tabsId} tabId={tab}>
-        {tab === 'library' ? (
+      {tab === 'library' ? (
+        <>
+          <Button size="sm" className="mb-2" onClick={() => setTab('blueprints')}>
+            {t('communities.library.back')}
+          </Button>
           <CommunityLibrary
             communityId={community.id}
             characterId={characterId}
@@ -213,81 +175,109 @@ export function CommunityDetail({
             membersFailed={membersFailed}
             now={now}
           />
-        ) : (
-          <>
-            {membersFailed ? (
-              <p role="alert" className="text-xs text-danger">
-                {t('communities.membersLoadFailed')}
-              </p>
-            ) : members === null ? (
-              <Spinner size="sm" label={t('communities.loading')} />
+        </>
+      ) : (
+        <>
+          <Tabs
+            tabsId={tabsId}
+            tabs={[
+              { id: 'blueprints', label: t('communities.tabs.blueprints') },
+              { id: 'fittings', label: t('communities.tabs.fittings') },
+              { id: 'members', label: t('communities.members') },
+            ]}
+            value={tab}
+            onChange={(id) => setTab(id as 'blueprints' | 'fittings' | 'members')}
+            label={t('communities.tabs.label')}
+            className="mb-2"
+          />
+          <TabPanel tabsId={tabsId} tabId={tab}>
+            {tab === 'blueprints' ? (
+              <ShareBlueprintsTab
+                characterId={characterId}
+                communityId={community.id}
+                onOpenLibrary={() => setTab('library')}
+              />
+            ) : tab === 'fittings' ? (
+              <ShareFittingsTab characterId={characterId} communityId={community.id} />
             ) : (
-              <ul className="divide-y divide-line">
-                {members.map((member) => {
-                  const isSelf = member.uid === myUid;
-                  const isAdminRow = member.uid === community.adminUid;
-                  const stale = isLibraryStale(member.libraryAsOf, now);
-                  const row = (
-                    <li
-                      key={member.uid}
-                      className={`flex items-center gap-2 py-1.5 text-xs ${stale ? 'opacity-60' : ''}`}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {member.characterName}
-                        {isSelf && (
-                          <span className="ml-1 text-text-dim">({t('communities.you')})</span>
-                        )}
-                        {member.libraryAsOf !== null && (
-                          <span className="ml-1 text-text-dim">
-                            {t('communities.asOf', { age: formatAge(now - member.libraryAsOf, t) })}
+              <>
+                {membersFailed ? (
+                  <p role="alert" className="text-xs text-danger">
+                    {t('communities.membersLoadFailed')}
+                  </p>
+                ) : members === null ? (
+                  <Spinner size="sm" label={t('communities.loading')} />
+                ) : (
+                  <ul className="divide-y divide-line">
+                    {members.map((member) => {
+                      const isSelf = member.uid === myUid;
+                      const isAdminRow = member.uid === community.adminUid;
+                      const stale = isLibraryStale(member.libraryAsOf, now);
+                      const row = (
+                        <li
+                          key={member.uid}
+                          className={`flex items-center gap-2 py-1.5 text-xs ${stale ? 'opacity-60' : ''}`}
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            {member.characterName}
+                            {isSelf && (
+                              <span className="ml-1 text-text-dim">({t('communities.you')})</span>
+                            )}
+                            {member.libraryAsOf !== null && (
+                              <span className="ml-1 text-text-dim">
+                                {t('communities.asOf', {
+                                  age: formatAge(now - member.libraryAsOf, t),
+                                })}
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-                      {stale && (
-                        <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                          {t('communities.staleBadge')}
-                        </span>
-                      )}
-                      {isAdminRow && (
-                        <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                          {t('communities.adminBadge')}
-                        </span>
-                      )}
-                      {admin && !isAdminRow && <RowMoreActions />}
-                    </li>
-                  );
-                  // Only the admin has actions, and only on another Member: a row
-                  // with nothing to offer gets no ⋮ and no menu.
-                  return admin && !isAdminRow ? (
-                    <RowActionsMenu
-                      key={member.uid}
-                      name={member.characterName}
-                      items={
-                        <>
-                          <MenuItem onSelect={() => setDialog({ kind: 'makeAdmin', member })}>
-                            {t('communities.makeAdminMenu', { name: member.characterName })}
-                          </MenuItem>
-                          <MenuSeparator />
-                          <MenuItem
-                            className="text-danger"
-                            onSelect={() => setDialog({ kind: 'remove', member })}
-                          >
-                            {t('communities.removeMenu', { name: member.characterName })}
-                          </MenuItem>
-                        </>
-                      }
-                    >
-                      {row}
-                    </RowActionsMenu>
-                  ) : (
-                    row
-                  );
-                })}
-              </ul>
+                          {stale && (
+                            <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
+                              {t('communities.staleBadge')}
+                            </span>
+                          )}
+                          {isAdminRow && (
+                            <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
+                              {t('communities.adminBadge')}
+                            </span>
+                          )}
+                          {admin && !isAdminRow && <RowMoreActions />}
+                        </li>
+                      );
+                      // Only the admin has actions, and only on another Member: a row
+                      // with nothing to offer gets no ⋮ and no menu.
+                      return admin && !isAdminRow ? (
+                        <RowActionsMenu
+                          key={member.uid}
+                          name={member.characterName}
+                          items={
+                            <>
+                              <MenuItem onSelect={() => setDialog({ kind: 'makeAdmin', member })}>
+                                {t('communities.makeAdminMenu', { name: member.characterName })}
+                              </MenuItem>
+                              <MenuSeparator />
+                              <MenuItem
+                                className="text-danger"
+                                onSelect={() => setDialog({ kind: 'remove', member })}
+                              >
+                                {t('communities.removeMenu', { name: member.characterName })}
+                              </MenuItem>
+                            </>
+                          }
+                        >
+                          {row}
+                        </RowActionsMenu>
+                      ) : (
+                        row
+                      );
+                    })}
+                  </ul>
+                )}
+              </>
             )}
-          </>
-        )}
-      </TabPanel>
+          </TabPanel>
+        </>
+      )}
 
       <ConfirmDialog
         open={dialog?.kind === 'regenerate'}
@@ -366,14 +356,6 @@ export function CommunityDetail({
           onPatch({ adminUid: dialog.member.uid });
           onChanged();
         }}
-      />
-      <ShareSelectionDialog
-        open={sharing}
-        characterId={characterId}
-        characterName={myName}
-        communityId={community.id}
-        onClose={() => setSharing(false)}
-        onSaved={setSharedCount}
       />
       {copied && <Toast message={copied} onClose={() => setCopied(null)} />}
     </Panel>

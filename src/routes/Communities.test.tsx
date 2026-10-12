@@ -162,6 +162,7 @@ describe('Communities page', () => {
       store.removeMember.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
+      await user.click(await screen.findByRole('tab', { name: en.communities.members }));
       await screen.findByText('Friend');
       expect(screen.getAllByRole('button', { name: /More actions/ })).toHaveLength(1);
       await user.click(screen.getByRole('button', { name: /More actions/ }));
@@ -175,6 +176,7 @@ describe('Communities page', () => {
       store.transferAdmin.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
+      await user.click(await screen.findByRole('tab', { name: en.communities.members }));
       await screen.findByText('Friend');
       await user.click(screen.getByRole('button', { name: /More actions/ }));
       await user.click(await screen.findByRole('menuitem', { name: /Make Friend admin/ }));
@@ -203,6 +205,7 @@ describe('Communities page', () => {
       store.leaveCommunity.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
+      await user.click(await screen.findByRole('tab', { name: en.communities.members }));
       await screen.findByText('Friend');
       expect(screen.queryByRole('button', { name: c.copyLink })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();

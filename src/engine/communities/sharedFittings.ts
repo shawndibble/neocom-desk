@@ -79,3 +79,21 @@ export function dedupeSharedFittings(
   }
   return [...byId.values()];
 }
+
+/** A Fitting's key in a share choice: its doc id without the owner, the same in every Community. */
+export function fittingChoiceKey({ source, key }: SharedFittingKey): string {
+  return `${source}-${key}`;
+}
+
+/**
+ * Whether a saved Fitting's re-save is pushed to one Community: it already
+ * holds the Fitting, or "share all" is on there (`allExcluded` is the
+ * Fittings stopped since, null when off) and this one was not stopped.
+ */
+export function followsSave(
+  alreadyShared: boolean,
+  allExcluded: ReadonlySet<string> | null,
+  key: SharedFittingKey
+): boolean {
+  return alreadyShared || (allExcluded !== null && !allExcluded.has(fittingChoiceKey(key)));
+}
