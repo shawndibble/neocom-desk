@@ -28,8 +28,10 @@ _Recorded 2026-10-12 · issue #3605._
     to that Community, and every later save or new Fitting is pushed
     automatically; deleting one removes it from the shared list. While it is
     on, the per-Fitting share control for that Community reads "shared with
-    all". Turning it off removes the copies it created; Fittings shared one by
-    one stay.
+    all". Turning it off removes every Fitting that Character shared to that
+    Community, including any shared one by one, so none stay available. The
+    switch asks first, since it removes them all. Leaving the Community does
+    the same, as for blueprints.
   - **Per Fitting**, from its Export or Fitting-actions menu, "Share to
     Community". A Character in several Communities gets a submenu listing
     them; in one, the item shares straight to it; in none, the item is
