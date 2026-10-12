@@ -109,9 +109,10 @@ function rememberThisPage(): void {
  * (#1544) sent the visitor with its landing already stashed, `/callback`,
  * whose Retry fallback restarts the very login that landing belongs to, and
  * `/s` and `/share` (the old spelling), whose "Log in" stashes the shared page
- * before it starts (#3075).
+ * before it starts (#3075), and `/communities/join`, whose invite page does the
+ * same so a visitor lands back on the invite after EVE's login.
  */
-const LANDING_KEEPING_ROUTES = ['/login', '/callback', '/s', '/share'];
+const LANDING_KEEPING_ROUTES = ['/login', '/callback', '/s', '/share', '/communities/join'];
 
 function forgetStrayLanding(): void {
   const here = currentRouterPath();

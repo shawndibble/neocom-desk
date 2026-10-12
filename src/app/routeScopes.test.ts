@@ -133,6 +133,7 @@ describe('every route must declare its scope requirement', () => {
       '*',
       '/',
       '/callback',
+      '/communities/join/:code',
       '/error',
       '/login',
       '/s/:shareId',

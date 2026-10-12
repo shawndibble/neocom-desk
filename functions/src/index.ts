@@ -35,6 +35,7 @@ import {
   parseCommunityIdInput,
   parseCreateInput,
   parseJoinInput,
+  parsePreviewInput,
   parseRemoveMemberInput,
   parseTransferAdminInput,
 } from './communities.js';
@@ -43,6 +44,7 @@ import {
   deleteCommunity,
   joinCommunity,
   leaveCommunity,
+  previewCommunity,
   purgeCharacterCommunities,
   regenerateInvite,
   removeMember,
@@ -338,6 +340,12 @@ const COMMUNITY_CALLABLE_OPTIONS = { maxInstances: 5 };
 
 export const createCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
   createCommunity(getFirestore(), callerOf(request), parseCreateInput(request.data))
+);
+
+// Callable with no session on purpose: the invite page shows what the link is
+// for before a visitor signs in. Returns three public facts, see previewCommunity.
+export const previewCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
+  previewCommunity(getFirestore(), parsePreviewInput(request.data).inviteCode)
 );
 
 export const joinCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>

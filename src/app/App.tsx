@@ -91,6 +91,7 @@ const Mail = lazy(routeChunks.loadMail);
 const Calendar = lazy(routeChunks.loadCalendar);
 const Contracts = lazy(routeChunks.loadContracts);
 const Communities = lazy(routeChunks.loadCommunities);
+const CommunityJoin = lazy(routeChunks.loadCommunityJoin);
 const Contacts = lazy(routeChunks.loadContacts);
 const Travel = lazy(routeChunks.loadTravel);
 const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
@@ -385,6 +386,8 @@ export function App() {
               (ids minted before the short key), kept so links already sent
               still open; the literal `/share/fitting` above outranks it. */}
             <Route path="/s/:shareId" element={<SharedLink />} />
+            {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
+            <Route path="/communities/join/:code" element={<CommunityJoin />} />
             <Route path="/share/:shareId" element={<SharedLink />} />
             {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
             <Route path="/error" element={<ErrorProbe />} />

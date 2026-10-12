@@ -78,6 +78,7 @@ const OTHER_ROUTE_TITLE_KEYS: Record<string, readonly string[]> = {
   '/error': ['error.title'],
   '/s/:shareId': ['share.title'],
   '/share/:shareId': ['share.title'],
+  '/communities/join/:code': ['communities.join.title'],
 };
 
 const ROUTE_PATTERNS = Object.entries({ ...OTHER_ROUTE_TITLE_KEYS, ...ROUTE_TITLE_KEYS });

@@ -12,6 +12,7 @@ import {
   parseCommunityIdInput,
   parseCreateInput,
   parseJoinInput,
+  parsePreviewInput,
   parseRemoveMemberInput,
 } from './communities.js';
 
@@ -150,5 +151,14 @@ describe('decideTransferAdmin', () => {
       memberUid: 'char:2',
     });
     expect(() => parseTransferAdminInput({ communityId: 'c1', memberUid: 'bob' })).toThrow();
+  });
+});
+
+describe('parsePreviewInput', () => {
+  it('takes an invite code and nothing else', () => {
+    expect(parsePreviewInput({ inviteCode: ' abc ', extra: 1 })).toEqual({ inviteCode: 'abc' });
+    for (const bad of [undefined, {}, { inviteCode: '' }, { inviteCode: 'x'.repeat(65) }]) {
+      expect(() => parsePreviewInput(bad)).toThrow();
+    }
   });
 });

@@ -7712,7 +7712,29 @@
     "deleteBody": "Every Member's shared blueprints are deleted and the Community is gone. This can't be undone.",
     "deleteAction": "Delete",
     "actionFailed": "That did not work. Try again.",
-    "notAdmin": "Only the admin can do that."
+    "notAdmin": "Only the admin can do that.",
+    "join": {
+      "title": "Join a Community",
+      "invitedBy": "Run by {{admin}}",
+      "gone": "This invite link no longer works",
+      "goneHint": "The admin may have revoked it. Ask them for a new link.",
+      "unavailable": "Could not load this invite. Check your connection and reload.",
+      "intro": "Joining shares nothing by itself. You choose which blueprints to share afterwards.",
+      "logIn": "Log in with EVE to join",
+      "logInHint": "Each Character joins on its own. Log in with the one you want to join with.",
+      "pickTitle": "Choose which Characters join",
+      "needsPermission": "Needs permission to read blueprints",
+      "grant": "Grant permission",
+      "another": "Join with another Character",
+      "joinAction_one": "Join with {{count}} Character",
+      "joinAction_other": "Join with {{count}} Characters",
+      "joined": "Joined",
+      "alreadyMember": "Already a Member",
+      "full": "This Community is full.",
+      "tooMany": "This Character is already in 10 Communities.",
+      "failed": "Could not join. Try again.",
+      "open": "Open the Community"
+    }
   },
   "contacts": {
     "title": "Contacts",
