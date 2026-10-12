@@ -31,6 +31,23 @@ import {
   decideAccountAction,
   lastSyncedAtOf,
 } from './purgeStaleAccounts.js';
+import {
+  parseCommunityIdInput,
+  parseCreateInput,
+  parseJoinInput,
+  parseRemoveMemberInput,
+} from './communities.js';
+import {
+  createCommunity,
+  deleteCommunity,
+  joinCommunity,
+  leaveCommunity,
+  purgeCharacterCommunities,
+  regenerateInvite,
+  removeMember,
+  revokeInvite,
+  type CallerCharacter,
+} from './communitiesStore.js';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
 import {
   LP_STORE_OFFERS_CHUNK_SIZE,
@@ -264,6 +281,10 @@ export const purgeStaleAccounts = onSchedule('every 24 hours', async () => {
       continue;
     }
 
+    // Shared Community data lives outside `characters/{uid}`, so the
+    // subcollection sweep below would never reach it (ADR 0018).
+    await purgeCharacterCommunities(db, ref.id);
+
     for (const sub of await ref.listCollections()) {
       for (;;) {
         if (passes >= STALE_ACCOUNT_MAX_PASSES) {
@@ -284,6 +305,83 @@ export const purgeStaleAccounts = onSchedule('every 24 hours', async () => {
     purged += 1;
   }
 });
+
+// Communities (issue #3596, ADR 0018). Every write that enforces a cap or
+// deletes another doc goes through these callables (communitiesStore.ts); the
+// client only writes a Member's own library chunks, directly, under the rules.
+
+/** The signed-in Character behind a callable: uid `char:{id}` + ownerHash claim. */
+function callerOf(request: {
+  auth?: { uid: string; token: Record<string, unknown> };
+}): CallerCharacter {
+  const uid = request.auth?.uid;
+  const ownerHash = request.auth?.token.ownerHash;
+  if (!uid || !uid.startsWith('char:') || typeof ownerHash !== 'string') {
+    throw new HttpsError('unauthenticated', 'Sign in with a Character first');
+  }
+  return { uid, ownerHash };
+}
+
+const COMMUNITY_CALLABLE_OPTIONS = { maxInstances: 5 };
+
+export const createCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
+  createCommunity(getFirestore(), callerOf(request), parseCreateInput(request.data))
+);
+
+export const joinCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
+  joinCommunity(getFirestore(), callerOf(request), parseJoinInput(request.data))
+);
+
+export const leaveCommunityCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    await leaveCommunity(
+      getFirestore(),
+      callerOf(request),
+      parseCommunityIdInput(request.data).communityId
+    );
+  }
+);
+
+export const removeCommunityMemberCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, memberUid } = parseRemoveMemberInput(request.data);
+    await removeMember(getFirestore(), callerOf(request), communityId, memberUid);
+  }
+);
+
+export const revokeCommunityInviteCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    await revokeInvite(
+      getFirestore(),
+      callerOf(request),
+      parseCommunityIdInput(request.data).communityId
+    );
+  }
+);
+
+export const regenerateCommunityInviteCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) =>
+    regenerateInvite(
+      getFirestore(),
+      callerOf(request),
+      parseCommunityIdInput(request.data).communityId
+    )
+);
+
+export const deleteCommunityCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    await deleteCommunity(
+      getFirestore(),
+      callerOf(request),
+      parseCommunityIdInput(request.data).communityId
+    );
+  }
+);
 
 /** Firestore's hard cap on writes in a single `WriteBatch`, with headroom for a shorter final page. */
 const BATCH_WRITE_PAGE_SIZE = 450;

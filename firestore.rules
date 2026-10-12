@@ -107,6 +107,15 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      // Communities membership index (issue #3596): one doc per Community
+      // this Character belongs to, written only by the Community callables
+      // (admin SDK). The Character may read its own; it backs the
+      // 10-Communities cap and purgeStaleAccounts's cleanup.
+      match /communities/{communityId} {
+        allow get, list: if isOwner();
+        allow write: if false;
+      }
+
       match /settings/{key} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();
@@ -427,6 +436,65 @@ service cloud.firestore {
         allow update, delete: if false;
       }
     }
+    // Communities (issue #3596, ADR 0018): the first collections gated by
+    // membership rather than by uid or public visibility. Members can read a
+    // Community, each other and each other's Shared Blueprint library; nobody
+    // creates, joins, leaves or removes through the client — the Community
+    // callables do, because the 100-Member and 10-Communities caps and the
+    // delete-on-leave cannot be expressed in rules. A Member writes only their
+    // own library chunks and pushed-at stamp, under the ownerHash guard.
+    //
+    // isMember is hash-strict: the Member doc stores the ownerHash the
+    // Character joined under, so a sold/transferred Character (same uid, new
+    // ownerHash) does not inherit the old owner's membership and can't read
+    // anyone's asset locations.
+    match /communities/{communityId} {
+      function memberPath(uid) {
+        return /databases/$(database)/documents/communities/$(communityId)/members/$(uid);
+      }
+      function isMember() {
+        return request.auth != null
+          && exists(memberPath(request.auth.uid))
+          && get(memberPath(request.auth.uid)).data.ownerHash == request.auth.token.ownerHash;
+      }
+
+      allow get: if isMember();
+      allow list, write: if false;
+
+      match /members/{memberUid} {
+        function isSelf() {
+          return request.auth != null && request.auth.uid == memberUid && isMember();
+        }
+
+        allow get, list: if isMember();
+        allow create, delete: if false;
+        // Only the pushed-at stamp: when the library was last pushed, its
+        // hash (so the device skips an unchanged push) and its chunk count.
+        allow update: if isSelf()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['pushedAt', 'libraryHash', 'chunkCount'])
+          && request.resource.data.pushedAt == request.time
+          && request.resource.data.libraryHash is string
+          && request.resource.data.libraryHash.size() <= 128
+          && request.resource.data.chunkCount is int
+          && request.resource.data.chunkCount >= 0
+          && request.resource.data.chunkCount <= 200;
+
+        // Shared Blueprint library: chunk docs "0", "1", ... of at most 500
+        // blueprints each, comfortably under Firestore's 1 MiB doc cap.
+        match /library/{chunkId} {
+          allow get, list: if isMember();
+          allow create, update: if isSelf()
+            && chunkId.matches('^[0-9]{1,3}$')
+            && request.resource.data.keys().hasOnly(['ownerHash', 'items'])
+            && request.resource.data.ownerHash == request.auth.token.ownerHash
+            && request.resource.data.items is list
+            && request.resource.data.items.size() <= 500;
+          allow delete: if isSelf();
+        }
+      }
+    }
+
     // Everything else: implicit deny.
   }
 }
