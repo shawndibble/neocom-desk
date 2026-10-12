@@ -20,6 +20,7 @@ import {
   decideJoin,
   decideLeave,
   decideMailInvite,
+  decideMailRelease,
   utcDayKey,
   MAX_MAIL_INVITES_PER_DAY,
   decideRemoveMember,
@@ -368,14 +369,37 @@ export async function reserveMailInvite(
     const quotaSnap = await tx.get(quota);
     const inviteSnap = await tx.get(invite);
     const dailyCount = Number(quotaSnap.get('count') ?? 0);
-    const decision = decideMailInvite({ dailyCount, alreadyInvited: inviteSnap.exists });
+    const decision = decideMailInvite({
+      dailyCount,
+      existing: inviteSnap.exists
+        ? {
+            sentAt: typeof inviteSnap.get('sentAt') === 'number' ? inviteSnap.get('sentAt') : null,
+            reservedAt: Number(inviteSnap.get('reservedAt') ?? 0),
+            attempts: Number(inviteSnap.get('attempts') ?? 1),
+          }
+        : null,
+      now,
+    });
+    if (decision === 'retake') {
+      // A crashed tab left this reserved: let the admin try again, at no extra cost.
+      tx.update(invite, {
+        reservedAt: now,
+        attempts: Number(inviteSnap.get('attempts') ?? 1) + 1,
+      });
+      return MAX_MAIL_INVITES_PER_DAY - dailyCount;
+    }
     if (decision !== 'ok') fail(decision);
-    tx.set(quota, { count: dailyCount + 1, ownerHash: caller.ownerHash });
+    tx.set(quota, {
+      count: dailyCount + 1,
+      refunds: Number(quotaSnap.get('refunds') ?? 0),
+      ownerHash: caller.ownerHash,
+    });
     tx.set(invite, {
       adminUid: caller.uid,
       targetName,
       day,
       reservedAt: now,
+      attempts: 1,
       sentAt: null,
     });
     return MAX_MAIL_INVITES_PER_DAY - (dailyCount + 1);
@@ -403,25 +427,42 @@ export async function confirmMailInvite(
 }
 
 /**
- * The send failed: give back the slot and the day's count. Idempotent, and
- * only for an invite this admin reserved that was never confirmed as sent.
+ * The send definitely failed: give back the slot and the day's count. Idempotent
+ * and bounded (see `decideMailRelease`): a fresh, unconfirmed reservation of this
+ * admin's, a few times a day.
  */
 export async function releaseMailInvite(
   db: Firestore,
   caller: CallerCharacter,
   communityId: string,
-  targetCharacterId: number
+  targetCharacterId: number,
+  now = Date.now()
 ): Promise<void> {
   await requireAdmin(db, communityId, caller);
   const invite = mailInviteRef(db, communityId, targetCharacterId);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(invite);
-    if (!snap.exists || snap.get('adminUid') !== caller.uid || snap.get('sentAt') !== null) return;
+    if (!snap.exists || snap.get('adminUid') !== caller.uid) return;
     const quota = quotaRef(db, caller.uid, String(snap.get('day')));
     const quotaSnap = await tx.get(quota);
+    const refundsToday = Number(quotaSnap.get('refunds') ?? 0);
+    const decision = decideMailRelease({
+      existing: {
+        sentAt: typeof snap.get('sentAt') === 'number' ? snap.get('sentAt') : null,
+        reservedAt: Number(snap.get('reservedAt') ?? 0),
+        attempts: Number(snap.get('attempts') ?? 1),
+      },
+      refundsToday,
+      now,
+    });
+    // Past the window, or out of refunds, the slot stays spent: the server
+    // can't tell a failed send from a skipped confirm.
+    if (decision !== 'refund') return;
     tx.delete(invite);
-    const count = Number(quotaSnap.get('count') ?? 0);
-    if (quotaSnap.exists && count > 0) tx.update(quota, { count: count - 1 });
+    if (quotaSnap.exists) {
+      const count = Number(quotaSnap.get('count') ?? 0);
+      tx.update(quota, { count: Math.max(0, count - 1), refunds: refundsToday + 1 });
+    }
   });
 }
 

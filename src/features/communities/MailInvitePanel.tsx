@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button, Field, Fields, TextInput } from '@/components/ui';
+import { EsiError } from '@/esi/errors';
 import { sendMail } from '@/features/character/mail';
 import { resolvePilotByName } from '@/features/travel/pilotLookup';
 import { callableErrorReason } from './callableError';
@@ -18,7 +19,21 @@ import {
 
 const SEND_MAIL = ['postCharacterMail'] as const;
 
-type Problem = 'notFound' | 'lookupFailed' | 'self' | 'alreadyInvited' | 'dailyCap' | 'sendFailed';
+type Problem =
+  | 'notFound'
+  | 'lookupFailed'
+  | 'self'
+  | 'alreadyInvited'
+  | 'dailyCap'
+  | 'sendFailed'
+  | 'sendUnsure';
+
+/** EVE renders mail as limited HTML: a name must not bring tags of its own. */
+const plain = (text: string) => text.replace(/[<>]/g, '');
+
+/** Only an answer from ESI that refuses the mail proves it was not sent; a timeout or 5xx proves nothing. */
+const isDefiniteRejection = (err: unknown) =>
+  err instanceof EsiError && err.status >= 400 && err.status < 500;
 
 /**
  * Invite by in-game mail (issue #3604): the admin types a Character name, the
@@ -44,6 +59,7 @@ export function MailInvitePanel({
   const [remaining, setRemaining] = useState<number | null>(null);
   const [sent, setSent] = useState<SentMailInvite[]>([]);
   const [reload, setReload] = useState(0);
+  const [lastSent, setLastSent] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +83,7 @@ export function MailInvitePanel({
     if (!typed || !community.inviteCode) return;
     setBusy(true);
     setProblem(null);
+    setLastSent(null);
     try {
       let target;
       try {
@@ -108,25 +125,37 @@ export function MailInvitePanel({
         await sendMail(
           characterId,
           [{ recipient_id: target.characterId, recipient_type: 'character' }],
-          t('communities.mailInvite.subject', { community: reservation.communityName }),
+          t('communities.mailInvite.subject', { community: plain(reservation.communityName) }),
           t('communities.mailInvite.body', {
-            admin: reservation.adminName,
-            community: reservation.communityName,
+            admin: plain(reservation.adminName),
+            community: plain(reservation.communityName),
             link: communityInviteUrl(reservation.inviteCode),
           })
         );
-      } catch {
-        // Nothing went out: give the slot and the day's count back.
-        await releaseMailInvite(characterId, community.id, target.characterId, target.name).catch(
-          () => undefined
-        );
-        setProblem('sendFailed');
+      } catch (err) {
+        if (isDefiniteRejection(err)) {
+          // ESI refused it: nothing went out, so give the slot and the day's count back.
+          await releaseMailInvite(characterId, community.id, target.characterId, target.name).catch(
+            () => undefined
+          );
+          setProblem('sendFailed');
+        } else {
+          // A timeout or server error: the mail may have been delivered. Keep the slot spent.
+          setProblem('sendUnsure');
+        }
         return;
       }
-      await confirmMailInvite(characterId, community.id, target.characterId, target.name).catch(
-        () => undefined
-      );
+      // The mail is out: stamp it, retrying, since an unstamped one reads as unsent.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          await confirmMailInvite(characterId, community.id, target.characterId, target.name);
+          break;
+        } catch {
+          // Try again; the server holds the cap whether or not this lands.
+        }
+      }
       setRemaining(reservation.remaining);
+      setLastSent(target.name);
       setName('');
       setReload((n) => n + 1);
     } finally {
@@ -174,6 +203,11 @@ export function MailInvitePanel({
       {remaining !== null && (
         <p role="status" className="text-xs text-text-dim">
           {t('communities.mailInvite.remaining', { count: remaining })}
+        </p>
+      )}
+      {lastSent && (
+        <p role="status" className="text-xs text-text-dim">
+          {t('communities.mailInvite.sentTo', { name: lastSent })}
         </p>
       )}
       {problem && (

@@ -7722,6 +7722,7 @@
       "remaining_other": "{{count}} mail invites left today",
       "sentList": "Mail invites sent",
       "sentAt": "Sent {{when}}",
+      "sentTo": "Invite sent to {{name}}.",
       "subject": "Invitation to join {{community}}",
       "body": "{{admin}} invites you to join the Community \"{{community}}\" on Neocom Desk.\n\nOpen this link to join:\n{{link}}",
       "grantTitle": "Permission to send mail",
@@ -7733,7 +7734,8 @@
         "self": "That is the admin Character itself.",
         "alreadyInvited": "That Character was already sent an invite to this Community.",
         "dailyCap": "You have used today's 20 mail invites. Try again tomorrow, or share the link yourself.",
-        "sendFailed": "The mail could not be sent. Nothing was counted. Try again, or share the link yourself."
+        "sendFailed": "EVE refused the mail, so nothing was sent or counted. Try again, or share the link yourself.",
+        "sendUnsure": "EVE did not confirm the mail. It may have been delivered, so it still counts. Check your in-game Sent folder before trying again."
       }
     },
     "share": {

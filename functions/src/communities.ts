@@ -113,15 +113,55 @@ export function utcDayKey(nowMs: number): string {
   return new Date(nowMs).toISOString().slice(0, 10);
 }
 
-export type MailInviteDecision = 'ok' | 'already-invited' | 'daily-cap';
+/**
+ * A reservation is made before the client sends the mail, and the server can't
+ * see whether the mail went out. So a release only refunds a reservation that is
+ * still fresh, and only a few a day: otherwise reserve, send, skip confirm,
+ * release would be an unlimited-mail loop.
+ */
+export const MAIL_RELEASE_WINDOW_MS = 2 * 60_000;
+export const MAIL_RELEASE_BUDGET_PER_DAY = 3;
+/** An unconfirmed reservation older than this (a crashed tab) may be taken again, without charging. */
+export const MAIL_RESERVATION_STALE_MS = 10 * 60_000;
+/** Reservations ever made for one target in one Community, retakes included. */
+export const MAIL_MAX_ATTEMPTS_PER_TARGET = 3;
+
+export interface MailInviteRecord {
+  /** Epoch ms the mail was confirmed sent, or null while only reserved. */
+  sentAt: number | null;
+  reservedAt: number;
+  attempts: number;
+}
+
+export type MailInviteDecision = 'ok' | 'retake' | 'already-invited' | 'daily-cap';
 
 /** One mail per target Character per Community comes first, so a repeat never reads as a cap. */
 export function decideMailInvite(state: {
   dailyCount: number;
-  alreadyInvited: boolean;
+  existing: MailInviteRecord | null;
+  now: number;
 }): MailInviteDecision {
-  if (state.alreadyInvited) return 'already-invited';
+  const { existing } = state;
+  if (existing) {
+    const stale = state.now - existing.reservedAt >= MAIL_RESERVATION_STALE_MS;
+    return existing.sentAt === null && stale && existing.attempts < MAIL_MAX_ATTEMPTS_PER_TARGET
+      ? 'retake'
+      : 'already-invited';
+  }
   return state.dailyCount >= MAX_MAIL_INVITES_PER_DAY ? 'daily-cap' : 'ok';
+}
+
+export type MailReleaseDecision = 'refund' | 'keep';
+
+export function decideMailRelease(state: {
+  existing: MailInviteRecord;
+  refundsToday: number;
+  now: number;
+}): MailReleaseDecision {
+  const fresh = state.now - state.existing.reservedAt <= MAIL_RELEASE_WINDOW_MS;
+  return state.existing.sentAt === null && fresh && state.refundsToday < MAIL_RELEASE_BUDGET_PER_DAY
+    ? 'refund'
+    : 'keep';
 }
 
 export function parseCommunityIdInput(data: unknown): CommunityIdInput {

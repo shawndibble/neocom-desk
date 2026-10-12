@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import en from '@/i18n/locales/en.json';
 import { db } from '@/db';
+import { EsiError } from '@/esi/errors';
 import { MailInvitePanel } from './MailInvitePanel';
 
 const store = vi.hoisted(() => ({
@@ -129,8 +130,44 @@ describe('Invite by mail panel', () => {
     expect(mail.sendMail).not.toHaveBeenCalled();
   });
 
-  it('gives the slot back when the mail fails to send', async () => {
-    mail.sendMail.mockRejectedValue(new Error('CSPA'));
+  it('keeps the slot spent when the mail may have gone out (a timeout)', async () => {
+    mail.sendMail.mockRejectedValue(new EsiError(0, 'timeout'));
+    render(<MailInvitePanel community={community} characterId={ME} />);
+    const user = await typeName();
+    await user.click(screen.getByRole('button', { name: m.send }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(m.problem.sendUnsure);
+    expect(store.releaseMailInvite).not.toHaveBeenCalled();
+    expect(store.confirmMailInvite).not.toHaveBeenCalled();
+  });
+
+  it('retries the Sent stamp when confirming fails once', async () => {
+    store.confirmMailInvite
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(undefined);
+    render(<MailInvitePanel community={community} characterId={ME} />);
+    const user = await typeName();
+    await user.click(screen.getByRole('button', { name: m.send }));
+    await waitFor(() => expect(store.confirmMailInvite).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('Invite sent to Bob.')).toBeInTheDocument();
+  });
+
+  it('strips markup from names before they go into the mail', async () => {
+    store.reserveMailInvite.mockResolvedValue({
+      inviteCode: 'CODE1',
+      communityName: 'Pals<font color="red">',
+      adminName: '<b>Boss',
+      remaining: 19,
+    });
+    render(<MailInvitePanel community={community} characterId={ME} />);
+    const user = await typeName();
+    await user.click(screen.getByRole('button', { name: m.send }));
+    await waitFor(() => expect(mail.sendMail).toHaveBeenCalled());
+    const [, , subject, body] = mail.sendMail.mock.calls[0];
+    expect(`${subject}${body}`).not.toMatch(/[<>]/);
+  });
+
+  it('gives the slot back when ESI refuses the mail', async () => {
+    mail.sendMail.mockRejectedValue(new EsiError(400, 'CSPA'));
     render(<MailInvitePanel community={community} characterId={ME} />);
     const user = await typeName();
     await user.click(screen.getByRole('button', { name: m.send }));
