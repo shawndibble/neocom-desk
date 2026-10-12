@@ -94,11 +94,8 @@ import { type QueueState } from '@/features/skills/queueStatus';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { RemoveSharedFittingsOption } from '@/features/communities/RemoveSharedFittingsOption';
-import {
-  SYNC_FLUSH_TIMEOUT_MS,
-  removeCharacterAfterSync,
-} from '@/features/character/removeCharacter';
+import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
+import { RemoveSharedOption } from '@/features/communities/RemoveSharedOption';
 import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
@@ -981,8 +978,8 @@ export function Characters() {
     id: number;
     name: string;
   } | null>(null);
-  // The logout prompt's "also remove my shared Fittings", on unless the pilot clears it.
-  const [removeSharedFittings, setRemoveSharedFittings] = useState(true);
+  /** Also delete this Character's Shared Blueprints from its Communities (issue #3600). */
+  const [removeShared, setRemoveShared] = useState(true);
   /** The Character whose removal just failed — rolled back whole, so it is still listed. */
   const [removeFailedName, setRemoveFailedName] = useState<string | null>(null);
   useEffect(() => {
@@ -1271,6 +1268,7 @@ export function Characters() {
   }
 
   function requestRemoveCharacter(characterId: number, name: string) {
+    setRemoveShared(true);
     setRemovingCharacter({ id: characterId, name });
   }
 
@@ -1287,17 +1285,7 @@ export function Characters() {
       cardId ? document.querySelector<HTMLElement>(`[data-character-select="${cardId}"]`) : null;
     setRemovingCharacter(null);
     try {
-      // Before the login goes: removing a shared Fitting is signed as this Character.
-      if (isSyncConfigured() && removeSharedFittings) {
-        // Bounded like the last sync push: offline must not stall the removal.
-        await Promise.race([
-          import('@/features/communities/sharedFittings').then((shared) =>
-            shared.unshareAllFittingsEverywhere(id)
-          ),
-          new Promise<void>((resolve) => setTimeout(resolve, SYNC_FLUSH_TIMEOUT_MS)),
-        ]).catch(() => undefined);
-      }
-      await removeCharacterAfterSync(id, isSyncConfigured());
+      await removeCharacterAfterSync(id, isSyncConfigured(), removeShared);
       useAuthFailure.getState().dismissNeedsLogin(id);
       // The dialog has closed by now, so this isn't overridden by its focus return.
       focusAfterCommit(
@@ -1954,10 +1942,11 @@ export function Characters() {
         <p className="text-xs text-text-dim">
           {removingCharacter && t('characters.removeConfirm', { name: removingCharacter.name })}
         </p>
-        {isSyncConfigured() && (
-          <RemoveSharedFittingsOption
-            checked={removeSharedFittings}
-            onChange={setRemoveSharedFittings}
+        {removingCharacter && (
+          <RemoveSharedOption
+            characterIds={[removingCharacter.id]}
+            checked={removeShared}
+            onChange={setRemoveShared}
           />
         )}
         <div className="mt-3 flex justify-end gap-2">

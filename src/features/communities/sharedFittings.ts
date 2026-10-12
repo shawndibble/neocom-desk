@@ -35,6 +35,7 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { loadTypes } from '@/sde/loadSde';
+import { markFittingsShared } from './shareSelection';
 import { loadCommunityMembers, loadMyCommunities, type CommunitySummary } from './communityStore';
 
 /** firestore.rules caps; a Fitting past them is left unshared rather than failing the batch. */
@@ -168,6 +169,7 @@ export async function toggleShare(
       name: fitting.name,
       code: fitting.code,
     });
+    if (ok) await markFittingsShared(characterId);
     return ok ? 'shared' : 'cannot';
   } catch {
     return 'failed';
@@ -238,6 +240,7 @@ export async function shareFittings(
     }
     await batch.commit();
   }
+  if (docs.length > 0) await markFittingsShared(characterId);
   return docs.length;
 }
 

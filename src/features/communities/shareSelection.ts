@@ -3,7 +3,7 @@
  * (issue #3599): the set of blueprint type ids, kept on this device in the
  * `settings` table under `communityShare:{characterId}:{communityId}`. It is
  * not a synced setting — the published copy is the Community's library
- * (pushed by #3600) — and holds only type ids, never token data. No row means
+ * (pushed by `libraryPush.ts`) — and holds only type ids, never token data. No row means
  * nothing is shared.
  */
 import { db } from '@/db';
@@ -29,6 +29,25 @@ export async function saveShareSelection(
   const key = keyFor(characterId, communityId);
   if (selected.size === 0) await db.settings.delete(key);
   else await db.settings.put({ key, value: [...selected].sort((a, b) => a - b) });
+}
+
+/** Whether any of these Characters shares anything: decides if a logout asks about shared blueprints. */
+export async function hasShareSelections(characterIds: readonly number[]): Promise<boolean> {
+  for (const characterId of characterIds) {
+    const found = await db.settings.where('key').startsWith(`${PREFIX}${characterId}:`).count();
+    if (found > 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Remembers on this device that the Character shared a Fitting (issue #3605),
+ * so the logout question is asked for it too. It lives under the same
+ * `communityShare:{characterId}:` prefix, so it is counted by
+ * `hasShareSelections` and deleted with the Character.
+ */
+export async function markFittingsShared(characterId: number): Promise<void> {
+  await db.settings.put({ key: `${PREFIX}${characterId}:fittings`, value: true });
 }
 
 /** Run inside `removeCharacter`'s transaction: a removed Character leaves no choices behind. */

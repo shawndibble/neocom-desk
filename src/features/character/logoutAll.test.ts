@@ -189,11 +189,9 @@ describe('logoutAllCharacters', () => {
     expect(await db.characters.count()).toBe(0);
   });
 
-  it('leaves shared Fittings alone unless asked, and without sync', async () => {
+  it('leaves shared Fittings alone unless asked', async () => {
     await seedCharacter(1);
     await logoutAllCharacters(true);
-    await seedCharacter(1);
-    await logoutAllCharacters(false, true);
     expect(sharedMock.unshareAllFittingsEverywhere).not.toHaveBeenCalled();
   });
 

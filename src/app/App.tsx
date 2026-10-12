@@ -11,6 +11,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { configureEsi } from '@/esi/client';
 import { configureActiveCharacter } from '@/esi/lane';
 import { triggerSync } from '@/sync';
+import { usePublishSharedLibraries } from '@/features/communities/usePublishSharedLibraries';
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
 import { useBackgroundSync } from './backgroundSync';
@@ -314,6 +315,8 @@ export function App() {
   // to have changed something — see backgroundSync.ts.
   const characterIds = useLiveQuery(() => db.characters.toCollection().primaryKeys(), [], []);
   useBackgroundSync(characterIds, activeCharacterId);
+  // Keeps what Characters share with their Communities current (issue #3600).
+  usePublishSharedLibraries(characterIds, activeCharacterId);
 
   // Keeps `bootShellPreload.ts`'s hint in step with Dexie, so the next cold
   // load knows to fetch the signed-in shell early. No default on the query:

@@ -5,7 +5,7 @@ import { Button, Field, Fields, Modal, Panel } from '@/components/ui';
 import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { logoutAllCharacters } from '@/features/character/logoutAll';
-import { RemoveSharedFittingsOption } from '@/features/communities/RemoveSharedFittingsOption';
+import { RemoveSharedOption } from '@/features/communities/RemoveSharedOption';
 import {
   deleteAllLocalData,
   purgeAllRemoteCharacterData,
@@ -26,10 +26,11 @@ export function DevicePanel() {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState(false);
+  /** Also delete what each Character shared with its Communities (issue #3600). */
+  const [removeShared, setRemoveShared] = useState(true);
   // Characters whose remote purge could not run now; set once step one is done.
   const [unpurged, setUnpurged] = useState<number[] | null>(null);
   const syncConfigured = isSyncConfigured();
-  const [removeSharedFittings, setRemoveSharedFittings] = useState(true);
 
   function openDialog(next: Dialog) {
     setFailed(false);
@@ -52,7 +53,7 @@ export function DevicePanel() {
 
   const confirmLogout = () =>
     run(async () => {
-      await logoutAllCharacters(syncConfigured, removeSharedFittings);
+      await logoutAllCharacters(syncConfigured, removeShared);
       setDialog(null);
     });
 
@@ -130,13 +131,11 @@ export function DevicePanel() {
         <p className="text-xs text-text-dim">
           {t('settings.deviceLogoutConfirm', { count: loggedIn })}
         </p>
-        {syncConfigured && (
-          <RemoveSharedFittingsOption
-            checked={removeSharedFittings}
-            onChange={setRemoveSharedFittings}
-            disabled={working}
-          />
-        )}
+        <RemoveSharedOption
+          characterIds={(characters ?? []).map((character) => character.characterId)}
+          checked={removeShared}
+          onChange={setRemoveShared}
+        />
         {failed && (
           <p role="alert" className="mt-2 text-xs text-danger">
             {t('settings.deviceLogoutFailed')}

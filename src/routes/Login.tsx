@@ -6,17 +6,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
-import {
-  EveSsoButton,
-  DataAgeBadge,
-  LogoMark,
-  Modal,
-  Panel,
-  plainTextActionClassName,
-  SEVERITY_TEXT,
-} from '@/components/ui';
+import { EveSsoButton, LogoMark, Modal, Panel, plainTextActionClassName } from '@/components/ui';
+import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
-import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
 import {
   focusRingClassName,
   inlineLinkClassName,
@@ -34,7 +26,6 @@ import {
   Market,
   MoonMining,
   NavTravel,
-  NavAlerts,
   Notifications,
   Offline,
   OpenSource,
@@ -50,16 +41,6 @@ import {
   Wallet,
   type IconProps,
 } from '@/components/ui/icons';
-import {
-  tabItemActiveClassName,
-  tabItemClassName,
-  tabItemIdleClassName,
-  tabListClassName,
-  tabScrollerClassName,
-} from '@/components/ui/tabStyles';
-import { MINUTE_MS } from '@/lib/age';
-import { formatCountdown } from '@/lib/duration';
-import { formatIsk } from '@/lib/isk';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 import { isPlayStoreApp } from '@/lib/playStoreApp';
 
@@ -163,16 +144,9 @@ interface Tile {
 /**
  * The questions the page leads with. Each names a surface a signed-in pilot
  * actually opens, so the claim under it can be checked against the app rather
- * than admired — no benefit here is broader than what ships. The first is the
- * multi-character one on purpose: it is the claim the tagline makes, and a
- * question is where a reader checks a claim.
+ * than admired — no benefit here is broader than what ships.
  */
 const TILES: Tile[] = [
-  {
-    key: 'attention',
-    shot: { file: 'desktop-overview', key: 'overview', size: DESKTOP_SIZE },
-    span: 'lg:col-span-4',
-  },
   {
     key: 'orders',
     shot: { file: 'desktop-order-detail', key: 'orderDetail', size: DESKTOP_SIZE },
@@ -186,7 +160,7 @@ const TILES: Tile[] = [
   {
     key: 'journal',
     shot: { file: 'desktop-wallet-journal', key: 'walletJournal', size: DESKTOP_SIZE },
-    span: 'lg:col-span-4',
+    span: 'lg:col-span-2',
   },
   {
     key: 'marketJumps',
@@ -232,42 +206,12 @@ const TRUST: LandingRow[] = [
   { icon: OpenSource, key: 'openSource' },
 ];
 
-/**
- * Sample values for the hero preview only — never real character data.
- *
- * The figures are the first tile's Overview capture (`desktop-overview`), so
- * the hero and the tiles tell one story: an industry job finishing in
- * 1h 59m as the next deadline, three jobs running, the 84.2M SP total.
- */
-const PREVIEW = {
-  name: 'Aurelia Vex',
-  totalSp: (84_213_904).toLocaleString(),
-  unallocatedSp: (12_500).toLocaleString(),
-  wallet: 1_234_567_890.12,
-  // No roman-numeral level here: the real Overview page's active-training
-  // line names the skill alone (Overview.tsx reads catalog skill names,
-  // never a level-suffixed one) — matching that exactly, not just its shape.
-  trainingSkill: 'Gunnery',
-  /** The soonest clock on the board: the next industry job to finish, as in the capture. */
-  deadlineSeconds: 3600 + 59 * 60,
-  trainingSeconds: 86_400 + 4 * 3600 + 20 * 60,
-  queued: 6,
-  alerts: 13,
-  jobsRunning: 3,
-};
-
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
 export function Login() {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
   // Read once: a TWA launch referrer only exists on the first load.
   const [inApp] = useState(isPlayStoreApp);
-
-  // Wall-clock reads for illustrative "how fresh is this" values in the
-  // static preview panel — same class of impurity Overview.tsx and
-  // NotificationFeedPanel.tsx already accept for the real thing. Lazy
-  // initializers run once on mount rather than every render.
-  const [previewFetchedAt] = useState(() => new Date(Date.now() - 2 * MINUTE_MS));
 
   // The tile capture shown enlarged, or null. One modal for the page
   // rather than one per tile: only one can be open at a time anyway.
@@ -319,7 +263,7 @@ export function Login() {
           button. The live preview sits under it as the proof, rather than
           beside it competing for the first look.
         */}
-        <section className="mx-auto flex max-w-6xl flex-col items-center gap-12 px-6 py-16 text-center">
+        <section className="mx-auto flex max-w-[96rem] flex-col items-center gap-12 px-4 py-16 text-center sm:px-6">
           <div className="flex flex-col items-center">
             <p className="text-[0.6875rem] font-bold tracking-[0.14em] text-accent uppercase">
               {t('login.eyebrow')}
@@ -339,127 +283,7 @@ export function Login() {
             </div>
           </div>
 
-          <div
-            role="group"
-            aria-labelledby="login-preview-label"
-            className="relative w-full max-w-3xl rounded-xs border border-line bg-panel/85 p-4 text-left shadow-[0_0_60px_-20px_rgba(87,199,244,0.25)] backdrop-blur-sm"
-          >
-            <span
-              id="login-preview-label"
-              className="absolute -top-3 right-4 bg-bg px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase"
-            >
-              {t('login.previewLabel')}
-            </span>
-
-            <div className="flex flex-wrap items-center gap-3 border-b border-line pb-3">
-              <div
-                aria-hidden="true"
-                className={`${characterAvatarBoxClassName('lg')} border-line bg-panel-2`}
-              />
-              <div className="min-w-0 flex-1 basis-48">
-                <p className="truncate text-sm font-semibold tracking-widest uppercase">
-                  {PREVIEW.name}
-                </p>
-                <p className="truncate text-xs text-text-dim">{t('login.previewCorp')}</p>
-              </div>
-            </div>
-
-            <div className={`${tabScrollerClassName} mt-3`}>
-              <div className={tabListClassName}>
-                <span className={`${tabItemClassName} ${tabItemActiveClassName}`}>
-                  {t('nav.overview')}
-                </span>
-                <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
-                  {t('nav.clones')}
-                </span>
-                <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
-                  {t('nav.employmentHistory')}
-                </span>
-              </div>
-            </div>
-
-            {/*
-            The Overview at the width this column has: a header row (the Next
-            deadline button and the alerts bell, as in the real page header),
-            then a grid of Widgets. Since the widget-grid redesign (scope
-            decision `20261011-064822-overview-is-a-widget-grid-the-pilot-builds`)
-            the page is no longer a fixed board with a summary strip, an Orders
-            card and an Alerts column: alerts live behind the bell, and every
-            tile is a Widget the pilot chose, drawn here as the Number view.
-
-            Every label is read from the keys the real Widgets render
-            (`overview.widgets.*`, `overview.board.*`, `overview.header.*`), so a
-            retired key shows up as a failing test instead of the literal key
-            printed at a signed-out visitor — it has happened once already.
-          */}
-            <div className="mt-3 flex items-center gap-2">
-              <span className="inline-flex min-h-9 min-w-0 items-center gap-2 rounded-xs border border-line bg-panel-2/50 px-2.5 text-xs">
-                <span className="shrink-0 tracking-widest text-text-dim uppercase">
-                  {t('overview.header.next')}
-                </span>
-                <span
-                  className={`shrink-0 font-medium whitespace-nowrap tabular-nums ${SEVERITY_TEXT.warning}`}
-                >
-                  {formatCountdown(PREVIEW.deadlineSeconds)}
-                </span>
-                <span className="truncate text-text-dim">{t('overview.board.nextJob')}</span>
-              </span>
-              <span className="flex-1" />
-              <DataAgeBadge date={previewFetchedAt} />
-              <span
-                role="img"
-                aria-label={t('nav.alertsWithCount', { count: PREVIEW.alerts })}
-                className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-xs border border-line text-text-dim"
-              >
-                <NavAlerts aria-hidden="true" />
-                <span
-                  aria-hidden="true"
-                  className="absolute -top-1 -right-1 min-w-4 rounded-xs bg-accent px-1 text-center text-[0.625rem] leading-4 font-semibold text-bg tabular-nums"
-                >
-                  {PREVIEW.alerts}
-                </span>
-              </span>
-            </div>
-
-            <div className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-2">
-              <PreviewWidget title={t('overview.widgets.wallet.title')}>
-                <p className="text-xl font-medium tabular-nums text-isk-pos">
-                  {formatIsk(PREVIEW.wallet, 2)}{' '}
-                  <small className="text-xs font-normal text-text-dim">{t('overview.isk')}</small>
-                </p>
-              </PreviewWidget>
-
-              <PreviewWidget title={t('overview.widgets.training.title')}>
-                <p className="text-xl leading-tight font-medium">{PREVIEW.trainingSkill}</p>
-                <p className="truncate text-xs text-text-dim">
-                  {t('overview.timeLeft', { duration: formatCountdown(PREVIEW.trainingSeconds) })}
-                  {' · '}
-                  {t('overview.board.queued', { count: PREVIEW.queued })}
-                </p>
-              </PreviewWidget>
-
-              <PreviewWidget title={t('overview.widgets.sp.title')}>
-                <p className="text-xl font-medium tabular-nums">
-                  {PREVIEW.totalSp}{' '}
-                  <small className="text-xs font-normal text-text-dim">
-                    {t('overview.widgets.sp.unit')}
-                  </small>
-                </p>
-                <p className="truncate text-xs text-text-dim">
-                  {t('overview.widgets.sp.unallocated', { sp: PREVIEW.unallocatedSp })}
-                </p>
-              </PreviewWidget>
-
-              <PreviewWidget title={t('overview.widgets.industry.title')}>
-                <p className="text-xl font-medium tabular-nums">{PREVIEW.jobsRunning}</p>
-                <p className="truncate text-xs text-text-dim">
-                  {t('overview.widgets.industry.running')}
-                  {' · '}
-                  {formatCountdown(PREVIEW.deadlineSeconds)}
-                </p>
-              </PreviewWidget>
-            </div>
-          </div>
+          <OverviewDemo />
         </section>
 
         <LandingSection id="login-answers" heading={t('login.answersHeading')}>
@@ -669,28 +493,5 @@ function CustomizeLink({ onClick }: { onClick: () => void }) {
     <button type="button" className={plainTextActionClassName()} onClick={onClick}>
       {t('permissions.customize.linkLabel')}
     </button>
-  );
-}
-
-/**
- * One Widget in the hero preview: the real Widget's frame (micro title in a
- * header row over a Number body) without its page link or menu.
- *
- * Not the live `Widget` component: that one links its title to the page that
- * owns it, and every destination is a route a signed-out visitor cannot
- * reach. A mockup that offers live navigation into gated pages is a promise
- * the page cannot keep.
- */
-function PreviewWidget({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section
-      aria-label={title}
-      className="flex min-w-0 flex-col rounded-xs border border-line bg-panel"
-    >
-      <p className="truncate border-b border-line px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase">
-        {title}
-      </p>
-      <div className="grid gap-0.5 px-3 py-2.5">{children}</div>
-    </section>
   );
 }

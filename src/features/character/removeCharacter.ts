@@ -47,13 +47,43 @@ export async function flushSync(characterIds: readonly number[]): Promise<void> 
 }
 
 /**
+ * Best-effort deletion of what these Characters shared with their Communities
+ * (issue #3600), bounded like {@link flushSync}: it needs each Character's
+ * sign-in, so it runs before the local removal, and a hung or failed delete
+ * must not keep the Character on the device. Whatever is left is removed by
+ * `purgeStaleAccounts` once no device syncs the Character.
+ */
+export async function removeSharedBlueprints(characterIds: readonly number[]): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, SYNC_FLUSH_TIMEOUT_MS);
+  });
+  const removals = (async () => {
+    const { removeSharedLibraries } = await import('@/features/communities/libraryPush');
+    const { unshareAllFittingsEverywhere } = await import('@/features/communities/sharedFittings');
+    // One Character at a time: Firebase has a single session slot.
+    for (const id of characterIds) {
+      await removeSharedLibraries(id).catch(() => undefined);
+      await unshareAllFittingsEverywhere(id).catch(() => undefined);
+    }
+  })().catch(() => undefined);
+  try {
+    await Promise.race([removals, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Removing one Character from the Characters page: a last push when sync is
  * set up (gate on `isSyncConfigured()` at the call site), then local removal.
  */
 export async function removeCharacterAfterSync(
   characterId: number,
-  syncConfigured: boolean
+  syncConfigured: boolean,
+  removeShared = false
 ): Promise<void> {
+  if (removeShared) await removeSharedBlueprints([characterId]);
   if (syncConfigured) await flushSync([characterId]);
   await removeCharacter(characterId);
 }
