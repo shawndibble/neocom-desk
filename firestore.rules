@@ -480,6 +480,44 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Shared Fittings (issue #3605): one flat collection per Community, so a
+      // list is one query however many Members there are. The doc id is
+      // `<uid>~saved-<fitting id>` or `<uid>~game-<ESI fitting id>`; binding
+      // its uid half to the writer is what stops one Member claiming or
+      // overwriting another's Fitting. The code is the Fitting Share Code, not
+      // a URL, so it opens from any origin. Never notes; never the sharer's
+      // skills. Deleted on leave/removal by the callables, like the library.
+      match /fittings/{fittingId} {
+        function idParts() {
+          return fittingId.split('~');
+        }
+        function ownsId() {
+          return request.auth != null
+            && idParts().size() == 2
+            && idParts()[0] == request.auth.uid
+            && idParts()[1].matches('^(saved|game)-[A-Za-z0-9-]{1,64}$');
+        }
+
+        allow get, list: if isMember();
+        allow create, update: if isMember() && ownsId()
+          && request.resource.data.keys().hasOnly(
+            ['ownerHash', 'ownerUid', 'source', 'name', 'hull', 'code', 'updatedAt'])
+          && request.resource.data.ownerHash == request.auth.token.ownerHash
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.source in ['saved', 'game']
+          && idParts()[1].matches('^' + request.resource.data.source + '-.*')
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 200
+          && request.resource.data.hull is string
+          && request.resource.data.hull.size() <= 200
+          && request.resource.data.code is string
+          && request.resource.data.code.size() > 0
+          && request.resource.data.code.size() <= 90000
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isMember() && ownsId();
+      }
+
       match /members/{memberUid} {
         function isSelf() {
           return request.auth != null && request.auth.uid == memberUid && isMember();

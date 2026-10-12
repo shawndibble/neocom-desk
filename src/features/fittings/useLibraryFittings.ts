@@ -4,11 +4,21 @@
  * the tabbed panels and the Start screen's single searchable list show the
  * same rows.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type FittingRecord } from '@/db';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
+import { isSyncConfigured } from '@/app/syncStatus';
+import {
+  dedupeSharedFittings,
+  parseSharedFittingId,
+  shareMarker,
+  type SharedFitting,
+  type SharedFittingRow,
+} from '@/engine/communities/sharedFittings';
+import type { CommunitySummary } from '@/features/communities/communityStore';
+import { uidForCharacter } from '@/sync/uid';
 import { decodeFittingShare } from '@/engine/fitting/fittingShare';
 import type { MyFittingRow } from '@/engine/fittings/myFittings';
 import type { CachedResult } from '@/esi/cache';
@@ -18,7 +28,17 @@ import { loadInGameFittings } from './inGameFittings';
 
 /** A saved or In-game Fitting as one row of the Start screen's list. */
 export type LibraryRow = MyFittingRow &
-  ({ source: 'saved'; record: FittingRecord } | { source: 'inGame'; inGame: CharacterFitting });
+  (
+    | { source: 'saved'; record: FittingRecord }
+    | { source: 'inGame'; inGame: CharacterFitting }
+    | {
+        source: 'shared';
+        shared: SharedFittingRow;
+        /** Who shared it (their Character's name), or null when no longer a Member. */
+        sharer: string | null;
+        communityNames: string[];
+      }
+  );
 
 /** A saved Fitting's row, for callers that only list those. */
 export type SavedRow = Extract<LibraryRow, { source: 'saved' }>;
@@ -146,5 +166,81 @@ export function inGameRows(
     hull: hullNames.get(fitting.ship_type_id) ?? unknownHull(fitting.ship_type_id),
     source: 'inGame' as const,
     inGame: fitting,
+  }));
+}
+
+/** The Communities a Character is in and the Fittings shared into them (issue #3605). Nothing loads without sync. */
+export function useCommunityFittings(characterId: number | null) {
+  const [state, setState] = useState<{
+    forCharacter: number;
+    communities: CommunitySummary[];
+    fittings: SharedFitting[];
+    sharerNames: ReadonlyMap<string, string>;
+  } | null>(null);
+  const requestIdRef = useRef(0);
+
+  const refresh = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    if (characterId === null || !isSyncConfigured()) {
+      setState(null);
+      return;
+    }
+    try {
+      const { loadSharedFittings } = await import('@/features/communities/sharedFittings');
+      const loaded = await loadSharedFittings(characterId);
+      if (requestId === requestIdRef.current) setState({ forCharacter: characterId, ...loaded });
+    } catch {
+      // Offline or signed out of sync: the library just lists its own Fittings.
+      if (requestId === requestIdRef.current) setState(null);
+    }
+  }, [characterId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a Character switch re-reads Communities, not a render-time derivation
+    void refresh();
+  }, [refresh]);
+
+  const uid = characterId === null ? null : uidForCharacter(characterId);
+  // A previous Character's load is not this one's until its own lands.
+  const current = state?.forCharacter === characterId ? state : null;
+  const rows = useMemo(
+    () =>
+      current && uid !== null
+        ? sharedRows(current.fittings, uid, current.communities, current.sharerNames)
+        : [],
+    [current, uid]
+  );
+  /** `shareMarker`s of the Fittings this Character already shared. */
+  const mine = useMemo(
+    () =>
+      new Set(
+        (current?.fittings ?? [])
+          .filter((fitting) => fitting.ownerUid === uid)
+          .flatMap((fitting) => {
+            const parsed = parseSharedFittingId(fitting.id);
+            return parsed ? [shareMarker(fitting.communityId, parsed)] : [];
+          })
+      ),
+    [current, uid]
+  );
+  return { communities: current?.communities ?? [], rows, mine, refresh };
+}
+
+/** Shared Fittings as list rows: not the viewer's own, one row per Fitting. */
+export function sharedRows(
+  fittings: readonly SharedFitting[],
+  viewerUid: string,
+  communities: readonly CommunitySummary[],
+  sharerNames: ReadonlyMap<string, string>
+): LibraryRow[] {
+  const communityName = new Map(communities.map((community) => [community.id, community.name]));
+  return dedupeSharedFittings(fittings, viewerUid).map((shared) => ({
+    id: `shared-${shared.id}`,
+    name: shared.name,
+    hull: shared.hull || null,
+    source: 'shared' as const,
+    shared,
+    sharer: sharerNames.get(shared.ownerUid) ?? null,
+    communityNames: shared.communityIds.map((id) => communityName.get(id) ?? ''),
   }));
 }

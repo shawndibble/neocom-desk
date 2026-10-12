@@ -17,6 +17,17 @@ const { scheduleSync, markFittingDeleted } = vi.hoisted(() => ({
 }));
 vi.mock('@/sync', () => ({ scheduleSync, markFittingDeleted }));
 
+const { syncConfigured, followSavedFitting, unshareDeletedFitting } = vi.hoisted(() => ({
+  syncConfigured: vi.fn(() => false),
+  followSavedFitting: vi.fn(() => Promise.resolve()),
+  unshareDeletedFitting: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: syncConfigured }));
+vi.mock('@/features/communities/sharedFittings', () => ({
+  followSavedFitting,
+  unshareDeletedFitting,
+}));
+
 beforeEach(async () => {
   await db.fittings.clear();
   vi.clearAllMocks();
@@ -132,5 +143,28 @@ describe('My Fittings store', () => {
       await db.fittings.delete(saved.id);
       await expect(renameFittingById(saved.id, 'New')).resolves.toBeUndefined();
     });
+  });
+});
+
+describe('shared copies follow the saved Fitting (issue #3605)', () => {
+  it('re-pushes the saved record to its Communities after a save', async () => {
+    syncConfigured.mockReturnValue(true);
+    const saved = await saveFitting(7, { name: 'Kite', code: 'abc' });
+    await vi.waitFor(() => expect(followSavedFitting).toHaveBeenCalledWith(7, saved));
+  });
+
+  it('removes the shared copies after a delete', async () => {
+    syncConfigured.mockReturnValue(true);
+    const saved = await saveFitting(7, { name: 'Kite', code: 'abc' });
+    await deleteFitting(saved);
+    await vi.waitFor(() => expect(unshareDeletedFitting).toHaveBeenCalledWith(7, saved.id));
+  });
+
+  it('does nothing when sync is not set up on this device', async () => {
+    syncConfigured.mockReturnValue(false);
+    const saved = await saveFitting(7, { name: 'Kite', code: 'abc' });
+    await deleteFitting(saved);
+    expect(followSavedFitting).not.toHaveBeenCalled();
+    expect(unshareDeletedFitting).not.toHaveBeenCalled();
   });
 });

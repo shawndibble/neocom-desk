@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Button, Panel, Tooltip } from '@/components/ui';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
@@ -44,23 +45,29 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** A saved Fitting decodes from its code; an In-game one maps straight from ESI's own shape. */
+/** The Fitting Share Code a saved or shared row carries; an In-game row has none. */
+function rowCode(row: LibraryRow): string | null {
+  if (row.source === 'saved') return row.record.code;
+  return row.source === 'shared' ? row.shared.code : null;
+}
+
+/** A saved or shared Fitting decodes from its code; an In-game one maps straight from ESI's own shape. */
 function usePreviewFitting(row: LibraryRow): Fitting | null {
-  const savedCode = row.source === 'saved' ? row.record.code : null;
+  const savedCode = rowCode(row);
   const codes = useMemo(() => (savedCode === null ? [] : [savedCode]), [savedCode]);
   const decoded = useCompareFittings(codes)[0]?.fitting ?? null;
   const inGame = useMemo(
     () => (row.source === 'inGame' ? esiFittingToFitting(row.inGame).fitting : null),
     [row]
   );
-  return row.source === 'saved' ? decoded : inGame;
+  return row.source === 'inGame' ? inGame : decoded;
 }
 
 /** The Fitting Share Code compare needs: a saved Fitting has one, an In-game one is encoded once; null when too large. */
 function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null | undefined {
   const [encoded, setEncoded] = useState<{ fitting: Fitting; code: string | null } | null>(null);
   useEffect(() => {
-    if (row.source === 'saved' || fitting === null) return;
+    if (row.source !== 'inGame' || fitting === null) return;
     let cancelled = false;
     void encodeFittingShare(fittingToShareInput(fitting)).then((result) => {
       if (!cancelled) setEncoded({ fitting, code: result.ok ? result.payload : null });
@@ -69,13 +76,23 @@ function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null |
       cancelled = true;
     };
   }, [row.source, fitting]);
-  if (row.source === 'saved') return row.record.code;
+  if (row.source !== 'inGame') return rowCode(row);
   return encoded?.fitting === fitting ? encoded.code : undefined;
+}
+
+/** "Shared by <name> in <Community>", for a Community's Fitting. */
+function sharedByText(row: Extract<LibraryRow, { source: 'shared' }>, t: TFunction): string {
+  return t('fittings.share.sharedBy', {
+    name: row.sharer ?? t('fittings.share.unknownSharer'),
+    communities: row.communityNames.join(', '),
+  });
 }
 
 /** A saved fitting's notes, or an In-game one's description. */
 function rowNotes(row: LibraryRow): string {
-  return row.source === 'saved' ? (row.record.notes ?? '') : row.inGame.description.trim();
+  if (row.source === 'saved') return row.record.notes ?? '';
+  // Notes are never shared.
+  return row.source === 'inGame' ? row.inGame.description.trim() : '';
 }
 
 /**
@@ -123,7 +140,9 @@ export function FittingPreview({
             {row.hull ?? t('fittings.myFittings.unknownHull')} ·{' '}
             {row.source === 'saved'
               ? t('fittings.start.sourceSaved')
-              : t('fittings.start.sourceInGame')}
+              : row.source === 'inGame'
+                ? t('fittings.start.sourceInGame')
+                : sharedByText(row, t)}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {row.source === 'saved' && (

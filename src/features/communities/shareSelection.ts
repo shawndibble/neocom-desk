@@ -40,6 +40,16 @@ export async function hasShareSelections(characterIds: readonly number[]): Promi
   return false;
 }
 
+/**
+ * Remembers on this device that the Character shared a Fitting (issue #3605),
+ * so the logout question is asked for it too. It lives under the same
+ * `communityShare:{characterId}:` prefix, so it is counted by
+ * `hasShareSelections` and deleted with the Character.
+ */
+export async function markFittingsShared(characterId: number): Promise<void> {
+  await db.settings.put({ key: `${PREFIX}${characterId}:fittings`, value: true });
+}
+
 /** Run inside `removeCharacter`'s transaction: a removed Character leaves no choices behind. */
 export async function deleteShareSelections(characterId: number): Promise<void> {
   await db.settings.where('key').startsWith(`${PREFIX}${characterId}:`).delete();
