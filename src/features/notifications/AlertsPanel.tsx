@@ -208,7 +208,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                         type="button"
                         aria-expanded={shown !== undefined}
                         onClick={() => setShown(group.key, shown === undefined ? FIRES_PAGE : null)}
-                        className="ml-2 inline-flex items-center gap-1 rounded-xs text-xs font-normal text-text-dim hover:text-text"
+                        className="ml-2 inline-flex min-h-11 items-center gap-1 rounded-xs text-xs md:min-h-0 font-normal text-text-dim hover:text-text"
                       >
                         <Caret expanded={shown !== undefined} />
                         {t('alerts.panel.groupCount', { count: group.count })}
@@ -258,10 +258,21 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                   )}
                   <Button
                     size={buttonSize}
-                    aria-label={t(
-                      danger ? 'alerts.panel.acknowledgeLabel' : 'alerts.panel.dismissLabel',
-                      { title: label, context: many ? 'all' : undefined, count: group.count }
-                    )}
+                    aria-label={
+                      many
+                        ? t(
+                            danger
+                              ? 'alerts.panel.acknowledgeAllLabel'
+                              : 'alerts.panel.dismissAllLabel',
+                            { title: label, count: group.count }
+                          )
+                        : t(
+                            danger ? 'alerts.panel.acknowledgeLabel' : 'alerts.panel.dismissLabel',
+                            {
+                              title: label,
+                            }
+                          )
+                    }
                     onClick={() => finish(group, index)}
                   >
                     {many
@@ -271,7 +282,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                       : t(danger ? 'alerts.panel.acknowledge' : 'alerts.panel.dismiss')}
                   </Button>
                 </div>
-                {shown !== undefined && (
+                {many && shown !== undefined && (
                   <ul className="mt-1 border-t border-line">
                     {group.entries.slice(0, shown).map((fire, fireIndex) => (
                       <FireRow
@@ -280,6 +291,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                         now={now}
                         characterName={nameById.get(fire.characterId) ?? String(fire.characterId)}
                         showCharacter={showCharacter}
+                        buttonSize={buttonSize}
                         onNavigate={onClose}
                         onDismiss={() => dismissFire(group, fireIndex)}
                       />
@@ -331,6 +343,7 @@ function FireRow({
   now,
   characterName,
   showCharacter,
+  buttonSize,
   onNavigate,
   onDismiss,
 }: {
@@ -338,6 +351,7 @@ function FireRow({
   now: number;
   characterName: string;
   showCharacter: boolean;
+  buttonSize: 'sm' | 'md';
   onNavigate: () => void;
   onDismiss: () => void;
 }) {
@@ -347,7 +361,7 @@ function FireRow({
   return (
     <li
       data-fire-id={fire.id}
-      className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-line py-1 last:border-b-0"
+      className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-line py-1 last:border-b-0 min-h-11 md:min-h-0"
     >
       <Link
         to={notificationUrlForSubject(
@@ -378,7 +392,7 @@ function FireRow({
         icon={<Icon.Close />}
         label={t('alerts.panel.dismissFire', { body })}
         variant="plain"
-        size="sm"
+        size={buttonSize}
         onClick={onDismiss}
       />
     </li>

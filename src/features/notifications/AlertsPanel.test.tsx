@@ -230,6 +230,27 @@ describe('AlertsPanel', () => {
       expect(await screen.findByText('Alerts, 2 new')).toBeInTheDocument();
     });
 
+    it('lists fires newest first and closes the list when one is left', async () => {
+      await db.notificationFeed.bulkPut([cal(3), cal(1), cal(2)]);
+      renderPanel();
+
+      await userEvent.click(await screen.findByRole('button', { name: '3 alerts' }));
+      const fireBodies = screen
+        .getAllByRole('button', { name: /^Dismiss: / })
+        .map((b) => b.getAttribute('aria-label'));
+      expect(fireBodies).toEqual([
+        'Dismiss: Event 1 body',
+        'Dismiss: Event 2 body',
+        'Dismiss: Event 3 body',
+      ]);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Dismiss: Event 3 body' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Dismiss: Event 2 body' }));
+      await waitFor(async () => expect(await liveIds()).toEqual(['cal-1']));
+      expect(screen.queryByRole('button', { name: /^Dismiss: / })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /alerts$/ })).not.toBeInTheDocument();
+    });
+
     it('lists ten fires and reveals the rest on request', async () => {
       await db.notificationFeed.bulkPut(Array.from({ length: 13 }, (_, i) => cal(i + 1)));
       renderPanel();
