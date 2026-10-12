@@ -170,6 +170,33 @@ describe('ordersTable', () => {
     expect(unnamed.rows[0]!.cells[5]).toBe('overview.widgets.orders.stationUnknown');
   });
 
+  it('opts every column into sorting and sorts on the real value, not the compact text', () => {
+    expect(table.columns.every((c) => c.sortable)).toBe(true);
+    const sortOf = (key: string) => table.rows.find((r) => r.key === key)!.sort!;
+    // item, side, price, vs best (signed gap), expires (the instant), station
+    const [item, side, price, vsBest, expires, station] = sortOf('2');
+    expect(item).toBe('Nocxium');
+    expect(side).toBe('overview.widgets.orders.sideSell');
+    expect(price).toBe(1_000);
+    expect(vsBest).toBe(5);
+    expect(expires).toBe(NOW + 3 * DAY);
+    expect(station).toBe('Jita IV');
+    expect(sortOf('3')[3]).toBe(-10);
+  });
+
+  it('leaves a sort key undefined where the cell has nothing to order by', () => {
+    const noRival = order({
+      orderId: 9,
+      stationName: null,
+      expiry: null,
+      station: { bestPrice: null, beatsMe: false, gapIsk: 0, gapPct: 0 },
+    });
+    const sort = ordersTable(t, [noRival], NOW, null).rows[0]!.sort!;
+    expect(sort[3]).toBeUndefined();
+    expect(sort[4]).toBeUndefined();
+    expect(sort[5]).toBeUndefined();
+  });
+
   it('carries the slots used as the footer only when the cap is known', () => {
     expect(table.footer).toBeUndefined();
     const withSlots = ordersTable(t, [healthy], NOW, { used: 38, total: 49 });

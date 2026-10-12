@@ -13,24 +13,49 @@
  * 28rem (a container query, so a phone's full-width widget drops it and a
  * half-width one on a desktop does too).
  */
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { IskAmount, RowCaret, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
-import { rowInteractiveClassName } from '@/components/ui/controlStyles';
+import {
+  IconButton,
+  IskAmount,
+  RowCaret,
+  SEVERITY_TEXT,
+  SegmentedControl,
+  SeverityIcon,
+} from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { nextDataTableSort } from '@/components/ui/dataTableSort';
+import * as Icon from '@/components/ui/icons';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { cx } from '@/lib/cx';
 import type { TableCell, TableColumn, TableModel, TableRowModel } from './data/types';
 import type { WidgetSize } from './kinds';
 import { fractionBar, type CellTone } from './data/cellKit';
 import { visibleColumns } from './tableModel';
+import {
+  ROWS_PER_PAGE_OPTIONS,
+  clampPage,
+  isRowsPerPage,
+  pageCount,
+  pageRange,
+  pageRows,
+  sortTableRows,
+  type RowsPerPage,
+} from './tableSortPage';
 
 export interface TableBodyProps {
   table: TableModel;
   /** The width budget, which decides how many columns fit (not necessarily the widget's own size). */
   columnsFor: WidgetSize;
-  /** The most rows to draw; the rest become a "+N more" line. */
+  /** The most rows to draw; the rest become a "+N more" line. Ignored by a paged table. */
   rowLimit: number;
+  /**
+   * Pages a table that opted in (`table.pageable`) instead of cutting it at `rowLimit`. Left out
+   * by a caller that has no room or no stored size (the chart's side table), which keeps the cut.
+   */
+  paging?: { rowsPerPage: RowsPerPage; onRowsPerPage: (rows: RowsPerPage) => void };
   /** The table's accessible name: the widget's title. */
   ariaLabel?: string;
   className?: string;
@@ -197,12 +222,139 @@ function Row({
   );
 }
 
-export function TableBody({ table, columnsFor, rowLimit, ariaLabel, className }: TableBodyProps) {
+/** The header cell's text: a plain label, or a button that sorts by the column. */
+function SortableLabel({
+  column,
+  direction,
+  onSort,
+}: {
+  column: TableColumn;
+  direction: 'asc' | 'desc' | null;
+  onSort: () => void;
+}) {
+  const { t } = useTranslation();
+  const active = direction !== null;
+  const SortGlyph = !active ? Icon.Sort : direction === 'asc' ? Icon.Ascending : Icon.Descending;
+  const label = active
+    ? t(`overview.widgets.table.${direction === 'asc' ? 'sortedAsc' : 'sortedDesc'}`, {
+        column: column.label,
+      })
+    : t('overview.widgets.table.sortBy', { column: column.label });
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onSort}
+      className={cx(
+        'inline-flex items-center gap-1 uppercase hover:text-text active:text-text-dim',
+        focusRingInsetClassName,
+        active && 'text-text',
+        column.align === 'end' && 'flex-row-reverse'
+      )}
+    >
+      {column.label}
+      <SortGlyph
+        aria-hidden="true"
+        size={Icon.ICON_SIZE.sm}
+        className={cx('shrink-0', active ? 'text-accent' : 'text-text-faint')}
+      />
+    </button>
+  );
+}
+
+/** Rows-per-page choice, a range, and paired carets (§6c's "Paired carets in IconButtons" cue). */
+function Pager({
+  page,
+  total,
+  perPage,
+  onPage,
+  onRowsPerPage,
+}: {
+  page: number;
+  total: number;
+  perPage: RowsPerPage;
+  onPage: (page: number) => void;
+  onRowsPerPage: (rows: RowsPerPage) => void;
+}) {
+  const { t } = useTranslation();
+  const { from, to } = pageRange(page, total, perPage);
+  const last = pageCount(total, perPage);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line px-3 py-1.5">
+      <SegmentedControl
+        label={t('overview.widgets.table.rowsPerPage')}
+        size="sm"
+        uppercase={false}
+        value={String(perPage)}
+        options={ROWS_PER_PAGE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
+        onChange={(value) => {
+          const next = Number(value);
+          if (isRowsPerPage(next)) onRowsPerPage(next);
+        }}
+      />
+      <div className="flex items-center gap-1.5">
+        <span aria-live="polite" className="text-[0.6875rem] text-text-dim tabular-nums">
+          {t('overview.widgets.table.pageStatus', { from, to, count: total })}
+        </span>
+        <IconButton
+          size="sm"
+          icon={<Icon.Back />}
+          label={t('overview.widgets.table.previousPage')}
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+        />
+        <IconButton
+          size="sm"
+          icon={<Icon.Descend />}
+          label={t('overview.widgets.table.nextPage')}
+          disabled={page >= last}
+          onClick={() => onPage(page + 1)}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function TableBody({
+  table,
+  columnsFor,
+  rowLimit,
+  paging,
+  ariaLabel,
+  className,
+}: TableBodyProps) {
   const { t } = useTranslation();
   const columns = visibleColumns(table.columns, columnsFor);
   const indexes = columns.map((column) => table.columns.indexOf(column));
-  const shown = table.rows.slice(0, rowLimit);
-  const more = table.rows.length - shown.length;
+  const [sort, setSort] = useState<{ columnId: string; direction: 'asc' | 'desc' } | null>(null);
+  // The page is remembered with the page size it was chosen under, so a size change
+  // starts over on page 1 without an effect to reset it.
+  const [pageState, setPageState] = useState({ page: 1, perPage: paging?.rowsPerPage });
+  // A sort on a column this width has dropped is ignored, so the rows never sit in an order
+  // no visible header explains; choosing it again (wider) picks it back up.
+  const activeSort = sort && columns.some((column) => column.key === sort.columnId) ? sort : null;
+  const sorted = useMemo(() => {
+    const index = activeSort
+      ? table.columns.findIndex((column) => column.key === activeSort.columnId)
+      : -1;
+    return activeSort && index >= 0
+      ? sortTableRows(table.rows, index, activeSort.direction)
+      : table.rows;
+  }, [table, activeSort]);
+
+  // A pageable table is never cut at the size's row limit; it shows everything, a page at a time
+  // once there are more rows than the smallest page.
+  const pageable = table.pageable === true && paging !== undefined;
+  const paged = pageable && sorted.length > ROWS_PER_PAGE_OPTIONS[0];
+  const requested = pageState.perPage === paging?.rowsPerPage ? pageState.page : 1;
+  const page = paged && paging ? clampPage(requested, sorted.length, paging.rowsPerPage) : 1;
+  const shown =
+    paged && paging
+      ? pageRows(sorted, page, paging.rowsPerPage)
+      : pageable
+        ? sorted
+        : sorted.slice(0, rowLimit);
+  const more = paged ? 0 : sorted.length - shown.length;
   if (shown.length === 0) return null;
   const hasHeader = columns.some((column) => column.label !== '');
   const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
@@ -213,20 +365,43 @@ export function TableBody({ table, columnsFor, rowLimit, ariaLabel, className }:
         {hasHeader && (
           <thead>
             <tr className="border-b border-line">
-              {columns.map((column, i) => (
-                <th
-                  key={column.key}
-                  scope="col"
-                  className={cx(
-                    cellPad,
-                    column.hideNarrow && HIDE_NARROW,
-                    'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',
-                    i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left'
-                  )}
-                >
-                  {column.label}
-                </th>
-              ))}
+              {columns.map((column, i) => {
+                const direction = activeSort?.columnId === column.key ? activeSort.direction : null;
+                return (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    aria-sort={
+                      column.sortable
+                        ? direction === null
+                          ? 'none'
+                          : direction === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                        : undefined
+                    }
+                    className={cx(
+                      cellPad,
+                      column.hideNarrow && HIDE_NARROW,
+                      'py-1 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase',
+                      i === 0 ? 'text-left' : column.align === 'end' ? 'text-right' : 'text-left'
+                    )}
+                  >
+                    {column.sortable ? (
+                      <SortableLabel
+                        column={column}
+                        direction={direction}
+                        onSort={() => {
+                          setSort(nextDataTableSort(sort, column.key));
+                          setPageState({ page: 1, perPage: paging?.rowsPerPage });
+                        }}
+                      />
+                    ) : (
+                      column.label
+                    )}
+                  </th>
+                );
+              })}
               {caret && <th aria-hidden="true" className="w-5" />}
             </tr>
           </thead>
@@ -246,6 +421,15 @@ export function TableBody({ table, columnsFor, rowLimit, ariaLabel, className }:
           ))}
         </tbody>
       </table>
+      {paged && paging && (
+        <Pager
+          page={page}
+          total={sorted.length}
+          perPage={paging.rowsPerPage}
+          onPage={(next) => setPageState({ page: next, perPage: paging.rowsPerPage })}
+          onRowsPerPage={paging.onRowsPerPage}
+        />
+      )}
       {more > 0 && (
         <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
           {t('overview.widgets.moreRows', { count: more })}

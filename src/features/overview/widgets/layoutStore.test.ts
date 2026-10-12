@@ -93,6 +93,12 @@ describe('parseLayout', () => {
     expect('range' in out!.widgets[0]).toBe(false);
   });
 
+  it('keeps a valid rowsPerPage and drops one that is not offered', () => {
+    expect(parseLayout(wrap(good({ rowsPerPage: 25 })))!.widgets[0].rowsPerPage).toBe(25);
+    expect('rowsPerPage' in parseLayout(wrap(good({ rowsPerPage: 7 })))!.widgets[0]).toBe(false);
+    expect('rowsPerPage' in parseLayout(wrap(good({ rowsPerPage: '10' })))!.widgets[0]).toBe(false);
+  });
+
   it('dedupes ids, keeping the first', () => {
     const out = parseLayout(wrap(good({ id: 'a' }), good({ id: 'a', kind: 'wallet' })));
     expect(out!.widgets).toHaveLength(1);
