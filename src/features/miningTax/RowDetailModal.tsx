@@ -120,8 +120,8 @@ function placeholderAssignment(row: MoonMiningTaxRow): MiningTaxAssignmentRecord
  * who it's owed to, how much, what was mined — with one main action for its
  * status (Settle up when owed, Accept new total when grown) and Edit, which
  * opens the same `EntryEditDialog` a combined entry uses. Everything rarer
- * (split, combine, link a payment, unassign) lives in the More menu beside
- * the title, and Unassign asks first: it deletes the Assignment.
+ * (split, combine, link a payment, unassign) lives in the chevron attached to
+ * the Edit button (a split button), and Unassign asks first: it deletes the Assignment.
  */
 export function RowDetailModal({
   open,
@@ -220,10 +220,10 @@ export function RowDetailModal({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <IconButton
-          variant="plain"
-          icon={<Icon.More />}
+          icon={<Icon.Expanded />}
           label={t('miningTax.detail.moreLabel')}
           disabled={busy}
+          className="-ml-px rounded-l-none"
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -254,7 +254,6 @@ export function RowDetailModal({
       open={open}
       onClose={onClose}
       placement={isPhone ? 'sheet' : 'center'}
-      titleActions={moreMenu || undefined}
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.detailTitle', { date: row.entry.date, system: systemName })}
@@ -455,9 +454,16 @@ export function RowDetailModal({
                 {t('miningTax.resolveConfirm')}
               </Button>
             )}
-            <Button disabled={busy} onClick={onEdit}>
-              {t('miningTax.detail.editAction')}
-            </Button>
+            <div className="flex">
+              <Button
+                disabled={busy}
+                onClick={onEdit}
+                className={moreMenu ? 'rounded-r-none' : undefined}
+              >
+                {t('miningTax.detail.editAction')}
+              </Button>
+              {moreMenu}
+            </div>
             <Button className="ml-auto" onClick={onClose}>
               {t('common.close')}
             </Button>
