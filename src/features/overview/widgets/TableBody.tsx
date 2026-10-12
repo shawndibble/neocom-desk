@@ -119,6 +119,9 @@ function Row({
         const cell = row.cells[indexes[i]];
         if (cell === undefined) return <td key={column.key} className={cellPad} />;
         const first = i === 0;
+        // Hidden trailing columns are still `:last-child`, so the last cell that shows pads itself.
+        const trailingHidden =
+          columns.slice(i + 1).length > 0 && columns.slice(i + 1).every((c) => c.hideNarrow);
         const text = cellText(cell);
         const tone = cellTone(cell);
         const toneClass = tone === undefined ? undefined : CELL_TONE[tone];
@@ -130,6 +133,7 @@ function Row({
             className={cx(
               cellPad,
               column.hideNarrow && HIDE_NARROW,
+              trailingHidden && 'pr-3 @md:pr-0',
               'py-0.5 text-[0.8125rem] tabular-nums',
               column.key === growKey
                 ? 'w-full max-w-0 truncate whitespace-nowrap'

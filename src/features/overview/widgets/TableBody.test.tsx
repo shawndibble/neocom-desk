@@ -51,6 +51,12 @@ describe('TableBody narrow-box rules', () => {
     expect(screen.getByRole('cell', { name: '310M' })).not.toHaveClass('hidden');
   });
 
+  it('pads the last cell that shows while the trailing columns are hidden', () => {
+    renderTable(model);
+    expect(screen.getByRole('cell', { name: '310M' })).toHaveClass('pr-3', '@md:pr-0');
+    expect(screen.getByRole('cell', { name: /Wyvern/ })).not.toHaveClass('pr-3');
+  });
+
   it('floors the first column only when it opts in', () => {
     renderTable(model);
     expect(screen.getByRole('cell', { name: /Wyvern/ })).toHaveClass('min-w-28');
