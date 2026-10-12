@@ -17,10 +17,10 @@ export type CostIndexSource = 'override' | 'missing' | 'esi';
  * pilot's number is still the best one when ESI was unreachable, and
  * `adjustedPrices` keeps gating the offline signal on its own.
  */
-export function applyCostIndexOverride(
-  snapshot: MarketSnapshot | null,
+export function applyCostIndexOverride<S extends MarketSnapshot | null>(
+  snapshot: S,
   overridePct: number | undefined
-): MarketSnapshot | null {
+): S {
   if (!snapshot || overridePct === undefined) return snapshot;
   return { ...snapshot, systemCostIndex: overridePct / 100, systemCostIndexMissing: false };
 }
@@ -44,14 +44,4 @@ export function parseCostIndexPct(raw: string): number | null | undefined {
   const value = Number(text);
   if (!Number.isFinite(value)) return undefined;
   return Math.min(100, Math.max(0, value));
-}
-
-/** Where a remembered override is filed: the facility if one is picked, else the system. */
-export function costIndexMemoryKey(place: {
-  buildLocationId?: number;
-  buildSystemId?: number;
-}): string | null {
-  if (place.buildLocationId !== undefined) return `loc:${place.buildLocationId}`;
-  if (place.buildSystemId !== undefined) return `sys:${place.buildSystemId}`;
-  return null;
 }

@@ -1803,6 +1803,32 @@ describe('BuildPlanDetail job cost index without an ESI figure (J-Space)', () =>
 });
 
 describe('BuildPlanDetail remembers a structure for the next plan', () => {
+  it('fills rigs and tax into a plan that opens at a structure already described', async () => {
+    await rememberFacility(
+      { buildLocationId: 1035 },
+      { rigFit: ['meT2', 'none', 'none'], facilityTaxPct: 2.5 }
+    );
+    const onUpdate = vi.fn();
+    render(
+      <Harness
+        plan={{
+          facility: 'raitaru',
+          buildLocationId: 1035,
+          buildSystemId: 30003888,
+          buildSystemName: 'Badivefi',
+        }}
+        onUpdate={onUpdate}
+      />
+    );
+
+    await waitFor(() =>
+      expect(onUpdate).toHaveBeenCalledWith({
+        rigFit: ['meT2', 'none', 'none'],
+        facilityTaxPct: 2.5,
+      })
+    );
+  });
+
   it('files the rigs and tax a pilot sets under the structure they are set for', async () => {
     const user = userEvent.setup();
     render(

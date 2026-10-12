@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  applyCostIndexOverride,
-  costIndexMemoryKey,
-  costIndexSource,
-  parseCostIndexPct,
-} from './costIndexOverride';
+import { applyCostIndexOverride, costIndexSource, parseCostIndexPct } from './costIndexOverride';
 import type { MarketSnapshot } from './marketData';
 
 function snapshot(over: Partial<MarketSnapshot> = {}): MarketSnapshot {
@@ -67,13 +62,5 @@ describe('parseCostIndexPct', () => {
   it('reads blank as cleared (null) and garbage as keep (undefined)', () => {
     expect(parseCostIndexPct('  ')).toBeNull();
     expect(parseCostIndexPct('abc')).toBeUndefined();
-  });
-});
-
-describe('costIndexMemoryKey', () => {
-  it('prefers the facility, falls back to the system, else nothing', () => {
-    expect(costIndexMemoryKey({ buildLocationId: 1234, buildSystemId: 31000001 })).toBe('loc:1234');
-    expect(costIndexMemoryKey({ buildSystemId: 31000001 })).toBe('sys:31000001');
-    expect(costIndexMemoryKey({})).toBeNull();
   });
 });

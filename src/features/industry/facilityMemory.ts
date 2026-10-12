@@ -17,7 +17,6 @@ import {
   type FacilityKind,
   type RigFit,
 } from '@/engine/industry/types';
-import { costIndexMemoryKey } from './costIndexOverride';
 
 const SETTING_KEY = 'industry.facilityMemory';
 
@@ -29,6 +28,25 @@ export interface FacilityMemory {
 }
 
 type Place = Pick<BuildPlanRecord, 'buildLocationId' | 'buildSystemId'>;
+
+/** Where a facility is filed: the picked station or structure, else its system. */
+export function facilityMemoryKey(place: Place): string | null {
+  if (place.buildLocationId !== undefined) return `loc:${place.buildLocationId}`;
+  if (place.buildSystemId !== undefined) return `sys:${place.buildSystemId}`;
+  return null;
+}
+
+/**
+ * Writes run one after another: each is a read-modify-write of one row, and two
+ * in flight would drop each other's fields (or let a recall read a row a clear
+ * has not yet written).
+ */
+let writes: Promise<unknown> = Promise.resolve();
+function enqueue<T>(job: () => Promise<T>): Promise<T> {
+  const run = writes.then(job, job);
+  writes = run.catch(() => undefined);
+  return run;
+}
 
 export function memoryFromPlan(
   plan: Pick<BuildPlanRecord, 'facility' | 'rigFit' | 'rigLevel' | 'facilityTaxPct'> &
@@ -63,22 +81,31 @@ async function readAll(): Promise<Record<string, FacilityMemory>> {
   return value && typeof value === 'object' ? (value as Record<string, FacilityMemory>) : {};
 }
 
-export async function recallFacility(place: Place): Promise<FacilityMemory | null> {
-  const key = costIndexMemoryKey(place);
-  if (key === null) return null;
-  return (await readAll())[key] ?? null;
+export function recallFacility(place: Place): Promise<FacilityMemory | null> {
+  const key = facilityMemoryKey(place);
+  if (key === null) return Promise.resolve(null);
+  return enqueue(async () => (await readAll())[key] ?? null);
 }
 
-export async function rememberFacility(place: Place, memory: FacilityMemory): Promise<void> {
-  const key = costIndexMemoryKey(place);
-  if (key === null) return;
-  const all = await readAll();
-  await db.settings.put({ key: SETTING_KEY, value: { ...all, [key]: { ...all[key], ...memory } } });
+export function rememberFacility(place: Place, memory: FacilityMemory): Promise<void> {
+  const key = facilityMemoryKey(place);
+  if (key === null) return Promise.resolve();
+  return enqueue(async () => {
+    const all = await readAll();
+    await db.settings.put({
+      key: SETTING_KEY,
+      value: { ...all, [key]: { ...all[key], ...memory } },
+    });
+  });
 }
 
-export async function forgetFacility(place: Place, field: keyof FacilityMemory): Promise<void> {
-  const key = costIndexMemoryKey(place);
-  if (key === null) return;
+export function forgetFacility(place: Place, field: keyof FacilityMemory): Promise<void> {
+  const key = facilityMemoryKey(place);
+  if (key === null) return Promise.resolve();
+  return enqueue(() => forget(key, field));
+}
+
+async function forget(key: string, field: keyof FacilityMemory): Promise<void> {
   const all = await readAll();
   if (!all[key]) return;
   const rest = { ...all[key] };

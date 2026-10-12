@@ -63,13 +63,9 @@ import {
   rememberActivityLocations,
 } from './facilityDefaults';
 import { rememberedLocationsFromEdit } from './rememberLocationFromEdit';
+import { applyCostIndexOverride, costIndexSource, parseCostIndexPct } from './costIndexOverride';
 import {
-  applyCostIndexOverride,
-  costIndexMemoryKey,
-  costIndexSource,
-  parseCostIndexPct,
-} from './costIndexOverride';
-import {
+  facilityMemoryKey,
   forgetFacility,
   memoryFromPlan,
   patchFromMemory,
@@ -552,22 +548,44 @@ export function BuildPlanDetail({
   );
   const costIndexMissing = esiSnapshot?.systemCostIndexMissing === true;
 
-  // A plan that opens at a J-Space facility the pilot already described (a new
-  // plan starts at the remembered location) gets that description back without
-  // a pick.
-  const memoryKey = costIndexMemoryKey(plan);
+  // A plan that opens at a facility the pilot already described (a new plan
+  // starts at the remembered location) gets that description back without a
+  // pick: its rigs and tax while it still has none of its own, and the cost
+  // index where ESI has none. Once per facility, and not keyed on the override
+  // itself — a pilot clearing it must not have it recalled straight back.
+  const latestPlan = useRef(plan);
+  const latestOnChange = useRef(onChange);
   useEffect(() => {
-    if (!costIndexMissing || plan.costIndexOverridePct !== undefined || memoryKey === null) return;
-    let cancelled = false;
-    void recallFacility(plan).then((memory) => {
-      if (cancelled || memory?.costIndexPct === undefined) return;
-      editPlan({ costIndexOverridePct: memory.costIndexPct });
+    latestPlan.current = plan;
+    latestOnChange.current = onChange;
+  });
+  const memoryKey = facilityMemoryKey(plan);
+  const recalledFor = useRef<{ rigs: string | null; index: string | null }>({
+    rigs: null,
+    index: null,
+  });
+  useEffect(() => {
+    if (memoryKey === null) return;
+    const wantRigs = recalledFor.current.rigs !== memoryKey;
+    const wantIndex = costIndexMissing && recalledFor.current.index !== memoryKey;
+    if (!wantRigs && !wantIndex) return;
+    if (wantRigs) recalledFor.current.rigs = memoryKey;
+    if (wantIndex) recalledFor.current.index = memoryKey;
+    void recallFacility(latestPlan.current).then((memory) => {
+      const current = latestPlan.current;
+      if (!memory || facilityMemoryKey(current) !== memoryKey) return;
+      const patch = patchFromMemory(memory, current.facility);
+      const bare = resolveRigFit(current).every((kind) => kind === 'none');
+      if (!wantRigs || !bare) {
+        delete patch.rigFit;
+        delete patch.facilityTaxPct;
+      }
+      if (!wantIndex || current.costIndexOverridePct !== undefined) {
+        delete patch.costIndexOverridePct;
+      }
+      if (Object.keys(patch).length > 0) latestOnChange.current({ kind: 'edit', patch });
     });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the facility and the missing flag only
-  }, [costIndexMissing, memoryKey, plan.costIndexOverridePct]);
+  }, [costIndexMissing, memoryKey]);
 
   // The Reaction Location's own cost index — a second, independent fetch
   // (issue #698): sharing `snapshot` would charge a reaction job at the
@@ -1077,8 +1095,9 @@ export function BuildPlanDetail({
   }
 
   /**
-   * Saves what the pilot just set for this facility — rigs, tax and, where ESI
-   * has none, the cost index — so any other plan built there starts with it
+   * Saves what the pilot just set for this facility — rigs, tax and the cost
+   * index they typed (the field only exists where ESI has none) — so any other
+   * plan built there starts with it
    * (`facilityMemory.ts`). A cleared index is forgotten, so a deliberate clear
    * is not undone by the recall on the next visit.
    */
@@ -1094,7 +1113,6 @@ export function BuildPlanDetail({
       patch.costIndexOverridePct !== undefined;
     if (!touched) return;
     const memory = memoryFromPlan(next);
-    if (!costIndexMissing) delete memory.costIndexPct;
     if (Object.keys(memory).length > 0) void rememberFacility(next, memory);
   }
 
@@ -1107,10 +1125,13 @@ export function BuildPlanDetail({
    */
   function movePlan(patch: PlanPatch) {
     update({ ...patch, costIndexOverridePct: undefined }, { moved: true });
-    void recallFacility({ ...plan, ...patch }).then((memory) => {
-      if (!memory) return;
-      const facility = patch.facility ?? plan.facility;
-      update(patchFromMemory(memory, facility), { moved: true });
+    const place = { ...plan, ...patch };
+    const key = facilityMemoryKey(place);
+    void recallFacility(place).then((memory) => {
+      // The pilot moved again while this was read: the answer is for a place
+      // they have already left.
+      if (!memory || facilityMemoryKey(latestPlan.current) !== key) return;
+      update(patchFromMemory(memory, place.facility), { moved: true });
     });
   }
 

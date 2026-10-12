@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
 import {
+  facilityMemoryKey,
   forgetFacility,
   memoryFromPlan,
   patchFromMemory,
@@ -49,6 +50,14 @@ describe('patchFromMemory', () => {
   });
 });
 
+describe('facilityMemoryKey', () => {
+  it('prefers the facility, falls back to the system, else nothing', () => {
+    expect(facilityMemoryKey({ buildLocationId: 1234, buildSystemId: 31000001 })).toBe('loc:1234');
+    expect(facilityMemoryKey({ buildSystemId: 31000001 })).toBe('sys:31000001');
+    expect(facilityMemoryKey({})).toBeNull();
+  });
+});
+
 describe('the stored memory', () => {
   beforeEach(async () => {
     await db.settings.clear();
@@ -73,6 +82,17 @@ describe('the stored memory', () => {
     await rememberFacility({ buildSystemId: 31000001 }, { costIndexPct: 4, facilityTaxPct: 1 });
     await forgetFacility({ buildSystemId: 31000001 }, 'costIndexPct');
     expect(await recallFacility({ buildSystemId: 31000001 })).toEqual({ facilityTaxPct: 1 });
+  });
+
+  it('keeps both fields when two edits are in flight at once', async () => {
+    await Promise.all([
+      rememberFacility({ buildLocationId: 5 }, { costIndexPct: 4 }),
+      rememberFacility({ buildLocationId: 5 }, { facilityTaxPct: 1 }),
+    ]);
+    expect(await recallFacility({ buildLocationId: 5 })).toEqual({
+      costIndexPct: 4,
+      facilityTaxPct: 1,
+    });
   });
 
   it('does nothing for a plan with no place', async () => {

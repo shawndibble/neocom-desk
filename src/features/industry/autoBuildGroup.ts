@@ -209,7 +209,7 @@ export async function applyGroupAutoBuild(
       const snapshot = applyCostIndexOverride(
         await snapshots[index]!.snapshot,
         member.plan.costIndexOverridePct
-      )!;
+      );
       const reactionSnapshot = await snapshots[index]!.reactionSnapshot;
       const blueprintPurchaseOffersFor = await snapshots[index]!.blueprintOffers;
       // Same gate as the member's own page (`resolveBuildPlan`'s
