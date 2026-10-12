@@ -163,9 +163,12 @@ describe('declared collections vs the hand-written Firestore config', () => {
     rules.indexOf(CHARACTER_MATCH) + CHARACTER_MATCH.length,
     rules.indexOf('match /deviceRegistrations/')
   );
-  const ruledSubcollections = [...characterBlock.matchAll(/match \/(\w+)\/\{\w+\} \{/g)].map(
-    (m) => m[1]
-  );
+  // Read-only subcollections the Community callables write (admin SDK): a
+  // Character's membership index (issue #3596). Never synced from the client.
+  const SERVER_WRITTEN_SUBCOLLECTIONS = ['communities'];
+  const ruledSubcollections = [...characterBlock.matchAll(/match \/(\w+)\/\{\w+\} \{/g)]
+    .map((m) => m[1])
+    .filter((name) => !SERVER_WRITTEN_SUBCOLLECTIONS.includes(name));
 
   const indexes = (
     JSON.parse(readFileSync(new URL('../../firestore.indexes.json', import.meta.url), 'utf8')) as {
