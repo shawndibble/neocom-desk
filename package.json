@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:rules": "npx --yes firebase-tools@14.27.0 emulators:exec --only firestore --project demo-neocom-rules \"vitest run --config vitest.rules.config.ts\"",
     "test:e2e": "playwright test",
     "sde:build": "node scripts/build-sde.mjs",
     "sde:verify": "node scripts/sde-verify.mjs",
@@ -60,6 +61,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@playwright/test": "^1.62.1",
     "@sentry/vite-plugin": "^5.4.0",
     "@storybook/addon-docs": "^10.6.1",
