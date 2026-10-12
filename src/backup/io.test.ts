@@ -158,6 +158,8 @@ describe('restoring an existing-format backup file', () => {
     miningTaxAssignments: ['oreLineValues', 'rawOrePriced', 'label'],
     // sourceJobId (Job History, #2866) postdates this fixture.
     productionRuns: ['sourceJobId'],
+    // costIndexOverridePct (J-Space cost index, 2026-10-12) postdates this fixture.
+    buildPlans: ['costIndexOverridePct'],
   };
   /**
    * Like `LEGACY_OMISSIONS`, but for a field that was *reshaped* rather than
