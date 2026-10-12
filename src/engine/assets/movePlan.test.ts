@@ -225,6 +225,23 @@ describe('planMove', () => {
       expect(result.comparison[0].unfitCount).toBe(0);
     });
 
+    it('does not make a haul out of zero-volume stock', () => {
+      const result = planMove({
+        destinationLocationIds: new Set([DEST]),
+        characters: [
+          {
+            characterId: 1,
+            name: 'Alice',
+            assets: [asset({ itemId: 1, typeId: 77, quantity: 5 })],
+          },
+        ],
+        unitM3: new Map([[77, 0]]),
+        shipTypeIds: new Set(),
+        hulls: [hull(1, 5000)],
+      });
+      expect(result.totals.trips).toBeNull();
+    });
+
     it('plans hauls per pickup: two stations never share a haul', () => {
       const result = plan([
         asset({ itemId: 1, typeId: 35, quantity: 10, locationId: A }),

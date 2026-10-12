@@ -5707,7 +5707,9 @@
       "unfitWarning_one": "{{hull}} cannot carry {{count}} stack whole. No hauler you can fly carries everything.",
       "unfitWarning_other": "{{hull}} cannot carry {{count}} stacks whole. No hauler you can fly carries everything.",
       "leavesBehind_one": "leaves {{count}} stack behind",
-      "leavesBehind_other": "leaves {{count}} stacks behind"
+      "leavesBehind_other": "leaves {{count}} stacks behind",
+      "shareOfLoadHauls_one": "{{percent}}% of the load · {{count}} haul",
+      "shareOfLoadHauls_other": "{{percent}}% of the load · {{count}} hauls"
     },
     "title": "Assets",
     "treeLabel": "Character assets",

@@ -161,11 +161,14 @@ export function planMove(input: {
     for (const hull of input.hulls.filter((h) => h.canFly && h.holds.length > 0)) {
       const packed = perCharacter.flatMap((c) =>
         c.pickups.map((p): PickupHauls => {
-          const lines: PackLine[] = p.lines.map((l) => ({
-            typeId: l.typeId,
-            quantity: l.quantity,
-            unitM3: (l.m3 ?? 0) / l.quantity,
-          }));
+          // A zero-volume line takes no room, so it never makes a haul of its own.
+          const lines: PackLine[] = p.lines
+            .filter((l) => l.m3 !== null && l.m3 > 0)
+            .map((l) => ({
+              typeId: l.typeId,
+              quantity: l.quantity,
+              unitM3: l.m3! / l.quantity,
+            }));
           return {
             characterId: c.characterId,
             locationId: p.locationId,

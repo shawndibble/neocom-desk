@@ -289,11 +289,15 @@ export function PlanResult({
                     </div>
                     {totals.totalM3 > 0 && capacity > 0 && (
                       <p className="m-0 pt-1.5 text-xs text-text-dim tabular-nums">
-                        {t('assets.movePlan.shareOfLoad', {
-                          percent: Math.round((p.totalM3 / totals.totalM3) * 100),
-                        })}
-                        {hauled &&
-                          ` · ${t('assets.movePlan.haulCount', { count: hauled.hauls.length })}`}
+                        {t(
+                          hauled
+                            ? 'assets.movePlan.shareOfLoadHauls'
+                            : 'assets.movePlan.shareOfLoad',
+                          {
+                            percent: Math.round((p.totalM3 / totals.totalM3) * 100),
+                            count: hauled?.hauls.length ?? 0,
+                          }
+                        )}
                       </p>
                     )}
                     {hauled && <PickupHaulList pickup={hauled} name={name} />}
