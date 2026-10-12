@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
   IconButton,
   InfoTooltip,
+  Tooltip,
   IskAmount,
   MenuItem,
   Modal,
@@ -145,6 +146,13 @@ export function InteractionGrammar() {
       <Group title={k('groups.explain')}>
         <Cue rule={k('rules.hintText')}>
           <HintText content={k('samples.hintContent')}>{k('samples.hintText')}</HintText>
+        </Cue>
+        <Cue rule={k('rules.communityMark')}>
+          <Tooltip content={k('samples.communityMarkContent')}>
+            <span tabIndex={0} className="text-text-dim">
+              <Icon.NavCommunities aria-label={k('samples.communityMark')} role="img" />
+            </span>
+          </Tooltip>
         </Cue>
         <Cue rule={k('rules.infoTooltip')}>
           <span>{k('samples.term')}</span>

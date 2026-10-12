@@ -18,6 +18,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { uidForCharacter } from '@/sync/uid';
 import { ConfirmDialog } from './ConfirmDialog';
 import { MailInvitePanel } from './MailInvitePanel';
+import { ShareFittingsPanel } from './ShareFittingsPanel';
 import { ShareSelectionDialog } from './ShareSelectionDialog';
 import { loadShareSelection } from './shareSelection';
 import {
@@ -183,6 +184,8 @@ export function CommunityDetail({
           {t('communities.share.choose')}
         </Button>
       </section>
+
+      <ShareFittingsPanel characterId={characterId} communityId={community.id} />
 
       <h3 className="mb-1 text-xs font-semibold">{t('communities.members')}</h3>
       {membersFailed ? (

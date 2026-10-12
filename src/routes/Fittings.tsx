@@ -57,6 +57,7 @@ import { useChargeLoading } from '@/features/fittings/useChargeLoading';
 import { useEditorItemActions } from '@/features/fittings/useEditorItemActions';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { writeCompareCodes } from '@/features/fittings/compareUrl';
+import { useEditorShare } from '@/features/fittings/useEditorShare';
 import { FittingHeader, type LibraryAction } from '@/features/fittings/FittingHeader';
 import type { HullEntry } from '@/engine/fittings/hullCatalogue';
 import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
@@ -219,6 +220,10 @@ function FittingsPage() {
     void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
     void loadFromInput(text, { replaceEntry: true });
   }, [location.key, location.state, location.pathname, location.search, navigate, loadFromInput]);
+  const editorShare = useEditorShare(
+    activeCharacterId,
+    workspace.savedId !== null && savedRecord?.id === workspace.savedId ? savedRecord : null
+  );
   const currentShareCode = new URLSearchParams(location.search).get('f');
   const hasUnsavedEdits =
     workspace.savedId !== null &&
@@ -672,6 +677,7 @@ function FittingsPage() {
             cloneImplants={workspace.profile?.implantTypeIds}
             compact={headerCompact}
             stats={stats}
+            share={editorShare}
             badges={{
               alpha: { blockers: alpha.blockers, skillName: alpha.skillName },
               mastery:

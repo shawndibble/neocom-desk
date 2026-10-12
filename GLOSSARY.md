@@ -20,7 +20,7 @@ here — they go one per file in `docs/context/decisions/`.
   the event id otherwise). A danger type nobody has acknowledged also raises
   the **Danger banner**. Distinct from the browser notification the same
   fire may also raise: two delivery channels, one event.
-- **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend — except the blueprints a **Member** opts to share with a **Community** (ADR 0018).
+- **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend — except the blueprints and **Fitting**s a **Member** opts to share with a **Community** (ADR 0018).
 - **Appraisal**: A Market page tab that prices a pasted pile of items — loot,
   a haul, a shopping list, or a whole EFT ship fit — at a **Trade Hub**, on
   both sides of the book at once: what it fetches sold into buy orders, and
@@ -515,6 +515,11 @@ here — they go one per file in `docs/context/decisions/`.
   with a **Community** — type, ME/TE, runs (BPO or BPC) and the station or
   structure it sits in. Chosen per Community, none by default, and stamped
   with when it was last refreshed so a stale one reads as stale.
+- **Shared Fitting**: A **Fitting** a **Member** chose to share with a
+  **Community**, kept there as its name, hull and **Fitting Share Code** —
+  never notes, never the sharer's skills. Others open it like a **Load**ed
+  Fitting, stated for their own skills. A saved Fitting's copy follows its
+  owner's saves; an **In-game Fitting**'s is a snapshot, "as of" when shared.
 - **Shared D-Scan**: A pasted D-Scan stored in a **Share Link** as its raw scan text, never just the counts; the recipient's **Fleet board** is rebuilt from that text. Read-only, and cannot be revoked: expiry is the only end of the link.
 - **Fleet board**: A D-Scan read as its ships grouped by role (Capitals, Industrial, Transport, Support, DPS, Drones and deployables, Structures and wrecks), with each role's count, percent and ship distances. Counts and distances only: D-Scan gives no bearing and never names a pilot.
 - **Danger read**: The answer a D-Scan view opens with: "am I in danger, and what should I watch?" A level (Clear on scan, Watch, Danger, Busy), then **Watch these** (ranked groups of identical hulls that can pin, reinforce, hurt or find the pilot) and **Leave or re-check if**. Read for the pilot's own ship; the rest sits beneath as the **Full scan**. States a condition, never a verdict.

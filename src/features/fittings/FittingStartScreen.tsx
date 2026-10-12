@@ -18,6 +18,7 @@ import {
   SearchInput,
   Spinner,
   TabPanel,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
@@ -26,6 +27,8 @@ import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import type { HullEntry } from '@/engine/fittings/hullCatalogue';
 import { filterMyFittings, groupByHull } from '@/engine/fittings/myFittings';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { loadDogmaEngine } from './dogmaFittingEngine';
 import { FittingPreview } from './FittingPreview';
 import { ImportFittingCard, ImportFittingDialog, NewFromHullDialog } from './FittingStartDialogs';
@@ -39,6 +42,7 @@ import type { FittingLibrarySource } from './useFittingPicker';
 import {
   inGameRows,
   savedRows,
+  useCommunityFittings,
   useInGameFittings,
   useSavedFittings,
   type LibraryRow,
@@ -143,6 +147,8 @@ export function FittingStartScreen({
 
   const saved = useSavedFittings(characterId);
   const inGame = useInGameFittings(characterId);
+  const community = useCommunityFittings(characterId);
+  const timeZone = useTimeZone();
   const hasCharacter = characterId !== null;
   const { refresh: refreshInGame } = inGame;
   // Save to EVE landed: pick up the fitting that just arrived.
@@ -159,8 +165,9 @@ export function FittingStartScreen({
             t('common.unknownType', { id })
           )
         : []),
+      ...(hasCharacter ? community.rows : []),
     ],
-    [saved.records, saved.hulls, inGame.result, inGame.hullNames, hasCharacter, t]
+    [saved.records, saved.hulls, inGame.result, inGame.hullNames, community.rows, hasCharacter, t]
   );
   const groups = useMemo(() => groupByHull(filterMyFittings(rows, query)), [rows, query]);
   const visible = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
@@ -169,12 +176,19 @@ export function FittingStartScreen({
 
   function open(row: LibraryRow) {
     if (row.source === 'saved') workspace.openSaved(row.record);
+    // A Community's Fitting opens like an import: stated for this pilot, nothing saved until they save.
+    else if (row.source === 'shared') void workspace.loadFromInput(row.shared.code);
     else void workspace.openLoaded(esiFittingToFitting(row.inGame));
     onOpened?.();
   }
 
   const rowActions = useLibraryRowActions({
     characterId,
+    sharing: {
+      communities: community.communities,
+      mine: community.mine,
+      onChanged: () => void community.refresh(),
+    },
     onOpen: open,
     onRename: (row) => setRenaming(row.record),
     onDelete: (row) => setDeleting(row.record),
@@ -360,11 +374,33 @@ export function FittingStartScreen({
                             )}
                           >
                             <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                            <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
-                              {row.source === 'saved'
-                                ? t('fittings.start.sourceSaved')
-                                : t('fittings.start.sourceInGame')}
-                            </span>
+                            {row.source === 'shared' ? (
+                              <Tooltip
+                                content={t(
+                                  row.shared.source === 'game'
+                                    ? 'fittings.share.tooltipAsOf'
+                                    : 'fittings.share.tooltipUpdated',
+                                  {
+                                    name: row.sharer ?? t('fittings.share.unknownSharer'),
+                                    communities: row.communityNames.join(', '),
+                                    when: formatTimestamp(new Date(row.shared.updatedAt), timeZone),
+                                  }
+                                )}
+                              >
+                                <span tabIndex={0} className="shrink-0 text-text-dim">
+                                  <Icon.NavCommunities
+                                    aria-label={t('fittings.share.sourceLabel')}
+                                    role="img"
+                                  />
+                                </span>
+                              </Tooltip>
+                            ) : (
+                              <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
+                                {row.source === 'saved'
+                                  ? t('fittings.start.sourceSaved')
+                                  : t('fittings.start.sourceInGame')}
+                              </span>
+                            )}
                             {/* Without the preview pane a row opens the editor (it loads state, so no href). */}
                             {!previewing && !rowMenus && (
                               <Icon.Descend

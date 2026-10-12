@@ -11,8 +11,14 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { MenuItem, MenuSeparator } from '@/components/ui';
+import { MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger } from '@/components/ui';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
+import {
+  shareMarker,
+  shareMenuMode,
+  type SharedFittingKey,
+} from '@/engine/communities/sharedFittings';
+import type { CommunitySummary } from '@/features/communities/communityStore';
 import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
@@ -29,18 +35,36 @@ import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 async function rowFitting(
   row: LibraryRow
 ): Promise<{ fitting: Fitting; code: string | null } | null> {
-  if (row.source === 'saved') {
-    const decoded = await decodeFittingShare(row.record.code);
+  if (row.source === 'saved' || row.source === 'shared') {
+    const code = row.source === 'saved' ? row.record.code : row.shared.code;
+    const decoded = await decodeFittingShare(code);
     if (!decoded.ok) return null;
-    return { fitting: shareToFitting(decoded.value, row.record.name), code: row.record.code };
+    return { fitting: shareToFitting(decoded.value, row.name), code };
   }
   const { fitting } = esiFittingToFitting(row.inGame);
   const encoded = await encodeFittingShare(fittingToShareInput(fitting));
   return { fitting, code: encoded.ok ? encoded.payload : null };
 }
 
+/** The Communities this Character is in, and which Fittings it already shared (issue #3605). */
+export interface LibrarySharing {
+  communities: readonly CommunitySummary[];
+  /** `shareMarker`s of what is already shared. */
+  mine: ReadonlySet<string>;
+  /** Called after a share or unshare lands, so the list can refetch. */
+  onChanged: () => void;
+}
+
+/** What names a Fitting to the Communities: a saved record's id, or an In-game Fitting's ESI id. */
+function shareKeyOf(row: LibraryRow): SharedFittingKey | null {
+  if (row.source === 'saved') return { source: 'saved', key: row.record.id };
+  if (row.source === 'inGame') return { source: 'game', key: String(row.inGame.fitting_id) };
+  return null;
+}
+
 interface LibraryRowActionsOptions {
   characterId: number | null;
+  sharing?: LibrarySharing;
   onOpen: (row: LibraryRow) => void;
   /** Saved rows only. */
   onRename?: (row: Extract<LibraryRow, { source: 'saved' }>) => void;
@@ -54,6 +78,7 @@ interface LibraryRowActionsOptions {
  */
 export function useLibraryRowActions({
   characterId,
+  sharing,
   onOpen,
   onRename,
   onDelete,
@@ -97,8 +122,55 @@ export function useLibraryRowActions({
     });
   }
 
+  async function toggleShare(row: LibraryRow, community: CommunitySummary, key: SharedFittingKey) {
+    if (characterId === null || !sharing) return;
+    const already = sharing.mine.has(shareMarker(community.id, key));
+    await withFitting(row, async ({ code }) => {
+      const shared = await import('@/features/communities/sharedFittings');
+      const outcome = await shared.toggleShare(
+        characterId,
+        community.id,
+        key,
+        { name: row.name, code },
+        already
+      );
+      setNotice(t(`fittings.share.${outcome}`, { community: community.name }));
+      if (outcome === 'shared' || outcome === 'unshared') sharing.onChanged();
+    });
+  }
+
+  /** "Share to Community": one item straight to the only Community, a submenu of them when there are several, nothing when there are none. */
+  function shareItems(row: LibraryRow): ReactNode {
+    const key = shareKeyOf(row);
+    if (!sharing || key === null || characterId === null) return null;
+    const label = (community: CommunitySummary) =>
+      sharing.mine.has(shareMarker(community.id, key))
+        ? t('fittings.share.unshareFrom', { community: community.name })
+        : t('fittings.share.shareTo', { community: community.name });
+    const mode = shareMenuMode(sharing.communities.length);
+    if (mode === 'none') return null;
+    if (mode === 'direct') {
+      const [only] = sharing.communities;
+      return <MenuItem onSelect={() => void toggleShare(row, only, key)}>{label(only)}</MenuItem>;
+    }
+    return (
+      <MenuSub>
+        <MenuSubTrigger>{t('fittings.share.shareToCommunity')}</MenuSubTrigger>
+        <MenuSubContent>
+          {sharing.communities.map((community) => (
+            <MenuItem key={community.id} onSelect={() => void toggleShare(row, community, key)}>
+              {label(community)}
+            </MenuItem>
+          ))}
+        </MenuSubContent>
+      </MenuSub>
+    );
+  }
+
   function itemsFor(row: LibraryRow): ReactNode {
     const saved = row.source === 'saved' ? row : null;
+    // Someone else's Fitting: open it, compare it, keep a copy. It is theirs to rename or delete.
+    const shared = row.source === 'shared';
     return (
       <>
         <MenuItem onSelect={() => onOpen(row)}>{t('fittings.libraryMenu.open')}</MenuItem>
@@ -130,15 +202,19 @@ export function useLibraryRowActions({
             })
           }
         >
-          {t('fittings.libraryMenu.duplicate')}
+          {t(shared ? 'fittings.libraryMenu.saveCopy' : 'fittings.libraryMenu.duplicate')}
         </MenuItem>
-        <MenuSeparator />
-        <MenuItem onSelect={() => void copy(row, 'eft')}>
-          {t('fittings.libraryMenu.copyEft')}
-        </MenuItem>
-        <MenuItem onSelect={() => void copy(row, 'permanentLink')}>
-          {t('fittings.libraryMenu.copyPermanentLink')}
-        </MenuItem>
+        {!shared && <MenuSeparator />}
+        {!shared && (
+          <>
+            <MenuItem onSelect={() => void copy(row, 'eft')}>
+              {t('fittings.libraryMenu.copyEft')}
+            </MenuItem>
+            <MenuItem onSelect={() => void copy(row, 'permanentLink')}>
+              {t('fittings.libraryMenu.copyPermanentLink')}
+            </MenuItem>
+          </>
+        )}
         {/* An In-game Fitting is in EVE already. */}
         {saved && (
           <MenuItem
@@ -152,6 +228,7 @@ export function useLibraryRowActions({
             {t('fittings.libraryMenu.saveToEve')}
           </MenuItem>
         )}
+        {shareItems(row)}
         {saved && (onRename || onDelete) && <MenuSeparator />}
         {saved && onRename && (
           <MenuItem onSelect={() => onRename(saved)}>{t('fittings.libraryMenu.rename')}</MenuItem>

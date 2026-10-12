@@ -21,6 +21,7 @@ import { AlphaCloneChip, AlphaCloneMenuRow } from './AlphaCloneChip';
 import { FittingExportItems, FittingExportMenu, FittingExportNotice } from './FittingExportMenu';
 import { fittingStatsText } from './fittingStatsText';
 import { MasteryChip } from './MasteryChip';
+import type { EditorShare } from './useEditorShare';
 import { useFittingExport } from './useFittingExport';
 import { FittingNameModal } from './SavedFittingModals';
 
@@ -53,6 +54,8 @@ interface FittingHeaderProps {
   badges?: HeaderBadges;
   /** The open Fitting's stats, for Copy stats; null while they load. */
   stats?: FittingStats | null;
+  /** "Share to Community" in Export, for a saved Fitting (`useEditorShare`). */
+  share?: EditorShare;
   save: ReactNode;
   /**
    * Below desktop, or while the Add slide-out narrows the page: one row — the
@@ -93,8 +96,10 @@ function CompactFittingHeader({
   save,
   badges,
   stats,
+  share,
   onRename,
 }: {
+  share?: EditorShare;
   onRename: () => void;
   fitting: Fitting;
   price: Appraisal | null;
@@ -117,7 +122,9 @@ function CompactFittingHeader({
       {identity}
       {/* The copy notices sit before Save and ⋮, so the header doesn't grow and shrink with them. */}
       <div className="ml-auto flex items-center gap-2">
-        <FittingExportNotice notice={exportActions.notice ?? copyStats.notice} />
+        <FittingExportNotice
+          notice={exportActions.notice ?? copyStats.notice ?? share?.notice ?? null}
+        />
         {save}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -135,7 +142,7 @@ function CompactFittingHeader({
             <p className="px-2 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('fittings.export.button')}
             </p>
-            <FittingExportItems actions={exportActions} price={price} />
+            <FittingExportItems actions={exportActions} price={price} share={share?.items} />
             {badges && (
               <>
                 <DropdownMenuSeparator />
@@ -182,6 +189,7 @@ export function FittingHeader({
   cloneImplants,
   badges,
   stats = null,
+  share,
   save,
   compact = false,
 }: FittingHeaderProps) {
@@ -275,6 +283,7 @@ export function FittingHeader({
           save={save}
           badges={badges}
           stats={stats}
+          share={share}
           onRename={() => setRenaming(true)}
         />
         {renameModal}
@@ -299,7 +308,12 @@ export function FittingHeader({
               {libraryItems}
             </DropdownMenuContent>
           </DropdownMenu>
-          <FittingExportMenu fitting={fitting} price={price} cloneImplants={cloneImplants} />
+          <FittingExportMenu
+            fitting={fitting}
+            price={price}
+            cloneImplants={cloneImplants}
+            share={share}
+          />
           {save}
           <FittingExportNotice notice={copyStats.notice} />
           <DropdownMenu>
