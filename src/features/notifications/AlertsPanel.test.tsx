@@ -245,9 +245,12 @@ describe('AlertsPanel', () => {
       ]);
 
       await userEvent.click(screen.getByRole('button', { name: 'Dismiss: Event 3 body' }));
+      await waitFor(() => expect(screen.queryByText('Event 3 body')).not.toBeInTheDocument());
       await userEvent.click(screen.getByRole('button', { name: 'Dismiss: Event 2 body' }));
       await waitFor(async () => expect(await liveIds()).toEqual(['cal-1']));
-      expect(screen.queryByRole('button', { name: /^Dismiss: / })).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: /^Dismiss: / })).not.toBeInTheDocument()
+      );
       expect(screen.queryByRole('button', { name: /alerts$/ })).not.toBeInTheDocument();
     });
 
