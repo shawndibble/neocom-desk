@@ -60,7 +60,7 @@ function member(
   };
 }
 
-function renderDialog(members: GroupMember[]) {
+function renderDialog(members: GroupMember[], assignments: MiningTaxAssignmentRecord[] = []) {
   const onSaved = vi.fn();
   const onClose = vi.fn();
   render(
@@ -72,6 +72,7 @@ function renderDialog(members: GroupMember[]) {
         systemName="Ainsan"
         systemSecurity={0.5}
         payees={payees}
+        assignments={assignments}
         typeNames={
           new Map([
             [ZEOLITES, 'Zeolites'],
@@ -319,5 +320,50 @@ describe('EntryEditDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn’t save/);
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('saves the label for every day, trimmed', async () => {
+    const d3 = member('d3', '2026-10-03', { label: 'Old moon' });
+    const d4 = member('d4', '2026-10-04', { label: 'Old moon' });
+    const { onSaved } = renderDialog([d3, d4]);
+
+    const field = screen.getByRole('textbox', { name: 'Moon / structure (optional)' });
+    expect(field).toHaveValue('Old moon');
+    fireEvent.change(field, { target: { value: '  Athanor in Q-S ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
+
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const [records, input] = actionsMock.editEntry.mock.calls[0];
+    expect(records).toHaveLength(2);
+    expect(input.label).toBe('  Athanor in Q-S ');
+  });
+
+  it('sends a blank label when it is cleared', async () => {
+    const d3 = member('d3', '2026-10-03', { label: 'Old moon', groupId: undefined });
+    const { onSaved } = renderDialog([d3]);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Moon / structure (optional)' }), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Save/ }));
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(actionsMock.editEntry.mock.calls[0][1].label).toBe('');
+  });
+
+  it('suggests labels already used for the same payee and system', () => {
+    const d3 = member('d3', '2026-10-03');
+    const other = (id: string, label: string, over: Partial<MiningTaxAssignmentRecord> = {}) =>
+      member(id, '2026-09-01', { label, ...over }).assignment;
+    renderDialog(
+      [d3],
+      [
+        other('a', 'Athanor in Q-S'),
+        other('b', 'Wrong payee', { payeeId: 'bu' }),
+        other('c', 'Wrong system', { solarSystemId: 2 }),
+      ]
+    );
+    const options = [...document.querySelectorAll('datalist option')].map((o) =>
+      o.getAttribute('value')
+    );
+    expect(options).toEqual(['Athanor in Q-S']);
   });
 });

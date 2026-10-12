@@ -70,7 +70,12 @@ export function LinkTransactionDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('miningTax.linkTransactionTitle')}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      dismissOnOutsidePress={false}
+      title={t('miningTax.linkTransactionTitle')}
+    >
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">{t('miningTax.linkTransactionHint')}</p>
 
