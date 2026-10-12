@@ -111,12 +111,12 @@ export function ordersTable(
   }));
   return {
     columns: [
-      { key: 'item', label: t(`${W}.orders.col.item`), priority: 0 },
-      { key: 'side', label: t(`${W}.orders.col.side`), priority: 4 },
+      { key: 'item', label: t(`${W}.orders.col.item`), priority: 0, nameFloor: true },
+      { key: 'side', label: t(`${W}.orders.col.side`), priority: 4, hideNarrow: true },
       { key: 'price', label: t(`${W}.orders.col.price`), align: 'end', priority: 2 },
       { key: 'vsBest', label: t(`${W}.orders.col.vsBest`), align: 'end', priority: 1 },
       { key: 'expires', label: t(`${W}.orders.col.expires`), align: 'end', priority: 3 },
-      { key: 'station', label: t(`${W}.orders.col.station`), priority: 5 },
+      { key: 'station', label: t(`${W}.orders.col.station`), priority: 5, hideNarrow: true },
     ],
     rows: tableRows,
     footer: slots ? t(`${W}.orders.slots`, slots) : undefined,
