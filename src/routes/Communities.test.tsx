@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -49,6 +49,18 @@ function renderPage(path = '/communities') {
   );
 }
 
+/**
+ * Clicks Copy and flushes the clipboard promise inside `act`, then the caller
+ * reads the Toast synchronously. The notice lasts 2.5s, so polling for it
+ * (`findByText`) can lose to a starved CI worker; nothing here waits on a timer.
+ */
+async function clickCopy() {
+  fireEvent.click(screen.getByRole('button', { name: c.copyLink }));
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
 async function seed() {
   Object.values(store).forEach((fn) => fn.mockReset());
   store.loadMyCommunities.mockResolvedValue([]);
@@ -67,8 +79,8 @@ beforeAll(async () => {
   configureClipboard(async () => {});
   const view = renderPage('/communities?community=c1');
   // Copy raises the page's Toast, the one piece the other tests meet cold.
-  await userEvent.click(await screen.findByRole('button', { name: c.copyLink }));
-  await screen.findByText(c.copied, undefined, { timeout: 20_000 });
+  await screen.findByRole('button', { name: c.copyLink });
+  await clickCopy();
   view.unmount();
   configureClipboard(null);
 }, 30_000);
@@ -111,11 +123,11 @@ describe('Communities page', () => {
     it('copies the invite link', async () => {
       const writer = vi.fn(async () => {});
       configureClipboard(writer);
-      const user = userEvent.setup();
       renderPage('/communities?community=c1');
-      await user.click(await screen.findByRole('button', { name: c.copyLink }));
+      await screen.findByRole('button', { name: c.copyLink });
+      await clickCopy();
       expect(writer).toHaveBeenCalledWith(expect.stringContaining('/communities/join/CODE123'));
-      expect(await screen.findByText(c.copied)).toBeInTheDocument();
+      expect(screen.getByText(c.copied)).toBeInTheDocument();
       configureClipboard(null);
     });
 
