@@ -1,4 +1,4 @@
-import type { OreLine } from './types';
+import type { OreLine, QuantityDiff } from './types';
 
 export interface SplitPlan {
   /** What the original keeps, per type — lines that would hit zero are dropped. */
@@ -34,4 +34,19 @@ export function planSplit(original: readonly OreLine[], moves: readonly OreLine[
     .filter((line) => moveByType.has(line.typeId))
     .map((line) => ({ typeId: line.typeId, quantity: moveByType.get(line.typeId)! }));
   return { kept, moved };
+}
+
+/**
+ * The ore a needs-review Assignment grew by — what the pilot usually wants to
+ * hand to another Payee — as split moves: per diffed type, `after − before`,
+ * capped at what `lines` (the fresh totals the split runs against) holds.
+ */
+export function growthMoves(diffs: readonly QuantityDiff[], lines: readonly OreLine[]): OreLine[] {
+  const moves: OreLine[] = [];
+  for (const diff of diffs) {
+    const held = lines.find((l) => l.typeId === diff.typeId)?.quantity ?? 0;
+    const quantity = Math.min(diff.after - diff.before, held);
+    if (quantity > 0) moves.push({ typeId: diff.typeId, quantity });
+  }
+  return moves;
 }

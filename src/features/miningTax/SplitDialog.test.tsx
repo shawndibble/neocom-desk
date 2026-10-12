@@ -117,6 +117,22 @@ describe('SplitDialog — the split preview', () => {
   });
 });
 
+describe('SplitDialog — a needs-review Assignment', () => {
+  it('starts with the ore it grew by already moved to the second Payee', () => {
+    const grown: MiningTaxAssignmentRecord = {
+      ...assignment,
+      status: 'needs-review',
+      reviewDiff: [{ typeId: ZEOLITES, before: 100, after: 130 }],
+      oreLines: [{ typeId: ZEOLITES, quantity: 130 }],
+    };
+    renderDialog({ assignment: grown });
+
+    expect(screen.getByRole('textbox', { name: /zeolites/i })).toHaveValue('30');
+    // The original keeps what it was assigned.
+    expect(screen.getByText('100,000 ISK · 10,000 ISK at 10%')).toBeInTheDocument();
+  });
+});
+
 describe('SplitDialog — a failed save', () => {
   it('says so and stays open', async () => {
     vi.mocked(split).mockResolvedValueOnce({

@@ -15,7 +15,7 @@ import {
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { planSplit } from '@/engine/miningTax/split';
+import { growthMoves, planSplit } from '@/engine/miningTax/split';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import { unmaskNumber } from '@/lib/numberMask';
@@ -79,7 +79,20 @@ export function SplitDialog({
   const [payeeId, setPayeeId] = useState<string | null>(null);
   const [taxPct, setTaxPct] = useState('');
   const [label, setLabel] = useState('');
-  const [moves, setMoves] = useState<ReadonlyMap<number, number>>(new Map());
+  // A needs-review Assignment already carries the ore it grew by, and growth is
+  // what the pilot is nearly always here to hand to someone else — so it starts
+  // moved. Everything else starts with nothing moved.
+  const [moves, setMoves] = useState<ReadonlyMap<number, number>>(
+    () =>
+      new Map(
+        assignment.status === 'needs-review' && assignment.reviewDiff
+          ? growthMoves(assignment.reviewDiff, assignment.oreLines).map((l) => [
+              l.typeId,
+              l.quantity,
+            ])
+          : []
+      )
+  );
   const [collector, setCollector] = useState<'original' | 'new'>('original');
   const { pending: saving, error: saveError, run } = useLedgerAction();
 

@@ -5577,6 +5577,7 @@
     "detail": {
       "linkWalletPayment": "Link a wallet payment…",
       "splitAction": "Split between Payees…",
+      "reviewSplitAction": "Give new ore to another Payee…",
       "moreLabel": "More actions for this entry",
       "unassignAction": "Unassign…",
       "valueLine": "Est. value {{value}} ISK on the day mined",
