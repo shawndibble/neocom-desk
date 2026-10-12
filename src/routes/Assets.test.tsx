@@ -1457,8 +1457,10 @@ describe('cross-character search (issue #85)', () => {
 
       expect(window.location.pathname).toBe('/assets/ships');
       expect(await within(panel).findByText('Rifter')).toBeInTheDocument();
-      expect(within(panel).getAllByRole('link', { name: 'Rifter' })).toHaveLength(1);
+      expect(within(panel).getAllByRole('button', { name: 'Rifter' })).toHaveLength(1);
       expect(within(panel).queryByText('Pilot Two')).not.toBeInTheDocument();
+      // One character's ships need no Character column.
+      expect(within(panel).queryByRole('columnheader', { name: /character/i })).toBeNull();
     });
 
     it('widens to every character from the page’s Character filter', async () => {
@@ -1471,9 +1473,10 @@ describe('cross-character search (issue #85)', () => {
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       await waitFor(() =>
-        expect(within(panel).getAllByRole('link', { name: 'Rifter' })).toHaveLength(2)
+        expect(within(panel).getAllByRole('button', { name: 'Rifter' })).toHaveLength(2)
       );
       expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
+      expect(within(panel).getByRole('columnheader', { name: /character/i })).toBeVisible();
     });
 
     it('shows the ship class under the name, with sortable columns and a search', async () => {
@@ -1504,22 +1507,22 @@ describe('cross-character search (issue #85)', () => {
       expect(within(panel).getByText('Frigate')).toBeVisible();
     });
 
-    it('a row holds one link into the ship’s location, on the ship name', async () => {
+    it('a row’s ⋮ menu holds Show info, Show fitting, Plan route and Open location assets', async () => {
       const user = userEvent.setup();
       render(<App />);
       const panel = await openMyShips(user);
 
-      const link = await within(panel).findByRole('link', { name: 'Rifter' });
-      expect(link).toHaveAttribute('href', expect.stringContaining('/assets/items/60003760'));
-      expect(
-        within(panel)
-          .getAllByRole('row')
-          .filter((r) => r.tagName === 'A')
-      ).toHaveLength(0);
-      expect(within(panel).getByRole('button', { name: /^ship/i }).className).toContain(
+      await within(panel).findByRole('button', { name: 'Rifter' });
+      expect(within(panel).queryByRole('link', { name: 'Rifter' })).toBeNull();
+      expect(within(panel).getByRole('button', { name: 'Rifter' }).className).toContain(
         'focus-visible:outline-accent'
       );
-      expect(within(panel).queryByRole('button', { name: /more actions/i })).toBeNull();
+      await user.click(within(panel).getByRole('button', { name: 'More actions for Rifter' }));
+      expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeVisible();
+      expect(screen.getByRole('menuitem', { name: 'Show fitting' })).toBeVisible();
+      expect(screen.getByRole('menuitem', { name: 'Plan route' })).toBeVisible();
+      await user.click(screen.getByRole('menuitem', { name: 'Open location assets' }));
+      await waitFor(() => expect(window.location.pathname).toContain('/assets/items/60003760'));
     });
 
     it('offers “Show all characters” when this character owns no ship', async () => {

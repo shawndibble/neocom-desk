@@ -1,15 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, RowCaret, SearchInput, Spinner, TypeIcon } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  MenuItem,
+  RowActionsMenu,
+  RowMoreActions,
+  SearchInput,
+  Spinner,
+  TypeIcon,
+} from '@/components/ui';
+import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
+import { ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
+import { useItemActions } from '@/features/market/itemActions';
+import { shipItemsEditLocation } from '@/features/fittings/assetShipLocation';
+import { routeToHref } from '@/features/travel/routeSafetyLink';
 import * as Icon from '@/components/ui/icons';
 import {
   focusRingClassName,
   focusRingInsetClassName,
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
+import type { ShipAssetItem } from '@/engine/fittings/assetShipMapper';
 import { findShips, type OwnedAsset, type ShipRow } from '@/engine/myShips';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { loadOtherCharactersAssets } from './assets';
@@ -32,6 +48,8 @@ interface ShipData {
   characterNames: ReadonlyMap<number, string>;
   /** Type names of the owned assets a ship sits in, by item id (for the trail). */
   holderNames: ReadonlyMap<number, string>;
+  /** What sits directly in each ship (slots, bays, cargo), by ship item id: the fitting the menu opens. */
+  contentsByShip: ReadonlyMap<number, ShipAssetItem[]>;
 }
 
 type ShipsState = { status: 'loading' } | { status: 'ready'; data: ShipData } | { status: 'error' };
@@ -65,12 +83,25 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
     const name = trailIds.has(asset.item_id) ? types[String(asset.type_id)]?.name : undefined;
     if (name) holderNames.set(asset.item_id, name);
   }
+  const shipIds = new Set(rows.map((r) => r.itemId));
+  const contentsByShip = new Map<number, ShipAssetItem[]>();
+  for (const asset of owned) {
+    if (asset.location_type !== 'item' || !shipIds.has(asset.location_id)) continue;
+    const list = contentsByShip.get(asset.location_id) ?? [];
+    list.push({
+      typeId: asset.type_id,
+      quantity: asset.quantity,
+      flag: asset.location_flag,
+    });
+    contentsByShip.set(asset.location_id, list);
+  }
   return {
     rows,
     typeNames,
     groupIdByType,
     characterNames: new Map(entries.map((e) => [e.characterId, e.name])),
     holderNames,
+    contentsByShip,
   };
 }
 
@@ -182,9 +213,12 @@ interface MyShipsViewProps {
   route: JumpBasis;
 }
 
-/** Phone: a card (ship line, place line, then one meta line: character, Sec, Jumps). `sm` up: the table grid. */
-const ROW_GRID =
-  'flex flex-wrap items-center gap-x-3 gap-y-1 sm:grid sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_4.5rem_1rem] sm:gap-y-0.5';
+/** Phone: a card (ship line, place line, then one meta line: character, Sec, Jumps). `sm` up: the table grid. The Character column only exists when more than one Character's ships are listed. */
+const ROW_GRID_BASE = 'flex flex-wrap items-center gap-x-3 gap-y-1 sm:grid sm:gap-y-0.5';
+const ROW_GRID_WITH_CHARACTER =
+  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_4.5rem_2rem]';
+const ROW_GRID_SINGLE_CHARACTER =
+  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.8fr)_2.5rem_4.5rem_2rem]';
 
 type SortColumn = 'ship' | 'character' | 'location' | 'security' | 'jumps';
 
@@ -213,6 +247,136 @@ function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string
     };
   }, [idsKey]);
   return classes;
+}
+
+interface ShipRowViewProps {
+  row: ShipRow;
+  data: ShipData;
+  rowGrid: string;
+  showCharacter: boolean;
+  placeName: string | null | undefined;
+  systemId: number | null;
+  security: number | null | undefined;
+  jumps: JumpsAwayResult | undefined;
+  shipClass: string | undefined;
+  /** Where the ship's location opens in the Assets browser. */
+  locationHref: string;
+  preference: RoutePreferenceKind;
+}
+
+/**
+ * One ship. Click opens Show info; the ⋮ button and a right-click or hold
+ * reach the same menu: Show info, Show fitting, Plan route, Open location assets.
+ */
+function ShipRowView({
+  row,
+  data,
+  rowGrid,
+  showCharacter,
+  placeName,
+  systemId,
+  security,
+  jumps,
+  shipClass,
+  locationHref,
+  preference,
+}: ShipRowViewProps) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { showInfo } = useItemActions();
+  const holdGuard = useLiftAfterHoldGuard();
+  const shipName =
+    data.typeNames.get(row.typeId) ?? t('assets.myShips.unknownType', { id: row.typeId });
+  const name =
+    placeName ??
+    (row.locationType === 'station'
+      ? t('assets.stationLabel', { id: row.locationId })
+      : t('assets.structureLabel', { id: row.locationId }));
+  const trail = row.trail
+    .map((itemId) => data.holderNames.get(itemId))
+    .filter(Boolean)
+    .join(' › ');
+  const openFitting = () =>
+    void shipItemsEditLocation(
+      { typeId: row.typeId, name: shipName },
+      data.contentsByShip.get(row.itemId) ?? []
+    ).then((location) => {
+      if (location) void navigate(location);
+    });
+  return (
+    <RowActionsMenu
+      name={shipName}
+      items={
+        <>
+          <ShowInfoMenuItem typeId={row.typeId} itemName={shipName} />
+          <MenuItem onSelect={openFitting}>{t('assets.myShips.menu.showFitting')}</MenuItem>
+          {systemId !== null && (
+            <MenuItem onSelect={() => void navigate(routeToHref(systemId, null, preference))}>
+              {t('assets.myShips.menu.planRoute')}
+            </MenuItem>
+          )}
+          <MenuItem onSelect={() => void navigate(locationHref)}>
+            {t('assets.myShips.menu.openLocation')}
+          </MenuItem>
+        </>
+      }
+    >
+      <div
+        role="row"
+        {...holdGuard.handlers}
+        className={`${rowGrid} group relative border-b border-line px-3 py-2 hover:bg-panel-2 ${tappableRowClassName}`}
+      >
+        <span role="cell" className="flex min-w-0 items-center gap-2 max-sm:basis-full max-sm:pr-9">
+          <TypeIcon typeId={row.typeId} size={32} width={24} height={24} />
+          <span className="min-w-0 break-words">
+            <button
+              type="button"
+              onClick={(event) => {
+                if (holdGuard.swallowClick(event)) return;
+                showInfo(row.typeId, shipName);
+              }}
+              className={`text-left font-semibold text-accent after:absolute after:inset-0 ${focusRingInsetClassName}`}
+            >
+              {shipName}
+            </button>
+            {shipClass && (
+              <span className="text-xs text-text-dim max-sm:ml-2 sm:block">{shipClass}</span>
+            )}
+          </span>
+          {row.inCargo && (
+            <span className="shrink-0 rounded-xs border border-line px-1 text-[0.6875rem] text-text-dim">
+              {t('assets.myShips.inCargo')}
+            </span>
+          )}
+        </span>
+        {showCharacter && (
+          <span
+            role="cell"
+            className="min-w-0 text-xs break-words text-text-dim max-sm:order-3 max-sm:flex-1 max-sm:truncate"
+          >
+            {data.characterNames.get(row.characterId)}
+          </span>
+        )}
+        <span role="cell" className="min-w-0 text-xs break-words max-sm:order-2 max-sm:basis-full">
+          {name}
+          {trail && <span className="text-text-dim"> · {trail}</span>}
+        </span>
+        <span role="cell" className="text-xs max-sm:order-4">
+          <SecurityValue security={security} />
+        </span>
+        <span role="cell" className="text-xs whitespace-nowrap max-sm:order-5">
+          {jumps?.kind === 'known' && jumps.jumps === 0 ? (
+            <span>{t('assets.myShips.here')}</span>
+          ) : (
+            <JumpsAwayText result={jumps} t={t} />
+          )}
+        </span>
+        <span className="relative flex max-sm:absolute max-sm:top-2 max-sm:right-2">
+          <RowMoreActions />
+        </span>
+      </div>
+    </RowActionsMenu>
+  );
 }
 
 /**
@@ -303,6 +467,14 @@ export function MyShipsView({
     });
     return items.map((item) => item.row);
   }, [state, rows, places, systemOf, shipClasses, query, sort]);
+  // One Character's ships need no Character column.
+  const showCharacter = characterIds.length > 1;
+  const columns = (
+    showCharacter
+      ? ['ship', 'character', 'location', 'security', 'jumps']
+      : ['ship', 'location', 'security', 'jumps']
+  ) as readonly SortColumn[];
+  const rowGrid = `${ROW_GRID_BASE} ${showCharacter ? ROW_GRID_WITH_CHARACTER : ROW_GRID_SINGLE_CHARACTER}`;
   const toggleSort = (column: SortColumn) =>
     setSort((prev) =>
       prev.column === column
@@ -349,9 +521,9 @@ export function MyShipsView({
           <div role="table" aria-label={t('assets.myShips.title')}>
             <div
               role="row"
-              className={`${ROW_GRID} border-b border-line px-3 py-1 text-[0.6875rem] tracking-widest text-text-dim uppercase max-sm:hidden`}
+              className={`${rowGrid} border-b border-line px-3 py-1 text-[0.6875rem] tracking-widest text-text-dim uppercase max-sm:hidden`}
             >
-              {(['ship', 'character', 'location', 'security', 'jumps'] as const).map((column) => {
+              {columns.map((column) => {
                 const active = sort.column === column;
                 const SortGlyph = !active
                   ? Icon.Sort
@@ -386,77 +558,21 @@ export function MyShipsView({
             {sorted.map((row) => {
               const key = placeKey(row);
               const systemId = systemOf.get(key);
-              const name =
-                places.names.get(key) ??
-                (row.locationType === 'station'
-                  ? t('assets.stationLabel', { id: row.locationId })
-                  : t('assets.structureLabel', { id: row.locationId }));
-              const jumps = places.jumps.get(key);
-              const shipClass = shipClasses.get(state.data.groupIdByType.get(row.typeId) ?? -1);
-              const trail = row.trail
-                .map((itemId) => state.data.holderNames.get(itemId))
-                .filter(Boolean)
-                .join(' › ');
               return (
-                <div
+                <ShipRowView
                   key={row.itemId}
-                  role="row"
-                  className={`${ROW_GRID} group relative border-b border-line px-3 py-2 hover:bg-panel-2 ${tappableRowClassName}`}
-                >
-                  <span
-                    role="cell"
-                    className="flex min-w-0 items-center gap-2 max-sm:basis-full max-sm:pr-6"
-                  >
-                    <TypeIcon typeId={row.typeId} size={32} width={24} height={24} />
-                    <span className="min-w-0 break-words">
-                      <Link
-                        to={hrefFor(row.locationId)}
-                        className={`font-semibold text-accent after:absolute after:inset-0 ${focusRingInsetClassName}`}
-                      >
-                        {state.data.typeNames.get(row.typeId) ??
-                          t('assets.myShips.unknownType', { id: row.typeId })}
-                      </Link>
-                      {shipClass && (
-                        <span className="text-xs text-text-dim max-sm:ml-2 sm:block">
-                          {shipClass}
-                        </span>
-                      )}
-                    </span>
-                    {row.inCargo && (
-                      <span className="shrink-0 rounded-xs border border-line px-1 text-[0.6875rem] text-text-dim">
-                        {t('assets.myShips.inCargo')}
-                      </span>
-                    )}
-                  </span>
-                  <span
-                    role="cell"
-                    className="min-w-0 text-xs break-words text-text-dim max-sm:order-3 max-sm:flex-1 max-sm:truncate"
-                  >
-                    {state.data.characterNames.get(row.characterId)}
-                  </span>
-                  <span
-                    role="cell"
-                    className="min-w-0 text-xs break-words max-sm:order-2 max-sm:basis-full"
-                  >
-                    {name}
-                    {trail && <span className="text-text-dim"> · {trail}</span>}
-                  </span>
-                  <span role="cell" className="text-xs max-sm:order-4">
-                    <SecurityValue
-                      security={typeof systemId === 'number' ? places.security.get(systemId) : null}
-                    />
-                  </span>
-                  <span role="cell" className="text-xs whitespace-nowrap max-sm:order-5">
-                    {jumps?.kind === 'known' && jumps.jumps === 0 ? (
-                      <span>{t('assets.myShips.here')}</span>
-                    ) : (
-                      <JumpsAwayText result={jumps} t={t} />
-                    )}
-                  </span>
-                  <span className="flex max-sm:absolute max-sm:top-3 max-sm:right-3">
-                    <RowCaret />
-                  </span>
-                </div>
+                  row={row}
+                  data={state.data}
+                  rowGrid={rowGrid}
+                  showCharacter={showCharacter}
+                  placeName={places.names.get(key)}
+                  systemId={typeof systemId === 'number' ? systemId : null}
+                  security={typeof systemId === 'number' ? places.security.get(systemId) : null}
+                  jumps={places.jumps.get(key)}
+                  shipClass={shipClasses.get(state.data.groupIdByType.get(row.typeId) ?? -1)}
+                  locationHref={hrefFor(row.locationId)}
+                  preference={route.rules.preference}
+                />
               );
             })}
           </div>
