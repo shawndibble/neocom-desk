@@ -132,7 +132,7 @@ export const NAV_ACTIVITIES = [
   { id: 'pi', paths: ['/planetary-industry'] },
   { id: 'trading', paths: ['/contracts'] },
   { id: 'industry', paths: [] },
-  { id: 'social', paths: ['/mail', '/calendar', '/contacts'] },
+  { id: 'social', paths: ['/mail', '/calendar', '/contacts', '/communities'] },
 ] as const satisfies readonly { id: string; paths: readonly string[] }[];
 
 function hiddenExcept(shown: ReadonlySet<string>): string[] {

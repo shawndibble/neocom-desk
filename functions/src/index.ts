@@ -36,6 +36,7 @@ import {
   parseCreateInput,
   parseJoinInput,
   parseRemoveMemberInput,
+  parseTransferAdminInput,
 } from './communities.js';
 import {
   createCommunity,
@@ -46,6 +47,7 @@ import {
   regenerateInvite,
   removeMember,
   revokeInvite,
+  transferAdmin,
   type CallerCharacter,
 } from './communitiesStore.js';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
@@ -358,6 +360,14 @@ export const removeCommunityMemberCallable = onCall<unknown>(
   async (request) => {
     const { communityId, memberUid } = parseRemoveMemberInput(request.data);
     await removeMember(getFirestore(), callerOf(request), communityId, memberUid);
+  }
+);
+
+export const transferCommunityAdminCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, memberUid } = parseTransferAdminInput(request.data);
+    await transferAdmin(getFirestore(), callerOf(request), communityId, memberUid);
   }
 );
 

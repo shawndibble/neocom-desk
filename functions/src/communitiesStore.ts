@@ -20,6 +20,7 @@ import {
   decideJoin,
   decideLeave,
   decideRemoveMember,
+  decideTransferAdmin,
   newInviteCode,
   type CreateCommunityInput,
   type JoinCommunityInput,
@@ -247,6 +248,27 @@ export async function removeMember(
   });
   if (decision !== 'ok') fail(decision);
   await removeMemberData(db, communityId, memberUid);
+}
+
+export async function transferAdmin(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  newAdminUid: string
+): Promise<void> {
+  const community = await requireAdmin(db, communityId, caller);
+  const target = await memberRef(db, communityId, newAdminUid).get();
+  const decision = decideTransferAdmin({
+    adminUid: community.get('adminUid'),
+    callerUid: caller.uid,
+    targetUid: newAdminUid,
+    targetIsCurrentMember: target.exists,
+  });
+  if (decision === 'already-admin') {
+    throw new HttpsError('failed-precondition', 'That Character is already the admin');
+  }
+  if (decision !== 'ok') fail(decision);
+  await community.ref.update({ adminUid: newAdminUid });
 }
 
 /** Revoking leaves no working link until the admin regenerates one. */

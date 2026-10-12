@@ -90,6 +90,7 @@ const Assets = lazy(routeChunks.loadAssets);
 const Mail = lazy(routeChunks.loadMail);
 const Calendar = lazy(routeChunks.loadCalendar);
 const Contracts = lazy(routeChunks.loadContracts);
+const Communities = lazy(routeChunks.loadCommunities);
 const Contacts = lazy(routeChunks.loadContacts);
 const Travel = lazy(routeChunks.loadTravel);
 const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
@@ -198,6 +199,7 @@ const ROUTE_ELEMENTS = {
   '/assets': <Assets />,
   '/mail': <Mail />,
   '/calendar': <Calendar />,
+  '/communities': <Communities />,
   '/contracts': <Contracts />,
   // The BPC search moved into Industry's tab strip; the old path stays as a
   // redirect so bookmarks and any link already in the wild still land on it.
