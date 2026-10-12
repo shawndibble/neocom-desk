@@ -152,6 +152,19 @@ describe('Community invite page', () => {
       );
     });
 
+    it('says the admin has to approve, and does not open the Community, when the join waits', async () => {
+      store.joinCommunity.mockResolvedValue({
+        communityId: 'c1',
+        alreadyMember: false,
+        pending: true,
+      });
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: /Join and share/ }));
+      expect(await screen.findByText(j.pending)).toBeInTheDocument();
+      expect(screen.queryByText('communities page')).not.toBeInTheDocument();
+    });
+
     it('stays on the page and names the cap when a join is refused', async () => {
       store.joinCommunity.mockRejectedValue({
         code: 'functions/resource-exhausted',

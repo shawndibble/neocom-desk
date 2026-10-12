@@ -21,6 +21,15 @@ export interface CommunitySummary {
   /** Null once the admin has revoked the link. */
   inviteCode: string | null;
   memberCount: number;
+  /** The admin lets each new Member in by hand, even one holding the link. Absent means off. */
+  requireApproval?: boolean;
+}
+
+/** A Character waiting for the admin to let it in. */
+export interface JoinRequest {
+  uid: string;
+  characterName: string;
+  requestedAt: number;
 }
 
 export interface CommunityMember {
@@ -46,7 +55,7 @@ export async function loadMyCommunities(characterId: number): Promise<CommunityS
   const db = getSyncFirestore();
   const index = await getDocs(collection(db, 'characters', uid, 'communities'));
   const loaded = await Promise.all(
-    index.docs.map(async (entry) => {
+    index.docs.map(async (entry): Promise<CommunitySummary | null> => {
       const snap = await getDoc(doc(db, 'communities', entry.id));
       if (!snap.exists()) return null;
       const data = snap.data();
@@ -56,7 +65,8 @@ export async function loadMyCommunities(characterId: number): Promise<CommunityS
         adminUid: String(data.adminUid ?? ''),
         inviteCode: typeof data.inviteCode === 'string' ? data.inviteCode : null,
         memberCount: Number(data.memberCount ?? 0),
-      } satisfies CommunitySummary;
+        requireApproval: data.requireApproval === true,
+      };
     })
   );
   return loaded
@@ -78,6 +88,24 @@ export async function loadCommunityMembers(
       libraryAsOf: libraryAsOf(entry.data()),
     }))
     .sort((a, b) => a.characterName.localeCompare(b.characterName));
+}
+
+/** The Characters waiting to be let in. Readable by the admin only. */
+export async function loadJoinRequests(
+  characterId: number,
+  communityId: string
+): Promise<JoinRequest[]> {
+  await ensureSignedIn(characterId);
+  const snap = await getDocs(
+    collection(getSyncFirestore(), 'communities', communityId, 'requests')
+  );
+  return snap.docs
+    .map((entry) => ({
+      uid: entry.id,
+      characterName: String(entry.data().characterName ?? ''),
+      requestedAt: Number(entry.data().requestedAt ?? 0),
+    }))
+    .sort((a, b) => a.requestedAt - b.requestedAt);
 }
 
 /** Every listed Member's shared blueprints, for the Community Library. A Member with none yields an empty list. */
@@ -138,8 +166,29 @@ export async function previewInvite(inviteCode: string): Promise<InvitePreview> 
 export function joinCommunity(characterId: number, inviteCode: string, characterName: string) {
   return call<
     { inviteCode: string; characterName: string },
-    { communityId: string; alreadyMember: boolean }
+    { communityId: string; alreadyMember: boolean; pending?: boolean }
   >(characterId, 'joinCommunityCallable', { inviteCode, characterName });
+}
+
+export async function setRequireApproval(
+  characterId: number,
+  communityId: string,
+  requireApproval: boolean
+): Promise<void> {
+  await call(characterId, 'setCommunityApprovalCallable', { communityId, requireApproval });
+}
+
+export async function decideJoinRequest(
+  characterId: number,
+  communityId: string,
+  memberUid: string,
+  accept: boolean
+): Promise<void> {
+  await call(characterId, 'decideCommunityJoinRequestCallable', {
+    communityId,
+    memberUid,
+    accept,
+  });
 }
 
 export interface MailInviteReservation {

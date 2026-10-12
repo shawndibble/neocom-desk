@@ -35,13 +35,16 @@ import {
   parseCommunityIdInput,
   parseCreateInput,
   parseJoinInput,
+  parseJoinRequestDecisionInput,
   parseMailInviteInput,
   parsePreviewInput,
   parseRemoveMemberInput,
+  parseRequireApprovalInput,
   parseTransferAdminInput,
 } from './communities.js';
 import {
   createCommunity,
+  decideJoinRequest,
   deleteCommunity,
   joinCommunity,
   confirmMailInvite,
@@ -53,6 +56,7 @@ import {
   removeMember,
   reserveMailInvite,
   revokeInvite,
+  setRequireApproval,
   transferAdmin,
   type CallerCharacter,
 } from './communitiesStore.js';
@@ -354,6 +358,22 @@ export const previewCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIO
 
 export const joinCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
   joinCommunity(getFirestore(), callerOf(request), parseJoinInput(request.data))
+);
+
+export const setCommunityApprovalCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, requireApproval } = parseRequireApprovalInput(request.data);
+    await setRequireApproval(getFirestore(), callerOf(request), communityId, requireApproval);
+  }
+);
+
+export const decideCommunityJoinRequestCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, memberUid, accept } = parseJoinRequestDecisionInput(request.data);
+    await decideJoinRequest(getFirestore(), callerOf(request), communityId, memberUid, accept);
+  }
 );
 
 export const leaveCommunityCallable = onCall<unknown>(

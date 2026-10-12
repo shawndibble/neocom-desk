@@ -21,20 +21,22 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { uidForCharacter } from '@/sync/uid';
 import { CommunityLibrary } from './CommunityLibrary';
 import { ConfirmDialog } from './ConfirmDialog';
-import { MailInvitePanel } from './MailInvitePanel';
+import { CommunityInvites } from './CommunityInvites';
+import { JoinRequestsList } from './JoinRequestsList';
 import { ShareFittingsTab } from './ShareFittingsTab';
 import { ShareBlueprintsTab } from './ShareBlueprintsTab';
 import {
-  communityInviteUrl,
   deleteCommunity,
   isCommunityAdmin,
   leaveCommunity,
   loadCommunityMembers,
+  loadJoinRequests,
   regenerateInvite,
   removeMember,
   revokeInvite,
   transferAdmin,
   type CommunityMember,
+  type JoinRequest,
   type CommunitySummary,
 } from './communityStore';
 
@@ -74,7 +76,10 @@ export function CommunityDetail({
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const tabsId = useTabsId();
-  const [tab, setTab] = useState<'blueprints' | 'fittings' | 'members' | 'library'>('blueprints');
+  const [tab, setTab] = useState<'blueprints' | 'fittings' | 'members' | 'invites' | 'library'>(
+    'blueprints'
+  );
+  const [requests, setRequests] = useState<JoinRequest[]>([]);
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
 
   // Bumped after a change that alters the Member list, to refetch it.
@@ -96,7 +101,24 @@ export function CommunityDetail({
     };
   }, [characterId, community.id, community.memberCount, reload]);
 
-  const inviteUrl = community.inviteCode ? communityInviteUrl(community.inviteCode) : null;
+  // The admin's waiting list. A failed read (a backend not yet updated) is an empty list.
+  const [requestsReload, setRequestsReload] = useState(0);
+  useEffect(() => {
+    if (!admin) return;
+    let cancelled = false;
+    loadJoinRequests(characterId, community.id).then(
+      (loaded) => {
+        if (!cancelled) setRequests(loaded);
+      },
+      () => {
+        if (!cancelled) setRequests([]);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [admin, characterId, community.id, requestsReload]);
+
   const close = () => setDialog(null);
   const changed = () => {
     setReload((n) => n + 1);
@@ -119,50 +141,6 @@ export function CommunityDetail({
         )
       }
     >
-      {admin && (
-        <>
-          <section className="mb-4 space-y-2" aria-label={t('communities.invite')}>
-            <h3 className="text-xs font-semibold">{t('communities.invite')}</h3>
-            {inviteUrl ? (
-              <>
-                <p className="text-xs text-text-dim">{t('communities.inviteHint')}</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <code className="min-w-0 flex-1 truncate rounded bg-surface-2 px-2 py-1 text-xs">
-                    {inviteUrl}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() =>
-                      void writeToClipboard(inviteUrl).then(
-                        () => setCopied(t('communities.copied')),
-                        () => setCopied(t('communities.copyFailed'))
-                      )
-                    }
-                  >
-                    {t('communities.copyLink')}
-                  </Button>
-                  <Button size="sm" onClick={() => setDialog({ kind: 'regenerate' })}>
-                    {t('communities.regenerate')}
-                  </Button>
-                  <Button size="sm" onClick={() => setDialog({ kind: 'revoke' })}>
-                    {t('communities.revoke')}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs text-text-dim">{t('communities.inviteOff')}</p>
-                <Button size="sm" onClick={() => setDialog({ kind: 'regenerate' })}>
-                  {t('communities.regenerate')}
-                </Button>
-              </div>
-            )}
-          </section>
-          {inviteUrl && <MailInvitePanel community={community} characterId={characterId} />}
-        </>
-      )}
-
       {tab === 'library' ? (
         <>
           <Button size="sm" className="mb-2" onClick={() => setTab('blueprints')}>
@@ -183,10 +161,17 @@ export function CommunityDetail({
             tabs={[
               { id: 'blueprints', label: t('communities.tabs.blueprints') },
               { id: 'fittings', label: t('communities.tabs.fittings') },
-              { id: 'members', label: t('communities.members') },
+              {
+                id: 'members',
+                label:
+                  admin && requests.length > 0
+                    ? t('communities.requests.tab', { count: requests.length })
+                    : t('communities.members'),
+              },
+              ...(admin ? [{ id: 'invites', label: t('communities.tabs.invites') }] : []),
             ]}
             value={tab}
-            onChange={(id) => setTab(id as 'blueprints' | 'fittings' | 'members')}
+            onChange={(id) => setTab(id as 'blueprints' | 'fittings' | 'members' | 'invites')}
             label={t('communities.tabs.label')}
             className="mb-2"
           />
@@ -199,8 +184,33 @@ export function CommunityDetail({
               />
             ) : tab === 'fittings' ? (
               <ShareFittingsTab characterId={characterId} communityId={community.id} />
+            ) : tab === 'invites' ? (
+              <CommunityInvites
+                community={community}
+                characterId={characterId}
+                onCopy={(url) =>
+                  void writeToClipboard(url).then(
+                    () => setCopied(t('communities.copied')),
+                    () => setCopied(t('communities.copyFailed'))
+                  )
+                }
+                onRegenerate={() => setDialog({ kind: 'regenerate' })}
+                onRevoke={() => setDialog({ kind: 'revoke' })}
+                onPatch={onPatch}
+              />
             ) : (
               <>
+                {admin && (
+                  <JoinRequestsList
+                    requests={requests}
+                    characterId={characterId}
+                    communityId={community.id}
+                    onDecided={() => {
+                      setRequestsReload((n) => n + 1);
+                      changed();
+                    }}
+                  />
+                )}
                 {membersFailed ? (
                   <p role="alert" className="text-xs text-danger">
                     {t('communities.membersLoadFailed')}

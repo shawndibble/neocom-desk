@@ -480,6 +480,16 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Characters waiting to be let in when the Community approves new
+      // Members: one doc per Character, written and removed only by the join
+      // and decision callables. Only the admin reads them, to accept or decline.
+      match /requests/{requestUid} {
+        allow get, list: if isMember()
+          && get(/databases/$(database)/documents/communities/$(communityId)).data.adminUid
+            == request.auth.uid;
+        allow write: if false;
+      }
+
       // Shared Fittings (issue #3605): one flat collection per Community, so a
       // list is one query however many Members there are. The doc id is
       // `<uid>~saved-<fitting id>` or `<uid>~game-<ESI fitting id>`; binding
