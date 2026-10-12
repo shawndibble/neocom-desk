@@ -4,6 +4,10 @@ import {
   MAX_COMMUNITY_MEMBERS,
   decideCreate,
   decideJoin,
+  decideMailInvite,
+  MAX_MAIL_INVITES_PER_DAY,
+  parseMailInviteInput,
+  utcDayKey,
   decideLeave,
   decideRemoveMember,
   decideTransferAdmin,
@@ -160,5 +164,39 @@ describe('parsePreviewInput', () => {
     for (const bad of [undefined, {}, { inviteCode: '' }, { inviteCode: 'x'.repeat(65) }]) {
       expect(() => parsePreviewInput(bad)).toThrow();
     }
+  });
+});
+
+describe('mail invites', () => {
+  it('parses a target Character id and name', () => {
+    expect(
+      parseMailInviteInput({ communityId: 'c1', targetCharacterId: 42, targetName: ' Bob ' })
+    ).toEqual({ communityId: 'c1', targetCharacterId: 42, targetName: 'Bob' });
+    for (const bad of [
+      { communityId: 'c1', targetCharacterId: 0, targetName: 'Bob' },
+      { communityId: 'c1', targetCharacterId: 1.5, targetName: 'Bob' },
+      { communityId: 'c1', targetCharacterId: '42', targetName: 'Bob' },
+      { communityId: 'c1', targetCharacterId: 42, targetName: '' },
+      { communityId: 'a/b', targetCharacterId: 42, targetName: 'Bob' },
+    ]) {
+      expect(() => parseMailInviteInput(bad)).toThrow();
+    }
+  });
+
+  it('counts a day in UTC', () => {
+    expect(utcDayKey(Date.UTC(2026, 9, 12, 23, 59, 59))).toBe('2026-10-12');
+    expect(utcDayKey(Date.UTC(2026, 9, 13, 0, 0, 0))).toBe('2026-10-13');
+  });
+
+  it('allows up to the daily cap, and reports a repeat target before the cap', () => {
+    expect(
+      decideMailInvite({ dailyCount: MAX_MAIL_INVITES_PER_DAY - 1, alreadyInvited: false })
+    ).toBe('ok');
+    expect(decideMailInvite({ dailyCount: MAX_MAIL_INVITES_PER_DAY, alreadyInvited: false })).toBe(
+      'daily-cap'
+    );
+    expect(decideMailInvite({ dailyCount: MAX_MAIL_INVITES_PER_DAY, alreadyInvited: true })).toBe(
+      'already-invited'
+    );
   });
 });

@@ -11,6 +11,8 @@ import { HttpsError } from 'firebase-functions/v2/https';
 export const MAX_COMMUNITY_MEMBERS = 100;
 /** Communities one Character can belong to. */
 export const MAX_COMMUNITIES_PER_CHARACTER = 10;
+/** Mail invites one admin may send per UTC day (issue #3604). */
+export const MAX_MAIL_INVITES_PER_DAY = 20;
 export const MAX_COMMUNITY_NAME_LENGTH = 60;
 export const MAX_CHARACTER_NAME_LENGTH = 100;
 const MAX_INVITE_CODE_LENGTH = 64;
@@ -85,6 +87,41 @@ export function parsePreviewInput(data: unknown): PreviewInviteInput {
   return {
     inviteCode: boundedString(record(data).inviteCode, 'inviteCode', MAX_INVITE_CODE_LENGTH),
   };
+}
+
+export interface MailInviteInput extends CommunityIdInput {
+  targetCharacterId: number;
+  /** Display only: the looked-up name, for the admin's "Sent" list. */
+  targetName: string;
+}
+
+export function parseMailInviteInput(data: unknown): MailInviteInput {
+  const d = record(data);
+  const id = d.targetCharacterId;
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0) {
+    throw new HttpsError('invalid-argument', 'targetCharacterId must be a Character id');
+  }
+  return {
+    communityId: docId(d.communityId, 'communityId'),
+    targetCharacterId: id,
+    targetName: boundedString(d.targetName, 'targetName', MAX_CHARACTER_NAME_LENGTH),
+  };
+}
+
+/** The UTC day a mail invite counts against, `YYYY-MM-DD`. */
+export function utcDayKey(nowMs: number): string {
+  return new Date(nowMs).toISOString().slice(0, 10);
+}
+
+export type MailInviteDecision = 'ok' | 'already-invited' | 'daily-cap';
+
+/** One mail per target Character per Community comes first, so a repeat never reads as a cap. */
+export function decideMailInvite(state: {
+  dailyCount: number;
+  alreadyInvited: boolean;
+}): MailInviteDecision {
+  if (state.alreadyInvited) return 'already-invited';
+  return state.dailyCount >= MAX_MAIL_INVITES_PER_DAY ? 'daily-cap' : 'ok';
 }
 
 export function parseCommunityIdInput(data: unknown): CommunityIdInput {

@@ -19,6 +19,9 @@ import {
   decideCreate,
   decideJoin,
   decideLeave,
+  decideMailInvite,
+  utcDayKey,
+  MAX_MAIL_INVITES_PER_DAY,
   decideRemoveMember,
   decideTransferAdmin,
   newInviteCode,
@@ -49,6 +52,14 @@ function fail(decision: string): never {
         `A Character can belong to at most ${MAX_COMMUNITIES_PER_CHARACTER} Communities`,
         { reason: 'too-many-communities' }
       );
+    case 'already-invited':
+      throw new HttpsError('already-exists', 'This Character was already sent an invite', {
+        reason: 'already-invited',
+      });
+    case 'daily-cap':
+      throw new HttpsError('resource-exhausted', 'Daily mail invite limit reached', {
+        reason: 'daily-cap',
+      });
     case 'community-full':
       // `details.reason` lets the join page tell the two caps apart without parsing prose.
       throw new HttpsError('resource-exhausted', 'This Community is full', {
@@ -313,6 +324,104 @@ export async function transferAdmin(
     }
     if (decision !== 'ok') fail(decision);
     tx.update(community.ref, { adminUid: newAdminUid });
+  });
+}
+
+const MAIL_INVITES_COLLECTION = 'mailInvites';
+const MAIL_QUOTA_COLLECTION = 'mailInviteQuota';
+const mailInviteRef = (db: Firestore, communityId: string, targetCharacterId: number) =>
+  communityRef(db, communityId).collection(MAIL_INVITES_COLLECTION).doc(String(targetCharacterId));
+const quotaRef = (db: Firestore, uid: string, day: string) =>
+  db.collection('characters').doc(uid).collection(MAIL_QUOTA_COLLECTION).doc(day);
+
+export interface MailInviteReservation {
+  inviteCode: string;
+  communityName: string;
+  adminName: string;
+  /** Mail invites left today after this one. */
+  remaining: number;
+}
+
+/**
+ * Claims one of the admin's daily mail invites and the one-per-target slot
+ * before the client sends the mail (the refresh token never leaves the device,
+ * so the client must send it). The cap lives here, in one transaction, not in
+ * the UI. A revoked link has nothing to mail: not-found.
+ */
+export async function reserveMailInvite(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  targetCharacterId: number,
+  targetName: string,
+  now = Date.now()
+): Promise<MailInviteReservation> {
+  const community = await requireAdmin(db, communityId, caller);
+  const inviteCode = community.get('inviteCode');
+  if (typeof inviteCode !== 'string') fail('invalid-invite');
+  const admin = await memberRef(db, communityId, caller.uid).get();
+  const day = utcDayKey(now);
+  const quota = quotaRef(db, caller.uid, day);
+  const invite = mailInviteRef(db, communityId, targetCharacterId);
+
+  const remaining = await db.runTransaction(async (tx) => {
+    const quotaSnap = await tx.get(quota);
+    const inviteSnap = await tx.get(invite);
+    const dailyCount = Number(quotaSnap.get('count') ?? 0);
+    const decision = decideMailInvite({ dailyCount, alreadyInvited: inviteSnap.exists });
+    if (decision !== 'ok') fail(decision);
+    tx.set(quota, { count: dailyCount + 1, ownerHash: caller.ownerHash });
+    tx.set(invite, {
+      adminUid: caller.uid,
+      targetName,
+      day,
+      reservedAt: now,
+      sentAt: null,
+    });
+    return MAX_MAIL_INVITES_PER_DAY - (dailyCount + 1);
+  });
+  return {
+    inviteCode,
+    communityName: String(community.get('name') ?? ''),
+    adminName: String(admin.get('characterName') ?? ''),
+    remaining,
+  };
+}
+
+/** The mail went out: stamp the time the admin's "Sent" list shows. */
+export async function confirmMailInvite(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  targetCharacterId: number,
+  now = Date.now()
+): Promise<void> {
+  await requireAdmin(db, communityId, caller);
+  const invite = mailInviteRef(db, communityId, targetCharacterId);
+  const snap = await invite.get();
+  if (snap.exists && snap.get('adminUid') === caller.uid) await invite.update({ sentAt: now });
+}
+
+/**
+ * The send failed: give back the slot and the day's count. Idempotent, and
+ * only for an invite this admin reserved that was never confirmed as sent.
+ */
+export async function releaseMailInvite(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  targetCharacterId: number
+): Promise<void> {
+  await requireAdmin(db, communityId, caller);
+  const invite = mailInviteRef(db, communityId, targetCharacterId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(invite);
+    if (!snap.exists || snap.get('adminUid') !== caller.uid || snap.get('sentAt') !== null) return;
+    const quota = quotaRef(db, caller.uid, String(snap.get('day')));
+    const quotaSnap = await tx.get(quota);
+    tx.delete(invite);
+    const count = Number(quotaSnap.get('count') ?? 0);
+    if (quotaSnap.exists && count > 0) tx.update(quota, { count: count - 1 });
   });
 }
 

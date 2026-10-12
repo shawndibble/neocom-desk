@@ -103,6 +103,90 @@ export function joinCommunity(characterId: number, inviteCode: string, character
   >(characterId, 'joinCommunityCallable', { inviteCode, characterName });
 }
 
+export interface MailInviteReservation {
+  inviteCode: string;
+  communityName: string;
+  adminName: string;
+  remaining: number;
+}
+
+/** Claims a daily mail invite and the one-per-target slot; the server holds the cap. */
+export function reserveMailInvite(
+  characterId: number,
+  communityId: string,
+  targetCharacterId: number,
+  targetName: string
+) {
+  return call<
+    { communityId: string; targetCharacterId: number; targetName: string },
+    MailInviteReservation
+  >(characterId, 'reserveCommunityMailInviteCallable', {
+    communityId,
+    targetCharacterId,
+    targetName,
+  });
+}
+
+export async function confirmMailInvite(
+  characterId: number,
+  communityId: string,
+  targetCharacterId: number,
+  targetName: string
+): Promise<void> {
+  await call(characterId, 'confirmCommunityMailInviteCallable', {
+    communityId,
+    targetCharacterId,
+    targetName,
+  });
+}
+
+/** Gives the reserved slot back after a failed send. */
+export async function releaseMailInvite(
+  characterId: number,
+  communityId: string,
+  targetCharacterId: number,
+  targetName: string
+): Promise<void> {
+  await call(characterId, 'releaseCommunityMailInviteCallable', {
+    communityId,
+    targetCharacterId,
+    targetName,
+  });
+}
+
+export const MAX_MAIL_INVITES_PER_DAY = 20;
+
+export interface SentMailInvite {
+  targetCharacterId: number;
+  targetName: string;
+  sentAt: number;
+}
+
+/** Mail invites left today (UTC) and the ones already sent from this Community, newest first. */
+export async function loadMailInviteStatus(
+  characterId: number,
+  communityId: string,
+  now = Date.now()
+): Promise<{ remaining: number; sent: SentMailInvite[] }> {
+  const uid = await ensureSignedIn(characterId);
+  const db = getSyncFirestore();
+  const day = new Date(now).toISOString().slice(0, 10);
+  const [quota, invites] = await Promise.all([
+    getDoc(doc(db, 'characters', uid, 'mailInviteQuota', day)),
+    getDocs(collection(db, 'communities', communityId, 'mailInvites')),
+  ]);
+  const used = Number(quota.exists() ? (quota.data().count ?? 0) : 0);
+  const sent = invites.docs
+    .filter((entry) => typeof entry.data().sentAt === 'number')
+    .map((entry) => ({
+      targetCharacterId: Number(entry.id),
+      targetName: String(entry.data().targetName ?? ''),
+      sentAt: Number(entry.data().sentAt),
+    }))
+    .sort((a, b) => b.sentAt - a.sentAt);
+  return { remaining: Math.max(0, MAX_MAIL_INVITES_PER_DAY - used), sent };
+}
+
 export function createCommunity(characterId: number, name: string, characterName: string) {
   return call<{ name: string; characterName: string }, { communityId: string; inviteCode: string }>(
     characterId,

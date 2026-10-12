@@ -15,6 +15,7 @@ import { NOTICE_MS } from '@/components/ui/useTimedToast';
 import { writeToClipboard } from '@/lib/clipboard';
 import { uidForCharacter } from '@/sync/uid';
 import { ConfirmDialog } from './ConfirmDialog';
+import { MailInvitePanel } from './MailInvitePanel';
 import { ShareSelectionDialog } from './ShareSelectionDialog';
 import { loadShareSelection } from './shareSelection';
 import {
@@ -122,44 +123,47 @@ export function CommunityDetail({
       }
     >
       {admin && (
-        <section className="mb-4 space-y-2" aria-label={t('communities.invite')}>
-          <h3 className="text-xs font-semibold">{t('communities.invite')}</h3>
-          {inviteUrl ? (
-            <>
-              <p className="text-xs text-text-dim">{t('communities.inviteHint')}</p>
+        <>
+          <section className="mb-4 space-y-2" aria-label={t('communities.invite')}>
+            <h3 className="text-xs font-semibold">{t('communities.invite')}</h3>
+            {inviteUrl ? (
+              <>
+                <p className="text-xs text-text-dim">{t('communities.inviteHint')}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded bg-surface-2 px-2 py-1 text-xs">
+                    {inviteUrl}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() =>
+                      void writeToClipboard(inviteUrl).then(
+                        () => setCopied(t('communities.copied')),
+                        () => setCopied(t('communities.copyFailed'))
+                      )
+                    }
+                  >
+                    {t('communities.copyLink')}
+                  </Button>
+                  <Button size="sm" onClick={() => setDialog({ kind: 'regenerate' })}>
+                    {t('communities.regenerate')}
+                  </Button>
+                  <Button size="sm" onClick={() => setDialog({ kind: 'revoke' })}>
+                    {t('communities.revoke')}
+                  </Button>
+                </div>
+              </>
+            ) : (
               <div className="flex flex-wrap items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded bg-surface-2 px-2 py-1 text-xs">
-                  {inviteUrl}
-                </code>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() =>
-                    void writeToClipboard(inviteUrl).then(
-                      () => setCopied(t('communities.copied')),
-                      () => setCopied(t('communities.copyFailed'))
-                    )
-                  }
-                >
-                  {t('communities.copyLink')}
-                </Button>
+                <p className="text-xs text-text-dim">{t('communities.inviteOff')}</p>
                 <Button size="sm" onClick={() => setDialog({ kind: 'regenerate' })}>
                   {t('communities.regenerate')}
                 </Button>
-                <Button size="sm" onClick={() => setDialog({ kind: 'revoke' })}>
-                  {t('communities.revoke')}
-                </Button>
               </div>
-            </>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs text-text-dim">{t('communities.inviteOff')}</p>
-              <Button size="sm" onClick={() => setDialog({ kind: 'regenerate' })}>
-                {t('communities.regenerate')}
-              </Button>
-            </div>
-          )}
-        </section>
+            )}
+          </section>
+          {inviteUrl && <MailInvitePanel community={community} characterId={characterId} />}
+        </>
       )}
 
       <section
