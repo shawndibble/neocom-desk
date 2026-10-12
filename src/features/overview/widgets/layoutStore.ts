@@ -24,6 +24,7 @@ import {
   type WidgetRange,
 } from './layout';
 import { SIZES } from './sizes';
+import { isRowsPerPage } from './tableSortPage';
 
 export const OVERVIEW_LAYOUT_KEY = 'sync.overviewLayout';
 
@@ -51,6 +52,7 @@ function parseWidget(raw: unknown): Widget | null {
   } else {
     delete out.range;
   }
+  if (!isRowsPerPage(raw.rowsPerPage)) delete out.rowsPerPage;
   return out as unknown as Widget;
 }
 

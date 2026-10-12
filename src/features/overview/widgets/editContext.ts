@@ -11,6 +11,7 @@
  */
 import { createContext, useContext } from 'react';
 import type { OverviewLayout, WidgetRange, WidgetScope, WidgetSize, WidgetView } from './layout';
+import type { RowsPerPage } from './tableSortPage';
 
 export interface OverviewEditActions {
   /** Add one widget of `kind` at the end, scroll to it and flash it. */
@@ -29,6 +30,7 @@ export interface OverviewEditActions {
   setView: (id: string, view: WidgetView) => void;
   setScope: (id: string, scope: WidgetScope) => void;
   setRange: (id: string, range: WidgetRange) => void;
+  setRowsPerPage: (id: string, rows: RowsPerPage) => void;
   rename: (id: string, title: string) => void;
   setShowOnPhone: (id: string, show: boolean) => void;
 }
@@ -66,6 +68,7 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setView: none,
   setScope: none,
   setRange: none,
+  setRowsPerPage: none,
   rename: none,
   setShowOnPhone: none,
 });

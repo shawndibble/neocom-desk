@@ -8,6 +8,7 @@
  *
  * No React, Dexie or fetch here: the store lives in `layoutStore.ts`.
  */
+import { isRowsPerPage, DEFAULT_ROWS_PER_PAGE, type RowsPerPage } from './tableSortPage';
 import { getKind, isAddable, type WidgetKindId, type WidgetSize, type WidgetView } from './kinds';
 
 export type { WidgetKindId, WidgetSize, WidgetView };
@@ -28,6 +29,8 @@ export interface Widget {
   title?: string;
   scope: WidgetScope;
   range?: WidgetRange;
+  /** Rows per page for a paged table; absent means the default. Only a table that opts in reads it. */
+  rowsPerPage?: RowsPerPage;
   showOnPhone: boolean;
 }
 
@@ -147,6 +150,24 @@ export function setRange(layout: OverviewLayout, id: string, range: WidgetRange)
   return update(layout, id, (w) => {
     if (w.range === range || !getKind(w.kind)?.hasRange) return null;
     return { ...w, range };
+  });
+}
+
+/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
+export function setRowsPerPage(
+  layout: OverviewLayout,
+  id: string,
+  rows: RowsPerPage
+): OverviewLayout {
+  if (!isRowsPerPage(rows)) return layout;
+  return update(layout, id, (w) => {
+    if (rows === (w.rowsPerPage ?? DEFAULT_ROWS_PER_PAGE)) return null;
+    if (rows === DEFAULT_ROWS_PER_PAGE) {
+      const { rowsPerPage: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, rowsPerPage: rows };
   });
 }
 

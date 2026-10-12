@@ -62,6 +62,14 @@ function signedPercent(row: OpenOrderRow): string {
   return `${row.price >= best ? '+' : '-'}${gap}%`;
 }
 
+/** vs best as a number: signed like the cell, so "+5%" orders above "-10%"; nothing with no rival price. */
+function vsBestSort(row: OpenOrderRow): number | undefined {
+  const best = row.station.bestPrice;
+  if (best === null) return undefined;
+  const gap = Math.round(row.station.gapPct * 10) / 10;
+  return row.price >= best ? gap : -gap;
+}
+
 /** Red when a rival's price beats mine (an undercut or outbid); nothing otherwise, since being ahead needs no flag. */
 function vsBestCell(row: OpenOrderRow): TableCell {
   const text = signedPercent(row);
@@ -107,18 +115,65 @@ export function ordersTable(
       expiresIn(t, row, now),
       shortStation(t, row.stationName),
     ],
+    // Same order as the columns. The cells are compact text ("1.2M", "3d 4h"), so sorting
+    // reads these instead; a lapsed order still sorts by when it lapsed.
+    sort: [
+      row.typeName,
+      t(`${W}.orders.${row.isBuyOrder ? 'sideBuy' : 'sideSell'}`),
+      row.price,
+      vsBestSort(row),
+      row.expiry?.expiresAt,
+      row.stationName === null ? undefined : shortStation(t, row.stationName),
+    ],
     tone: PROBLEM_TONE[row.problem],
   }));
   return {
     columns: [
-      { key: 'item', label: t(`${W}.orders.col.item`), priority: 0, nameFloor: true },
-      { key: 'side', label: t(`${W}.orders.col.side`), priority: 4, hideNarrow: true },
-      { key: 'price', label: t(`${W}.orders.col.price`), align: 'end', priority: 2 },
-      { key: 'vsBest', label: t(`${W}.orders.col.vsBest`), align: 'end', priority: 1 },
-      { key: 'expires', label: t(`${W}.orders.col.expires`), align: 'end', priority: 3 },
-      { key: 'station', label: t(`${W}.orders.col.station`), priority: 5, hideNarrow: true },
+      {
+        key: 'item',
+        label: t(`${W}.orders.col.item`),
+        sortable: true,
+        priority: 0,
+        nameFloor: true,
+      },
+      {
+        key: 'side',
+        label: t(`${W}.orders.col.side`),
+        sortable: true,
+        priority: 4,
+        hideNarrow: true,
+      },
+      {
+        key: 'price',
+        label: t(`${W}.orders.col.price`),
+        sortable: true,
+        align: 'end',
+        priority: 2,
+      },
+      {
+        key: 'vsBest',
+        label: t(`${W}.orders.col.vsBest`),
+        sortable: true,
+        align: 'end',
+        priority: 1,
+      },
+      {
+        key: 'expires',
+        label: t(`${W}.orders.col.expires`),
+        sortable: true,
+        align: 'end',
+        priority: 3,
+      },
+      {
+        key: 'station',
+        label: t(`${W}.orders.col.station`),
+        sortable: true,
+        priority: 5,
+        hideNarrow: true,
+      },
     ],
     rows: tableRows,
+    pageable: true,
     footer: slots ? t(`${W}.orders.slots`, slots) : undefined,
   };
 }

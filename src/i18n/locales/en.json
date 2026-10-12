@@ -4273,6 +4273,15 @@
       },
       "moreRows_one": "+{{count}} more",
       "moreRows_other": "+{{count}} more",
+      "table": {
+        "sortBy": "Sort by {{column}}",
+        "sortedAsc": "{{column}}, sorted ascending",
+        "sortedDesc": "{{column}}, sorted descending",
+        "rowsPerPage": "Rows per page",
+        "previousPage": "Previous page",
+        "nextPage": "Next page",
+        "pageStatus": "{{from}}–{{to}} of {{count}}"
+      },
       "noWidgets": "There are no widgets to show on this Overview."
     },
     "header": {

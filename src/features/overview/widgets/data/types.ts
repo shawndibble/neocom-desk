@@ -131,12 +131,19 @@ export interface TableColumn {
    * column's text is the point (an item name) and the other columns are few.
    */
   nameFloor?: boolean;
+  /**
+   * The header becomes a sort button. Needs a matching entry in each row's `sort`, since the
+   * cell text is display-only ("1.2M", "3d 4h") and sorting it would order strings, not values.
+   */
+  sortable?: boolean;
 }
 
 export interface TableRowModel {
   key: string;
   /** One cell per column, in column order. */
   cells: TableCell[];
+  /** One sort key per column, in column order; `undefined` sinks the row to the end. Only read for `sortable` columns. */
+  sort?: (number | string | undefined)[];
   /** A severity dot before the first cell; absent or `clear` draws none. */
   tone?: DeadlineSeverity;
   /** Set only when the row leads somewhere narrower than the widget's own title link. */
@@ -146,6 +153,12 @@ export interface TableRowModel {
 export interface TableModel {
   columns: TableColumn[];
   rows: TableRowModel[];
+  /**
+   * Pages instead of cutting at the size's row limit and printing "+N more", for a table whose
+   * every row matters (undercut orders: a hidden one is a missed relist). Only takes effect
+   * where the caller also passes `paging`.
+   */
+  pageable?: boolean;
   /** One quiet line under the rows ("38 of 49 slots"), when the table has a fact that is not a row. */
   footer?: string;
 }
