@@ -1,10 +1,7 @@
 /**
- * Trained-skills page's per-group disclosure header touch target (issue
- * #1071): the header shared `min-h-8` (32px) with `Disclosure.tsx`, the
- * shared disclosure primitive it duplicates instead of reusing — neither
- * ever reached the 44px touch floor on a phone. Fixed on both with
- * `min-h-11 ... md:min-h-0`, the same precedent as #1064's Open Orders
- * disclosure row.
+ * Trained-skills page's per-group tile touch target (issue #1071, now the
+ * group board of #3643): the tile is a content-sized card that never drops
+ * below the 44px touch floor.
  *
  * Uses the default seeded character (no route/Dexie overrides needed):
  * `skills.spec.ts` already proves "Spaceship Command" renders as a trained
@@ -26,13 +23,13 @@ async function gotoTrainedSkills(page: Page) {
   await page.waitForURL(/\/skills\/trained$/);
 }
 
-test('skill-group disclosure header meets the 44px touch floor at 390px, and still expands/collapses', async ({
+test('skill-group tile meets the 44px touch floor at 390px, and still expands/collapses', async ({
   page,
 }) => {
   await gotoTrainedSkills(page);
   await page.setViewportSize(PHONE);
 
-  const header = page.getByRole('button', { name: /^Spaceship Command/ });
+  const header = page.getByRole('heading', { name: /^Spaceship Command/ }).getByRole('button');
   await expect(header).toBeVisible();
   await expect(header).toHaveAttribute('aria-expanded', 'false');
 
@@ -50,24 +47,6 @@ test('skill-group disclosure header meets the 44px touch floor at 390px, and sti
   await expect(header).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('skill-group disclosure header drops the touch-tier floor at and above md (1280px), staying content-driven', async ({
-  page,
-}) => {
-  await gotoTrainedSkills(page);
-  await page.setViewportSize(DESKTOP);
-
-  const header = page.getByRole('button', { name: /^Spaceship Command/ });
-  await expect(header).toBeVisible();
-
-  const height = await header.evaluate((el) => el.getBoundingClientRect().height);
-  // `md:min-h-0` removes the floor rather than pinning back to the old
-  // fixed 32px — pinned to the real measured content-driven height, not
-  // just "< 44", so a loose upper bound can't miss a partial regression
-  // back toward the touch-tier height.
-  expect(height).toBeGreaterThanOrEqual(24);
-  expect(height).toBeLessThanOrEqual(36);
-});
-
 /**
  * The trained-skill rows under each header (#1468): a single `py-1.5 text-xs`
  * line landed at 28px on a phone while the header above it reached 44px.
@@ -75,7 +54,10 @@ test('skill-group disclosure header drops the touch-tier floor at and above md (
  * that same 28px above it.
  */
 async function caldariFrigateRow(page: Page) {
-  await page.getByRole('button', { name: /^Spaceship Command/ }).click();
+  await page
+    .getByRole('heading', { name: /^Spaceship Command/ })
+    .getByRole('button')
+    .click();
   const row = page.getByRole('button', { name: /^Caldari Frigate/ });
   await expect(row).toBeVisible();
   return row;
@@ -173,7 +155,8 @@ test('the in-progress skill shows a Training chip at 390px, and no other row doe
 
   await page.getByRole('button', { name: /^Gunnery/ }).click();
   const chip = page
-    .getByRole('button', { name: /^Small Hybrid Turret/ })
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('button', { name: /^Small Hybrid Turret/ }) })
     .getByText(/^Training → IV · 4d 4h$/);
   await expect(chip).toBeVisible();
   // One on the row, one on its group's header (#2002); no other row has one.
@@ -242,16 +225,17 @@ async function openTrainingRow(page: Page, size: { width: number; height: number
   await gotoTrainedSkills(page);
   await page.setViewportSize(size);
   await page.getByRole('button', { name: /^Production/ }).click();
-  const row = page.getByRole('button', { name: /^Advanced Industrial Ship Construction/ });
-  await expect(row).toBeVisible();
-  const name = row.getByText('Advanced Industrial Ship Construction', { exact: true });
+  const button = page.getByRole('button', { name: /^Advanced Industrial Ship Construction/ });
+  await expect(button).toBeVisible();
+  const row = page.getByRole('listitem').filter({ has: button });
+  const name = row.getByRole('link', { name: 'Advanced Industrial Ship Construction' });
   const chip = row.getByText(/^Training →/);
   await expect(chip).toBeVisible();
-  return { row, name, chip };
+  return { row, button, name, chip };
 }
 
 test('the training row shows its full name with the chip under it at 390px', async ({ page }) => {
-  const { row, name, chip } = await openTrainingRow(page, PHONE);
+  const { row, button, name, chip } = await openTrainingRow(page, PHONE);
 
   const fits = await name.evaluate((el) => el.scrollHeight <= el.clientHeight);
   expect(fits).toBe(true);
@@ -263,8 +247,8 @@ test('the training row shows its full name with the chip under it at 390px', asy
   expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
   expect(rowBox.height).toBeGreaterThanOrEqual(44);
 
-  await row.click();
-  await expect(row).toHaveAttribute('aria-pressed', 'true');
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
   );
@@ -276,8 +260,10 @@ test('a 40-character skill name wraps to at most two lines at 390px', async ({ p
   await gotoTrainedSkills(page);
   await page.setViewportSize(PHONE);
   await page.getByRole('button', { name: /^Resource Processing/ }).click();
-  const row = page.getByRole('button', { name: /^Capital Shipboard Compression Technology/ });
-  const name = row.getByText('Capital Shipboard Compression Technology', { exact: true });
+  const row = page.getByRole('listitem').filter({
+    has: page.getByRole('button', { name: /^Capital Shipboard Compression Technology/ }),
+  });
+  const name = row.getByRole('link', { name: 'Capital Shipboard Compression Technology' });
   await expect(name).toBeVisible();
 
   const fits = await name.evaluate((el) => el.scrollHeight <= el.clientHeight);

@@ -1829,6 +1829,15 @@
     "offlineTitle": "Showing cached data",
     "sp": "{{value}} SP",
     "trainingChip": "Training → {{level}} · {{time}}",
+    "board": {
+      "trainedOfTotal": "{{trained}} / {{total}}",
+      "tileMatches_one": "{{count}} match",
+      "tileMatches_other": "{{count}} matches",
+      "needBook": "Need book",
+      "levelQueued": "{{level}} → {{queued}}",
+      "summaryTrained": "Trained",
+      "summaryQueued": "In queue"
+    },
     "levelOfFive": "Level {{level}} of 5",
     "levelOfFivePlanned": "Level {{level}} of 5, planned to {{planned}}",
     "searchPlaceholder": "Search skills…",

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  queuedLevelsBySkill,
   applyCompletedQueueEntries,
   applyTrainingProgress,
   classifySkillQueue,
@@ -643,5 +644,41 @@ describe('projectQueueEnd', () => {
     );
     expect(r.startMs).toBe(NOW);
     expect(r.queuedLevels).toEqual([]);
+  });
+});
+
+describe('queuedLevelsBySkill', () => {
+  const NOW = Date.parse('2026-01-01T00:00:00Z');
+  const entry = (
+    skill_id: number,
+    finished_level: number,
+    queue_position: number,
+    finish: string | null
+  ) => ({
+    skill_id,
+    finished_level,
+    queue_position,
+    ...(finish ? { start_date: '2025-12-30T00:00:00Z', finish_date: finish } : {}),
+  });
+
+  it('maps each skill to the highest level still waiting in the queue', () => {
+    const levels = queuedLevelsBySkill(
+      [
+        entry(1, 4, 0, '2026-01-02T00:00:00Z'),
+        entry(1, 5, 1, '2026-01-09T00:00:00Z'),
+        entry(2, 3, 2, '2026-01-10T00:00:00Z'),
+      ],
+      NOW
+    );
+    expect(levels.get(1)).toBe(5);
+    expect(levels.get(2)).toBe(3);
+  });
+
+  it('ignores entries that already finished, since those are applied to the trained level', () => {
+    expect(queuedLevelsBySkill([entry(1, 4, 0, '2025-12-31T00:00:00Z')], NOW).size).toBe(0);
+  });
+
+  it('keeps a paused queue, whose entries have no dates, as queued', () => {
+    expect(queuedLevelsBySkill([entry(1, 2, 0, null)], NOW).get(1)).toBe(2);
   });
 });

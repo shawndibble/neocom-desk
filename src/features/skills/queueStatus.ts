@@ -64,6 +64,24 @@ export function classifySkillQueue(
   });
 }
 
+/**
+ * The highest level each skill still has waiting in the queue, for the board's
+ * queued pips. Finished entries are left out: `completedQueueLevels` already
+ * folds those into the trained level. A paused queue's entries have no dates,
+ * so they stay queued rather than looking finished.
+ */
+export function queuedLevelsBySkill(
+  entries: readonly SkillQueueEntry[],
+  nowMs: number
+): Map<number, number> {
+  const levels = new Map<number, number>();
+  for (const { entry, status } of classifySkillQueue(entries, nowMs)) {
+    if (status === 'completed') continue;
+    levels.set(entry.skill_id, Math.max(levels.get(entry.skill_id) ?? 0, entry.finished_level));
+  }
+  return levels;
+}
+
 /** A level ESI's /skills has not caught up to yet. `sp` is null when absent. */
 export interface CompletedLevel {
   level: number;
