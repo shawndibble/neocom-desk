@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   dedupeSharedFittings,
+  fittingChoiceKey,
+  followsSave,
   parseSharedFittingId,
   shareMarker,
   shareMenuMode,
@@ -81,5 +83,32 @@ describe('dedupeSharedFittings', () => {
       'char:1'
     );
     expect(rows).toHaveLength(3);
+  });
+});
+
+describe('fittingChoiceKey', () => {
+  it('is the id without its owner, so it stays the same in every Community', () => {
+    expect(fittingChoiceKey({ source: 'saved', key: 'abc' })).toBe('saved-abc');
+    expect(fittingChoiceKey({ source: 'game', key: '77' })).toBe('game-77');
+  });
+});
+
+describe('followsSave', () => {
+  const key = { source: 'saved', key: 'a' } as const;
+
+  it('follows a save into a Community that already holds the Fitting', () => {
+    expect(followsSave(true, null, key)).toBe(true);
+  });
+
+  it('does not follow into a Community that holds nothing when share-all is off', () => {
+    expect(followsSave(false, null, key)).toBe(false);
+  });
+
+  it('shares a brand-new Fitting under share-all', () => {
+    expect(followsSave(false, new Set(), key)).toBe(true);
+  });
+
+  it('leaves out a Fitting the Member stopped sharing under share-all', () => {
+    expect(followsSave(false, new Set(['saved-a']), key)).toBe(false);
   });
 });

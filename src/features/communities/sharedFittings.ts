@@ -26,6 +26,8 @@ import {
 import { db as localDb } from '@/db';
 import { decodeFittingShare } from '@/engine/fitting/fittingShare';
 import {
+  fittingChoiceKey,
+  followsSave,
   parseSharedFittingId,
   sharedFittingId,
   type SharedFitting,
@@ -35,7 +37,7 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { loadTypes } from '@/sde/loadSde';
-import { markFittingsShared } from './shareSelection';
+import { loadFittingsAll, markFittingsShared } from './shareSelection';
 import { loadCommunityMembers, loadMyCommunities, type CommunitySummary } from './communityStore';
 
 /** firestore.rules caps; a Fitting past them is left unshared rather than failing the batch. */
@@ -109,6 +111,23 @@ export async function loadCommunityFittings(
     });
   }
   return loaded;
+}
+
+/** The Fittings (by `fittingChoiceKey`) this Character has shared into one Community. */
+export async function loadMySharedFittingKeys(
+  characterId: number,
+  communityId: string
+): Promise<Set<string>> {
+  const uid = await ensureSignedIn(characterId);
+  const mine = await getDocs(
+    query(fittingsOf(getSyncFirestore(), communityId), where('ownerUid', '==', uid))
+  );
+  const keys = new Set<string>();
+  for (const entry of mine.docs) {
+    const parsed = parseSharedFittingId(entry.id);
+    if (parsed) keys.add(fittingChoiceKey(parsed));
+  }
+  return keys;
 }
 
 /** The Communities this Character is in, every Fitting shared into each, and who (by uid) shared them. */
@@ -283,12 +302,18 @@ export async function followSavedFitting(
     const db = getSyncFirestore();
     await Promise.all(
       communities.map(async (community) => {
-        const existing = await getDoc(doc(fittingsOf(db, community.id), docId));
+        const key = { source: 'saved', key: record.id } as const;
+        const [existing, allExcluded] = await Promise.all([
+          getDoc(doc(fittingsOf(db, community.id), docId)),
+          loadFittingsAll(characterId, community.id),
+        ]);
         // Deleted since this save began: don't bring it back.
-        if (existing.exists() && (await localDb.fittings.get(record.id))) {
+        if (
+          followsSave(existing.exists(), allExcluded, key) &&
+          (await localDb.fittings.get(record.id))
+        ) {
           await shareFitting(characterId, community.id, {
-            source: 'saved',
-            key: record.id,
+            ...key,
             name: record.name,
             code: record.code,
           });

@@ -22,7 +22,7 @@ import { uidForCharacter } from '@/sync/uid';
 import { CommunityLibrary } from './CommunityLibrary';
 import { ConfirmDialog } from './ConfirmDialog';
 import { MailInvitePanel } from './MailInvitePanel';
-import { ShareFittingsPanel } from './ShareFittingsPanel';
+import { ShareFittingsTab } from './ShareFittingsTab';
 import { ShareBlueprintsTab } from './ShareBlueprintsTab';
 import {
   communityInviteUrl,
@@ -198,7 +198,7 @@ export function CommunityDetail({
                 onOpenLibrary={() => setTab('library')}
               />
             ) : tab === 'fittings' ? (
-              <ShareFittingsPanel characterId={characterId} communityId={community.id} />
+              <ShareFittingsTab characterId={characterId} communityId={community.id} />
             ) : (
               <>
                 {membersFailed ? (

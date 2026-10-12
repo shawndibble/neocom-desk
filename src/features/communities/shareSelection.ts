@@ -94,3 +94,32 @@ export async function saveShareChoice(
     await saveShareSelection(characterId, communityId, choice.allowed);
   });
 }
+
+const fittingsAllKeyFor = (characterId: number, communityId: string) =>
+  `${keyFor(characterId, communityId)}:fittings-all`;
+
+/**
+ * Whether "share all my Fittings" is on for a Community (issue #3605), and if
+ * so the Fittings (`source-key`) the Member has stopped since. Null is off.
+ * Which Fittings are actually shared is the Community's own copy; this is only
+ * the standing instruction that makes later saves follow it.
+ */
+export async function loadFittingsAll(
+  characterId: number,
+  communityId: string
+): Promise<Set<string> | null> {
+  const row = await db.settings.get(fittingsAllKeyFor(characterId, communityId));
+  if (!row) return null;
+  const ids = Array.isArray(row.value) ? row.value : [];
+  return new Set(ids.filter((id): id is string => typeof id === 'string'));
+}
+
+export async function saveFittingsAll(
+  characterId: number,
+  communityId: string,
+  excluded: ReadonlySet<string> | null
+): Promise<void> {
+  const key = fittingsAllKeyFor(characterId, communityId);
+  if (excluded === null) await db.settings.delete(key);
+  else await db.settings.put({ key, value: [...excluded].sort() });
+}

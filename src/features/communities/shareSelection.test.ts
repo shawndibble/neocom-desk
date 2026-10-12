@@ -4,8 +4,10 @@ import { removeCharacter } from '@/features/character/removeCharacter';
 import {
   deleteShareSelections,
   hasShareSelections,
+  loadFittingsAll,
   loadShareChoice,
   loadShareSelection,
+  saveFittingsAll,
   saveShareChoice,
   saveShareSelection,
 } from './shareSelection';
@@ -88,5 +90,36 @@ describe('share choice storage', () => {
     expect(await hasShareSelections([1])).toBe(true);
     await deleteShareSelections(1);
     expect(await db.settings.count()).toBe(0);
+  });
+});
+
+describe('share-all Fittings storage', () => {
+  it('is off until switched on', async () => {
+    expect(await loadFittingsAll(1, 'c1')).toBeNull();
+  });
+
+  it('round-trips the Fittings stopped since it was switched on', async () => {
+    await saveFittingsAll(1, 'c1', new Set(['saved-b', 'game-9']));
+    expect(await loadFittingsAll(1, 'c1')).toEqual(new Set(['saved-b', 'game-9']));
+  });
+
+  it('stays on with nothing stopped', async () => {
+    await saveFittingsAll(1, 'c1', new Set());
+    expect(await loadFittingsAll(1, 'c1')).toEqual(new Set());
+  });
+
+  it('switches off by saving null, and is kept apart per Community', async () => {
+    await saveFittingsAll(1, 'c1', new Set());
+    await saveFittingsAll(1, 'c2', new Set());
+    await saveFittingsAll(1, 'c1', null);
+    expect(await loadFittingsAll(1, 'c1')).toBeNull();
+    expect(await loadFittingsAll(1, 'c2')).not.toBeNull();
+  });
+
+  it('counts as sharing and goes with the Character', async () => {
+    await saveFittingsAll(1, 'c1', new Set());
+    expect(await hasShareSelections([1])).toBe(true);
+    await deleteShareSelections(1);
+    expect(await loadFittingsAll(1, 'c1')).toBeNull();
   });
 });

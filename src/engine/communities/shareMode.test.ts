@@ -53,3 +53,12 @@ describe('stopSharing and addShared', () => {
     expect(before).toEqual({ all: false, allowed: new Set([10]) });
   });
 });
+
+describe('a choice over string keys (Fittings)', () => {
+  it('revokes and re-adds by key under share-all', () => {
+    const stopped = stopSharing<string>(shareAll<string>(), 'saved-a');
+    expect([...effectiveSelection(['saved-a', 'saved-b'], stopped)]).toEqual(['saved-b']);
+    const again = addShared(stopped, 'saved-a');
+    expect([...effectiveSelection(['saved-a', 'saved-b'], again)]).toEqual(['saved-a', 'saved-b']);
+  });
+});
