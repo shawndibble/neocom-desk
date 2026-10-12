@@ -61,10 +61,12 @@ export async function removeSharedBlueprints(characterIds: readonly number[]): P
   const removals = (async () => {
     const { removeSharedLibraries } = await import('@/features/communities/libraryPush');
     const { unshareAllFittingsEverywhere } = await import('@/features/communities/sharedFittings');
+    const { unshareAllPlansEverywhere } = await import('@/features/communities/sharedPlans');
     // One Character at a time: Firebase has a single session slot.
     for (const id of characterIds) {
       await removeSharedLibraries(id).catch(() => undefined);
       await unshareAllFittingsEverywhere(id).catch(() => undefined);
+      await unshareAllPlansEverywhere(id).catch(() => undefined);
     }
   })().catch(() => undefined);
   try {

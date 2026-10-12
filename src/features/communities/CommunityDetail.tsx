@@ -24,6 +24,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { CommunityInvites } from './CommunityInvites';
 import { JoinRequestsList } from './JoinRequestsList';
 import { ShareFittingsTab } from './ShareFittingsTab';
+import { ShareSkillPlansTab } from './ShareSkillPlansTab';
 import { ShareBlueprintsTab } from './ShareBlueprintsTab';
 import {
   deleteCommunity,
@@ -76,9 +77,9 @@ export function CommunityDetail({
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const tabsId = useTabsId();
-  const [tab, setTab] = useState<'blueprints' | 'fittings' | 'members' | 'invites' | 'library'>(
-    'blueprints'
-  );
+  const [tab, setTab] = useState<
+    'blueprints' | 'fittings' | 'plans' | 'members' | 'invites' | 'library'
+  >('blueprints');
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   // Admin-only tabs fall back to Blueprints if the admin role moved to someone else.
   const shownTab = tab === 'invites' && !admin ? 'blueprints' : tab;
@@ -163,6 +164,7 @@ export function CommunityDetail({
             tabs={[
               { id: 'blueprints', label: t('communities.tabs.blueprints') },
               { id: 'fittings', label: t('communities.tabs.fittings') },
+              { id: 'plans', label: t('communities.tabs.plans') },
               {
                 id: 'members',
                 label:
@@ -173,7 +175,9 @@ export function CommunityDetail({
               ...(admin ? [{ id: 'invites', label: t('communities.tabs.invites') }] : []),
             ]}
             value={shownTab}
-            onChange={(id) => setTab(id as 'blueprints' | 'fittings' | 'members' | 'invites')}
+            onChange={(id) =>
+              setTab(id as 'blueprints' | 'fittings' | 'plans' | 'members' | 'invites')
+            }
             label={t('communities.tabs.label')}
             className="mb-2"
           />
@@ -186,6 +190,8 @@ export function CommunityDetail({
               />
             ) : shownTab === 'fittings' ? (
               <ShareFittingsTab characterId={characterId} communityId={community.id} />
+            ) : shownTab === 'plans' ? (
+              <ShareSkillPlansTab characterId={characterId} communityId={community.id} />
             ) : shownTab === 'invites' ? (
               <CommunityInvites
                 community={community}

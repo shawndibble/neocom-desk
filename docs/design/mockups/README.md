@@ -22,7 +22,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 |---|---|---|
 | [lp-store-search](lp-store-search/README.md) | Issue #2873 | option B, one box for item or corporation |
 | [wallet-balance-trend](wallet-balance-trend/README.md) | worked example | story `mockups-wallet--proposed`, today vs proposed |
-| [communities-share](communities-share/README.md) | Communities share page | Option A, one flat tab row |
 | [stock-targets](stock-targets/index.html) | Issue #3521 | revised: Market › Stock, one list per market (station picked), listed vs hangar; HTML, not PNGs |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.

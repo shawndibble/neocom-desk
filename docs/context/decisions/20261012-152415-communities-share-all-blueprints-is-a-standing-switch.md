@@ -1,6 +1,6 @@
 # Scope decisions — Communities: share all blueprints is a standing switch, one tab per kind
 
-_Recorded 2026-10-12. Mockup: `docs/design/mockups/communities-share/`._
+_Recorded 2026-10-12. Mockup: Option A, one flat tab row (removed from the repo once built; git history keeps it)._
 
 - **The Community page is one flat tab row: Blueprints, Fittings, (later) Skill plans, Members.** Tabs within tabs were rejected: two selected states at once, two rows on a phone, and Members is a peer of the others. The Community Library is no longer a tab; it opens from a button on Blueprints, with a Back button.
 - **"Share all my blueprints" is a standing switch, like Fittings.** While on, a blueprint acquired later is shared too, so the choice is stored as share-all plus the blueprints stopped since (an exclusion list), not as an allowlist of type ids. Stopping one blueprint under share-all adds an exclusion; sharing it again lifts it.

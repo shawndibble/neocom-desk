@@ -51,6 +51,16 @@ export async function markFittingsShared(characterId: number): Promise<void> {
   await db.settings.put({ key: `${PREFIX}${characterId}:fittings`, value: true });
 }
 
+/**
+ * Remembers on this device that the Character shared a Skill Plan, so the
+ * sweep refreshes it and the logout question is asked. Same prefix as the
+ * Fittings marker, so it is counted by `hasShareSelections` and deleted with
+ * the Character.
+ */
+export async function markPlansShared(characterId: number): Promise<void> {
+  await db.settings.put({ key: `${PREFIX}${characterId}:plans`, value: true });
+}
+
 /** Run inside `removeCharacter`'s transaction: a removed Character leaves no choices behind. */
 export async function deleteShareSelections(characterId: number): Promise<void> {
   await db.settings.where('key').startsWith(`${PREFIX}${characterId}:`).delete();
