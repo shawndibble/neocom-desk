@@ -64,9 +64,13 @@ async function seed() {
 beforeAll(async () => {
   await seed();
   store.loadMyCommunities.mockResolvedValue([community()]);
+  configureClipboard(async () => {});
   const view = renderPage('/communities?community=c1');
-  await screen.findByRole('button', { name: c.copyLink });
+  // Copy raises the page's Toast, the one piece the other tests meet cold.
+  await userEvent.click(await screen.findByRole('button', { name: c.copyLink }));
+  await screen.findByText(c.copied, undefined, { timeout: 20_000 });
   view.unmount();
+  configureClipboard(null);
 }, 30_000);
 
 beforeEach(seed);
