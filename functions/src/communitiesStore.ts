@@ -250,8 +250,10 @@ async function deleteMemberShares(db: Firestore, communityId: string, uid: strin
     .where('ownerUid', '==', uid)
     .get();
   const writer = db.bulkWriter();
-  for (const fitting of fittings.docs) void writer.delete(fitting.ref);
+  // Awaited, so a delete that fails after its retries fails the leave rather than orphaning a readable copy.
+  const deletes = fittings.docs.map((fitting) => writer.delete(fitting.ref));
   await writer.close();
+  await Promise.all(deletes);
 }
 
 /**

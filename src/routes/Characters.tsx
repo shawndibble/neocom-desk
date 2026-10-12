@@ -95,7 +95,10 @@ import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { RemoveSharedFittingsOption } from '@/features/communities/RemoveSharedFittingsOption';
-import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
+import {
+  SYNC_FLUSH_TIMEOUT_MS,
+  removeCharacterAfterSync,
+} from '@/features/character/removeCharacter';
 import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
@@ -1286,9 +1289,13 @@ export function Characters() {
     try {
       // Before the login goes: removing a shared Fitting is signed as this Character.
       if (isSyncConfigured() && removeSharedFittings) {
-        await import('@/features/communities/sharedFittings')
-          .then((shared) => shared.unshareAllFittingsEverywhere(id))
-          .catch(() => undefined);
+        // Bounded like the last sync push: offline must not stall the removal.
+        await Promise.race([
+          import('@/features/communities/sharedFittings').then((shared) =>
+            shared.unshareAllFittingsEverywhere(id)
+          ),
+          new Promise<void>((resolve) => setTimeout(resolve, SYNC_FLUSH_TIMEOUT_MS)),
+        ]).catch(() => undefined);
       }
       await removeCharacterAfterSync(id, isSyncConfigured());
       useAuthFailure.getState().dismissNeedsLogin(id);

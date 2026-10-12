@@ -133,6 +133,7 @@ export async function loadShareStatus(
 ): Promise<{ communities: CommunitySummary[]; sharedIn: Set<string> }> {
   const communities = await loadMyCommunities(characterId);
   const docId = sharedFittingId(uidForCharacter(characterId), key);
+  await ensureSignedIn(characterId);
   const db = getSyncFirestore();
   const held = await Promise.all(
     communities.map(async (community) =>
@@ -275,11 +276,13 @@ export async function followSavedFitting(
       source: 'saved',
       key: record.id,
     });
+    await ensureSignedIn(characterId);
     const db = getSyncFirestore();
     await Promise.all(
       communities.map(async (community) => {
         const existing = await getDoc(doc(fittingsOf(db, community.id), docId));
-        if (existing.exists()) {
+        // Deleted since this save began: don't bring it back.
+        if (existing.exists() && (await localDb.fittings.get(record.id))) {
           await shareFitting(characterId, community.id, {
             source: 'saved',
             key: record.id,

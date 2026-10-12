@@ -32,7 +32,8 @@ export async function logoutAllCharacters(
   if (syncConfigured && removeSharedFittings) {
     const shared = await import('@/features/communities/sharedFittings').catch(() => null);
     if (shared) {
-      await Promise.allSettled(ids.map((id) => shared.unshareAllFittingsEverywhere(id)));
+      // One at a time: Firebase has a single session slot, so parallel removals sign each other out.
+      for (const id of ids) await shared.unshareAllFittingsEverywhere(id).catch(() => undefined);
     }
   }
   if (syncConfigured) await flushSync(ids);

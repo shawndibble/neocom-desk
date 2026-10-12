@@ -21,6 +21,7 @@ import { AlphaCloneChip, AlphaCloneMenuRow } from './AlphaCloneChip';
 import { FittingExportItems, FittingExportMenu, FittingExportNotice } from './FittingExportMenu';
 import { fittingStatsText } from './fittingStatsText';
 import { MasteryChip } from './MasteryChip';
+import type { EditorShare } from './useEditorShare';
 import { useFittingExport } from './useFittingExport';
 import { FittingNameModal } from './SavedFittingModals';
 
@@ -54,7 +55,7 @@ interface FittingHeaderProps {
   /** The open Fitting's stats, for Copy stats; null while they load. */
   stats?: FittingStats | null;
   /** "Share to Community" in Export, for a saved Fitting (`useEditorShare`). */
-  share?: { items: ReactNode; notice: string | null };
+  share?: EditorShare;
   save: ReactNode;
   /**
    * Below desktop, or while the Add slide-out narrows the page: one row — the
@@ -98,7 +99,7 @@ function CompactFittingHeader({
   share,
   onRename,
 }: {
-  share?: { items: ReactNode; notice: string | null };
+  share?: EditorShare;
   onRename: () => void;
   fitting: Fitting;
   price: Appraisal | null;

@@ -387,7 +387,7 @@ export function FittingStartScreen({
                                   }
                                 )}
                               >
-                                <span className="shrink-0 text-text-dim">
+                                <span tabIndex={0} className="shrink-0 text-text-dim">
                                   <Icon.NavCommunities
                                     aria-label={t('fittings.share.sourceLabel')}
                                     role="img"

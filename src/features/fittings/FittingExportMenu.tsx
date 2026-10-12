@@ -11,6 +11,7 @@ import {
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { formatIsk } from '@/lib/isk';
+import type { EditorShare } from './useEditorShare';
 import { useFittingExport, type FittingExport } from './useFittingExport';
 
 interface Props {
@@ -20,7 +21,7 @@ interface Props {
   /** The pilot's active clone, left off the multibuy list (`useFittingExport`). */
   cloneImplants?: readonly number[];
   /** "Share to Community" and its notice, for a saved Fitting (`useEditorShare`). */
-  share?: { items: ReactNode; notice: string | null };
+  share?: EditorShare;
 }
 
 /** The notice a copy leaves, announced politely. */

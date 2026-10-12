@@ -172,6 +172,7 @@ export function inGameRows(
 /** The Communities a Character is in and the Fittings shared into them (issue #3605). Nothing loads without sync. */
 export function useCommunityFittings(characterId: number | null) {
   const [state, setState] = useState<{
+    forCharacter: number;
     communities: CommunitySummary[];
     fittings: SharedFitting[];
     sharerNames: ReadonlyMap<string, string>;
@@ -187,7 +188,7 @@ export function useCommunityFittings(characterId: number | null) {
     try {
       const { loadSharedFittings } = await import('@/features/communities/sharedFittings');
       const loaded = await loadSharedFittings(characterId);
-      if (requestId === requestIdRef.current) setState(loaded);
+      if (requestId === requestIdRef.current) setState({ forCharacter: characterId, ...loaded });
     } catch {
       // Offline or signed out of sync: the library just lists its own Fittings.
       if (requestId === requestIdRef.current) setState(null);
@@ -200,27 +201,29 @@ export function useCommunityFittings(characterId: number | null) {
   }, [refresh]);
 
   const uid = characterId === null ? null : uidForCharacter(characterId);
+  // A previous Character's load is not this one's until its own lands.
+  const current = state?.forCharacter === characterId ? state : null;
   const rows = useMemo(
     () =>
-      state && uid !== null
-        ? sharedRows(state.fittings, uid, state.communities, state.sharerNames)
+      current && uid !== null
+        ? sharedRows(current.fittings, uid, current.communities, current.sharerNames)
         : [],
-    [state, uid]
+    [current, uid]
   );
   /** `shareMarker`s of the Fittings this Character already shared. */
   const mine = useMemo(
     () =>
       new Set(
-        (state?.fittings ?? [])
+        (current?.fittings ?? [])
           .filter((fitting) => fitting.ownerUid === uid)
           .flatMap((fitting) => {
             const parsed = parseSharedFittingId(fitting.id);
             return parsed ? [shareMarker(fitting.communityId, parsed)] : [];
           })
       ),
-    [state, uid]
+    [current, uid]
   );
-  return { communities: state?.communities ?? [], rows, mine, refresh };
+  return { communities: current?.communities ?? [], rows, mine, refresh };
 }
 
 /** Shared Fittings as list rows: not the viewer's own, one row per Fitting. */
