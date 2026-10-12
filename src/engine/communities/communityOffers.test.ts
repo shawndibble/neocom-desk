@@ -110,4 +110,18 @@ describe('buildCommunityOffers', () => {
     expect(offers.map((o) => o.uid)).toEqual(['u2']);
     expect(offers[0].runs).toBe(-1);
   });
+
+  it('drops malformed Member-written items instead of rendering them', () => {
+    const bad = [
+      { ...bp(), locationName: { x: 1 } },
+      { ...bp(), runs: 'a' },
+      { ...bp(), systemName: 5 },
+      null,
+    ] as unknown as SharedBlueprint[];
+    const offers = buildCommunityOffers(
+      [source('Alpha', [{ uid: 'u1', characterName: 'Ann', asOf: NOW, items: [...bad, bp()] }])],
+      NOW
+    );
+    expect(offers).toHaveLength(1);
+  });
 });

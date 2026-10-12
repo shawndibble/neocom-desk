@@ -1698,7 +1698,7 @@ export function BpcSourcingPanel() {
                       ? t('bpcContracts.communityAskToCopy', { name: row.memberName })
                       : t('bpcContracts.communityFrom', { name: row.memberName })}
                   </span>
-                  <span className="rounded border border-line px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest uppercase">
+                  <span className="text-[0.625rem] font-semibold tracking-widest uppercase">
                     {t('bpcContracts.communityChip', { names: row.communityNames.join(', ') })}
                   </span>
                   {row.stale && (
@@ -2177,8 +2177,8 @@ export function BpcSourcingPanel() {
                     : t('bpcContracts.mobile.offerCount', { count: displayRows.length })
                 }
                 // A contract row opens its contract; a market row opens the
-                // item's Market entry. No contract exists for an owned row —
-                // nothing to open.
+                // item's Market entry. Owned and Community rows have no
+                // contract: nothing to open.
                 rowClickable={(row) => row.source !== 'community'}
                 onRowClick={(row) => {
                   if (row.source === 'community') return;

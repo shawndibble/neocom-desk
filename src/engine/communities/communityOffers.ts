@@ -29,6 +29,21 @@ export interface CommunityOffer extends SharedBlueprint {
   stale: boolean;
 }
 
+const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+
+/** Firestore data is Member-written: drop anything that isn't a well-formed Shared Blueprint. */
+function isSharedBlueprint(b: SharedBlueprint): boolean {
+  return (
+    !!b &&
+    finite(b.typeId) &&
+    finite(b.me) &&
+    finite(b.te) &&
+    finite(b.runs) &&
+    typeof b.locationName === 'string' &&
+    typeof b.systemName === 'string'
+  );
+}
+
 function instanceKey(uid: string, b: SharedBlueprint): string {
   return JSON.stringify([uid, b.typeId, b.me, b.te, b.runs, b.locationName, b.systemName]);
 }
@@ -44,6 +59,7 @@ export function buildCommunityOffers(
       if (excludeUids.has(member.uid)) continue;
       const counts = new Map<string, { item: SharedBlueprint; count: number }>();
       for (const item of member.items) {
+        if (!isSharedBlueprint(item)) continue;
         const key = instanceKey(member.uid, item);
         const entry = counts.get(key);
         if (entry) entry.count += 1;
