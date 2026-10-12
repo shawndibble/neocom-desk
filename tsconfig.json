@@ -29,6 +29,8 @@
     // matcher type augmentations every `.test.tsx` relies on. Dropping it
     // from the program makes `toBeInTheDocument` an error everywhere.
     "vitest.setup.dom.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "vitest.rules.config.ts",
+    "rules-tests"
   ]
 }

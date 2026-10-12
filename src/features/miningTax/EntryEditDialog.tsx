@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ComponentProps } from 'react';
 import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
@@ -12,7 +12,7 @@ import {
   IskInput,
   TextInput,
 } from '@/components/ui';
-import type { PayeeRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import * as Icon from '@/components/ui/icons';
@@ -20,9 +20,16 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { editEntry, type CombinedMemberValues } from './ledgerActions';
 import { useLedgerAction } from './useLedgerAction';
 import { formatDateRange, type GroupMember } from './groupRows';
-import { combinedDayValues, combinedLineDefaults, dayTotalValues } from './combinedValues';
+import {
+  combinedDayValues,
+  combinedLineDefaults,
+  dayTaxValues,
+  dayTotalValues,
+} from './combinedValues';
 import { useMiningTaxOreValueMode } from './oreValueMode';
 import { LedgerActionError } from './LedgerActionError';
+import { LabelField } from './LabelField';
+import { labelSuggestions } from './assignmentLabel';
 
 interface EntryEditDialogProps {
   open: boolean;
@@ -32,9 +39,57 @@ interface EntryEditDialogProps {
   systemName: string;
   systemSecurity: number | null | undefined;
   payees: readonly PayeeRecord[];
+  /** Every assignment, for the label suggestions (labels already used for this payee and system). */
+  assignments?: readonly MiningTaxAssignmentRecord[];
   typeNames: ReadonlyMap<number, string>;
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   onSaved: () => void;
+}
+
+/**
+ * An `IskInput` whose default is real text, not a placeholder: an untouched
+ * box shows the figure as ordinary selectable text (selected whole on focus,
+ * so typing replaces it), and wiping it brings the default back on blur
+ * rather than leaving a faded number that looks undeletable. `value` is `''`
+ * while the pilot hasn't chosen their own figure.
+ */
+function DefaultedIskInput({
+  value,
+  defaultAmount,
+  onChange,
+  onFocus,
+  onBlur,
+  ...rest
+}: Omit<ComponentProps<typeof IskInput>, 'defaultAmount' | 'placeholder'> & {
+  defaultAmount: number;
+}) {
+  // Blank mid-edit stays blank (so a fresh figure can be typed); the default
+  // returns on blur, remounting the field so it re-reads it.
+  const [blanked, setBlanked] = useState(false);
+  const [resets, setResets] = useState(0);
+  const shown = value !== '' ? value : blanked ? '' : String(defaultAmount);
+  return (
+    <IskInput
+      key={resets}
+      {...rest}
+      value={shown}
+      onChange={(next) => {
+        setBlanked(next === '');
+        onChange(next === String(defaultAmount) ? '' : next);
+      }}
+      onFocus={(event) => {
+        event.currentTarget.select();
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        if (event.currentTarget.value.trim() === '') {
+          setBlanked(false);
+          setResets((n) => n + 1);
+        }
+        onBlur?.(event);
+      }}
+    />
+  );
 }
 
 const LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
@@ -67,6 +122,7 @@ export function EntryEditDialog({
   systemName,
   systemSecurity,
   payees,
+  assignments = [],
   typeNames,
   pricesFor,
   onSaved,
@@ -88,11 +144,18 @@ export function EntryEditDialog({
   const multiDay = current.length > 1;
   const [payeeId, setPayeeId] = useState<string | undefined>(first?.payeeId);
   const [taxPct, setTaxPct] = useState(String(first?.taxPct ?? ''));
+  // Every day of an entry shares payee and terms, so one label covers them all.
+  const [label, setLabel] = useState(first?.label ?? '');
   // Per day, per ore type: the pilot's own whole-ISK figure as `IskInput`
   // reports it (plain digits). Absent or blank means "untouched".
   const [overrides, setOverrides] = useState<Record<string, Record<number, string>>>({});
   // Per day, the whole day's value when ore values aren't edited one by one.
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({});
+  // Per day, a tax the pilot typed (whole ISK) and the rate it was typed at:
+  // it stands only while that rate does, then the day falls back to its value.
+  const [taxOverrides, setTaxOverrides] = useState<
+    Record<string, { tax: number; pct: number } | undefined>
+  >({});
   const { pending: saving, error: saveError, run } = useLedgerAction();
   // The one case with a single editable value for the whole entry.
   const singleDayValue = !perOre && !multiDay ? current[0]?.assignment : undefined;
@@ -117,13 +180,20 @@ export function EntryEditDialog({
     const { assignment } = member;
     const rate = pctValid ? pct : assignment.taxPct;
     if (!perOre) {
+      const typedTax = taxOverrides[assignment.id];
+      if (typedTax && typedTax.pct === rate) {
+        const fromTax = dayTaxValues(typedTax.tax, rate);
+        if (fromTax) return fromTax;
+      }
       const raw = dayOverrides[assignment.id] ?? '';
       if (raw !== '') return dayTotalValues(Number(raw), rate);
       return combinedDayValues(assignment, {}, new Map(), rate);
     }
     const edits: Record<number, number> = {};
     for (const [typeId, raw] of Object.entries(overrides[assignment.id] ?? {})) {
-      if (raw !== '') edits[Number(typeId)] = Number(raw);
+      // A box left at its own default isn't an edit: only a changed figure re-totals the day.
+      const fallback = Math.round(defaults.get(assignment.id)?.get(Number(typeId)) ?? 0);
+      if (raw !== '' && raw !== String(fallback)) edits[Number(typeId)] = Number(raw);
     }
     return combinedDayValues(assignment, edits, defaults.get(assignment.id) ?? new Map(), rate);
   }
@@ -138,7 +208,7 @@ export function EntryEditDialog({
       () =>
         editEntry(
           current.map((m) => m.assignment),
-          { payeeId, taxPct: pct, members: Object.fromEntries(values) }
+          { payeeId, taxPct: pct, label, members: Object.fromEntries(values) }
         ),
       onSaved
     );
@@ -148,6 +218,8 @@ export function EntryEditDialog({
     <Modal
       open={open}
       onClose={onClose}
+      // A form: a stray click outside must not throw away what was typed.
+      dismissOnOutsidePress={false}
       placement={isPhone ? 'sheet-full' : 'center'}
       title={
         <span className="flex items-center gap-1.5">
@@ -204,6 +276,14 @@ export function EntryEditDialog({
           </div>
         </div>
 
+        <LabelField
+          value={label}
+          onChange={setLabel}
+          suggestions={
+            payeeId && first ? labelSuggestions(assignments, payeeId, first.solarSystemId) : []
+          }
+        />
+
         {current.map((member) => {
           const { assignment } = member;
           const lineDefaults = defaults.get(assignment.id) ?? new Map<number, number>();
@@ -241,7 +321,7 @@ export function EntryEditDialog({
                         </span>
                       </span>
                       {perOre && (
-                        <IskInput
+                        <DefaultedIskInput
                           echo={false}
                           aria-label={t('miningTax.entryEdit.oreValueLabel', {
                             name,
@@ -269,7 +349,7 @@ export function EntryEditDialog({
                     <span className="min-w-0 flex-1 text-text-dim">
                       {t('miningTax.estimatedValueLabel')}
                     </span>
-                    <IskInput
+                    <DefaultedIskInput
                       echo={false}
                       aria-label={t('miningTax.entryEdit.dayValueLabel', {
                         date: assignment.date,
@@ -296,17 +376,21 @@ export function EntryEditDialog({
               // marks an editable value). Per-ore and combined entries keep
               // their per-line boxes, so there the tile is a read-only total.
               <div className="relative">
-                <IskInput
+                <DefaultedIskInput
                   echo={false}
                   aria-label={t('miningTax.entryEdit.dayValueLabel', {
                     date: singleDayValue.date,
                   })}
-                  className="[&_input]:pr-7 [&_input]:font-semibold [&_input]:placeholder:text-text"
+                  className="[&_input]:pr-7 [&_input]:font-semibold"
                   value={dayOverrides[singleDayValue.id] ?? ''}
                   defaultAmount={Math.round(singleDayValue.estimatedValue)}
-                  onChange={(value) =>
-                    setDayOverrides((previous) => ({ ...previous, [singleDayValue.id]: value }))
-                  }
+                  onChange={(value) => {
+                    setTaxOverrides((previous) => ({
+                      ...previous,
+                      [singleDayValue.id]: undefined,
+                    }));
+                    setDayOverrides((previous) => ({ ...previous, [singleDayValue.id]: value }));
+                  }}
                 />
                 <Icon.Rename
                   size={Icon.ICON_SIZE.sm}
@@ -320,7 +404,48 @@ export function EntryEditDialog({
           </div>
           <div className="rounded-xs border border-line px-2 py-1.5">
             <p className={LABEL}>{t('miningTax.entryEdit.taxAt', { pct: pctValid ? pct : '—' })}</p>
-            <p className="font-semibold tabular-nums">{formatIsk(totalTax)}</p>
+            {singleDayValue ? (
+              // The same two-way link from the other side: a typed tax sets
+              // the value it implies. Needs a rate above 0% to imply one.
+              <div className="relative">
+                <DefaultedIskInput
+                  echo={false}
+                  disabled={!pctValid || pct <= 0}
+                  aria-label={t('miningTax.entryEdit.dayTaxLabel', { date: singleDayValue.date })}
+                  className="[&_input]:pr-7 [&_input]:font-semibold"
+                  value={
+                    taxOverrides[singleDayValue.id]?.pct === pct
+                      ? String(taxOverrides[singleDayValue.id]?.tax)
+                      : ''
+                  }
+                  defaultAmount={Math.round(totalTax)}
+                  onChange={(raw) => {
+                    const id = singleDayValue.id;
+                    if (raw === '' || !pctValid) {
+                      setTaxOverrides((previous) => ({ ...previous, [id]: undefined }));
+                      return;
+                    }
+                    const derived = dayTaxValues(Number(raw), pct);
+                    if (!derived) return;
+                    setTaxOverrides((previous) => ({
+                      ...previous,
+                      [id]: { tax: Number(raw), pct },
+                    }));
+                    setDayOverrides((previous) => ({
+                      ...previous,
+                      [id]: String(derived.estimatedValue),
+                    }));
+                  }}
+                />
+                <Icon.Rename
+                  size={Icon.ICON_SIZE.sm}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-text-faint"
+                />
+              </div>
+            ) : (
+              <p className="font-semibold tabular-nums">{formatIsk(totalTax)}</p>
+            )}
           </div>
         </div>
 

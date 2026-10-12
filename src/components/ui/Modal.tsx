@@ -48,6 +48,12 @@ interface ModalProps {
    */
   closeOnBack?: boolean;
   /**
+   * Whether a click on the backdrop closes the modal (default). Pass `false`
+   * for a form whose typed input a stray click outside would throw away;
+   * Escape, Back, the close button and the form's own Cancel still close it.
+   */
+  dismissOnOutsidePress?: boolean;
+  /**
    * Where focus goes on close when nothing on the page held it as the modal
    * opened (a sheet a URL opened), or that element is gone.
    */
@@ -96,6 +102,7 @@ export function Modal({
   placement = 'center',
   initialFocusRef,
   closeOnBack = true,
+  dismissOnOutsidePress = true,
   returnFocusFallback,
 }: ModalProps) {
   const { t } = useTranslation();
@@ -172,7 +179,7 @@ export function Modal({
       onClick={(event) => {
         // With `p-0`, the only clicks whose target is the dialog element are
         // ones that landed on its ::backdrop.
-        if (event.target === dialogRef.current) onClose();
+        if (dismissOnOutsidePress && event.target === dialogRef.current) onClose();
       }}
       className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
     >

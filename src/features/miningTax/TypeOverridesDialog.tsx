@@ -118,7 +118,12 @@ export function TypeOverridesDialog({ open, onClose, onChanged }: TypeOverridesD
   const isEmpty = LIST_IDS.every((list) => rows[list].length === 0);
 
   return (
-    <Modal open={open} onClose={handleClose} title={t('miningTax.oreTagsTitle')}>
+    <Modal
+      open={open}
+      onClose={handleClose}
+      dismissOnOutsidePress={false}
+      title={t('miningTax.oreTagsTitle')}
+    >
       <div className="space-y-3">
         <p className="text-xs text-text-dim">{t('miningTax.oreTagsHint')}</p>
         {error && (

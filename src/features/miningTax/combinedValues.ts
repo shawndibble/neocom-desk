@@ -73,3 +73,16 @@ export function combinedDayValues(
 export function dayTotalValues(estimatedValue: number, taxPct: number): CombinedDayValues {
   return { estimatedValue, taxOwed: (estimatedValue * taxPct) / 100 };
 }
+
+/**
+ * One day's figures when the pilot types the tax owed instead of the value:
+ * the value is what that tax implies at the rate, in whole ISK, and the tax
+ * is kept exactly as typed — so saving never drifts the figure the pilot
+ * entered, even though `value × rate` can differ from it by under a
+ * half-percent-of-an-ISK of rounding. `null` at a 0% rate, where no value
+ * implies any tax.
+ */
+export function dayTaxValues(taxOwed: number, taxPct: number): CombinedDayValues | null {
+  if (!(taxPct > 0)) return null;
+  return { estimatedValue: Math.round((taxOwed * 100) / taxPct), taxOwed };
+}

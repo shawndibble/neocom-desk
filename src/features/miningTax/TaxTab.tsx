@@ -1414,6 +1414,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         return (
           <HintText content={name} desktopOnly>
             {name}
+            {dr.assignment?.label && (
+              <span className="text-text-dim"> · {dr.assignment.label}</span>
+            )}
           </HintText>
         );
       },
@@ -2095,6 +2098,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             systemName={systemName(editTarget)}
             systemSecurity={systemSecurityOf(editTarget)}
             payees={allPayees}
+            assignments={everyAssignment}
             typeNames={data.typeNames}
             pricesFor={pricesFor}
             onSaved={() => {
@@ -2206,6 +2210,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             row={splitTarget.row}
             systemName={systemName(splitTarget)}
             payees={allPayees}
+            assignments={everyAssignment}
             typeNames={data.typeNames}
             pricesFor={pricesFor}
             busy={busy}

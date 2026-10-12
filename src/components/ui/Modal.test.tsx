@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -65,6 +65,20 @@ describe('Modal', () => {
     // the <dialog> itself as the event target.
     await user.click(dialog);
     expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
+  });
+
+  it('ignores a backdrop click when dismissOnOutsidePress is off, but still closes on Escape', async () => {
+    const onCloseSpy = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Modal open onClose={onCloseSpy} title="Form" dismissOnOutsidePress={false}>
+        <button type="button">Inside</button>
+      </Modal>
+    );
+    await user.click(screen.getByRole('dialog', { name: 'Form' }));
+    expect(onCloseSpy).not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
+    expect(onCloseSpy).toHaveBeenCalledTimes(1);
   });
 
   it('closes and restores focus when unmounted while open', async () => {

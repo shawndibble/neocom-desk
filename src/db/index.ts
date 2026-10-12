@@ -736,6 +736,13 @@ export interface MiningTaxAssignmentRecord {
    * the setting flips (`oreFormReprice.ts`); paid ones just keep it.
    */
   rawOrePriced?: boolean;
+  /**
+   * Free-text "Moon / structure" note (e.g. "Athanor in Q-S"). ESI names no
+   * structure, so this is the pilot's own tag for telling two slices of one
+   * day apart. Metadata only: never part of the coalesce terms key, pricing or
+   * merging.
+   */
+  label?: string;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

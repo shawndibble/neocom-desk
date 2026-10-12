@@ -80,7 +80,7 @@ const payees: PayeeRecord[] = [
   },
 ];
 
-function renderDialog() {
+function renderDialog(extra: Partial<React.ComponentProps<typeof SplitDialog>> = {}) {
   return render(
     <MemoryRouter>
       <SplitDialog
@@ -94,6 +94,7 @@ function renderDialog() {
         pricesFor={pricesFor}
         busy={false}
         onSplit={vi.fn()}
+        {...extra}
       />
     </MemoryRouter>
   );
@@ -151,5 +152,86 @@ describe('SplitDialog — a failed save', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn’t save/);
     expect(onSplit).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Split · move 40 units' })).toBeEnabled();
+  });
+});
+
+describe('SplitDialog — the same Payee at a second rate', () => {
+  async function pickJita() {
+    await userEvent.click(screen.getByRole('combobox', { name: 'Move part of this day to' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Jita landlord' }));
+    fireEvent.change(screen.getByRole('slider', { name: 'Units of Zeolites to move' }), {
+      target: { value: '40' },
+    });
+  }
+
+  it('offers the current Payee and splits to it at a different rate', async () => {
+    renderDialog();
+    await pickJita();
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Tax %' }), {
+      target: { value: '8' },
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+    expect(split).toHaveBeenLastCalledWith(
+      assignment,
+      expect.objectContaining({ payeeId: 'p-jita', taxPct: 8 }),
+      expect.anything()
+    );
+  });
+
+  it('warns and disables the split while Payee and rate both match', async () => {
+    renderDialog();
+    await pickJita();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/merge straight back/);
+    expect(screen.getByRole('button', { name: 'Split · move 40 units' })).toBeDisabled();
+  });
+
+  it('fills the rate box from a rate chip built from earlier Assignments', async () => {
+    renderDialog({ assignments: [assignment, { ...assignment, id: 'a-2', taxPct: 8 }] });
+    await pickJita();
+
+    await userEvent.click(screen.getByRole('button', { name: '8%' }));
+
+    expect(screen.getByRole('spinbutton', { name: 'Tax %' })).toHaveValue(8);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('sends the Moon / structure label for the new slice and suggests labels used before', async () => {
+    renderDialog({
+      assignments: [{ ...assignment, id: 'a-2', label: 'Moon 1' }],
+    });
+    await pickJita();
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Tax %' }), {
+      target: { value: '8' },
+    });
+    const input = screen.getByRole('combobox', { name: 'Moon / structure (optional)' });
+    expect(document.querySelector(`datalist option[value="Moon 1"]`)).not.toBeNull();
+    await userEvent.type(input, 'Moon 2');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+    expect(split).toHaveBeenLastCalledWith(
+      assignment,
+      expect.objectContaining({ label: 'Moon 2' }),
+      expect.anything()
+    );
+  });
+});
+
+describe('SplitDialog — dismissal', () => {
+  it('ignores a backdrop click, so a half-made split is not lost', () => {
+    const onClose = vi.fn();
+    renderDialog({ onClose });
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still closes from Cancel', async () => {
+    const onClose = vi.fn();
+    renderDialog({ onClose });
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

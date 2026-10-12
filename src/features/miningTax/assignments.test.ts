@@ -127,6 +127,55 @@ describe('createAssignment', () => {
   });
 });
 
+describe('Moon / structure label', () => {
+  it('createAssignment stores a trimmed label and omits a blank one', async () => {
+    const base = {
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    };
+    const labelled = await createAssignment({ ...base, label: '  Athanor  ' });
+    expect(labelled.label).toBe('Athanor');
+    await db.miningTaxAssignments.clear();
+    const blank = await createAssignment({ ...base, label: '   ' });
+    expect('label' in blank).toBe(false);
+  });
+
+  it('splitAssignment labels the new slice and leaves the kept slice its own label', async () => {
+    const original: MiningTaxAssignmentRecord = {
+      id: 'orig',
+      characterId: CHAR_A,
+      date: '2026-09-05',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 5,
+      estimatedValue: 1000,
+      taxOwed: 50,
+      status: 'outstanding',
+      label: 'Moon 1',
+      updatedAt: 1,
+    };
+    await db.miningTaxAssignments.put(original);
+    const prices = new Map([[TYPE_A, 10]]);
+
+    const { kept, created } = await splitAssignment(
+      original,
+      { moves: [{ typeId: TYPE_A, quantity: 40 }], payeeId: 'payee-1', taxPct: 8, label: 'Moon 2' },
+      { kept: prices, moved: prices }
+    );
+
+    expect(kept.label).toBe('Moon 1');
+    expect(created.label).toBe('Moon 2');
+  });
+});
+
 describe('dismissEntries for one entry', () => {
   it('creates a payee-less, zero-tax Assignment with status dismissed', async () => {
     const [dismissed] = await dismissEntries([
@@ -1367,6 +1416,53 @@ describe('updateCombinedAssignments', () => {
     const stored = await db.miningTaxAssignments.get('d3');
     expect(stored?.status).toBe('paid');
     expect(stored?.payment?.paymentId).toBe('p1');
+  });
+});
+
+describe('updateCombinedAssignments label', () => {
+  const same = { estimatedValue: 100, taxOwed: 5 };
+
+  it('sets one label on every member and touches nothing else', async () => {
+    const d3 = member('d3', '2026-10-03', { status: 'paid', paidAt: 5 });
+    const d4 = member('d4', '2026-10-04');
+    await db.miningTaxAssignments.bulkPut([d3, d4]);
+
+    await updateCombinedAssignments([d3, d4], {
+      payeeId: 'star-tail',
+      taxPct: d3.taxPct,
+      label: '  Athanor in Q-S ',
+      members: { d3: same, d4: same },
+    });
+
+    const [s3, s4] = await Promise.all([
+      db.miningTaxAssignments.get('d3'),
+      db.miningTaxAssignments.get('d4'),
+    ]);
+    expect(s3).toMatchObject({ label: 'Athanor in Q-S', status: 'paid', paidAt: 5, groupId: 'g1' });
+    expect(s4?.label).toBe('Athanor in Q-S');
+  });
+
+  it('removes the label when the new one is blank', async () => {
+    const d3 = member('d3', '2026-10-03', { label: 'Old moon' });
+    await db.miningTaxAssignments.put(d3);
+    await updateCombinedAssignments([d3], {
+      payeeId: 'star-tail',
+      taxPct: d3.taxPct,
+      label: '   ',
+      members: { d3: same },
+    });
+    expect((await db.miningTaxAssignments.get('d3'))?.label).toBeUndefined();
+  });
+
+  it('keeps the label when the input leaves it out', async () => {
+    const d3 = member('d3', '2026-10-03', { label: 'Old moon' });
+    await db.miningTaxAssignments.put(d3);
+    await updateCombinedAssignments([d3], {
+      payeeId: 'star-tail',
+      taxPct: d3.taxPct,
+      members: { d3: same },
+    });
+    expect((await db.miningTaxAssignments.get('d3'))?.label).toBe('Old moon');
   });
 });
 

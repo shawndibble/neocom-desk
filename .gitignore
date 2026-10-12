@@ -26,3 +26,7 @@ e2e-output/
 twa/*
 !twa/twa-manifest.json
 storybook-static
+
+# Firestore emulator logs (npm run test:rules)
+firestore-debug.log
+ui-debug.log

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -296,6 +296,17 @@ describe('RowDetailModal owed entry', () => {
     expect(onSettleUp).toHaveBeenCalledTimes(1);
   });
 
+  it('attaches the More menu to the Edit button, not the title', () => {
+    renderModal('outstanding', owed);
+    const edit = screen.getByRole('button', { name: 'Edit…' });
+    const more = screen.getByRole('button', { name: 'More actions for this entry' });
+    expect(more.parentElement).toBe(edit.parentElement);
+    expect(edit.nextElementSibling).toBe(more);
+    expect(
+      within(screen.getByRole('dialog')).getAllByRole('button', { name: /More actions/ })
+    ).toHaveLength(1);
+  });
+
   it('asks before unassigning', async () => {
     const onUndo = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onUndo });
@@ -403,5 +414,21 @@ describe('RowDetailModal — price breakdown', () => {
   it('offers no copy item when the row has no breakdown', async () => {
     renderModal('unassigned', null);
     expect(screen.queryByRole('button', { name: 'More actions for this entry' })).toBeNull();
+  });
+});
+
+describe('RowDetailModal backdrop dismissal', () => {
+  it('ignores a backdrop click while the Assign form is showing', () => {
+    const onClose = vi.fn();
+    renderModal('unassigned', null, undefined, vi.fn(), { onClose });
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps backdrop dismissal for a summary view', () => {
+    const onClose = vi.fn();
+    renderModal('needs-review', null, undefined, vi.fn(), { onClose });
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

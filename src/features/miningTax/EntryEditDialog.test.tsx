@@ -60,17 +60,19 @@ function member(
   };
 }
 
-function renderDialog(members: GroupMember[]) {
+function renderDialog(members: GroupMember[], assignments: MiningTaxAssignmentRecord[] = []) {
   const onSaved = vi.fn();
+  const onClose = vi.fn();
   render(
     <MemoryRouter>
       <EntryEditDialog
         open
-        onClose={vi.fn()}
+        onClose={onClose}
         members={members}
         systemName="Ainsan"
         systemSecurity={0.5}
         payees={payees}
+        assignments={assignments}
         typeNames={
           new Map([
             [ZEOLITES, 'Zeolites'],
@@ -87,7 +89,7 @@ function renderDialog(members: GroupMember[]) {
       />
     </MemoryRouter>
   );
-  return { onSaved };
+  return { onSaved, onClose };
 }
 
 beforeEach(() => {
@@ -104,7 +106,7 @@ describe('EntryEditDialog', () => {
 
     // One box per ore line per day, each starting at its share of the billed value.
     const zeolitesOct4 = screen.getByRole('textbox', { name: 'Zeolites value on 2026-10-04' });
-    expect(zeolitesOct4).toHaveAttribute('placeholder', '1,000');
+    expect(zeolitesOct4).toHaveValue('1000');
     fireEvent.change(zeolitesOct4, { target: { value: '3000' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
 
@@ -173,15 +175,122 @@ describe('EntryEditDialog', () => {
     const { onSaved } = renderDialog([member('d3', '2026-10-03', { groupId: undefined })]);
     expect(screen.getAllByText('Estimated value')).toHaveLength(1);
     const box = screen.getByRole('textbox', { name: 'Estimated value on 2026-10-03' });
-    expect(box).toHaveAttribute('placeholder', '2,000');
+    expect(box).toHaveValue('2000');
     fireEvent.change(box, { target: { value: '4000' } });
-    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Tax owed on 2026-10-03' })).toHaveValue('200');
     fireEvent.change(box, { target: { value: '' } });
+    // Blank while editing, so a new figure can be typed; blur restores the default as text.
+    expect(box).toHaveValue('');
+    fireEvent.blur(box);
+    expect(screen.getByRole('textbox', { name: 'Estimated value on 2026-10-03' })).toHaveValue(
+      '2000'
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
     const [, input] = actionsMock.editEntry.mock.calls[0];
     expect(input.members.d3.estimatedValue).toBe(2_000);
+  });
+
+  describe('single-day tax tile', () => {
+    function setup(overrides: Partial<MiningTaxAssignmentRecord> = {}) {
+      useMiningTaxOreValueMode.setState({ value: false, hydrated: true });
+      const view = renderDialog([member('d3', '2026-10-03', { groupId: undefined, ...overrides })]);
+      return {
+        ...view,
+        value: () => screen.getByRole('textbox', { name: 'Estimated value on 2026-10-03' }),
+        tax: () => screen.getByRole('textbox', { name: 'Tax owed on 2026-10-03' }),
+      };
+    }
+
+    it('starts at the billed tax and follows an edited value', () => {
+      const { value, tax } = setup();
+      expect(tax()).toHaveValue('100');
+      fireEvent.change(value(), { target: { value: '4000' } });
+      expect(tax()).toHaveValue('200');
+    });
+
+    it('a typed tax sets the value it implies and saves that tax exactly', async () => {
+      const { onSaved, value, tax } = setup({ taxPct: 7, taxOwed: 140 });
+      fireEvent.change(tax(), { target: { value: '100' } });
+      expect(value()).toHaveValue('1429');
+      expect(tax()).toHaveValue('100');
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect(actionsMock.editEntry.mock.calls[0][1].members.d3).toEqual({
+        estimatedValue: 1_429,
+        taxOwed: 100,
+      });
+    });
+
+    it('editing the value afterwards drops the typed tax', async () => {
+      const { onSaved, value, tax } = setup();
+      fireEvent.change(tax(), { target: { value: '150' } });
+      expect(value()).toHaveValue('3000');
+      fireEvent.change(value(), { target: { value: '4000' } });
+      expect(tax()).toHaveValue('200');
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect(actionsMock.editEntry.mock.calls[0][1].members.d3).toEqual({
+        estimatedValue: 4_000,
+        taxOwed: 200,
+      });
+    });
+
+    it('a changed rate afterwards keeps the derived value and re-bills it', async () => {
+      const { onSaved, value, tax } = setup();
+      fireEvent.change(tax(), { target: { value: '150' } });
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Tax %' }), {
+        target: { value: '10' },
+      });
+      expect(value()).toHaveValue('3000');
+      expect(tax()).toHaveValue('300');
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect(actionsMock.editEntry.mock.calls[0][1].members.d3).toEqual({
+        estimatedValue: 3_000,
+        taxOwed: 300,
+      });
+    });
+
+    it('is disabled at a 0% rate, which implies no value', () => {
+      const { tax } = setup({ taxPct: 0, taxOwed: 0 });
+      expect(tax()).toBeDisabled();
+    });
+
+    it('clearing it restores the current tax as text on blur', () => {
+      const { tax } = setup();
+      fireEvent.change(tax(), { target: { value: '' } });
+      fireEvent.blur(tax());
+      expect(tax()).toHaveValue('100');
+    });
+  });
+
+  it('selects an untouched value on focus so typing replaces it', () => {
+    useMiningTaxOreValueMode.setState({ value: false, hydrated: true });
+    renderDialog([member('d3', '2026-10-03', { groupId: undefined })]);
+    const box = screen.getByRole('textbox', {
+      name: 'Estimated value on 2026-10-03',
+    }) as HTMLInputElement;
+    fireEvent.focus(box);
+    expect(box.selectionStart).toBe(0);
+    expect(box.selectionEnd).toBe(box.value.length);
+  });
+
+  it('keeps an untouched per-ore day as billed even though its boxes show real text', async () => {
+    const { onSaved } = renderDialog([member('d3', '2026-10-03', { groupId: undefined })]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(actionsMock.editEntry.mock.calls[0][1].members.d3).toEqual({
+      estimatedValue: 2_000,
+      taxOwed: 100,
+    });
+  });
+
+  it('is not dismissed by a backdrop click', () => {
+    const { onClose } = renderDialog([member('d3', '2026-10-03')]);
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('combined multi-day entry: a box per day, and the tile is a read-only total', () => {
@@ -211,5 +320,50 @@ describe('EntryEditDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn’t save/);
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('saves the label for every day, trimmed', async () => {
+    const d3 = member('d3', '2026-10-03', { label: 'Old moon' });
+    const d4 = member('d4', '2026-10-04', { label: 'Old moon' });
+    const { onSaved } = renderDialog([d3, d4]);
+
+    const field = screen.getByRole('textbox', { name: 'Moon / structure (optional)' });
+    expect(field).toHaveValue('Old moon');
+    fireEvent.change(field, { target: { value: '  Athanor in Q-S ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save all 2 days' }));
+
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const [records, input] = actionsMock.editEntry.mock.calls[0];
+    expect(records).toHaveLength(2);
+    expect(input.label).toBe('  Athanor in Q-S ');
+  });
+
+  it('sends a blank label when it is cleared', async () => {
+    const d3 = member('d3', '2026-10-03', { label: 'Old moon', groupId: undefined });
+    const { onSaved } = renderDialog([d3]);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Moon / structure (optional)' }), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Save/ }));
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(actionsMock.editEntry.mock.calls[0][1].label).toBe('');
+  });
+
+  it('suggests labels already used for the same payee and system', () => {
+    const d3 = member('d3', '2026-10-03');
+    const other = (id: string, label: string, over: Partial<MiningTaxAssignmentRecord> = {}) =>
+      member(id, '2026-09-01', { label, ...over }).assignment;
+    renderDialog(
+      [d3],
+      [
+        other('a', 'Athanor in Q-S'),
+        other('b', 'Wrong payee', { payeeId: 'bu' }),
+        other('c', 'Wrong system', { solarSystemId: 2 }),
+      ]
+    );
+    const options = [...document.querySelectorAll('datalist option')].map((o) =>
+      o.getAttribute('value')
+    );
+    expect(options).toEqual(['Athanor in Q-S']);
   });
 });
