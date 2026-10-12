@@ -13,6 +13,7 @@
  * schedules the sync after it commits. Every write here is Dexie-only, so it
  * can run inside that transaction.
  */
+import { normalizeLabel } from './assignmentLabel';
 import {
   db,
   type MiningTaxAssignmentRecord,
@@ -108,6 +109,8 @@ export interface AssignInput {
   taxOwed: number;
   /** "I already paid this" — the Assign dialog's checkbox, unchecked by default. */
   markPaid: boolean;
+  /** Optional "Moon / structure" note; metadata only. */
+  label?: string;
 }
 
 /** The `rawOrePriced` marker for a value snapshotted under the Ore Form setting as it stands now. */
@@ -130,6 +133,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     taxOwed: input.taxOwed,
     status: input.markPaid ? 'paid' : 'outstanding',
     ...(input.markPaid ? { paidAt: now } : {}),
+    ...(normalizeLabel(input.label) ? { label: normalizeLabel(input.label) } : {}),
     ...oreFormMarker(),
     updatedAt: now,
   };
@@ -553,6 +557,8 @@ export interface SplitInput {
    * when a third Assignment on the same entry already collects.
    */
   collector?: 'original' | 'new';
+  /** "Moon / structure" note for the NEW slice; the kept slice keeps its own. */
+  label?: string;
 }
 
 /**
@@ -636,6 +642,7 @@ export async function splitAssignment(
     taxOwed: createdValue.taxOwed,
     status: 'outstanding',
     ...(input.collector === 'new' ? { collectsGrowth: true } : {}),
+    ...(normalizeLabel(input.label) ? { label: normalizeLabel(input.label) } : {}),
     ...marker,
     updatedAt: now,
   };

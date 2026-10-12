@@ -21,6 +21,8 @@ import { cx } from '@/lib/cx';
 import { unmaskNumber } from '@/lib/numberMask';
 import { split } from './ledgerActions';
 import { ratesForPayee } from './payeeRates';
+import { labelSuggestions } from './assignmentLabel';
+import { LabelField } from './LabelField';
 import type { MoonMiningTaxRow } from './snapshot';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
@@ -76,6 +78,7 @@ export function SplitDialog({
   const { t } = useTranslation();
   const [payeeId, setPayeeId] = useState<string | null>(null);
   const [taxPct, setTaxPct] = useState('');
+  const [label, setLabel] = useState('');
   const [moves, setMoves] = useState<ReadonlyMap<number, number>>(new Map());
   const [collector, setCollector] = useState<'original' | 'new'>('original');
   const { pending: saving, error: saveError, run } = useLedgerAction();
@@ -143,6 +146,7 @@ export function SplitDialog({
             moves: movedLines,
             payeeId,
             taxPct: pctValue,
+            label,
             ...(someoneElseCollects ? {} : { collector }),
           },
           prices
@@ -209,6 +213,14 @@ export function SplitDialog({
             </div>
           </div>
         )}
+
+        <LabelField
+          value={label}
+          onChange={setLabel}
+          suggestions={
+            payeeId ? labelSuggestions(assignments, payeeId, assignment.solarSystemId) : []
+          }
+        />
 
         {rateChips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">

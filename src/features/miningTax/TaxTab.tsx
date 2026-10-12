@@ -1414,6 +1414,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         return (
           <HintText content={name} desktopOnly>
             {name}
+            {dr.assignment?.label && (
+              <span className="text-text-dim"> · {dr.assignment.label}</span>
+            )}
           </HintText>
         );
       },

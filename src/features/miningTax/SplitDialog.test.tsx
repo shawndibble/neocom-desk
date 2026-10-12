@@ -197,4 +197,25 @@ describe('SplitDialog — the same Payee at a second rate', () => {
     expect(screen.getByRole('spinbutton', { name: 'Tax %' })).toHaveValue(8);
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  it('sends the Moon / structure label for the new slice and suggests labels used before', async () => {
+    renderDialog({
+      assignments: [{ ...assignment, id: 'a-2', label: 'Moon 1' }],
+    });
+    await pickJita();
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Tax %' }), {
+      target: { value: '8' },
+    });
+    const input = screen.getByRole('combobox', { name: 'Moon / structure (optional)' });
+    expect(document.querySelector(`datalist option[value="Moon 1"]`)).not.toBeNull();
+    await userEvent.type(input, 'Moon 2');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+    expect(split).toHaveBeenLastCalledWith(
+      assignment,
+      expect.objectContaining({ label: 'Moon 2' }),
+      expect.anything()
+    );
+  });
 });

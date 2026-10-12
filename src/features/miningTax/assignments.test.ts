@@ -127,6 +127,55 @@ describe('createAssignment', () => {
   });
 });
 
+describe('Moon / structure label', () => {
+  it('createAssignment stores a trimmed label and omits a blank one', async () => {
+    const base = {
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    };
+    const labelled = await createAssignment({ ...base, label: '  Athanor  ' });
+    expect(labelled.label).toBe('Athanor');
+    await db.miningTaxAssignments.clear();
+    const blank = await createAssignment({ ...base, label: '   ' });
+    expect('label' in blank).toBe(false);
+  });
+
+  it('splitAssignment labels the new slice and leaves the kept slice its own label', async () => {
+    const original: MiningTaxAssignmentRecord = {
+      id: 'orig',
+      characterId: CHAR_A,
+      date: '2026-09-05',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 5,
+      estimatedValue: 1000,
+      taxOwed: 50,
+      status: 'outstanding',
+      label: 'Moon 1',
+      updatedAt: 1,
+    };
+    await db.miningTaxAssignments.put(original);
+    const prices = new Map([[TYPE_A, 10]]);
+
+    const { kept, created } = await splitAssignment(
+      original,
+      { moves: [{ typeId: TYPE_A, quantity: 40 }], payeeId: 'payee-1', taxPct: 8, label: 'Moon 2' },
+      { kept: prices, moved: prices }
+    );
+
+    expect(kept.label).toBe('Moon 1');
+    expect(created.label).toBe('Moon 2');
+  });
+});
+
 describe('dismissEntries for one entry', () => {
   it('creates a payee-less, zero-tax Assignment with status dismissed', async () => {
     const [dismissed] = await dismissEntries([
