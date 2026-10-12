@@ -163,6 +163,8 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     // in src/components/ui and is not scanned.)
     const audited = [
       'src/features/character/assetBrowserRows.tsx',
+      // Admin's Member rows: Make admin… and Remove…, reachable nowhere else.
+      'src/features/communities/CommunityDetail.tsx',
       'src/features/fittings/FittingAddPanel.tsx',
       'src/features/fittings/FittingRackList.tsx',
       'src/features/fittings/FittingStartScreen.tsx',

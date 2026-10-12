@@ -74,7 +74,7 @@ export function Communities() {
       <PageHeader
         title={t('communities.title')}
         actions={
-          <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
+          <Button variant="primary" onClick={() => setCreating(true)}>
             {t('communities.create')}
           </Button>
         }
