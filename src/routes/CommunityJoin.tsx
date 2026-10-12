@@ -61,7 +61,11 @@ export function CommunityJoin() {
         if (!cancelled) setState({ status: 'ok', preview });
       } catch (err) {
         if (!cancelled) {
-          setState({ status: callableErrorCode(err) === 'not-found' ? 'gone' : 'unavailable' });
+          setState({
+            status: ['not-found', 'invalid-argument'].includes(callableErrorCode(err) ?? '')
+              ? 'gone'
+              : 'unavailable',
+          });
         }
       }
     })();
@@ -106,12 +110,12 @@ export function CommunityJoin() {
     setWorking(true);
     const next: Record<number, JoinResult> = {};
     let communityId: string | null = null;
-    let firstJoined: number | null = null;
+    const joinedIds: number[] = [];
     for (const character of chosen) {
       try {
         const joined = await joinCommunity(character.characterId, code, character.name);
         communityId = joined.communityId;
-        firstJoined ??= character.characterId;
+        joinedIds.push(character.characterId);
         next[character.characterId] = joined.alreadyMember ? 'alreadyMember' : 'joined';
       } catch (err) {
         next[character.characterId] =
@@ -125,8 +129,11 @@ export function CommunityJoin() {
     setResults(next);
     setWorking(false);
     const allDone = chosen.every((c) => ['joined', 'alreadyMember'].includes(next[c.characterId]));
-    if (allDone && communityId && firstJoined !== null) {
-      await setActiveCharacter(firstJoined);
+    if (allDone && communityId && joinedIds.length > 0) {
+      // /communities shows the active Character's Communities: keep it if it
+      // just joined, otherwise switch to one that did.
+      const active = useActiveCharacter.getState().activeCharacterId;
+      if (active === null || !joinedIds.includes(active)) await setActiveCharacter(joinedIds[0]);
       navigate(`/communities?community=${communityId}`);
     }
   }
@@ -197,6 +204,11 @@ export function CommunityJoin() {
                           <Checkbox
                             checked={ok && !unchecked.has(character.characterId)}
                             disabled={!ok || working}
+                            aria-describedby={
+                              withBlueprints !== undefined && !ok
+                                ? `needs-${character.characterId}`
+                                : undefined
+                            }
                             onChange={(event) =>
                               setUnchecked((prev) => {
                                 const next = new Set(prev);
@@ -211,7 +223,7 @@ export function CommunityJoin() {
                         </label>
                         {withBlueprints !== undefined && !ok && (
                           <>
-                            <span className="text-text-dim">
+                            <span id={`needs-${character.characterId}`} className="text-text-dim">
                               {t('communities.join.needsPermission')}
                             </span>
                             <Button size="sm" onClick={() => grant(character.characterId)}>
@@ -222,9 +234,7 @@ export function CommunityJoin() {
                         {result && (
                           <span
                             role={
-                              result === 'joined' || result === 'alreadyMember'
-                                ? undefined
-                                : 'alert'
+                              result === 'joined' || result === 'alreadyMember' ? 'status' : 'alert'
                             }
                             className={
                               result === 'joined' || result === 'alreadyMember'
