@@ -1,5 +1,4 @@
 import type { ConsolidationCharacter } from '@/engine/assets/consolidation';
-import type { CargoHold } from '@/engine/market/cargoHolds';
 import type { CharacterAsset } from '@/esi/endpoints';
 
 export interface MovePlanSource {
@@ -82,14 +81,6 @@ export function selectedPlanCharacters(
     if (picked.length > 0) out.push({ characterId, name, assets: picked });
   }
   return out;
-}
-
-/** A hauler's hold for volume math: the general hold, else everything it can carry. */
-export function holdCapacityM3(holds: readonly CargoHold[]): number | null {
-  const general = holds.filter((h) => h.kind === 'general').reduce((s, h) => s + h.capacityM3, 0);
-  if (general > 0) return general;
-  const total = holds.reduce((s, h) => s + h.capacityM3, 0);
-  return total > 0 ? total : null;
 }
 
 /** Rigs fitted to each assembled ship, by the ship's itemID; ships with none are absent. */

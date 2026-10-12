@@ -1,3 +1,4 @@
+import type { Haul } from '@/engine/assets/movePlan';
 import type { PickerStack } from './movePlanInput';
 
 /**
@@ -36,37 +37,26 @@ export function splitSegments(parts: readonly { key: number; m3: number }[]): Sp
   return parts.filter((p) => p.m3 > 0).map((p) => ({ ...p, share: p.m3 / total }));
 }
 
-export interface TripLane {
-  trip: number;
-  m3: number;
-  share: number;
-}
-
-/** The load cut into hold-sized trips; the last one carries what is left. */
-export function tripLanes(totalM3: number, capacityM3: number): TripLane[] {
-  if (totalM3 <= 0 || capacityM3 <= 0) return [];
-  const lanes: TripLane[] = [];
-  for (let left = totalM3, trip = 1; left > 1e-9; left -= capacityM3, trip += 1) {
-    const m3 = Math.min(capacityM3, left);
-    lanes.push({ trip, m3, share: m3 / totalM3 });
-  }
-  return lanes;
-}
-
-export interface TripRun {
+export interface HaulRun {
+  /** 1-based first and last haul of a run of identical loads. */
   from: number;
   to: number;
-  m3: number;
+  haul: Haul;
 }
 
-/** Neighbouring trips carrying the same volume folded into one range, so nine full holds read as one entry. */
-export function tripRuns(lanes: readonly TripLane[]): TripRun[] {
-  const runs: TripRun[] = [];
-  for (const l of lanes) {
+const haulSignature = (haul: Haul) =>
+  haul.holds
+    .map((h) => `${h.kind}:${h.lines.map((l) => `${l.typeId}x${l.quantity}`).join(',')}`)
+    .join('|');
+
+/** Neighbouring hauls carrying the exact same load folded into one range, so nine full holds read as one entry. */
+export function foldHauls(hauls: readonly Haul[]): HaulRun[] {
+  const runs: HaulRun[] = [];
+  hauls.forEach((haul, i) => {
     const last = runs[runs.length - 1];
-    if (last && Math.abs(last.m3 - l.m3) < 1e-6) last.to = l.trip;
-    else runs.push({ from: l.trip, to: l.trip, m3: l.m3 });
-  }
+    if (last && haulSignature(last.haul) === haulSignature(haul)) last.to = i + 1;
+    else runs.push({ from: i + 1, to: i + 1, haul });
+  });
   return runs;
 }
 

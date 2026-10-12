@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
-import { planMove, type MoveHull } from '@/engine/assets/movePlan';
+import { planMove, type MoveHull, type PackHold } from '@/engine/assets/movePlan';
 import { loadOtherCharactersAssets } from '@/features/character/assets';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
@@ -13,7 +13,7 @@ import {
   useFittingCatalogue,
   type FittingCatalogue,
 } from '@/features/fittings/useFittingCatalogue';
-import { hullCargoHolds } from '@/features/market/haulingCargo';
+import { hullPackHolds } from '@/features/market/haulingCargo';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -23,7 +23,6 @@ import { PickerList } from './MovePlanPicker';
 import { PlanResult, type PlanState } from './MovePlanResult';
 import {
   fittedRigCounts,
-  holdCapacityM3,
   pickerStacks,
   selectedPlanCharacters,
   type MovePlanSource,
@@ -90,7 +89,7 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
   const stackTypeIds = [...new Set(stacks.map((s) => s.typeId))];
   const [typeNames, unitM3] = await Promise.all([
     loadTypeNames(stackTypeIds),
-    loadTypePackagedVolumes(stackTypeIds),
+    loadTypePackagedVolumes(stackTypeIds, shipTypeIds),
   ]);
   const places = new Map<number, string>();
   const systems = new Map<number, number | null>();
@@ -142,7 +141,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
   const hullSource = useRef<HullSourceData>({ catalogue: null, profile: null });
-  const hullCapacity = useRef(new Map<number, number | null>());
+  const hullHolds = useRef(new Map<number, PackHold[]>());
   const idsKey = characterIds.join(',');
   const focusAfterCommit = useFocusAfterCommit();
   const planHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -249,13 +248,10 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
       buildHullCatalogue([...catalogue.groupsById.values()], catalogue.marketTypes).find(
         (c) => c.name === HAULER_CLASS
       )?.hulls ?? [];
-    const todo = haulers.filter((h) => !hullCapacity.current.has(h.typeId));
+    const todo = haulers.filter((h) => !hullHolds.current.has(h.typeId));
     await mapWithConcurrencyLimit(todo, HULL_CONCURRENCY, async (hull) => {
       try {
-        hullCapacity.current.set(
-          hull.typeId,
-          holdCapacityM3(await hullCargoHolds(hull.typeId, profile))
-        );
+        hullHolds.current.set(hull.typeId, await hullPackHolds(hull.typeId, profile));
       } catch {
         // Not cached: a transient failure should be retried next time.
       }
@@ -263,7 +259,7 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     const owned = new Set(
       loaded.sources.flatMap((s) => s.assets.filter((a) => a.is_singleton).map((a) => a.type_id))
     );
-    const sized = haulers.filter((h) => hullCapacity.current.get(h.typeId));
+    const sized = haulers.filter((h) => (hullHolds.current.get(h.typeId)?.length ?? 0) > 0);
     // From the bundled ship tree, so no ESI call per hauler; a hull it lacks counts as flyable.
     const tree = await loadShipTree().catch(() => null);
     const required = new Map(tree?.ships.map((ship) => [ship.typeID, ship.required]));
@@ -276,7 +272,8 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
       typeId: h.typeId,
       name: h.name,
       hullClass: h.group,
-      capacityM3: hullCapacity.current.get(h.typeId)!,
+      capacityM3: hullHolds.current.get(h.typeId)!.reduce((sum, x) => sum + x.capacityM3, 0),
+      holds: hullHolds.current.get(h.typeId)!,
       owned: owned.has(h.typeId),
       canFly: flyable[i],
     }));

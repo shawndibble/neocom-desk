@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CharacterAsset } from '@/esi/endpoints';
-import {
-  fittedRigCounts,
-  holdCapacityM3,
-  pickerStacks,
-  selectedPlanCharacters,
-} from './movePlanInput';
+import { fittedRigCounts, pickerStacks, selectedPlanCharacters } from './movePlanInput';
 
 const asset = (over: Partial<CharacterAsset>): CharacterAsset =>
   ({
@@ -53,19 +48,6 @@ describe('selectedPlanCharacters', () => {
   });
   it('drops a Character with nothing selected', () => {
     expect(selectedPlanCharacters(entries, new Set(), new Set())).toEqual([]);
-  });
-});
-
-describe('holdCapacityM3', () => {
-  it('prefers the general hold, falls back to the sum', () => {
-    expect(
-      holdCapacityM3([
-        { kind: 'general', capacityM3: 100 },
-        { kind: 'ore', capacityM3: 50 },
-      ] as never)
-    ).toBe(100);
-    expect(holdCapacityM3([{ kind: 'ice', capacityM3: 50 }] as never)).toBe(50);
-    expect(holdCapacityM3([])).toBeNull();
   });
 });
 

@@ -41,6 +41,8 @@
 import { EsiError } from '@/esi/client';
 import { getUniverseType, postUniverseNames } from '@/esi/endpoints';
 import { loadTypes } from '@/sde/loadSde';
+import { knownPackagedVolumeOf } from '@/sde/marketTypes';
+import { loadMarketTypesById } from '@/sde/marketTypesById';
 import {
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
@@ -228,23 +230,31 @@ export async function loadTypeNames(typeIds: readonly number[]): Promise<Map<num
 
 /**
  * Hauled volume (m3) per type: the packaged volume where the type has one,
- * else the unpackaged volume - same fallback the Hauling page uses.
+ * else the unpackaged volume. The market catalogue is read first: it carries
+ * the packaged figure of every hull, which the slim SDE snapshot never does.
+ * A ship in `shipTypeIds` takes only the catalogue's figure, never the
+ * snapshot's assembled volume (a Praxis is 470,000 m3 assembled, 50,000
+ * packaged), so a ship the catalogue lacks reads as unknown.
  */
 export async function loadTypePackagedVolumes(
-  typeIds: readonly number[]
+  typeIds: readonly number[],
+  shipTypeIds: ReadonlySet<number> = new Set()
 ): Promise<Map<number, number>> {
-  try {
-    const types = await loadTypes();
-    const map = new Map<number, number>();
-    for (const id of typeIds) {
-      const type = types[String(id)];
-      const volume = type?.packagedVolume ?? type?.volume;
-      if (volume !== undefined) map.set(id, volume);
+  const market = await loadMarketTypesById().catch(() => null);
+  const types = await loadTypes().catch(() => null);
+  const map = new Map<number, number>();
+  for (const id of typeIds) {
+    const known = knownPackagedVolumeOf(market?.get(id));
+    if (known !== null && known > 0) {
+      map.set(id, known);
+      continue;
     }
-    return map;
-  } catch {
-    return new Map();
+    if (shipTypeIds.has(id)) continue;
+    const type = types?.[String(id)];
+    const volume = type?.packagedVolume ?? type?.volume;
+    if (volume !== undefined) map.set(id, volume);
   }
+  return map;
 }
 
 /**

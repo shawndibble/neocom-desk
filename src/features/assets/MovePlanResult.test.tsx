@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import type { MovePlan } from '@/engine/assets/movePlan';
+import type { Haul, MovePlan } from '@/engine/assets/movePlan';
 import { PlanResult } from './MovePlanResult';
 
 const hull = {
@@ -12,9 +12,29 @@ const hull = {
   name: 'Badger',
   hullClass: 'Industrial',
   capacityM3: 100,
+  holds: [{ kind: 'cargo' as const, capacityM3: 100 }],
   owned: false,
   canFly: true,
 };
+
+const cargoHaul = (m3: number): Haul => ({
+  usedM3: m3,
+  holds: [
+    {
+      kind: 'cargo',
+      capacityM3: 100,
+      usedM3: m3,
+      lines: [{ typeId: 34, quantity: m3, m3 }],
+    },
+  ],
+});
+
+const hauledBy = (hauls: Haul[], unfit: never[] = []) => ({
+  hull,
+  trips: hauls.length,
+  unfitCount: unfit.length,
+  pickups: [{ characterId: 1, locationId: 60003760, hauls, unfit }],
+});
 
 const plan = {
   perCharacter: [
@@ -33,8 +53,8 @@ const plan = {
     unknownVolumeCount: 0,
     trips: 2,
   },
-  suggested: { hull, trips: 2 },
-  comparison: [{ hull, trips: 2 }],
+  suggested: hauledBy([cargoHaul(100), cargoHaul(50)]),
+  comparison: [hauledBy([cargoHaul(100), cargoHaul(50)])],
 } as MovePlan;
 
 const shipPlan = {
@@ -54,7 +74,7 @@ const shipPlan = {
 } as MovePlan;
 
 describe('PlanResult', () => {
-  it('has one Back control and puts the unit on each trip lane label', () => {
+  it('has one Back control and lists each haul with what goes in each hold', () => {
     render(
       <MemoryRouter>
         <PlanResult
@@ -81,12 +101,19 @@ describe('PlanResult', () => {
     );
     expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: /edit items/i })).toBeNull();
-    expect(screen.getByText('Trip 1 · 100 m³')).toBeTruthy();
-    expect(screen.getByText('Trip 2 · 50 m³')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Haul 1 of 2' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Haul 2 of 2' })).toBeTruthy();
+    expect(screen.getAllByText('Cargo hold')).toHaveLength(2);
+    expect(screen.getByText('50 of 100 m³')).toBeTruthy();
   });
 
-  it('folds equal full trips into one range', () => {
-    const big = { ...plan, totals: { ...plan.totals, totalM3: 350, trips: 4 } } as MovePlan;
+  it('folds equal full hauls into one range', () => {
+    const hauls = [cargoHaul(100), cargoHaul(100), cargoHaul(100), cargoHaul(50)];
+    const big = {
+      ...plan,
+      totals: { ...plan.totals, totalM3: 350, trips: 4 },
+      suggested: hauledBy(hauls),
+    } as MovePlan;
     render(
       <MemoryRouter>
         <PlanResult
@@ -111,8 +138,114 @@ describe('PlanResult', () => {
         />
       </MemoryRouter>
     );
-    expect(screen.getByText('Trips 1–3 · 100 m³ each')).toBeTruthy();
-    expect(screen.getByText('Trip 4 · 50 m³')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Hauls 1–3 of 4 · same load each' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Haul 4 of 4' })).toBeTruthy();
+  });
+
+  it('shows the fleet hangar apart from the cargo hold, and what the hauler leaves behind', () => {
+    const haul: Haul = {
+      usedM3: 50_100,
+      holds: [
+        {
+          kind: 'fleetHangar',
+          capacityM3: 50_000,
+          usedM3: 50_000,
+          lines: [{ typeId: 47466, quantity: 1, m3: 50_000 }],
+        },
+        {
+          kind: 'cargo',
+          capacityM3: 4_500,
+          usedM3: 100,
+          lines: [{ typeId: 34, quantity: 100, m3: 100 }],
+        },
+      ],
+    };
+    const withUnfit = {
+      ...plan,
+      suggested: {
+        ...hauledBy([haul]),
+        unfitCount: 1,
+        pickups: [
+          {
+            characterId: 1,
+            locationId: 60003760,
+            hauls: [haul],
+            unfit: [{ typeId: 28661, quantity: 1, unitM3: 50_000 }],
+          },
+        ],
+      },
+    } as MovePlan;
+    render(
+      <MemoryRouter>
+        <PlanResult
+          state={{
+            plan: withUnfit,
+            destinationSystem: null,
+            destinationStation: 'Amarr VIII',
+            pickupSystems: new Map(),
+          }}
+          scope={{ characters: [], activeCharacterId: null } as never}
+          compareOpen={false}
+          headingRef={{ current: null }}
+          onToggleCompare={vi.fn()}
+          onBack={vi.fn()}
+          onDone={vi.fn()}
+          onPackShip={vi.fn()}
+          rigsOf={() => 0}
+          canPack={() => true}
+          name={(typeId) =>
+            typeId === 47466 ? 'Praxis' : typeId === 28661 ? 'Kronos' : 'Tritanium'
+          }
+          placeLabel={() => 'Jita 4-4'}
+          hueOf={() => 0}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Fleet hangar')).toBeTruthy();
+    expect(screen.getByText('Cargo hold')).toBeTruthy();
+    expect(screen.getByText('50,000 of 50,000 m³')).toBeTruthy();
+    expect(screen.getByText('Praxis')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: "Won't fit this hauler" })).toBeTruthy();
+    expect(screen.getByText('Kronos')).toBeTruthy();
+    expect(screen.getByText(/cannot carry 1 stack whole/)).toBeTruthy();
+  });
+
+  it('says which compared haulers leave stacks behind, so fewer trips are not misread', () => {
+    const lesser = {
+      ...hauledBy([cargoHaul(100)]),
+      hull: { ...hull, typeId: 649, name: 'Wreathe' },
+      unfitCount: 1,
+    };
+    const many = {
+      ...plan,
+      suggested: hauledBy([cargoHaul(100), cargoHaul(50)]),
+      comparison: [hauledBy([cargoHaul(100), cargoHaul(50)]), lesser],
+    } as MovePlan;
+    render(
+      <MemoryRouter>
+        <PlanResult
+          state={{
+            plan: many,
+            destinationSystem: null,
+            destinationStation: 'Amarr VIII',
+            pickupSystems: new Map(),
+          }}
+          scope={{ characters: [], activeCharacterId: null } as never}
+          compareOpen={false}
+          headingRef={{ current: null }}
+          onToggleCompare={vi.fn()}
+          onBack={vi.fn()}
+          onDone={vi.fn()}
+          onPackShip={vi.fn()}
+          rigsOf={() => 0}
+          canPack={() => true}
+          name={() => 'Tritanium'}
+          placeLabel={() => 'Jita 4-4'}
+          hueOf={() => 0}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(/leaves 1 stack behind/)).toBeTruthy();
   });
 
   describe('Pack instead', () => {
