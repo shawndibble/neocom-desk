@@ -49,7 +49,7 @@ vi.mock('@/features/industry/data', () => ({
           material_efficiency: 0,
           time_efficiency: 0,
           quantity: -1,
-          location_id: 60003760,
+          location_id: 1034000000001,
           location_flag: 'Hangar',
         },
       ],
@@ -60,8 +60,9 @@ vi.mock('@/features/industry/data', () => ({
 vi.mock('@/features/character/assets', () => ({
   loadCharacterAssets: async () => ({ cached: { data: [] }, needsReauth: false }),
 }));
+const location = vi.hoisted(() => vi.fn());
 vi.mock('@/features/bpcContracts/blueprintLocation', () => ({
-  loadBlueprintLocation: async () => ({ name: 'Jita IV - Moon 4', systemId: 30000142 }),
+  loadBlueprintLocation: (...args: unknown[]) => location(...args),
 }));
 vi.mock('@/sde/solarSystems', () => ({
   lookupSolarSystem: async () => ({ name: 'Jita' }),
@@ -82,6 +83,23 @@ describe('publishSharedLibrary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     choice.current = { all: false, allowed: new Set([100]) };
+    location.mockResolvedValue({ name: 'Jita IV - Moon 4', systemId: 30000142 });
+  });
+
+  it('publishes the rest and counts a blueprint whose place cannot be read', async () => {
+    choice.current = { all: true, excluded: new Set() };
+    // Blueprint 100 sits in a readable station, 200 in a structure with no name.
+    location.mockImplementation(async (_char: number, id: number) =>
+      id === 60003760
+        ? { name: 'Jita IV - Moon 4', systemId: 30000142 }
+        : { name: null, systemId: null }
+    );
+    memberDoc({ ownerHash: 'owner-1' });
+    await expect(publishSharedLibrary(1, 'c1')).resolves.toMatchObject({
+      outcome: 'full',
+      skipped: 1,
+    });
+    expect((setDoc.mock.calls[0]![1] as { items: unknown[] }).items).toEqual(published);
   });
 
   it('under share-all also publishes a blueprint that was never picked, minus exclusions', async () => {
@@ -98,7 +116,10 @@ describe('publishSharedLibrary', () => {
 
   it('writes the selected blueprints only, then stamps the Member doc', async () => {
     memberDoc({ ownerHash: 'owner-1' });
-    await expect(publishSharedLibrary(1, 'c1')).resolves.toBe('full');
+    await expect(publishSharedLibrary(1, 'c1')).resolves.toMatchObject({
+      outcome: 'full',
+      skipped: 0,
+    });
     expect(setDoc).toHaveBeenCalledTimes(1);
     expect(setDoc.mock.calls[0]![0]).toEqual({ path: 'communities/c1/members/uid1/library/0' });
     expect(setDoc.mock.calls[0]![1]).toEqual({ ownerHash: 'owner-1', items: published });
@@ -114,7 +135,7 @@ describe('publishSharedLibrary', () => {
       chunkCount: 1,
       pushedAt: { toMillis: () => Date.now() - 1000 },
     });
-    await expect(publishSharedLibrary(1, 'c1')).resolves.toBe('skip');
+    await expect(publishSharedLibrary(1, 'c1')).resolves.toMatchObject({ outcome: 'skip' });
     expect(setDoc).not.toHaveBeenCalled();
     expect(updateDoc).not.toHaveBeenCalled();
   });
@@ -125,7 +146,7 @@ describe('publishSharedLibrary', () => {
       chunkCount: 1,
       pushedAt: { toMillis: () => Date.now() - 8 * 24 * 60 * 60 * 1000 },
     });
-    await expect(publishSharedLibrary(1, 'c1')).resolves.toBe('stamp');
+    await expect(publishSharedLibrary(1, 'c1')).resolves.toMatchObject({ outcome: 'stamp' });
     expect(setDoc).not.toHaveBeenCalled();
     expect(updateDoc).toHaveBeenCalledTimes(1);
   });
@@ -139,7 +160,7 @@ describe('publishSharedLibrary', () => {
 
   it('does nothing for a Character that is no longer a Member', async () => {
     memberDoc(null);
-    await expect(publishSharedLibrary(1, 'c1')).resolves.toBe('unavailable');
+    await expect(publishSharedLibrary(1, 'c1')).resolves.toMatchObject({ outcome: 'unavailable' });
     expect(updateDoc).not.toHaveBeenCalled();
   });
 

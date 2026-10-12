@@ -24,7 +24,7 @@ import {
   libraryHash,
   LIBRARY_MAX_CHUNKS,
   planPush,
-  selectSharedBlueprints,
+  splitSharedBlueprints,
   type PushPlan,
   type ResolvedPlace,
 } from '@/engine/communities/sharedLibrary';
@@ -37,7 +37,20 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { loadShareChoice } from './shareSelection';
 
-const inFlight = new Map<string, Promise<PushPlan | 'unavailable'>>();
+/**
+ * What one publish did. `skipped` counts the selected blueprints left out
+ * because their station or structure could not be worked out (inside a
+ * container that cannot be traced, or in a structure this Character cannot
+ * read), so the Member can be told instead of wondering where they went.
+ */
+export interface PublishResult {
+  outcome: PushPlan | 'unavailable';
+  skipped: number;
+}
+
+const unavailable: PublishResult = { outcome: 'unavailable', skipped: 0 };
+
+const inFlight = new Map<string, Promise<PublishResult>>();
 
 function memberRef(communityId: string, uid: string) {
   return doc(getSyncFirestore(), 'communities', communityId, 'members', uid);
@@ -75,40 +88,34 @@ async function buildLibrary(characterId: number, choice: ShareChoice) {
   }
 
   const places = new Map<number, ResolvedPlace>();
-  let lookupFailed = false;
   await Promise.all(
     [...new Set(placeIds.values())].map(async (locationId) => {
       const location = await loadBlueprintLocation(characterId, locationId);
       const system = location.systemId == null ? null : await lookupSolarSystem(location.systemId);
       if (location.name && system) {
         places.set(locationId, { locationName: location.name, systemName: system.name });
-      } else {
-        lookupFailed = true;
       }
     })
   );
-  // A failed lookup would drop blueprints and shrink the Community's copy;
-  // publish nothing and retry next sweep instead.
-  if (lookupFailed) return null;
 
-  return selectSharedBlueprints(owned, selected, (blueprint) => {
+  // One blueprint in a structure nobody can read must not hold back the rest:
+  // it is left out and counted, and the next sweep picks it up if the place
+  // resolves by then (the hash changes, so the library is pushed again).
+  return splitSharedBlueprints(owned, selected, (blueprint) => {
     const locationId = placeIds.get(blueprint.item_id);
     return locationId === undefined ? null : (places.get(locationId) ?? null);
   });
 }
 
-async function publish(
-  characterId: number,
-  communityId: string
-): Promise<PushPlan | 'unavailable'> {
+async function publish(characterId: number, communityId: string): Promise<PublishResult> {
   const [choice, character] = await Promise.all([
     loadShareChoice(characterId, communityId),
     db.characters.get(characterId),
   ]);
-  if (!character?.ownerHash) return 'unavailable';
+  if (!character?.ownerHash) return unavailable;
   const uid = await ensureSignedIn(characterId);
   const member = await getDoc(memberRef(communityId, uid));
-  if (!member.exists()) return 'unavailable';
+  if (!member.exists()) return unavailable;
   const data = member.data();
   const pushedAt = (data.pushedAt as Timestamp | undefined)?.toMillis?.();
   const last =
@@ -117,14 +124,15 @@ async function publish(
       : null;
   const oldChunkCount = Number(data.chunkCount ?? 0);
 
-  const items = await buildLibrary(characterId, choice);
-  if (!items) return 'unavailable';
+  const built = await buildLibrary(characterId, choice);
+  if (!built) return unavailable;
+  const { shared: items, skipped } = built;
   const hash = libraryHash(items);
   const plan = planPush(last, hash, items.length, Date.now());
-  if (plan === 'skip') return plan;
+  if (plan === 'skip') return { outcome: plan, skipped };
 
   const chunks = chunkLibrary(items);
-  if (chunks.length > LIBRARY_MAX_CHUNKS) return 'unavailable';
+  if (chunks.length > LIBRARY_MAX_CHUNKS) return { outcome: 'unavailable', skipped };
   if (plan === 'full') {
     // Invalidate the stored hash first: a push cut off before the final stamp
     // must not leave a hash that matches chunks it no longer describes.
@@ -155,7 +163,7 @@ async function publish(
     libraryHash: hash,
     chunkCount: chunks.length,
   });
-  return plan;
+  return { outcome: plan, skipped };
 }
 
 /**
@@ -166,12 +174,12 @@ async function publish(
 export function publishSharedLibrary(
   characterId: number,
   communityId: string
-): Promise<PushPlan | 'unavailable'> {
+): Promise<PublishResult> {
   const key = `${characterId}:${communityId}`;
   const running = inFlight.get(key);
   if (running) return running;
   const run = publish(characterId, communityId)
-    .catch((): 'unavailable' => 'unavailable')
+    .catch((): PublishResult => unavailable)
     .finally(() => inFlight.delete(key));
   inFlight.set(key, run);
   return run;

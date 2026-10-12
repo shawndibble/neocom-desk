@@ -37,7 +37,7 @@ function renderTab() {
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  publish.mockResolvedValue('full');
+  publish.mockResolvedValue({ outcome: 'full', skipped: 0 });
   await db.settings.clear();
 });
 
@@ -90,7 +90,7 @@ describe('ShareBlueprintsTab', () => {
   });
 
   it('says so when a change could not be published', async () => {
-    publish.mockResolvedValue('unavailable');
+    publish.mockResolvedValue({ outcome: 'unavailable', skipped: 0 });
     const user = userEvent.setup();
     renderTab();
     await user.click(await screen.findByRole('checkbox', { name: b.shareAll }));
@@ -107,6 +107,12 @@ describe('ShareBlueprintsTab', () => {
     await waitFor(async () =>
       expect(await loadShareChoice(1, 'c1')).toEqual({ all: true, excluded: new Set([10, 20]) })
     );
+  });
+
+  it('says how many blueprints were left out for want of a known place', async () => {
+    publish.mockResolvedValue({ outcome: 'full', skipped: 2 });
+    renderTab();
+    expect(await screen.findByText(/2 blueprints are not shared/)).toBeInTheDocument();
   });
 
   it('links to BPC Sourcing narrowed to the Community and owned sources', async () => {

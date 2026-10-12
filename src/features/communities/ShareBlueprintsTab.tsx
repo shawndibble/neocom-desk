@@ -13,7 +13,7 @@ import {
 } from '@/engine/communities/shareMode';
 import { bpcSourcingCommunityHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { ConfirmDialog } from './ConfirmDialog';
-import { publishSharedLibrary } from './libraryPush';
+import { publishSharedLibrary, type PublishResult } from './libraryPush';
 import { loadShareChoice, saveShareChoice } from './shareSelection';
 import { useOwnedBlueprintTypes } from './useOwnedBlueprintTypes';
 
@@ -50,12 +50,17 @@ export function ShareBlueprintsTab({
   const [query, setQuery] = useState('');
   const [confirmingOff, setConfirmingOff] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [unpublished, setUnpublished] = useState(false);
+  const [published, setPublished] = useState<PublishResult | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void loadShareChoice(characterId, communityId).then((saved) => {
       if (!cancelled) setChoice(saved);
+    });
+    // Opening the tab checks what the Community holds against this device, so
+    // blueprints left out show up here without waiting for a change.
+    void publishSharedLibrary(characterId, communityId).then((result) => {
+      if (!cancelled) setPublished(result);
     });
     return () => {
       cancelled = true;
@@ -108,9 +113,7 @@ export function ShareBlueprintsTab({
       try {
         await saveShareChoice(characterId, communityId, next);
         // Never rejects: 'unavailable' means nothing reached the Community this time.
-        void publishSharedLibrary(characterId, communityId).then((result) =>
-          setUnpublished(result === 'unavailable')
-        );
+        void publishSharedLibrary(characterId, communityId).then(setPublished);
       } catch {
         latest.current = base;
         setChoice(base);
@@ -216,9 +219,14 @@ export function ShareBlueprintsTab({
           {t('communities.blueprints.limited', { count: ROW_LIMIT })}
         </p>
       )}
-      {unpublished && (
+      {published?.outcome === 'unavailable' && (
         <p role="status" className="text-xs text-warning">
           {t('communities.blueprints.unpublished')}
+        </p>
+      )}
+      {published !== null && published.skipped > 0 && (
+        <p role="status" className="text-xs text-warning">
+          {t('communities.blueprints.skipped', { count: published.skipped })}
         </p>
       )}
       {failed && (

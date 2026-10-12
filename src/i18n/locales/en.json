@@ -7908,6 +7908,8 @@
       "offTitle": "Stop sharing all your blueprints?",
       "offBody": "This removes every blueprint you share with this Community, including ones you picked one by one. You can share them again at any time.",
       "offAction": "Stop sharing all",
+      "skipped_one": "{{count}} blueprint is not shared: Neocom Desk cannot tell which station or structure it is in (inside a container it cannot trace, or in a structure you cannot read). It is added once its place can be worked out.",
+      "skipped_other": "{{count}} blueprints are not shared: Neocom Desk cannot tell which station or structure they are in (inside a container it cannot trace, or in a structure you cannot read). They are added once their place can be worked out.",
       "unpublished": "Saved on this device, but it did not reach the Community yet. Neocom Desk retries on its own; blueprints it cannot place at a station are left out."
     },
     "join": {
