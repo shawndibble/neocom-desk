@@ -5,12 +5,12 @@
  * no timezone ever shifts a day.
  */
 
-export type MiningYieldRange = '90d' | '30d' | '7d' | 'today';
+export type MiningYieldRange = '1y' | '90d' | '30d' | '7d' | 'today';
 
-/** Widest first, the order the control lists them. No "All": history is kept 90 days, so it would always equal "90d". */
-export const MINING_YIELD_RANGES: readonly MiningYieldRange[] = ['90d', '30d', '7d', 'today'];
+/** Widest first, the order the control lists them. No "All": history is kept a year, so it would always equal "1y". */
+export const MINING_YIELD_RANGES: readonly MiningYieldRange[] = ['1y', '90d', '30d', '7d', 'today'];
 
-const RANGE_DAYS: Record<MiningYieldRange, number> = { '90d': 90, '30d': 30, '7d': 7, today: 1 };
+const RANGE_DAYS: Record<MiningYieldRange, number> = { '1y': 365, '90d': 90, '30d': 30, '7d': 7, today: 1 };
 
 /** `date` shifted by `days` (negative = earlier), as a bare date string. */
 export function shiftDate(date: string, days: number): string {

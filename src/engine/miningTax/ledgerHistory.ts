@@ -11,7 +11,7 @@
 import type { MiningLedgerRow } from './types';
 import { shiftDate } from './yieldRange';
 
-export const LEDGER_HISTORY_DAYS = 90;
+export const LEDGER_HISTORY_DAYS = 365;
 
 function rowKey(row: MiningLedgerRow): string {
   return `${row.date}|${row.solar_system_id}|${row.type_id}`;

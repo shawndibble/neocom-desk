@@ -10,7 +10,12 @@ import { cx } from '@/lib/cx';
 import { Caret } from '@/components/ui/Disclosure';
 import { tabPath } from '@/lib/pageTabs';
 import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
-import { WHAT_WE_STORE_GROUPS, type WhatWeStoreGroup } from './whatWeStore';
+import {
+  RETENTION_GROUPS,
+  WHAT_WE_STORE_GROUPS,
+  type RetentionGroup,
+  type WhatWeStoreGroup,
+} from './whatWeStore';
 
 const LINK = inlineLinkClassName;
 const LIST = 'list-disc space-y-1 pl-5 marker:text-text-faint';
@@ -39,6 +44,23 @@ function StoreGroup({ group }: { group: WhatWeStoreGroup }) {
         ))}
       </ul>
     </>
+  );
+}
+
+/** One retention group: what is kept, with how long beside it. */
+function RetentionList({ group }: { group: RetentionGroup }) {
+  const { t } = useTranslation();
+  return (
+    <section className="space-y-1">
+      <h3 className="font-semibold text-text">{t(group.titleKey)}</h3>
+      <ul className={LIST}>
+        {group.items.map((item) => (
+          <li key={item.id}>
+            {t(item.labelKey)} <span className="text-text-dim">{t(item.durationKey)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -118,6 +140,17 @@ export function FaqPanel() {
       id: 'local',
       questionKey: 'settings.faq.q.local',
       answer: <StoreGroup group={storeGroup('local')} />,
+    },
+    {
+      id: 'retention',
+      questionKey: 'settings.faq.q.retention',
+      answer: (
+        <>
+          {RETENTION_GROUPS.map((group) => (
+            <RetentionList key={group.id} group={group} />
+          ))}
+        </>
+      ),
     },
     {
       id: 'writes',

@@ -32,7 +32,7 @@ export function Bars({ model, height }: { model: BarsChartModel; height: number 
   );
 }
 
-/** A 90-day series must fit a Small tile: hairline gaps once there are many bars. */
+/** A year-long series must fit a Small tile: hairline gaps once there are many bars. */
 const gapOf = (bars: number) => (bars > 40 ? 'gap-px' : 'gap-0.5');
 
 function PlainPlot({ model, height }: { model: BarsChartModel; height: number }) {

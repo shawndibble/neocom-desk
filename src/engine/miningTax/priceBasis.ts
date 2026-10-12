@@ -197,7 +197,7 @@ export function mergeSnapshotDay(existing: SnapshotDay, fresh: SnapshotDay): Sna
   return { ...existing, ...fresh };
 }
 
-/** Saved days older than the 90-day window ending today — the ones to delete. */
+/** Saved days older than the one-year window ending today — the ones to delete. */
 export function prunePriceSnapshotDates(dates: readonly string[], today: string): string[] {
   const cutoff = shiftDate(today, -(LEDGER_HISTORY_DAYS - 1));
   return dates.filter((date) => date < cutoff);

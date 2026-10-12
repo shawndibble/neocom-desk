@@ -15,6 +15,7 @@ describe('rangeStartDate', () => {
     expect(rangeStartDate('7d', TODAY)).toBe('2026-09-16');
     expect(rangeStartDate('30d', TODAY)).toBe('2026-08-24');
     expect(rangeStartDate('90d', TODAY)).toBe('2026-06-25');
+    expect(rangeStartDate('1y', TODAY)).toBe('2025-09-23');
   });
 
   it('crosses month and year boundaries on bare dates', () => {
@@ -22,7 +23,7 @@ describe('rangeStartDate', () => {
   });
 
   it('offers the four ranges, widest first', () => {
-    expect(MINING_YIELD_RANGES).toEqual(['90d', '30d', '7d', 'today']);
+    expect(MINING_YIELD_RANGES).toEqual(['1y', '90d', '30d', '7d', 'today']);
   });
 });
 

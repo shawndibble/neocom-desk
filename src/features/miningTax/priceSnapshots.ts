@@ -9,7 +9,7 @@ import {
   type SnapshotDay,
 } from '@/engine/miningTax/priceBasis';
 
-/** Folds `prices` into today's saved day and drops days older than 90. */
+/** Folds `prices` into today's saved day and drops days older than a year. */
 export async function saveTodayPriceSnapshot(today: string, prices: SnapshotDay): Promise<void> {
   await db.transaction('rw', db.jitaPriceSnapshots, async () => {
     const existing = await db.jitaPriceSnapshots.get(today);

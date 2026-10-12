@@ -5377,6 +5377,7 @@
       "daysCoveredValue": "{{count}} of {{total}}",
       "historyStartsHint": "Saved history starts {{date}}",
       "range": {
+        "1y": "1y",
         "90d": "90d",
         "30d": "30d",
         "7d": "7d",
@@ -9563,6 +9564,7 @@
       "q": {
         "synced": "What syncs between my devices?",
         "local": "What stays on this device?",
+        "retention": "How long is my data stored?",
         "writes": "Does Neocom Desk change anything in EVE?",
         "delete": "How do I delete my data?",
         "update": "How do I force an update?",
@@ -9612,7 +9614,7 @@
           "esi": "Your characters' EVE data: assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
           "corp": "Corporation data: wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and LP stores.",
-          "miningHistory": "90 days of mining ledger, longer than the 30 EVE returns.",
+          "miningHistory": "A year of mining ledger, longer than the 30 days EVE returns.",
           "jobHistory": "Delivered industry jobs, kept after ESI stops returning them. Removed with the Character.",
           "login": "Your EVE login token.",
           "loginNote": "It never leaves this device.",
@@ -9627,6 +9629,42 @@
           "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
+      },
+      "retention": {
+        "device": {
+          "title": "On this device",
+          "moonTax": "Moon Mining entries and payments:",
+          "moonTaxKept": "until you delete them or remove the character.",
+          "ledger": "Mining ledger:",
+          "ledgerKept": "one year.",
+          "prices": "Daily Jita price snapshots:",
+          "pricesKept": "one year.",
+          "netWorth": "Net worth history:",
+          "netWorthKept": "until you remove the character. The Overview charts the last year.",
+          "jobs": "Delivered industry jobs:",
+          "jobsKept": "until you remove the character.",
+          "alerts": "Alerts:",
+          "alertsKept": "the newest 300.",
+          "esi": "Your characters' EVE data (assets, wallet, skills, mail lists):",
+          "esiKept": "replaced on each refresh.",
+          "lookups": "Names, items, stations and mail bodies looked up:",
+          "lookupsKept": "30 days after they were last fetched.",
+          "market": "Market prices and history:",
+          "marketKept": "7 days after they were last fetched."
+        },
+        "server": {
+          "title": "On our server (Firebase)",
+          "synced": "Everything listed under What syncs between my devices:",
+          "syncedKept": "until you delete it.",
+          "deleted": "Records you delete:",
+          "deletedKept": "a deletion marker stays 30 days so your other devices catch up, then goes too.",
+          "alerts": "Alerts you've seen:",
+          "alertsKept": "30 days, at most 100.",
+          "push": "Push notification text, if on:",
+          "pushKept": "the next 72 hours of alerts, plus alerts already sent for 30 days.",
+          "idle": "An account no device has synced in:",
+          "idleKept": "90 days, then all of its synced data is deleted."
+        }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."
     },

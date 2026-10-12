@@ -129,3 +129,54 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
     ],
   },
 ];
+
+/** One line of the retention answer: what is kept, and for how long. */
+export interface RetentionItem {
+  id: string;
+  labelKey: string;
+  durationKey: string;
+}
+
+export interface RetentionGroup {
+  id: 'device' | 'server';
+  titleKey: string;
+  items: readonly RetentionItem[];
+}
+
+/**
+ * How long each kind of data is kept, on this device and on the server. Like
+ * the store groups above, a user-facing commitment: the numbers mirror the
+ * code that enforces them (`engine/miningTax/ledgerHistory.ts`,
+ * `esi/cachePrune.ts`, `features/notifications/feed.ts`, `sync/merge.ts`,
+ * `functions/src/purgeStaleAccounts.ts`), so change one and change the other.
+ */
+export const RETENTION_GROUPS: readonly RetentionGroup[] = [
+  {
+    id: 'device',
+    titleKey: 'settings.faq.retention.device.title',
+    items: [
+      'moonTax',
+      'ledger',
+      'prices',
+      'netWorth',
+      'jobs',
+      'alerts',
+      'esi',
+      'lookups',
+      'market',
+    ].map((id) => ({
+      id,
+      labelKey: `settings.faq.retention.device.${id}`,
+      durationKey: `settings.faq.retention.device.${id}Kept`,
+    })),
+  },
+  {
+    id: 'server',
+    titleKey: 'settings.faq.retention.server.title',
+    items: ['synced', 'deleted', 'alerts', 'push', 'idle'].map((id) => ({
+      id,
+      labelKey: `settings.faq.retention.server.${id}`,
+      durationKey: `settings.faq.retention.server.${id}Kept`,
+    })),
+  },
+];

@@ -1034,7 +1034,7 @@ export interface MiningLedgerHistoryRecord {
  * (issue #1279) — the ore's pricing type (its Compressed form where one
  * exists) and each reprocessing material. ESI history only has a daily
  * average; this is the app's own record of the book's two sides. Keyed by
- * EVE/UTC date, 90 days kept. Character-independent and device-local.
+ * EVE/UTC date, a year kept. Character-independent and device-local.
  */
 export interface JitaPriceSnapshotRecord {
   date: string;
@@ -1345,7 +1345,7 @@ db.version(13).stores({
   mailDrafts: 'id, characterId',
 });
 
-// Additive: v13 stores unchanged, plus the Mining Overview's 90-day ledger
+// Additive: v13 stores unchanged, plus the Mining Overview's one-year ledger
 // history (issue #1278). One row per Character, keyed by it, so
 // `removeCharacter` drops it with a single delete.
 db.version(14).stores({
@@ -1371,7 +1371,7 @@ db.version(14).stores({
 });
 
 // Additive: v14 stores unchanged, plus the Mining Overview's saved daily Jita
-// buy/sell prices (issue #1279). Keyed by date, so the 90-day prune is a
+// buy/sell prices (issue #1279). Keyed by date, so the one-year prune is a
 // primary-key range delete.
 db.version(15).stores({
   characters: 'characterId, corporationId',

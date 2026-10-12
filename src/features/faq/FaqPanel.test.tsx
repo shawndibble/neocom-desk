@@ -5,9 +5,9 @@ import '@/i18n';
 import { REMOTE_COLLECTIONS } from '@/sync/syncedCollections';
 import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
 import { FaqPanel } from './FaqPanel';
-import { WHAT_WE_STORE_GROUPS } from './whatWeStore';
+import { RETENTION_GROUPS, WHAT_WE_STORE_GROUPS } from './whatWeStore';
 
-const QUESTIONS = 9;
+const QUESTIONS = 10;
 
 /** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq() {
@@ -173,6 +173,7 @@ describe('FaqPanel — What We Store', () => {
     const items = WHAT_WE_STORE_GROUPS.flatMap((g) => g.items);
     const lines =
       QUESTIONS +
+      RETENTION_GROUPS.reduce((sum, g) => sum + g.items.length, 0) +
       items.length +
       items.reduce((sum, item) => sum + (item.detailKeys?.length ?? 0), 0);
     expect(screen.getAllByRole('listitem')).toHaveLength(lines);

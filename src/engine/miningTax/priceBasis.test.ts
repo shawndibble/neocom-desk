@@ -222,9 +222,9 @@ describe('mergeSnapshotDay', () => {
 });
 
 describe('prunePriceSnapshotDates', () => {
-  it('lists the saved days older than the 90-day window, today counted as day one', () => {
-    expect(prunePriceSnapshotDates(['2026-06-24', '2026-06-25', TODAY], TODAY)).toEqual([
-      '2026-06-24',
+  it('lists the saved days older than the one-year window, today counted as day one', () => {
+    expect(prunePriceSnapshotDates(['2025-09-22', '2025-09-23', TODAY], TODAY)).toEqual([
+      '2025-09-22',
     ]);
   });
 });
