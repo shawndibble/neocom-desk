@@ -3,6 +3,7 @@ import {
   EMPTY_BPC_SEARCH_FILTER,
   filterBpcContracts,
   filterBpcSearchRows,
+  communityOfferToSearchRow,
   contractRowToSearchRow,
   ownedBlueprintToSearchRow,
   blueprintOfferStats,
@@ -808,5 +809,50 @@ describe('blueprintSearchName', () => {
   it('is case- and space-insensitive about the suffix', () => {
     expect(blueprintSearchName('Buzzard BLUEPRINT')).toBe('Buzzard');
     expect(blueprintSearchName('Buzzard blueprint  ')).toBe('Buzzard');
+  });
+});
+
+describe('communityOfferToSearchRow', () => {
+  const offer = (overrides = {}) =>
+    communityOfferToSearchRow({
+      uid: 'u1',
+      memberName: 'Ann',
+      typeId: 33078,
+      me: 10,
+      te: 20,
+      runs: 5,
+      quantity: 1,
+      communityNames: ['Alpha'],
+      stale: false,
+      asOf: 1,
+      locationName: 'Jita IV',
+      systemName: 'Jita',
+      ...overrides,
+    });
+
+  it('is a free row named for the Member, with no resolvable region, space or system', () => {
+    expect(offer()).toMatchObject({
+      source: 'community',
+      price: 0,
+      memberName: 'Ann',
+      me: 10,
+      runs: 5,
+      regionId: null,
+      space: null,
+      systemId: null,
+    });
+  });
+
+  it('passes a max price and min runs filter for a shared original, never hides a stale row', () => {
+    const rows = [offer({ runs: -1 }), offer({ stale: true })];
+    const kept = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      maxPrice: 1,
+      minRuns: 99,
+    });
+    expect(kept).toEqual([rows[0]]);
+    expect(
+      filterBpcSearchRows([rows[1]], { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 })
+    ).toHaveLength(1);
   });
 });

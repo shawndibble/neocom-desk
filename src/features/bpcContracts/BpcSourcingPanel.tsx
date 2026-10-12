@@ -90,6 +90,7 @@ import {
 } from '@/features/bpcContracts/bpcSearchColumns';
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
 import { useLpBlueprintOffers } from '@/features/bpcContracts/useLpBlueprintOffers';
+import { useCommunityBlueprintOffers } from '@/features/bpcContracts/useCommunityBlueprintOffers';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import { useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
@@ -360,6 +361,7 @@ const SOURCE_LABEL_KEYS: Record<SourceToggle, string> = {
   contractBpo: 'bpcContracts.sourceContractBpos',
   market: 'bpcContracts.sourceMarketBpos',
   lp: 'bpcContracts.sourceLpStore',
+  community: 'bpcContracts.sourceCommunity',
   owned: 'bpcContracts.sourceOwned',
 };
 
@@ -367,6 +369,7 @@ const SOURCE_TOOLTIP_KEYS: Partial<Record<SourceToggle, string>> = {
   contractBpo: 'bpcContracts.sourceContractBposTooltip',
   market: 'bpcContracts.sourceMarketBposTooltip',
   lp: 'bpcContracts.sourceLpStoreTooltip',
+  community: 'bpcContracts.sourceCommunityTooltip',
 };
 
 interface BpcFilterBarProps {
@@ -1174,6 +1177,29 @@ export function BpcSourcingPanel() {
     );
   }, [lpOffers.rows, selectedTypeId, uiFilter.typeQuery, marketLookup.typeIds, nonTypeFilter]);
 
+  const communityOffers = useCommunityBlueprintOffers({
+    characterId: activeCharacterId,
+    enabled: sources.has('community'),
+  });
+  const communitySearchRows = useMemo(() => {
+    const searched =
+      selectedTypeId !== null || uiFilter.typeQuery.trim() !== ''
+        ? new Set(marketLookup.typeIds)
+        : null;
+    return filterBpcSearchRows(
+      searched
+        ? communityOffers.rows.filter((row) => searched.has(row.typeId))
+        : communityOffers.rows,
+      nonTypeFilter
+    );
+  }, [
+    communityOffers.rows,
+    selectedTypeId,
+    uiFilter.typeQuery,
+    marketLookup.typeIds,
+    nonTypeFilter,
+  ]);
+
   /**
    * The cheapest BPO per blueprint type in the results (issue #1241):
    * contract originals in the Region filter's scope, market orders for the
@@ -1218,7 +1244,16 @@ export function BpcSourcingPanel() {
     const marketRows = sources.has('market') ? marketSearchRows : [];
     const contractBpoRows = sources.has('contractBpo') ? contractBpoSearchRows : [];
     const lpRows = sources.has('lp') ? lpSearchRows : [];
-    return [...ownedRows, ...marketRows, ...contractBpoRows, ...lpRows, ...contractRows];
+    const communityRows = sources.has('community') ? communitySearchRows : [];
+    // An owned blueprint beats a Community Offer (free), which beats any priced offer.
+    return [
+      ...ownedRows,
+      ...communityRows,
+      ...marketRows,
+      ...contractBpoRows,
+      ...lpRows,
+      ...contractRows,
+    ];
   }, [
     sources,
     contractSearchRows,
@@ -1226,6 +1261,7 @@ export function BpcSourcingPanel() {
     marketSearchRows,
     contractBpoSearchRows,
     lpSearchRows,
+    communitySearchRows,
   ]);
 
   // Both summarise `filteredRows`, not every row of the chosen blueprint, so
@@ -1288,7 +1324,9 @@ export function BpcSourcingPanel() {
                 ? t('bpcContracts.sourceMarketSingular')
                 : row.source === 'lp'
                   ? t('bpcContracts.sourceLpStoreSingular')
-                  : t('bpcContracts.sourceOwned')}
+                  : row.source === 'community'
+                    ? t('bpcContracts.sourceCommunitySingular')
+                    : t('bpcContracts.sourceOwned')}
           </span>
         ),
       },
@@ -1409,7 +1447,9 @@ export function BpcSourcingPanel() {
         // top of the table while rendering — and now summarising — at its real
         // price. Owned rows sort last (Infinity) rather than reading as cheapest.
         sortValue: (row) => {
-          if (row.source === 'market' || row.source === 'lp') return row.price;
+          if (row.source === 'market' || row.source === 'lp' || row.source === 'community') {
+            return row.price;
+          }
           const contract = asContract(row);
           if (!contract) return Infinity;
           // A PLEX-for-item barter's real ask isn't ISK at all (issue #1105)
@@ -1420,7 +1460,9 @@ export function BpcSourcingPanel() {
           return effectivePrice(contract);
         },
         render: (row) => {
-          if (row.source === 'market') return <IskAmount value={row.price} />;
+          if (row.source === 'market' || row.source === 'community') {
+            return <IskAmount value={row.price} />;
+          }
           if (row.source === 'lp') {
             return (
               <HintText
@@ -1641,6 +1683,33 @@ export function BpcSourcingPanel() {
               // name links inside it).
               <span className={entityLinkClassName('max-sm:block max-sm:truncate')}>{name}</span>
             );
+          if (row.source === 'community') {
+            return (
+              <span
+                className={cx(
+                  'flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-col sm:flex-nowrap sm:items-start sm:gap-1',
+                  row.stale && 'opacity-60'
+                )}
+              >
+                <span className="min-w-0 max-w-full">{title}</span>
+                <span className="inline-flex flex-wrap items-center gap-1.5 text-[0.6875rem] font-normal text-text-dim">
+                  <span>
+                    {row.runs === -1
+                      ? t('bpcContracts.communityAskToCopy', { name: row.memberName })
+                      : t('bpcContracts.communityFrom', { name: row.memberName })}
+                  </span>
+                  <span className="rounded border border-line px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest uppercase">
+                    {t('bpcContracts.communityChip', { names: row.communityNames.join(', ') })}
+                  </span>
+                  {row.stale && (
+                    <span className="rounded bg-surface-2 px-1.5 py-0.5">
+                      {t('communities.staleBadge')}
+                    </span>
+                  )}
+                </span>
+              </span>
+            );
+          }
           if (!bpo && !owned) return title;
           return (
             // One wrapping line on the phone card, so a tag sits beside the
@@ -2084,7 +2153,9 @@ export function BpcSourcingPanel() {
                       ? `market:${row.orderId}`
                       : row.source === 'lp'
                         ? `lp:${row.corporationId}:${row.offerId}`
-                        : `owned:${row.itemId}`
+                        : row.source === 'community'
+                          ? `community:${row.memberUid}:${row.typeId}:${row.me}:${row.te}:${row.runs}:${row.locationName}:${index}`
+                          : `owned:${row.itemId}`
                 }
                 {...sortProps}
                 // A two-line card per offer on a phone — price at the right of
@@ -2108,7 +2179,9 @@ export function BpcSourcingPanel() {
                 // A contract row opens its contract; a market row opens the
                 // item's Market entry. No contract exists for an owned row —
                 // nothing to open.
+                rowClickable={(row) => row.source !== 'community'}
                 onRowClick={(row) => {
+                  if (row.source === 'community') return;
                   if (row.source === 'lp') {
                     // The store, with this offer picked; `affordableOnly=0` so an
                     // offer the pilot can't yet afford is not filtered out of view.
