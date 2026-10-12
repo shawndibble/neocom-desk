@@ -176,6 +176,9 @@ describe('library chunks', () => {
       })
     );
     await assertFails(
+      setDoc(doc(db, `${MEMBER_1}/library/200`), { ownerHash: 'hash-1', items: [] })
+    );
+    await assertFails(
       setDoc(doc(db, `${MEMBER_1}/library/abc`), { ownerHash: 'hash-1', items: [] })
     );
     await assertFails(

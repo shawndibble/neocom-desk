@@ -283,7 +283,17 @@ export const purgeStaleAccounts = onSchedule('every 24 hours', async () => {
 
     // Shared Community data lives outside `characters/{uid}`, so the
     // subcollection sweep below would never reach it (ADR 0018).
-    await purgeCharacterCommunities(db, ref.id);
+    try {
+      await purgeCharacterCommunities(db, ref.id);
+    } catch (err) {
+      // Leave the account (and its stale heartbeat) in place so tomorrow's
+      // run retries it, rather than letting one bad Community abort the rest.
+      logWarn('Stale account purge: Community cleanup failed, will retry', {
+        uid: ref.id,
+        error: err instanceof Error ? err.message : err,
+      });
+      continue;
+    }
 
     for (const sub of await ref.listCollections()) {
       for (;;) {

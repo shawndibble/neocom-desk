@@ -69,10 +69,33 @@ async function loadCommunity(db: Firestore, communityId: string) {
   return snap;
 }
 
-async function requireAdmin(db: Firestore, communityId: string, callerUid: string) {
+/**
+ * A Member doc counts for the caller only under the ownerHash it was joined
+ * with: a sold Character keeps its uid but gets a new ownerHash, and must not
+ * act on, or be told it holds, the previous owner's membership.
+ */
+async function isCurrentMember(db: Firestore, communityId: string, caller: CallerCharacter) {
+  const member = await memberRef(db, communityId, caller.uid).get();
+  return member.exists && member.get('ownerHash') === caller.ownerHash;
+}
+
+async function requireAdmin(db: Firestore, communityId: string, caller: CallerCharacter) {
   const snap = await loadCommunity(db, communityId);
-  if (snap.get('adminUid') !== callerUid) fail('not-admin');
+  if (snap.get('adminUid') !== caller.uid || !(await isCurrentMember(db, communityId, caller))) {
+    fail('not-admin');
+  }
   return snap;
+}
+
+/**
+ * Drops index entries whose Community no longer exists (a join that raced a
+ * delete), so they can't count against the 10-Communities cap forever.
+ */
+async function pruneDanglingIndex(db: Firestore, uid: string): Promise<void> {
+  for (const entry of (await indexCollection(db, uid).limit(MAX_COMMUNITIES_PER_CHARACTER).get())
+    .docs) {
+    if (!(await communityRef(db, entry.id).get()).exists) await entry.ref.delete();
+  }
 }
 
 export async function createCommunity(
@@ -80,6 +103,7 @@ export async function createCommunity(
   caller: CallerCharacter,
   input: CreateCommunityInput
 ): Promise<{ communityId: string; inviteCode: string }> {
+  await pruneDanglingIndex(db, caller.uid);
   const ref = db.collection(COMMUNITIES_COLLECTION).doc();
   const inviteCode = newInviteCode();
   const now = Date.now();
@@ -122,6 +146,17 @@ export async function joinCommunity(
     .get();
   if (found.empty) fail('invalid-invite');
   const ref = found.docs[0].ref;
+  await pruneDanglingIndex(db, caller.uid);
+  // A Member doc under another ownerHash is the previous owner of a sold
+  // Character: their shared data goes, and this Character joins fresh. Chunks
+  // left by any earlier crashed removal are cleared too, since they would be
+  // readable again the moment this Member doc exists.
+  const existing = await memberRef(db, ref.id, caller.uid).get();
+  if (existing.exists && existing.get('ownerHash') !== caller.ownerHash) {
+    await removeMemberData(db, ref.id, caller.uid);
+  } else if (!existing.exists) {
+    await db.recursiveDelete(memberRef(db, ref.id, caller.uid).collection(LIBRARY_COLLECTION));
+  }
 
   return db.runTransaction(async (tx) => {
     // Re-read inside the transaction: the invite may have been revoked, or
@@ -157,17 +192,18 @@ export async function joinCommunity(
 }
 
 /**
- * Deletes one Member's shared data and membership, in this order: library
- * chunks first, so a crash part-way can never leave readable chunks behind a
- * rejoin; then the Member doc, the index doc and the count, in one
- * transaction. Safe to re-run, and safe when the Community is already gone.
+ * Deletes one Member's shared data and membership. The Member doc, index doc
+ * and count go first, in one transaction: with the Member doc gone the rules
+ * stop the Member writing another chunk, so the library sweep after it can't
+ * race a rewrite. A crash between the two leaves chunks no one can read;
+ * joinCommunity clears them before the Member can return. Safe to re-run,
+ * and safe when the Community is already gone.
  */
 export async function removeMemberData(
   db: Firestore,
   communityId: string,
   uid: string
 ): Promise<void> {
-  await db.recursiveDelete(memberRef(db, communityId, uid).collection(LIBRARY_COLLECTION));
   await db.runTransaction(async (tx) => {
     const community = await tx.get(communityRef(db, communityId));
     const member = await tx.get(memberRef(db, communityId, uid));
@@ -177,6 +213,7 @@ export async function removeMemberData(
     }
     tx.delete(indexCollection(db, uid).doc(communityId));
   });
+  await db.recursiveDelete(memberRef(db, communityId, uid).collection(LIBRARY_COLLECTION));
 }
 
 export async function leaveCommunity(
@@ -185,11 +222,10 @@ export async function leaveCommunity(
   communityId: string
 ): Promise<void> {
   const community = await loadCommunity(db, communityId);
-  const member = await memberRef(db, communityId, caller.uid).get();
   const decision = decideLeave({
     adminUid: community.get('adminUid'),
     callerUid: caller.uid,
-    isMember: member.exists,
+    isMember: await isCurrentMember(db, communityId, caller),
   });
   if (decision !== 'ok') fail(decision);
   await removeMemberData(db, communityId, caller.uid);
@@ -201,7 +237,7 @@ export async function removeMember(
   communityId: string,
   memberUid: string
 ): Promise<void> {
-  const community = await loadCommunity(db, communityId);
+  const community = await requireAdmin(db, communityId, caller);
   const member = await memberRef(db, communityId, memberUid).get();
   const decision = decideRemoveMember({
     adminUid: community.get('adminUid'),
@@ -219,7 +255,7 @@ export async function revokeInvite(
   caller: CallerCharacter,
   communityId: string
 ): Promise<void> {
-  const community = await requireAdmin(db, communityId, caller.uid);
+  const community = await requireAdmin(db, communityId, caller);
   await community.ref.update({ inviteCode: null });
 }
 
@@ -228,20 +264,35 @@ export async function regenerateInvite(
   caller: CallerCharacter,
   communityId: string
 ): Promise<{ inviteCode: string }> {
-  const community = await requireAdmin(db, communityId, caller.uid);
+  const community = await requireAdmin(db, communityId, caller);
   const inviteCode = newInviteCode();
   await community.ref.update({ inviteCode });
   return { inviteCode };
 }
 
-/** Removes every Member's data and index doc, then the Community itself. */
-export async function deleteCommunityData(db: Firestore, communityId: string): Promise<void> {
+/**
+ * Removes every Member's data and index doc, then the Community itself. The
+ * invite is revoked first so no join lands mid-delete, and the admin's own
+ * index doc goes last: if this crashes part-way, the admin's purge or retry
+ * still finds the Community to finish it.
+ */
+export async function deleteCommunityData(
+  db: Firestore,
+  communityId: string,
+  adminUid?: string
+): Promise<void> {
   const ref = communityRef(db, communityId);
+  if ((await ref.get()).exists) await ref.update({ inviteCode: null });
   for (const member of await ref.collection(COMMUNITY_MEMBERS_COLLECTION).listDocuments()) {
+    if (member.id === adminUid) continue;
     await db.recursiveDelete(member.collection(LIBRARY_COLLECTION));
     await indexCollection(db, member.id).doc(communityId).delete();
   }
+  if (adminUid) {
+    await db.recursiveDelete(memberRef(db, communityId, adminUid).collection(LIBRARY_COLLECTION));
+  }
   await db.recursiveDelete(ref);
+  if (adminUid) await indexCollection(db, adminUid).doc(communityId).delete();
 }
 
 export async function deleteCommunity(
@@ -249,8 +300,8 @@ export async function deleteCommunity(
   caller: CallerCharacter,
   communityId: string
 ): Promise<void> {
-  await requireAdmin(db, communityId, caller.uid);
-  await deleteCommunityData(db, communityId);
+  await requireAdmin(db, communityId, caller);
+  await deleteCommunityData(db, communityId, caller.uid);
 }
 
 /**
@@ -263,7 +314,7 @@ export async function purgeCharacterCommunities(db: Firestore, uid: string): Pro
   for (const entry of (await indexCollection(db, uid).get()).docs) {
     const community = await communityRef(db, entry.id).get();
     if (community.exists && community.get('adminUid') === uid) {
-      await deleteCommunityData(db, entry.id);
+      await deleteCommunityData(db, entry.id, uid);
     } else {
       await removeMemberData(db, entry.id, uid);
     }
