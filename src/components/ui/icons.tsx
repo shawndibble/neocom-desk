@@ -456,6 +456,7 @@ export const NavContracts = withWeight(Handshake);
 export const NavMail = withWeight(EnvelopeSimple);
 export const NavCalendar = withWeight(CalendarBlank);
 export const NavContacts = withWeight(AddressBook);
+export const NavCommunities = withWeight(UsersFour);
 export const NavTravel = withWeight(MapTrifold);
 export const NavSettings = withWeight(GearSix);
 export const NavHelp = withWeight(Question);

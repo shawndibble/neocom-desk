@@ -48,7 +48,7 @@ describe('railGroups', () => {
         labelKey: 'nav.groups.economy',
         paths: ['/market', '/wallet', '/assets', '/contracts'],
       },
-      { labelKey: 'nav.groups.social', paths: ['/mail', '/calendar', '/contacts'] },
+      { labelKey: 'nav.groups.social', paths: ['/mail', '/calendar', '/contacts', '/communities'] },
     ]);
   });
 });

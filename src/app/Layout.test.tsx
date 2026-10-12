@@ -478,6 +478,7 @@ describe('Layout desktop rail domain grouping', () => {
       'Mail',
       'Calendar',
       'Contacts',
+      'Communities',
     ]);
   });
 

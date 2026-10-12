@@ -237,6 +237,14 @@ export const NAV_PAGES = [
     mobileTab: true,
     tablessNav: true,
   },
+  // Communities: Firebase-backed, no ESI scope of its own.
+  {
+    path: '/communities',
+    labelKey: 'nav.communities',
+    group: 'social',
+    gating: 'ungated',
+    mobileTab: false,
+  },
   /*
    * Help is not a setting: FAQ and Support left Settings for this footer page.
    * Like Settings, it keeps a permanent row in the More sheet rather than a

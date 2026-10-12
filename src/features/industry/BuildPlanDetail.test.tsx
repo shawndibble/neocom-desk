@@ -8,6 +8,7 @@ import '@/i18n';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { db, type BuildPlanRecord } from '@/db';
+import { recallFacility, rememberFacility } from './facilityMemory';
 import type { BlueprintType, TypeMap } from '@/sde/types';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { CorpOwnedStockState } from './corpOwnedStock';
@@ -37,11 +38,12 @@ function toastStatus() {
 // handlers here. The panel only needs *a* resolved snapshot to stop showing
 // "loading" — its shape doesn't matter to the Runs/ME/TE fields under test.
 const loadMarketSnapshot = vi.hoisted(() =>
-  vi.fn(async () => ({
+  vi.fn(async (): Promise<Record<string, unknown>> => ({
     hubPrices: {},
     hubBuyPrices: {},
     adjustedPrices: {},
     systemCostIndex: 0.05,
+    systemCostIndexMissing: false,
   }))
 );
 vi.mock('./marketData', () => ({ loadMarketSnapshot }));
@@ -1711,5 +1713,143 @@ describe('BuildPlanDetail Break Even button', () => {
     await user.tab();
 
     expect(screen.queryByText(/No break even found up to/)).not.toBeInTheDocument();
+  });
+});
+
+describe('BuildPlanDetail job cost index without an ESI figure (J-Space)', () => {
+  const costIndexInput = () => screen.getByRole('textbox', { name: 'Job cost index %' });
+  const wormholeStructure = {
+    facility: 'raitaru',
+    buildSystemId: 31000005,
+    buildSystemName: 'J123456',
+    buildLocationId: 1040000000001,
+    buildLocationName: 'J123456 - Home',
+  } as const;
+
+  beforeEach(() => {
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: {},
+      hubBuyPrices: {},
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      systemCostIndexMissing: true,
+    });
+  });
+
+  afterEach(() => {
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: {},
+      hubBuyPrices: {},
+      adjustedPrices: {},
+      systemCostIndex: 0.05,
+      systemCostIndexMissing: false,
+    });
+  });
+
+  it('says why the fee is 0 and offers a field with a tooltip on where to find the number', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={wormholeStructure} />);
+    await openSetup(user);
+
+    expect(await screen.findByText(/ESI has no cost index for this system/)).toBeInTheDocument();
+    expect(costIndexInput()).toHaveAccessibleDescription(/ESI has no cost index/);
+    await user.hover(screen.getByRole('button', { name: 'Where to find the job cost index' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Facilities tab/);
+  });
+
+  it('commits the typed index and remembers it for the facility', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={wormholeStructure} onUpdate={onUpdate} />);
+    await openSetup(user);
+    await screen.findByText(/ESI has no cost index for this system/);
+
+    await user.type(costIndexInput(), '3.5');
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledWith({ costIndexOverridePct: 3.5 });
+    await waitFor(async () =>
+      expect(await recallFacility({ buildLocationId: 1040000000001 })).toMatchObject({
+        costIndexPct: 3.5,
+      })
+    );
+  });
+
+  it('fills the index back in when a plan opens at a facility already described', async () => {
+    await rememberFacility({ buildLocationId: 1040000000001 }, { costIndexPct: 2.25 });
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={wormholeStructure} onUpdate={onUpdate} />);
+
+    await waitFor(() => expect(onUpdate).toHaveBeenCalledWith({ costIndexOverridePct: 2.25 }));
+    await openSetup(user);
+    expect(costIndexInput()).toHaveValue('2.25');
+  });
+
+  it('shows no field where ESI has the index', async () => {
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: {},
+      hubBuyPrices: {},
+      adjustedPrices: {},
+      systemCostIndex: 0.05,
+      systemCostIndexMissing: false,
+    });
+    const user = userEvent.setup();
+    render(<Harness plan={{ facility: 'raitaru' }} />);
+    await openSetup(user);
+
+    expect(screen.queryByRole('textbox', { name: 'Job cost index %' })).not.toBeInTheDocument();
+  });
+});
+
+describe('BuildPlanDetail remembers a structure for the next plan', () => {
+  it('fills rigs and tax into a plan that opens at a structure already described', async () => {
+    await rememberFacility(
+      { buildLocationId: 1035 },
+      { rigFit: ['meT2', 'none', 'none'], facilityTaxPct: 2.5 }
+    );
+    const onUpdate = vi.fn();
+    render(
+      <Harness
+        plan={{
+          facility: 'raitaru',
+          buildLocationId: 1035,
+          buildSystemId: 30003888,
+          buildSystemName: 'Badivefi',
+        }}
+        onUpdate={onUpdate}
+      />
+    );
+
+    await waitFor(() =>
+      expect(onUpdate).toHaveBeenCalledWith({
+        rigFit: ['meT2', 'none', 'none'],
+        facilityTaxPct: 2.5,
+      })
+    );
+  });
+
+  it('files the rigs and tax a pilot sets under the structure they are set for', async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        plan={{
+          facility: 'raitaru',
+          buildLocationId: 1035,
+          buildSystemId: 30003888,
+          buildSystemName: 'Badivefi',
+        }}
+      />
+    );
+    await openSetup(user);
+
+    const tax = screen.getByRole('textbox', { name: 'Facility tax %' });
+    await user.clear(tax);
+    await user.type(tax, '2.5');
+    await user.tab();
+
+    await waitFor(async () =>
+      expect(await recallFacility({ buildLocationId: 1035 })).toMatchObject({ facilityTaxPct: 2.5 })
+    );
   });
 });

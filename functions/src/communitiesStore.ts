@@ -19,7 +19,12 @@ import {
   decideCreate,
   decideJoin,
   decideLeave,
+  decideMailInvite,
+  decideMailRelease,
+  utcDayKey,
+  MAX_MAIL_INVITES_PER_DAY,
   decideRemoveMember,
+  decideTransferAdmin,
   newInviteCode,
   type CreateCommunityInput,
   type JoinCommunityInput,
@@ -45,10 +50,22 @@ function fail(decision: string): never {
     case 'too-many-communities':
       throw new HttpsError(
         'resource-exhausted',
-        `A Character can belong to at most ${MAX_COMMUNITIES_PER_CHARACTER} Communities`
+        `A Character can belong to at most ${MAX_COMMUNITIES_PER_CHARACTER} Communities`,
+        { reason: 'too-many-communities' }
       );
+    case 'already-invited':
+      throw new HttpsError('already-exists', 'This Character was already sent an invite', {
+        reason: 'already-invited',
+      });
+    case 'daily-cap':
+      throw new HttpsError('resource-exhausted', 'Daily mail invite limit reached', {
+        reason: 'daily-cap',
+      });
     case 'community-full':
-      throw new HttpsError('resource-exhausted', 'This Community is full');
+      // `details.reason` lets the join page tell the two caps apart without parsing prose.
+      throw new HttpsError('resource-exhausted', 'This Community is full', {
+        reason: 'community-full',
+      });
     case 'invalid-invite':
       throw new HttpsError('not-found', 'Invite link is not valid');
     case 'not-admin':
@@ -96,6 +113,34 @@ async function pruneDanglingIndex(db: Firestore, uid: string): Promise<void> {
     .docs) {
     if (!(await communityRef(db, entry.id).get()).exists) await entry.ref.delete();
   }
+}
+
+export interface InvitePreview {
+  name: string;
+  adminName: string;
+  memberCount: number;
+}
+
+/**
+ * What the invite page shows before sign-in: name, admin and Member count.
+ * Callable without a session, so it returns only these three public facts —
+ * never the invite code, the admin's uid or any Member beyond the admin's name.
+ * An unknown or revoked code is the same not-found a join gives.
+ */
+export async function previewCommunity(db: Firestore, inviteCode: string): Promise<InvitePreview> {
+  const found = await db
+    .collection(COMMUNITIES_COLLECTION)
+    .where('inviteCode', '==', inviteCode)
+    .limit(1)
+    .get();
+  if (found.empty) fail('invalid-invite');
+  const community = found.docs[0];
+  const admin = await memberRef(db, community.id, community.get('adminUid')).get();
+  return {
+    name: String(community.get('name') ?? ''),
+    adminName: String(admin.get('characterName') ?? ''),
+    memberCount: Number(community.get('memberCount') ?? 0),
+  };
 }
 
 export async function createCommunity(
@@ -247,6 +292,178 @@ export async function removeMember(
   });
   if (decision !== 'ok') fail(decision);
   await removeMemberData(db, communityId, memberUid);
+}
+
+export async function transferAdmin(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  newAdminUid: string
+): Promise<void> {
+  // One transaction, so the heir can't leave between the check and the
+  // hand-over and strand the Community with an admin who is not a Member.
+  await db.runTransaction(async (tx) => {
+    const community = await tx.get(communityRef(db, communityId));
+    if (!community.exists) throw new HttpsError('not-found', 'Community not found');
+    const callerMember = await tx.get(memberRef(db, communityId, caller.uid));
+    const target = await tx.get(memberRef(db, communityId, newAdminUid));
+    if (
+      community.get('adminUid') !== caller.uid ||
+      !callerMember.exists ||
+      callerMember.get('ownerHash') !== caller.ownerHash
+    ) {
+      fail('not-admin');
+    }
+    const decision = decideTransferAdmin({
+      adminUid: community.get('adminUid'),
+      callerUid: caller.uid,
+      targetUid: newAdminUid,
+      targetIsMember: target.exists,
+    });
+    if (decision === 'already-admin') {
+      throw new HttpsError('failed-precondition', 'That Character is already the admin');
+    }
+    if (decision !== 'ok') fail(decision);
+    tx.update(community.ref, { adminUid: newAdminUid });
+  });
+}
+
+const MAIL_INVITES_COLLECTION = 'mailInvites';
+const MAIL_QUOTA_COLLECTION = 'mailInviteQuota';
+const mailInviteRef = (db: Firestore, communityId: string, targetCharacterId: number) =>
+  communityRef(db, communityId).collection(MAIL_INVITES_COLLECTION).doc(String(targetCharacterId));
+const quotaRef = (db: Firestore, uid: string, day: string) =>
+  db.collection('characters').doc(uid).collection(MAIL_QUOTA_COLLECTION).doc(day);
+
+export interface MailInviteReservation {
+  inviteCode: string;
+  communityName: string;
+  adminName: string;
+  /** Mail invites left today after this one. */
+  remaining: number;
+}
+
+/**
+ * Claims one of the admin's daily mail invites and the one-per-target slot
+ * before the client sends the mail (the refresh token never leaves the device,
+ * so the client must send it). The cap lives here, in one transaction, not in
+ * the UI. A revoked link has nothing to mail: not-found.
+ */
+export async function reserveMailInvite(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  targetCharacterId: number,
+  targetName: string,
+  now = Date.now()
+): Promise<MailInviteReservation> {
+  const community = await requireAdmin(db, communityId, caller);
+  const inviteCode = community.get('inviteCode');
+  if (typeof inviteCode !== 'string') fail('invalid-invite');
+  const admin = await memberRef(db, communityId, caller.uid).get();
+  const day = utcDayKey(now);
+  const quota = quotaRef(db, caller.uid, day);
+  const invite = mailInviteRef(db, communityId, targetCharacterId);
+
+  const remaining = await db.runTransaction(async (tx) => {
+    const quotaSnap = await tx.get(quota);
+    const inviteSnap = await tx.get(invite);
+    const dailyCount = Number(quotaSnap.get('count') ?? 0);
+    const decision = decideMailInvite({
+      dailyCount,
+      existing: inviteSnap.exists
+        ? {
+            sentAt: typeof inviteSnap.get('sentAt') === 'number' ? inviteSnap.get('sentAt') : null,
+            reservedAt: Number(inviteSnap.get('reservedAt') ?? 0),
+            attempts: Number(inviteSnap.get('attempts') ?? 1),
+          }
+        : null,
+      now,
+    });
+    if (decision === 'retake') {
+      // A crashed tab left this reserved: let the admin try again, at no extra cost.
+      tx.update(invite, {
+        reservedAt: now,
+        attempts: Number(inviteSnap.get('attempts') ?? 1) + 1,
+      });
+      return MAX_MAIL_INVITES_PER_DAY - dailyCount;
+    }
+    if (decision !== 'ok') fail(decision);
+    tx.set(quota, {
+      count: dailyCount + 1,
+      refunds: Number(quotaSnap.get('refunds') ?? 0),
+      ownerHash: caller.ownerHash,
+    });
+    tx.set(invite, {
+      adminUid: caller.uid,
+      targetName,
+      day,
+      reservedAt: now,
+      attempts: 1,
+      sentAt: null,
+    });
+    return MAX_MAIL_INVITES_PER_DAY - (dailyCount + 1);
+  });
+  return {
+    inviteCode,
+    communityName: String(community.get('name') ?? ''),
+    adminName: String(admin.get('characterName') ?? ''),
+    remaining,
+  };
+}
+
+/** The mail went out: stamp the time the admin's "Sent" list shows. */
+export async function confirmMailInvite(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  targetCharacterId: number,
+  now = Date.now()
+): Promise<void> {
+  await requireAdmin(db, communityId, caller);
+  const invite = mailInviteRef(db, communityId, targetCharacterId);
+  const snap = await invite.get();
+  if (snap.exists && snap.get('adminUid') === caller.uid) await invite.update({ sentAt: now });
+}
+
+/**
+ * The send definitely failed: give back the slot and the day's count. Idempotent
+ * and bounded (see `decideMailRelease`): a fresh, unconfirmed reservation of this
+ * admin's, a few times a day.
+ */
+export async function releaseMailInvite(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  targetCharacterId: number,
+  now = Date.now()
+): Promise<void> {
+  await requireAdmin(db, communityId, caller);
+  const invite = mailInviteRef(db, communityId, targetCharacterId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(invite);
+    if (!snap.exists || snap.get('adminUid') !== caller.uid) return;
+    const quota = quotaRef(db, caller.uid, String(snap.get('day')));
+    const quotaSnap = await tx.get(quota);
+    const refundsToday = Number(quotaSnap.get('refunds') ?? 0);
+    const decision = decideMailRelease({
+      existing: {
+        sentAt: typeof snap.get('sentAt') === 'number' ? snap.get('sentAt') : null,
+        reservedAt: Number(snap.get('reservedAt') ?? 0),
+        attempts: Number(snap.get('attempts') ?? 1),
+      },
+      refundsToday,
+      now,
+    });
+    // Past the window, or out of refunds, the slot stays spent: the server
+    // can't tell a failed send from a skipped confirm.
+    if (decision !== 'refund') return;
+    tx.delete(invite);
+    if (quotaSnap.exists) {
+      const count = Number(quotaSnap.get('count') ?? 0);
+      tx.update(quota, { count: Math.max(0, count - 1), refunds: refundsToday + 1 });
+    }
+  });
 }
 
 /** Revoking leaves no working link until the admin regenerates one. */

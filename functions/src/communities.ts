@@ -11,6 +11,8 @@ import { HttpsError } from 'firebase-functions/v2/https';
 export const MAX_COMMUNITY_MEMBERS = 100;
 /** Communities one Character can belong to. */
 export const MAX_COMMUNITIES_PER_CHARACTER = 10;
+/** Mail invites one admin may send per UTC day (issue #3604). */
+export const MAX_MAIL_INVITES_PER_DAY = 20;
 export const MAX_COMMUNITY_NAME_LENGTH = 60;
 export const MAX_CHARACTER_NAME_LENGTH = 100;
 const MAX_INVITE_CODE_LENGTH = 64;
@@ -34,6 +36,7 @@ export interface CommunityIdInput {
 export interface RemoveMemberInput extends CommunityIdInput {
   memberUid: string;
 }
+export type TransferAdminInput = RemoveMemberInput;
 
 function record(data: unknown): Record<string, unknown> {
   if (typeof data !== 'object' || data === null) {
@@ -76,6 +79,91 @@ export function parseJoinInput(data: unknown): JoinCommunityInput {
   };
 }
 
+export interface PreviewInviteInput {
+  inviteCode: string;
+}
+
+export function parsePreviewInput(data: unknown): PreviewInviteInput {
+  return {
+    inviteCode: boundedString(record(data).inviteCode, 'inviteCode', MAX_INVITE_CODE_LENGTH),
+  };
+}
+
+export interface MailInviteInput extends CommunityIdInput {
+  targetCharacterId: number;
+  /** Display only: the looked-up name, for the admin's "Sent" list. */
+  targetName: string;
+}
+
+export function parseMailInviteInput(data: unknown): MailInviteInput {
+  const d = record(data);
+  const id = d.targetCharacterId;
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0) {
+    throw new HttpsError('invalid-argument', 'targetCharacterId must be a Character id');
+  }
+  return {
+    communityId: docId(d.communityId, 'communityId'),
+    targetCharacterId: id,
+    targetName: boundedString(d.targetName, 'targetName', MAX_CHARACTER_NAME_LENGTH),
+  };
+}
+
+/** The UTC day a mail invite counts against, `YYYY-MM-DD`. */
+export function utcDayKey(nowMs: number): string {
+  return new Date(nowMs).toISOString().slice(0, 10);
+}
+
+/**
+ * A reservation is made before the client sends the mail, and the server can't
+ * see whether the mail went out. So a release only refunds a reservation that is
+ * still fresh, and only a few a day: otherwise reserve, send, skip confirm,
+ * release would be an unlimited-mail loop.
+ */
+export const MAIL_RELEASE_WINDOW_MS = 2 * 60_000;
+export const MAIL_RELEASE_BUDGET_PER_DAY = 3;
+/** An unconfirmed reservation older than this (a crashed tab) may be taken again, without charging. */
+export const MAIL_RESERVATION_STALE_MS = 10 * 60_000;
+/** Reservations ever made for one target in one Community, retakes included. */
+export const MAIL_MAX_ATTEMPTS_PER_TARGET = 3;
+
+export interface MailInviteRecord {
+  /** Epoch ms the mail was confirmed sent, or null while only reserved. */
+  sentAt: number | null;
+  reservedAt: number;
+  attempts: number;
+}
+
+export type MailInviteDecision = 'ok' | 'retake' | 'already-invited' | 'daily-cap';
+
+/** One mail per target Character per Community comes first, so a repeat never reads as a cap. */
+export function decideMailInvite(state: {
+  dailyCount: number;
+  existing: MailInviteRecord | null;
+  now: number;
+}): MailInviteDecision {
+  const { existing } = state;
+  if (existing) {
+    const stale = state.now - existing.reservedAt >= MAIL_RESERVATION_STALE_MS;
+    return existing.sentAt === null && stale && existing.attempts < MAIL_MAX_ATTEMPTS_PER_TARGET
+      ? 'retake'
+      : 'already-invited';
+  }
+  return state.dailyCount >= MAX_MAIL_INVITES_PER_DAY ? 'daily-cap' : 'ok';
+}
+
+export type MailReleaseDecision = 'refund' | 'keep';
+
+export function decideMailRelease(state: {
+  existing: MailInviteRecord;
+  refundsToday: number;
+  now: number;
+}): MailReleaseDecision {
+  const fresh = state.now - state.existing.reservedAt <= MAIL_RELEASE_WINDOW_MS;
+  return state.existing.sentAt === null && fresh && state.refundsToday < MAIL_RELEASE_BUDGET_PER_DAY
+    ? 'refund'
+    : 'keep';
+}
+
 export function parseCommunityIdInput(data: unknown): CommunityIdInput {
   return { communityId: docId(record(data).communityId, 'communityId') };
 }
@@ -87,6 +175,10 @@ export function parseRemoveMemberInput(data: unknown): RemoveMemberInput {
     throw new HttpsError('invalid-argument', 'memberUid must be a Character uid');
   }
   return { communityId: docId(d.communityId, 'communityId'), memberUid };
+}
+
+export function parseTransferAdminInput(data: unknown): TransferAdminInput {
+  return parseRemoveMemberInput(data);
 }
 
 /** 128 random bits, URL-safe: the invite link is the only gate to a Community. */
@@ -138,5 +230,19 @@ export function decideRemoveMember(state: {
 }): RemoveMemberDecision {
   if (state.callerUid !== state.adminUid) return 'not-admin';
   if (state.targetUid === state.adminUid) return 'cannot-remove-admin';
+  return state.targetIsMember ? 'ok' : 'not-a-member';
+}
+
+export type TransferAdminDecision = 'ok' | 'not-admin' | 'already-admin' | 'not-a-member';
+
+/** The new admin must already be a Member (a Member doc exists for them). */
+export function decideTransferAdmin(state: {
+  adminUid: string;
+  callerUid: string;
+  targetUid: string;
+  targetIsMember: boolean;
+}): TransferAdminDecision {
+  if (state.callerUid !== state.adminUid) return 'not-admin';
+  if (state.targetUid === state.adminUid) return 'already-admin';
   return state.targetIsMember ? 'ok' : 'not-a-member';
 }

@@ -23,6 +23,7 @@ export const NAV_ICONS: Record<NavPagePath, ComponentType<Icon.IconProps>> = {
   '/mail': Icon.NavMail,
   '/calendar': Icon.NavCalendar,
   '/contacts': Icon.NavContacts,
+  '/communities': Icon.NavCommunities,
   '/travel': Icon.NavTravel,
   '/settings': Icon.NavSettings,
   '/help': Icon.NavHelp,

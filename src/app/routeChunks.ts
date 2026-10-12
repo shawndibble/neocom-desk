@@ -129,6 +129,7 @@ export const loadAssets = named(() => import('@/routes/Assets'), 'Assets');
 export const loadMail = named(() => import('@/routes/Mail'), 'Mail');
 export const loadCalendar = named(() => import('@/routes/Calendar'), 'Calendar');
 export const loadContracts = named(() => import('@/routes/Contracts'), 'Contracts');
+export const loadCommunities = named(() => import('@/routes/Communities'), 'Communities');
 export const loadContacts = named(() => import('@/routes/Contacts'), 'Contacts');
 export const loadTravel = named(() => import('@/routes/Travel'), 'Travel');
 export const loadEmploymentHistory = named(
@@ -139,6 +140,7 @@ export const loadSettings = named(() => import('@/routes/Settings'), 'Settings')
 export const loadHelp = named(() => import('@/routes/Help'), 'Help');
 export const loadStyleguide = named(() => import('@/routes/Styleguide'), 'Styleguide');
 export const loadFittingShared = named(() => import('@/routes/FittingShared'), 'FittingShared');
+export const loadCommunityJoin = named(() => import('@/routes/CommunityJoin'), 'CommunityJoin');
 export const loadSharedLink = named(() => import('@/routes/SharedLink'), 'SharedLink');
 export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
@@ -184,6 +186,7 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/assets': loadAssets,
   '/mail': loadMail,
   '/calendar': loadCalendar,
+  '/communities': loadCommunities,
   '/contracts': loadContracts,
   '/bpc-contracts': loadIndustry,
   '/contacts': loadContacts,

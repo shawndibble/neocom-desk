@@ -51,11 +51,15 @@ export interface MarketSnapshot {
   adjustedPrices: AdjustedPrices | null;
   /**
    * Manufacturing cost index for the system the job runs in — `costIndexSystemId`
-   * when the caller names one, else the hub's own system. Null when the live ESI
-   * call failed, or when the named system has no index (an unknown or
-   * industry-less system).
+   * when the caller names one, else the hub's own system. Null only when the
+   * live ESI call failed (the offline signal). A system ESI answered for but
+   * lists no index for (J-Space: wormholes are absent from the list) reads 0 with
+   * `systemCostIndexMissing` set, so prices still show and the page can say why
+   * the job fee is understated.
    */
   systemCostIndex: number | null;
+  /** True only when ESI answered but has no index for the system — never for the offline null. */
+  systemCostIndexMissing?: boolean;
 }
 
 /** Reuses the hub-price TTL: both are "how often do market conditions change" caches. */
@@ -235,7 +239,9 @@ export function loadMarketSnapshots(
     }
 
     const indices = await costIndices.get(request.activity ?? 'manufacturing')!;
-    const systemCostIndex = indices?.get(request.costIndexSystemId ?? request.hub.systemId) ?? null;
+    const found = indices?.get(request.costIndexSystemId ?? request.hub.systemId);
+    const systemCostIndexMissing = indices != null && found === undefined;
+    const systemCostIndex = indices == null ? null : (found ?? 0);
 
     return {
       hubPrices,
@@ -243,6 +249,7 @@ export function loadMarketSnapshots(
       hubSellVolumes,
       adjustedPrices: await adjustedPrices,
       systemCostIndex,
+      systemCostIndexMissing,
     };
   });
 }

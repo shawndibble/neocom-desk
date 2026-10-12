@@ -35,17 +35,25 @@ import {
   parseCommunityIdInput,
   parseCreateInput,
   parseJoinInput,
+  parseMailInviteInput,
+  parsePreviewInput,
   parseRemoveMemberInput,
+  parseTransferAdminInput,
 } from './communities.js';
 import {
   createCommunity,
   deleteCommunity,
   joinCommunity,
+  confirmMailInvite,
   leaveCommunity,
+  previewCommunity,
   purgeCharacterCommunities,
   regenerateInvite,
+  releaseMailInvite,
   removeMember,
+  reserveMailInvite,
   revokeInvite,
+  transferAdmin,
   type CallerCharacter,
 } from './communitiesStore.js';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
@@ -338,6 +346,12 @@ export const createCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTION
   createCommunity(getFirestore(), callerOf(request), parseCreateInput(request.data))
 );
 
+// Callable with no session on purpose: the invite page shows what the link is
+// for before a visitor signs in. Returns three public facts, see previewCommunity.
+export const previewCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
+  previewCommunity(getFirestore(), parsePreviewInput(request.data).inviteCode)
+);
+
 export const joinCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
   joinCommunity(getFirestore(), callerOf(request), parseJoinInput(request.data))
 );
@@ -358,6 +372,46 @@ export const removeCommunityMemberCallable = onCall<unknown>(
   async (request) => {
     const { communityId, memberUid } = parseRemoveMemberInput(request.data);
     await removeMember(getFirestore(), callerOf(request), communityId, memberUid);
+  }
+);
+
+export const transferCommunityAdminCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, memberUid } = parseTransferAdminInput(request.data);
+    await transferAdmin(getFirestore(), callerOf(request), communityId, memberUid);
+  }
+);
+
+// Mail invites (issue #3604): the client sends the EVE mail with its own token,
+// so the cap, the one-per-target rule and the "Sent" stamp live in these three.
+export const reserveCommunityMailInviteCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) => {
+    const { communityId, targetCharacterId, targetName } = parseMailInviteInput(request.data);
+    return reserveMailInvite(
+      getFirestore(),
+      callerOf(request),
+      communityId,
+      targetCharacterId,
+      targetName
+    );
+  }
+);
+
+export const confirmCommunityMailInviteCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
+    await confirmMailInvite(getFirestore(), callerOf(request), communityId, targetCharacterId);
+  }
+);
+
+export const releaseCommunityMailInviteCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
+    await releaseMailInvite(getFirestore(), callerOf(request), communityId, targetCharacterId);
   }
 );
 
