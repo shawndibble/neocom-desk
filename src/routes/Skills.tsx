@@ -5,26 +5,16 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import {
-  Caret,
   DataAgeBadge,
   EmptyState,
   Panel,
   SearchInput,
-  SkillBar,
   Spinner,
   StatChip,
   StatChips,
   IconButton,
   LiveStatus,
-  Tooltip,
 } from '@/components/ui';
-import {
-  focusRingInsetClassName,
-  rowInteractiveClassName,
-  selectedRowClassName,
-  tappableRowClassName,
-} from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
@@ -41,7 +31,6 @@ import {
   type SkillCatalog,
 } from '@/features/skills/skillMap';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
-import { progressToNextLevel } from '@/engine/sp';
 import {
   loadCharacterAttributes,
   loadCharacterImplants,
@@ -52,11 +41,17 @@ import { formatCountdown } from '@/lib/duration';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
 import { filterSkillGroups } from '@/features/skills/skillGroupFilter';
-import { classifySkillQueue, type CompletedLevel } from '@/features/skills/queueStatus';
+import {
+  classifySkillQueue,
+  queuedLevelsBySkill,
+  type CompletedLevel,
+} from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
-import { stripEveMarkup, typeDescription } from '@/features/skills/typeDisplay';
+import { typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
-import { skillCsvColumns, skillCsvRows, type SkillGroup } from '@/features/skills/skillsCsv';
+import { skillCsvColumns, skillCsvRows } from '@/features/skills/skillsCsv';
+import { boardCsvGroups, buildSkillBoard } from '@/features/skills/skillBoard';
+import { GroupTile, SkillBoardRow } from '@/features/skills/SkillBoardView';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -93,6 +88,8 @@ interface Snapshot {
    * render stays free of a clock.
    */
   completedLevels: Map<number, CompletedLevel>;
+  /** Highest level each skill still has waiting in the queue, for the board's queued pips. */
+  queuedLevels: Map<number, number>;
   /** The level training right now (queue head, still in the future), or null. Null too when the queue was skipped or is paused. */
   training: { skillTypeID: number; targetLevel: number; secondsRemaining: number } | null;
   /** SP those credited levels add to ESI's total_sp, which is stale by the same amount. */
@@ -131,6 +128,8 @@ async function loadSkillsSnapshot(
         }
       : null;
 
+  const queuedLevels = queuedLevelsBySkill(queueResult?.data ?? [], Date.now());
+
   // Already superseded: skip the per-implant type lookups, their results would
   // be discarded.
   const implantIds = signal.cancelled ? [] : (implantsResult?.data ?? []);
@@ -158,6 +157,7 @@ async function loadSkillsSnapshot(
     attributesResult,
     training,
     completedLevels,
+    queuedLevels,
     completedSp,
     fetchedAt,
     implantDetails,
@@ -186,6 +186,7 @@ export function Skills() {
   const skillsNeedsReauth = data?.skillsNeedsReauth ?? false;
   const attributesResult = data?.attributesResult ?? null;
   const completedLevels = data?.completedLevels ?? null;
+  const queuedLevels = data?.queuedLevels ?? null;
   const training = data?.training ?? null;
   const completedSp = data?.completedSp ?? 0;
   const trainingChip = training && (
@@ -223,44 +224,36 @@ export function Skills() {
     setSelectedSkillTypeID(null);
   }
 
-  const groups = useMemo<SkillGroup[]>(() => {
+  // Every SDE skill, grouped, with the character's corrected level, queued
+  // level and whether the book is still missing (#3643).
+  const groups = useMemo(() => {
     if (!skillsResult?.data || !catalog) return [];
-    const byGroup = new Map<string, SkillGroup['skills']>();
+    const trained = new Map<number, { level: number; sp: number | null }>();
     const done = new Map(completedLevels ?? []);
-    const add = (skillTypeID: number, level: number, sp: number | null) => {
-      const info = catalog.bySkillTypeID.get(skillTypeID);
-      const groupName = info?.groupName ?? t('common.unknown');
-      const list = byGroup.get(groupName) ?? [];
-      list.push({
-        skillTypeID,
-        name: info?.name ?? `#${skillTypeID}`,
-        level,
-        sp,
-        description: info?.description ? stripEveMarkup(info.description) : null,
-        rank: info?.rank ?? 1,
-      });
-      byGroup.set(groupName, list);
-    };
     for (const skill of skillsResult.data.skills) {
       // Delete as we go, so the leftovers below are only the skills /skills
       // does not list at all.
       const finished = done.get(skill.skill_id);
       done.delete(skill.skill_id);
       const beatsEsi = finished !== undefined && finished.level > skill.trained_skill_level;
-      add(
-        skill.skill_id,
-        beatsEsi ? finished.level : skill.trained_skill_level,
-        beatsEsi ? (finished.sp ?? skill.skillpoints_in_skill) : skill.skillpoints_in_skill
-      );
+      trained.set(skill.skill_id, {
+        level: beatsEsi ? finished.level : skill.trained_skill_level,
+        sp: beatsEsi ? (finished.sp ?? skill.skillpoints_in_skill) : skill.skillpoints_in_skill,
+      });
     }
-    for (const [skillTypeID, finished] of done) add(skillTypeID, finished.level, finished.sp);
-    return [...byGroup.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([groupName, skills]) => ({
-        groupName,
-        skills: skills.sort((a, b) => a.name.localeCompare(b.name)),
-      }));
-  }, [skillsResult, catalog, completedLevels, t]);
+    for (const [skillTypeID, finished] of done) {
+      trained.set(skillTypeID, { level: finished.level, sp: finished.sp });
+    }
+    return buildSkillBoard({
+      catalog: [...catalog.bySkillTypeID.values()],
+      trained,
+      queuedLevels: queuedLevels ?? new Map(),
+      unknownGroupName: t('common.unknown'),
+    });
+  }, [skillsResult, catalog, completedLevels, queuedLevels, t]);
+  const trainedCount = groups.reduce((sum, group) => sum + group.trained, 0);
+  const totalCount = groups.reduce((sum, group) => sum + group.total, 0);
+  const queuedCount = groups.reduce((sum, group) => sum + group.queued, 0);
 
   const trainedSkillsMap = useMemo(
     () => toTrainedSkillsMap(skillsResult?.data?.skills ?? []),
@@ -356,14 +349,16 @@ export function Skills() {
   // skills scope needs re-auth — the old export button was disabled then too.
   const csvRows = useMemo(() => {
     if (skillsNeedsReauth) return [];
-    if (!searching) return skillCsvRows(groups);
+    if (!searching) return skillCsvRows(boardCsvGroups(groups));
     return skillCsvRows(
-      groups
-        .filter((group) => filterResult.visibleGroupNames.has(group.groupName))
-        .map((group) => ({
-          ...group,
-          skills: filterResult.matchedSkillsByGroup.get(group.groupName) ?? [],
-        }))
+      boardCsvGroups(
+        groups
+          .filter((group) => filterResult.visibleGroupNames.has(group.groupName))
+          .map((group) => ({
+            ...group,
+            skills: filterResult.matchedSkillsByGroup.get(group.groupName) ?? [],
+          }))
+      )
     );
   }, [groups, skillsNeedsReauth, searching, filterResult]);
   const csvColumns = useMemo(() => skillCsvColumns(t), [t]);
@@ -400,6 +395,15 @@ export function Skills() {
       </LiveStatus>
 
       <StatChips>
+        {totalCount > 0 && (
+          <StatChip
+            label={t('skills.board.summaryTrained')}
+            value={t('skills.board.trainedOfTotal', { trained: trainedCount, total: totalCount })}
+          />
+        )}
+        {queuedCount > 0 && (
+          <StatChip label={t('skills.board.summaryQueued')} value={String(queuedCount)} />
+        )}
         <StatChip
           label={t('skills.totalSp')}
           value={
@@ -544,113 +548,61 @@ export function Skills() {
             />
           ) : (
             <>
-              {groups.map((group) => {
-                if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;
-                const expanded = searching || expandedGroups.has(group.groupName);
-                const groupHasTraining =
-                  training !== null &&
-                  group.skills.some((skill) => skill.skillTypeID === training.skillTypeID);
-                const skillsToShow = searching
-                  ? (filterResult.matchedSkillsByGroup.get(group.groupName) ?? [])
-                  : group.skills;
-                return (
-                  <section
-                    key={group.groupName}
-                    className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
-                  >
-                    <h2>
-                      <button
-                        type="button"
-                        aria-expanded={expanded}
-                        disabled={searching}
-                        onClick={() => toggleGroup(group.groupName)}
-                        className={cx(
-                          'flex min-h-11 w-full scroll-mt-14 items-center justify-between gap-2 border-line px-3 py-1 text-left disabled:hover:bg-transparent md:min-h-0',
-                          rowInteractiveClassName,
-                          focusRingInsetClassName,
-                          expanded && 'border-b'
-                        )}
-                      >
-                        <span className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                          <Caret expanded={expanded} />
-                          <span className="truncate">{group.groupName}</span>
-                        </span>
-                        <span className="flex shrink-0 items-center gap-2">
-                          {groupHasTraining && trainingChip}
-                          <span className="text-[0.6875rem] tabular-nums text-text-dim">
-                            {skillsToShow.length}
-                          </span>
-                        </span>
-                      </button>
-                    </h2>
-                    {expanded && (
-                      <div className="p-3">
-                        <ul className="divide-y divide-line">
-                          {skillsToShow.map((skill) => {
-                            const selected = selectedSkillTypeID === skill.skillTypeID;
-                            const progress =
-                              skill.sp === null
-                                ? null
-                                : progressToNextLevel(skill.rank, skill.level, skill.sp);
-                            const row = (
-                              <button
-                                type="button"
-                                ref={(el) => {
-                                  if (el) rowButtons.current.set(skill.skillTypeID, el);
-                                  else rowButtons.current.delete(skill.skillTypeID);
-                                }}
-                                aria-pressed={selected}
-                                onClick={() =>
-                                  setSelectedSkillTypeID((current) =>
-                                    current === skill.skillTypeID ? null : skill.skillTypeID
-                                  )
-                                }
-                                className={cx(
-                                  tappableRowClassName,
-                                  'flex w-full scroll-mt-14 items-center justify-between gap-2 py-1.5 text-left text-xs',
-                                  rowInteractiveClassName,
-                                  focusRingInsetClassName,
-                                  selected
-                                    ? selectedRowClassName
-                                    : 'border-l-2 border-l-transparent'
-                                )}
-                              >
-                                <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
-                                  <span className="dt-primary line-clamp-2 min-w-0 sm:line-clamp-none sm:flex-1 sm:truncate">
-                                    {skill.name}
-                                  </span>
-                                  {training?.skillTypeID === skill.skillTypeID && trainingChip}
-                                </span>
-                                <SkillBar
-                                  level={skill.level}
-                                  progress={progress}
-                                  plannedLevel={plannedLevels.get(skill.skillTypeID) ?? null}
-                                />
-                                <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
-                                  {skill.sp === null
-                                    ? t('common.unknown')
-                                    : t('skills.sp', { value: skill.sp.toLocaleString() })}
-                                </span>
-                              </button>
-                            );
-                            return (
-                              <li key={skill.skillTypeID}>
-                                {skill.description ? (
-                                  <Tooltip content={skill.description} className="w-full">
-                                    {row}
-                                  </Tooltip>
-                                ) : (
-                                  row
-                                )}
-                              </li>
-                            );
-                          })}
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {groups.map((group) => {
+                  if (searching && !filterResult.visibleGroupNames.has(group.groupName))
+                    return null;
+                  const expanded = searching || expandedGroups.has(group.groupName);
+                  const groupHasTraining =
+                    training !== null &&
+                    group.skills.some((skill) => skill.skillTypeID === training.skillTypeID);
+                  const skillsToShow = searching
+                    ? (filterResult.matchedSkillsByGroup.get(group.groupName) ?? [])
+                    : group.skills;
+                  const listId = `skills-group-${group.groupName.replace(/\W+/g, '-')}`;
+                  return (
+                    <section key={group.groupName} className={expanded ? 'col-span-full' : ''}>
+                      <h2>
+                        <GroupTile
+                          group={group}
+                          expanded={expanded}
+                          matchCount={searching ? skillsToShow.length : undefined}
+                          trailing={groupHasTraining ? trainingChip : null}
+                          controlsId={listId}
+                          onToggle={() => toggleGroup(group.groupName)}
+                        />
+                      </h2>
+                      {expanded && (
+                        <ul
+                          id={listId}
+                          className="mt-1 divide-y divide-line rounded-xs border border-line bg-panel/85 px-3"
+                        >
+                          {skillsToShow.map((skill) => (
+                            <SkillBoardRow
+                              key={skill.skillTypeID}
+                              skill={skill}
+                              selected={selectedSkillTypeID === skill.skillTypeID}
+                              plannedLevel={plannedLevels.get(skill.skillTypeID) ?? null}
+                              trainingChip={
+                                training?.skillTypeID === skill.skillTypeID ? trainingChip : null
+                              }
+                              buttonRef={(el) => {
+                                if (el) rowButtons.current.set(skill.skillTypeID, el);
+                                else rowButtons.current.delete(skill.skillTypeID);
+                              }}
+                              onSelect={() =>
+                                setSelectedSkillTypeID((current) =>
+                                  current === skill.skillTypeID ? null : skill.skillTypeID
+                                )
+                              }
+                            />
+                          ))}
                         </ul>
-                      </div>
-                    )}
-                  </section>
-                );
-              })}
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
             </>
           )}
         </>

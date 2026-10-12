@@ -1079,10 +1079,11 @@ How to choose:
 
 Overrides:
 
-| Page                                     | Entity     | Opens                                                                                                                | One step away                   | Recorded in                                                                                                                 |
-| ---------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Planetary Industry (Plan, Map, Colonies) | Item type  | PI product detail: the Map tab with that product's drawer open, by URL (from Plan and Colonies too)                  | Market, Show info (⋮ or drawer) | `docs/context/decisions/20261005-212941-entity-link-destination-follows-the-page-pi-item.md`; `?product=` (`piProductHref`) |
-| Planetary Industry (Colonies)            | Own colony | The Map tab with that colony's richness drawer open, by URL (`?planet=`, `piPlanetHref`): the optional resource pick | Plan this colony                | `docs/context/decisions/20261006-001359-planet-richness-override-narrows-a-colonys-advice.md`                               |
+| Page                                     | Entity     | Opens                                                                                                                          | One step away                   | Recorded in                                                                                                                 |
+| ---------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Planetary Industry (Plan, Map, Colonies) | Item type  | PI product detail: the Map tab with that product's drawer open, by URL (from Plan and Colonies too)                            | Market, Show info (⋮ or drawer) | `docs/context/decisions/20261005-212941-entity-link-destination-follows-the-page-pi-item.md`; `?product=` (`piProductHref`) |
+| Planetary Industry (Colonies)            | Own colony | The Map tab with that colony's richness drawer open, by URL (`?planet=`, `piPlanetHref`): the optional resource pick           | Plan this colony                | `docs/context/decisions/20261006-001359-planet-richness-override-narrows-a-colonys-advice.md`                               |
+| Skills › Trained                         | Skill      | The skill info modal (the default); the rest of the row opens the inspector, so the name is a link beside the row's own button | Inspector (the row)             | `docs/context/decisions/20261012-154348-skills-trained-is-a-group-board.md`                                                 |
 
 Rows:
 

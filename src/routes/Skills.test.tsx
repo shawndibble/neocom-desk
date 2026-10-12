@@ -45,6 +45,18 @@ const FIXTURE_SKILLS: SkillType[] = [
     secondaryAttr: 'willpower',
     prereqs: [{ skillTypeID: 1, level: 3 }],
   },
+  {
+    // In the SDE but not in the character's skills: a skill whose book is still to buy.
+    typeID: 3,
+    name: 'Sharpshooter',
+    description: '',
+    groupID: 10,
+    groupName: 'Gunnery',
+    rank: 2,
+    primaryAttr: 'perception',
+    secondaryAttr: 'willpower',
+    prereqs: [{ skillTypeID: 1, level: 1 }],
+  },
 ];
 
 vi.mock('@/sde/loadSde', () => ({
@@ -138,7 +150,7 @@ describe('Skills', () => {
     expect(screen.getByRole('img', { name: 'Level 5 of 5' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
     const implantTrigger = (await screen.findByText('Ocular Filter - Basic')).closest('a')!;
-    const frigateTrigger = screen.getByText('Frigate').closest('button')!;
+    const frigateTrigger = screen.getByText('Frigate').closest('a')!;
     // Tooltip content only mounts once its trigger is focused/hovered, and
     // Radix closes any other open tooltip document-wide when a new one opens
     // — so check each one right after focusing it, not both at once.
@@ -531,6 +543,98 @@ describe('Skills', () => {
     } finally {
       configureClipboard(null);
     }
+  });
+
+  it('shows trained of total on each tile, counting skills the character has not trained', async () => {
+    render(<App />);
+
+    // Gunnery has Small Hybrid Turret (trained) and Sharpshooter (not in ESI's skills).
+    const gunnery = await screen.findByRole('button', { name: /^Gunnery/ });
+    expect(within(gunnery).getByText('1 / 2')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('button', { name: /^Spaceship Command/ })).getByText('1 / 1')
+    ).toBeInTheDocument();
+    // The summary strip carries the overall count.
+    expect(screen.getByText('2 / 3')).toBeInTheDocument();
+  });
+
+  it('marks a skill ESI does not list as needing its book, with empty pips and no SP', async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Gunnery/ }));
+    const row = screen.getByRole('button', { name: 'Sharpshooter' });
+    expect(within(row).getByText('Need book')).toBeInTheDocument();
+    expect(within(row).getByRole('img', { name: 'Level 0 of 5' })).toBeInTheDocument();
+    expect(within(row).queryByText(/SP$/)).not.toBeInTheDocument();
+    // A trained skill never shows the marker.
+    expect(
+      within(screen.getByRole('button', { name: 'Small Hybrid Turret' })).queryByText('Need book')
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the skill info modal from the skill name, while the rest of the row opens the inspector', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Spaceship Command/ }));
+    const link = screen.getByRole('link', { name: 'Frigate' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('info=skill-2'));
+
+    await user.click(screen.getByRole('button', { name: 'Frigate' }));
+    expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument();
+    expect(window.location.search).not.toContain('info=');
+
+    await user.click(link);
+    await waitFor(() => expect(window.location.search).toContain('info=skill-2'));
+  });
+
+  it('shows the queued level beside the trained one, and queued pips', async () => {
+    const day = 86_400_000;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 2,
+            queue_position: 0,
+            finished_level: 4,
+            start_date: new Date(Date.now() - day).toISOString(),
+            finish_date: new Date(Date.now() + 4 * day).toISOString(),
+          },
+          {
+            skill_id: 2,
+            queue_position: 1,
+            finished_level: 5,
+            start_date: new Date(Date.now() + 4 * day).toISOString(),
+            finish_date: new Date(Date.now() + 9 * day).toISOString(),
+          },
+        ])
+      )
+    );
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Spaceship Command/ }));
+    const row = screen.getByRole('button', { name: 'Frigate' });
+    expect(within(row).getByText('3 → 5')).toBeInTheDocument();
+    expect(
+      within(row).getByRole('img', { name: 'Level 3 of 5, planned to 5' })
+    ).toBeInTheDocument();
+    // The summary strip counts the skill once, not once per queued level.
+    expect(screen.getByText('In queue')).toBeInTheDocument();
+  });
+
+  it('finds a skill the character has not trained, and expands its group to show it', async () => {
+    render(<App />);
+
+    await screen.findByRole('button', { name: /^Gunnery/ });
+    fireEvent.change(screen.getByPlaceholderText('Search skills…'), {
+      target: { value: 'sharpshooter' },
+    });
+    expect(await screen.findByText('Need book')).toBeInTheDocument();
+    // The tile reports its matches instead of trained / total.
+    expect(
+      within(screen.getByRole('button', { name: /^Gunnery/ })).getByText('1 match')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Spaceship Command/ })).not.toBeInTheDocument();
   });
 
   it('announces the match count, and no matches, for a search', async () => {

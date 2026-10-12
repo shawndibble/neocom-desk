@@ -6,30 +6,34 @@
  * every keystroke rather than debouncing.
  */
 import { rankedSearch } from '@/lib/rankedSearch';
-import type { SkillGroup } from './skillsCsv';
+/** The slice of a group the filter reads: a name and skills with names, whether a CSV `SkillGroup` or a board group. */
+interface FilterableGroup {
+  groupName: string;
+  skills: readonly { name: string }[];
+}
 
 /** Search starts filtering groups at this many characters (GLOSSARY.md; matches the Market Browser). */
 export const SKILL_GROUP_SEARCH_MIN_QUERY_LENGTH = 3;
 
-export interface SkillGroupFilterResult {
+export interface SkillGroupFilterResult<G extends FilterableGroup = FilterableGroup> {
   /** Group names that have at least one matching skill. */
   visibleGroupNames: ReadonlySet<string>;
   /** Matching skills per surviving group, keyed by group name. */
-  matchedSkillsByGroup: ReadonlyMap<string, SkillGroup['skills']>;
+  matchedSkillsByGroup: ReadonlyMap<string, G['skills']>;
 }
 
 /**
  * Null means "no filter active" (query under SKILL_GROUP_SEARCH_MIN_QUERY_LENGTH) —
  * the caller renders every group at its own collapse state, in full.
  */
-export function filterSkillGroups(
-  groups: readonly SkillGroup[],
+export function filterSkillGroups<G extends FilterableGroup>(
+  groups: readonly G[],
   query: string
-): SkillGroupFilterResult | null {
+): SkillGroupFilterResult<G> | null {
   if (query.trim().length < SKILL_GROUP_SEARCH_MIN_QUERY_LENGTH) return null;
 
   const visibleGroupNames = new Set<string>();
-  const matchedSkillsByGroup = new Map<string, SkillGroup['skills']>();
+  const matchedSkillsByGroup = new Map<string, G['skills']>();
   for (const group of groups) {
     const matches = rankedSearch(group.skills, query, {
       primary: (skill) => skill.name,

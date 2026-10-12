@@ -95,8 +95,10 @@ test('Skills > Trained: Shift+Tab through rows never lands under the sticky sear
   expect(count).toBeGreaterThan(40);
   await rowButtons.last().focus();
 
+  // The board lists every skill in the SDE, hundreds of rows, so walk a long
+  // stretch of them rather than all.
   let checked = 0;
-  for (let i = 0; i < count + 5; i += 1) {
+  for (let i = 0; i < Math.min(count + 5, 80); i += 1) {
     const barBottom = (await bar.boundingBox())!.y + (await bar.boundingBox())!.height;
     const focused = await focusedBox(page, 'main section');
     if (!focused) break; // left the list (reached the sticky bar's controls)
