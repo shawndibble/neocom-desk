@@ -140,11 +140,6 @@ describe('Login', () => {
     expect(
       screen.getByRole('heading', { name: /is this blueprint worth building today/i })
     ).toBeInTheDocument();
-    // The tagline sells "every character you fly"; this is the question that
-    // backs it up.
-    expect(
-      screen.getByRole('heading', { name: /which character needs my attention/i })
-    ).toBeInTheDocument();
   });
 
   it('pairs every question with a screenshot, each with alt text, lazily loaded', async () => {
@@ -155,7 +150,7 @@ describe('Login', () => {
     const images = grid.getAllByRole('img');
     // One capture per tile, and one tile per heading.
     expect(images).toHaveLength(grid.getAllByRole('heading', { level: 3 }).length);
-    expect(images).toHaveLength(10);
+    expect(images).toHaveLength(9);
     for (const image of images) {
       expect(image.getAttribute('alt')).toBeTruthy();
       expect(image).toHaveAttribute('loading', 'lazy');
@@ -238,19 +233,44 @@ describe('Login', () => {
 
     // The header row: the Next deadline button and the alerts bell with its count.
     expect(preview.getByText('Next')).toBeInTheDocument();
-    expect(preview.getByText('Next industry job finishes')).toBeInTheDocument();
-    expect(preview.getByRole('img', { name: /13/ })).toBeInTheDocument();
+    expect(preview.getByText('Customize')).toBeInTheDocument();
+    expect(preview.getByRole('button', { name: /alerts, 5 waiting/i })).toBeInTheDocument();
 
     // The grid: one Widget per tile, each titled as the real Widget is.
-    for (const title of ['Wallet', 'Training', 'Skill points', 'Industry']) {
+    for (const title of [
+      'Mining tax',
+      'Training',
+      'Contracts',
+      'Location and ship',
+      'Coming up',
+      'Wallet',
+      'Planetary',
+      'Mail',
+      'Wallet flow',
+      'Open orders',
+    ]) {
       expect(preview.getByRole('region', { name: title })).toBeInTheDocument();
     }
-    expect(preview.getByText('Gunnery')).toBeInTheDocument();
-    expect(preview.getByText(/12,500 unallocated/)).toBeInTheDocument();
+    expect(preview.getByText('Mining Exploitation 5')).toBeInTheDocument();
+    expect(preview.getByText('Nothing due')).toBeInTheDocument();
 
     // The fixed board is gone: no summary strip cells, no folded alerts row.
     expect(preview.queryByText('Training now')).not.toBeInTheDocument();
     expect(preview.queryByText('13 unread')).not.toBeInTheDocument();
+  });
+
+  it('opens sample alerts from the demo bell, and the demo links nowhere', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    const preview = within(await screen.findByRole('group', { name: /logged-in view/i }));
+
+    await user.click(preview.getByRole('button', { name: /alerts, 5 waiting/i }));
+    const panel = await screen.findByRole('dialog');
+    expect(within(panel).getByText('Order undercut')).toBeInTheDocument();
+    expect(within(panel).getAllByRole('listitem')).toHaveLength(5);
+
+    // A signed-out visitor cannot reach any page the real Widgets link to.
+    expect(preview.queryAllByRole('link')).toHaveLength(0);
   });
 
   it('renders no unresolved i18n keys anywhere on the page', async () => {
