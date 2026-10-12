@@ -19,6 +19,7 @@ type RetargetPatch = Pick<BuildPlanRecord, 'hubId' | 'facility' | 'security'> &
       | 'buildLocationName'
       | 'rigFit'
       | 'facilityTaxPct'
+      | 'costIndexOverridePct'
     >
   >;
 
@@ -36,6 +37,8 @@ export function retargetPatch(snapshot: BuildGroupSnapshot): RetargetPatch {
     // from before this Retarget cannot outlive it (`buildLocationPatch`).
     buildLocationId: snapshot.buildLocationId,
     buildLocationName: snapshot.buildLocationName,
+    // Read for the system it came from, so it does not follow the plan to another.
+    costIndexOverridePct: undefined,
     // An NPC station has no rig slots and a tax CCP fixes at 0.25%, so both
     // are cleared the same way a manual facility change clears them
     // (`buildLocationPatch`). Landing on a structure writes the rig fit and

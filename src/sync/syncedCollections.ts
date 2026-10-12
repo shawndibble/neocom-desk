@@ -245,6 +245,9 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
       ...(p.buildLocationId !== undefined ? { buildLocationId: p.buildLocationId } : {}),
       ...(p.buildLocationName !== undefined ? { buildLocationName: p.buildLocationName } : {}),
       ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
+      ...(p.costIndexOverridePct !== undefined
+        ? { costIndexOverridePct: p.costIndexOverridePct }
+        : {}),
       ...(p.materialPriceBasis !== undefined ? { materialPriceBasis: p.materialPriceBasis } : {}),
       ...(materialSourcing !== undefined ? { materialSourcing } : {}),
       ...(p.ownedStockScope !== undefined ? { ownedStockScope: p.ownedStockScope } : {}),
@@ -309,6 +312,9 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
     ...(r.buildLocationId !== undefined ? { buildLocationId: r.buildLocationId } : {}),
     ...(r.buildLocationName !== undefined ? { buildLocationName: r.buildLocationName } : {}),
     ...(r.facilityTaxPct !== undefined ? { facilityTaxPct: r.facilityTaxPct } : {}),
+    ...(r.costIndexOverridePct !== undefined
+      ? { costIndexOverridePct: r.costIndexOverridePct }
+      : {}),
     ...(r.materialPriceBasis !== undefined ? { materialPriceBasis: r.materialPriceBasis } : {}),
     ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
     ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),

@@ -84,12 +84,21 @@ describe('loadMarketSnapshot', () => {
     expect(snapshot.systemCostIndex).toBe(0.0272);
   });
 
-  it('reports a null cost index for a build system with no industry index', async () => {
+  it('reads a build system ESI has no index for (J-Space) as 0, flagged missing', async () => {
     server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
 
     const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], 30000001);
 
-    expect(snapshot.systemCostIndex).toBeNull();
+    expect(snapshot.systemCostIndex).toBe(0);
+    expect(snapshot.systemCostIndexMissing).toBe(true);
+  });
+
+  it('does not flag a system ESI does have an index for', async () => {
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
+
+    const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], BUILD_SYSTEM_ID);
+
+    expect(snapshot.systemCostIndexMissing).toBe(false);
   });
 
   it('reports adjustedPrices and systemCostIndex as null when the ESI calls fail (offline signal)', async () => {
@@ -104,6 +113,8 @@ describe('loadMarketSnapshot', () => {
     expect(snapshot.hubPrices).toEqual({ 34: 5.5 });
     expect(snapshot.adjustedPrices).toBeNull();
     expect(snapshot.systemCostIndex).toBeNull();
+    // Offline is not "no entry": the page must keep saying prices are unavailable.
+    expect(snapshot.systemCostIndexMissing).toBe(false);
   });
 
   it('caches the cost index across calls within the TTL, refetching only after clearing', async () => {
@@ -314,7 +325,9 @@ describe('system cost indices: sharing and persistence', () => {
 
     expect(hits.count).toBe(1);
     expect(a.systemCostIndex).toBe(0.0464);
-    expect(b.systemCostIndex).toBeNull();
+    // ESI answered, but lists no reaction index for the hub system: 0, flagged missing.
+    expect(b.systemCostIndex).toBe(0);
+    expect(b.systemCostIndexMissing).toBe(true);
   });
 
   it('a reload inside the TTL reads the persisted indices instead of refetching', async () => {

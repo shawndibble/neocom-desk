@@ -247,6 +247,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Cost Index**: A solar system's current manufacturing activity level
   (read live from ESI). Higher activity in a system drives its Job Fee up;
   distinct from EIV, which prices the materials rather than the system.
+  ESI lists none for a wormhole (J-Space) system, so the pilot types the figure
+  they read in the in-game Industry window; it is remembered per facility.
 - **Current System**: The solar system a **Jump Range** measures from. The
   active Character's ESI location by default; the pilot can pick another
   system when ESI is stale or silent. A pick is device-local, per Character,
