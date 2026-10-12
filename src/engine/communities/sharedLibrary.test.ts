@@ -5,6 +5,7 @@ import {
   libraryHash,
   planPush,
   selectSharedBlueprints,
+  splitSharedBlueprints,
   LIBRARY_CHUNK_SIZE,
   LIBRARY_STALE_MS,
   LIBRARY_STAMP_REFRESH_MS,
@@ -55,6 +56,27 @@ describe('selectSharedBlueprints', () => {
     expect(Object.keys(item!).sort()).toEqual(
       ['locationName', 'me', 'runs', 'systemName', 'te', 'typeId'].sort()
     );
+  });
+});
+
+describe('splitSharedBlueprints', () => {
+  const owned = [
+    { type_id: 100, material_efficiency: 10, time_efficiency: 20, runs: -1, location_id: 1 },
+    { type_id: 100, material_efficiency: 0, time_efficiency: 0, runs: 3, location_id: 3 },
+    { type_id: 200, material_efficiency: 0, time_efficiency: 0, runs: 5, location_id: 3 },
+    { type_id: 300, material_efficiency: 2, time_efficiency: 4, runs: 1, location_id: 3 },
+  ];
+  const placeOf = (b: { location_id: number }) => (b.location_id === 3 ? null : place);
+
+  it('counts the selected blueprints it could not place, and shares the rest', () => {
+    const { shared, skipped } = splitSharedBlueprints(owned, new Set([100, 200]), placeOf);
+    expect(shared).toEqual([bp()]);
+    expect(skipped).toBe(2);
+  });
+
+  it('does not count a blueprint that was never selected', () => {
+    expect(splitSharedBlueprints(owned, new Set([100]), placeOf).skipped).toBe(1);
+    expect(splitSharedBlueprints(owned, new Set(), placeOf)).toEqual({ shared: [], skipped: 0 });
   });
 });
 

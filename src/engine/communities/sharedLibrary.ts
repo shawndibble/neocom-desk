@@ -46,18 +46,23 @@ export interface ResolvedPlace {
  * The blueprints to publish: those whose type is selected and whose station or
  * structure and system are known. `placeOf` returns null for one in a
  * container with no resolvable station, or an unresolvable structure; that
- * blueprint is left out rather than shared with a guessed place.
+ * blueprint is left out rather than shared with a guessed place, and counted
+ * in `skipped` so the Member can be told how many.
  */
-export function selectSharedBlueprints<B extends OwnedBlueprintInput>(
+export function splitSharedBlueprints<B extends OwnedBlueprintInput>(
   owned: readonly B[],
   selected: ReadonlySet<number>,
   placeOf: (blueprint: B) => ResolvedPlace | null
-): SharedBlueprint[] {
+): { shared: SharedBlueprint[]; skipped: number } {
   const shared: SharedBlueprint[] = [];
+  let skipped = 0;
   for (const blueprint of owned) {
     if (!selected.has(blueprint.type_id)) continue;
     const place = placeOf(blueprint);
-    if (!place) continue;
+    if (!place) {
+      skipped += 1;
+      continue;
+    }
     shared.push({
       typeId: blueprint.type_id,
       me: blueprint.material_efficiency,
@@ -67,7 +72,15 @@ export function selectSharedBlueprints<B extends OwnedBlueprintInput>(
       systemName: place.systemName,
     });
   }
-  return shared.sort(compareShared);
+  return { shared: shared.sort(compareShared), skipped };
+}
+
+export function selectSharedBlueprints<B extends OwnedBlueprintInput>(
+  owned: readonly B[],
+  selected: ReadonlySet<number>,
+  placeOf: (blueprint: B) => ResolvedPlace | null
+): SharedBlueprint[] {
+  return splitSharedBlueprints(owned, selected, placeOf).shared;
 }
 
 function compareShared(a: SharedBlueprint, b: SharedBlueprint): number {
