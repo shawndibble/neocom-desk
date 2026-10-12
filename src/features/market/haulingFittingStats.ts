@@ -5,6 +5,7 @@
  */
 import { computeFittingStats } from '@/features/fittings/dogmaFittingEngine';
 import { holdsFromStats, type CargoHold } from '@/engine/market/cargoHolds';
+import type { PackHold } from '@/engine/assets/haulPacking';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 
 /**
@@ -20,4 +21,18 @@ export async function computeCargoHolds(
     overheated: false,
   });
   return holdsFromStats(stats.holds);
+}
+
+/** The cargo hold and fleet hangar apart, for packing a load into each; a hold the hull lacks is left out. */
+export async function computePackHolds(
+  fitting: Fitting,
+  profile: PilotProfile
+): Promise<PackHold[]> {
+  const { holds } = await computeFittingStats(fitting, profile, undefined, undefined, {
+    overheated: false,
+  });
+  const out: PackHold[] = [];
+  if (holds.cargo > 0) out.push({ kind: 'cargo', capacityM3: holds.cargo });
+  if (holds.fleetHangar > 0) out.push({ kind: 'fleetHangar', capacityM3: holds.fleetHangar });
+  return out;
 }

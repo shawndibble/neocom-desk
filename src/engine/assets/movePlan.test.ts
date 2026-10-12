@@ -23,6 +23,7 @@ const hull = (typeId: number, capacityM3: number, owned = false, canFly = true):
   name: `Hull ${typeId}`,
   hullClass: 'Industrial',
   capacityM3,
+  holds: [{ kind: 'cargo', capacityM3 }],
   owned,
   canFly,
 });
@@ -54,7 +55,7 @@ describe('planMove', () => {
       characters: 1,
       shipsToFly: 1,
       unknownVolumeCount: 0,
-      trips: 1,
+      trips: 2, // a haul loads at one pickup only
     });
     expect(result.perCharacter[0].pickups.map((p) => p.locationId)).toEqual([A, B]);
     expect(result.perCharacter[0].pickups[1].ships).toEqual([{ itemId: 3, typeId: SHIP }]);
@@ -162,5 +163,95 @@ describe('planMove', () => {
     expect(packed.totals).toMatchObject({ shipsToFly: 0, totalM3: 500, stacks: 1 });
     expect(packed.perCharacter[0].pickups[0].ships).toEqual([]);
     expect(packed.perCharacter[0].pickups[0].lines[0]).toMatchObject({ typeId: SHIP, quantity: 1 });
+  });
+
+  describe('haul packing', () => {
+    // Mastodon-like: 4,500 cargo + 50,000 fleet hangar.
+    const mastodon: MoveHull = {
+      typeId: 12747,
+      name: 'Mastodon',
+      hullClass: 'Deep Space Transport',
+      capacityM3: 54_500,
+      holds: [
+        { kind: 'cargo', capacityM3: 4_500 },
+        { kind: 'fleetHangar', capacityM3: 50_000 },
+      ],
+      owned: true,
+      canFly: true,
+    };
+    const PRAXIS = 47466;
+    const praxisPlan = (hulls: readonly MoveHull[], extra: ConsolidationAsset[] = []) =>
+      planMove({
+        destinationLocationIds: new Set([DEST]),
+        characters: [
+          {
+            characterId: 1,
+            name: 'Alice',
+            assets: [
+              asset({ itemId: 9, typeId: PRAXIS, isSingleton: true }),
+              asset({ itemId: 10, typeId: 35, quantity: 2000 }), // 4,000 m3
+              ...extra,
+            ],
+          },
+        ],
+        unitM3: new Map([
+          [PRAXIS, 50_000],
+          [35, 2],
+        ]),
+        shipTypeIds: new Set([PRAXIS]),
+        packedShipIds: new Set([9]),
+        hulls,
+      });
+
+    it('puts the packaged ship in the fleet hangar and loose stock in the cargo hold, one haul', () => {
+      const result = praxisPlan([mastodon]);
+      expect(result.totals.trips).toBe(1);
+      const [pickup] = result.suggested!.pickups;
+      expect(pickup.hauls).toHaveLength(1);
+      const [cargo, hangar] = [...pickup.hauls[0].holds].sort(
+        (a, b) => a.capacityM3 - b.capacityM3
+      );
+      expect(hangar.lines).toEqual([{ typeId: PRAXIS, quantity: 1, m3: 50_000 }]);
+      expect(cargo.lines).toEqual([{ typeId: 35, quantity: 2000, m3: 4_000 }]);
+    });
+
+    it('ranks a hull that leaves a unit behind below one that carries everything', () => {
+      const small = hull(1, 30_000); // one 30k hold: a 50k packaged ship never fits
+      const result = praxisPlan([small, mastodon]);
+      expect(result.suggested?.hull.typeId).toBe(12747);
+      const bad = result.comparison.find((o) => o.hull.typeId === 1)!;
+      expect(bad.unfitCount).toBe(1);
+      expect(bad.pickups[0].unfit).toEqual([{ typeId: PRAXIS, quantity: 1, unitM3: 50_000 }]);
+      expect(result.comparison[0].unfitCount).toBe(0);
+    });
+
+    it('does not make a haul out of zero-volume stock', () => {
+      const result = planMove({
+        destinationLocationIds: new Set([DEST]),
+        characters: [
+          {
+            characterId: 1,
+            name: 'Alice',
+            assets: [asset({ itemId: 1, typeId: 77, quantity: 5 })],
+          },
+        ],
+        unitM3: new Map([[77, 0]]),
+        shipTypeIds: new Set(),
+        hulls: [hull(1, 5000)],
+      });
+      expect(result.totals.trips).toBeNull();
+    });
+
+    it('plans hauls per pickup: two stations never share a haul', () => {
+      const result = plan([
+        asset({ itemId: 1, typeId: 35, quantity: 10, locationId: A }),
+        asset({ itemId: 2, typeId: 35, quantity: 10, locationId: B }),
+      ]);
+      expect(result.totals.trips).toBe(2);
+      expect(result.suggested?.pickups.map((p) => [p.locationId, p.hauls.length])).toEqual([
+        [A, 1],
+        [B, 1],
+      ]);
+    });
   });
 });

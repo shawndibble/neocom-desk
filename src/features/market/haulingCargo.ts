@@ -15,6 +15,7 @@ import type { FittingRecord } from '@/db';
 import { decodeFittingShare } from '@/engine/fitting/fittingShare';
 import { newFitting } from '@/engine/fittings/fittingEdit';
 import { isHoldKind, type CargoHold } from '@/engine/market/cargoHolds';
+import type { PackHold } from '@/engine/assets/haulPacking';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -75,6 +76,15 @@ async function cargoOf(fitting: Fitting, profile: PilotProfile): Promise<CargoHo
 /** A hull's own holds, for a pilot with these skills. */
 export function hullCargoHolds(hullTypeId: number, profile: PilotProfile): Promise<CargoHold[]> {
   return cargoOf(newFitting(hullTypeId, ''), profile);
+}
+
+/** A hull's cargo hold and fleet hangar apart, for a pilot with these skills. */
+export async function hullPackHolds(
+  hullTypeId: number,
+  profile: PilotProfile
+): Promise<PackHold[]> {
+  const { computePackHolds } = await import('./haulingFittingStats');
+  return computePackHolds(newFitting(hullTypeId, ''), profile);
 }
 
 /** A saved Fitting's holds, or null when its share code no longer decodes. */

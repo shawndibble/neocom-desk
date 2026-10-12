@@ -10,17 +10,22 @@
 import {
   consolidationLine,
   isHangarStock,
-  tripsFor,
   type ConsolidationCharacter,
   type ConsolidationLine,
 } from './consolidation';
+import { packHauls, type Haul, type PackHold, type PackLine } from './haulPacking';
+
+export type { Haul, HoldLoad, PackHold } from './haulPacking';
 
 export interface MoveHull {
   typeId: number;
   name: string;
   /** e.g. "Freighter", "Industrial". */
   hullClass: string;
+  /** Every hold added up, for display. */
   capacityM3: number;
+  /** The holds that take any item (cargo hold, fleet hangar), each with its own m³. */
+  holds: PackHold[];
   /** Whether any of the user's Characters owns this hull. */
   owned: boolean;
   /** Whether the pilot has the skills to fly this hull; one they cannot is never suggested. */
@@ -46,9 +51,22 @@ export interface MoveCharacterPlan {
   totalM3: number;
 }
 
+/** One pickup location's load, packed into hauls for one hull. */
+export interface PickupHauls {
+  characterId: number;
+  locationId: number;
+  hauls: Haul[];
+  /** Stacks whose single unit is bigger than the hull's biggest hold. */
+  unfit: PackLine[];
+}
+
 export interface HaulerOption {
   hull: MoveHull;
+  /** Hauls over every pickup (a haul loads at one pickup only). */
   trips: number;
+  pickups: PickupHauls[];
+  /** Stacks this hull cannot carry at all; a hull with any ranks behind every one with none. */
+  unfitCount: number;
 }
 
 export interface MovePlan {
@@ -65,7 +83,7 @@ export interface MovePlan {
     /** Trips with the suggested hauler; null without a suggestion. */
     trips: number | null;
   };
-  /** Fewest trips, then smallest hull; null with nothing to haul or no hulls. */
+  /** Fewest left-behind stacks, then fewest hauls, then smallest hull; null with nothing to haul or no hulls. */
   suggested: HaulerOption | null;
   /** Every hull, best first, for the "Compare haulers" disclosure. */
   comparison: HaulerOption[];
@@ -139,13 +157,39 @@ export function planMove(input: {
   const totalM3 = perCharacter.reduce((sum, c) => sum + c.totalM3, 0);
 
   const comparison: HaulerOption[] = [];
-  for (const hull of input.hulls.filter((h) => h.canFly)) {
-    const trips = tripsFor(totalM3, hull.capacityM3);
-    if (trips !== null) comparison.push({ hull, trips });
+  if (totalM3 > 0) {
+    for (const hull of input.hulls.filter((h) => h.canFly && h.holds.length > 0)) {
+      const packed = perCharacter.flatMap((c) =>
+        c.pickups.map((p): PickupHauls => {
+          // A zero-volume line takes no room, so it never makes a haul of its own.
+          const lines: PackLine[] = p.lines
+            .filter((l) => l.m3 !== null && l.m3 > 0)
+            .map((l) => ({
+              typeId: l.typeId,
+              quantity: l.quantity,
+              unitM3: l.m3! / l.quantity,
+            }));
+          return {
+            characterId: c.characterId,
+            locationId: p.locationId,
+            ...packHauls(lines, hull.holds),
+          };
+        })
+      );
+      comparison.push({
+        hull,
+        pickups: packed.filter((p) => p.hauls.length > 0 || p.unfit.length > 0),
+        trips: packed.reduce((sum, p) => sum + p.hauls.length, 0),
+        unfitCount: packed.reduce((sum, p) => sum + p.unfit.length, 0),
+      });
+    }
   }
   comparison.sort(
     (a, b) =>
-      a.trips - b.trips || a.hull.capacityM3 - b.hull.capacityM3 || a.hull.typeId - b.hull.typeId
+      a.unfitCount - b.unfitCount ||
+      a.trips - b.trips ||
+      a.hull.capacityM3 - b.hull.capacityM3 ||
+      a.hull.typeId - b.hull.typeId
   );
   const suggested = comparison[0] ?? null;
 

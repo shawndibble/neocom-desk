@@ -1,3 +1,4 @@
+import type { Haul } from '@/engine/assets/movePlan';
 import { describe, expect, it } from 'vitest';
 import {
   PICKUP_HUE_COUNT,
@@ -5,9 +6,8 @@ import {
   pickupHues,
   shortStationLabels,
   splitSegments,
+  foldHauls,
   sortStacksByVolume,
-  tripLanes,
-  tripRuns,
 } from './movePlanView';
 import type { PickerStack } from './movePlanInput';
 
@@ -52,20 +52,6 @@ describe('splitSegments', () => {
   });
   it('is empty with nothing to share', () => {
     expect(splitSegments([{ key: 1, m3: 0 }])).toEqual([]);
-  });
-});
-
-describe('tripLanes', () => {
-  it('cuts the load into hold-sized trips with a short last one', () => {
-    const lanes = tripLanes(23862, 6500);
-    expect(lanes.map((l) => l.m3)).toEqual([6500, 6500, 6500, 4362]);
-    expect(lanes.map((l) => l.trip)).toEqual([1, 2, 3, 4]);
-    expect(lanes.reduce((s, l) => s + l.share, 0)).toBeCloseTo(1, 10);
-  });
-  it('is one lane when it fits, and none without a load or a hold', () => {
-    expect(tripLanes(100, 6500).map((l) => l.m3)).toEqual([100]);
-    expect(tripLanes(0, 6500)).toEqual([]);
-    expect(tripLanes(100, 0)).toEqual([]);
   });
 });
 
@@ -147,15 +133,29 @@ describe('sortStacksByVolume', () => {
   });
 });
 
-describe('tripRuns', () => {
-  it('folds neighbouring full trips into one range and keeps the short last trip apart', () => {
-    expect(tripRuns(tripLanes(23862, 6500))).toEqual([
-      { from: 1, to: 3, m3: 6500 },
-      { from: 4, to: 4, m3: 4362 },
+describe('foldHauls', () => {
+  const haul = (typeId: number, quantity: number): Haul => ({
+    usedM3: quantity,
+    holds: [
+      {
+        kind: 'cargo',
+        capacityM3: 100,
+        usedM3: quantity,
+        lines: [{ typeId, quantity, m3: quantity }],
+      },
+    ],
+  });
+
+  it('folds neighbouring identical hauls into a range', () => {
+    const runs = foldHauls([haul(1, 100), haul(1, 100), haul(1, 100), haul(1, 40)]);
+    expect(runs.map((r) => [r.from, r.to])).toEqual([
+      [1, 3],
+      [4, 4],
     ]);
   });
-  it('is one single-trip run when it fits, and empty without lanes', () => {
-    expect(tripRuns(tripLanes(100, 6500))).toEqual([{ from: 1, to: 1, m3: 100 }]);
-    expect(tripRuns([])).toEqual([]);
+
+  it('keeps hauls that differ by type apart, and handles none', () => {
+    expect(foldHauls([haul(1, 100), haul(2, 100)])).toHaveLength(2);
+    expect(foldHauls([])).toEqual([]);
   });
 });
