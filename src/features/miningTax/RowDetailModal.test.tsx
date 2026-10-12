@@ -105,7 +105,7 @@ describe('RowDetailModal system link', () => {
 });
 
 describe('RowDetailModal split', () => {
-  it('offers Split on a needs-review row', async () => {
+  it('offers handing the new ore to another Payee on a needs-review row', async () => {
     const onSplit = vi.fn();
     renderModal(
       'needs-review',
@@ -124,8 +124,7 @@ describe('RowDetailModal split', () => {
       } as MiningTaxAssignmentRecord,
       onSplit
     );
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Split between Payees…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Give new ore to another Payee…' }));
     expect(onSplit).toHaveBeenCalledTimes(1);
   });
 });
