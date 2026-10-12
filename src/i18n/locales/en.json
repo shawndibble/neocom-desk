@@ -3225,13 +3225,34 @@
     "heading": "Answers, not API dumps.",
     "previewLabel": "Example — logged-in view",
     "previewCorp": "Deep Space Transport",
+    "demo": {
+      "alerts": {
+        "ago": "{{duration}} ago",
+        "undercut": {
+          "title": "Order undercut",
+          "detail": "Superconductors ×570 at Amarr VIII"
+        },
+        "jobReady": {
+          "title": "Industry job ready",
+          "detail": "Medium Capacitor Booster II ×10 is ready to deliver"
+        },
+        "skillDone": {
+          "title": "Skill finished",
+          "detail": "Mining Exploitation IV is done, the next skill starts"
+        },
+        "extractor": {
+          "title": "Extractor ending soon",
+          "detail": "Efa IV runs out in 2d 21h"
+        },
+        "mail": {
+          "title": "New mail",
+          "detail": "From the corp recruiter: Welcome aboard"
+        }
+      }
+    },
     "answersHeading": "The questions it exists to answer",
     "answersLead": "Each of these is a screen from the app, filled with sample data. Select a picture to enlarge it.",
     "answers": {
-      "attention": {
-        "question": "Which character needs my attention?",
-        "answer": "An Overview of widgets you choose and arrange, with every pilot’s training queue at a glance and one alerts bell for what fired on any character: skills finished, jobs ready to deliver, orders undercut, mail waiting."
-      },
       "orders": {
         "question": "Which of my orders is quietly losing ISK?",
         "answer": "Open Orders files each order under the worst thing wrong with it, worst first, across every character. Open one to see what holding, undercutting, dumping into a buy order or reprocessing would net after fees."
@@ -3271,10 +3292,6 @@
     },
     "screenshotEnlarge": "Enlarge: {{alt}}",
     "screenshots": {
-      "overview": {
-        "alt": "A character’s Overview on a desktop: a grid of widgets the pilot chose, here the skill queue and industry jobs as tables beside the wallet balance and skill points, with the next deadline and the alerts bell above.",
-        "caption": "Your own Overview of what needs you next"
-      },
       "orderDetail": {
         "alt": "An open sell order: who is cheaper at the station, system and region, and whether there is a better exit.",
         "caption": "Every order explains what it is losing to"

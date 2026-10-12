@@ -8,6 +8,7 @@ export function AreaChart({ model, height }: { model: AreaChartModel; height: nu
     <div aria-hidden="true" className="grid gap-1">
       {line.length > 0 && (
         <svg
+          aria-hidden="true"
           viewBox={`0 0 100 ${height}`}
           preserveAspectRatio="none"
           className="block w-full text-accent"
