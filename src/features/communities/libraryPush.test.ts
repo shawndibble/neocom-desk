@@ -86,6 +86,16 @@ describe('publishSharedLibrary', () => {
     location.mockResolvedValue({ name: 'Jita IV - Moon 4', systemId: 30000142 });
   });
 
+  it('runs once more when a call arrives mid-flight, so a change is never missed', async () => {
+    memberDoc({ ownerHash: 'owner-1' });
+    const first = publishSharedLibrary(1, 'c1');
+    const second = publishSharedLibrary(1, 'c1');
+    const third = publishSharedLibrary(1, 'c1');
+    await Promise.all([first, second, third]);
+    // The first run, plus one shared by the two that arrived behind it.
+    expect(getDoc).toHaveBeenCalledTimes(2);
+  });
+
   it('publishes the rest and counts a blueprint whose place cannot be read', async () => {
     choice.current = { all: true, excluded: new Set() };
     // Blueprint 100 sits in a readable station, 200 in a structure with no name.

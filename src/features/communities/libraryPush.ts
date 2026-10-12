@@ -50,7 +50,11 @@ export interface PublishResult {
 
 const unavailable: PublishResult = { outcome: 'unavailable', skipped: 0 };
 
-const inFlight = new Map<string, Promise<PublishResult>>();
+/** The run in flight for a pair, and the one run queued behind it when a call arrived mid-flight. */
+const inFlight = new Map<
+  string,
+  { run: Promise<PublishResult>; next: Promise<PublishResult> | null }
+>();
 
 function memberRef(communityId: string, uid: string) {
   return doc(getSyncFirestore(), 'communities', communityId, 'members', uid);
@@ -168,7 +172,10 @@ async function publish(characterId: number, communityId: string): Promise<Publis
 
 /**
  * Pushes one Character's selection to one Community if its hash changed.
- * Concurrent calls for the same pair share one run. Never throws: a failed
+ * A call that arrives while a run is in flight waits for it and then runs
+ * once more, however many such calls there are: the run in flight may have
+ * read the choice before the change that prompted the call. The second run
+ * is cheap when nothing changed (the hash matches). Never throws: a failed
  * push just leaves the last one in place, and the next sweep retries.
  */
 export function publishSharedLibrary(
@@ -176,13 +183,19 @@ export function publishSharedLibrary(
   communityId: string
 ): Promise<PublishResult> {
   const key = `${characterId}:${communityId}`;
+  const start = (): Promise<PublishResult> => {
+    const run: Promise<PublishResult> = publish(characterId, communityId)
+      .catch((): PublishResult => unavailable)
+      .finally(() => {
+        if (inFlight.get(key)?.run === run) inFlight.delete(key);
+      });
+    inFlight.set(key, { run, next: null });
+    return run;
+  };
   const running = inFlight.get(key);
-  if (running) return running;
-  const run = publish(characterId, communityId)
-    .catch((): PublishResult => unavailable)
-    .finally(() => inFlight.delete(key));
-  inFlight.set(key, run);
-  return run;
+  if (!running) return start();
+  running.next ??= running.run.then(start);
+  return running.next;
 }
 
 /** Every Community the Character is in: used at boot and on a timer. */

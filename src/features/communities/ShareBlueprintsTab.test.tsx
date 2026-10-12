@@ -110,9 +110,32 @@ describe('ShareBlueprintsTab', () => {
   });
 
   it('says how many blueprints were left out for want of a known place', async () => {
+    await saveShareChoice(1, 'c1', { all: true, excluded: new Set() });
     publish.mockResolvedValue({ outcome: 'full', skipped: 2 });
     renderTab();
     expect(await screen.findByText(/2 blueprints are not shared/)).toBeInTheDocument();
+  });
+
+  it('does not check the Community on open when nothing is shared', async () => {
+    renderTab();
+    await screen.findByText(b.noneShared);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('shows only the newest publish result when two overlap', async () => {
+    const results: ((value: unknown) => void)[] = [];
+    await saveShareChoice(1, 'c1', { all: true, excluded: new Set() });
+    publish.mockImplementation(() => new Promise((resolve) => results.push(resolve)));
+    const user = userEvent.setup();
+    renderTab();
+    await waitFor(() => expect(results).toHaveLength(1));
+    const row = (await screen.findByText('Beta Blueprint')).closest('li')!;
+    await user.click(within(row).getByRole('button', { name: b.stop }));
+    await waitFor(() => expect(results).toHaveLength(2));
+    results[1]!({ outcome: 'full', skipped: 3 });
+    results[0]!({ outcome: 'full', skipped: 9 });
+    expect(await screen.findByText(/3 blueprints are not shared/)).toBeInTheDocument();
+    expect(screen.queryByText(/9 blueprints are not shared/)).not.toBeInTheDocument();
   });
 
   it('links to BPC Sourcing narrowed to the Community and owned sources', async () => {

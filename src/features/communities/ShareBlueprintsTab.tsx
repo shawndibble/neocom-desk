@@ -1,5 +1,5 @@
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
@@ -52,20 +52,29 @@ export function ShareBlueprintsTab({
   const [failed, setFailed] = useState(false);
   const [published, setPublished] = useState<PublishResult | null>(null);
 
+  /** Shows a publish's result unless a later publish has been asked for since. */
+  const report = useCallback((result: Promise<PublishResult>) => {
+    const mine = ++publishes.current;
+    void result.then((value) => {
+      if (mine === publishes.current) setPublished(value);
+    });
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     void loadShareChoice(characterId, communityId).then((saved) => {
-      if (!cancelled) setChoice(saved);
-    });
-    // Opening the tab checks what the Community holds against this device, so
-    // blueprints left out show up here without waiting for a change.
-    void publishSharedLibrary(characterId, communityId).then((result) => {
-      if (!cancelled) setPublished(result);
+      if (cancelled) return;
+      setChoice(saved);
+      // Opening the tab checks what the Community holds against this device, so
+      // blueprints left out show up here without waiting for a change. Nothing
+      // is chosen, nothing to check.
+      if (saved.all || saved.allowed.size > 0)
+        report(publishSharedLibrary(characterId, communityId));
     });
     return () => {
       cancelled = true;
     };
-  }, [characterId, communityId]);
+  }, [characterId, communityId, report]);
 
   const types = useMemo(() => (owned.status === 'ready' ? owned.owned : []), [owned]);
   const typeIds = useMemo(() => types.map((type) => type.typeId), [types]);
@@ -98,6 +107,7 @@ export function ShareBlueprintsTab({
   // back exactly its own change.
   const latest = useRef<ShareChoice | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
+  const publishes = useRef(0);
   useEffect(() => {
     latest.current = choice;
   }, [choice]);
@@ -113,7 +123,7 @@ export function ShareBlueprintsTab({
       try {
         await saveShareChoice(characterId, communityId, next);
         // Never rejects: 'unavailable' means nothing reached the Community this time.
-        void publishSharedLibrary(characterId, communityId).then(setPublished);
+        report(publishSharedLibrary(characterId, communityId));
       } catch {
         latest.current = base;
         setChoice(base);
@@ -224,7 +234,7 @@ export function ShareBlueprintsTab({
           {t('communities.blueprints.unpublished')}
         </p>
       )}
-      {published !== null && published.skipped > 0 && (
+      {published !== null && published.outcome !== 'unavailable' && published.skipped > 0 && (
         <p role="status" className="text-xs text-warning">
           {t('communities.blueprints.skipped', { count: published.skipped })}
         </p>
