@@ -7727,6 +7727,7 @@
     "library": {
       "tab": "Library",
       "tabsLabel": "Community views",
+      "back": "Back to Blueprints",
       "legend": "BPO: shares the original. BPC: shares copies only. Stale Members are greyed.",
       "filterLabel": "Show blueprints",
       "missingCommunity": "Missing from the Community",
@@ -7840,15 +7841,28 @@
       "loading": "Loading blueprints…",
       "needsReauth": "Grant permission to read blueprints to choose what to share.",
       "failed": "Could not load this Character's blueprints.",
-      "choose": "Choose what to share…",
       "chooseCount": "Choose what to share ({{count}})…",
-      "hide": "Hide",
-      "summary_one": "{{name}} shares {{count}} blueprint",
-      "summary_other": "{{name}} shares {{count}} blueprints",
-      "dialogTitle": "What {{name}} shares",
-      "dialogHint": "Nothing is shared until you choose. Your choice is saved on this device.",
-      "save": "Save",
       "saveFailed": "Could not save your choice."
+    },
+    "tabs": {
+      "label": "Community",
+      "blueprints": "Blueprints",
+      "fittings": "Fittings"
+    },
+    "blueprints": {
+      "shareAll": "Share all my blueprints",
+      "allShared": "All {{count}} shared, including ones you get later",
+      "openLibrary": "Open the Community Library",
+      "filter": "Search your shared blueprints",
+      "search": "Search your blueprints to share",
+      "addable": "Add to what you share",
+      "share": "Share",
+      "stop": "Stop sharing",
+      "noneShared": "No blueprints shared yet",
+      "limited": "Showing the first {{count}}. Search to narrow the list.",
+      "offTitle": "Stop sharing all your blueprints?",
+      "offBody": "This removes every blueprint you share with this Community, including ones you picked one by one. You can share them again at any time.",
+      "offAction": "Stop sharing all"
     },
     "join": {
       "title": "Join a Community",

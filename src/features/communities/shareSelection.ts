@@ -7,6 +7,7 @@
  * nothing is shared.
  */
 import { db } from '@/db';
+import type { ShareChoice } from '@/engine/communities/shareMode';
 
 const PREFIX = 'communityShare:';
 const keyFor = (characterId: number, communityId: string) =>
@@ -53,4 +54,43 @@ export async function markFittingsShared(characterId: number): Promise<void> {
 /** Run inside `removeCharacter`'s transaction: a removed Character leaves no choices behind. */
 export async function deleteShareSelections(characterId: number): Promise<void> {
   await db.settings.where('key').startsWith(`${PREFIX}${characterId}:`).delete();
+}
+
+const allKeyFor = (characterId: number, communityId: string) =>
+  `${keyFor(characterId, communityId)}:all`;
+
+/**
+ * The Character's full choice for a Community: share-all (its row holds the
+ * blueprints stopped since) or the allowlist. A `:all` row under the same
+ * prefix is counted by `hasShareSelections` and deleted with the Character.
+ */
+export async function loadShareChoice(
+  characterId: number,
+  communityId: string
+): Promise<ShareChoice> {
+  const all = await db.settings.get(allKeyFor(characterId, communityId));
+  if (all) {
+    const ids = Array.isArray(all.value) ? all.value : [];
+    return { all: true, excluded: new Set(ids.filter((id): id is number => Number.isInteger(id))) };
+  }
+  return { all: false, allowed: await loadShareSelection(characterId, communityId) };
+}
+
+export async function saveShareChoice(
+  characterId: number,
+  communityId: string,
+  choice: ShareChoice
+): Promise<void> {
+  const allKey = allKeyFor(characterId, communityId);
+  if (choice.all) {
+    await db.transaction('rw', db.settings, async () => {
+      await db.settings.delete(keyFor(characterId, communityId));
+      await db.settings.put({ key: allKey, value: [...choice.excluded].sort((a, b) => a - b) });
+    });
+    return;
+  }
+  await db.transaction('rw', db.settings, async () => {
+    await db.settings.delete(allKey);
+    await saveShareSelection(characterId, communityId, choice.allowed);
+  });
 }

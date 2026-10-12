@@ -23,8 +23,7 @@ import { CommunityLibrary } from './CommunityLibrary';
 import { ConfirmDialog } from './ConfirmDialog';
 import { MailInvitePanel } from './MailInvitePanel';
 import { ShareFittingsPanel } from './ShareFittingsPanel';
-import { ShareSelectionDialog } from './ShareSelectionDialog';
-import { loadShareSelection } from './shareSelection';
+import { ShareBlueprintsTab } from './ShareBlueprintsTab';
 import {
   communityInviteUrl,
   deleteCommunity,
@@ -74,21 +73,9 @@ export function CommunityDetail({
   const [membersFailed, setMembersFailed] = useState(false);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
   const tabsId = useTabsId();
-  const [tab, setTab] = useState<'members' | 'library'>('members');
-  const [sharedCount, setSharedCount] = useState<number | null>(null);
+  const [tab, setTab] = useState<'blueprints' | 'fittings' | 'members' | 'library'>('blueprints');
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadShareSelection(characterId, community.id).then((saved) => {
-      if (!cancelled) setSharedCount(saved.size);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, community.id]);
 
   // Bumped after a change that alters the Member list, to refetch it.
   const [reload, setReload] = useState(0);
@@ -109,7 +96,6 @@ export function CommunityDetail({
     };
   }, [characterId, community.id, community.memberCount, reload]);
 
-  const myName = members?.find((member) => member.uid === myUid)?.characterName ?? '';
   const inviteUrl = community.inviteCode ? communityInviteUrl(community.inviteCode) : null;
   const close = () => setDialog(null);
   const changed = () => {
@@ -177,35 +163,35 @@ export function CommunityDetail({
         </>
       )}
 
-      <section
-        className="mb-4 flex flex-wrap items-center gap-2"
-        aria-label={t('communities.share.legend')}
-      >
-        <p className="text-xs text-text-dim">
-          {sharedCount !== null &&
-            myName !== '' &&
-            t('communities.share.summary', { count: sharedCount, name: myName })}
-        </p>
-        <Button size="sm" onClick={() => setSharing(true)}>
-          {t('communities.share.choose')}
+      {tab === 'library' ? (
+        <Button size="sm" className="mb-2" onClick={() => setTab('blueprints')}>
+          {t('communities.library.back')}
         </Button>
-      </section>
-
-      <ShareFittingsPanel characterId={characterId} communityId={community.id} />
-
-      <Tabs
-        tabsId={tabsId}
-        tabs={[
-          { id: 'members', label: t('communities.members') },
-          { id: 'library', label: t('communities.library.tab') },
-        ]}
-        value={tab}
-        onChange={(id) => setTab(id as 'members' | 'library')}
-        label={t('communities.library.tabsLabel')}
-        className="mb-2"
-      />
+      ) : (
+        <Tabs
+          tabsId={tabsId}
+          tabs={[
+            { id: 'blueprints', label: t('communities.tabs.blueprints') },
+            { id: 'fittings', label: t('communities.tabs.fittings') },
+            { id: 'members', label: t('communities.members') },
+          ]}
+          value={tab}
+          onChange={(id) => setTab(id as 'blueprints' | 'fittings' | 'members')}
+          label={t('communities.tabs.label')}
+          className="mb-2"
+        />
+      )}
       <TabPanel tabsId={tabsId} tabId={tab}>
-        {tab === 'library' ? (
+        {tab === 'blueprints' ? (
+          <ShareBlueprintsTab
+            characterId={characterId}
+            communityId={community.id}
+            onChanged={() => {}}
+            onOpenLibrary={() => setTab('library')}
+          />
+        ) : tab === 'fittings' ? (
+          <ShareFittingsPanel characterId={characterId} communityId={community.id} />
+        ) : tab === 'library' ? (
           <CommunityLibrary
             communityId={community.id}
             characterId={characterId}
@@ -366,14 +352,6 @@ export function CommunityDetail({
           onPatch({ adminUid: dialog.member.uid });
           onChanged();
         }}
-      />
-      <ShareSelectionDialog
-        open={sharing}
-        characterId={characterId}
-        characterName={myName}
-        communityId={community.id}
-        onClose={() => setSharing(false)}
-        onSaved={setSharedCount}
       />
       {copied && <Toast message={copied} onClose={() => setCopied(null)} />}
     </Panel>

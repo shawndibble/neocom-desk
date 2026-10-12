@@ -18,6 +18,7 @@ import {
   type Timestamp,
 } from 'firebase/firestore/lite';
 import { db } from '@/db';
+import { effectiveSelection, type ShareChoice } from '@/engine/communities/shareMode';
 import {
   chunkLibrary,
   libraryHash,
@@ -34,7 +35,7 @@ import { resolveBlueprintPlacement } from '@/features/industry/ownedBlueprints';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
-import { loadShareSelection } from './shareSelection';
+import { loadShareChoice } from './shareSelection';
 
 const inFlight = new Map<string, Promise<PushPlan | 'unavailable'>>();
 
@@ -54,13 +55,17 @@ export async function listCommunityIds(characterId: number): Promise<string[]> {
  * when the inputs aren't all on hand (no cached blueprints or assets, scope
  * lost): the caller publishes nothing rather than shrinking the library.
  */
-async function buildLibrary(characterId: number, selected: ReadonlySet<number>) {
+async function buildLibrary(characterId: number, choice: ShareChoice) {
   const [blueprints, assets] = await Promise.all([
     loadCharacterBlueprints(characterId),
     loadCharacterAssets(characterId),
   ]);
   if (!blueprints.cached || !assets.cached) return null;
 
+  const selected = effectiveSelection(
+    [...new Set(blueprints.cached.data.map((blueprint) => blueprint.type_id))],
+    choice
+  );
   const assetsByItemId = new Map(assets.cached.data.map((asset) => [asset.item_id, asset]));
   const owned = blueprints.cached.data.filter((blueprint) => selected.has(blueprint.type_id));
   const placeIds = new Map<number, number>();
@@ -96,8 +101,8 @@ async function publish(
   characterId: number,
   communityId: string
 ): Promise<PushPlan | 'unavailable'> {
-  const [selected, character] = await Promise.all([
-    loadShareSelection(characterId, communityId),
+  const [choice, character] = await Promise.all([
+    loadShareChoice(characterId, communityId),
     db.characters.get(characterId),
   ]);
   if (!character?.ownerHash) return 'unavailable';
@@ -112,7 +117,7 @@ async function publish(
       : null;
   const oldChunkCount = Number(data.chunkCount ?? 0);
 
-  const items = await buildLibrary(characterId, selected);
+  const items = await buildLibrary(characterId, choice);
   if (!items) return 'unavailable';
   const hash = libraryHash(items);
   const plan = planPush(last, hash, items.length, Date.now());
