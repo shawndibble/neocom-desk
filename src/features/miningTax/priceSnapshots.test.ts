@@ -16,14 +16,14 @@ describe('saveTodayPriceSnapshot', () => {
     expect(saved.get('2026-09-22')).toEqual({ 1: { buy: 5, sell: 6 }, 2: { buy: 3, sell: 4 } });
   });
 
-  it('drops saved days older than 90 days, today counted as day one', async () => {
+  it('drops saved days older than a year, today counted as day one', async () => {
     await db.jitaPriceSnapshots.bulkPut([
-      { date: '2026-06-24', prices: { 1: { buy: 1, sell: 1 } } },
-      { date: '2026-06-25', prices: { 1: { buy: 1, sell: 1 } } },
+      { date: '2025-09-22', prices: { 1: { buy: 1, sell: 1 } } },
+      { date: '2025-09-23', prices: { 1: { buy: 1, sell: 1 } } },
     ]);
 
     await saveTodayPriceSnapshot('2026-09-22', { 1: { buy: 2, sell: 2 } });
 
-    expect([...(await loadPriceSnapshots()).keys()].sort()).toEqual(['2026-06-25', '2026-09-22']);
+    expect([...(await loadPriceSnapshots()).keys()].sort()).toEqual(['2025-09-23', '2026-09-22']);
   });
 });

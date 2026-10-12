@@ -52,7 +52,7 @@ export interface NetWorthDay {
 }
 
 /** The days (the newest included) of a Character's snapshots the widget reads: what its change and chart cover. */
-export const NET_WORTH_HISTORY_DAYS = 30;
+export const NET_WORTH_HISTORY_DAYS = 365;
 
 export interface NetWorthCharacter {
   characterId: number;

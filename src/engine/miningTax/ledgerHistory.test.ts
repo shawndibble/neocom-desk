@@ -41,11 +41,11 @@ describe('mergeLedgerHistory', () => {
   });
 
   it(`drops rows more than ${LEDGER_HISTORY_DAYS} days before the newest day held`, () => {
-    // Newest day 2026-09-22; the 90-day window is 2026-06-25 .. 2026-09-22.
-    const stored = [row('2026-06-24', 1), row('2026-06-25', 2)];
+    // Newest day 2026-09-22; the one-year window is 2025-09-23 .. 2026-09-22.
+    const stored = [row('2025-09-22', 1), row('2025-09-23', 2)];
     const fresh = [row('2026-09-22', 3)];
 
-    expect(mergeLedgerHistory(stored, fresh)).toEqual([row('2026-06-25', 2), row('2026-09-22', 3)]);
+    expect(mergeLedgerHistory(stored, fresh)).toEqual([row('2025-09-23', 2), row('2026-09-22', 3)]);
   });
 
   it('sums rows one fetch reports twice for the same day, system and type, before replacing', () => {

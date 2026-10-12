@@ -55,7 +55,7 @@ export const BACKFILL_HUB = SNAPSHOT_HUBS[0];
 /** Every type_id this job prices: raw + compressed ore/ice/gas + reprocessing materials (`scripts/build-sde.mjs`). */
 export const PRICED_TYPE_IDS: readonly number[] = MINING_TYPE_IDS;
 
-/** Mirrors `LEDGER_HISTORY_DAYS` in `src/engine/miningTax/ledgerHistory.ts` — the ledger itself never asks about a day older than this. */
+/** Server-side market history window. The device keeps a year of ledger (`LEDGER_HISTORY_DAYS` in `src/engine/miningTax/ledgerHistory.ts`); days past this one are priced from the device's own saved snapshots. */
 export const MARKET_HISTORY_RETENTION_DAYS = 90;
 
 export interface SidePrices {
