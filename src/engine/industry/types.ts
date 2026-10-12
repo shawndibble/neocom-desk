@@ -670,12 +670,21 @@ export type OwnedStockScope =
       containers?: readonly number[];
     };
 
+/** The Community Member a Blueprint Acquisition tier is taken from (issue #3603). */
+export interface AcquisitionCommunitySource {
+  memberName: string;
+  /** The Member's library has not refreshed in 30 days. */
+  stale: boolean;
+}
+
 /** What a Blueprint Acquisition row (issue #838) reports, at whatever node resolved it. */
 export interface AcquisitionLine {
   /** ISK to cover the shortfall at the resolved tier; ignored when `owned`. */
   unitPrice: number | null;
   /** True when the resolved tier's owned runs already cover the need — nothing bought. */
   owned: boolean;
+  /** Set when the tier is a Community Offer: free, from this Member. */
+  community?: AcquisitionCommunitySource;
 }
 
 /**
@@ -717,7 +726,7 @@ export interface MaterialCostLine extends EffectiveMaterial {
    * owned-stock offer (`ownedStockOffer.ts`) and no place in the multibuy
    * text.
    */
-  acquisitionTier?: { me: number; te: number };
+  acquisitionTier?: { me: number; te: number; community?: AcquisitionCommunitySource };
 }
 
 export type BuildRecommendation = 'build' | 'buy' | 'unknown';

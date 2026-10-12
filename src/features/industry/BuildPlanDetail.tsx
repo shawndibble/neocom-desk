@@ -331,6 +331,7 @@ export function BuildPlanDetail({
     standing,
     bpcOffersFor,
     bpcLastResortOffersFor,
+    communityOffersFor,
   } = pricingSourcesForHub(pricingInputs, hub);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
   // Include Reactions (issue #698): meaningless for a reaction-activity plan,
@@ -715,6 +716,7 @@ export function BuildPlanDetail({
           bpcOffersFor,
           bpcLastResortOffersFor,
           blueprintPurchaseOffersFor,
+          communityOffersFor,
           includeBlueprintCost,
         },
         { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
@@ -730,6 +732,7 @@ export function BuildPlanDetail({
       bpcOffersFor,
       bpcLastResortOffersFor,
       blueprintPurchaseOffersFor,
+      communityOffersFor,
       includeBlueprintCost,
       snapshot,
       reactionSnapshot?.systemCostIndex,

@@ -280,7 +280,11 @@ export function acquisitionMaterialFor(
     unitPrice,
     lineCost: remainingQuantity * (unitPrice ?? 0),
     unpriced: remainingQuantity > 0 && unitPrice === null,
-    acquisitionTier: { me: acquisition.me, te: acquisition.te },
+    acquisitionTier: {
+      me: acquisition.me,
+      te: acquisition.te,
+      ...(acquisition.line.community ? { community: acquisition.line.community } : {}),
+    },
   };
 }
 

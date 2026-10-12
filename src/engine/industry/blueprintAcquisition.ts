@@ -9,7 +9,7 @@
  * `engine/contracts/bpcSearch.ts`'s `OwnedBlueprintInput` stays decoupled —
  * a caller adapts `CharacterBlueprint`/`BpcContractRow` into the shapes here.
  */
-import type { AcquisitionResolution } from '@/engine/industry/types';
+import type { AcquisitionCommunitySource, AcquisitionResolution } from '@/engine/industry/types';
 
 /** One owned copy of a blueprint. */
 export interface OwnedBlueprintCopy {
@@ -34,6 +34,8 @@ export interface BpcOffer {
    * not this blueprint. Absent/false for an ordinary single-type listing.
    */
   isMultiType?: boolean;
+  /** Set on a Community Offer (issue #3603): the Member who shares it. Its `price` is always 0. */
+  community?: AcquisitionCommunitySource;
 }
 
 /** `AcquisitionResolution` minus `blueprintTypeID` — this module has no typeID of its own to report, only the caller (`recipes.ts`) knows it. */
@@ -76,6 +78,14 @@ export interface SelectBlueprintTierInputs {
    * beats one that opens with no blueprint price when something is for sale.
    */
   lastResortOffers?: readonly BpcOffer[];
+  /**
+   * Community Offers (issue #3603): Shared Blueprints Members of the
+   * Character's Communities hold, free to take. They join the tier pool at 0
+   * ISK, so an owned BPO at the same tier still wins (owned tiers are never
+   * bought) and any priced offer at that tier loses to them. A Member's
+   * reaction formula is never passed here — the caller drops it.
+   */
+  communityOffers?: readonly BpcOffer[];
   /** ME to quote when nothing is owned and nothing can be bought — mirrors `assumedMeForUnowned`. */
   assumedMeForUnowned: number;
 }
@@ -86,7 +96,14 @@ interface Candidate {
   /** Runs already covered before buying anything; Infinity for a BPO. */
   ownedRuns: number;
   /** How to extend this exact tier by buying more, if anything can. */
-  extend: { capacityRuns: number; price: number } | null;
+  extend: Extend | null;
+}
+
+/** What buying more at one tier brings: its runs, its price, and who shares it when it is a Community Offer. */
+interface Extend {
+  capacityRuns: number;
+  price: number;
+  community?: AcquisitionCommunitySource;
 }
 
 /**
@@ -102,7 +119,7 @@ export interface TierOption {
   /** Runs already covered before buying anything; Infinity for a BPO. */
   ownedRuns: number;
   /** How to extend this exact tier by buying more, if anything can. */
-  extend: { capacityRuns: number; price: number } | null;
+  extend: Extend | null;
   cost: number | null;
 }
 
@@ -131,18 +148,19 @@ function ownedTierCandidates(copies: readonly OwnedBlueprintCopy[]): Candidate[]
   return [...byTier.values()];
 }
 
-function offerToExtend(offer: BpcOffer): { capacityRuns: number; price: number } {
+function offerToExtend(offer: BpcOffer): Extend {
   return {
     // A listing's combined `quantity` copies all come with the one contract
     // at its one `price` — buying it whole nets every run all of them carry,
     // not just one copy's worth.
     capacityRuns: offer.runs === -1 ? INFINITE_RUNS : offer.runs * offer.quantity,
     price: offer.price,
+    ...(offer.community ? { community: offer.community } : {}),
   };
 }
 
 /** Whole copies needed to cover `shortfall` runs at `extend`'s capacity/price — never a fractional-copy price. */
-function shortfallCost(shortfall: number, extend: { capacityRuns: number; price: number }): number {
+function shortfallCost(shortfall: number, extend: Extend): number {
   return copiesToCover(shortfall, extend) * extend.price;
 }
 
@@ -254,7 +272,13 @@ function primaryOffers(inputs: SelectBlueprintTierInputs): BpcOffer[] {
     inputs.bpoSellPrice === null
       ? []
       : [{ me: 0, te: 0, runs: -1, quantity: 1, price: inputs.bpoSellPrice }];
+  // Shared first: a free tie at one tier goes to the Member, never a 0 ISK LP redemption.
+  const community = usableOffers(inputs.communityOffers ?? [], true).map((offer) => ({
+    ...offer,
+    price: 0,
+  }));
   return [
+    ...community,
     ...usableOffers([...inputs.bpcOffers, ...bpo]),
     ...usableOffers(inputs.extraOffers ?? [], true),
   ];
@@ -311,7 +335,11 @@ export function resolveTierOption(option: TierOption, neededRuns: number): Bluep
   return {
     me: option.me,
     te: option.te,
-    line: { unitPrice: price, owned: false },
+    line: {
+      unitPrice: price,
+      owned: false,
+      ...(option.extend?.community ? { community: option.extend.community } : {}),
+    },
     coverage,
     ...(purchasedRuns !== undefined ? { purchasedRuns } : {}),
   };

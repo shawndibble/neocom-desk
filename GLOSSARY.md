@@ -76,7 +76,11 @@ here — they go one per file in `docs/context/decisions/`.
   buildable node isn't fully covered by an owned **BPO**. It takes whichever
   owned-or-purchasable ME/TE tier makes the node's total cost lowest, trying
   **BPC Sourcing** first, then the BPO's ordinary sell price. A
-  reaction-activity node only ever considers a BPO.
+  **Community Offer** joins the same tier pool at 0 ISK, so the
+  **Acquisition Verdict** can flip to build; the row reads "from <name>" and
+  shows stale. Ranking: an owned BPO beats a Community Offer, which beats any
+  priced contract offer. A reaction-activity node only ever considers a BPO,
+  and a **Member**'s reaction formula is never a source.
 - **Booster**: Cerebral accelerator; user adds it manually, entering the time
   left as EVE's tooltip shows it, for training-time math. A Skill Plan holds
   an ordered list of Boosters run one after another, since EVE has a single

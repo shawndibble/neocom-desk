@@ -661,3 +661,93 @@ describe('selectBlueprintTier — every purchasable source competes on total cos
     expect(result.line).toEqual({ unitPrice: null, owned: false });
   });
 });
+
+describe('Community Offers (issue #3603)', () => {
+  const base = {
+    neededRuns: 5,
+    materialCostAtMe: costAtMe,
+    bpcOffers: [],
+    bpoSellPrice: null,
+    assumedMeForUnowned: 0,
+  };
+  const shared = { memberName: 'Alice', stale: false };
+
+  it('a shared BPO covers the need at 0 ISK and names the Member', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [],
+      communityOffers: [{ me: 10, te: 20, runs: -1, quantity: 1, price: 0, community: shared }],
+    });
+    expect(result).toMatchObject({
+      me: 10,
+      te: 20,
+      line: { unitPrice: 0, owned: false, community: shared },
+    });
+  });
+
+  it('beats a priced contract offer at the same tier', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [],
+      bpcOffers: [{ me: 10, te: 20, runs: 5, quantity: 1, price: 1_000 }],
+      communityOffers: [{ me: 10, te: 20, runs: 5, quantity: 1, price: 0, community: shared }],
+    });
+    expect(result.line).toEqual({ unitPrice: 0, owned: false, community: shared });
+  });
+
+  it('an owned BPO at the same tier wins over a Community Offer', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [{ me: 10, te: 20, runs: -1 }],
+      communityOffers: [{ me: 10, te: 20, runs: -1, quantity: 1, price: 0, community: shared }],
+    });
+    expect(result).toEqual({ me: 10, te: 20, line: null });
+  });
+
+  it('a stale flag rides along', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [],
+      communityOffers: [
+        {
+          me: 5,
+          te: 10,
+          runs: -1,
+          quantity: 1,
+          price: 0,
+          community: { memberName: 'Bob', stale: true },
+        },
+      ],
+    });
+    expect(result.line).toMatchObject({ community: { memberName: 'Bob', stale: true } });
+  });
+
+  it('tops up a short owned copy at its tier for free, naming the Member', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [{ me: 10, te: 20, runs: 2 }],
+      communityOffers: [{ me: 10, te: 20, runs: 5, quantity: 1, price: 0, community: shared }],
+    });
+    expect(result.line).toMatchObject({ unitPrice: 0, community: shared });
+  });
+
+  it('a priced offer at a better ME still wins when its materials save more', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [],
+      bpcOffers: [{ me: 10, te: 20, runs: 5, quantity: 1, price: 1 }],
+      communityOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 0, community: shared }],
+    });
+    expect(result.me).toBe(10);
+    expect(result.line).toEqual({ unitPrice: 1, owned: false });
+  });
+
+  it('ignores a malformed Community Offer', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [],
+      communityOffers: [{ me: 10, te: 20, runs: 0, quantity: 1, price: 0, community: shared }],
+    });
+    expect(result.line).toEqual({ unitPrice: null, owned: false });
+  });
+});

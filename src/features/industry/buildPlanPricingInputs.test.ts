@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { create } from 'zustand';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
+import type { BpcContractRow, BpcSearchRow } from '@/engine/contracts/bpcSearch';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
 import { getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
@@ -14,6 +14,7 @@ import { useAssumedMe } from './assumedMe';
 import { useIncludeBlueprintCost } from './includeBlueprintCost';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import {
+  communityOffersForRows,
   isPricingReady,
   loadBpcContractRows,
   pricingSourcesForHub,
@@ -84,6 +85,7 @@ function inputs(overrides: Partial<BuildPlanPricingInputs> = {}): BuildPlanPrici
     corpBlueprints: CORP,
     standings: new Map(),
     bpcRows: [],
+    communityRows: [],
     ...overrides,
   };
 }
@@ -267,5 +269,50 @@ describe('loadBpcContractRows', () => {
     await expect(loadBpcContractRows(1)).resolves.toBeNull();
     mockedBpcContracts.mockRejectedValue(new Error('offline'));
     await expect(loadBpcContractRows(1)).resolves.toBeNull();
+  });
+});
+
+describe('communityOffersForRows', () => {
+  const row = (overrides: Record<string, unknown>) =>
+    ({
+      source: 'community',
+      typeId: 100,
+      me: 10,
+      te: 20,
+      runs: -1,
+      quantity: 1,
+      price: 0,
+      memberUid: 'u1',
+      memberName: 'Alice',
+      communityNames: ['A'],
+      stale: false,
+      asOf: 1,
+      locationName: 'Jita IV',
+      systemName: 'Jita',
+      regionId: null,
+      space: null,
+      systemId: null,
+      ...overrides,
+    }) as BpcSearchRow;
+
+  it('maps Shared Blueprints to free offers named for the Member, by type', () => {
+    const lookup = communityOffersForRows([row({}), row({ typeId: 200, stale: true })]);
+    expect(lookup(100)).toEqual([
+      {
+        me: 10,
+        te: 20,
+        runs: -1,
+        quantity: 1,
+        price: 0,
+        community: { memberName: 'Alice', stale: false },
+      },
+    ]);
+    expect(lookup(200)[0]!.community).toEqual({ memberName: 'Alice', stale: true });
+    expect(lookup(300)).toEqual([]);
+  });
+
+  it('returns the same lookup for the same rows', () => {
+    const rows = [row({})];
+    expect(communityOffersForRows(rows)).toBe(communityOffersForRows(rows));
   });
 });
