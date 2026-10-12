@@ -113,6 +113,13 @@ describe('publishSharedLibrary', () => {
     expect(updateDoc).toHaveBeenCalledTimes(1);
   });
 
+  it('invalidates the stored hash before it rewrites chunks', async () => {
+    memberDoc({ ownerHash: 'owner-1' });
+    await publishSharedLibrary(1, 'c1');
+    expect(updateDoc.mock.calls[0]![1]).toMatchObject({ libraryHash: '' });
+    expect(updateDoc.mock.invocationCallOrder[0]).toBeLessThan(setDoc.mock.invocationCallOrder[0]!);
+  });
+
   it('does nothing for a Character that is no longer a Member', async () => {
     memberDoc(null);
     await expect(publishSharedLibrary(1, 'c1')).resolves.toBe('unavailable');
@@ -147,8 +154,10 @@ describe('removeSharedLibraries', () => {
       .mockResolvedValue({ docs: [] });
     await removeSharedLibraries(1);
     expect(deleteDoc.mock.calls.map((c) => c[0])).toEqual(['r0', 'r1', 'r2']);
-    expect(updateDoc).toHaveBeenCalledTimes(2);
-    expect(updateDoc.mock.calls[0]![1]).toEqual({
+    // Per Community: invalidate the hash, delete chunks, then zero the stamp.
+    expect(updateDoc).toHaveBeenCalledTimes(4);
+    expect(updateDoc.mock.calls[0]![1]).toMatchObject({ libraryHash: '', chunkCount: 2 });
+    expect(updateDoc.mock.calls[1]![1]).toEqual({
       pushedAt: 'SERVER_TIME',
       libraryHash: '',
       chunkCount: 0,

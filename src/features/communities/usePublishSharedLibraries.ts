@@ -7,6 +7,8 @@ export const PUBLISH_BOOT_DELAY_MS = 20 * 1000;
 /** Then every half hour. The hash check makes a sweep with nothing new cost one read. */
 export const PUBLISH_INTERVAL_MS = 30 * 60 * 1000;
 
+let sweeping = false;
+
 /**
  * Keeps each Character's Shared Blueprints current in its Communities (issue
  * #3600): one sweep after boot, then on a timer. Only Characters that share
@@ -20,10 +22,9 @@ export function usePublishSharedLibraries(
   const key = characterIds?.join(',') ?? '';
   useEffect(() => {
     if (!characterIds?.length || !isSyncConfigured()) return;
-    let running = false;
     const sweep = async () => {
-      if (running) return;
-      running = true;
+      if (sweeping) return;
+      sweeping = true;
       try {
         const { publishAllSharedLibraries } = await import('./libraryPush');
         const ordered = [...characterIds].sort(
@@ -35,7 +36,7 @@ export function usePublishSharedLibraries(
       } catch {
         // Offline or signed out: the next sweep retries.
       } finally {
-        running = false;
+        sweeping = false;
       }
     };
     const boot = setTimeout(() => void sweep(), PUBLISH_BOOT_DELAY_MS);

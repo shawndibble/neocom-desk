@@ -69,17 +69,22 @@ async function buildLibrary(characterId: number, selected: ReadonlySet<number>) 
     if (placement.kind === 'place') placeIds.set(blueprint.item_id, placement.locationId);
   }
 
-  const places = new Map<number, ResolvedPlace | null>();
+  const places = new Map<number, ResolvedPlace>();
+  let lookupFailed = false;
   await Promise.all(
     [...new Set(placeIds.values())].map(async (locationId) => {
       const location = await loadBlueprintLocation(characterId, locationId);
       const system = location.systemId == null ? null : await lookupSolarSystem(location.systemId);
-      places.set(
-        locationId,
-        location.name && system ? { locationName: location.name, systemName: system.name } : null
-      );
+      if (location.name && system) {
+        places.set(locationId, { locationName: location.name, systemName: system.name });
+      } else {
+        lookupFailed = true;
+      }
     })
   );
+  // A failed lookup would drop blueprints and shrink the Community's copy;
+  // publish nothing and retry next sweep instead.
+  if (lookupFailed) return null;
 
   return selectSharedBlueprints(owned, selected, (blueprint) => {
     const locationId = placeIds.get(blueprint.item_id);
@@ -95,7 +100,7 @@ async function publish(
     loadShareSelection(characterId, communityId),
     db.characters.get(characterId),
   ]);
-  if (!character) return 'unavailable';
+  if (!character?.ownerHash) return 'unavailable';
   const uid = await ensureSignedIn(characterId);
   const member = await getDoc(memberRef(communityId, uid));
   if (!member.exists()) return 'unavailable';
@@ -116,6 +121,14 @@ async function publish(
   const chunks = chunkLibrary(items);
   if (chunks.length > LIBRARY_MAX_CHUNKS) return 'unavailable';
   if (plan === 'full') {
+    // Invalidate the stored hash first: a push cut off before the final stamp
+    // must not leave a hash that matches chunks it no longer describes.
+    await ensureSignedIn(characterId);
+    await updateDoc(memberRef(communityId, uid), {
+      pushedAt: serverTimestamp(),
+      libraryHash: '',
+      chunkCount: oldChunkCount,
+    });
     await Promise.all(
       chunks.map((chunk, index) =>
         setDoc(doc(memberRef(communityId, uid), 'library', String(index)), {
@@ -130,6 +143,8 @@ async function publish(
       )
     );
   }
+  // The slow build above can outlast another Character's sign-in.
+  await ensureSignedIn(characterId);
   await updateDoc(memberRef(communityId, uid), {
     pushedAt: serverTimestamp(),
     libraryHash: hash,
@@ -173,6 +188,12 @@ export async function removeSharedLibraries(characterId: number): Promise<void> 
   for (const communityId of await listCommunityIds(characterId)) {
     const member = memberRef(communityId, uid);
     const chunks = await getDocs(collection(member, 'library'));
+    // Hash first, so a removal cut off mid-way can't leave a hash that matches an emptied library.
+    await updateDoc(member, {
+      pushedAt: serverTimestamp(),
+      libraryHash: '',
+      chunkCount: chunks.size,
+    });
     await Promise.all(chunks.docs.map((chunk) => deleteDoc(chunk.ref)));
     await updateDoc(member, { pushedAt: serverTimestamp(), libraryHash: '', chunkCount: 0 });
   }

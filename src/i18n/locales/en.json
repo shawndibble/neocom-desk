@@ -7671,7 +7671,7 @@
     "memberCount_one": "{{count}} Member",
     "memberCount_other": "{{count}} Members",
     "adminBadge": "Admin",
-    "asOf": "as of {{age}} ago",
+    "asOf": "as of {{age}}",
     "staleBadge": "Stale",
     "removeSharedOption_one": "Also remove the blueprints this Character shared with Communities",
     "removeSharedOption_other": "Also remove the blueprints these Characters shared with Communities",
