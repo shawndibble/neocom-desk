@@ -48,10 +48,10 @@ describe('splitMailBody', () => {
 
   it('keeps prose around the table and trims the blank lines around it', () => {
     const blocks = splitMailBody(MOON);
-    expect(blocks[0]).toEqual({ kind: 'text', text: 'Greetings Pilots,\n' });
+    expect(blocks[0]).toEqual({ kind: 'text', text: 'Greetings Pilots,' });
     expect(blocks[2]).toEqual({
       kind: 'text',
-      text: '\n\nI hope to see taxes paid before saturday 17th october.',
+      text: 'I hope to see taxes paid before saturday 17th october.',
     });
   });
 
