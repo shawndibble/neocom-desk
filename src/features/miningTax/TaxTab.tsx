@@ -2206,6 +2206,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             row={splitTarget.row}
             systemName={systemName(splitTarget)}
             payees={allPayees}
+            assignments={everyAssignment}
             typeNames={data.typeNames}
             pricesFor={pricesFor}
             busy={busy}

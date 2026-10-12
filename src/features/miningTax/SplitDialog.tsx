@@ -3,6 +3,7 @@ import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  FilterChip,
   Modal,
   Select,
   SelectContent,
@@ -19,6 +20,7 @@ import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import { unmaskNumber } from '@/lib/numberMask';
 import { split } from './ledgerActions';
+import { ratesForPayee } from './payeeRates';
 import type { MoonMiningTaxRow } from './snapshot';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
@@ -32,6 +34,8 @@ interface SplitDialogProps {
   row: MoonMiningTaxRow;
   systemName: string;
   payees: readonly PayeeRecord[];
+  /** Every Assignment the pilot has made — the rates previously billed per Payee become quick picks. */
+  assignments?: readonly MiningTaxAssignmentRecord[];
   typeNames: ReadonlyMap<number, string>;
   /**
    * Prices at a given Payee's trade hub, on a given date. A split is the one
@@ -63,13 +67,13 @@ export function SplitDialog({
   row,
   systemName,
   payees,
+  assignments = [],
   typeNames,
   pricesFor,
   busy,
   onSplit,
 }: SplitDialogProps) {
   const { t } = useTranslation();
-  const otherPayees = payees.filter((p) => p.id !== assignment.payeeId);
   const [payeeId, setPayeeId] = useState<string | null>(null);
   const [taxPct, setTaxPct] = useState('');
   const [moves, setMoves] = useState<ReadonlyMap<number, number>>(new Map());
@@ -96,14 +100,23 @@ export function SplitDialog({
   // move units.
   const prices = {
     kept: pricesFor(payees.find((p) => p.id === assignment.payeeId)?.hubId, assignment.date),
-    moved: pricesFor(otherPayees.find((p) => p.id === payeeId)?.hubId, assignment.date),
+    moved: pricesFor(payees.find((p) => p.id === payeeId)?.hubId, assignment.date),
   };
   const keptValue = computeAssignmentValue(keptLines, prices.kept, assignment.taxPct);
   const newValue = computeAssignmentValue(movedLines, prices.moved, safePct);
   const movedUnits = movedLines.reduce((sum, line) => sum + line.quantity, 0);
 
+  // The same Payee at the same rate would be fused back into one Assignment
+  // on the next load (`coalesce.ts`), so it is no split at all.
+  const refuses = payeeId === assignment.payeeId && pctValue === assignment.taxPct;
+  const chosenPayee = payees.find((p) => p.id === payeeId);
+  const rateChips = chosenPayee
+    ? ratesForPayee(assignments, chosenPayee.id, chosenPayee.defaultTaxPct)
+    : [];
+
   const canSplit =
     payeeId !== null &&
+    !refuses &&
     movedLines.length > 0 &&
     keptLines.length > 0 &&
     Number.isFinite(pctValue) &&
@@ -140,7 +153,7 @@ export function SplitDialog({
 
   const originalPayeeName =
     payees.find((p) => p.id === assignment.payeeId)?.name ?? t('miningTax.unknownPayee');
-  const newPayeeName = otherPayees.find((p) => p.id === payeeId)?.name ?? '';
+  const newPayeeName = chosenPayee?.name ?? '';
 
   return (
     <Modal
@@ -151,7 +164,7 @@ export function SplitDialog({
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">{t('miningTax.splitDialogHint')}</p>
 
-        {otherPayees.length === 0 ? (
+        {payees.length === 0 ? (
           <p className="text-xs text-text-dim">{t('miningTax.splitNoOtherPayeeHint')}</p>
         ) : (
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -163,7 +176,7 @@ export function SplitDialog({
                 value={payeeId ?? undefined}
                 onValueChange={(value) => {
                   setPayeeId(value);
-                  const chosen = otherPayees.find((p) => p.id === value);
+                  const chosen = payees.find((p) => p.id === value);
                   if (chosen) setTaxPct(String(chosen.defaultTaxPct));
                 }}
               >
@@ -171,7 +184,7 @@ export function SplitDialog({
                   <SelectValue placeholder={t('miningTax.payeePlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {otherPayees.map((payee) => (
+                  {payees.map((payee) => (
                     <SelectItem key={payee.id} value={payee.id}>
                       {payee.name}
                     </SelectItem>
@@ -195,6 +208,27 @@ export function SplitDialog({
               />
             </div>
           </div>
+        )}
+
+        {rateChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('miningTax.splitRatesLabel')}
+            </span>
+            {rateChips.map((rate) => (
+              <FilterChip
+                key={rate}
+                label={`${rate}%`}
+                selected={pctValue === rate}
+                onToggle={() => setTaxPct(String(rate))}
+              />
+            ))}
+          </div>
+        )}
+        {refuses && (
+          <p role="alert" className="text-xs text-warning">
+            {t('miningTax.splitSameRateWarning')}
+          </p>
         )}
 
         <div className="rounded-xs border border-line bg-panel-2">
