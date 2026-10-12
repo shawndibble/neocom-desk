@@ -69,6 +69,9 @@ describe('CommunityLibrary', () => {
     await user.click(screen.getByRole('button', { name: /Ships/ }));
     expect(screen.getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(screen.queryByText('Merlin Blueprint')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('img', { name: 'Ann holds it' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('img', { name: 'Ann shares the original' }).length).toBeGreaterThan(
+      0
+    );
+    expect(screen.getByText(en.communities.staleBadge)).toBeInTheDocument();
   });
 });

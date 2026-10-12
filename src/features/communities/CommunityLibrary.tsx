@@ -174,7 +174,12 @@ export function CommunityLibrary({
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
 
-  const memberKey = members?.map((member) => member.uid).join(',') ?? null;
+  const memberKey = members
+    ? members
+        .map((member) => member.uid)
+        .sort()
+        .join(',')
+    : null;
   useEffect(() => {
     if (memberKey === null) return;
     let cancelled = false;
@@ -228,7 +233,7 @@ export function CommunityLibrary({
     [allRows, myUid, query]
   );
 
-  if (failed || membersFailed) {
+  if (membersFailed || (failed && !loaded)) {
     return (
       <p role="alert" className="text-xs text-danger">
         {t('communities.library.loadFailed')}
@@ -266,6 +271,21 @@ export function CommunityLibrary({
         />
       </div>
 
+      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-dim">
+        {members.map((member) => (
+          <li key={member.uid} className={staleUids.has(member.uid) ? 'opacity-60' : ''}>
+            {member.characterName}
+            {member.libraryAsOf === null
+              ? ` · ${t('communities.library.sharesNothing')}`
+              : ` · ${t('communities.asOf', { age: formatAge(now - member.libraryAsOf, t) })}`}
+            {staleUids.has(member.uid) && (
+              <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem]">
+                {t('communities.staleBadge')}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
       <p className="text-xs text-text-dim">{t('communities.library.legend')}</p>
 
       {tree.length === 0 ? (

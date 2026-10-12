@@ -57,6 +57,6 @@ describe('filterLibraryRows', () => {
   });
 
   it('searches by name, any case', () => {
-    expect(ids(filterLibraryRows(rows, 'me', 'all', 'beta'))).toEqual([2]);
+    expect(ids(filterLibraryRows(rows, 'me', 'missingFromMe', 'beta'))).toEqual([2]);
   });
 });

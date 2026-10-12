@@ -22,7 +22,7 @@ export interface LibraryRow extends BlueprintTypeInfo {
   holders: LibraryHolder[];
 }
 
-export type LibraryFilter = 'all' | 'missingCommunity' | 'ownedByMe' | 'missingFromMe';
+export type LibraryFilter = 'missingCommunity' | 'ownedByMe' | 'missingFromMe';
 
 /** One row per catalog blueprint, holders in Member order. A shared type not in the catalog is dropped. */
 export function buildLibraryRows(
@@ -67,8 +67,6 @@ export function filterLibraryRows(
         return mine;
       case 'missingFromMe':
         return !mine && row.holders.length > 0;
-      default:
-        return true;
     }
   });
 }

@@ -90,14 +90,19 @@ export async function loadMemberLibraries(
   const db = getSyncFirestore();
   return Promise.all(
     memberUids.map(async (uid) => {
-      const chunks = await getDocs(
-        collection(db, 'communities', communityId, 'members', uid, 'library')
-      );
-      const items = chunks.docs.flatMap((chunk) => {
-        const list = chunk.data().items;
-        return Array.isArray(list) ? (list as SharedBlueprint[]) : [];
-      });
-      return { uid, items };
+      // One unreadable Member (just removed, say) must not blank everyone else's column.
+      try {
+        const chunks = await getDocs(
+          collection(db, 'communities', communityId, 'members', uid, 'library')
+        );
+        const items = chunks.docs.flatMap((chunk) => {
+          const list = chunk.data().items;
+          return Array.isArray(list) ? (list as SharedBlueprint[]) : [];
+        });
+        return { uid, items };
+      } catch {
+        return { uid, items: [] };
+      }
     })
   );
 }
