@@ -20,20 +20,30 @@ _Recorded 2026-10-12 · issue #3605._
   In-game Fitting and cannot see it change, so sharing one writes a copy of its
   code as of that moment, keyed by its ESI fitting id. It carries only what an
   In-game Fitting carries (no module state, charge binding or implants).
-  Sharing it again replaces the copy. Its tooltip says "as of" rather than
-  "last updated".
-- **Opt-in per Community, per Fitting; nothing shared by default.** Two ways
-  in: the Community page offers "share all my Fittings" for that Community;
-  or, from one Fitting's Export or Fitting-actions menu, "Share to
-  Community". A Character in several Communities gets a submenu listing them;
-  in one, the item shares straight to it; in none, the item is absent.
-  Unsharing is available from the same places.
+  Sharing it again replaces the copy. Its updated-at is the time of the last
+  share, shown as "last updated" like any other.
+- **Opt-in per Community; nothing shared by default.** Two ways in:
+  - **"Share all my Fittings" is an ongoing switch**, per Community, on the
+    Community page. While on, every saved Fitting of that Character is shared
+    to that Community, and every later save or new Fitting is pushed
+    automatically; deleting one removes it from the shared list. While it is
+    on, the per-Fitting share control for that Community reads "shared with
+    all". Turning it off removes every Fitting that Character shared to that
+    Community, including any shared one by one, so none stay available. The
+    switch asks first, since it removes them all. Leaving the Community does
+    the same, as for blueprints.
+  - **Per Fitting**, from its Export or Fitting-actions menu, "Share to
+    Community". A Character in several Communities gets a submenu listing
+    them; in one, the item shares straight to it; in none, the item is
+    absent. Unsharing is available from the same menu.
 - **Shared Fittings live in the Member's own Fittings list.** No separate
   tab. They appear in the Ships section's Fittings library, searched and
   grouped by hull like any other row, marked with a Community icon. The
-  tooltip names who shared it and when it was last updated. Row actions are
-  the Load-style ones (open, compare, save a copy); Rename and Delete do not
-  apply to a Fitting someone else owns.
+  tooltip names who shared it and when it was last updated. Opening one is
+  exactly a **Load**: it becomes the opener's own working Fitting, which they
+  can edit, save to My Fittings (a copy that stops following the original)
+  and save to EVE. Rename and Delete of the shared row itself do not apply to
+  a Fitting someone else owns.
 - **No cap on shared Fittings for now.** Revisit if writes or reads grow.
 - **Same gate and lifetime as shared blueprints (ADR 0018).** Readable only
   by Members; written only by the owning Character under the `ownerHash`
