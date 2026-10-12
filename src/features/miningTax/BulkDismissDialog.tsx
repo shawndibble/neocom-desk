@@ -78,7 +78,12 @@ export function BulkDismissDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('miningTax.bulkDismissTitle')}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      dismissOnOutsidePress={false}
+      title={t('miningTax.bulkDismissTitle')}
+    >
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">{t('miningTax.bulkDismissHint')}</p>
 

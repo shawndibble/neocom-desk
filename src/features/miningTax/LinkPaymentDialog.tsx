@@ -155,7 +155,12 @@ export function LinkPaymentDialog({
     t(`miningTax.linkConfidence.${suggestion.confidence}`, { payee: payee.name });
 
   return (
-    <Modal open={open} onClose={close} title={t('miningTax.linkPaymentTitle')}>
+    <Modal
+      open={open}
+      onClose={close}
+      dismissOnOutsidePress={false}
+      title={t('miningTax.linkPaymentTitle')}
+    >
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">{t('miningTax.linkPaymentHint')}</p>
 

@@ -264,7 +264,12 @@ export function SettleUpDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t('miningTax.settleUpTitle', { payee: title })}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      dismissOnOutsidePress={false}
+      title={t('miningTax.settleUpTitle', { payee: title })}
+    >
       <div className="space-y-3 text-sm">
         <OreArrivalNotice
           entries={included.map((r) => r.assignment)}

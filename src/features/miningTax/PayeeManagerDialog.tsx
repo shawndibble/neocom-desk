@@ -248,6 +248,7 @@ export function PayeeManagerDialog({
         closeForm();
         onClose();
       }}
+      dismissOnOutsidePress={false}
       title={t('miningTax.managePayeesTitle')}
     >
       <div className="space-y-3">
