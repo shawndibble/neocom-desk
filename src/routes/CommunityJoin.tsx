@@ -123,11 +123,16 @@ export function CommunityJoin() {
         const joined = await joinCommunity(character.characterId, code, character.name);
         communityId = joined.communityId;
         joinedIds.push(character.characterId);
-        await saveShareSelection(
-          character.characterId,
-          joined.communityId,
-          shares[character.characterId] ?? new Set()
-        );
+        // An untouched picker on a re-join must not wipe the choice saved before.
+        const chosenIds = shares[character.characterId];
+        if (chosenIds || !joined.alreadyMember) {
+          // The join stands even if this device can't save the choice.
+          await saveShareSelection(
+            character.characterId,
+            joined.communityId,
+            chosenIds ?? new Set()
+          ).catch(() => undefined);
+        }
         next[character.characterId] = joined.alreadyMember ? 'alreadyMember' : 'joined';
       } catch (err) {
         next[character.characterId] =

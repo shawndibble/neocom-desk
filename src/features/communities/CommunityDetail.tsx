@@ -168,6 +168,7 @@ export function CommunityDetail({
       >
         <p className="text-xs text-text-dim">
           {sharedCount !== null &&
+            myName !== '' &&
             t('communities.share.summary', { count: sharedCount, name: myName })}
         </p>
         <Button size="sm" onClick={() => setSharing(true)}>
