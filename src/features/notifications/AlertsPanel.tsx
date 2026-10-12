@@ -16,16 +16,22 @@
  * device only and is offered for price alerts alone.
  */
 import { useMemo, useRef, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Button,
+  Caret,
   EmptyState,
+  IconButton,
   FilterChip,
   Tooltip,
   plainTextActionClassName,
   textActionClassName,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { db, type NotificationFeedRecord } from '@/db';
+import { CharacterLink } from '@/features/entities';
 import type { AlertsPanelRenderProps } from '@/components/ui/alertsPanelContext';
 import { SETTINGS_TABS } from '@/app/pageTabs';
 import { cx } from '@/lib/cx';
@@ -45,9 +51,14 @@ import {
   type AlertChip,
 } from './dangerAlert';
 import { dismissFeedEntriesAndSync } from './feedSync';
+import { dedupeCharacterName } from './notificationBody';
+import { notificationUrlForSubject } from './notificationOptions';
 import { useNotificationPermission } from './permission';
 import { pruneExpired, snooze, useSnoozeStore } from './snooze';
 import { useVisibleAlertEntries } from './useUnreadAlertCount';
+
+/** Fires listed under an opened group before "Show N more" — a week away can leave hundreds. */
+const FIRES_PAGE = 10;
 
 const NOTIFICATION_SETTINGS_PATH = tabPath(SETTINGS_TABS, 'notifications');
 
@@ -59,6 +70,15 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const snoozeMap = useSnoozeStore((state) => state.value);
   const { permission } = useNotificationPermission();
   const [chip, setChip] = useState<AlertChip>('all');
+  /** Group key → how many of its fires are listed; absent means collapsed. */
+  const [opened, setOpened] = useState<ReadonlyMap<string, number>>(new Map());
+  const characters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const nameById = useMemo(
+    () => new Map(characters.map((character) => [character.characterId, character.name])),
+    [characters]
+  );
+  // One-Character device: the name is the same on every row, so it is dropped.
+  const showCharacter = characters.length > 1;
   const focusAfterCommit = useFocusAfterCommit();
   const rootRef = useRef<HTMLDivElement>(null);
   const sheet = variant === 'sheet';
@@ -86,6 +106,30 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   function finish(group: AlertTypeGroup, index: number) {
     focusNeighbour(index);
     void dismissFeedEntriesAndSync(group.entries);
+  }
+
+  function setShown(key: string, shown: number | null) {
+    setOpened((prev) => {
+      const next = new Map(prev);
+      if (shown === null) next.delete(key);
+      else next.set(key, shown);
+      return next;
+    });
+  }
+
+  /** Dismisses one fire; focus moves to a neighbouring fire, else the group's toggle, else the heading. */
+  function dismissFire(group: AlertTypeGroup, fireIndex: number) {
+    const fireControl = (id: string | undefined) =>
+      id === undefined
+        ? null
+        : () => rootRef.current?.querySelector<HTMLElement>(`[data-fire-id="${id}"] button`);
+    focusAfterCommit(
+      fireControl(group.entries[fireIndex + 1]?.id),
+      fireControl(group.entries[fireIndex - 1]?.id),
+      rowControl(group.key),
+      heading
+    );
+    void dismissFeedEntriesAndSync([group.entries[fireIndex]]);
   }
 
   const buttonSize = sheet ? 'md' : 'sm';
@@ -145,6 +189,8 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
             const newest = group.entries[0];
             const label = alertGroupLabel(t, group.target);
             const fired = new Date(group.newestFiredAt);
+            const shown = opened.get(group.key);
+            const many = group.count > 1;
             return (
               <li
                 key={group.key}
@@ -157,10 +203,16 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="min-w-0 font-semibold">
                     {label}
-                    {group.count > 1 && (
-                      <span className="ml-2 text-xs font-normal text-text-dim">
+                    {many && (
+                      <button
+                        type="button"
+                        aria-expanded={shown !== undefined}
+                        onClick={() => setShown(group.key, shown === undefined ? FIRES_PAGE : null)}
+                        className="ml-2 inline-flex items-center gap-1 rounded-xs text-xs font-normal text-text-dim hover:text-text"
+                      >
+                        <Caret expanded={shown !== undefined} />
                         {t('alerts.panel.groupCount', { count: group.count })}
-                      </span>
+                      </button>
                     )}
                   </span>
                   <Tooltip
@@ -208,13 +260,45 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                     size={buttonSize}
                     aria-label={t(
                       danger ? 'alerts.panel.acknowledgeLabel' : 'alerts.panel.dismissLabel',
-                      { title: label }
+                      { title: label, context: many ? 'all' : undefined, count: group.count }
                     )}
                     onClick={() => finish(group, index)}
                   >
-                    {t(danger ? 'alerts.panel.acknowledge' : 'alerts.panel.dismiss')}
+                    {many
+                      ? t(danger ? 'alerts.panel.acknowledgeAll' : 'alerts.panel.dismissAll', {
+                          count: group.count,
+                        })
+                      : t(danger ? 'alerts.panel.acknowledge' : 'alerts.panel.dismiss')}
                   </Button>
                 </div>
+                {shown !== undefined && (
+                  <ul className="mt-1 border-t border-line">
+                    {group.entries.slice(0, shown).map((fire, fireIndex) => (
+                      <FireRow
+                        key={fire.id}
+                        fire={fire}
+                        now={now}
+                        characterName={nameById.get(fire.characterId) ?? String(fire.characterId)}
+                        showCharacter={showCharacter}
+                        onNavigate={onClose}
+                        onDismiss={() => dismissFire(group, fireIndex)}
+                      />
+                    ))}
+                    {shown < group.count && (
+                      <li className="pt-1.5">
+                        <button
+                          type="button"
+                          className={textActionClassName()}
+                          onClick={() => setShown(group.key, shown + FIRES_PAGE)}
+                        >
+                          {t('alerts.panel.showMore', {
+                            count: Math.min(FIRES_PAGE, group.count - shown),
+                          })}
+                        </button>
+                      </li>
+                    )}
+                  </ul>
+                )}
               </li>
             );
           })}
@@ -238,5 +322,65 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
         <span>{t('alerts.panel.bannerNote')}</span>
       </div>
     </div>
+  );
+}
+
+/** One fire inside an opened group: its own body (the group row only shows the newest), age and ×. */
+function FireRow({
+  fire,
+  now,
+  characterName,
+  showCharacter,
+  onNavigate,
+  onDismiss,
+}: {
+  fire: NotificationFeedRecord;
+  now: number;
+  characterName: string;
+  showCharacter: boolean;
+  onNavigate: () => void;
+  onDismiss: () => void;
+}) {
+  const { t } = useTranslation();
+  const fired = new Date(fire.firedAt);
+  const body = dedupeCharacterName(fire.body, characterName);
+  return (
+    <li
+      data-fire-id={fire.id}
+      className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-line py-1 last:border-b-0"
+    >
+      <Link
+        to={notificationUrlForSubject(
+          fire.eventId,
+          fire.subjectId ?? fire.typeId,
+          fire.characterId
+        )}
+        onClick={onNavigate}
+        className="min-w-0 flex-1 basis-48 rounded-xs text-xs text-text-dim hover:text-text hover:underline"
+      >
+        {body}
+      </Link>
+      {showCharacter && (
+        <CharacterLink
+          id={fire.characterId}
+          className="max-w-24 shrink-0 truncate text-[0.6875rem] font-medium"
+        >
+          {characterName}
+        </CharacterLink>
+      )}
+      <time
+        dateTime={fired.toISOString()}
+        className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim"
+      >
+        {formatAge(Math.max(0, now - fire.firedAt), t)}
+      </time>
+      <IconButton
+        icon={<Icon.Close />}
+        label={t('alerts.panel.dismissFire', { body })}
+        variant="plain"
+        size="sm"
+        onClick={onDismiss}
+      />
+    </li>
   );
 }

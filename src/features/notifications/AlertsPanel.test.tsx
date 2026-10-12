@@ -191,4 +191,54 @@ describe('AlertsPanel', () => {
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^View/ })).toHaveClass('h-11');
   });
+
+  describe('a group of several fires', () => {
+    const cal = (n: number) =>
+      entry(`cal-${n}`, 'newCalendarEvent', {
+        title: `Event ${n}`,
+        firedAt: Date.now() - n * 60_000,
+      });
+
+    it('opens to list every fire, each with its own body', async () => {
+      await db.notificationFeed.bulkPut([cal(1), cal(2), cal(3)]);
+      renderPanel();
+
+      const toggle = await screen.findByRole('button', { name: '3 alerts' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByText('Event 2 body')).not.toBeInTheDocument();
+
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getAllByText(/^Event \d body$/)).toHaveLength(4); // newest also heads the group
+    });
+
+    it('labels the group dismiss with the count and dismisses them all', async () => {
+      await db.notificationFeed.bulkPut([cal(1), cal(2)]);
+      renderPanel();
+
+      await userEvent.click(await screen.findByRole('button', { name: /^Dismiss all 2 / }));
+      await waitFor(async () => expect(await liveIds()).toEqual([]));
+    });
+
+    it('dismisses a single fire and leaves the rest', async () => {
+      await db.notificationFeed.bulkPut([cal(1), cal(2), cal(3)]);
+      renderPanel();
+
+      await userEvent.click(await screen.findByRole('button', { name: '3 alerts' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Dismiss: Event 2 body' }));
+      await waitFor(async () => expect(await liveIds()).toEqual(['cal-1', 'cal-3']));
+      expect(await screen.findByText('Alerts, 2 new')).toBeInTheDocument();
+    });
+
+    it('lists ten fires and reveals the rest on request', async () => {
+      await db.notificationFeed.bulkPut(Array.from({ length: 13 }, (_, i) => cal(i + 1)));
+      renderPanel();
+
+      await userEvent.click(await screen.findByRole('button', { name: '13 alerts' }));
+      expect(screen.getAllByRole('button', { name: /^Dismiss: / })).toHaveLength(10);
+      await userEvent.click(screen.getByRole('button', { name: 'Show 3 more' }));
+      expect(screen.getAllByRole('button', { name: /^Dismiss: / })).toHaveLength(13);
+      expect(screen.queryByRole('button', { name: /^Show \d+ more/ })).not.toBeInTheDocument();
+    });
+  });
 });
