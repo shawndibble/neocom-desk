@@ -7,8 +7,7 @@
  * is `features/communities/shareSelection.ts`.
  */
 export type ShareChoice<K = number> =
-  | { all: false; allowed: ReadonlySet<K> }
-  | { all: true; excluded: ReadonlySet<K> };
+  { all: false; allowed: ReadonlySet<K> } | { all: true; excluded: ReadonlySet<K> };
 
 export const noneShared = <K = number>(): ShareChoice<K> => ({ all: false, allowed: new Set() });
 export const shareAll = <K = number>(): ShareChoice<K> => ({ all: true, excluded: new Set() });

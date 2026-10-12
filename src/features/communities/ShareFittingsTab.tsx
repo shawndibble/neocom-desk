@@ -1,3 +1,4 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
@@ -202,7 +203,7 @@ export function ShareFittingsTab({
     <div className="space-y-2">
       <p className="text-xs text-text-dim">{t('communities.fittings.hint')}</p>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex min-h-8 items-center gap-2 text-xs font-medium">
+        <label className={`flex items-center gap-2 text-xs font-medium ${tappableRowClassName}`}>
           <Checkbox
             checked={all}
             onChange={(event) => {

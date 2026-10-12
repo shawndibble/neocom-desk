@@ -1,3 +1,4 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
@@ -108,7 +109,7 @@ function ShareScopeRow({
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label className="flex min-h-8 items-center gap-2 text-xs font-medium">
+      <label className={`flex items-center gap-2 text-xs font-medium ${tappableRowClassName}`}>
         <Checkbox checked={all} onChange={(event) => onToggle(event.target.checked)} />
         Share all my {KIND_LABEL[kind].toLowerCase()}
       </label>
@@ -266,7 +267,7 @@ function InvitesTab({
 }) {
   return (
     <div className="space-y-3">
-      <label className="flex min-h-8 items-start gap-2 text-xs">
+      <label className={`flex items-start gap-2 text-xs ${tappableRowClassName}`}>
         <Checkbox checked={approval} onChange={(event) => setApproval(event.target.checked)} />
         <span>
           <span className="block font-medium">Approve new members</span>

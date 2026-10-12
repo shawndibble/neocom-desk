@@ -1,3 +1,4 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
@@ -135,7 +136,7 @@ export function ShareBlueprintsTab({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex min-h-8 items-center gap-2 text-xs font-medium">
+        <label className={`flex items-center gap-2 text-xs font-medium ${tappableRowClassName}`}>
           <Checkbox
             checked={choice.all}
             onChange={(event) => {
