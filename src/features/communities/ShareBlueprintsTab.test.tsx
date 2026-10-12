@@ -25,21 +25,14 @@ import { ShareBlueprintsTab } from './ShareBlueprintsTab';
 const b = en.communities.blueprints;
 
 function renderTab() {
-  const onChanged = vi.fn();
   const onOpenLibrary = vi.fn();
-  render(
-    <ShareBlueprintsTab
-      characterId={1}
-      communityId="c1"
-      onChanged={onChanged}
-      onOpenLibrary={onOpenLibrary}
-    />
-  );
-  return { onChanged, onOpenLibrary };
+  render(<ShareBlueprintsTab characterId={1} communityId="c1" onOpenLibrary={onOpenLibrary} />);
+  return { onOpenLibrary };
 }
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  publish.mockResolvedValue('full');
   await db.settings.clear();
 });
 
@@ -52,12 +45,11 @@ describe('ShareBlueprintsTab', () => {
 
   it('shares all, lists every blueprint, and publishes', async () => {
     const user = userEvent.setup();
-    const { onChanged } = renderTab();
+    renderTab();
     await user.click(await screen.findByRole('checkbox', { name: b.shareAll }));
     expect(await screen.findByText('Alpha Blueprint')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: b.stop })).toHaveLength(3);
     expect(await loadShareChoice(1, 'c1')).toEqual({ all: true, excluded: new Set() });
-    expect(onChanged).toHaveBeenLastCalledWith(3);
     expect(publish).toHaveBeenCalledWith(1, 'c1');
   });
 
@@ -89,6 +81,26 @@ describe('ShareBlueprintsTab', () => {
     await user.click(within(dialog).getByRole('button', { name: b.offAction }));
     await waitFor(async () =>
       expect(await loadShareChoice(1, 'c1')).toEqual({ all: false, allowed: new Set() })
+    );
+  });
+
+  it('says so when a change could not be published', async () => {
+    publish.mockResolvedValue('unavailable');
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(await screen.findByRole('checkbox', { name: b.shareAll }));
+    expect(await screen.findByText(b.unpublished)).toBeInTheDocument();
+  });
+
+  it('runs two quick changes one after the other, each from the one before', async () => {
+    await saveShareChoice(1, 'c1', { all: true, excluded: new Set() });
+    const user = userEvent.setup();
+    renderTab();
+    const rows = await screen.findAllByRole('button', { name: b.stop });
+    await user.click(rows[0]!);
+    await user.click(screen.getAllByRole('button', { name: b.stop })[0]!);
+    await waitFor(async () =>
+      expect(await loadShareChoice(1, 'c1')).toEqual({ all: true, excluded: new Set([10, 20]) })
     );
   });
 

@@ -7862,7 +7862,8 @@
       "limited": "Showing the first {{count}}. Search to narrow the list.",
       "offTitle": "Stop sharing all your blueprints?",
       "offBody": "This removes every blueprint you share with this Community, including ones you picked one by one. You can share them again at any time.",
-      "offAction": "Stop sharing all"
+      "offAction": "Stop sharing all",
+      "unpublished": "Saved on this device, but it did not reach the Community yet. Neocom Desk retries on its own; blueprints it cannot place at a station are left out."
     },
     "join": {
       "title": "Join a Community",

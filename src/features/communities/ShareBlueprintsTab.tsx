@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import {
@@ -17,6 +17,13 @@ import { useOwnedBlueprintTypes } from './useOwnedBlueprintTypes';
 /** A long list shows this many rows; the search narrows it. */
 const ROW_LIMIT = 100;
 
+const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+
+/** The types whose name contains the search text (all of them when it is empty), by name. */
+function namedLike<T extends { name: string }>(types: readonly T[], needle: string): T[] {
+  return types.filter((type) => type.name.toLowerCase().includes(needle)).sort(byName);
+}
+
 /**
  * The Blueprints tab of a Community (issue #3599 follow-up): what this
  * Character shares, one row per blueprint with Stop sharing. "Share all my
@@ -28,13 +35,10 @@ const ROW_LIMIT = 100;
 export function ShareBlueprintsTab({
   characterId,
   communityId,
-  onChanged,
   onOpenLibrary,
 }: {
   characterId: number;
   communityId: string;
-  /** The number of blueprints now shared, for the page's summary. */
-  onChanged: (count: number) => void;
   onOpenLibrary: () => void;
 }) {
   const { t } = useTranslation();
@@ -43,6 +47,7 @@ export function ShareBlueprintsTab({
   const [query, setQuery] = useState('');
   const [confirmingOff, setConfirmingOff] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [unpublished, setUnpublished] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,34 +66,55 @@ export function ShareBlueprintsTab({
     [choice, typeIds]
   );
   const needle = query.trim().toLowerCase();
-  const matches = (name: string) => needle === '' || name.toLowerCase().includes(needle);
-  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
   const sharedRows = useMemo(
-    () => types.filter((type) => sharedIds.has(type.typeId) && matches(type.name)).sort(byName),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `matches` closes over `needle`.
+    () =>
+      namedLike(
+        types.filter((type) => sharedIds.has(type.typeId)),
+        needle
+      ),
     [types, sharedIds, needle]
   );
   const addable = useMemo(
     () =>
       choice && !choice.all && needle !== ''
-        ? types.filter((type) => !sharedIds.has(type.typeId) && matches(type.name)).sort(byName)
+        ? namedLike(
+            types.filter((type) => !sharedIds.has(type.typeId)),
+            needle
+          )
         : [],
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `matches` closes over `needle`.
     [types, sharedIds, choice, needle]
   );
 
-  async function update(next: ShareChoice) {
+  // Saves run one after another, each from the choice the one before left, so
+  // two quick clicks never build from the same base and a failed save rolls
+  // back exactly its own change.
+  const latest = useRef<ShareChoice | null>(null);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    latest.current = choice;
+  }, [choice]);
+
+  function update(change: (current: ShareChoice) => ShareChoice): Promise<void> {
     setFailed(false);
-    const previous = choice;
-    setChoice(next);
-    try {
-      await saveShareChoice(characterId, communityId, next);
-      onChanged(effectiveSelection(typeIds, next).size);
-      void publishSharedLibrary(characterId, communityId);
-    } catch {
-      setChoice(previous);
-      setFailed(true);
-    }
+    queue.current = queue.current.then(async () => {
+      const base = latest.current;
+      if (!base) return;
+      const next = change(base);
+      latest.current = next;
+      setChoice(next);
+      try {
+        await saveShareChoice(characterId, communityId, next);
+        // Never rejects: 'unavailable' means nothing reached the Community this time.
+        void publishSharedLibrary(characterId, communityId).then((result) =>
+          setUnpublished(result === 'unavailable')
+        );
+      } catch {
+        latest.current = base;
+        setChoice(base);
+        setFailed(true);
+      }
+    });
+    return queue.current;
   }
 
   if (owned.status === 'loading' || choice === null) {
@@ -106,8 +132,6 @@ export function ShareBlueprintsTab({
   }
   if (types.length === 0) return <EmptyState title={t('communities.share.noBlueprints')} />;
 
-  const names = new Map(types.map((type) => [type.typeId, type.name]));
-
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -115,7 +139,7 @@ export function ShareBlueprintsTab({
           <Checkbox
             checked={choice.all}
             onChange={(event) => {
-              if (event.target.checked) void update(shareAll());
+              if (event.target.checked) update(shareAll);
               else setConfirmingOff(true);
             }}
           />
@@ -146,7 +170,10 @@ export function ShareBlueprintsTab({
             {addable.slice(0, ROW_LIMIT).map((type) => (
               <li key={type.typeId} className="flex items-center gap-2 py-1 text-xs">
                 <span className="min-w-0 flex-1 truncate">{type.name}</span>
-                <Button size="sm" onClick={() => void update(addShared(choice, type.typeId))}>
+                <Button
+                  size="sm"
+                  onClick={() => update((current) => addShared(current, type.typeId))}
+                >
                   {t('communities.blueprints.share')}
                 </Button>
               </li>
@@ -164,8 +191,11 @@ export function ShareBlueprintsTab({
         <ul className="divide-y divide-line">
           {sharedRows.slice(0, ROW_LIMIT).map((type) => (
             <li key={type.typeId} className="flex items-center gap-2 py-1 text-xs">
-              <span className="min-w-0 flex-1 truncate">{names.get(type.typeId)}</span>
-              <Button size="sm" onClick={() => void update(stopSharing(choice, type.typeId))}>
+              <span className="min-w-0 flex-1 truncate">{type.name}</span>
+              <Button
+                size="sm"
+                onClick={() => update((current) => stopSharing(current, type.typeId))}
+              >
                 {t('communities.blueprints.stop')}
               </Button>
             </li>
@@ -175,6 +205,11 @@ export function ShareBlueprintsTab({
       {sharedRows.length > ROW_LIMIT && (
         <p className="text-xs text-text-dim">
           {t('communities.blueprints.limited', { count: ROW_LIMIT })}
+        </p>
+      )}
+      {unpublished && (
+        <p role="status" className="text-xs text-warning">
+          {t('communities.blueprints.unpublished')}
         </p>
       )}
       {failed && (
@@ -188,7 +223,7 @@ export function ShareBlueprintsTab({
         body={t('communities.blueprints.offBody')}
         actionLabel={t('communities.blueprints.offAction')}
         onClose={() => setConfirmingOff(false)}
-        onConfirm={() => update(noneShared())}
+        onConfirm={() => update(noneShared)}
       />
     </div>
   );

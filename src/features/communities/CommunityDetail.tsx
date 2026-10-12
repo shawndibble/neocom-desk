@@ -164,34 +164,10 @@ export function CommunityDetail({
       )}
 
       {tab === 'library' ? (
-        <Button size="sm" className="mb-2" onClick={() => setTab('blueprints')}>
-          {t('communities.library.back')}
-        </Button>
-      ) : (
-        <Tabs
-          tabsId={tabsId}
-          tabs={[
-            { id: 'blueprints', label: t('communities.tabs.blueprints') },
-            { id: 'fittings', label: t('communities.tabs.fittings') },
-            { id: 'members', label: t('communities.members') },
-          ]}
-          value={tab}
-          onChange={(id) => setTab(id as 'blueprints' | 'fittings' | 'members')}
-          label={t('communities.tabs.label')}
-          className="mb-2"
-        />
-      )}
-      <TabPanel tabsId={tabsId} tabId={tab}>
-        {tab === 'blueprints' ? (
-          <ShareBlueprintsTab
-            characterId={characterId}
-            communityId={community.id}
-            onChanged={() => {}}
-            onOpenLibrary={() => setTab('library')}
-          />
-        ) : tab === 'fittings' ? (
-          <ShareFittingsPanel characterId={characterId} communityId={community.id} />
-        ) : tab === 'library' ? (
+        <>
+          <Button size="sm" className="mb-2" onClick={() => setTab('blueprints')}>
+            {t('communities.library.back')}
+          </Button>
           <CommunityLibrary
             communityId={community.id}
             characterId={characterId}
@@ -199,81 +175,109 @@ export function CommunityDetail({
             membersFailed={membersFailed}
             now={now}
           />
-        ) : (
-          <>
-            {membersFailed ? (
-              <p role="alert" className="text-xs text-danger">
-                {t('communities.membersLoadFailed')}
-              </p>
-            ) : members === null ? (
-              <Spinner size="sm" label={t('communities.loading')} />
+        </>
+      ) : (
+        <>
+          <Tabs
+            tabsId={tabsId}
+            tabs={[
+              { id: 'blueprints', label: t('communities.tabs.blueprints') },
+              { id: 'fittings', label: t('communities.tabs.fittings') },
+              { id: 'members', label: t('communities.members') },
+            ]}
+            value={tab}
+            onChange={(id) => setTab(id as 'blueprints' | 'fittings' | 'members')}
+            label={t('communities.tabs.label')}
+            className="mb-2"
+          />
+          <TabPanel tabsId={tabsId} tabId={tab}>
+            {tab === 'blueprints' ? (
+              <ShareBlueprintsTab
+                characterId={characterId}
+                communityId={community.id}
+                onOpenLibrary={() => setTab('library')}
+              />
+            ) : tab === 'fittings' ? (
+              <ShareFittingsPanel characterId={characterId} communityId={community.id} />
             ) : (
-              <ul className="divide-y divide-line">
-                {members.map((member) => {
-                  const isSelf = member.uid === myUid;
-                  const isAdminRow = member.uid === community.adminUid;
-                  const stale = isLibraryStale(member.libraryAsOf, now);
-                  const row = (
-                    <li
-                      key={member.uid}
-                      className={`flex items-center gap-2 py-1.5 text-xs ${stale ? 'opacity-60' : ''}`}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {member.characterName}
-                        {isSelf && (
-                          <span className="ml-1 text-text-dim">({t('communities.you')})</span>
-                        )}
-                        {member.libraryAsOf !== null && (
-                          <span className="ml-1 text-text-dim">
-                            {t('communities.asOf', { age: formatAge(now - member.libraryAsOf, t) })}
+              <>
+                {membersFailed ? (
+                  <p role="alert" className="text-xs text-danger">
+                    {t('communities.membersLoadFailed')}
+                  </p>
+                ) : members === null ? (
+                  <Spinner size="sm" label={t('communities.loading')} />
+                ) : (
+                  <ul className="divide-y divide-line">
+                    {members.map((member) => {
+                      const isSelf = member.uid === myUid;
+                      const isAdminRow = member.uid === community.adminUid;
+                      const stale = isLibraryStale(member.libraryAsOf, now);
+                      const row = (
+                        <li
+                          key={member.uid}
+                          className={`flex items-center gap-2 py-1.5 text-xs ${stale ? 'opacity-60' : ''}`}
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            {member.characterName}
+                            {isSelf && (
+                              <span className="ml-1 text-text-dim">({t('communities.you')})</span>
+                            )}
+                            {member.libraryAsOf !== null && (
+                              <span className="ml-1 text-text-dim">
+                                {t('communities.asOf', {
+                                  age: formatAge(now - member.libraryAsOf, t),
+                                })}
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-                      {stale && (
-                        <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                          {t('communities.staleBadge')}
-                        </span>
-                      )}
-                      {isAdminRow && (
-                        <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                          {t('communities.adminBadge')}
-                        </span>
-                      )}
-                      {admin && !isAdminRow && <RowMoreActions />}
-                    </li>
-                  );
-                  // Only the admin has actions, and only on another Member: a row
-                  // with nothing to offer gets no ⋮ and no menu.
-                  return admin && !isAdminRow ? (
-                    <RowActionsMenu
-                      key={member.uid}
-                      name={member.characterName}
-                      items={
-                        <>
-                          <MenuItem onSelect={() => setDialog({ kind: 'makeAdmin', member })}>
-                            {t('communities.makeAdminMenu', { name: member.characterName })}
-                          </MenuItem>
-                          <MenuSeparator />
-                          <MenuItem
-                            className="text-danger"
-                            onSelect={() => setDialog({ kind: 'remove', member })}
-                          >
-                            {t('communities.removeMenu', { name: member.characterName })}
-                          </MenuItem>
-                        </>
-                      }
-                    >
-                      {row}
-                    </RowActionsMenu>
-                  ) : (
-                    row
-                  );
-                })}
-              </ul>
+                          {stale && (
+                            <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
+                              {t('communities.staleBadge')}
+                            </span>
+                          )}
+                          {isAdminRow && (
+                            <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
+                              {t('communities.adminBadge')}
+                            </span>
+                          )}
+                          {admin && !isAdminRow && <RowMoreActions />}
+                        </li>
+                      );
+                      // Only the admin has actions, and only on another Member: a row
+                      // with nothing to offer gets no ⋮ and no menu.
+                      return admin && !isAdminRow ? (
+                        <RowActionsMenu
+                          key={member.uid}
+                          name={member.characterName}
+                          items={
+                            <>
+                              <MenuItem onSelect={() => setDialog({ kind: 'makeAdmin', member })}>
+                                {t('communities.makeAdminMenu', { name: member.characterName })}
+                              </MenuItem>
+                              <MenuSeparator />
+                              <MenuItem
+                                className="text-danger"
+                                onSelect={() => setDialog({ kind: 'remove', member })}
+                              >
+                                {t('communities.removeMenu', { name: member.characterName })}
+                              </MenuItem>
+                            </>
+                          }
+                        >
+                          {row}
+                        </RowActionsMenu>
+                      ) : (
+                        row
+                      );
+                    })}
+                  </ul>
+                )}
+              </>
             )}
-          </>
-        )}
-      </TabPanel>
+          </TabPanel>
+        </>
+      )}
 
       <ConfirmDialog
         open={dialog?.kind === 'regenerate'}
