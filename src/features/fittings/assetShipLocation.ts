@@ -33,10 +33,18 @@ export async function assetShipEditLocation(
   ship: AssetTreeContainerNode,
   name: string
 ): Promise<{ pathname: string; search: string } | null> {
+  return shipItemsEditLocation({ typeId: ship.asset.type_id, name }, shipItems(ship));
+}
+
+/** The same, from a ship's direct contents already in hand (My ships reads a flat asset list, no tree). */
+export async function shipItemsEditLocation(
+  ship: { typeId: number; name: string },
+  items: readonly ShipAssetItem[]
+): Promise<{ pathname: string; search: string } | null> {
   const rackOf = await loadFittingSlots();
   const fitting = assetShipToFitting(
-    { typeId: ship.asset.type_id, name },
-    shipItems(ship),
+    ship,
+    items,
     // A module has a rack; a charge in its slot doesn't (a drone's rack is its bay).
     (typeId) => {
       const rack = rackOf[String(typeId)];

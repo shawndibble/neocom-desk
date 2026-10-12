@@ -5853,6 +5853,11 @@
       "searchLabel": "Search ships",
       "searchPlaceholder": "Ship, hull or location",
       "noMatches": "No ships match your search.",
+      "menu": {
+        "showFitting": "Show fitting",
+        "planRoute": "Plan route",
+        "openLocation": "Open location assets"
+      },
       "columns": {
         "ship": "Ship",
         "character": "Character",
