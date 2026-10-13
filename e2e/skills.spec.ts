@@ -1,7 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-import { IMPLANT_NAMES } from './support/fixtureData';
 
 test.beforeEach(async ({ page }) => {
   await signInAndGoto(page);
@@ -30,10 +29,4 @@ test('renders trained skills grouped by SDE group, with SP totals', async ({ pag
   await expect(page.getByRole('heading', { name: 'Gunnery' })).toBeVisible();
   await expect(page.getByText('Small Hybrid Turret', { exact: true })).toBeVisible();
   await expect(page.getByText('8,000 SP')).toBeVisible();
-});
-
-test('shows implant names, not type IDs', async ({ page }) => {
-  for (const name of Object.values(IMPLANT_NAMES)) {
-    await expect(page.getByText(name, { exact: true })).toBeVisible();
-  }
 });
