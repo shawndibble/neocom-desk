@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
@@ -314,16 +315,22 @@ export function SplitDialog({
             <legend className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('miningTax.splitCollectorLabel')}
             </legend>
-            <label className="flex items-center gap-2 text-xs">
+            <label
+              className={`flex cursor-pointer items-start gap-2 text-xs ${tappableRowClassName}`}
+            >
               <Radio
+                className="mt-0.5"
                 name="split-collector"
                 checked={collector === 'original'}
                 onChange={() => setCollector('original')}
               />
               {t('miningTax.splitCollectorKeeps', { payee: originalPayeeName })}
             </label>
-            <label className="flex items-center gap-2 text-xs">
+            <label
+              className={`flex cursor-pointer items-start gap-2 text-xs ${tappableRowClassName}`}
+            >
               <Radio
+                className="mt-0.5"
                 name="split-collector"
                 checked={collector === 'new'}
                 onChange={() => setCollector('new')}
