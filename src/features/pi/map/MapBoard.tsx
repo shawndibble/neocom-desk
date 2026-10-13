@@ -231,8 +231,13 @@ export function MapBoard(props: MapBoardProps) {
         } else if (litIds.has(product.typeId) && litIds.has(input)) {
           base.push({
             d: curve(a, b),
+            // Off-path wires step back whenever a chain is lit, so the lit one is what the eye follows.
             cls: cx(
-              aim ? 'stroke-line/20' : quiet ? 'stroke-line/20' : 'stroke-line-bright/45',
+              aim || quiet
+                ? 'stroke-line/20'
+                : trace !== null
+                  ? 'stroke-line-bright/25'
+                  : 'stroke-line-bright/45',
               skips
             ),
           });
@@ -257,7 +262,10 @@ export function MapBoard(props: MapBoardProps) {
         } else if (newIds.has(raw.typeId) && props.whatIfTypes.has(type)) {
           mid.push({ d: curve(a, b), cls: 'stroke-map-whatif/50 stroke-[1.2]' });
         } else if (ticked.has(type) && litIds.has(raw.typeId) && !quiet) {
-          base.push({ d: curve(a, b), cls: 'stroke-line-bright/30' });
+          base.push({
+            d: curve(a, b),
+            cls: trace !== null ? 'stroke-line-bright/20' : 'stroke-line-bright/30',
+          });
         }
       }
     }
@@ -421,7 +429,7 @@ export function MapBoard(props: MapBoardProps) {
           <section
             key={tier}
             aria-labelledby={`${headingId}-${tier}`}
-            className="flex flex-col"
+            className="relative flex flex-col"
             data-tier={tier}
           >
             <ColumnHead
@@ -442,7 +450,7 @@ export function MapBoard(props: MapBoardProps) {
                     <li
                       key={product.typeId}
                       aria-hidden="true"
-                      className="h-11 flex-none rounded-xs bg-panel-2/35 md:h-[34px] touch:h-11"
+                      className="h-11 flex-none md:h-[34px] touch:h-11"
                     />
                   );
                 }
@@ -571,6 +579,12 @@ export function MapBoard(props: MapBoardProps) {
                 );
               })}
             </ul>
+            {/* Gaps carry no fill (a grey box read as a broken tile); a column left with none says why. */}
+            {graph.tiers[tier].every((product) => !visible(product.typeId)) && (
+              <p className="pointer-events-none absolute inset-x-0 top-1/2 px-2 text-center text-[11px] text-text-dim">
+                {t('piMap.columnNone')}
+              </p>
+            )}
           </section>
         ))}
       </div>
