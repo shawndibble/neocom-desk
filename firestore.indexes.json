@@ -364,6 +364,17 @@
       ]
     },
     {
+      "collectionGroup": "fittings",
+      "fieldPath": "ownerUid",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
+    },
+    {
       "collectionGroup": "miningTaxAssignments",
       "fieldPath": "*",
       "ttl": false,
