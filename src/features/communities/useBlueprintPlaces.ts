@@ -1,10 +1,12 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { db } from '@/db';
 import type { BlueprintCopy } from '@/engine/communities/shareMode';
 import { loadBlueprintLocation } from '@/features/bpcContracts/blueprintLocation';
-import { loadCharacterAssets } from '@/features/character/assets';
-import { loadCharacterBlueprints } from '@/features/industry/data';
-import { resolveBlueprintPlacement } from '@/features/industry/ownedBlueprints';
+import { KEY as ASSETS_KEY } from '@/features/character/assets';
+import { KEY as BLUEPRINTS_KEY } from '@/features/industry/data';
 import { lookupSolarSystem } from '@/sde/solarSystems';
+import { loadPlacedBlueprints } from './blueprintPlacement';
 
 /** A station or structure's name and system; either is null when it cannot be read. */
 export interface PlaceLabel {
@@ -13,45 +15,59 @@ export interface PlaceLabel {
 }
 
 /**
- * Every blueprint copy a Character owns with its resolved station or
- * structure (the same placement `libraryPush` matches location rules on),
- * for sharing by location. Null until loaded. A copy in a container that
- * cannot be traced has no place; without cached assets only hangar copies
- * are placed.
+ * The Character's blueprint copies with their places, or why there are none:
+ * `unavailable` when the blueprints or assets aren't cached, which is also
+ * when a publish sends nothing, so locations cannot be shared yet.
  */
-export function useBlueprintCopies(characterId: number): BlueprintCopy[] | null {
-  const [loaded, setLoaded] = useState<{ characterId: number; copies: BlueprintCopy[] } | null>(
+export type BlueprintCopies =
+  { status: 'loading' } | { status: 'unavailable' } | { status: 'ready'; copies: BlueprintCopy[] };
+
+const LOADING: BlueprintCopies = { status: 'loading' };
+
+/**
+ * Every blueprint copy a Character owns with its resolved station or
+ * structure, through the same resolver the publish uses
+ * (`loadPlacedBlueprints`). Reloads when the blueprint or asset cache is
+ * refreshed, so counts and "via" labels follow blueprints that move; the last
+ * answer stays on screen meanwhile.
+ */
+export function useBlueprintCopies(characterId: number): BlueprintCopies {
+  // A refresh of either cache row rewrites its meta's `fetchedAt`.
+  const stamp = useLiveQuery(async () => {
+    const [blueprints, assets] = await Promise.all([
+      db.esiCacheMeta.get([characterId, BLUEPRINTS_KEY]),
+      db.esiCacheMeta.get([characterId, ASSETS_KEY]),
+    ]);
+    return `${blueprints?.fetchedAt ?? ''}:${assets?.fetchedAt ?? ''}`;
+  }, [characterId]);
+  const [loaded, setLoaded] = useState<{ characterId: number; value: BlueprintCopies } | null>(
     null
   );
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      let copies: BlueprintCopy[] = [];
+      let value: BlueprintCopies = { status: 'unavailable' };
       try {
-        const [blueprints, assets] = await Promise.all([
-          loadCharacterBlueprints(characterId),
-          loadCharacterAssets(characterId),
-        ]);
-        const assetsByItemId = new Map(
-          (assets.cached?.data ?? []).map((asset) => [asset.item_id, asset])
-        );
-        copies = (blueprints.cached?.data ?? []).map((blueprint) => {
-          const placement = resolveBlueprintPlacement(blueprint, assetsByItemId);
-          return {
-            typeId: blueprint.type_id,
-            placeId: placement.kind === 'place' ? placement.locationId : null,
+        const placed = await loadPlacedBlueprints(characterId);
+        if (placed) {
+          value = {
+            status: 'ready',
+            copies: placed.blueprints.map((blueprint) => ({
+              typeId: blueprint.type_id,
+              placeId: placed.placeIdOf(blueprint),
+            })),
           };
-        });
+        }
       } catch {
-        // No places: sharing by type still works.
+        // Unavailable: sharing by type still works.
       }
-      if (!cancelled) setLoaded({ characterId, copies });
+      if (!cancelled) setLoaded({ characterId, value });
     })();
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
-  return loaded && loaded.characterId === characterId ? loaded.copies : null;
+  }, [characterId, stamp]);
+  return loaded && loaded.characterId === characterId ? loaded.value : LOADING;
 }
 
 /**

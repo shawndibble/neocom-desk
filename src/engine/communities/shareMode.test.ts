@@ -2,38 +2,20 @@ import { describe, expect, it } from 'vitest';
 import {
   addShared,
   copiesByPlace,
-  effectiveSelection,
   noBlueprintsShared,
   noneShared,
   shareAll,
   shareAllBlueprints,
   sharesBlueprint,
   shareLocation,
+  shareType,
   stopSharing,
   stopSharingLocation,
+  stopSharingType,
   typeShareStatus,
   type BlueprintShare,
   type ShareChoice,
 } from './shareMode';
-
-const owned = [10, 20, 30];
-
-describe('effectiveSelection', () => {
-  it('shares only the allowed owned types when not sharing all', () => {
-    const choice: ShareChoice = { all: false, allowed: new Set([20, 99]) };
-    expect([...effectiveSelection(owned, choice)]).toEqual([20]);
-  });
-
-  it('shares every owned type but the excluded ones when sharing all', () => {
-    const choice: ShareChoice = { all: true, excluded: new Set([20]) };
-    expect([...effectiveSelection(owned, choice)]).toEqual([10, 30]);
-  });
-
-  it('includes a blueprint acquired after share-all was turned on', () => {
-    const choice = shareAll();
-    expect(effectiveSelection([...owned, 40], choice).has(40)).toBe(true);
-  });
-});
 
 describe('stopSharing and addShared', () => {
   it('revoking under share-all adds an exclusion', () => {
@@ -65,9 +47,8 @@ describe('stopSharing and addShared', () => {
 describe('a choice over string keys (Fittings)', () => {
   it('revokes and re-adds by key under share-all', () => {
     const stopped = stopSharing<string>(shareAll<string>(), 'saved-a');
-    expect([...effectiveSelection(['saved-a', 'saved-b'], stopped)]).toEqual(['saved-b']);
-    const again = addShared(stopped, 'saved-a');
-    expect([...effectiveSelection(['saved-a', 'saved-b'], again)]).toEqual(['saved-a', 'saved-b']);
+    expect(stopped).toEqual({ all: true, excluded: new Set(['saved-a']) });
+    expect(addShared(stopped, 'saved-a')).toEqual(shareAll<string>());
   });
 });
 
@@ -100,6 +81,23 @@ describe('sharing blueprints by location', () => {
     };
     expect(sharesBlueprint(share, 10, 600)).toBe(true);
     expect(sharesBlueprint(share, 20, 500)).toBe(false);
+  });
+
+  it('includes a blueprint acquired after share-all was turned on', () => {
+    expect(sharesBlueprint(shareAllBlueprints(), 40, null)).toBe(true);
+  });
+
+  it('shares and stops one type without touching the location rules', () => {
+    const share = shareLocation(allow(), 500);
+    expect(shareType(share, 10)).toEqual(shareLocation(allow(10), 500));
+    expect(stopSharingType(shareLocation(allow(10), 500), 10)).toEqual(share);
+  });
+
+  it('stops a type under share-all as an exclusion', () => {
+    expect(stopSharingType(shareAllBlueprints(), 20).choice).toEqual({
+      all: true,
+      excluded: new Set([20]),
+    });
   });
 
   it('stops a location rule without touching the types', () => {

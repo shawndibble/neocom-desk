@@ -1,31 +1,32 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  EmptyState,
-  Modal,
-  SearchInput,
-  Spinner,
-  TabPanel,
-  Tabs,
-  useTabsId,
-} from '@/components/ui';
+import { Button, EmptyState, Modal, SearchInput, SegmentedControl, Spinner } from '@/components/ui';
+import type { TypeStatus } from '@/engine/communities/shareMode';
 import type { BlueprintTypeInfo } from '@/engine/communities/shareTree';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { PlaceName, ViaLabel, type TypeStatus } from './sharedBlueprintRows';
+import { BlueprintName, PlaceName } from './sharedBlueprintRows';
+import { namedLike, needleOf, ROW_LIMIT } from './shareLists';
 import type { PlaceLabel } from './useBlueprintPlaces';
 
-/** A long list shows this many rows; the search narrows it. */
-const ROW_LIMIT = 100;
-
 type Section = 'locations' | 'blueprints';
+
+/**
+ * Where the Character's blueprints are, for the Locations section: loading,
+ * unavailable (no cached assets, so a location rule could not publish
+ * anything), or every place with how many blueprints sit there.
+ */
+export type DialogPlaces =
+  | { status: 'loading' }
+  | { status: 'unavailable' }
+  | { status: 'ready'; counts: ReadonlyMap<number, number> };
 
 /**
  * Where a Member adds to what they share with a Community: a station or
  * structure (a standing rule, every blueprint there now and later) or one
  * blueprint type at a time. Each Share acts at once; the tab behind is the
  * list of what is shared. Under share-all only blueprints that were stopped
- * can be added, so there is no Locations section and no tab bar.
+ * can be added, so there is no Locations section and no switch.
  */
 export function AddBlueprintsDialog({
   open,
@@ -45,8 +46,7 @@ export function AddBlueprintsDialog({
   shareAll: boolean;
   types: readonly BlueprintTypeInfo[];
   status: ReadonlyMap<number, TypeStatus>;
-  /** Every place the Character holds blueprints at, with how many; null while they load. */
-  places: ReadonlyMap<number, number> | null;
+  places: DialogPlaces;
   sharedLocations: ReadonlySet<number>;
   labels: ReadonlyMap<number, PlaceLabel>;
   onShareType: (typeId: number) => void;
@@ -55,22 +55,8 @@ export function AddBlueprintsDialog({
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  const tabsId = useTabsId();
   const [section, setSection] = useState<Section>('locations');
   const shown: Section = shareAll ? 'blueprints' : section;
-
-  const body =
-    shown === 'locations' ? (
-      <LocationList
-        places={places}
-        sharedLocations={sharedLocations}
-        labels={labels}
-        onShare={onShareLocation}
-        onStop={onStopLocation}
-      />
-    ) : (
-      <BlueprintList types={types} status={status} labels={labels} onShare={onShareType} />
-    );
 
   return (
     <Modal
@@ -79,25 +65,30 @@ export function AddBlueprintsDialog({
       title={t('communities.blueprints.addTitle')}
       placement={isPhone ? 'sheet-full' : 'center'}
     >
-      {shareAll ? (
-        body
-      ) : (
-        <div className="space-y-2">
-          <Tabs
-            tabsId={tabsId}
+      <div className="space-y-2">
+        {!shareAll && (
+          <SegmentedControl
             label={t('communities.blueprints.addSections')}
             value={section}
-            onChange={(id) => setSection(id as Section)}
-            tabs={[
-              { id: 'locations', label: t('communities.blueprints.tabLocations') },
-              { id: 'blueprints', label: t('communities.blueprints.tabBlueprints') },
+            onChange={setSection}
+            options={[
+              { value: 'locations', label: t('communities.blueprints.tabLocations') },
+              { value: 'blueprints', label: t('communities.blueprints.tabBlueprints') },
             ]}
           />
-          <TabPanel tabsId={tabsId} tabId={section}>
-            {body}
-          </TabPanel>
-        </div>
-      )}
+        )}
+        {shown === 'locations' ? (
+          <LocationList
+            places={places}
+            sharedLocations={sharedLocations}
+            labels={labels}
+            onShare={onShareLocation}
+            onStop={onStopLocation}
+          />
+        ) : (
+          <BlueprintList types={types} status={status} labels={labels} onShare={onShareType} />
+        )}
+      </div>
     </Modal>
   );
 }
@@ -109,7 +100,7 @@ function LocationList({
   onShare,
   onStop,
 }: {
-  places: ReadonlyMap<number, number> | null;
+  places: DialogPlaces;
   sharedLocations: ReadonlySet<number>;
   labels: ReadonlyMap<number, PlaceLabel>;
   onShare: (placeId: number) => void;
@@ -118,7 +109,7 @@ function LocationList({
   const { t } = useTranslation();
   const rows = useMemo(
     () =>
-      [...(places ?? [])].sort(([a], [b]) => {
+      [...(places.status === 'ready' ? places.counts : [])].sort(([a], [b]) => {
         const nameA = labels.get(a)?.name;
         const nameB = labels.get(b)?.name;
         if (nameA && nameB) return nameA.localeCompare(nameB);
@@ -126,16 +117,23 @@ function LocationList({
       }),
     [places, labels]
   );
+  if (places.status === 'loading') {
+    return <Spinner size="sm" label={t('communities.blueprints.placesLoading')} />;
+  }
+  if (places.status === 'unavailable') {
+    return (
+      <p className="text-xs text-text-dim">{t('communities.blueprints.locationsNeedAssets')}</p>
+    );
+  }
   return (
     <div className="space-y-2">
       <p className="text-xs text-text-dim">{t('communities.blueprints.locationsHint')}</p>
-      {places === null ? (
-        <Spinner size="sm" label={t('communities.blueprints.placesLoading')} />
-      ) : rows.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState title={t('communities.blueprints.noLocations')} />
       ) : (
         <ul className="divide-y divide-line">
           {rows.map(([placeId, count]) => {
+            // The button stays and swaps its label, so focus stays on it.
             const shared = sharedLocations.has(placeId);
             return (
               <li key={placeId} className="flex items-center gap-2 py-1 text-xs">
@@ -165,46 +163,63 @@ function BlueprintList({
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  const needle = query.trim().toLowerCase();
+  const search = useRef<HTMLInputElement>(null);
+  const shareButtons = useRef(new Map<number, HTMLButtonElement>());
+  const focusAfterCommit = useFocusAfterCommit();
   // Every type the by-type choice leaves out, including one some of whose
   // copies a shared location already covers: its copies elsewhere need a way in.
-  const addable = useMemo(
-    () =>
-      types
-        .filter((type) => !status.get(type.typeId)?.direct)
-        .filter((type) => type.name.toLowerCase().includes(needle))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [types, status, needle]
+  const candidates = useMemo(
+    () => types.filter((type) => !status.get(type.typeId)?.direct),
+    [types, status]
   );
-  const anyAddable = types.some((type) => !status.get(type.typeId)?.direct);
-  if (!anyAddable) return <EmptyState title={t('communities.blueprints.nothingToAdd')} />;
+  const matches = useMemo(() => namedLike(candidates, needleOf(query)), [candidates, query]);
+  const rows = matches.slice(0, ROW_LIMIT);
+  if (candidates.length === 0) {
+    return <EmptyState title={t('communities.blueprints.nothingToAdd')} />;
+  }
   return (
     <div className="space-y-2">
       <SearchInput
+        ref={search}
         className="w-full"
         value={query}
         placeholder={t('communities.blueprints.addSearch')}
         aria-label={t('communities.blueprints.addSearch')}
         onChange={(event) => setQuery(event.target.value)}
       />
-      {addable.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState title={t('communities.share.noMatch')} />
       ) : (
         <ul className="divide-y divide-line">
-          {addable.slice(0, ROW_LIMIT).map((type) => (
+          {rows.map((type, index) => (
             <li key={type.typeId} className="flex items-center gap-2 py-1 text-xs">
-              <span className="min-w-0 flex-1 truncate">
-                {type.name}
-                <ViaLabel via={status.get(type.typeId)?.via ?? []} labels={labels} />
-              </span>
-              <Button size="sm" onClick={() => onShare(type.typeId)}>
+              <BlueprintName
+                name={type.name}
+                via={status.get(type.typeId)?.via ?? []}
+                labels={labels}
+              />
+              <Button
+                size="sm"
+                ref={(el) => {
+                  if (el) shareButtons.current.set(type.typeId, el);
+                  else shareButtons.current.delete(type.typeId);
+                }}
+                onClick={() => {
+                  // Sharing removes this row: focus moves to a neighbour, else the search.
+                  const near = [rows[index + 1], rows[index - 1]].map(
+                    (other) => () => (other ? shareButtons.current.get(other.typeId) : null)
+                  );
+                  focusAfterCommit(...near, search);
+                  onShare(type.typeId);
+                }}
+              >
                 {t('communities.blueprints.share')}
               </Button>
             </li>
           ))}
         </ul>
       )}
-      {addable.length > ROW_LIMIT && (
+      {matches.length > ROW_LIMIT && (
         <p className="text-xs text-text-dim">
           {t('communities.blueprints.limited', { count: ROW_LIMIT })}
         </p>

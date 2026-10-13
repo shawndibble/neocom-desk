@@ -28,13 +28,11 @@ import {
   type PushPlan,
   type ResolvedPlace,
 } from '@/engine/communities/sharedLibrary';
-import { loadCharacterAssets } from '@/features/character/assets';
 import { loadBlueprintLocation } from '@/features/bpcContracts/blueprintLocation';
-import { loadCharacterBlueprints } from '@/features/industry/data';
-import { resolveBlueprintPlacement } from '@/features/industry/ownedBlueprints';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
+import { loadPlacedBlueprints } from './blueprintPlacement';
 import { listCommunityIds } from './communityStore';
 import { loadBlueprintShare } from './shareSelection';
 
@@ -67,22 +65,12 @@ function memberRef(communityId: string, uid: string) {
  * lost): the caller publishes nothing rather than shrinking the library.
  */
 async function buildLibrary(characterId: number, share: BlueprintShare) {
-  const [blueprints, assets] = await Promise.all([
-    loadCharacterBlueprints(characterId),
-    loadCharacterAssets(characterId),
-  ]);
-  if (!blueprints.cached || !assets.cached) return null;
-
   // Every copy's place first (local, no requests): a location rule shares a
   // copy whose type was never picked, so filtering by type first would miss it.
-  const assetsByItemId = new Map(assets.cached.data.map((asset) => [asset.item_id, asset]));
-  const placeIds = new Map<number, number>();
-  for (const blueprint of blueprints.cached.data) {
-    const placement = resolveBlueprintPlacement(blueprint, assetsByItemId);
-    if (placement.kind === 'place') placeIds.set(blueprint.item_id, placement.locationId);
-  }
-  const placeIdOf = (blueprint: { item_id: number }) => placeIds.get(blueprint.item_id) ?? null;
-  const owned = blueprints.cached.data.filter((blueprint) =>
+  const placed = await loadPlacedBlueprints(characterId);
+  if (!placed) return null;
+  const { placeIdOf } = placed;
+  const owned = placed.blueprints.filter((blueprint) =>
     sharesBlueprint(share, blueprint.type_id, placeIdOf(blueprint))
   );
 
