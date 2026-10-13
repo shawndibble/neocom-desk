@@ -96,6 +96,7 @@ import {
 } from '../piPlanLink';
 import { usePlanPreference } from '../planTicksPref';
 import { AddPlanetDetail, ProductDetail, type FinderOrigin } from './MapDetail';
+import { ChainEstimateMark } from './ChainTileFigure';
 import { MapBoard } from './MapBoard';
 import { MapHelp } from './MapHelp';
 import { MapPhone } from './MapPhone';
@@ -730,10 +731,11 @@ export function PlanMap({
   // What a tile's figure and marks mean, where the tiles are: the help drawer has the long form.
   // With prices down no tile carries a figure or a mark, so there is nothing to explain.
   const legend = pricesFailed ? null : (
-    <p
+    <div
+      role="group"
       aria-label={t('piMap.legend.label')}
       className={cx(
-        'flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-normal tracking-normal text-text-dim normal-case',
+        'flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.6875rem] font-normal tracking-normal text-text-dim normal-case',
         // Beside the title it gives way first and wraps, so "Planet map" never truncates.
         phone ? 'border-b border-line px-3 py-1.5' : 'min-w-0 flex-1 basis-0'
       )}
@@ -760,12 +762,10 @@ export function PlanMap({
       </span>
       <span aria-hidden="true">·</span>
       <span className="inline-flex items-center gap-1">
-        <span className="rounded-xs border border-warning/60 px-1 text-[0.625rem] leading-[0.875rem] font-semibold text-warning">
-          {t('piShared.estimateBadge')}
-        </span>
+        <ChainEstimateMark />
         {t('piMap.legend.estimate')}
       </span>
-    </p>
+    </div>
   );
 
   const picksStrip = (

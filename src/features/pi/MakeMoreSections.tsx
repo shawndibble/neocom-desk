@@ -660,17 +660,20 @@ function RebuildCard({
   steps: ChecklistColumn | null;
   ticks: Ticks;
 }) {
-  const changes = card.status === 'change';
+  const isChange = card.status === 'change';
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  // Steps start open once the pilot has ticked one (they are part-way through);
-  // after that, the pilot's own toggle wins.
-  const [stepsChoice, setStepsChoice] = useState<boolean | null>(null);
   const altId = useId();
   const stepsId = useId();
   const nowItem = card.sells[0];
   const doneCount = steps ? steps.steps.filter((step) => ticks.has(step.id)).length : 0;
-  const stepsOpen = stepsChoice ?? doneCount > 0;
+  // Opens once a step is ticked (part-way through, even when ticks load late) and stays
+  // open: unticking the last step must not fold the list away under the pilot. The
+  // pilot's own toggle wins over both.
+  const [stepsChoice, setStepsChoice] = useState<boolean | null>(null);
+  const [autoOpened, setAutoOpened] = useState(doneCount > 0);
+  if (doneCount > 0 && !autoOpened) setAutoOpened(true);
+  const stepsOpen = stepsChoice ?? autoOpened;
   return (
     <li id={card.anchor} tabIndex={-1} className="scroll-mt-4 px-3 py-3 outline-none">
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
@@ -680,7 +683,7 @@ function RebuildCard({
             <RebuildSentence card={card} haulDays={haulDays} upgradeFrom={upgradeFrom} />
           </p>
           {(steps || card.alternative) && (
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               {steps && (
                 <button
                   type="button"
@@ -710,6 +713,11 @@ function RebuildCard({
                     )}
                   </span>
                 </button>
+              )}
+              {steps && card.alternative && (
+                <span aria-hidden="true" className="text-text-dim">
+                  ·
+                </span>
               )}
               {card.alternative && (
                 <button
@@ -757,8 +765,8 @@ function RebuildCard({
                 </span>
               )}
             </span>
-            {/* A kept colony sits under "stay as they are": an As-is tag would repeat it. */}
-            {changes && <VerbTag verb="rebuild" label={t('piPlan.make.tagRebuild')} />}
+            {/* A kept colony sits under its own fold: an As-is tag would repeat it. */}
+            {isChange && <VerbTag verb="rebuild" label={t('piPlan.make.tagRebuild')} />}
           </div>
         )}
       </div>
@@ -774,29 +782,32 @@ function RebuildCard({
  */
 export function RebuildPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) {
   const { t } = useTranslation();
-  const { hash } = useLocation();
+  const { hash, key } = useLocation();
   const stepsFor = new Map(view.checklist.map((column) => [column.planetId, column]));
   const changed = view.rebuilds.filter((card) => card.status === 'change');
   const kept = view.rebuilds.filter((card) => card.status !== 'change');
   const hashInKept = kept.some((card) => `#${card.anchor}` === hash);
   const [open, setOpen] = useState(hashInKept);
-  // A new link to a folded colony opens the fold during render, so the card
-  // exists by the time the page's scroll effect looks for it.
-  const [seenHash, setSeenHash] = useState(hash);
-  if (hash !== seenHash) {
-    setSeenHash(hash);
+  // Each link to a folded colony (a repeat of the same one too) opens the fold during
+  // render, so the card exists by the time the page's scroll effect looks for it.
+  const [seenLink, setSeenLink] = useState(key);
+  if (key !== seenLink) {
+    setSeenLink(key);
     if (hashInKept && !open) setOpen(true);
   }
-  const card = (c: RebuildCardView) => (
-    <RebuildCard
-      key={c.planetId}
-      card={c}
-      haulDays={view.hauling.haulDays}
-      upgradeFrom={stepsFor.get(c.planetId)?.fit?.upgradeFromLevel ?? null}
-      steps={stepsFor.get(c.planetId) ?? null}
-      ticks={ticks}
-    />
-  );
+  const renderCard = (c: RebuildCardView) => {
+    const steps = stepsFor.get(c.planetId) ?? null;
+    return (
+      <RebuildCard
+        key={c.planetId}
+        card={c}
+        haulDays={view.hauling.haulDays}
+        upgradeFrom={steps?.fit?.upgradeFromLevel ?? null}
+        steps={steps}
+        ticks={ticks}
+      />
+    );
+  };
   return (
     <Panel
       title={t(
@@ -813,7 +824,7 @@ export function RebuildPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) 
       padded={false}
     >
       {changed.length > 0 ? (
-        <ul className="divide-y divide-line">{changed.map(card)}</ul>
+        <ul className="divide-y divide-line">{changed.map(renderCard)}</ul>
       ) : (
         <p className="px-3 py-2.5 text-sm text-text-dim">{t('piPlan.make.noRebuild')}</p>
       )}
@@ -824,7 +835,7 @@ export function RebuildPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) 
           expanded={open}
           onToggle={() => setOpen(!open)}
         >
-          <ul className="divide-y divide-line">{kept.map(card)}</ul>
+          <ul className="divide-y divide-line">{kept.map(renderCard)}</ul>
         </Disclosure>
       )}
     </Panel>

@@ -28,8 +28,8 @@ function renderRebuilds(reason: string) {
       <RebuildPanel view={view} ticks={NO_TICKS} />
     </MemoryRouter>
   );
-  // A colony with nothing to change folds under "stays as it is".
-  fireEvent.click(screen.getByRole('button', { name: /stays as it is/ }));
+  // A colony with nothing to change folds under "with no rebuild".
+  fireEvent.click(screen.getByRole('button', { name: /with no rebuild/ }));
 }
 
 describe('RebuildPanel, a colony with no rebuild advice', () => {
@@ -69,7 +69,7 @@ describe('RebuildPanel, colonies that keep their setup', () => {
       </MemoryRouter>
     );
     expect(screen.getByText('No rebuild is worth the trouble at your prices.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /1 planet stays as it is/ })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /1 planet with no rebuild/ })).toHaveAttribute(
       'aria-expanded',
       'false'
     );

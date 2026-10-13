@@ -581,7 +581,7 @@ export function MapBoard(props: MapBoardProps) {
             </ul>
             {/* Gaps carry no fill (a grey box read as a broken tile); a column left with none says why. */}
             {graph.tiers[tier].every((product) => !visible(product.typeId)) && (
-              <p className="pointer-events-none absolute inset-x-0 top-1/2 px-2 text-center text-[11px] text-text-dim">
+              <p className="pointer-events-none absolute inset-x-0 top-1/2 px-2 text-center text-[0.6875rem] text-text-dim">
                 {t('piMap.columnNone')}
               </p>
             )}

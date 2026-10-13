@@ -387,13 +387,12 @@ describe('PlanetaryIndustry', () => {
     expect(within(panel).getAllByText('Unknown product').length).toBeGreaterThan(0);
   });
 
-  it("explains what the page can't see, in plain words, from the colony list's help", async () => {
+  it("explains what the page can't see, in plain words", async () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
-    fireEvent.focus(screen.getByRole('button', { name: 'About colony data freshness' }));
-    expect(screen.getByRole('tooltip')).toHaveTextContent(
-      /the game only updates a colony's storage and extractors/
-    );
+    expect(
+      screen.getByText(/the game only updates a colony's storage and extractors/)
+    ).toBeInTheDocument();
   });
 
   it('reads a colony with no readable extraction program as unknown storage, never blank', async () => {

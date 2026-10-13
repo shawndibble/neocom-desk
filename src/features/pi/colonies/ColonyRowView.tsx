@@ -257,21 +257,21 @@ function FaultTags({ tags, planetName }: { tags: readonly FaultTag[]; planetName
 }
 
 /**
- * The row grid from `md`: colony, extractors, storage, next step, ⋮. The ⋮
+ * The row grid from `lg`: colony, extractors, storage, next step, ⋮. The ⋮
  * column has a fixed width so `ColonyListHeader`'s labels sit over the cells.
  */
 const ROW_GRID =
-  'md:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)_12rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
+  'lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)_12rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
 
 /**
- * Column labels, once above the rows from `md`, with each column's help. A
- * phone row is a stacked card and labels its own cells instead.
+ * Column labels, once above the rows from `lg`, with each column's help. A
+ * narrower row is a stacked card and labels its own cells instead.
  */
 export function ColonyListHeader({ haulHours }: { haulHours: number }) {
   const { t } = useTranslation();
   return (
     <div
-      className={`grid gap-x-4 border-b border-line px-3 py-1.5 max-md:hidden ${ROW_GRID} ${MICRO}`}
+      className={`grid gap-x-4 border-b border-line px-3 py-1.5 max-lg:hidden ${ROW_GRID} ${MICRO}`}
     >
       <span className="pl-24">{t('piColonies.colonyColumn')}</span>
       <span className="flex items-center gap-1">
@@ -452,11 +452,11 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               return;
             props.onToggle();
           }}
-          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:items-start ${ROW_GRID}`}
+          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 lg:items-start ${ROW_GRID}`}
         >
           {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
-            <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11">
+            <div className="flex min-w-0 items-start gap-2.5 max-lg:pr-11">
               <button
                 type="button"
                 id={buttonId}
@@ -507,11 +507,11 @@ export function ColonyRowView(props: ColonyRowViewProps) {
             </div>
 
             <div className="min-w-0 space-y-1">
-              <div className="flex items-center justify-between gap-2 md:justify-start md:gap-0">
-                {/* From md the list header shows the label and its help; a screen reader still hears it per row. */}
+              <div className="flex items-center justify-between gap-2 lg:justify-start lg:gap-0">
+                {/* From lg the list header shows the label and its help; a screen reader still hears it per row. */}
                 <span className={`flex items-center gap-1 ${MICRO}`}>
-                  <span className="md:sr-only">{t('piColonies.extractors')}</span>
-                  <span className="md:hidden">
+                  <span className="lg:sr-only">{t('piColonies.extractors')}</span>
+                  <span className="lg:hidden">
                     <InfoTooltip
                       label={t('common.aboutLabel', { label: t('piColonies.extractors') })}
                       content={t('piColonies.help.extractors')}
@@ -532,11 +532,11 @@ export function ColonyRowView(props: ColonyRowViewProps) {
             </div>
 
             <div className="min-w-0 space-y-1">
-              <div className="flex items-center justify-between gap-2 md:justify-start md:gap-0">
-                {/* From md the list header shows the label and its help; a screen reader still hears it per row. */}
+              <div className="flex items-center justify-between gap-2 lg:justify-start lg:gap-0">
+                {/* From lg the list header shows the label and its help; a screen reader still hears it per row. */}
                 <span className={`flex items-center gap-1 ${MICRO}`}>
-                  <span className="md:sr-only">{t('piColonies.storageFull')}</span>
-                  <span className="md:hidden">
+                  <span className="lg:sr-only">{t('piColonies.storageFull')}</span>
+                  <span className="lg:hidden">
                     <InfoTooltip
                       label={t('common.aboutLabel', { label: t('piColonies.storageFull') })}
                       content={t('piColonies.help.storage', {
@@ -569,17 +569,17 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               </p>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-1 md:items-stretch">
+            <div className="flex min-w-0 flex-col gap-1 lg:items-stretch">
               {actionWithExact}
               <p className="text-center text-[0.6875rem] text-text-dim">{note}</p>
             </div>
 
-            <div className="flex justify-end max-md:absolute max-md:top-1 max-md:right-1 md:items-start">
+            <div className="flex justify-end max-lg:absolute max-lg:top-1 max-lg:right-1 lg:items-start">
               <RowMoreActions />
             </div>
 
             {row.tags.length > 0 && (
-              <div className="md:col-span-full md:pl-[4.6rem]">
+              <div className="lg:col-span-full lg:pl-[4.6rem]">
                 <FaultTags tags={row.tags} planetName={planetName} />
               </div>
             )}

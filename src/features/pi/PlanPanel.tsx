@@ -29,6 +29,13 @@ interface Props extends GoalPlannerPanelProps {
   seedingGoal: boolean;
 }
 
+/** What each answer does, under the picker once the pilot has picked. */
+const QUESTION_HINT: Record<PlanQuestion, string> = {
+  'make-more': 'piPlan.picker.makeMoreHint',
+  'find-best': 'piPlan.picker.findBestHint',
+  product: 'piPlan.picker.productHint',
+};
+
 function Option({
   selected,
   onSelect,
@@ -158,7 +165,7 @@ export function PlanPanel(props: Props) {
           </h2>
           <div
             role="group"
-            aria-label={t('piPlan.picker.title')}
+            aria-labelledby={pickerHeadingId}
             className="grid divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0"
           >
             <Option
@@ -181,23 +188,16 @@ export function PlanPanel(props: Props) {
           </div>
           {/* Why this question opened, until the pilot picks; then what the picked one does. */}
           <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
-            {picked === null && !esiFailed ? (
-              <span>
-                {t(`piPlan.picker.opened.${unknown ? 'unknown' : opening.reason}`, {
+            {picked === null && !esiFailed
+              ? t(`piPlan.picker.opened.${unknown ? 'unknown' : opening.reason}`, {
                   count: colonyCount,
-                })}
-              </span>
-            ) : question === 'make-more' ? (
-              colonyCount > 0 ? (
-                t('piPlan.picker.makeMoreHint', { count: colonyCount })
-              ) : (
-                t('piPlan.picker.makeMoreNone')
-              )
-            ) : question === 'find-best' ? (
-              t('piPlan.picker.findBestHint')
-            ) : (
-              t('piPlan.picker.productHint')
-            )}
+                })
+              : t(
+                  question === 'make-more' && colonyCount === 0
+                    ? 'piPlan.picker.makeMoreNone'
+                    : QUESTION_HINT[question],
+                  { count: colonyCount }
+                )}
           </p>
         </Panel>
         {question === 'make-more' && (

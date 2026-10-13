@@ -8,6 +8,21 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
 
+/** The "Est." chip a chain figure carries; the Map legend shows the same one. */
+export function ChainEstimateMark({ tight = false }: { tight?: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      className={cx(
+        'rounded-xs border border-warning/60 px-1 text-[0.625rem] font-semibold text-warning',
+        tight ? 'leading-[0.6875rem]' : 'leading-[0.875rem]'
+      )}
+    >
+      {t('piShared.estimateBadge')}
+    </span>
+  );
+}
+
 export function ChainTileFigure({
   iskPerDay,
   stacked = false,
@@ -18,7 +33,6 @@ export function ChainTileFigure({
   stacked?: boolean;
   className?: string;
 }) {
-  const { t } = useTranslation();
   return (
     <span
       aria-hidden="true"
@@ -29,14 +43,7 @@ export function ChainTileFigure({
       )}
     >
       <span className="font-semibold">{formatIskCompact(iskPerDay)}</span>
-      <span
-        className={cx(
-          'rounded-xs border border-warning/60 px-1 text-[0.625rem] font-semibold text-warning',
-          stacked ? 'leading-[0.6875rem]' : 'leading-[0.875rem]'
-        )}
-      >
-        {t('piShared.estimateBadge')}
-      </span>
+      <ChainEstimateMark tight={stacked} />
     </span>
   );
 }

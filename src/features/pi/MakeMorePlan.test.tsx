@@ -255,7 +255,7 @@ describe('MakeMorePlan', () => {
   it('says Change for a rebuild and Keep for a colony already on its best', () => {
     renderPlan();
     expect(screen.queryByText(/Keep Uttindar II/)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /1 planet stays as it is/ }));
+    fireEvent.click(screen.getByRole('button', { name: /1 planet with no rebuild/ }));
     const cards = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'));
     expect(cards).toHaveLength(2);
     expect(cards[0]).toHaveTextContent(/Change Hek VI \(Barren\) to make/);
@@ -287,7 +287,7 @@ describe('MakeMorePlan', () => {
     const cardFor = (colony: typeof keeping) => {
       mockState = ready({ ...fixtureAdvice, colonies: [changing, colony] });
       const { unmount } = renderPlan();
-      fireEvent.click(screen.getByRole('button', { name: /1 planet stays as it is/ }));
+      fireEvent.click(screen.getByRole('button', { name: /1 planet with no rebuild/ }));
       const card = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'))[1];
       const text = card.textContent ?? '';
       unmount();
@@ -393,6 +393,17 @@ describe('MakeMorePlan', () => {
     const boxes = within(region).getAllByRole('checkbox');
     await user.click(boxes[0]);
     await waitFor(() => expect(toggle).toHaveTextContent(`1 of ${boxes.length} done`));
+  });
+
+  it('keeps the steps open when the pilot unticks the last ticked one', async () => {
+    const user = userEvent.setup();
+    const steps = buildPlanView(withChains, fixturePi, (id) => `Planet ${id}`).checklist[0].steps;
+    await usePlanTicks.getState().setValue([steps[0].id]);
+    renderPlan();
+    const region = screen.getByRole('region', { name: 'In-game steps for Hek VI' });
+    await user.click(within(region).getAllByRole('checkbox')[0]);
+    await waitFor(() => expect(usePlanTicks.getState().value).toEqual([]));
+    expect(screen.getByRole('region', { name: 'In-game steps for Hek VI' })).toBeInTheDocument();
   });
 
   it('starts with the steps open once one of them is ticked', async () => {
