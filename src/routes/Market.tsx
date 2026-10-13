@@ -70,7 +70,6 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { StockTab } from '@/features/stockTargets/StockTab';
-import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
@@ -115,26 +114,13 @@ const ROW_CAP = 15;
 
 /**
  * The page's own top-level tabs: Market Browser plus a character's Open
- * orders and History — previously the separate `/orders` route (open +
- * history) and Wallet's Transactions tab. Distinct from `itemTab` below,
- * which is the *selected item's* own Order Book / Price History split and
- * has nothing to do with this.
- *
- * `history` and `history/transactions` are one tab wearing two hats: both are
- * the character's past, they overlap on item and side, and they answer the
- * same question from either end — which orders ended, and which fills paid
- * out. So History is the tab, and the view is picked from a select in the
- * table's own header (`HistoryViewSelect`) rather than a second row of tabs
- * (round 54). `history/transactions` is still its own `MARKET_TABS` entry —
- * a tab id containing a literal `/` (`docs/ARCHITECTURE.md` §9) — so it gets
- * a real, distinct, bookmarkable path without either needing a second row of
- * tabs or teaching the shared tab foundation about subtabs.
+ * orders and History — previously the separate `/orders` route (open
+ * orders) and Wallet's Transactions tab. History is the character's wallet
+ * fills; its old Ended orders view was dropped in #3692. Distinct from
+ * `itemTab` below, which is the *selected item's* own Order Book / Price
+ * History split and has nothing to do with this.
  */
 type MarketTab = (typeof MARKET_TABS.tabs)[number]['id'];
-
-function isHistoryView(tab: MarketTab): tab is 'history' | 'history/transactions' {
-  return tab === 'history' || tab === 'history/transactions';
-}
 
 /**
  * The two sections quoted at a Trade Hub, and so the two that share the page
@@ -337,13 +323,8 @@ export function Market() {
   const itemTabsId = useTabsId();
   // Market's full view list: a strip on desktop, the title-row picker on a phone.
   const marketViews: PageViews = {
-    value: isHistoryView(tab) ? 'history' : tab,
-    // Clicking History while already inside it would otherwise throw away
-    // the chosen view and snap back to the orders one.
-    onChange: (id) => {
-      if (id === 'history' && isHistoryView(tab)) return;
-      changeTab(id as MarketTab);
-    },
+    value: tab,
+    onChange: (id) => changeTab(id as MarketTab),
     tabs: [
       { id: 'browser', label: t('market.sections.browser') },
       { id: 'orders', label: t('market.sections.openOrders') },
@@ -525,7 +506,6 @@ export function Market() {
   const sellHeadingRef = useRef<HTMLHeadingElement>(null);
   const buyHeadingRef = useRef<HTMLHeadingElement>(null);
   const clearFilterRef = useRef<HTMLButtonElement>(null);
-  const focusHistoryView = useRef(false);
   useFocusHeading(itemHeadingRef, selectedTypeId, !isDesktop);
   const selectedInCompare = useCompareSet((state) =>
     state.items.some((item) => item.typeId === selectedTypeId)
@@ -958,24 +938,7 @@ export function Market() {
           {tab === 'orders' && <OpenOrdersPanel />}
           {tab === 'stock' && <StockTab activeCharacterId={activeCharacterId} />}
 
-          {tab === 'history' && (
-            <OrderHistoryPanel
-              focusViewOnMount={focusHistoryView}
-              onViewChange={(view) => {
-                focusHistoryView.current = view === 'transactions';
-                changeTab(view === 'transactions' ? 'history/transactions' : 'history');
-              }}
-            />
-          )}
-          {tab === 'history/transactions' && (
-            <TransactionsPanel
-              focusViewOnMount={focusHistoryView}
-              onViewChange={(view) => {
-                focusHistoryView.current = view === 'history';
-                changeTab(view === 'transactions' ? 'history/transactions' : 'history');
-              }}
-            />
-          )}
+          {tab === 'history' && <TransactionsPanel />}
 
           {/* The list itself lives in `useAppraisal` at route level, so switching
           to the Browser and back does not throw away a forty-line paste. */}

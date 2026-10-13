@@ -31,7 +31,6 @@ export type CsvSurface =
   // corp-vs-personal above.
   | 'contacts-across'
   | 'orders-open'
-  | 'orders-history'
   | 'mail'
   | 'calendar'
   | 'market-sell'

@@ -4,23 +4,22 @@ Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, 
 
 ## Summary table
 
-| Feature              | Where                                                                                | Notes                                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Market page shell    | `/market`, `src/routes/Market.tsx`                                                   | `MARKET_TABS` (`src/app/pageTabs.ts:126`); page UNGATED, tabs gate themselves               |
-| Browser              | `/market/browser`                                                                    | Item finder + ESI order book; Location Mode hub/region/all regions; Jump Range filters      |
-| Order book item tabs | Browser item panel                                                                   | Order book, Variations, Price history                                                       |
-| Quickbar             | Browser finder column                                                                | Per-character pinned items, drag reorder, price alerts                                      |
-| Compare drawer       | all Market tabs when set non-empty                                                   | Prices + Attributes views; scratch set                                                      |
-| Open orders          | `/market/orders` (`?char=<id>` narrows to one Character, with a "Name only" readout) | All-character worklist by problem; Order Detail modal                                       |
-| History (orders)     | `/market/history`                                                                    | Expired/cancelled orders                                                                    |
-| Transactions         | `/market/history/transactions`                                                       | Wallet fills with realized margin; reached via History view select (not its own tab button) |
-| Appraisal            | `/market/appraisal`                                                                  | Paste list, price at hub, net/refine/LP, Compare Hubs, share link                           |
-| Stock                | `/market/stock[/<list id>]`                                                          | Stock Lists: per-market targets vs listed and in-hangar counts (section 4b)                 |
-| Hauling              | `/travel/hauling` (Travel tab; `/market/hauling` redirects)                          | Hub price-gap scan, Trip Plan, Multibuy; moved to Travel (`20261010-193521`, #3526)         |
-| LP Store             | `/wallet/lp-store[/:corporationId]` (Wallet tab; `/market/lp-store` redirects)       | Own route that draws Wallet's tab bar; ISK/LP ranking (`20261010-200446`, #3527)            |
-| Contract Item search | `/contracts/search/items`                                                            | Public contract lines from shared Firestore snapshot                                        |
-| Courier search       | `/contracts/search/courier`                                                          | Public courier contracts ranked ISK/jump                                                    |
-| Page paste           | `src/app/GlobalPasteRouter.tsx`                                                      | Ctrl/Cmd+V routes EFT fit to Fittings or item list to Appraisal                             |
+| Feature              | Where                                                                                | Notes                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Market page shell    | `/market`, `src/routes/Market.tsx`                                                   | `MARKET_TABS` (`src/app/pageTabs.ts:126`); page UNGATED, tabs gate themselves          |
+| Browser              | `/market/browser`                                                                    | Item finder + ESI order book; Location Mode hub/region/all regions; Jump Range filters |
+| Order book item tabs | Browser item panel                                                                   | Order book, Variations, Price history                                                  |
+| Quickbar             | Browser finder column                                                                | Per-character pinned items, drag reorder, price alerts                                 |
+| Compare drawer       | all Market tabs when set non-empty                                                   | Prices + Attributes views; scratch set                                                 |
+| Open orders          | `/market/orders` (`?char=<id>` narrows to one Character, with a "Name only" readout) | All-character worklist by problem; Order Detail modal                                  |
+| History              | `/market/history`                                                                    | Wallet fills with realized margin                                                      |
+| Appraisal            | `/market/appraisal`                                                                  | Paste list, price at hub, net/refine/LP, Compare Hubs, share link                      |
+| Stock                | `/market/stock[/<list id>]`                                                          | Stock Lists: per-market targets vs listed and in-hangar counts (section 4b)            |
+| Hauling              | `/travel/hauling` (Travel tab; `/market/hauling` redirects)                          | Hub price-gap scan, Trip Plan, Multibuy; moved to Travel (`20261010-193521`, #3526)    |
+| LP Store             | `/wallet/lp-store[/:corporationId]` (Wallet tab; `/market/lp-store` redirects)       | Own route that draws Wallet's tab bar; ISK/LP ranking (`20261010-200446`, #3527)       |
+| Contract Item search | `/contracts/search/items`                                                            | Public contract lines from shared Firestore snapshot                                   |
+| Courier search       | `/contracts/search/courier`                                                          | Public courier contracts ranked ISK/jump                                               |
+| Page paste           | `src/app/GlobalPasteRouter.tsx`                                                      | Ctrl/Cmd+V routes EFT fit to Fittings or item list to Appraisal                        |
 
 ## Purpose and user goal
 
@@ -49,8 +48,8 @@ Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, 
 ## 1. Route, nav, scopes
 
 - Nav: `/market` is an Economy destination, `gating: 'scope'`, `mobileTab: true` (`src/app/navDestinations.ts`). LP Store is no longer under Market: it is a Wallet tab, `/wallet/lp-store` (`WALLET_TABS`, `20261010-200446-lp-store-moves-from-market-to-wallet`, #3527), and Hauling is a Travel tab, `/travel/hauling` (`TRAVEL_TABS`, `20261010-193521-hauling-moves-from-market-to-travel`, #3526). `/contracts` is a separate Economy destination (`navDestinations.ts:207`).
-- Tabs rendered in the tab bar: Browser, Open orders, Stock, History, Appraisal (`MARKET_TABS`, `src/app/pageTabs.ts`). `history/transactions` is a sixth `MARKET_TABS` entry (tab id containing `/`) reached only via `HistoryViewSelect` inside History (`pageTabs.ts:115-125`). Re-clicking History while inside it keeps the chosen view (`Market.tsx:855`).
-- Legacy: `/wallet/transactions` -> `/market/history/transactions`; `/wallet/loyalty[/:id]` -> `/wallet/lp-store[/:id]` (`src/app/legacyPaths.ts`); `/market/lp-store[/:id]` -> `/wallet/lp-store[/:id]` and `/market/hauling` -> `/travel/hauling` (`PAGE_LEGACY_LOCATIONS`, `src/app/pageTabs.ts`); `/orders` retired into Market (note in `routeScopes.ts:52`).
+- Tabs rendered in the tab bar: Browser, Open orders, Stock, History, Appraisal (`MARKET_TABS`, `src/app/pageTabs.ts`). History is the Transactions table; its old Ended orders view was dropped in #3692.
+- Legacy: `/wallet/transactions` and `/market/history/transactions` -> `/market/history` (query kept); `/wallet/loyalty[/:id]` -> `/wallet/lp-store[/:id]` (`src/app/legacyPaths.ts`); `/market/lp-store[/:id]` -> `/wallet/lp-store[/:id]` and `/market/hauling` -> `/travel/hauling` (`PAGE_LEGACY_LOCATIONS`, `src/app/pageTabs.ts`); `/orders` retired into Market (note in `routeScopes.ts:52`).
 - Scopes (`src/app/routeScopes.ts`): `/market` UNGATED (`:57`); Open orders/History need `esi-markets.read_character_orders.v1`, Transactions `esi-wallet.read_character_wallet.v1`, each as a panel-level `GrantBanner`; Browser and Appraisal need none (Hauling, now `/travel/hauling`, needs none either). LP Store's gate moved with it: `/wallet/lp-store` and `/wallet/lp-store/:corporationId` use `LP_STORE_REQUIREMENT` (`:245-246`). `/contracts` UNGATED (`:230`), History tab gates `getCharacterContracts` per tab; search tabs need no scope.
 - Page layout: `max-w-[96rem]` on Browser else `max-w-6xl` (`Market.tsx:759`). Header hub picker/refresh described in section 2.1.
 - Held at route level so they survive tab switches: `useAppraisal` (pasted list), `useOrderBookOrchestration` (CompareDrawer and Item Detail read it), Compare Set (`Market.tsx:473,493`).
@@ -140,7 +139,7 @@ Browser decisions: `20260831-140406-market-browser-rebuild`, `20260831-140406-th
 
 ## 3. Open orders, History, Transactions (Market tabs)
 
-Paths relative to repo root. Tabs from `MARKET_TABS` (`src/app/pageTabs.ts`): `orders` = `/market/orders`, `history` = `/market/history`, `history/transactions` = `/market/history/transactions` (tab id with a literal `/`, not a nested tab; ADR 0015). `/market` is UNGATED (`src/app/routeScopes.ts:57`); each of these three panels gates itself (banner, not page replace). Mounted in `src/routes/Market.tsx:868-883`. Old `/wallet/transactions` redirects to `/market/history/transactions` (`src/app/pageTabs.ts` WALLET_TABS note).
+Paths relative to repo root. Tabs from `MARKET_TABS` (`src/app/pageTabs.ts`): `orders` = `/market/orders`, `history` = `/market/history` (ADR 0015). `/market` is UNGATED (`src/app/routeScopes.ts:57`); each of these panels gates itself (banner, not page replace). Mounted in `src/routes/Market.tsx`. Old `/wallet/transactions` and `/market/history/transactions` redirect to `/market/history`.
 
 ### Summary table
 
@@ -161,9 +160,7 @@ Paths relative to repo root. Tabs from `MARKET_TABS` (`src/app/pageTabs.ts`): `o
 | Cost basis / Floor               | `orderCostBasis.ts`, `engine/market/orderFloor.ts`, `walletCostBasis.ts` | Production Run first, wallet FIFO fills the rest                                                                         |
 | Frequently undercut flag         | `engine/market/orderProblemHistory.ts`, `orderProblemSamples.ts`         | rolling local samples                                                                                                    |
 | Undercut notification            | `features/notifications/events.ts:147`                                   | `marketOrderUndercut`, station tier only                                                                                 |
-| History (orders)                 | `/market/history`, `OrderHistoryPanel.tsx`                               | expired/cancelled orders; search, side, state filter, sort, CSV                                                          |
-| History view switch              | `HistoryViewSelect.tsx`                                                  | select (desktop) / segmented (phone) between Orders and Transactions                                                     |
-| Transactions                     | `/market/history/transactions`, `TransactionsPanel.tsx`                  | personal wallet fills; search/side/date filter, summary strip, margin column, CSV                                        |
+| History (Transactions)           | `/market/history`, `TransactionsPanel.tsx`                               | personal wallet fills; search/side/date filter, summary strip, margin column, CSV                                        |
 | Realized margin                  | `transactionMargins.ts`, `engine/market/realizedMargin.ts`               | FIFO vs own wallet buys minus sales tax                                                                                  |
 | Fill highlight                   | `transactionHighlight.ts`                                                | `?highlight=<typeId>` from fill alert -> newest sell of item                                                             |
 
@@ -226,25 +223,14 @@ What: worklist of every authenticated character's open market orders, each filed
 - `orderSlots.ts`: `maxMarketOrders` = 5 + 4 Trade + 8 Retail + 16 Wholesale + 32 Tycoon per level; used only by `src/routes/Overview.tsx:39`, not by Open orders.
 - `priceTick.ts`: legal undercut price (one tick below, 4 significant figures; decision `20260924-002508`).
 
-**Notifications link**: `marketOrderUndercut` (`events.ts:147`, default both channels, scope `getCharacterOrders`; station tier only, undercut for sell / outbid for buy) and `marketOrderFilled` (default feed only; destination `/market/history/transactions`, `notificationOptions.ts:75`, row highlight). Both deep-link with `?highlight=`.
+**Notifications link**: `marketOrderUndercut` (`events.ts:147`, default both channels, scope `getCharacterOrders`; station tier only, undercut for sell / outbid for buy) and `marketOrderFilled` (default feed only; destination `/market/history`, `notificationOptions.ts:75`, row highlight). Both deep-link with `?highlight=`.
 
 ### History (`/market/history`)
-
-What: character's expired + cancelled orders (ESI order history). `OrderHistoryPanel.tsx`.
-
-- Data: `GET /characters/{id}/orders/history`, scope `esi-markets.read_character_orders.v1` (`getCharacterOrderHistory`), paginated; `truncated` flag -> "incomplete" warning. cacheKey `market:order-history`. Active character only.
-- Header: `HistoryViewSelect` (Orders | Transactions), refresh, `TableActionsMenu` (CSV surface `orders-history`, filtered rows, `orderHistoryCsvColumns`), data age.
-- Filter bar (`orderHistoryFilter.ts`, URL `history.q`, `history.side`, `history.state`, `history.sort`): search (item name), Buy/Sell chips, Expired/Cancelled chips; funnel count excludes text; column picker (side, price, remaining, issued, state; device-local `orderHistoryVisibleColumns`; hidden on phone). Default sort issued desc.
-- Columns: Item, Side, Price, Remaining, Issued (date), State (phone hidden). `DataTable` virtualize auto, `responsive="table"` (horizontal scroll on phone).
-- States: spinner (not hydrated / first load), error `loadFailedTitle`, reauth `GrantBanner` (:327), empty `CachedEmptyState`, offline banner, no match + "Reset filters".
-- Item cell: no context menu or detail modal in this table (`DataTable` at :389 gets no `rowContextMenu`).
-
-### Transactions (`/market/history/transactions`)
 
 What: character's buy/sell fills; corp fills live on `/corp/wallet`. `TransactionsPanel.tsx`.
 
 - Data: `GET /characters/{id}/wallet/transactions` (`esi-wallet.read_character_wallet.v1`; `loadWalletTransactionsWithStatus`, page cap -> `truncated` warning) + wallet journal (only for Margin; failure blanks Margin, not the tab). cacheKey `market:transactions`.
-- Header: `HistoryViewSelect`, refresh, `TableActionsMenu` (CSV surface `wallet-transactions`, filtered rows), `DataAgeBadge`.
+- Header: title "Transactions", refresh, `TableActionsMenu` (CSV surface `wallet-transactions`, filtered rows), `DataAgeBadge`.
 - Filter bar: reuses `TransactionsFilterBar` from `src/features/corp/CorpTransactionsPanel.tsx:94` — search, Side select, From/To date fields; URL `transactions.*` (`walletTransactionFilter.ts`).
 - Summary strip (`TransactionsSummaryStrip.tsx`): date range, Sold / Bought / Net over filtered rows.
 - Columns: Date (`formatTimestamp`, user time zone), Item (`ItemInfoLink`, sticky start), Side (phone hidden), Quantity, Unit price, Total (signed, toned), Margin (phone hidden, header tooltip, cell tooltip shows unit cost + sales tax; "—" if no margin; blank on buys). Default sort date desc; all columns sortable. Virtualized.

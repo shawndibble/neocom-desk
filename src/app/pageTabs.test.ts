@@ -216,3 +216,29 @@ describe('Hauling, a Travel tab (issue #3526)', () => {
     expect(tabbedPagePathFor('/travel/hauling')).toBe('/travel/hauling');
   });
 });
+
+describe('History is Transactions only (issue #3692)', () => {
+  it('has no separate Transactions tab', () => {
+    expect(MARKET_TABS.tabs.map((tab) => tab.id)).toEqual([
+      'browser',
+      'orders',
+      'stock',
+      'history',
+      'appraisal',
+    ]);
+  });
+
+  it('moves an old History › Transactions link to History, keeping the highlight', () => {
+    const moved = PAGE_LEGACY_LOCATIONS['/market'];
+    expect(moved?.('/market/history/transactions', '?highlight=34')).toEqual({
+      pathname: '/market/history',
+      search: '?highlight=34',
+    });
+    expect(moved?.('/market/history/transactions/', '')).toEqual({
+      pathname: '/market/history',
+      search: '',
+    });
+    expect(moved?.('/market/history/transactionsx', '')).toBeNull();
+    expect(isTabRedirectPath('/market/history/transactions')).toBe(true);
+  });
+});

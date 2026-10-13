@@ -947,8 +947,7 @@ export function OrderDetailContent({
                 // stays hidden, same as any other resolved `deep`) — say why
                 // system/region above read "not checked" instead of leaving the
                 // user to wonder where the "check deeper" button went. Same
-                // key/shape `OrderHistoryPanel.tsx` and `VariationsTable.tsx` use
-                // for their own truncated fetches.
+                // key/shape `VariationsTable.tsx` uses for its own truncated fetch.
                 <p className="pt-1.5 text-[0.6875rem] text-warning uppercase">
                   {t('common.incompleteTitle')}
                 </p>

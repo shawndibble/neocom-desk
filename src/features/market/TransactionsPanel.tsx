@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type RefObject } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -44,7 +44,6 @@ import {
 } from '@/features/character/walletTransactionsCsv';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import { transactionMargins } from './transactionMargins';
-import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { highlightedTransactionId } from './transactionHighlight';
 
@@ -89,7 +88,7 @@ async function loadTransactionsSnapshot(
 }
 
 /**
- * Market's Transactions tab: a character's recent buy/sell fills. Personal
+ * Market's History tab: a character's recent buy/sell fills. Personal
  * only, and now for a reason of its own rather than for want of an endpoint:
  * the corporation's fills live on the corp side of `/wallet`, beside the corp
  * journal they reconcile against (issue #570). Desktop carries the same
@@ -98,17 +97,10 @@ async function loadTransactionsSnapshot(
  * the character's own wallet buys (issue #1740); the phone day list keeps its
  * own strip and no filter bar or margin.
  */
-interface TransactionsPanelProps {
-  /** Switches the History tab to its other view; the picker lives in this panel's header. */
-  onViewChange: (view: HistoryView) => void;
-  /** See `HistoryViewSelect`'s `focusOnMountRef`. */
-  focusViewOnMount?: RefObject<boolean>;
-}
-
 /** Module-level so the table's windowing and row memo see one stable function. */
 const transactionRowKey = (txn: WalletTransaction) => txn.transaction_id;
 
-export function TransactionsPanel({ onViewChange, focusViewOnMount }: TransactionsPanelProps) {
+export function TransactionsPanel() {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const timeZone = useTimeZone();
@@ -274,32 +266,25 @@ export function TransactionsPanel({ onViewChange, focusViewOnMount }: Transactio
   return (
     <Panel
       padded={false}
-      actionsFill={isPhone}
+      title={t('market.sections.transactions')}
       actions={
-        <span className="flex w-full items-center justify-between gap-2">
-          <HistoryViewSelect
-            value="transactions"
-            onChange={onViewChange}
-            focusOnMountRef={focusViewOnMount}
+        <span className="flex items-center gap-2">
+          <IconButton
+            size={isPhone ? 'md' : 'sm'}
+            icon={<Icon.Refresh />}
+            label={t('wallet.refresh')}
+            onClick={refresh}
           />
-          <span className="flex items-center gap-2">
-            <IconButton
-              size={isPhone ? 'md' : 'sm'}
-              icon={<Icon.Refresh />}
-              label={t('wallet.refresh')}
-              onClick={refresh}
-            />
-            {transactionsResult && (
-              <>
-                <TableActionsMenu
-                  name={t('market.sections.transactions')}
-                  tableExport={transactionsExport}
-                  size={isPhone ? 'md' : 'sm'}
-                />
-                <DataAgeBadge date={transactionsResult.fetchedAt} />
-              </>
-            )}
-          </span>
+          {transactionsResult && (
+            <>
+              <TableActionsMenu
+                name={t('market.sections.transactions')}
+                tableExport={transactionsExport}
+                size={isPhone ? 'md' : 'sm'}
+              />
+              <DataAgeBadge date={transactionsResult.fetchedAt} />
+            </>
+          )}
         </span>
       }
     >

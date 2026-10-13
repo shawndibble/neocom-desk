@@ -56,18 +56,17 @@ function LocationProbe() {
   return <output data-testid="location-search">{useLocation().search}</output>;
 }
 
-function renderPanel(url = '/market/history/transactions') {
+function renderPanel(url = '/market/history') {
   const actions = fakeItemActions();
-  const onViewChange = vi.fn();
   render(
     <MemoryRouter initialEntries={[url]}>
       <FakeItemActions actions={actions}>
-        <TransactionsPanel onViewChange={onViewChange} />
+        <TransactionsPanel />
       </FakeItemActions>
       <LocationProbe />
     </MemoryRouter>
   );
-  return { actions, onViewChange };
+  return { actions };
 }
 
 beforeEach(() => {
@@ -350,9 +349,9 @@ describe('TransactionsPanel — phone', () => {
   it('pulses the fill a notification pointed at', async () => {
     load([transaction({ transaction_id: 7 })]);
     render(
-      <MemoryRouter initialEntries={['/market/history/transactions?highlight=2048']}>
+      <MemoryRouter initialEntries={['/market/history?highlight=2048']}>
         <FakeItemActions>
-          <TransactionsPanel onViewChange={vi.fn()} />
+          <TransactionsPanel />
         </FakeItemActions>
       </MemoryRouter>
     );
@@ -361,12 +360,5 @@ describe('TransactionsPanel — phone', () => {
     expect(row).toHaveAttribute('data-row-key', '7');
     expect(row).toHaveClass('row-pulse');
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
-  });
-
-  it('switches to Ended orders from the header toggle', async () => {
-    load([transaction()]);
-    const { onViewChange } = renderPanel();
-    fireEvent.click(await screen.findByRole('button', { name: 'Ended orders' }));
-    expect(onViewChange).toHaveBeenCalledWith('history');
   });
 });
