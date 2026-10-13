@@ -13,12 +13,8 @@
  * Pure, per CLAUDE.md. The caller supplies the graph; `features/route` is
  * what reads it off the snapshot.
  */
-import {
-  findJumpRoute,
-  jumpDistancesFrom,
-  type FindJumpRouteOptions,
-  type JumpGraph,
-} from './jumpRoute';
+import { findFlownRoute, flownJumpDistancesFrom } from './holeDetour';
+import type { FindJumpRouteOptions, JumpGraph } from './jumpRoute';
 
 /** One row's two ends; `null` where the location resolves to no system. */
 export interface RouteEnds {
@@ -50,7 +46,7 @@ export function jumpCountsForRoutes(
   const counts = new Array<number | null>(routes.length).fill(null);
   for (const [originSystemId, indexes] of byOrigin) {
     if (indexes.length >= SWEEP_THRESHOLD) {
-      const distances = jumpDistancesFrom(graph, originSystemId, options);
+      const distances = flownJumpDistancesFrom(graph, originSystemId, options);
       for (const index of indexes) {
         const destinationSystemId = routes[index].destinationSystemId as number;
         // The same membership guard the single-lookup path applies. A
@@ -64,7 +60,7 @@ export function jumpCountsForRoutes(
       continue;
     }
     const [index] = indexes;
-    const route = findJumpRoute(
+    const route = findFlownRoute(
       graph,
       originSystemId,
       routes[index].destinationSystemId as number,

@@ -25,10 +25,9 @@ import { bridgeBetween, bridgeConnections, type AnsiblexGate } from './ansiblex'
 import { lightYearDistance, type SystemPosition } from './jumpDrive';
 import { jumpWayFacts, type JumpDriveOptions, type JumpHop, type JumpWayFacts } from './jumpLegs';
 import { findJumpRoute, type FindJumpRouteOptions, type JumpGraph } from './jumpRoute';
+import { crossesHole, gatesOnlyOptions, longerThanGates, noHoleOptions } from './holeDetour';
 import {
-  gatesOnlyOptions,
   legWays,
-  longerThanGates,
   type JumpContext,
   parseLegPin,
   pinWaitsOnHoleList,
@@ -49,7 +48,7 @@ import {
   type RouteSafetySystemEntry,
   type SystemKills,
 } from './routeSafety';
-import { HUB_SYSTEM_IDS, type TheraConnection } from './theraConnections';
+import type { TheraConnection } from './theraConnections';
 import type { TripLeg, TripPlan } from './tripPlan';
 
 /** How a route entered a system from the one before it. */
@@ -142,29 +141,6 @@ export interface LegAlternatives {
   pinned: PinnedLegRoute<PinnableHole> | null;
 }
 
-const HUB_IDS: ReadonlySet<number> = new Set(Object.values(HUB_SYSTEM_IDS));
-
-/** A route that steps into or out of a hub by something other than a gate: a hole jump. */
-function crossesHole(graph: JumpGraph, systems: readonly number[]): boolean {
-  return systems.some(
-    (id, index) =>
-      index > 0 &&
-      (HUB_IDS.has(id) || HUB_IDS.has(systems[index - 1])) &&
-      !graph.get(systems[index - 1])?.includes(id)
-  );
-}
-
-/** The same search without the holes: the bridges, preference and Avoided Systems stay. */
-function withoutHoles(options: FindJumpRouteOptions): FindJumpRouteOptions {
-  return {
-    ...options,
-    extraConnections: options.extraConnections?.filter(
-      ([a, b]) => !HUB_IDS.has(a) && !HUB_IDS.has(b)
-    ),
-    freeSystems: undefined,
-  };
-}
-
 /**
  * The trip with each leg the planner sent through Thera or Turnur in more
  * jumps than the gates flown without the holes instead. A biased preference
@@ -181,7 +157,7 @@ export function gatesOverLongerHoles<T extends PlannedTrip>(trip: T): T {
     const gates = findJumpRoute(graph, leg.from, leg.to, gatesOnlyOptions(options));
     if (!longerThanGates(leg.route.systems, gates)) return leg;
     changed = true;
-    return { ...leg, route: findJumpRoute(graph, leg.from, leg.to, withoutHoles(options)) };
+    return { ...leg, route: findJumpRoute(graph, leg.from, leg.to, noHoleOptions(options)) };
   });
   if (!changed) return trip;
   const jumps = legs.reduce(

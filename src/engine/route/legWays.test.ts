@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { findJumpRoute, routeCost, routeSweepFrom, type JumpGraph } from './jumpRoute';
 import { holeNetwork } from './routeHoles';
 import { HUB_SYSTEM_IDS, type TheraConnection } from './theraConnections';
+import { gatesOnlyOptions } from './holeDetour';
 import {
-  gatesOnlyOptions,
   legPinToken,
   legWays,
   parseLegPin,

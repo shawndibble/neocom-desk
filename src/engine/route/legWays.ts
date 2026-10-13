@@ -27,6 +27,7 @@ import {
 import { bridgeConnections, type AnsiblexGate } from './ansiblex';
 import type { JumpSystem } from './jumpDrive';
 import { routeWithJumps, type JumpDriveOptions } from './jumpLegs';
+import { gatesOnlyOptions, longerThanGates } from './holeDetour';
 import { holeNetwork, type HoleEnds } from './routeHoles';
 import { HUB_SYSTEM_IDS, type TheraHub } from './theraConnections';
 
@@ -42,11 +43,6 @@ export interface JumpContext {
 
 /** A hole a pin can name: its EVE-Scout id and the two systems it joins. */
 export type PinnableHole = HoleEnds & { id: string };
-
-/** The same search with every hole taken away: the preference and Avoided Systems stay. */
-export function gatesOnlyOptions(options: FindJumpRouteOptions): FindJumpRouteOptions {
-  return { ...options, extraConnections: undefined, freeSystems: undefined };
-}
 
 /** `options` with these holes added to whatever holes it already has. */
 function withHoles(
@@ -184,14 +180,6 @@ export function routeOverJumps(
     gatesOnlyOptions(options)
   );
   return route.kind === 'route' ? { kind: 'route', systems: route.systems } : route;
-}
-
-/**
- * A route with more jumps than the gate route: no reason to fly it. With no
- * gate route at all, nothing is longer.
- */
-export function longerThanGates(systems: readonly number[], gates: JumpRouteResult): boolean {
-  return gates.kind === 'route' && systems.length > gates.systems.length;
 }
 
 /** One way to fly a leg: by gates alone, the cheapest way through a hub, or over the bridges. */

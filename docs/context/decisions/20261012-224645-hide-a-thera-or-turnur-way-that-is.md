@@ -24,7 +24,7 @@ _Recorded 2026-10-12._
   even when its way is longer, and listed as the way in use. A hole pinned by
   name (Thera tab's Route via) is flown as before: the pilot chose it.
 
-- **Only Route Safety — a known gap.** Jump counts elsewhere (the jump basis,
-  `features/route/jumpBasis.ts`) still count the planner's hole route. Under a
-  biased preference with holes on, such a count can be higher than the route
-  Route Safety now flies.
+- **Every jump count follows the same rule.** The jump basis counts
+  (`features/route/jumpBasis.ts`: Assets, Market, Courier and the rest) use
+  `engine/route/holeDetour.ts`, as Route Safety does, so a count always
+  matches the route Route Safety draws.

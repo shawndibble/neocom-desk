@@ -17,9 +17,8 @@
  * Collapsing the last two would let an offline first visit report "no gate
  * route exists" for every haul in the game.
  */
+import { findFlownRoute, flownJumpDistancesFrom } from '@/engine/route/holeDetour';
 import {
-  findJumpRoute,
-  jumpDistancesFrom,
   type FindJumpRouteOptions,
   type JumpGraph,
   type JumpRouteResult,
@@ -43,8 +42,9 @@ export type LocalRouteRules = Partial<RouteRules>;
  * Connections beyond the stargates, and the systems they make free — the open
  * Thera / Turnur holes (issue #2476) and known Ansiblex bridges, as
  * `useJumpBasis` builds them from the pilot's Route Safety settings. Every
- * count passes the same ones, so every count matches the route Route Safety
- * draws.
+ * count passes the same ones, and drops a hole route longer than the gates as
+ * Route Safety does (`engine/route/holeDetour.ts`), so every count matches the
+ * route Route Safety draws.
  */
 export type RouteGraphExtras = Pick<FindJumpRouteOptions, 'extraConnections' | 'freeSystems'>;
 
@@ -102,7 +102,7 @@ export async function findLocalRoute(
     securityLookupFor(rules.preference ?? 'shortest'),
   ]);
   if (!graph) return { kind: 'unknown' };
-  return findJumpRoute(
+  return findFlownRoute(
     graph,
     originSystemId,
     destinationSystemId,
@@ -153,7 +153,7 @@ export async function localJumpDistances(
   if (!graph) return { kind: 'unknown' };
   return {
     kind: 'known',
-    jumps: jumpDistancesFrom(graph, originSystemId, engineOptions(rules, securityOf, extras)),
+    jumps: flownJumpDistancesFrom(graph, originSystemId, engineOptions(rules, securityOf, extras)),
   };
 }
 
