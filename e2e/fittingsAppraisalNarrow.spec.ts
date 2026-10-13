@@ -72,8 +72,10 @@ async function openBreakdown(page: Page, size: { width: number; height: number }
   await page.getByRole('button', { name: 'Import…', exact: true }).click();
   await page.getByLabel('Link or text').fill(EFT);
   await page.getByRole('button', { name: 'Load', exact: true }).click();
+  // Below desktop the Ring, the List and the stats are one row of tabs.
+  await page.getByRole('tab', { name: 'Stats', exact: true }).click();
   await page.getByRole('button', { name: /^Price/ }).click();
-  await page.getByRole('button', { name: 'Appraise' }).click({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Appraise' }).click(STATS_TIMEOUT);
   const dialog = page.getByRole('dialog', { name: 'Price breakdown' });
   await expect(dialog.getByText('500,000,000 ISK').first()).toBeVisible(STATS_TIMEOUT);
   return dialog;
