@@ -246,6 +246,18 @@ export default defineConfig({
               test: /node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom)[\\/]/,
             },
             { name: 'vendor-sentry', test: /node_modules[\\/]@sentry(-internal)?[\\/]/ },
+            // Same reasoning for the rest of the boot path: Dexie opens the
+            // database and i18next/zustand run before first paint, so all
+            // three ride in the entry's static imports on every page. Left
+            // ungrouped they are re-emitted inside the entry chunk, and with a
+            // deploy every ~15 minutes that re-downloads them each time the
+            // service worker installs (the precache is the whole update cost).
+            { name: 'vendor-dexie', test: /node_modules[\\/](dexie|dexie-react-hooks)[\\/]/ },
+            {
+              name: 'vendor-i18n',
+              test: /node_modules[\\/](i18next|react-i18next|html-parse-stringify|void-elements)[\\/]/,
+            },
+            { name: 'vendor-zustand', test: /node_modules[\\/]zustand[\\/]/ },
           ],
         },
       },
