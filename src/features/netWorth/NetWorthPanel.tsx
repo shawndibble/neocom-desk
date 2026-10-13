@@ -40,6 +40,7 @@ import {
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
+import { CharacterSwatch } from './CharacterSwatch';
 import { LAYER_LABEL_KEYS, LAYER_SWATCH } from './layerMeta';
 import { useNetWorthHiddenCharacters, useNetWorthHiddenLayers } from './netWorthSettings';
 import { buildTableRows, type NetWorthTableRow } from './tableRows';
@@ -289,16 +290,27 @@ export function NetWorthPanel({
         header: t('wallet.balanceCharacterColumn'),
         stickyStart: true,
         stickyStartOnPanel: true,
-        render: (row) => (
-          <span className={row.covered ? undefined : 'text-text-dim'}>
-            {row.characterName}
-            {!row.covered && (
-              <span className="block text-[0.6875rem] text-warning">
-                {t('wallet.balanceCharacterNotShared')}
+        render: (row) => {
+          const lineIndex =
+            mode === 'multi' ? lines.findIndex((c) => c.characterId === row.characterId) : -1;
+          return (
+            <span className={cx('flex items-start gap-1.5', !row.covered && 'text-text-dim')}>
+              {lineIndex >= 0 && (
+                <span className="mt-1.5 flex shrink-0">
+                  <CharacterSwatch index={lineIndex} />
+                </span>
+              )}
+              <span>
+                {row.characterName}
+                {!row.covered && (
+                  <span className="block text-[0.6875rem] text-warning">
+                    {t('wallet.balanceCharacterNotShared')}
+                  </span>
+                )}
               </span>
-            )}
-          </span>
-        ),
+            </span>
+          );
+        },
       },
       ...listed.map<DataTableColumn<NetWorthTableRow>>((id) => ({
         id,
@@ -329,7 +341,7 @@ export function NetWorthPanel({
       { id: 'go', header: '', align: 'right', render: () => <RowCaret /> },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- toggleCharacter closes over the same values listed
-    [t, hiddenCharacters, hiddenLayers, included.length, shown, listed, coveredIds]
+    [t, mode, lines, hiddenCharacters, hiddenLayers, included.length, shown, listed, coveredIds]
   );
 
   const chart = hasPoints ? (

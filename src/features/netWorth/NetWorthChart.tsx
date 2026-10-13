@@ -31,6 +31,7 @@ import { formatDateOnly } from '@/lib/timestamp';
 import { timeAxisTicks } from '@/engine/wallet/timeTicks';
 import { lineKey, type LineRow, type StackRow } from '@/engine/netWorth/chartRows';
 import { LAYER_IDS, type LayerId } from '@/engine/netWorth/series';
+import { CharacterSwatch } from './CharacterSwatch';
 import { LAYER_COLOR, LAYER_LABEL_KEYS, characterStroke } from './layerMeta';
 
 const MAX_X_TICKS = 5;
@@ -113,11 +114,14 @@ function LinesTooltip({
   return (
     <ChartTooltipShell>
       <p className="font-semibold text-text">{dayLabel(row.x)}</p>
-      {lines.map((line) => {
+      {lines.map((line, index) => {
         const value = row[lineKey(line.characterId)];
         return typeof value === 'number' ? (
-          <p key={line.characterId}>
-            {line.name}: {formatIsk(value)}
+          <p key={line.characterId} className="flex items-center gap-1.5">
+            <CharacterSwatch index={index} />
+            <span>
+              {line.name}: {formatIsk(value)}
+            </span>
           </p>
         ) : null;
       })}
@@ -263,6 +267,19 @@ export default function NetWorthChart(props: NetWorthChartProps) {
           )}
         </ResponsiveContainer>
       </div>
+      {props.mode === 'multi' && (
+        <ul
+          data-testid="net-worth-legend"
+          className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-dim md:hidden"
+        >
+          {props.lines.map((line, index) => (
+            <li key={line.characterId} className="flex min-w-0 max-w-full items-center gap-1.5">
+              <CharacterSwatch index={index} />
+              <span className="truncate">{line.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="sr-only">
         <DataTable
           columns={columns}
