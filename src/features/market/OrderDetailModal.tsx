@@ -39,11 +39,10 @@ import type { OpenOrderRow } from './openOrdersModel';
 import type { RegionCompetition, StructureCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
 import { OrderProblemBadge } from './OrderProblemBadge';
-import { orderBadgeFor } from './orderBadgeKind';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
-import { orderVerdict, type OrderVerdictKind } from './orderVerdict';
-import { orderRowSummary } from './orderRowSummary';
-import { orderNextAction } from './orderNextAction';
+import type { OrderVerdictKind } from './orderVerdict';
+import type { OrderRowSummary } from './orderRowSummary';
+import { adviseOrder } from './orderAdvice';
 import { orderExits, hubHaulGaps, type OrderExitKind } from './orderExits';
 import { useOpenOrderDetail, type OrderDetail } from './useOrderDetail';
 import type { OrderDetailSnapshot, OrderDetailView } from './orderDetailView';
@@ -440,12 +439,10 @@ function computeSellThrough(
 /**
  * The suggested bid for a beaten buy order — one legal tick over the rival
  * (issue #1421) — or null when there is no rival price in hand to quote yet.
- * Reads `orderRowSummary` directly rather than `OrderRowSummaryText`'s own
- * internal call, since the quick answer needs the bare number for
+ * Reads the bare number off the summary, since the quick answer needs it for
  * `CopyablePrice` to copy — the formatted sentence is only its visible label.
  */
-function outbidSuggestion(row: OpenOrderRow): number | null {
-  const summary = orderRowSummary(row);
+function outbidSuggestion(summary: OrderRowSummary | null): number | null {
   return summary?.kind === 'outbid' ? summary.suggestedPrice : null;
 }
 
@@ -484,7 +481,7 @@ export function OrderDetailContent({
       ? 'structure'
       : 'known';
 
-  const badge = orderBadgeFor(row);
+  const { badge, summary, verdict, next: nextAction } = adviseOrder(row);
   const station =
     location === 'structure'
       ? structureStationScopeState(row, structureMarket)
@@ -511,8 +508,6 @@ export function OrderDetailContent({
     station.kind === 'clear' &&
     (system.kind === 'clear' || system.kind === 'unavailable' || system.kind === 'notChecked') &&
     region.kind === 'clear';
-  const verdict = orderVerdict(row);
-  const nextAction = orderNextAction(row, verdict);
   const nextActionText = (() => {
     switch (nextAction.kind) {
       case 'cheapestRival':
@@ -526,7 +521,7 @@ export function OrderDetailContent({
         return null;
     }
   })();
-  const outbidSuggestedPrice = row.isBuyOrder ? outbidSuggestion(row) : null;
+  const outbidSuggestedPrice = row.isBuyOrder ? outbidSuggestion(summary) : null;
   const exits = orderExits({ row, competitors: deep?.competitors, reprocessing });
   // Named only when it moved the number: never on scrap (f4b5a3f5).
   const refineImplantPct = reprocessing
@@ -791,7 +786,7 @@ export function OrderDetailContent({
               />
             )}
             <p className="mt-2">
-              <OrderRowSummaryText row={row} />
+              <OrderRowSummaryText row={row} summary={summary} />
             </p>
             {/*
               The phone list's row is plain text, not `MarketItemLink` (a
