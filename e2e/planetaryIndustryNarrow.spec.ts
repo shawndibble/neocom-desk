@@ -62,11 +62,12 @@ test.describe('PI Plan — Goal Planner', () => {
       await signInAndGoto(page, './planetary-industry/colonies');
       await mockPlannerColonies(page);
       await mockHubPrices(page);
-      await page.goto(`./planetary-industry/plan?goals=${GOALS}`);
+      // Coolant beyond what the colonies' Ionic Solutions can make: its inputs are rationed, not short themselves.
+      await page.goto('./planetary-industry/plan?goals=9832:2000');
 
       const table = page.getByRole('table', { name: 'Everything the goals need, by tier' });
       await expect(table).toBeAttached({ timeout: 20_000 });
-      const heldBack = table.getByText(/\d+% made/).first();
+      const heldBack = table.getByText(/^\d+% made$/).first();
       await expect(heldBack).toBeVisible();
       await expect(heldBack).not.toHaveAttribute('title');
 
