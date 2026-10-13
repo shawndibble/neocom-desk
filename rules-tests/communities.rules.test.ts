@@ -225,6 +225,13 @@ describe('mail invites', () => {
     await assertSucceeds(getDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-12')));
   });
 
+  it('lets the admin read a day’s count before any invite went out that day', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertSucceeds(getDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-13')));
+    const other = characterAuth(env, 2, 'hash-2').firestore();
+    await assertFails(getDoc(doc(other, 'characters/char:1/mailInviteQuota/2026-10-13')));
+  });
+
   it('hides them from other Members, non-Members and another Character’s quota', async () => {
     const member = characterAuth(env, 2, 'hash-2').firestore();
     await assertFails(getDoc(doc(member, `${C}/mailInvites/42`)));
