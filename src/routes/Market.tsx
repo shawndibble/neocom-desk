@@ -26,7 +26,6 @@ import {
   Toast,
   TypeIcon,
   useTabsId,
-  type TabItem,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -295,13 +294,7 @@ export function Market() {
   const { slots: headerSlots, metaSlot, actionsSlot } = usePageHeaderSlots();
   const viewsTabsId = useTabsId();
   const itemTabsId = useTabsId();
-  const marketTabs: TabItem[] = [
-    { id: 'browser', label: t('market.sections.browser') },
-    { id: 'orders', label: t('market.sections.openOrders') },
-    { id: 'stock', label: t('market.sections.stock') },
-    { id: 'history', label: t('market.sections.history') },
-    { id: 'appraisal', label: t('market.sections.appraisal') },
-  ];
+  const marketTabs = MARKET_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }));
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // The Appraisal tab's other half of the same control pair as the header's hub picker.

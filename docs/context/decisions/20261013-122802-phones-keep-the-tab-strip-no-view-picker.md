@@ -6,7 +6,7 @@ _Recorded 2026-10-13._
   title-row view picker (`PageViewPicker`) is gone. Supersedes the 4+-tab
   bullet in `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`
   and the Travel bullet in `20261010-193521-hauling-moves-from-market-to-travel`.
-  Why: Skills, Industry, Market, Travel and the LP Store showed a dropdown on a
+  Why: Skills, Industry, Market and Travel showed a dropdown on a
   phone while every other page showed tabs, so the same job had two controls
   depending on how many tabs a page happened to have. The strip already scrolls
   sideways when it outgrows a phone
