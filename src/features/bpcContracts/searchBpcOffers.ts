@@ -1,0 +1,323 @@
+/**
+ * BPC Sourcing's search as one pure function: every source's rows narrowed,
+ * ordered and summarised for one query (issues #608, #1241; ADR 0013, 0018).
+ * It hides what the panel used to do inline: Space / Jump Range narrowing of
+ * the contract rows, the six per-source row sets, the "searched types" rule
+ * that confines LP and Community Offers to what the query names, and the
+ * precedence the sources merge in. The Firestore snapshot, the market lookup
+ * and the LP / Community hooks stay outside; this takes what they loaded.
+ */
+import {
+  EMPTY_BPC_SEARCH_FILTER,
+  blueprintOfferStats,
+  blueprintSearchName,
+  bpcPriceSummary,
+  contractRowToSearchRow,
+  filterBpcContracts,
+  filterBpcSearchRows,
+  listedBlueprintTypeOptions,
+  marketBpoToSearchRow,
+  ownedBlueprintToSearchRow,
+  type BlueprintOfferStats,
+  type BlueprintTypeOption,
+  type BpcContractRow,
+  type BpcPriceSummary,
+  type BpcSearchFilter,
+  type BpcSearchRow,
+} from '@/engine/contracts/bpcSearch';
+import { withinJumpRange } from '@/engine/route/jumpRange';
+import type { SpaceKind } from '@/engine/space';
+import type { CharacterBlueprint } from '@/esi/endpoints';
+import { rankedSearch } from '@/lib/rankedSearch';
+import { parseIskAmount } from '@/lib/isk';
+import type { ContractLocationInfo, ResolvedLocation } from './blueprintLocation';
+import type { BpcSourcingFilter } from './bpcActiveFilters';
+import type { SourceToggle } from './bpcSourcingUrl';
+import {
+  cheaperBpo,
+  cheapestBpoSourcesByType,
+  marketBpoOffers,
+  type BpoOffer,
+  type BpoSources,
+  type MarketBpoBook,
+} from './bpoAvailability';
+import { MARKET_BPO_LOOKUP_LIMIT } from './useMarketBpoOrders';
+
+/** Rows of the typed-search type filter: the closest this many blueprint names. */
+const TYPE_SEARCH_LIMIT = 50;
+
+/** Blueprints offered in the autocomplete under the search box. */
+const SUGGESTION_LIMIT = 8;
+
+/** One row of the search's autocomplete: a candidate blueprint plus what its listings look like. */
+export type BlueprintSuggestion = BlueprintTypeOption & BlueprintOfferStats;
+
+/** What the sources loaded; nothing here depends on the query. */
+export interface BpcSourceData {
+  /** Public contract copies. */
+  contractRows: readonly BpcContractRow[];
+  /** Public contract originals (issue #1241). */
+  originals: readonly BpcContractRow[];
+  /** Keyed by `BpcContractRow.locationId`. */
+  contractLocations: ReadonlyMap<number, ContractLocationInfo>;
+  blueprintNames: ReadonlyMap<number, string>;
+  ownedBlueprints: readonly CharacterBlueprint[];
+  ownedLocations: ReadonlyMap<number, ResolvedLocation>;
+  /** Market BPO books loaded for `marketTypeIds`; `marketLocations` keyed by order location. */
+  marketBooksByType: ReadonlyMap<number, MarketBpoBook>;
+  marketLocations: ReadonlyMap<number, ContractLocationInfo>;
+  /** Null until the market region is known: no market rows. */
+  marketRegionId: number | null;
+  marketHubStationId: number;
+  /** The types the market was looked up for (`bpcMarketLookup`). */
+  marketTypeIds: readonly number[];
+  /** Already built from every blueprint; narrowed here to the searched types. */
+  lpRows: readonly BpcSearchRow[];
+  communityRows: readonly BpcSearchRow[];
+}
+
+/** What the pilot asked: the URL filter, the picked blueprint, the sources and the Space / Jump narrowing. */
+export interface BpcQuery {
+  filter: BpcSourcingFilter;
+  /** The one blueprint picked from the autocomplete, or null while free text. */
+  selectedTypeId: number | null;
+  sources: ReadonlySet<SourceToggle>;
+  /** Null when every kind is checked. */
+  spaceKinds: ReadonlySet<SpaceKind> | null;
+  /** Null when no Jump Range is active. */
+  allowedSystems: ReadonlySet<number> | null;
+}
+
+export interface BpcOfferSearch {
+  suggestions: BlueprintSuggestion[];
+  /** Contract copies matching every filter (not the source toggles). */
+  filteredRows: BpcContractRow[];
+  bpoSourcesByType: Map<number, BpoSources>;
+  bpoByType: Map<number, BpoOffer>;
+  /** Every toggled-on source, merged in precedence order. */
+  displayRows: BpcSearchRow[];
+  /** Of `filteredRows`, for the picked blueprint; null while none is picked. */
+  summary: BpcPriceSummary | null;
+}
+
+/** Positive-integer text field to a filter number, or null when blank/invalid — never NaN reaching the engine filter. */
+function parsePositiveNumber(value: string): number | null {
+  if (value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+/** Space and Jump Range narrow contract rows up front: `BpcContractRow` carries no space of its own. */
+function narrowByLocation(
+  rows: readonly BpcContractRow[],
+  kinds: ReadonlySet<SpaceKind> | null,
+  allowedSystems: ReadonlySet<number> | null,
+  locations: ReadonlyMap<number, ContractLocationInfo>
+): readonly BpcContractRow[] {
+  if (!kinds && !allowedSystems) return rows;
+  return rows.filter((row) => {
+    const location = locations.get(row.locationId);
+    if (kinds && (location?.space == null || !kinds.has(location.space))) return false;
+    return withinJumpRange(location?.systemId, allowedSystems);
+  });
+}
+
+/**
+ * The blueprint types the market is checked for BPOs (issue #1241): the
+ * chosen blueprint, else the closest typed matches across the whole SDE,
+ * else none — never every type in the results. `capped` when more matched.
+ */
+export function bpcMarketLookup(
+  selectedTypeId: number | null,
+  typeQuery: string,
+  allBlueprintOptions: readonly BlueprintTypeOption[]
+): { typeIds: number[]; capped: boolean } {
+  if (selectedTypeId !== null) return { typeIds: [selectedTypeId], capped: false };
+  if (typeQuery.trim() === '') return { typeIds: [], capped: false };
+  const matches = rankedSearch(allBlueprintOptions, blueprintSearchName(typeQuery), {
+    primary: (o) => blueprintSearchName(o.name),
+    limit: MARKET_BPO_LOOKUP_LIMIT + 1,
+  }).map((o) => o.typeId);
+  return {
+    typeIds: matches.slice(0, MARKET_BPO_LOOKUP_LIMIT),
+    capped: matches.length > MARKET_BPO_LOOKUP_LIMIT,
+  };
+}
+
+export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferSearch {
+  const { filter: uiFilter, selectedTypeId, sources, spaceKinds, allowedSystems } = query;
+  const { contractLocations } = data;
+  const spaceFilteredRows = narrowByLocation(
+    data.contractRows,
+    spaceKinds,
+    allowedSystems,
+    contractLocations
+  );
+  const spaceFilteredOriginals = narrowByLocation(
+    data.originals,
+    spaceKinds,
+    allowedSystems,
+    contractLocations
+  );
+
+  // Owned typeIds join the options (gated on the Owned toggle) so free-text
+  // search narrows an Owned-only result, never displacing a real contract
+  // match from the ranked window when Owned is off.
+  const ownedTypeIds = sources.has('owned')
+    ? data.ownedBlueprints.map((bp) => ({ typeId: bp.type_id }))
+    : [];
+  const listedOriginals = sources.has('contractBpo') ? spaceFilteredOriginals : [];
+  const typeOptions = listedBlueprintTypeOptions(
+    [...spaceFilteredRows, ...listedOriginals, ...ownedTypeIds],
+    data.blueprintNames
+  );
+
+  // Every filter except the blueprint itself: suggestion counts and the table
+  // must answer the same question.
+  const nonTypeFilter: BpcSearchFilter = {
+    ...EMPTY_BPC_SEARCH_FILTER,
+    regionId: uiFilter.regionId,
+    minMe: parsePositiveNumber(uiFilter.minMe),
+    minTe: parsePositiveNumber(uiFilter.minTe),
+    minRuns: parsePositiveNumber(uiFilter.minRuns),
+    maxPrice: uiFilter.maxPrice.trim() === '' ? null : parseIskAmount(uiFilter.maxPrice),
+    spaceKinds,
+    allowedSystems,
+    hideAuctions: uiFilter.hideAuctions,
+    hidePlexRequests: uiFilter.hidePlex,
+  };
+
+  const suggestions: BlueprintSuggestion[] = [];
+  if (selectedTypeId === null && uiFilter.typeQuery.trim() !== '') {
+    const offerStats = blueprintOfferStats(filterBpcContracts(spaceFilteredRows, nonTypeFilter));
+    for (const option of rankedSearch(typeOptions, blueprintSearchName(uiFilter.typeQuery), {
+      primary: (option) => blueprintSearchName(option.name),
+      limit: SUGGESTION_LIMIT,
+    })) {
+      // A blueprint with no offers left under the current filters is not a
+      // candidate — picking it would resolve to an empty table.
+      const stats = offerStats.get(option.typeId);
+      if (stats) suggestions.push({ ...option, ...stats });
+    }
+  }
+
+  const typeIds =
+    selectedTypeId !== null
+      ? new Set([selectedTypeId])
+      : uiFilter.typeQuery.trim().length === 0
+        ? null
+        : new Set(
+            rankedSearch(typeOptions, blueprintSearchName(uiFilter.typeQuery), {
+              primary: (o) => blueprintSearchName(o.name),
+              limit: TYPE_SEARCH_LIMIT,
+            }).map((o) => o.typeId)
+          );
+  const engineFilter: BpcSearchFilter = { ...nonTypeFilter, typeIds };
+
+  const filteredRows = filterBpcContracts(spaceFilteredRows, engineFilter);
+  const contractSearchRows = filteredRows.map((row) =>
+    contractRowToSearchRow(row, contractLocations.get(row.locationId))
+  );
+
+  const ownedSearchRows = data.ownedBlueprints.map((bp) => {
+    const location = data.ownedLocations.get(bp.location_id);
+    return ownedBlueprintToSearchRow({
+      itemId: bp.item_id,
+      typeId: bp.type_id,
+      runs: bp.runs,
+      me: bp.material_efficiency,
+      te: bp.time_efficiency,
+      quantity: bp.quantity,
+      locationName: location?.name ?? null,
+      regionId: location?.regionId ?? null,
+      space: location?.space ?? null,
+      systemId: location?.systemId ?? null,
+    });
+  });
+  const filteredOwnedRows = filterBpcSearchRows(ownedSearchRows, engineFilter);
+
+  const contractBpoSearchRows = filterBpcContracts(spaceFilteredOriginals, engineFilter).map(
+    (row) => contractRowToSearchRow(row, contractLocations.get(row.locationId))
+  );
+
+  // Already limited to the looked-up types, so filtered on everything but the
+  // listed-type search (`engineFilter.typeIds` only knows listed types).
+  const marketSearchRows: BpcSearchRow[] = [];
+  if (data.marketRegionId !== null) {
+    for (const [typeId, book] of data.marketBooksByType) {
+      for (const offer of marketBpoOffers(book.sell, book.regionId, data.marketHubStationId)) {
+        const location = data.marketLocations.get(offer.locationId);
+        marketSearchRows.push(
+          marketBpoToSearchRow({
+            orderId: offer.orderId,
+            typeId,
+            regionId: offer.regionId,
+            locationId: offer.locationId,
+            price: offer.price,
+            volumeRemain: offer.volumeRemain,
+            atHub: offer.atHub,
+            locationName: location?.name ?? null,
+            space: location?.space ?? null,
+            systemId: location?.systemId ?? null,
+          })
+        );
+      }
+    }
+  }
+  const filteredMarketRows = filterBpcSearchRows(marketSearchRows, nonTypeFilter);
+
+  // LP and Community rows cover every blueprint; a typed or picked search
+  // narrows them to the looked-up types.
+  const searched =
+    selectedTypeId !== null || uiFilter.typeQuery.trim() !== ''
+      ? new Set(data.marketTypeIds)
+      : null;
+  const narrowToSearched = (rows: readonly BpcSearchRow[]) =>
+    filterBpcSearchRows(
+      searched ? rows.filter((row) => searched.has(row.typeId)) : rows,
+      nonTypeFilter
+    );
+  const lpSearchRows = narrowToSearched(data.lpRows);
+  const communitySearchRows = narrowToSearched(data.communityRows);
+
+  // The cheapest BPO per blueprint type in the results: contract originals in
+  // the Region filter's scope, market orders for the looked-up types only.
+  const bpoTypeIds = new Set(data.marketTypeIds);
+  for (const row of filteredRows) bpoTypeIds.add(row.typeId);
+  for (const row of filteredOwnedRows) bpoTypeIds.add(row.typeId);
+  const bpoSourcesByType = cheapestBpoSourcesByType(bpoTypeIds, {
+    originals: data.originals,
+    contractRegionId: uiFilter.regionId,
+    marketBooks: data.marketBooksByType,
+    hubStationId: data.marketHubStationId,
+  });
+  const bpoByType = new Map<number, BpoOffer>();
+  for (const [typeId, bpoSources] of bpoSourcesByType) {
+    const best = cheaperBpo(bpoSources);
+    if (best) bpoByType.set(typeId, best);
+  }
+
+  // Owned rows lead, then the BPO sources, ahead of the synced contract
+  // snapshot, which can run to six figures while the others number in the
+  // dozens. An owned blueprint beats a Community Offer (free), which beats
+  // any priced offer.
+  const displayRows: BpcSearchRow[] = [
+    ...(sources.has('owned') ? filteredOwnedRows : []),
+    ...(sources.has('community') ? communitySearchRows : []),
+    ...(sources.has('market') ? filteredMarketRows : []),
+    ...(sources.has('contractBpo') ? contractBpoSearchRows : []),
+    ...(sources.has('lp') ? lpSearchRows : []),
+    ...(sources.has('contract') ? contractSearchRows : []),
+  ];
+
+  return {
+    suggestions,
+    filteredRows,
+    bpoSourcesByType,
+    bpoByType,
+    displayRows,
+    // Of `filteredRows`, not every row of the chosen blueprint: it describes
+    // what is on screen.
+    summary: selectedTypeId === null ? null : bpcPriceSummary(filteredRows),
+  };
+}
