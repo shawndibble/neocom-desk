@@ -82,6 +82,7 @@ function RouteVia({
 }
 
 function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow>[] {
+  'use memo';
   const { t } = useTranslation();
   return [
     {
@@ -276,6 +277,7 @@ export function TheraTable({
   /** Route Safety through a row's hole; absent where there is no origin to route from. */
   routeVia?: RouteViaHref;
 }) {
+  'use memo';
   const columns = useColumns(routeVia);
   return (
     <DataTable
