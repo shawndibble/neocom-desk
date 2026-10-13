@@ -496,12 +496,9 @@ export function CompareDrawer({
               >
                 {t('market.compare.handle', { count: items.length })}
               </h2>
-              {/* An always-visible segmented toggle, not `HistoryViewSelect`'s select-on-desktop
-                  pattern: that one earns the select because its two options are
-                  a nuance most readers don't know they need (a tooltip explains
-                  the distinction); Prices vs Attributes needs no such
-                  explanation, so the compact always-visible toggle is right at
-                  every width, not just on a phone. */}
+              {/* An always-visible segmented toggle, not a select: Prices vs
+                  Attributes needs no explanation, so the compact toggle is
+                  right at every width, not just on a phone. */}
               <SegmentedControl
                 label={t('market.compare.viewLabel')}
                 options={(['prices', 'attributes'] as const).map((option) => ({

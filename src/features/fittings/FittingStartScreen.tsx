@@ -218,7 +218,7 @@ export function FittingStartScreen({
   const refreshInGameButton =
     hasCharacter && inGame.granted === true ? (
       <IconButton
-        size={isPhone ? 'md' : 'sm'}
+        size="md"
         icon={<Icon.Refresh />}
         label={t('fittings.inGame.refresh')}
         onClick={() => void inGame.refresh()}

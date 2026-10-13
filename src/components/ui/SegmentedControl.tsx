@@ -75,6 +75,9 @@ export function SegmentedControl<T extends string>({
       aria-describedby={describedBy}
       className={cx(
         'overflow-hidden rounded-xs border border-line',
+        // The height is the group's, border included, so it matches a Button of the
+        // same size beside it; the segments stretch to fill it.
+        controlHeightClassName[size],
         fill ? 'flex w-full' : 'inline-flex',
         className
       )}
@@ -95,7 +98,6 @@ export function SegmentedControl<T extends string>({
               interactiveClassName,
               focusRingInsetClassName,
               disabledClassName,
-              controlHeightClassName[size],
               uppercase ? 'text-[0.6875rem] font-semibold tracking-widest uppercase' : 'text-xs',
               fill && 'flex-1 basis-0',
               index > 0 && 'border-l border-line',

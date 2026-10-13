@@ -246,7 +246,7 @@ function SortableLabel({
       aria-label={label}
       onClick={onSort}
       className={cx(
-        'inline-flex items-center gap-1 uppercase hover:text-text active:text-text-dim',
+        'inline-flex items-center gap-1 uppercase hover:text-text active:text-text-dim min-h-11 md:min-h-0 touch:min-h-11',
         focusRingInsetClassName,
         active && 'text-text',
         column.align === 'end' && 'flex-row-reverse'

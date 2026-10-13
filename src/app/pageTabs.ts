@@ -91,7 +91,7 @@ export const MINING_TABS = definePageTabs('/mining', [
 
 /**
  * `transactions` is not a tab Wallet shows: the Character's fills live on
- * Market's History › Transactions view, and the corporation's on
+ * Market's History tab, and the corporation's on
  * `/corp/wallet`. The entry exists only so an old `/wallet/transactions` link
  * reaches `Wallet.tsx`, which sends it on to Market, instead of `TabRoute`
  * bouncing it to Balance.
@@ -122,25 +122,12 @@ export const CONTRACTS_TABS = definePageTabs(
   'search/items'
 );
 
-/**
- * `history/transactions` is a tab id containing a literal `/`, not a nested
- * subtab of `history` — `tabFromPathname` only ever compares one segment
- * against a tab's `id` for equality, so a `/`-bearing id is how a two-segment
- * path (`/market/history/transactions`) resolves without either this
- * registry or `usePageTab` needing to understand subtabs at all (the same
- * technique `CONTRACTS_TABS` above uses for its own search sub-tab). It is
- * not one of the four tabs the `Tabs` bar renders — `HistoryViewSelect`,
- * inside History's own header, is what switches into and out of it (round
- * 54); this entry exists only so that path resolves to a real tab instead of
- * bouncing to the default (docs/ARCHITECTURE.md §9).
- */
 export const MARKET_TABS = definePageTabs('/market', [
   { id: 'browser', labelKey: 'market.sections.browser' },
   { id: 'orders', labelKey: 'market.sections.openOrders' },
   // `stock/<list id>` opens one market's Stock List.
   { id: 'stock', labelKey: 'market.sections.stock', deep: true },
   { id: 'history', labelKey: 'market.sections.history' },
-  { id: 'history/transactions', labelKey: 'market.sections.transactions' },
   { id: 'appraisal', labelKey: 'market.sections.appraisal' },
 ]);
 
@@ -188,6 +175,7 @@ export const PAGE_LEGACY_LOCATIONS: Partial<
 /**
  * Hauling was a Market tab until #3526; it is a Travel tab now. LP Store was
  * one until #3527; it is a Wallet tab now, and a store's corporation id rides along.
+ * `/market/history/transactions`, History's old Transactions view, is History now.
  */
 function legacyMarketLocation(
   pathname: string,
@@ -198,6 +186,9 @@ function legacyMarketLocation(
   }
   if (pathname === '/market/lp-store' || pathname.startsWith('/market/lp-store/')) {
     return { pathname: `/wallet${pathname.slice('/market'.length)}`, search };
+  }
+  if (pathname.replace(/\/$/, '') === '/market/history/transactions') {
+    return { pathname: tabPath(MARKET_TABS, 'history'), search };
   }
   return null;
 }

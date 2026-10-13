@@ -19,7 +19,7 @@ Implement the work described in the spec or ticket you were given. Do not reopen
    (name them if the ticket doesn't), the acceptance criteria, relevant
    glossary/scope-decision/ADR excerpts, and existing patterns/files to reuse. Don't
    re-read what the report already gives you.
-2. UI work: before writing any, run `npm run ui:catalog <Name>` for each primitive you might need; never re-implement one. A new `src/components/ui` primitive gets a `<Component>.stories.tsx` (JSDoc `@summary` on component, props, stories).
+2. UI work: before writing any, run `npm run ui:catalog <Name>` for each primitive you might need; never re-implement one. A new `src/components/ui` primitive gets a `<Component>.stories.tsx` (JSDoc `@summary` on component, props, stories). Controls sharing a row share one `size` (DESIGN.md §3; a `SearchInput` makes it an `md` row). `e2e/inlineControlHeights.spec.ts` measures every route and tab as the empty fixture renders it; a row it can't reach (a dialog, a menu, a toolbar that needs data or a seeded backend) gets `expectInlineControlsAligned` from `e2e/support/controlHeights.ts` in that surface's own spec.
    Drive `/tdd` at the seams from that report — one red → green slice at a
    time. Calculation/logic modules (`src/engine`, `src/auth`, industry math)
    are TDD-mandatory per `CLAUDE.md`: failing test first, then code. This is

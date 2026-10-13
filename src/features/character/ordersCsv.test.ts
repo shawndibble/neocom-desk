@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toCsv } from '@/lib/csv';
-import type { MarketOrder, MarketOrderHistory } from '@/esi/endpoints';
-import { ordersCsvColumns, orderHistoryCsvColumns } from './ordersCsv';
+import type { MarketOrder } from '@/esi/endpoints';
+import { ordersCsvColumns } from './ordersCsv';
 
 const t = (k: string) => k;
 const nameFor = (typeId: number) => `Item ${typeId}`;
@@ -59,27 +59,5 @@ describe('ordersCsvColumns', () => {
     expect(issuedColumn.value(order({ issued: '2026-08-25T00:00:00Z' }))).toBe(
       '2026-08-25T00:00:00Z'
     );
-  });
-});
-
-describe('orderHistoryCsvColumns', () => {
-  it('appends a state column after the open-order columns', () => {
-    const columns = orderHistoryCsvColumns(t, nameFor);
-    expect(columns.map((c) => c.header)).toEqual([
-      'orders.item',
-      'orders.side',
-      'orders.price',
-      'orders.csvVolumeRemain',
-      'orders.csvVolumeTotal',
-      'orders.issued',
-      'orders.state',
-    ]);
-  });
-
-  it('passes state through raw', () => {
-    const columns = orderHistoryCsvColumns(t, nameFor);
-    const stateColumn = columns.find((c) => c.header === 'orders.state')!;
-    const row: MarketOrderHistory = { ...order(), state: 'expired' };
-    expect(stateColumn.value(row)).toBe('expired');
   });
 });

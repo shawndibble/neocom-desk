@@ -146,9 +146,9 @@ async function loadWalletSnapshot(
 
 /**
  * The Character's recent fills, read only so a journal line can name the item
- * behind it (the fills themselves are listed on Market's History ›
- * Transactions view). Its own load, not part of `loadWalletSnapshot`: the
- * Balance tab would otherwise wait on a cursor walk it never shows.
+ * behind it (the fills themselves are listed on Market's History tab). Its
+ * own load, not part of `loadWalletSnapshot`: the Balance tab would
+ * otherwise wait on a cursor walk it never shows.
  */
 interface PersonalFillsSnapshot {
   transactions: readonly WalletTransactionCommon[];
@@ -167,8 +167,8 @@ async function loadPersonalFills(characterId: number): Promise<PersonalFillsSnap
 /**
  * Wallet: the pilot's own ISK — balance and journal, for the active Character
  * or every Character (`?char=`). Read-only, cached for offline. Recent
- * transactions moved to Market's History › Transactions view, and the
- * corporation's wallet lives on `/corp/wallet` (it was a Personal /
+ * transactions live on Market's History tab, and the corporation's wallet
+ * lives on `/corp/wallet` (it was a Personal /
  * Corporation switch here once — see `routes/CorpWallet.tsx`).
  */
 export function Wallet() {
@@ -530,7 +530,7 @@ export function Wallet() {
     return <Navigate to={`/corp/wallet${query ? `?${query}` : ''}`} replace />;
   }
   // Personal transactions live under Market › History.
-  if (tab === 'transactions') return <Navigate to="/market/history/transactions" replace />;
+  if (tab === 'transactions') return <Navigate to="/market/history" replace />;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -753,7 +753,7 @@ export function Wallet() {
             actions={
               <span className="flex items-center gap-2">
                 <Link
-                  to="/market/history/transactions"
+                  to="/market/history"
                   className={cx(
                     'inline-flex min-h-11 min-w-11 items-center justify-center text-xs md:min-h-0 md:min-w-0',
                     inlineLinkClassName

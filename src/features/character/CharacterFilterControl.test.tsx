@@ -149,5 +149,24 @@ describe('CharacterFilterControl', () => {
       );
       expect(screen.getByRole('button')).toHaveClass('h-11', 'w-11');
     });
+
+    // The text pill at `md` and up keeps its tier's height too, so it sits
+    // level with the PageHeader actions it shares a line with (Mining Overview).
+    it('keeps the tier height for the text pill at md and up', () => {
+      const { rerender } = render(
+        <CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />
+      );
+      expect(screen.getByRole('button')).toHaveClass('md:h-7', 'touch:h-9');
+      rerender(
+        <CharacterFilterControl
+          activeCharacterId={1}
+          value="current"
+          onChange={() => {}}
+          size="md"
+        />
+      );
+      expect(screen.getByRole('button')).toHaveClass('md:h-9', 'touch:h-11');
+      expect(screen.getByRole('button')).not.toHaveClass('md:h-7');
+    });
   });
 });

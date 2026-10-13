@@ -11,6 +11,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { overviewLayoutSetting, signInAndGoto, type SeededWidget } from './support/authSeed';
 import { CHARACTER_ID, SCOPES } from './support/fixtureData';
+import type { MarketOrder } from '../src/esi/endpoints';
 
 const PHONE = { width: 390, height: 844 };
 const HOUR_MS = 60 * 60 * 1000;
@@ -228,3 +229,73 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
     expect(await hasHorizontalOverflow(page)).toBe(false);
   });
 }
+
+/** Six sell orders, issued and expiring at different times so the Expires sort reorders them. */
+function openOrderFixtures(): MarketOrder[] {
+  return [34, 35, 36, 37, 38, 39].map((type_id, i) => ({
+    order_id: 500 + i,
+    type_id,
+    price: 100 + i * 10,
+    region_id: 10000002,
+    location_id: 60003760,
+    is_buy_order: false,
+    is_corporation: false,
+    volume_remain: 10,
+    volume_total: 10,
+    issued: new Date(Date.now() - i * 24 * HOUR_MS).toISOString(),
+    duration: 90,
+    range: 'station',
+  }));
+}
+
+async function openOrdersWidget(page: Page, viewport: { width: number; height: number }) {
+  await page.route(`**/characters/${CHARACTER_ID}/orders`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(openOrderFixtures()),
+    })
+  );
+  await page.setViewportSize(viewport);
+  await signInAndGoto(page, './overview', SCOPES, [
+    overviewLayoutSetting([{ kind: 'orders', size: 'M', view: 'list' }]),
+  ]);
+  const sortButtons = page.locator('main section button[aria-label^="Sort by"]');
+  await expect(sortButtons.first()).toBeVisible({ timeout: FIRST_LOAD_MS });
+  return sortButtons;
+}
+
+test('Open Orders sort headers meet the 44px touch floor at 390px', async ({ page }) => {
+  const sortButtons = await openOrdersWidget(page, PHONE);
+  const count = await sortButtons.count();
+  expect(count).toBeGreaterThanOrEqual(2);
+  const boxes: Box[] = [];
+  for (let i = 0; i < count; i += 1) {
+    // Polled: a card remounted as its reads land measures as a null box.
+    await expect
+      .poll(async () => (await sortButtons.nth(i).boundingBox())?.height ?? 0)
+      .toBeGreaterThanOrEqual(44);
+    boxes.push((await sortButtons.nth(i).boundingBox())!);
+  }
+  expectNoOverlap(boxes);
+  for (const box of boxes) expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
+  expect(await hasHorizontalOverflow(page)).toBe(false);
+
+  // Sorting still works: Expires sets aria-sort, a second tap flips it.
+  const header = page.locator('main section th', {
+    has: page.locator('button[aria-label^="Expires"], button[aria-label$="Expires"]'),
+  });
+  await page.getByRole('button', { name: 'Sort by Expires' }).click();
+  await expect(header).toHaveAttribute('aria-sort', 'ascending');
+  await page.getByRole('button', { name: 'Expires, sorted ascending' }).click();
+  await expect(header).toHaveAttribute('aria-sort', 'descending');
+});
+
+test('Open Orders sort headers stay compact with a fine pointer at 1280px', async ({ page }) => {
+  const sortButtons = await openOrdersWidget(page, { width: 1280, height: 900 });
+  const count = await sortButtons.count();
+  for (let i = 0; i < count; i += 1) {
+    const box = (await sortButtons.nth(i).boundingBox())!;
+    expect(box.height).toBeLessThan(30);
+  }
+});
