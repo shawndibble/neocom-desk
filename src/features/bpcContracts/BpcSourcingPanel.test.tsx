@@ -1608,7 +1608,11 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(
         within(marketCard).getByText('2,000,000.00 ISK', { selector: '.sr-only' })
       ).toBeInTheDocument();
-      expect(marketCard).toHaveTextContent('incl. NPC-seeded');
+      // The NPC-seeded caveat is a hint beside the price, not a line of text.
+      expect(
+        within(marketCard).getByRole('button', { name: 'About this market price' })
+      ).toBeInTheDocument();
+      expect(marketCard).not.toHaveTextContent('NPC-seeded');
       // System plus its security, never the station or region name.
       await waitFor(() => expect(marketCard).toHaveTextContent('Jita 0.9'));
       expect(marketCard).not.toHaveTextContent('Jita IV - Moon 4');
@@ -1622,16 +1626,19 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         within(contractCard).getByText('40,000,000.00 ISK', { selector: '.sr-only' })
       ).toBeInTheDocument();
       // The group header names the source: no per-card "BPO" cue line, so
-      // the card is as tall as a region card (three lines).
+      // the card is as tall as a region card (two lines).
       expect(within(contractCard).queryByText('BPO')).not.toBeInTheDocument();
-      expect(contractCard.children).toHaveLength(3);
       // Accent only on the cheapest box in the row: the 2M market BPO beats
       // every copy (3M+) and the 40M contract BPO, so it alone is lit.
       expect(marketCard).toHaveClass('border-accent-dim');
       expect(contractCard).not.toHaveClass('border-accent-dim');
       expect(contractCard).not.toHaveClass('bg-accent/10');
-      expect(marketCard.children).toHaveLength(3);
-      expect(contractCard).toHaveTextContent('ME 8 / TE 16');
+      // Two lines, as tall as a region cell: price, then system.
+      expect(marketCard.children).toHaveLength(2);
+      expect(contractCard.children).toHaveLength(2);
+      // The research reads "8/16", the full wording on hover.
+      expect(contractCard).toHaveTextContent('8/16');
+      expect(contractCard).not.toHaveTextContent('ME 8');
       await waitFor(() => expect(contractCard).toHaveTextContent('Jita 0.9'));
       expect(contractCard).not.toHaveTextContent('Jita IV - Moon 4');
       expect(contractCard).not.toHaveTextContent('The Forge');

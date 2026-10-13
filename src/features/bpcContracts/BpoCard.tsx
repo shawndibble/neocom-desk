@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { InfoTooltip, IskAmount } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import { SystemLink } from '@/features/entities';
 import type { OfferLocation } from '@/features/contractSearch/offerLocations';
 import { cx } from '@/lib/cx';
@@ -28,10 +29,11 @@ interface BpoCardProps {
  */
 export function BpoCard({ bpo, mayBeCheaper, cheapest, location, className }: BpoCardProps) {
   const { t } = useTranslation();
-  const detail =
-    bpo.kind === 'market'
-      ? t('bpcContracts.bpoCardNpcSeeded')
-      : t('bpcContracts.bpoMeTe', { me: bpo.me, te: bpo.te });
+  // A market BPO always sells unresearched (ME0/TE0), so only a contract
+  // original names its research ("10/20", the full wording on hover). That and
+  // the market's NPC-seeded caveat ride the existing lines, so the card stays
+  // two lines, as tall as a region cell.
+  const meTe = bpo.kind === 'contract' ? { me: bpo.me, te: bpo.te } : null;
 
   return (
     <li
@@ -49,6 +51,12 @@ export function BpoCard({ bpo, mayBeCheaper, cheapest, location, className }: Bp
           value={bpo.price}
           className={cx('text-sm tabular-nums', cheapest && 'text-accent')}
         />
+        {bpo.kind === 'market' && (
+          <InfoTooltip
+            label={t('bpcContracts.bpoCardNpcSeededLabel')}
+            content={t('bpcContracts.bpoCardNpcSeededHint')}
+          />
+        )}
         {mayBeCheaper && (
           <InfoTooltip
             label={t('bpcContracts.bpoMayBeCheaper')}
@@ -58,28 +66,40 @@ export function BpoCard({ bpo, mayBeCheaper, cheapest, location, className }: Bp
         )}
       </span>
       {/* Missing entry: still resolving. Null system: a player structure. */}
-      <span className="truncate text-[0.6875rem] text-text-dim">
-        {location === undefined ? (
-          t('bpcContracts.locationResolving')
-        ) : location.systemName === null ? (
-          t('bpcContracts.notApplicable')
-        ) : (
+      <span className="flex min-w-0 items-baseline gap-1 text-[0.6875rem] text-text-dim">
+        <span className="min-w-0 truncate">
+          {location === undefined ? (
+            t('bpcContracts.locationResolving')
+          ) : location.systemName === null ? (
+            t('bpcContracts.notApplicable')
+          ) : (
+            <>
+              {location.systemId !== null ? (
+                <SystemLink systemId={location.systemId}>{location.systemName}</SystemLink>
+              ) : (
+                location.systemName
+              )}
+              {location.security !== null && (
+                <>
+                  {' '}
+                  <SecurityStatus security={location.security} />
+                </>
+              )}
+            </>
+          )}
+        </span>
+        {meTe !== null && (
           <>
-            {location.systemId !== null ? (
-              <SystemLink systemId={location.systemId}>{location.systemName}</SystemLink>
-            ) : (
-              location.systemName
-            )}
-            {location.security !== null && (
-              <>
-                {' '}
-                <SecurityStatus security={location.security} />
-              </>
-            )}
+            <span aria-hidden>·</span>
+            <HintText
+              className="shrink-0 whitespace-nowrap"
+              content={t('bpcContracts.bpoMeTe', meTe)}
+            >
+              {t('bpcContracts.bpoMeTeShort', meTe)}
+            </HintText>
           </>
         )}
       </span>
-      <span className="truncate text-[0.6875rem] text-text-dim">{detail}</span>
     </li>
   );
 }
