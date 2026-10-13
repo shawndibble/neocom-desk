@@ -25,12 +25,12 @@ export interface FanOutCharacter {
   name: string;
 }
 
-export interface FanOutResult<T> {
+interface FanOutResult<T> {
   entries: T[];
   skipped: FanOutCharacter[];
 }
 
-export interface FanOutOptions<T> {
+interface FanOutOptions<T> {
   /** ESI scope every fetched Character must have granted. Omit for no pre-check. */
   scope?: string;
   /** Restrict to these Characters; default every stored Character. */
