@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -23,7 +23,8 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({ '587': { name: 'Rifter' } })),
 }));
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() }));
-vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => false }));
+const phone = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => phone.value }));
 vi.mock('./FittingPreview', () => ({ FittingPreview: () => null }));
 
 const shared = vi.hoisted(() => ({
@@ -85,6 +86,7 @@ function renderScreen() {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  phone.value = false;
   await db.fittings.clear();
   const encoded = await encodeFittingShare(fittingToShareInput(RIFTER));
   if (!encoded.ok) throw new Error('encode failed');
@@ -104,6 +106,42 @@ describe('Community Fittings in the library', () => {
     await userEvent.dblClick(row);
     expect(workspace.loadFromInput).toHaveBeenCalledWith(code);
     expect(workspace.openSaved).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    'shows sharer and Community as visible text on the row (phone: %s)',
+    async (isPhone) => {
+      phone.value = isPhone;
+      loaded([PALS], [theirs()]);
+      renderScreen();
+      const row = await screen.findByRole('button', { name: /^Bob’s Rifter/ });
+      expect(within(row).getByText('Bob · Pals')).toHaveClass('truncate');
+    }
+  );
+
+  it('says a former Member when the sharer is unknown, with no dangling separator', async () => {
+    shared.loadSharedFittings.mockResolvedValue({
+      communities: [PALS],
+      fittings: [theirs()],
+      sharerNames: new Map(),
+    });
+    renderScreen();
+    const row = await screen.findByRole('button', { name: /^Bob’s Rifter/ });
+    expect(within(row).getByText('a former Member · Pals')).toBeInTheDocument();
+  });
+
+  it('comma-joins several Communities', async () => {
+    loaded([PALS, CREW], [theirs(), theirs({ communityId: 'c2' })]);
+    renderScreen();
+    const row = await screen.findByRole('button', { name: /^Bob’s Rifter/ });
+    expect(within(row).getByText('Bob · Pals, Crew')).toBeInTheDocument();
+  });
+
+  it('keeps Saved rows to one line', async () => {
+    loaded([PALS], [theirs()]);
+    renderScreen();
+    const row = await screen.findByRole('button', { name: /^Kite/ });
+    expect(within(row).queryByText(/·/)).not.toBeInTheDocument();
   });
 
   it('gives a shared row Open, Compare and Save a copy, with no Rename or Delete', async () => {
