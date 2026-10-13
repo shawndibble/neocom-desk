@@ -87,19 +87,16 @@ async function loadTransactionsSnapshot(
   };
 }
 
-/**
- * Market's History tab: a character's recent buy/sell fills. Personal
- * only, and now for a reason of its own rather than for want of an endpoint:
- * the corporation's fills live on the corp side of `/wallet`, beside the corp
- * journal they reconcile against (issue #570). Desktop carries the same
- * search / side / date filter bar as that panel, plus the Sold / Bought / Net
- * strip over the rows left (issue #1738), and a Margin column priced from
- * the character's own wallet buys (issue #1740); the phone day list keeps its
- * own strip and no filter bar or margin.
- */
 /** Module-level so the table's windowing and row memo see one stable function. */
 const transactionRowKey = (txn: WalletTransaction) => txn.transaction_id;
 
+/**
+ * Market's History tab: a character's recent buy/sell fills. Personal only:
+ * the corporation's fills live on `/corp/wallet`, beside the corp journal
+ * they reconcile against. Same search / side / date filter bar as that
+ * panel, a Sold / Bought / Net strip over the rows left, and a Margin column
+ * priced from the character's own wallet buys.
+ */
 export function TransactionsPanel() {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -266,7 +263,6 @@ export function TransactionsPanel() {
   return (
     <Panel
       padded={false}
-      title={t('market.sections.transactions')}
       actions={
         <span className="flex items-center gap-2">
           <IconButton

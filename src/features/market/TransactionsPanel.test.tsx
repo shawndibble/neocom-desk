@@ -133,7 +133,7 @@ describe('TransactionsPanel — desktop filter and totals', () => {
 
   it('narrows the rows by side from the URL', async () => {
     load(FILLS);
-    renderPanel('/market/history/transactions?txn.side=buy');
+    renderPanel('/market/history?txn.side=buy');
 
     expect(await screen.findByRole('row', { name: /Tritanium/ })).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /Damage Control II/ })).not.toBeInTheDocument();
@@ -141,7 +141,7 @@ describe('TransactionsPanel — desktop filter and totals', () => {
 
   it('narrows the rows by date range from the URL', async () => {
     load(FILLS);
-    renderPanel('/market/history/transactions?txn.start=2026-09-15');
+    renderPanel('/market/history?txn.start=2026-09-15');
 
     expect(await screen.findByRole('row', { name: /Damage Control II/ })).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /Tritanium/ })).not.toBeInTheDocument();
@@ -149,7 +149,7 @@ describe('TransactionsPanel — desktop filter and totals', () => {
 
   it('says so when the filter matches nothing, rather than showing a blank table', async () => {
     load(FILLS);
-    renderPanel('/market/history/transactions?txn.q=nothing-like-this');
+    renderPanel('/market/history?txn.q=nothing-like-this');
 
     expect(await screen.findByText('No transactions match this filter.')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Totals for the transactions shown' })).toBeNull();
@@ -157,7 +157,7 @@ describe('TransactionsPanel — desktop filter and totals', () => {
 
   it('resets a URL-seeded filter that matches nothing, bringing the rows back', async () => {
     load(FILLS);
-    renderPanel('/market/history/transactions?txn.start=2026-09-25');
+    renderPanel('/market/history?txn.start=2026-09-25');
     await screen.findByText('No transactions match this filter.');
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
@@ -191,7 +191,7 @@ describe('TransactionsPanel — desktop filter and totals', () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     const user = userEvent.setup();
     load(FILLS);
-    renderPanel('/market/history/transactions?txn.side=buy');
+    renderPanel('/market/history?txn.side=buy');
     await screen.findByRole('row', { name: /Tritanium/ });
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Transactions' }), {

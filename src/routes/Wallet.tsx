@@ -147,8 +147,8 @@ async function loadWalletSnapshot(
 /**
  * The Character's recent fills, read only so a journal line can name the item
  * behind it (the fills themselves are listed on Market's History tab). Its
- * own load, not part of `loadWalletSnapshot`: the
- * Balance tab would otherwise wait on a cursor walk it never shows.
+ * own load, not part of `loadWalletSnapshot`: the Balance tab would
+ * otherwise wait on a cursor walk it never shows.
  */
 interface PersonalFillsSnapshot {
   transactions: readonly WalletTransactionCommon[];

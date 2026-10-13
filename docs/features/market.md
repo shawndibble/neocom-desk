@@ -1,6 +1,6 @@
 # Market, Hauling, LP Store, Contract search: feature inventory
 
-Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, Appraisal), Hauling (now the Travel tab `/travel/hauling`, `20261010-193521`, #3526), LP Store (now the Wallet tab `/wallet/lp-store`, `20261010-200446`, #3527), and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `GLOSSARY.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
+Scope: `/market` (Browser, Open orders, Stock, History, Appraisal), Hauling (now the Travel tab `/travel/hauling`, `20261010-193521`, #3526), LP Store (now the Wallet tab `/wallet/lp-store`, `20261010-200446`, #3527), and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `GLOSSARY.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
 
 ## Summary table
 
@@ -23,7 +23,7 @@ Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, 
 
 ## Purpose and user goal
 
-"What is this item worth where I trade, and do my own orders need me?" Market is the pilot's trading desk: look up a price, keep their own orders competitive, keep a market they sell at stocked, and price a pile of loot. The live tabs (`MARKET_TABS`, `src/app/pageTabs.ts`) are Browser, Open orders, Stock, History (+ Transactions) and Appraisal. Tab jobs: **Browser** = price one item from the real order book (ADR 0003, `20260831-140406-market-browser-rebuild`); **Open orders** = "what needs me", grouped by worst Order Problem (`20260906-155913`); **Stock** = "does the market I sell at have what it should" (`20261010-182330`); **History / Transactions** = what filled and what it made; **Appraisal** = price a pasted list at a Trade Hub (`20260908-164742`).
+"What is this item worth where I trade, and do my own orders need me?" Market is the pilot's trading desk: look up a price, keep their own orders competitive, keep a market they sell at stocked, and price a pile of loot. The live tabs (`MARKET_TABS`, `src/app/pageTabs.ts`) are Browser, Open orders, Stock, History and Appraisal. Tab jobs: **Browser** = price one item from the real order book (ADR 0003, `20260831-140406-market-browser-rebuild`); **Open orders** = "what needs me", grouped by worst Order Problem (`20260906-155913`); **Stock** = "does the market I sell at have what it should" (`20261010-182330`); **History** = what filled and what it made (wallet transactions); **Appraisal** = price a pasted list at a Trade Hub (`20260908-164742`).
 
 - **Top jobs (ranked):** 1. "Where can I get item X within N jumps, even in another region?" (Browser: Jump Range from the Current System spans regions, `20260929-204125`; owner, 2026-10-11) 2. "Which of my orders have a problem, and how do I fix it?" (Open orders; owner, 2026-10-11) 3. "What is this pile worth?" (Appraisal).
 - **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11): copy a new price, a sell list or a multibuy list into the client; paste an inventory list into Appraisal. Phone parity: Market is one of the four default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); Open orders has a compact phone list (`20260924-020211`, #1429). Pilots arrive from alerts: `marketOrderUndercut` → `/market/orders`, `stockBelowTarget` → `/market/stock`, `marketOrderFilled` → Transactions, `priceAlertTriggered` → Browser (`src/features/notifications/notificationOptions.ts`). Browser is laid out two-column at desk width (`max-w-[96rem]`).
@@ -50,7 +50,7 @@ Scope: `/market` (Browser, Open orders, Stock, History, History > Transactions, 
 - Nav: `/market` is an Economy destination, `gating: 'scope'`, `mobileTab: true` (`src/app/navDestinations.ts`). LP Store is no longer under Market: it is a Wallet tab, `/wallet/lp-store` (`WALLET_TABS`, `20261010-200446-lp-store-moves-from-market-to-wallet`, #3527), and Hauling is a Travel tab, `/travel/hauling` (`TRAVEL_TABS`, `20261010-193521-hauling-moves-from-market-to-travel`, #3526). `/contracts` is a separate Economy destination (`navDestinations.ts:207`).
 - Tabs rendered in the tab bar: Browser, Open orders, Stock, History, Appraisal (`MARKET_TABS`, `src/app/pageTabs.ts`). History is the Transactions table; its old Ended orders view was dropped in #3692.
 - Legacy: `/wallet/transactions` and `/market/history/transactions` -> `/market/history` (query kept); `/wallet/loyalty[/:id]` -> `/wallet/lp-store[/:id]` (`src/app/legacyPaths.ts`); `/market/lp-store[/:id]` -> `/wallet/lp-store[/:id]` and `/market/hauling` -> `/travel/hauling` (`PAGE_LEGACY_LOCATIONS`, `src/app/pageTabs.ts`); `/orders` retired into Market (note in `routeScopes.ts:52`).
-- Scopes (`src/app/routeScopes.ts`): `/market` UNGATED (`:57`); Open orders/History need `esi-markets.read_character_orders.v1`, Transactions `esi-wallet.read_character_wallet.v1`, each as a panel-level `GrantBanner`; Browser and Appraisal need none (Hauling, now `/travel/hauling`, needs none either). LP Store's gate moved with it: `/wallet/lp-store` and `/wallet/lp-store/:corporationId` use `LP_STORE_REQUIREMENT` (`:245-246`). `/contracts` UNGATED (`:230`), History tab gates `getCharacterContracts` per tab; search tabs need no scope.
+- Scopes (`src/app/routeScopes.ts`): `/market` UNGATED (`:57`); Open orders needs `esi-markets.read_character_orders.v1`, History `esi-wallet.read_character_wallet.v1`, each as a panel-level `GrantBanner`; Browser and Appraisal need none (Hauling, now `/travel/hauling`, needs none either). LP Store's gate moved with it: `/wallet/lp-store` and `/wallet/lp-store/:corporationId` use `LP_STORE_REQUIREMENT` (`:245-246`). `/contracts` UNGATED (`:230`), History tab gates `getCharacterContracts` per tab; search tabs need no scope.
 - Page layout: `max-w-[96rem]` on Browser else `max-w-6xl` (`Market.tsx:759`). Header hub picker/refresh described in section 2.1.
 - Held at route level so they survive tab switches: `useAppraisal` (pasted list), `useOrderBookOrchestration` (CompareDrawer and Item Detail read it), Compare Set (`Market.tsx:473,493`).
 
@@ -137,7 +137,7 @@ Browser decisions: `20260831-140406-market-browser-rebuild`, `20260831-140406-th
 - Player-structure rows have no name (scope not taken); only structure markets scope opt-in elsewhere.
 - Compare Set / Variations / Price History ignore All regions and Jump Range; header copy notes this via `allRegionsSecondaryNote`/`rangeSecondaryNote`.
 
-## 3. Open orders, History, Transactions (Market tabs)
+## 3. Open orders and History (Market tabs)
 
 Paths relative to repo root. Tabs from `MARKET_TABS` (`src/app/pageTabs.ts`): `orders` = `/market/orders`, `history` = `/market/history` (ADR 0015). `/market` is UNGATED (`src/app/routeScopes.ts:57`); each of these panels gates itself (banner, not page replace). Mounted in `src/routes/Market.tsx`. Old `/wallet/transactions` and `/market/history/transactions` redirect to `/market/history`.
 
@@ -230,7 +230,7 @@ What: worklist of every authenticated character's open market orders, each filed
 What: character's buy/sell fills; corp fills live on `/corp/wallet`. `TransactionsPanel.tsx`.
 
 - Data: `GET /characters/{id}/wallet/transactions` (`esi-wallet.read_character_wallet.v1`; `loadWalletTransactionsWithStatus`, page cap -> `truncated` warning) + wallet journal (only for Margin; failure blanks Margin, not the tab). cacheKey `market:transactions`.
-- Header: title "Transactions", refresh, `TableActionsMenu` (CSV surface `wallet-transactions`, filtered rows), `DataAgeBadge`.
+- Header: refresh, `TableActionsMenu` (CSV surface `wallet-transactions`, filtered rows), `DataAgeBadge`.
 - Filter bar: reuses `TransactionsFilterBar` from `src/features/corp/CorpTransactionsPanel.tsx:94` — search, Side select, From/To date fields; URL `transactions.*` (`walletTransactionFilter.ts`).
 - Summary strip (`TransactionsSummaryStrip.tsx`): date range, Sold / Bought / Net over filtered rows.
 - Columns: Date (`formatTimestamp`, user time zone), Item (`ItemInfoLink`, sticky start), Side (phone hidden), Quantity, Unit price, Total (signed, toned), Margin (phone hidden, header tooltip, cell tooltip shows unit cost + sales tax; "—" if no margin; blank on buys). Default sort date desc; all columns sortable. Virtualized.
@@ -245,7 +245,6 @@ What: character's buy/sell fills; corp fills live on `/corp/wallet`. `Transactio
 - Notification events from the feasibility note: only `marketOrderUndercut` (station tier) and `marketOrderFilled` exist in `events.ts`; no `orderUnderFloor`, `orderExpiring`, `orderStale` events (grep of `src/features/notifications` found none). Proposed thresholds table (scope, min gap, min rival stock, repeat suppression) and "try on today's orders" replay: no match in notifications code.
 - Order slots / capital tied up: `maxMarketOrders` is used only on Overview (`routes/Overview.tsx:39`), no slots usage line on Open orders.
 - Open orders context menu has no "filter to station" or "copy location" (those exist only on Browser book `OrderRowContextMenu.tsx`).
-- Order History table has no row actions, context menu, detail modal or per-character view; active character only (cf. Open orders all-characters).
 - History table has no fill time/state detail; `fillTime.ts` engine is not surfaced in History or Open orders.
 - Transactions: personal only; no all-characters view; Margin is before broker fees (`realizedMargin.ts` header) and blank for any sale lacking a journal tax line (journal can reach back shorter than transactions).
 - Open orders is active-character gated for load error/redirect (`Navigate` to `/characters`) even though data spans every authenticated character.
@@ -650,7 +649,7 @@ Summary
 | Appraisal share snapshot                                                                                                                            | Firestore `share` doc, 7-day TTL (`shareStore.ts:23`)                    | Yes (written on Share)           |
 | Public contract/courier snapshots                                                                                                                   | Firestore (Cloud Function written), Dexie-cached                         | Read only                        |
 | Hub, Location Mode, Price Percent, column pickers, Hauling cargo/budget/filters, price-history range, LP price basis, contract mode, courier filter | device-local (localStorage/Dexie settings)                               | No                               |
-| Browser filters/tabs, Orders/History/Transactions filters, Hauling lane, LP filters, contract filters                                               | URL params (ADR 0015)                                                    | No                               |
+| Browser filters/tabs, Orders/History filters, Hauling lane, LP filters, contract filters                                                            | URL params (ADR 0015)                                                    | No                               |
 | Compare Set, Appraisal paste, LP "own materials" chip                                                                                               | memory only                                                              | No                               |
 | Open-orders problem samples                                                                                                                         | Dexie, rolling 7 d                                                       | No                               |
 | Order book                                                                                                                                          | memory 300 s; Fuzzwork hub prices 15 min memory + Dexie (`prices.ts:26`) | No                               |
@@ -673,13 +672,13 @@ Scope matrix: Browser, Variations, Compare, Price History, Appraisal, Hauling = 
 12. Why does contract search work without a contracts scope? Public contracts come from a shared Firestore snapshot synced every 30 min by a Cloud Function (ADR 0013; staleness 30 min, `publicContractOffers.ts:34`), so no per-user ESI. It still needs an active character (cache keyed by character; none = redirect to `/characters`) and a sync backend.
 13. Courier ranking and flags? ISK/jump = reward / max(jumps,1); going rate = corpus median needing >=20 samples, "far above" at >=8x (`courierGoingRate.ts:31,71`); community floor = collateral/1B x jumps x 1M (`:87`); high collateral flag default 50x ratio, modal only.
 14. Why is the Quickbar per character and synced but Compare Set not? Quickbar is Editable Data with a synced collection (`syncedCollections.ts:337`); Compare is deliberately scratch (`compareSet.ts`).
-15. Why does `/market` stay ungated? Browser needs no scope; gating the page would hide it for everyone. Orders/History/Transactions banner themselves (`routeScopes.ts:57`).
+15. Why does `/market` stay ungated? Browser needs no scope; gating the page would hide it for everyone. Orders/History banner themselves (`routeScopes.ts:57`).
 16. What does Share store and for how long? Priced items only (max 1000, `appraisalSnapshot.ts:18`), 7-day Firestore TTL, same pile reuses same link; view is rebuilt at stored prices without refine/LP/net since those depend on the sharer's character.
 
 ## 9. Observed gaps (cross-cutting)
 
 - Doc-vs-code: summary rows above that say "cross-device sync not verified" for Quickbar were wrong; fixed.
-- Orders/History/Transactions read only through active-character redirect; no all-character History or Transactions.
+- Orders/History read only through active-character redirect; no all-character History.
 - No live prices on Quickbar rows; alerts only for pinned items.
 - Appraisal paste lost on reload; refine/LP omitted from CSV and share.
 - LP Store: hub/basis not in URL.

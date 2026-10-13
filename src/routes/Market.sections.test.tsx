@@ -216,7 +216,7 @@ describe('Market top-level tabs', () => {
   });
 
   it('moves an old /market/history/transactions link to History, keeping its query', async () => {
-    window.history.pushState({}, '', '/market/history?highlight=34');
+    window.history.pushState({}, '', '/market/history/transactions?highlight=34');
     render(<App />);
 
     await waitFor(() => expect(window.location.pathname).toBe('/market/history'));
