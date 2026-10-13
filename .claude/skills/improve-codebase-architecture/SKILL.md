@@ -8,29 +8,31 @@ disable-model-invocation: true
 
 Surface architectural friction and propose **deepening opportunities**: refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability, **without** producing god files that are harder for humans to maintain.
 
-This is a local copy of the `mattpocock-skills` skill. It differs in three ways: the repo's glossary and decision locations, the **Guardrails** section below, and the PI exclusion. Everything in Guardrails is mandatory, in the report and in the grilling loop.
+This is a local copy of the `mattpocock-skills` skill. It differs mainly in the repo's glossary and decision locations, the **Guardrails** section below, the PI exclusion and the read-only sub-agent rule. Everything in Guardrails is mandatory, in the report and in the grilling loop.
 
 This command is _informed_ by the project's domain model and built on a shared design vocabulary:
 
-- Call the Skill tool with "codebase-design" for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion, and don't drift into "component," "service," "API," or "boundary."
+- Call the Skill tool with "mattpocock-skills:codebase-design" for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion, and don't drift into "component," "service," "API," or "boundary."
 - Domain language: `GLOSSARY.md` gives names to good seams. Don't read it whole: `grep -n -i "<term>" GLOSSARY.md`. Scope decisions live in `docs/context/decisions/`, ADRs in `docs/adr/`. This command must not re-litigate them. Architecture map: `docs/ARCHITECTURE.md`, read it first.
 
 ## Guardrails
 
 **Depth is the ratio of behavior to interface size. It is not file size or line count.** A module with a big or leaky interface is shallow however much it contains. Every candidate must satisfy all of these:
 
-1. **Small interface.** The deepened module exposes roughly 3 to 5 exports. More means a bag of utilities, not a deep module: split it along a real seam or drop the candidate.
+1. **Small interface.** The deepened module exposes at most 5 exports (6 only with a stated reason). More means a bag of utilities, not a deep module: split it along a real seam or drop the candidate.
 2. **Callers must get simpler.** Name the glue code, branching or duplicated knowledge that disappears from callers. If the change only moves code, drop it.
 3. **No merging for its own sake.** Never collapse several shallow modules into one large file. Keep the implementation split into cohesive internal files behind one index, and import the module only through that index.
-4. **Size ceiling.** Flag any resulting implementation file over ~400 lines, or a module over ~1,500 lines in total, and propose the split into two modules along a real seam. Reviewer-sized: one person must be able to review it in one sitting.
+4. **Size ceiling.** Measure it: run `wc -l` on the files involved, read-only, never guess. Flag any resulting implementation file over ~400 lines, or a module over ~1,500 lines in total, and propose the split into two modules along a real seam. Reviewer-sized: one person must be able to review it in one sitting.
 5. **One reason to change.** If the module's description needs "and", it is two modules.
 6. **Real seams only.** A seam needs two real adapters (production plus test counts). One adapter is hypothetical: no new interface or indirection for it.
 7. **Respect layering.** `src/engine` stays pure: no fetch, DOM or Dexie imports. Refresh tokens stay in Dexie only. Don't move logic across that line.
 8. **Tests move up, not away.** Calculation and logic modules keep TDD. Name which tests survive at the new interface and which are deleted as redundant. Never propose a deepening that reduces coverage of behavior.
 9. **UI work follows `docs/DESIGN.md`.** Don't deepen by re-implementing a `src/components/ui` primitive.
-10. **Skip `src/features/pi` and `routes/PlanetaryIndustry*`** unless the user names them (the PI pages are being overhauled).
+10. **Skip `src/features/pi` and `src/routes/PlanetaryIndustry*`** unless the user names them (the PI pages are being overhauled).
 
-Each card carries a **Guardrail check** row: proposed export count, the callers that get simpler, the largest resulting file, and the seam's two adapters. A card that can't fill it in is `Speculative` at best.
+Each card carries a **Guardrail check** row: proposed export count, the callers that get simpler, the largest resulting file and module total, and the seam's two adapters, plus one line on guardrails 5, 7, 8 and 9 (one reason to change, layering, surviving tests, no re-implemented primitive). A card that can't fill it in is `Speculative` at best.
+
+Run at most three agents at once, including any design-it-twice fan-out.
 
 ## Process
 
@@ -39,7 +41,7 @@ Each card carries a **Guardrail check** row: proposed export count, the callers 
 **Scope before you scan: YAGNI.** Deepening a module pays off by making future changes to it easier, so put extra weight on the parts of the codebase that have recently changed. Decide *where* to look before you look:
 
 - If the user named a direction (a module, a subsystem, a pain point), take it, and skip the inference below.
-- Otherwise, walk back a good stretch of the commit history (`git log --oneline origin/main`) to find the codebase's hot spots, the files and areas that keep coming up, and let those paths pull your attention first. If the changes are scattered with no clear hot spot, widen the net. Survey `origin/main`, not a possibly stale working tree.
+- Otherwise, walk back a good stretch of the commit history (`git fetch origin main`, then `git log --oneline origin/main`) to find the codebase's hot spots, the files and areas that keep coming up, and let those paths pull your attention first. If the changes are scattered with no clear hot spot, widen the net. Survey `origin/main`, not a possibly stale working tree.
 
 Read `docs/ARCHITECTURE.md`, grep `GLOSSARY.md` for the terms in the area, and read any ADRs and `docs/context/decisions/` entries touching it first.
 
@@ -82,13 +84,13 @@ Do NOT propose interfaces yet. After the file is written, ask the user: "Which o
 
 ### 3. Grilling loop
 
-Once the user picks a candidate, call the Skill tool with "grilling" to walk the decision tree with them: constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive. Apply the Guardrails here too: state the export list and the internal file split explicitly, and get the user's approval of the interface before any code moves. If the interface grows past the cap during grilling, stop and split.
+Once the user picks a candidate, call the Skill tool with "mattpocock-skills:grilling" to walk the decision tree with them: constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive. Apply the Guardrails here too. Make no file edits in the main checkout: glossary and decision changes wait for the implementation worktree. State the export list and the internal file split explicitly, and get the user's approval of the interface before any code moves. If the interface grows past the 5-export cap during grilling, stop and split.
 
-Side effects happen inline as decisions crystallize; call the Skill tool with "domain-modeling" to keep the domain model current as you go:
+Side effects happen inline as decisions crystallize; call the Skill tool with "mattpocock-skills:domain-modeling" to keep the domain model current as you go (ignore its `CONTEXT.md` default: this repo uses `GLOSSARY.md`):
 
 - **Naming a deepened module after a concept not in `GLOSSARY.md`?** Add the term to the glossary. **Never append a scope decision to it**: record those with `node scripts/new-decision.mjs "<title>" [--issue <n>]`, never numbered.
 - **Sharpening a fuzzy term during the conversation?** Update `GLOSSARY.md` right there.
-- **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing; skip ephemeral reasons ("not worth it right now") and self-evident ones.
-- **Want to explore alternative interfaces for the deepened module?** Call the Skill tool with "codebase-design" and use its design-it-twice parallel sub-agent pattern.
+- **User rejects the candidate with a load-bearing reason?** Offer an ADR (numbered per the `docs/adr/` convention, see `docs/agents/domain.md`), framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing; skip ephemeral reasons ("not worth it right now") and self-evident ones.
+- **Want to explore alternative interfaces for the deepened module?** Call the Skill tool with "mattpocock-skills:codebase-design" and use its design-it-twice parallel sub-agent pattern.
 
 Implementation then follows the repo workflow: a worktree, TDD for logic, `npm run typecheck` and only the touched test files locally, `/code-review` before merge.

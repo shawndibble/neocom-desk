@@ -1,6 +1,6 @@
 # HTML Report Format
 
-The architectural review is rendered as a single self-contained HTML file in the OS temp directory. Tailwind and Mermaid both come from CDNs. Mermaid handles graph-shaped diagrams reliably; hand-built divs and inline SVG handle the more editorial visuals (mass diagrams, cross-sections). Mix the two: don't lean on Mermaid for everything, it'll start to look generic.
+The architectural review is rendered as a single self-contained HTML file in the scratchpad or temp directory (see SKILL.md). Tailwind and Mermaid both come from CDNs. Mermaid handles graph-shaped diagrams reliably; hand-built divs and inline SVG handle the more editorial visuals (mass diagrams, cross-sections). Mix the two: don't lean on Mermaid for everything, it'll start to look generic.
 
 ## Scaffold
 
@@ -50,7 +50,7 @@ Each candidate is one `<article>`:
 - **Problem**: one sentence. What hurts.
 - **Solution**: one sentence. What changes.
 - **Wins**: bullets, ≤6 words each. e.g. "Tests hit one interface", "Pricing logic stops leaking", "Delete 4 shallow wrappers".
-- **Guardrail check**: a compact four-cell strip, mandatory (see SKILL.md Guardrails): `exports` (target ≤5), `callers simplified` (name them), `largest file` (lines, flag >400), `seam adapters` (two real ones). Tint a cell red if it fails. In the After diagram, draw the interface as a thin surface and the implementation as several small internal files, never one big box.
+- **Guardrail check**: a compact four-cell strip, mandatory (see SKILL.md Guardrails): `exports` (≤5), `callers simplified` (name them), `largest file` (lines, flag >400) and `module total` (flag >1,500), `seam adapters` (two real ones), plus one line for guardrails 5, 7, 8, 9. Tint a cell red if it fails. In the After diagram, draw the interface as a thin surface and the implementation as several small internal files, never one big box.
 - **ADR callout** (if applicable): one line in an amber-tinted box.
 
 No paragraphs of explanation. If the diagram needs a paragraph to be understood, redraw the diagram.
@@ -103,6 +103,10 @@ Before: a tree of function calls rendered as nested boxes. After: the same tree 
 ## Top recommendation section
 
 One larger card. Candidate name, one sentence on why, anchor link to its card. That's it.
+
+## Split candidates section
+
+After the top recommendation, a short list of existing god files or fat interfaces found in the survey: path, line count or export count, and the seam to split along. Omit the section if there are none.
 
 ## Tone
 
