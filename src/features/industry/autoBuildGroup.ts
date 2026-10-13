@@ -10,7 +10,6 @@
  * market data (`loadMarketSnapshots`) — the same reason `useComparedBuildResults.ts`
  * sits here instead of the engine.
  */
-import { applyCostIndexOverride } from './costIndexOverride';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -22,7 +21,7 @@ import {
   type BuildStrategy,
 } from '@/engine/industry/autoMakeOrBuy';
 import { craftScope, reactionCraftEligible } from '@/engine/industry/craftScope';
-import type { MakeMethod, MakeOrBuyContext, MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import type { MakeMethod, MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { IndustryBlueprint } from '@/engine/industry/types';
 import { industryActivityOf } from '@/engine/industry/types';
 import type { PiData } from '@/sde/types';
@@ -34,15 +33,8 @@ import {
   autoBuildDepthContext,
   type PlanFacilityContext,
 } from './planFacilityContext';
-import { materialPricesFor } from './priceBasis';
-import {
-  acquisitionForLookup,
-  recipeForLookup,
-  verdictAcquisitionFor,
-  type RecipeCatalog,
-  type RecipeSources,
-} from './recipes';
-import { planOwnedBlueprints, reactionFacilityFor, resolveTopLevelTier } from './resolveBuildPlan';
+import { recipeForLookup, type RecipeCatalog } from './recipes';
+import { planOwnedBlueprints, resolveMakeOrBuy } from './resolveBuildPlan';
 import { communityOffersForRows, offersForRegion } from './buildPlanPricingInputs';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 
@@ -130,7 +122,7 @@ export function memberRecipeFor(
  * member.
  *
  * Walks at the stored `plan.me`, not the member's resolved ME
- * (`resolveTopLevelTier`) that `applyGroupAutoBuild` uses: resolving it
+ * (`resolveMakeOrBuy`) that `applyGroupAutoBuild` uses: resolving it
  * needs live prices, and ME can't change depth anyway — every effective
  * quantity floors at `runs` (never zero), so the same recipes are reached at
  * any ME.
@@ -168,7 +160,7 @@ export function groupAutoBuildMaxDepth(
  * is left out of the returned map entirely, contributing nothing rather than
  * an empty set — as is one whose prices never landed, the same way its own
  * page's Auto Build waits on prices. Each member is walked at its resolved
- * ME (`resolveTopLevelTier`), the same ME its own page walks at.
+ * ME (`resolveMakeOrBuy`), the same ME its own page walks at.
  *
  * Owned blueprints and the Reaction Location resolve per member through
  * `resolveBuildPlan.ts`'s own helpers — corp copies count only for a member
@@ -197,76 +189,42 @@ export async function applyGroupAutoBuild(
   });
 
   const snapshots = loadPlanSnapshots(members, { catalog, pi });
-  const recipeSources: GroupRecipeSources = {
-    catalog,
-    pi,
-    ownedBlueprints,
-    corpOwnedBlueprints,
-    assumedMe,
-  };
-
   const picks = new Map<string, Set<number>>();
   await Promise.all(
     members.map(async (member, index) => {
-      const snapshot = applyCostIndexOverride(
-        await snapshots[index]!.snapshot,
-        member.plan.costIndexOverridePct
-      );
+      const snapshot = await snapshots[index]!.snapshot;
       const reactionSnapshot = await snapshots[index]!.reactionSnapshot;
       const blueprintPurchaseOffersFor = await snapshots[index]!.blueprintOffers;
-      // Same gate as the member's own page (`resolveBuildPlan`'s
-      // `makeOrBuyContext`): without real fees every verdict would read
-      // "build", so a member whose prices never landed is left untouched.
-      if (snapshot.adjustedPrices === null || snapshot.systemCostIndex === null) return;
-      const reactionFacility = reactionFacilityFor(member.plan, reactionSnapshot?.systemCostIndex);
-      const recipeFor = memberRecipeFor(member.plan, recipeSources);
-      const materialPrices = materialPricesFor(snapshot, member.plan.materialPriceBasis);
       const hub = getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB;
-      const acquisitionSources: RecipeSources = {
-        catalog,
-        pi,
-        ownedBlueprints: planOwnedBlueprints(member.plan, ownedBlueprints, corpOwnedBlueprints),
-        assumedMeForUnowned: assumedMe,
-        blueprintAcquisition: {
-          offersFor: offersForRegion(bpcRows, hub.regionId),
-          extraOffersFor: blueprintPurchaseOffersFor,
-          lastResortOffersFor: offersForRegion(bpcRows, hub.regionId, true),
-          communityOffersFor: communityOffersForRows(communityRows),
-          hubPrices: snapshot.hubPrices,
-          sourcing: member.plan.materialSourcing,
-        },
-      };
-      const ctx: MakeOrBuyContext = {
-        ...member.facilityContext,
-        systemCostIndex: snapshot.systemCostIndex,
-        adjustedPrices: snapshot.adjustedPrices,
-        materialPrices,
-        modifiers,
-        reactionFacility,
-        // Same blueprint cost the member's own page quotes a verdict with.
-        acquisitionFor: verdictAcquisitionFor(acquisitionSources, includeBlueprintCost),
-      };
-      // The ME the member's own page walks at: its top-level Blueprint
-      // Acquisition tier, resolved against a fresh pool per member.
-      const acquisitionFor = acquisitionForLookup(acquisitionSources);
-      const { me } = resolveTopLevelTier(
+      // A member whose prices never landed resolves to null and is left
+      // untouched: without real fees every verdict would read "build".
+      const resolution = resolveMakeOrBuy(
         member.plan,
-        member.blueprint,
-        acquisitionFor,
-        ctx,
-        materialPrices
+        {
+          catalog,
+          pi,
+          ownedBlueprints,
+          corpBlueprints: corpOwnedBlueprints,
+          assumedMe,
+          modifiers,
+          bpcOffersFor: offersForRegion(bpcRows, hub.regionId),
+          bpcLastResortOffersFor: offersForRegion(bpcRows, hub.regionId, true),
+          blueprintPurchaseOffersFor,
+          communityOffersFor: communityOffersForRows(communityRows),
+          includeBlueprintCost,
+        },
+        { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
       );
+      if (!resolution) return;
+      const { blueprint, recipeFor, ctx, me } = resolution;
       picks.set(
         member.plan.id,
-        autoBuildHere(member.blueprint, me, {
+        autoBuildHere(blueprint, me, {
           recipeFor,
           ctx,
           depth: options.depth,
           runs: member.plan.runs,
-          scope: craftScope(
-            industryActivityOf(member.blueprint),
-            member.plan.includeReactions ?? false
-          ),
+          scope: craftScope(industryActivityOf(blueprint), member.plan.includeReactions ?? false),
           strategy: options.strategy,
         })
       );

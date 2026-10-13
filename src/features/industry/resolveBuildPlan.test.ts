@@ -9,7 +9,7 @@ import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog
 import type { MarketSnapshot } from './marketData';
 import { makeOrBuy } from '@/engine/industry/makeOrBuy';
 import { materialRecipe } from './recipes';
-import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
+import { resolveBuildPlan, resolveMakeOrBuy, type BuildPlanSources } from './resolveBuildPlan';
 
 function entry(
   blueprintTypeID: number,
@@ -429,5 +429,41 @@ describe('blueprint purchases are charged once per plan, not once per node', () 
       { snapshot: snapshot({ 1: 1000, 300: 100, 34: 5 }) }
     );
     expect(chargedFor(resolved.result, 200)).toBe(100);
+  });
+});
+
+describe('resolveMakeOrBuy', () => {
+  const catalog = catalogOf([entry(100, 1, [{ typeID: 34, quantity: 10 }])]);
+
+  it('returns the same context, ME and TE the full resolution prices the plan with', () => {
+    const src = sources(catalog, { ownedBlueprints: [owned(100, -1, 8)] });
+    const prices = { snapshot: snapshot({ 1: 1000, 34: 5 }) };
+    const full = resolveBuildPlan(plan(), src, prices);
+    const verdict = resolveMakeOrBuy(plan(), src, prices);
+    expect(verdict).not.toBeNull();
+    expect(verdict!.me).toBe(full.resolvedMe);
+    expect(verdict!.te).toBe(full.resolvedTe);
+    expect(verdict!.me).toBe(8);
+    expect(verdict!.ctx.systemCostIndex).toBe(full.makeOrBuyContext!.systemCostIndex);
+    expect(verdict!.ctx.materialPrices).toEqual(full.materialPrices);
+    expect(verdict!.blueprint.products[0]?.typeID).toBe(1);
+    expect(verdict!.recipeFor(34)).toBeNull();
+  });
+
+  it('is null until live fees land, like the full resolution', () => {
+    expect(resolveMakeOrBuy(plan(), sources(catalog), { snapshot: null })).toBeNull();
+    expect(
+      resolveMakeOrBuy(plan(), sources(catalog), {
+        snapshot: { ...snapshot({ 34: 5 }), adjustedPrices: null },
+      })
+    ).toBeNull();
+  });
+
+  it('is null when the blueprint is missing from the catalog', () => {
+    expect(
+      resolveMakeOrBuy(plan({ blueprintTypeID: 999 }), sources(catalog), {
+        snapshot: snapshot({ 34: 5 }),
+      })
+    ).toBeNull();
   });
 });
