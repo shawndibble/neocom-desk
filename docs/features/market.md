@@ -178,7 +178,7 @@ What: worklist of every authenticated character's open market orders, each filed
 
 **Page header line**: "N characters · N orders · N need attention" (`headerCharacters/headerSummary/headerAttention`), `needsAttentionCount`.
 
-**Panel actions**: refresh icon, `TableActionsMenu` (CSV/export), `DataAgeBadge`.
+**Page header** (portaled from the panel via `PageHeaderPortals.tsx`, no panel title bar): refresh icon and `TableActionsMenu` (CSV/export) beside the bell; `DataAgeBadge` beside the page title.
 
 **Groups** (`openOrdersModel.ts groupOpenOrders`, ORDER_PROBLEMS order in `engine/market/orderProblems.ts:39`): belowFloor > undercutStation > undercutSystem > undercutRegion > expiringOrStale > outbid > healthy. Buy order never belowFloor; buy undercuts collapse to `outbid`. Group header = caret toggle button (fold), title + count, hint line with ISK tied up (`IskAmount`), worst gap %, per-character counts when >1 character (`groupHeaderLine` panel :1162). Left stripe colour by severity (`GROUP_ACCENT` :133). Healthy group has "Show healthy / Hide healthy" text action tied to `hideHealthy` filter (default true, `DEFAULT_FILTER` :114). Per-group "check system and region" icon button (`checkDeeper`, panel :1054). Highlighted row (from notification) forces its group open (`openOrdersView.ts isGroupFolded`).
 
@@ -230,9 +230,10 @@ What: worklist of every authenticated character's open market orders, each filed
 What: character's buy/sell fills; corp fills live on `/corp/wallet`. `TransactionsPanel.tsx`.
 
 - Data: `GET /characters/{id}/wallet/transactions` (`esi-wallet.read_character_wallet.v1`; `loadWalletTransactionsWithStatus`, page cap -> `truncated` warning) + wallet journal (only for Margin; failure blanks Margin, not the tab). cacheKey `market:transactions`.
-- Header: refresh, `TableActionsMenu` (CSV surface `wallet-transactions`, filtered rows), `DataAgeBadge`.
+- Page header (portaled via `PageHeaderPortals.tsx`, no panel title bar): refresh and `TableActionsMenu` (CSV surface `wallet-transactions`, filtered rows) beside the bell; `DataAgeBadge` beside the page title.
+- Layout: Sold / Bought / Net card, then the table card (filter bar on top).
 - Filter bar: reuses `TransactionsFilterBar` from `src/features/corp/CorpTransactionsPanel.tsx:94` — search, Side select, From/To date fields; URL `transactions.*` (`walletTransactionFilter.ts`).
-- Summary strip (`TransactionsSummaryStrip.tsx`): date range, Sold / Bought / Net over filtered rows.
+- Summary card (`TransactionsSummaryStrip.tsx`): date range, Sold / Bought / Net over filtered rows.
 - Columns: Date (`formatTimestamp`, user time zone), Item (`ItemInfoLink`, sticky start), Side (phone hidden), Quantity, Unit price, Total (signed, toned), Margin (phone hidden, header tooltip, cell tooltip shows unit cost + sales tax; "—" if no margin; blank on buys). Default sort date desc; all columns sortable. Virtualized.
 - Highlight: `?highlight=<typeId>` -> newest sell of that item (`transactionHighlight.ts`), pulsed.
 - Margin: `transactionMargins.ts` links `transaction_tax` journal lines to fills (`journalTransactionLinks`), then `realizedMargins`: FIFO personal buys as lots; sale margin = total - lot cost - sales tax; none when tax line missing, units not covered by wallet buys, or the type outran its buys (then no margins for that type). Broker fees not included. Computed over all fills, not filtered rows.

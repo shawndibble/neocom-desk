@@ -69,6 +69,7 @@ import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/c
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
+import { usePageHeaderSlots } from '@/features/market/pageHeaderSlots';
 import { StockTab } from '@/features/stockTargets/StockTab';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
@@ -316,6 +317,10 @@ export function Market() {
     setExpandCompareOnAppraisal(expandCompare);
   }
   const isPhone = useIsPhone();
+  // Open orders and History hang Refresh, export and data age on the page
+  // header rather than on a title bar of their own.
+  const tabOwnsHeader = tab === 'orders' || tab === 'history';
+  const { slots: headerSlots, metaSlot, actionsSlot } = usePageHeaderSlots();
   const viewsTabsId = useTabsId();
   const itemTabsId = useTabsId();
   // Market's full view list: a strip on desktop, the title-row picker on a phone.
@@ -840,6 +845,7 @@ export function Market() {
         <PageHeader
           title={t('market.title')}
           views={marketViews}
+          meta={tabOwnsHeader ? metaSlot : undefined}
           actions={
             usesHubPicker(tab) ? (
               <>
@@ -913,6 +919,8 @@ export function Market() {
                   }
                 />
               </>
+            ) : tabOwnsHeader ? (
+              actionsSlot
             ) : undefined
           }
         />
@@ -932,10 +940,10 @@ export function Market() {
           tabId={marketViews.value}
           labelled={!usesViewPicker(marketViews.tabs.length, isPhone)}
         >
-          {tab === 'orders' && <OpenOrdersPanel />}
+          {tab === 'orders' && <OpenOrdersPanel headerSlots={headerSlots} />}
           {tab === 'stock' && <StockTab activeCharacterId={activeCharacterId} />}
 
-          {tab === 'history' && <TransactionsPanel />}
+          {tab === 'history' && <TransactionsPanel headerSlots={headerSlots} />}
 
           {/* The list itself lives in `useAppraisal` at route level, so switching
           to the Browser and back does not throw away a forty-line paste. */}

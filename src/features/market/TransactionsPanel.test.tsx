@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { TransactionsPanel } from './TransactionsPanel';
+import { WithPageHeaderSlots } from './__fixtures__/pageHeaderSlots';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -61,7 +62,9 @@ function renderPanel(url = '/market/history') {
   render(
     <MemoryRouter initialEntries={[url]}>
       <FakeItemActions actions={actions}>
-        <TransactionsPanel />
+        <WithPageHeaderSlots>
+          {(slots) => <TransactionsPanel headerSlots={slots} />}
+        </WithPageHeaderSlots>
       </FakeItemActions>
       <LocationProbe />
     </MemoryRouter>
@@ -93,6 +96,28 @@ describe('TransactionsPanel — the row as an item', () => {
     // Right-click may still offer the table's own Export; never item actions.
     expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('TransactionsPanel — page header controls', () => {
+  it('puts Refresh, Export and the data age in the page header, not a title bar of its own', async () => {
+    mockTransactions({
+      data: [transaction()],
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+    renderPanel();
+
+    const header = screen.getByRole('banner');
+    expect(
+      await within(header).findByRole('button', { name: 'Export Transactions' })
+    ).toBeInTheDocument();
+    expect(within(header).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(header.querySelector('time')).not.toBeNull();
+    // The table's card has no header strip left.
+    const table = screen.getByRole('table', { name: 'Transactions' });
+    expect(table.closest('.rounded-xs')?.querySelector('header')).toBeNull();
   });
 });
 
@@ -351,7 +376,9 @@ describe('TransactionsPanel — phone', () => {
     render(
       <MemoryRouter initialEntries={['/market/history?highlight=2048']}>
         <FakeItemActions>
-          <TransactionsPanel />
+          <WithPageHeaderSlots>
+            {(slots) => <TransactionsPanel headerSlots={slots} />}
+          </WithPageHeaderSlots>
         </FakeItemActions>
       </MemoryRouter>
     );

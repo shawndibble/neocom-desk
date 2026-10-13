@@ -13,7 +13,7 @@ interface TransactionsSummaryStripProps {
   className?: string;
 }
 
-/** The Sold / Bought / Net strip over the fills shown — phone day list and desktop table alike. */
+/** The Sold / Bought / Net card over the fills shown, above Market History's table. */
 export function TransactionsSummaryStrip({
   transactions,
   className,
@@ -25,7 +25,7 @@ export function TransactionsSummaryStrip({
     <section
       aria-label={t('wallet.transactionsSummaryLabel')}
       className={cx(
-        'mx-3 mt-3 flex flex-col gap-2 rounded-xs border border-line bg-panel p-3',
+        'flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm',
         className
       )}
     >
