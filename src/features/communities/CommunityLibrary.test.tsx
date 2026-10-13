@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import en from '@/i18n/locales/en.json';
 import { uidForCharacter } from '@/sync/uid';
@@ -20,9 +20,29 @@ vi.mock('@/sde/loadMarketSde', () => ({
 }));
 vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: async () => ({
-    '10': { name: 'Rifter Blueprint', products: [] },
-    '11': { name: 'Merlin Blueprint', products: [] },
+    '10': { name: 'Rifter Blueprint', products: [{ typeID: 587, quantity: 1 }] },
+    '11': { name: 'Merlin Blueprint', products: [{ typeID: 603, quantity: 1 }] },
   }),
+}));
+const JITA = 30000142;
+const EFA = 30003070;
+const systems = vi.hoisted(() => ({ readable: true, pending: false }));
+vi.mock('@/sde/solarSystems', () => ({
+  loadSolarSystemsById: () => (systems.pending ? new Promise(() => {}) : loadSystems()),
+}));
+async function loadSystems() {
+  return systems.readable
+    ? new Map([
+        [JITA, { id: JITA, name: 'Jita', security: 0.95, regionId: 1 }],
+        [EFA, { id: EFA, name: 'Efa', security: -0.2, regionId: 2 }],
+      ])
+    : null;
+}
+// Jita is 3 jumps out; Efa has no stargate route from here.
+const jumps = new Map([[JITA, 3]]);
+vi.mock('@/features/route/currentSystem', () => ({
+  useCurrentSystem: () => ({ systemId: 30000144, loaded: true }),
+  useJumpRangeFilter: () => ({ status: 'off', allowed: null, jumps, jumpsStatus: 'ready' }),
 }));
 vi.mock('./communityStore', () => ({
   loadMemberLibraries: async () => [
@@ -41,9 +61,15 @@ const members = [
   { uid: uidForCharacter(1), characterName: 'Me', joinedAt: 2, libraryAsOf: null },
 ];
 
+function Where() {
+  const location = useLocation();
+  return <output aria-label="where">{location.pathname + location.search}</output>;
+}
+
 function renderLibrary() {
   return render(
     <MemoryRouter>
+      <Where />
       <CommunityLibrary
         communityId="c1"
         characterId={1}
@@ -76,10 +102,130 @@ describe('CommunityLibrary', () => {
       .slice(1)
       .map((row) => row.textContent);
     expect(rows).toHaveLength(2);
+    // "Jita IV" already says Jita: no system line under it.
     expect(rows.find((text) => text?.includes('Jita IV'))).toMatch(
-      /Rifter Blueprint.*Ann.*Jita IV.*Jita.*0 \/ 0.*BPO/
+      /^Rifter Blueprint.*Ann.*Jita IV3.*0 \/ 0.*BPO/
     );
-    expect(rows.find((text) => text?.includes('Efa VII'))).toMatch(/10 \/ 20.*7 runs/);
+    expect(rows.find((text) => text?.includes('Efa VII'))).toMatch(/Efa VII—.*10 \/ 20.*7 runs/);
+  });
+
+  it('opens Show info from the blueprint name', async () => {
+    renderLibrary();
+    const table = await screen.findByRole('table', { name: l.sharedLabel });
+    const [name] = within(table).getAllByRole('link', { name: 'Rifter Blueprint' });
+    expect(name).toHaveAttribute('href', expect.stringContaining('info=type-10'));
+  });
+
+  it('links the jumps to the route there, and shows a dash where none is known', async () => {
+    renderLibrary();
+    const table = await screen.findByRole('table', { name: l.sharedLabel });
+    const jita = within(table).getByRole('link', { name: /^3 / });
+    expect(jita).toHaveAttribute('href', `/travel/route?stops=${JITA}`);
+    const efa = within(table)
+      .getAllByRole('row')
+      .find((row) => row.textContent?.includes('Efa VII'))!;
+    expect(within(efa).getByText('—')).toBeInTheDocument();
+  });
+
+  it('shows a dash for every jumps cell when the system list cannot be read', async () => {
+    systems.readable = false;
+    try {
+      renderLibrary();
+      const table = await screen.findByRole('table', { name: l.sharedLabel });
+      expect(await within(table).findAllByText('—')).toHaveLength(2);
+      expect(within(table).queryByText('…')).not.toBeInTheDocument();
+    } finally {
+      systems.readable = true;
+    }
+  });
+
+  it('the row menu says View route is still checking while the system list loads', async () => {
+    systems.pending = true;
+    try {
+      const user = userEvent.setup();
+      renderLibrary();
+      const table = await screen.findByRole('table', { name: l.sharedLabel });
+      const [more] = within(table).getAllByRole('button', {
+        name: en.common.moreActionsLabel.replace('{{name}}', 'Rifter Blueprint'),
+      });
+      await user.click(more!);
+      expect(screen.getByRole('menuitem', { name: l.viewRouteChecking })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
+      expect(screen.queryByText(l.systemUnknown)).not.toBeInTheDocument();
+    } finally {
+      systems.pending = false;
+    }
+  });
+
+  it('sorts by jumps, the unknown last either way', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    const table = await screen.findByRole('table', { name: l.sharedLabel });
+    const header = within(table).getByRole('button', { name: new RegExp(l.columns.jumps) });
+    // Twice: descending, where a plain number sort would put the unknown first.
+    await user.click(header);
+    await user.click(header);
+    expect(
+      within(table).getByRole('columnheader', { name: new RegExp(l.columns.jumps) })
+    ).toHaveAttribute('aria-sort', 'descending');
+    const places = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => (row.textContent?.includes('Jita IV') ? 'Jita' : 'Efa'));
+    expect(places).toEqual(['Jita', 'Efa']);
+  });
+
+  it('a row menu shows info, plans a seeded build, sources the blueprint and routes there', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    const table = await screen.findByRole('table', { name: l.sharedLabel });
+    const efaRow = () =>
+      within(screen.getByRole('table', { name: l.sharedLabel }))
+        .getAllByRole('row')
+        .find((row) => row.textContent?.includes('Efa VII'))!;
+    const open = async () =>
+      user.click(
+        within(efaRow()).getByRole('button', {
+          name: en.common.moreActionsLabel.replace('{{name}}', 'Rifter Blueprint'),
+        })
+      );
+    expect(table).toBeInTheDocument();
+
+    await open();
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      en.market.contextMenu.showInfo,
+      en.industry.contextMenu.buildPlan,
+      l.openInSourcing,
+      en.travel.waypoints.viewRoute,
+    ]);
+    await user.click(screen.getByRole('menuitem', { name: en.industry.contextMenu.buildPlan }));
+    expect(screen.getByRole('status', { name: 'where' })).toHaveTextContent(
+      '/industry/plans?product=587&me=10&te=20&runs=7'
+    );
+  });
+
+  it('the row menu opens BPC Sourcing on the blueprint and the route to its system', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    const table = await screen.findByRole('table', { name: l.sharedLabel });
+    const efaRow = within(table)
+      .getAllByRole('row')
+      .find((row) => row.textContent?.includes('Efa VII'))!;
+    const more = within(efaRow).getByRole('button', {
+      name: en.common.moreActionsLabel.replace('{{name}}', 'Rifter Blueprint'),
+    });
+    await user.click(more);
+    await user.click(screen.getByRole('menuitem', { name: l.openInSourcing }));
+    expect(screen.getByRole('status', { name: 'where' })).toHaveTextContent(
+      '/industry/sourcing?sourcing.type=10'
+    );
+    await user.click(more);
+    await user.click(screen.getByRole('menuitem', { name: en.travel.waypoints.viewRoute }));
+    expect(screen.getByRole('status', { name: 'where' })).toHaveTextContent(
+      `/travel/route?stops=${EFA}`
+    );
   });
 
   it('narrows the shared blueprints by Member, station or system', async () => {

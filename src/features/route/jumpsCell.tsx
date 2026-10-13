@@ -59,3 +59,12 @@ export function renderJumpsCell(
     </JumpsLink>
   );
 }
+
+/**
+ * A Jumps column's `sortValue`: the settled count, else `undefined`, which
+ * `DataTable` sorts last in both directions — an unknown or still-loading
+ * distance never reads as nearest or farthest.
+ */
+export function jumpsCellSortValue(cell: JumpsCellValue): number | undefined {
+  return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
+}
