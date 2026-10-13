@@ -3,6 +3,7 @@ import {
   detectInstallPlatform,
   selectInstallPromptVariant,
   selectInstallAppVariant,
+  INSTALL_PROMPT_MIN_PAGE_VISITS,
 } from './installPromptRules';
 
 const UA = {
@@ -64,7 +65,14 @@ describe('selectInstallPromptVariant', () => {
     isStandalone: false,
     deferredPromptAvailable: false,
     platform: 'android' as const,
+    pageVisits: INSTALL_PROMPT_MIN_PAGE_VISITS,
   };
+
+  it('waits until the player has opened enough pages', () => {
+    const early = { ...base, pageVisits: INSTALL_PROMPT_MIN_PAGE_VISITS - 1 };
+    expect(selectInstallPromptVariant({ ...early, deferredPromptAvailable: true })).toBe('none');
+    expect(selectInstallPromptVariant({ ...early, platform: 'ios-safari' })).toBe('none');
+  });
 
   it('shows nothing once seen', () => {
     expect(selectInstallPromptVariant({ ...base, seen: true, deferredPromptAvailable: true })).toBe(

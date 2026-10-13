@@ -2,8 +2,8 @@
  * The deferred `beforeinstallprompt` event, kept app-wide so Settings can offer
  * "Install this app" after the one-time banner is gone. The event fires once,
  * early, so the listener is registered when this module loads (App imports it)
- * rather than when the Settings panel mounts. `InstallPrompt` keeps its own
- * listener for the banner; both just `preventDefault()` and hold the event.
+ * rather than when the Settings panel or the banner mounts. This is the only
+ * listener: `InstallPrompt` and Settings both read the event from here.
  */
 import { create } from 'zustand';
 import type { BeforeInstallPromptEvent } from './installPromptRules';

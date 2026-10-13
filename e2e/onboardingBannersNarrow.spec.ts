@@ -14,7 +14,8 @@
  * explainer by design), and a synthetic `beforeinstallprompt` satisfies the
  * install banner's native variant the same way a real Chromium would. The
  * Install Prompt is mobile-only, so the page also has to claim to be
- * Android Chrome — headless Chromium's desktop UA would hide it.
+ * Android Chrome — headless Chromium's desktop UA would hide it. It also
+ * waits for five page visits after login, so the profile is seeded past that.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -67,7 +68,9 @@ async function makeInstallPromptEligible(page: import('@playwright/test').Page):
 test('shows one onboarding banner at a time at 390px, then the next one', async ({ page }) => {
   await pinNotificationPermissionToDefault(page);
   await page.setViewportSize(PHONE);
-  await signInAndGoto(page, './overview');
+  await signInAndGoto(page, './overview', undefined, [
+    { key: 'installPrompt.pageVisits', value: 5 },
+  ]);
   // issue #1788: the explainer now waits for a second route. Wait for the
   // overview heading before navigating away — `page.goto`'s `load` event
   // fires before the dev server's lazy-loaded Layout/Prompt tree commits, so
