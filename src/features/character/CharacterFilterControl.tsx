@@ -39,7 +39,7 @@
  * phone-only "whose data is this" avatar `PageHeader` used to float in its
  * own corner (#1764): with this trigger already carrying that cue whenever a
  * route offers the filter, a second, separate avatar had nothing left to
- * say. At `md` the trigger is the usual text button regardless of `size`;
+ * say. At `md` the trigger is the usual text button, at its tier's height;
  * there is room for the words there.
  */
 import { useTranslation } from 'react-i18next';
@@ -56,6 +56,7 @@ import {
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import {
   fieldBaseClassName,
+  controlHeightClassName,
   fieldSizeClassName,
   focusRingClassName,
   interactiveClassName,
@@ -104,13 +105,13 @@ export interface CharacterFilterControlProps {
  * two `md:`-prefixed utilities fighting over the same breakpoint — the one
  * ordering Tailwind does not promise to resolve predictably, the same reason
  * two unprefixed utilities for one property are avoided elsewhere in this
- * file. At `md` the trigger is always the same compact text pill regardless
- * of this tier (`md:h-7`, in `triggerBaseClassName` below, unconditionally)
- * — so only the phone-width half varies here.
+ * file. At `md` and up the trigger is a text pill whose height is still the
+ * tier's (`controlHeightClassName`), so it sits level with the `PageHeader`
+ * actions or panel `IconButton`s it shares a line with.
  */
 const TRIGGER_BOX: Record<'sm' | 'md', string> = {
-  sm: 'h-9 w-9',
-  md: 'h-11 w-11',
+  sm: `w-9 ${controlHeightClassName.sm}`,
+  md: `w-11 ${controlHeightClassName.md}`,
 };
 
 /**
@@ -123,7 +124,7 @@ const TRIGGER_BOX: Record<'sm' | 'md', string> = {
 const triggerBaseClassName =
   `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
   `tracking-widest uppercase ${interactiveClassName} ${focusRingClassName} ` +
-  `md:h-7 bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
+  `bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
   `hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ` +
   `md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
 

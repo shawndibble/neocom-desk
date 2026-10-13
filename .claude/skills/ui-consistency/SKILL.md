@@ -113,7 +113,9 @@ in [`../improve-mobile-ux/SKILL.md`](../improve-mobile-ux/SKILL.md) step 4
 - Viewport **1280×800**, not 390. Phone layout belongs to `/improve-mobile-ux`.
 - Beyond screenshots, have the spec log `getBoundingClientRect().height` for
   every control in each suspect row. "The `Select` is 30px beside a 28px
-  `Button`" is a finding nobody can argue with.
+  `Button`" is a finding nobody can argue with. `expectInlineControlsAligned`
+  (`e2e/support/controlHeights.ts`) does this for a whole page; CI already
+  runs it on every route and tab, so look for rows that need data or a click.
 
 A finding the measurement contradicts is dead.
 

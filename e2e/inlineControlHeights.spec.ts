@@ -12,7 +12,7 @@
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-import { expectInlineControlsAligned } from './support/controlHeights';
+import { CONTROL_ROW_WIDTHS, expectInlineControlsAligned } from './support/controlHeights';
 import { ROUTE_REQUIREMENTS } from '../src/app/routeScopes';
 import { PAGE_TABS } from '../src/app/pageTabs';
 import { tabPath } from '../src/lib/pageTabs';
@@ -25,18 +25,15 @@ const TABS = Object.values(PAGE_TABS).flatMap((page) =>
   page.tabs.map((tab) => tabPath(page, tab.id))
 );
 
-const WIDTHS = [1280, 390];
-
 for (const url of [...new Set([...ROUTES, ...TABS])]) {
   test(`${url}: inline controls share one height`, async ({ page }) => {
-    await page.setViewportSize({ width: WIDTHS[0], height: 900 });
+    await page.setViewportSize({ width: CONTROL_ROW_WIDTHS[0], height: 900 });
     await signInAndGoto(page, url);
-    for (const width of WIDTHS) {
+    for (const width of CONTROL_ROW_WIDTHS) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.locator('main')).toBeVisible();
       await expect(page.locator('main .animate-spin')).toHaveCount(0, { timeout: 8000 });
-      // `body`: a page's header actions and sheets sit outside `main`.
-      await expectInlineControlsAligned(page, `${url} @${width}`, 'body');
+      await expectInlineControlsAligned(page, `${url} @${width}`);
     }
   });
 }

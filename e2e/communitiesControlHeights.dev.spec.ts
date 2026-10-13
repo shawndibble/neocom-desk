@@ -11,7 +11,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-import { expectInlineControlsAligned } from './support/controlHeights';
+import { CONTROL_ROW_WIDTHS, expectInlineControlsAligned } from './support/controlHeights';
 import type { setCommunityBackendOverride } from '../src/features/communities/backendOverride';
 import type { createCommunitiesFixture } from '../src/storybook/communitiesFixture';
 
@@ -53,14 +53,13 @@ async function openWithSampleCommunities(page: Page, path: string): Promise<void
   await expect(page.locator('main .animate-spin')).toHaveCount(0, { timeout: 8000 });
 }
 
-for (const width of [1280, 390]) {
+for (const width of CONTROL_ROW_WIDTHS) {
   for (const { name, path } of SURFACES) {
     test(`communities ${name}: inline controls share one height (${width}px)`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await openWithSampleCommunities(page, path);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-      // `body`, not `main`: My sharing and Manage open in a portalled sheet.
-      await expectInlineControlsAligned(page, `${name} @${width}`, 'body');
+      await expectInlineControlsAligned(page, `${name} @${width}`);
     });
   }
 }
