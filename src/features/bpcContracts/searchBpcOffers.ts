@@ -1,7 +1,7 @@
 /**
  * BPC Sourcing's search as pure functions, in two stages so a keystroke reruns only the second:
  * `prepareBpcOffers` (narrowing, type options, offer stats) and `rankBpcOffers` (type query,
- * suggestions, per-source rows, precedence). `searchBpcOffers` composes both (ADR 0013, 0018).
+ * suggestions, per-source rows, source order). `searchBpcOffers` composes both (ADR 0013, 0018).
  */
 import {
   EMPTY_BPC_SEARCH_FILTER,
@@ -89,7 +89,7 @@ export interface BpcOfferSearch {
   filteredRows: BpcContractRow[];
   bpoSourcesByType: Map<number, BpoSources>;
   bpoByType: Map<number, BpoOffer>;
-  /** Every toggled-on source, merged in precedence order. */
+  /** Every toggled-on source, merged in the table's secondary-sort order (owned, Community, LP store, then market and contracts). */
   displayRows: BpcSearchRow[];
   /** Of `filteredRows`, for the picked blueprint; null while none is picked. */
   summary: BpcPriceSummary | null;
@@ -219,7 +219,7 @@ export function prepareBpcOffers(data: BpcPrepareData, input: BpcPrepareInput): 
   return { spaceFilteredRows, spaceFilteredOriginals, typeOptions, nonTypeFilter, offerStats };
 }
 
-/** Stage 2: the type query's suggestions, per-source rows and precedence merge. */
+/** Stage 2: the type query's suggestions, per-source rows and the source-ordered merge. */
 export function rankBpcOffers(
   prepared: PreparedBpcOffers,
   data: BpcSourceData,
@@ -349,16 +349,17 @@ export function rankBpcOffers(
     if (best) bpoByType.set(typeId, best);
   }
 
-  // Owned rows lead, then the BPO sources, ahead of the synced contract
-  // snapshot, which can run to six figures while the others number in the
-  // dozens. An owned blueprint beats a Community Offer (free), which beats
-  // any priced offer.
+  // The order here is the table's hidden secondary sort. The panel's sort
+  // (and `DataTable`'s own) is stable, so whichever column the pilot sorts by,
+  // rows that tie on it fall back to this order: owned, then Community, then
+  // LP store, then market and contracts (the synced snapshot can run to six
+  // figures while the others number in the dozens).
   const displayRows: BpcSearchRow[] = [
     ...(sources.has('owned') ? filteredOwnedRows : []),
     ...(sources.has('community') ? communitySearchRows : []),
+    ...(sources.has('lp') ? lpSearchRows : []),
     ...(sources.has('market') ? filteredMarketRows : []),
     ...(sources.has('contractBpo') ? contractBpoSearchRows : []),
-    ...(sources.has('lp') ? lpSearchRows : []),
     ...(sources.has('contract') ? contractSearchRows : []),
   ];
 

@@ -1384,7 +1384,9 @@ export function BpcSourcingPanel() {
   const sortProps = useUrlSort(BPC_SOURCING_SORT_KEY, OFFERS_DEFAULT_SORT, sortColumnIds);
   // The top `RESULT_LIMIT` rows by the table's own sort (`sortRows` is the
   // rule `DataTable` sorts with), so the cap keeps the cheapest copies under
-  // the default Price sort, the nearest under Jumps, and so on.
+  // the default Price sort, the nearest under Jumps, and so on. The sort is
+  // stable, so ties keep `displayRows`' source order (the hidden secondary
+  // sort, `rankBpcOffers`); `DataTable`'s own re-sort preserves it too.
   const shownRows = useMemo(() => {
     const { columnId, direction } = sortProps.sort;
     const column =
