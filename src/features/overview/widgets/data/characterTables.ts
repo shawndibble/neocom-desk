@@ -224,9 +224,15 @@ export function contractsTable(
     columns: [
       { key: 'contract', label: t(`${W}.contracts.col.contract`), priority: 0 },
       { key: 'expires', label: t(`${W}.contracts.col.expires`), align: 'end', priority: 1 },
-      { key: 'status', label: t(`${W}.contracts.col.status`), priority: 2 },
+      { key: 'status', label: t(`${W}.contracts.col.status`), priority: 2, hideNarrow: true },
       { key: 'reward', label: t(`${W}.contracts.col.reward`), align: 'end', priority: 3 },
-      { key: 'collateral', label: t(`${W}.contracts.col.collateral`), align: 'end', priority: 4 },
+      {
+        key: 'collateral',
+        label: t(`${W}.contracts.col.collateral`),
+        align: 'end',
+        priority: 4,
+        hideNarrow: true,
+      },
     ],
     rows,
   };
