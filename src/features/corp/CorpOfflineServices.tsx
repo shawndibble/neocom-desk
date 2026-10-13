@@ -43,10 +43,17 @@ export function CorpOfflineServices({ items }: CorpOfflineServicesProps) {
         three-service outage the vertical weight of a reinforcement timer.
       */}
       <ul className="flex flex-wrap gap-1.5">
+        {/*
+          A chip never runs wider than the panel (#3675): ESI structure names
+          run to ~60 characters, wider than a phone's panel, and a wrap
+          container only breaks between chips. So the chip caps at the row and
+          the name wraps inside it; `min-h-7` keeps a short name's chip the
+          same single 28px line it always was.
+        */}
         {items.map((item) => (
           <li
             key={item.id}
-            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-xs bg-panel-2 px-2.5 text-[0.6875rem] whitespace-nowrap"
+            className="inline-flex min-h-7 max-w-full min-w-0 items-center gap-1.5 rounded-xs bg-panel-2 px-2.5 py-1 text-[0.6875rem]"
           >
             {/*
               Decorative: the severity's name is the visible text beside it
@@ -58,8 +65,8 @@ export function CorpOfflineServices({ items }: CorpOfflineServicesProps) {
               size={Icon.ICON_SIZE.sm}
               className="shrink-0 text-warning"
             />
-            <span className="text-text-dim">{item.subject}</span>
-            <span>{structureStateLabel(item.detail)}</span>
+            <span className="min-w-0 text-text-dim wrap-anywhere">{item.subject}</span>
+            <span className="shrink-0 whitespace-nowrap">{structureStateLabel(item.detail)}</span>
           </li>
         ))}
       </ul>

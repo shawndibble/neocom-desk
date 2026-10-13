@@ -61,8 +61,16 @@ function makeAccessTokenWithCorpScopes(): string {
 
 const LONG_NAME = 'Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha';
 
-/** Logs in with the corp scopes granted, mocks one structure called `name`, and opens `/corp`. */
-async function openCorpBoard(page: Page, name: string, structureCount = 1): Promise<void> {
+/**
+ * Logs in with the corp scopes granted, mocks one structure called `name`, and opens `/corp`.
+ * `services` rides on every mocked structure (ESI's own `{ name, state }` shape).
+ */
+async function openCorpBoard(
+  page: Page,
+  name: string,
+  structureCount = 1,
+  services: readonly { name: string; state: string }[] = []
+): Promise<void> {
   // Registered after `installSsoMock` (the `page` fixture's own setup), so
   // Playwright tries this one first: same endpoint, a token carrying the
   // corp scope group too.
@@ -108,6 +116,7 @@ async function openCorpBoard(page: Page, name: string, structureCount = 1): Prom
           // instead of truncating — a short name would never surface it.
           name: index === 0 ? name : `${name} ${index + 1}`,
           fuel_expires: new Date(Date.now() + (index + 2) * 86_400_000).toISOString(),
+          services,
         }))
       );
     }
@@ -121,7 +130,9 @@ async function openCorpBoard(page: Page, name: string, structureCount = 1): Prom
   await expect(page).toHaveURL(/\/overview$/);
 
   await page.goto('./corp');
-  await expect(page.getByText(name, { exact: true })).toBeVisible();
+  // `.first()`: an offline service names its structure a second time, in
+  // the Offline services chip.
+  await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
 }
 
 test.describe('corp ops board — 320px width', () => {
@@ -230,3 +241,33 @@ for (const width of [390, 1024, 1280]) {
     });
   });
 }
+
+test.describe('corp Offline services chip — long structure name (#3675)', () => {
+  for (const width of [320, 390]) {
+    test(`the chip stays inside its panel and the page does not overflow at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await openCorpBoard(page, LONG_NAME, 1, [{ name: 'Manufacturing', state: 'offline' }]);
+
+      const chip = page
+        .getByRole('heading', { name: 'Offline services' })
+        .locator('xpath=ancestor::section[1]')
+        .getByRole('listitem');
+      await expect(chip).toContainText(LONG_NAME);
+      await expect(chip.getByText('Manufacturing', { exact: true })).toBeVisible();
+
+      const { chipRight, panelRight } = await chip.evaluate((el) => ({
+        chipRight: el.getBoundingClientRect().right,
+        panelRight: el.closest('section')!.getBoundingClientRect().right,
+      }));
+      expect(chipRight).toBeLessThanOrEqual(panelRight + 1);
+
+      const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    });
+  }
+});
