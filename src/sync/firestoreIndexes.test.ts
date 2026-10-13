@@ -59,6 +59,9 @@ const EXTRA_INDEXED_FIELDS: Partial<Record<string, readonly string[]>> = {
   // `firedAt` indexed at COLLECTION_GROUP scope. Nothing filters on it within
   // a single collection, so that scope is the only one re-enabled.
   notificationFeed: ['firedAt'],
+  // The Community Fittings tab lists and clears a Character's own shares with
+  // `where('ownerUid', '==', uid)` (features/communities/sharedFittings.ts).
+  fittings: ['ownerUid'],
 };
 
 describe('firestore.indexes.json field overrides', () => {
