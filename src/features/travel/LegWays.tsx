@@ -28,7 +28,7 @@ import {
 import { cx } from '@/lib/cx';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { useIsPhone } from '@/lib/useIsPhone';
-import type { RouteHolesState } from './useRouteHoles';
+import type { RouteHolesState } from '@/features/route/useRouteHoles';
 import type { RouteSafetyLeg, RouteSafetyWay } from './useRouteSafety';
 
 const badgeClassName = 'rounded-xs px-1 text-[0.625rem] tracking-widest text-text-dim uppercase';

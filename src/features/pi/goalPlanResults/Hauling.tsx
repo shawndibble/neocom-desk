@@ -10,7 +10,7 @@ import { volumeOf } from '@/engine/pi/haulEffort';
 import { piTier as piTierOf } from '@/engine/pi/chain';
 import { PiProductLink } from '../PiProductLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
-import { JumpsLink } from '@/features/travel/JumpsLink';
+import { JumpsLink } from '@/features/route/JumpsLink';
 import { formatVolume } from '@/features/industry/format';
 import { TierChip } from '../DirectiveRow';
 import type { PlanHauling } from '../goalPlannerModel';

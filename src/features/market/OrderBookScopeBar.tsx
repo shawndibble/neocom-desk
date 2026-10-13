@@ -10,7 +10,7 @@
  * column is hidden then). Both bars read and write one `BrowserFilterValue`,
  * so they can never disagree.
  */
-import { JumpsLink } from '@/features/travel/JumpsLink';
+import { JumpsLink } from '@/features/route/JumpsLink';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {

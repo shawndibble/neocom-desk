@@ -44,7 +44,7 @@ import { enumParam, optionalEnumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { TheraFilters } from './TheraFilters';
 import { HUB_OPTIONS, SIZE_OPTIONS } from './theraOptions';
-import { routeViaHref } from './routeSafetyLink';
+import { routeViaHref } from '@/features/route/routeSafetyLink';
 import { TheraTable } from './TheraTable';
 import { useTheraConnections, type TheraConnectionsState } from './useTheraConnections';
 import type { TravelTabProps } from './travelTab';

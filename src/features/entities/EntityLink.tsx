@@ -22,7 +22,7 @@ import type { PlanEntry } from '@/engine/types';
 import { entityInfoHref, parseEntityInfo, type EntityInfoTarget } from '@/lib/entityInfo';
 import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
-import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { routeToHref } from '@/features/route/routeSafetyLink';
 import { ENTITY_INFO_PUSHED_STATE } from './entityInfoState';
 
 type AnchorProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'id'>;

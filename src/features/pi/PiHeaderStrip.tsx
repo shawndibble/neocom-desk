@@ -11,7 +11,7 @@ import {
   StatChips,
 } from '@/components/ui';
 import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
-import { routeExposure } from '@/features/contractSearch/routeExposure';
+import { routeExposure } from '@/features/route/routeExposure';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { useJumpBasis } from '@/features/route/jumpBasis';

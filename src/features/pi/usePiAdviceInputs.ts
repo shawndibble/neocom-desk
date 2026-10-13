@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import type { RouteSystem } from '@/engine/pi/planHaul';
-import { routeExposure } from '@/features/contractSearch/routeExposure';
+import { routeExposure } from '@/features/route/routeExposure';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { useCadence } from './cadencePref';
 import { loadCommandCenterUpgrades } from './colonyBudget';

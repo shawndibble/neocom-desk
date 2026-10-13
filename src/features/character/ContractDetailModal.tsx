@@ -41,7 +41,7 @@ import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { CharacterLink, CorporationLink, SystemLink } from '@/features/entities';
-import { resolvePlaceSystemId } from '@/features/travel/placeSystem';
+import { resolvePlaceSystemId } from '@/features/route/placeSystem';
 import { loadSystemName } from './systemSecurity';
 import { StandingTag } from './StandingTag';
 import { ContractReceiverLink } from './ContractReceiverLink';

@@ -13,7 +13,7 @@ vi.mock('./planetSlots', () => ({ loadInterplanetaryConsolidation: vi.fn(async (
 vi.mock('./planAdviceModel', () => ({ hubBooks: vi.fn(() => ({})) }));
 const BASIS = vi.hoisted(() => ({ rules: {}, network: {}, key: 'k', hydrated: true }));
 vi.mock('@/features/route/jumpBasis', () => ({ useJumpBasis: () => BASIS }));
-vi.mock('@/features/contractSearch/routeExposure', () => ({
+vi.mock('@/features/route/routeExposure', () => ({
   routeExposure: vi.fn(async () => ({ kind: 'unknown' })),
 }));
 

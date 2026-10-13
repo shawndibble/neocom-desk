@@ -19,7 +19,7 @@ import { useTicker } from '@/lib/ticker';
 import { DEFAULT_SECURITY_PENALTY, type RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { avoidListKey, effectiveAvoid } from '@/engine/route/avoidRules';
 import { EDENCOM_SYSTEMS, TRIGLAVIAN_MINOR_VICTORY_SYSTEMS } from '@/engine/route/invasionSystems';
-import { loadPodKills } from '@/features/travel/routeSafetyData';
+import { loadPodKills } from '@/features/route/routeSafetyData';
 import { useAvoidedSystems } from './avoidedSystems';
 import { ROUTE_PREFERENCES } from './routePreferences';
 

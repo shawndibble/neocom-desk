@@ -49,7 +49,11 @@ import type { RouteQuery, RouteRules } from '@/features/route/routeRules';
 import type { RouteJumpSetup } from '@/features/route/routeJumpSettings';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { useLawlessSystems } from './useLawlessSystems';
-import { loadRouteRegionNames, loadSystemActivity, type SystemActivity } from './routeSafetyData';
+import {
+  loadRouteRegionNames,
+  loadSystemActivity,
+  type SystemActivity,
+} from '@/features/route/routeSafetyData';
 import {
   bridgeEndsFromKey,
   bridgeKey,
@@ -57,7 +61,7 @@ import {
   holeNetworkKey,
   pinsFromKey,
   pinsKey,
-} from './routeSafetyKeys';
+} from '@/features/route/routeSafetyKeys';
 
 export type {
   RouteSafetyLeg,

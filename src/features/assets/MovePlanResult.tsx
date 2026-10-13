@@ -9,7 +9,7 @@ import {
   type CharacterScopeReadoutProps,
 } from '@/features/character/CharacterScopeReadout';
 import { useSystemName } from '@/features/route/useSolarSystems';
-import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { routeToHref } from '@/features/route/routeSafetyLink';
 import { firstConnected, useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatCubicMetres } from '@/lib/volume';
 import { createLocalSetting } from '@/lib/useLocalSetting';
