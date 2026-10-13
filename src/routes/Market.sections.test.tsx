@@ -67,8 +67,6 @@ const openOrder = {
   range: 'region',
 };
 
-const historyOrder = { ...openOrder, order_id: 2, state: 'expired' as const };
-
 const transactions = [
   {
     transaction_id: 1,
@@ -101,7 +99,7 @@ const server = setupServer(
     HttpResponse.json([openOrder])
   ),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders/history`, () =>
-    HttpResponse.json([historyOrder])
+    HttpResponse.json([])
   ),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, ({ request }) => {
     const fromId = new URL(request.url).searchParams.get('from_id');

@@ -50,9 +50,8 @@ export const ROUTE_REQUIREMENTS = {
   // Character-agnostic or locally-backed: nothing to gate.
   '/characters': UNGATED,
   // Market Browser itself is SDE + Fuzzwork only — no character endpoint. Its
-  // Open Orders and History tabs (formerly the separate `/orders` route and
-  // Wallet's Transactions tab) are each panel-gated the same way
-  // `/wallet` is below, so a missing grant only banners that tab rather than
+  // Open Orders and History tabs are each panel-gated the same way `/wallet`
+  // is below, so a missing grant only banners that tab rather than
   // hiding the scope-free Browser tab everyone can use.
   '/market': UNGATED,
   // Skill Plans are local, editable data. The ESI reads sharpen them — the

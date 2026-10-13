@@ -113,12 +113,9 @@ import {
 const ROW_CAP = 15;
 
 /**
- * The page's own top-level tabs: Market Browser plus a character's Open
- * orders and History — previously the separate `/orders` route (open
- * orders) and Wallet's Transactions tab. History is the character's wallet
- * fills; its old Ended orders view was dropped in #3692. Distinct from
- * `itemTab` below, which is the *selected item's* own Order Book / Price
- * History split and has nothing to do with this.
+ * The page's own top-level tabs: Browser, Open orders, Stock, History (the
+ * character's wallet fills), Appraisal. Distinct from `itemTab` below, the
+ * selected item's own Order Book / Price History split.
  */
 type MarketTab = (typeof MARKET_TABS.tabs)[number]['id'];
 

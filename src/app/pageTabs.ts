@@ -91,7 +91,7 @@ export const MINING_TABS = definePageTabs('/mining', [
 
 /**
  * `transactions` is not a tab Wallet shows: the Character's fills live on
- * Market's History › Transactions view, and the corporation's on
+ * Market's History tab, and the corporation's on
  * `/corp/wallet`. The entry exists only so an old `/wallet/transactions` link
  * reaches `Wallet.tsx`, which sends it on to Market, instead of `TabRoute`
  * bouncing it to Balance.
@@ -122,10 +122,6 @@ export const CONTRACTS_TABS = definePageTabs(
   'search/items'
 );
 
-/**
- * History is the character's wallet fills; old `/market/history/transactions`
- * links move there via `PAGE_LEGACY_LOCATIONS` (issue #3692).
- */
 export const MARKET_TABS = definePageTabs('/market', [
   { id: 'browser', labelKey: 'market.sections.browser' },
   { id: 'orders', labelKey: 'market.sections.openOrders' },
@@ -179,7 +175,7 @@ export const PAGE_LEGACY_LOCATIONS: Partial<
 /**
  * Hauling was a Market tab until #3526; it is a Travel tab now. LP Store was
  * one until #3527; it is a Wallet tab now, and a store's corporation id rides along.
- * History's Transactions view became History itself in #3692.
+ * `/market/history/transactions`, History's old Transactions view, is History now.
  */
 function legacyMarketLocation(
   pathname: string,

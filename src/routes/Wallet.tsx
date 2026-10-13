@@ -167,8 +167,8 @@ async function loadPersonalFills(characterId: number): Promise<PersonalFillsSnap
 /**
  * Wallet: the pilot's own ISK — balance and journal, for the active Character
  * or every Character (`?char=`). Read-only, cached for offline. Recent
- * transactions moved to Market's History tab, and the
- * corporation's wallet lives on `/corp/wallet` (it was a Personal /
+ * transactions live on Market's History tab, and the corporation's wallet
+ * lives on `/corp/wallet` (it was a Personal /
  * Corporation switch here once — see `routes/CorpWallet.tsx`).
  */
 export function Wallet() {

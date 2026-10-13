@@ -93,9 +93,7 @@ const transactionRowKey = (txn: WalletTransaction) => txn.transaction_id;
 /**
  * Market's History tab: a character's recent buy/sell fills. Personal only:
  * the corporation's fills live on `/corp/wallet`, beside the corp journal
- * they reconcile against. Same search / side / date filter bar as that
- * panel, a Sold / Bought / Net strip over the rows left, and a Margin column
- * priced from the character's own wallet buys.
+ * they reconcile against.
  */
 export function TransactionsPanel() {
   const { t } = useTranslation();
