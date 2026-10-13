@@ -43,6 +43,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
       id: 'name',
       header: t('fittings.appraisal.item'),
       className: 'min-w-32 break-words',
+      stickyStart: true,
       render: (row) => (
         <MarketItemLink typeId={row.typeId} className={entityLinkClassName()}>
           {row.name}
@@ -59,6 +60,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
     {
       id: 'unit',
       header: t('fittings.appraisal.unitPrice'),
+      phoneHidden: true,
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => isk(row.sellEach),
