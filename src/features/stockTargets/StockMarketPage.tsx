@@ -272,7 +272,7 @@ export function StockMarketPage({
           ‹ {t('stockTargets.markets.back')}
         </Link>
       )}
-      {/* One row at every width: a long name wraps in its own column, never under the actions. */}
+      {/* Name wraps in its own column, never under the actions. */}
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <h2
@@ -293,7 +293,7 @@ export function StockMarketPage({
         <Button variant="primary" onClick={() => setDialog('add')}>
           {t('stockTargets.add.open')}
         </Button>
-        {/* Rare actions share the one ⋮ (§6c header tier 3); it closes the cluster. */}
+        {/* Rare actions share one ⋮ (§6c header tier 3). */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconButton

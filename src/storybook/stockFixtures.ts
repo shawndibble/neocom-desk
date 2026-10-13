@@ -1,7 +1,7 @@
 /**
  * Market › Stock fixtures: three markets the sample pilot keeps stocked, the
- * sell orders and hangar stock behind them, and Jita prices. Pure data plus
- * the ESI and Fuzzwork routes that serve it.
+ * sell orders and hangar stock behind them, and Jita prices, plus the ESI and
+ * Fuzzwork routes that serve them.
  */
 import type { StockList } from '@/engine/stockTargets/stockLists';
 import type { CharacterAsset, CharacterBlueprint, MarketOrder } from '@/esi/endpoints';

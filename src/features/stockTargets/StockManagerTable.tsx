@@ -239,7 +239,7 @@ export function StockManagerTable({
             )}
           </span>
         ),
-      // The Shortfall, which this cell spells out as its two halves.
+      // Sorts by Shortfall; the cell shows it as its two halves.
       sortValue: (row) => row.shortfall,
     },
     {

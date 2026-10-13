@@ -188,7 +188,7 @@ export function StockBuilderView({
       render: (row) => row.toSource.toLocaleString(),
       sortValue: (row) => row.toSource,
     },
-    // Every row in the other table has no blueprint: the section heading says so once.
+    // Needs-blueprint table: no row has one; its heading says so.
     ...(withBlueprintColumns
       ? [
           {
@@ -286,7 +286,7 @@ export function StockBuilderView({
       ) : (
         <>
           <section aria-labelledby={`${headingId}-can`} className="space-y-2">
-            {/* The action sits on its section's heading line on desktop; a phone gets it full width under the lists. */}
+            {/* Desktop: on the heading line. Phone: full width under the lists. */}
             <div className="flex items-end gap-2">
               <h3 id={`${headingId}-can`} className={cx('flex-1', sectionHeadingClassName)}>
                 {t('stockTargets.builder.canBuild', { count: split.buildable.length })}
