@@ -18,8 +18,13 @@ import {
 import { focusRingClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { CommunityDetail } from '@/features/communities/CommunityDetail';
-import { COMMUNITY_TABS, INVITES_TAB_PARAM } from '@/features/communities/communityTabs';
-import { CONTENT_SCOPES } from '@/features/communities/contentScope';
+import { communityBadgeClassName } from '@/features/communities/communityBadge';
+import { communityInitials } from '@/features/communities/communityInitials';
+import {
+  COMMUNITY_TABS,
+  INVITES_TAB_PARAM,
+  MINE_VIEW_PARAM,
+} from '@/features/communities/communityTabs';
 import { CreateCommunityDialog } from '@/features/communities/CreateCommunityDialog';
 import {
   isCommunityAdmin,
@@ -30,14 +35,6 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 
 /** The switcher's "back to the list" value; no Community id can equal it. */
 const ALL = '__all';
-
-/** Two letters for the tile beside a Community's name: the first letters of its first two words. */
-function communityInitials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  return (
-    words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '?').slice(0, 2)
-  ).toUpperCase();
-}
 
 /**
  * Communities (issue #3597, ADR 0018): the Communities the active Character
@@ -127,8 +124,7 @@ export function Communities() {
   const selected = communities?.find((community) => community.id === selectedId) ?? null;
   const tabParam = params.get('tab');
   const initialTab = COMMUNITY_TABS.find((tab) => tab === tabParam);
-  const viewParam = params.get('view');
-  const initialScope = CONTENT_SCOPES.find((scope) => scope === viewParam);
+  const initialSharing = params.get('view') === MINE_VIEW_PARAM;
   const open = (id: string | null) => setParams(id ? { community: id } : {}, { replace: true });
 
   return (
@@ -136,17 +132,19 @@ export function Communities() {
       <PageHeader
         title={t('communities.title')}
         actions={
-          // Primary only while it is the one thing to do; once in a Community it steps back.
+          // Primary only while it is the one thing to do; once in a Community it
+          // steps back. Always md: level with the alerts bell beside it.
           <Button
             variant={communities?.length === 0 ? 'primary' : 'ghost'}
-            size={communities?.length === 0 ? 'md' : 'sm'}
+            aria-label={t('communities.createLabel')}
             onClick={() => setCreating(true)}
           >
             {t('communities.create')}
           </Button>
         }
       />
-      <p className="text-xs text-text-dim">{t('communities.intro')}</p>
+      {/* Inside a Community its own card says what it is; the intro is for the list. */}
+      {!selected && <p className="text-xs text-text-dim">{t('communities.intro')}</p>}
 
       {failed && selected && (
         <p role="alert" className="text-xs text-danger">
@@ -164,7 +162,7 @@ export function Communities() {
               scrollToDetail.current = id !== ALL && id !== selected.id;
             }}
           >
-            <SelectTrigger aria-label={t('communities.switch')} className="w-full">
+            <SelectTrigger aria-label={t('communities.switch')} className="w-full sm:w-72">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -214,9 +212,7 @@ export function Communities() {
                     </span>
                     {/* Only the exception is marked: every row is a Community the Character is a Member of. */}
                     {isCommunityAdmin(community, characterId) && (
-                      <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                        {t('communities.adminBadge')}
-                      </span>
+                      <span className={communityBadgeClassName}>{t('communities.adminBadge')}</span>
                     )}
                     <RowCaret />
                   </button>
@@ -233,7 +229,7 @@ export function Communities() {
             key={`${characterId}:${selected.id}`}
             community={selected}
             initialTab={initialTab}
-            initialScope={initialScope}
+            initialSharing={initialSharing}
             initialPanel={tabParam === INVITES_TAB_PARAM ? 'invites' : undefined}
             characterId={characterId}
             onChanged={() => refresh()}

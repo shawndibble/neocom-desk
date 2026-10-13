@@ -9,6 +9,7 @@ import { uidForCharacter } from '@/sync/uid';
 import type { CommunityMember } from './communityStore';
 import { ROW_LIMIT } from './shareLists';
 import { loadCommunityFittings } from './sharedFittings';
+import { useReportMineCount } from './useTabSharing';
 
 type State =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; fittings: SharedFitting[] };
@@ -23,16 +24,20 @@ export function CommunitySharedFittings({
   characterId,
   communityId,
   members,
+  onMineCount,
 }: {
   characterId: number;
   communityId: string;
   /** For the sharer's name; null while the roster loads. */
   members: readonly CommunityMember[] | null;
+  /** How many of the listed Fittings are this Character's, once loaded (the tab's sharing line). */
+  onMineCount?: (count: number) => void;
 }) {
   const { t } = useTranslation();
   const [state, setState] = useState<State>({ status: 'loading' });
   const [query, setQuery] = useState('');
   const myUid = uidForCharacter(characterId);
+  useReportMineCount(state.status === 'ready' ? state.fittings : null, myUid, onMineCount);
 
   useEffect(() => {
     let cancelled = false;

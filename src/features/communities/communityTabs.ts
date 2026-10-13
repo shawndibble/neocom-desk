@@ -1,5 +1,10 @@
 export type CommunityTab = 'blueprints' | 'fittings' | 'plans' | 'members';
 
+/** The Community tabs that hold shared content, each with its own My sharing. */
+export type ContentTab = Exclude<CommunityTab, 'members'>;
+
+export const isContentTab = (tab: CommunityTab): tab is ContentTab => tab !== 'members';
+
 /** The tabs a `?tab=` link may open on, in the order the bar shows them. */
 export const COMMUNITY_TABS: readonly CommunityTab[] = [
   'blueprints',
@@ -13,3 +18,9 @@ export const COMMUNITY_TABS: readonly CommunityTab[] = [
  * Manage › Invites, so an old link still lands on the invite controls.
  */
 export const INVITES_TAB_PARAM = 'invites';
+
+/**
+ * `?view=mine` opened the old Mine view of the tab it came with. It now opens
+ * that tab's My sharing, so an old link still lands on the share controls.
+ */
+export const MINE_VIEW_PARAM = 'mine';

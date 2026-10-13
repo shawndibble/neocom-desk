@@ -12,12 +12,11 @@ import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { isLibraryStale } from '@/engine/communities/sharedLibrary';
 import { formatAge } from '@/lib/age';
 import { characterIdForUid } from '@/sync/uid';
+import { communityBadgeClassName } from './communityBadge';
 import type { CommunityMember } from './communityStore';
 
 /** Above this many Members a name filter earns its row; a short roster is read at a glance. */
 const FILTER_FROM = 8;
-
-const BADGE = 'rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim';
 
 /**
  * The Members tab's roster: a portrait, the name and when their library was
@@ -91,8 +90,12 @@ export function CommunityMemberList({
                     </span>
                   )}
                 </span>
-                {stale && <span className={BADGE}>{t('communities.staleBadge')}</span>}
-                {isAdminRow && <span className={BADGE}>{t('communities.adminBadge')}</span>}
+                {stale && (
+                  <span className={communityBadgeClassName}>{t('communities.staleBadge')}</span>
+                )}
+                {isAdminRow && (
+                  <span className={communityBadgeClassName}>{t('communities.adminBadge')}</span>
+                )}
                 {isAdmin && !isAdminRow && <RowMoreActions />}
               </li>
             );

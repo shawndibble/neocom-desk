@@ -18,6 +18,20 @@ describe('Tabs', () => {
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
   });
 
+  it('names a counted tab with its count', () => {
+    render(
+      <Tabs
+        tabsId="t"
+        label="Community"
+        tabs={[...tabs, { id: 'members', label: 'Members', count: 12 }]}
+        value="open"
+        onChange={() => undefined}
+      />
+    );
+    expect(screen.getByRole('tab', { name: 'Members 12' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Open' })).toBeInTheDocument();
+  });
+
   it('calls onChange on click', async () => {
     const onChange = vi.fn();
     render(<Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={onChange} />);

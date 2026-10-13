@@ -7,7 +7,6 @@ import en from '@/i18n/locales/en.json';
 import { db } from '@/db';
 import { configureClipboard } from '@/lib/clipboard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { CONTENT_SCOPE_KEY, useContentScopes } from '@/features/communities/contentScope';
 import { Communities } from './Communities';
 
 const store = vi.hoisted(() => ({
@@ -31,7 +30,7 @@ vi.mock('@/features/communities/communityStore', async (importOriginal) => ({
 }));
 vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn() }));
 // The content views have their own tests; here each is a marker, so the page's
-// own structure (tabs, Everyone / Mine, Manage) is what is under test.
+// own structure (tabs, the sharing line, My sharing, Manage) is what is under test.
 vi.mock('@/features/communities/CommunityLibrary', () => ({
   CommunityLibrary: () => <p>everyone-blueprints</p>,
 }));
@@ -113,10 +112,6 @@ async function seed() {
   store.loadJoinRequests.mockResolvedValue([]);
   await db.characters.clear();
   await db.settings.clear();
-  useContentScopes.setState({
-    value: { blueprints: 'everyone', fittings: 'everyone', plans: 'everyone' },
-    hydrated: false,
-  });
   await db.characters.put({ characterId: ME, name: 'Me', ownerHash: 'h', addedAt: 1 });
   useActiveCharacter.setState({ activeCharacterId: ME, hydrated: true });
 }
@@ -150,7 +145,7 @@ describe('Communities page', () => {
     store.loadMyCommunities.mockResolvedValueOnce([]).mockResolvedValue([community()]);
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole('button', { name: c.create }));
+    await user.click(await screen.findByRole('button', { name: c.createLabel }));
     await user.type(screen.getByLabelText(c.nameLabel), '  Pals ');
     await user.click(screen.getByRole('button', { name: c.createAction }));
     await waitFor(() => expect(store.createCommunity).toHaveBeenCalledWith(ME, 'Pals', 'Me'));
@@ -161,7 +156,7 @@ describe('Communities page', () => {
     store.createCommunity.mockRejectedValue({ code: 'functions/resource-exhausted' });
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole('button', { name: c.create }));
+    await user.click(await screen.findByRole('button', { name: c.createLabel }));
     await user.type(screen.getByLabelText(c.nameLabel), 'Pals');
     await user.click(screen.getByRole('button', { name: c.createAction }));
     expect(await screen.findByRole('alert')).toHaveTextContent(c.tooMany);
@@ -271,7 +266,7 @@ describe('Communities page', () => {
       store.removeMember.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
-      await user.click(await screen.findByRole('tab', { name: en.communities.members }));
+      await user.click(await screen.findByRole('tab', { name: /^Members/ }));
       await screen.findByText('Friend');
       expect(screen.getAllByRole('button', { name: /More actions/ })).toHaveLength(1);
       await user.click(screen.getByRole('button', { name: /More actions/ }));
@@ -285,7 +280,7 @@ describe('Communities page', () => {
       store.transferAdmin.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
-      await user.click(await screen.findByRole('tab', { name: en.communities.members }));
+      await user.click(await screen.findByRole('tab', { name: /^Members/ }));
       await screen.findByText('Friend');
       await user.click(screen.getByRole('button', { name: /More actions/ }));
       await user.click(await screen.findByRole('menuitem', { name: /Make Friend admin/ }));
@@ -325,43 +320,60 @@ describe('Communities page', () => {
       store.loadMyCommunities.mockResolvedValue([community()]);
     });
 
-    it('opens on the Blueprints Community Library, Everyone first', async () => {
+    it('opens on the Blueprints Community Library, with the Member count on its tab', async () => {
       renderPage('/communities?community=c1');
       expect(await screen.findByText('everyone-blueprints')).toBeInTheDocument();
-      const everyone = screen.getByRole('button', { name: c.scope.everyone });
-      expect(everyone).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByText('mine-blueprints')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Pals' })).toBeInTheDocument();
       expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
         c.tabs.blueprints,
         c.tabs.fittings,
         c.tabs.plans,
-        c.members,
+        `${c.members} 2`,
       ]);
+      expect(await screen.findByText(c.sharing.blueprintsNone)).toBeInTheDocument();
     });
 
-    it('switches a tab to Mine and remembers the pick for that tab only', async () => {
+    it('says when every blueprint is shared, from the choice on this device', async () => {
+      await db.settings.put({ key: `communityShare:${ME}:c1:all`, value: [] });
+      renderPage('/communities?community=c1');
+      expect(await screen.findByText(c.sharing.blueprintsAll)).toBeInTheDocument();
+    });
+
+    it('opens My sharing for the tab over its list, and closes it', async () => {
       const user = userEvent.setup();
-      const view = renderPage('/communities?community=c1&tab=fittings');
+      renderPage('/communities?community=c1&tab=fittings');
       expect(await screen.findByText('everyone-fittings')).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: c.scope.mine }));
-      expect(await screen.findByText('mine-fittings')).toBeInTheDocument();
-      await waitFor(async () =>
-        expect((await db.settings.get(CONTENT_SCOPE_KEY))?.value).toEqual({
-          blueprints: 'everyone',
-          fittings: 'mine',
-          plans: 'everyone',
-        })
+      await user.click(screen.getByRole('button', { name: c.sharing.open }));
+      const panel = await screen.findByRole('dialog', { name: c.sharing.title });
+      expect(within(panel).getByText('mine-fittings')).toBeInTheDocument();
+      expect(within(panel).getByText(`${c.tabs.fittings} in Pals`)).toBeInTheDocument();
+      // The list stays on the page under it.
+      expect(screen.getByText('everyone-fittings')).toBeInTheDocument();
+      await user.click(within(panel).getByRole('button', { name: en.common.close }));
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: c.sharing.title })).not.toBeInTheDocument()
+      );
+      expect(await screen.findByText('everyone-fittings')).toBeInTheDocument();
+    });
+
+    it('closes My sharing on the way to Members, which has none', async () => {
+      const user = userEvent.setup();
+      renderPage('/communities?community=c1&tab=plans&view=mine');
+      await screen.findByRole('dialog', { name: c.sharing.title });
+      await user.click(screen.getByRole('tab', { name: /^Members/ }));
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: c.sharing.title })).not.toBeInTheDocument()
       );
       await user.click(screen.getByRole('tab', { name: c.tabs.plans }));
       expect(await screen.findByText('everyone-plans')).toBeInTheDocument();
-      view.unmount();
-
-      renderPage('/communities?community=c1&tab=fittings');
-      expect(await screen.findByText('mine-fittings')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: c.sharing.title })).not.toBeInTheDocument();
     });
 
-    it('opens on Mine from a ?view=mine link', async () => {
+    it('opens My sharing from an old ?view=mine link', async () => {
       renderPage('/communities?community=c1&tab=plans&view=mine');
-      expect(await screen.findByText('mine-plans')).toBeInTheDocument();
+      const panel = await screen.findByRole('dialog', { name: c.sharing.title });
+      expect(within(panel).getByText('mine-plans')).toBeInTheDocument();
     });
 
     it('opens Manage › Invites from an old ?tab=invites link, then drops the param', async () => {
@@ -466,9 +478,9 @@ describe('Communities page', () => {
       store.leaveCommunity.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
-      await screen.findByRole('tab', { name: c.members });
+      await screen.findByRole('tab', { name: /^Members/ });
       expect(screen.queryByRole('button', { name: /^Manage/ })).not.toBeInTheDocument();
-      await user.click(await screen.findByRole('tab', { name: en.communities.members }));
+      await user.click(await screen.findByRole('tab', { name: /^Members/ }));
       await screen.findByText('Friend');
       expect(screen.queryByRole('button', { name: c.copyLink })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();

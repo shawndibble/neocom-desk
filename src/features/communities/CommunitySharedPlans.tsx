@@ -12,6 +12,7 @@ import { uidForCharacter } from '@/sync/uid';
 import type { CommunityMember } from './communityStore';
 import { loadCommunityPlans } from './sharedPlans';
 import { SharedPlanList, type SharedPlanRow } from './SharedPlanList';
+import { useReportMineCount } from './useTabSharing';
 
 type State =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; plans: SharedPlan[] };
@@ -26,11 +27,14 @@ export function CommunitySharedPlans({
   characterId,
   communityId,
   members,
+  onMineCount,
 }: {
   characterId: number;
   communityId: string;
   /** For the sharer's name; null while the roster loads. */
   members: readonly CommunityMember[] | null;
+  /** How many of the listed plans are this Character's, once loaded (the tab's sharing line). */
+  onMineCount?: (count: number) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -38,6 +42,7 @@ export function CommunitySharedPlans({
   const copying = useRef(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const myUid = uidForCharacter(characterId);
+  useReportMineCount(state.status === 'ready' ? state.plans : null, myUid, onMineCount);
 
   useEffect(() => {
     let cancelled = false;

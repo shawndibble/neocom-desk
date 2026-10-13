@@ -12,6 +12,11 @@ import {
 export interface TabItem {
   id: string;
   label: string;
+  /**
+   * How many things the tab holds (a Community's Members), in a round badge
+   * after the label (§6c). Part of the tab's name, never a control or a status.
+   */
+  count?: number;
 }
 
 interface TabPanelProps {
@@ -148,6 +153,18 @@ export function Tabs({
               )}
             >
               {tab.label}
+              {/* The space keeps the name "Members 12"; a flex item, it draws nothing. */}
+              {tab.count !== undefined && ' '}
+              {tab.count !== undefined && (
+                <span
+                  className={cx(
+                    'ml-1.5 inline-grid h-4.5 min-w-4.5 place-items-center rounded-full border px-1 text-[0.625rem] tracking-normal tabular-nums',
+                    active ? 'border-accent-dim text-text' : 'border-line-bright'
+                  )}
+                >
+                  {tab.count}
+                </span>
+              )}
             </button>
           );
         })}

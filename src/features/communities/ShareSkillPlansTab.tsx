@@ -23,7 +23,7 @@ function namedLike(plans: readonly SkillPlanRecord[], needle: string): SkillPlan
 }
 
 /**
- * The Skill plans tab's Mine view: what this Character shares, one row per
+ * The Skill plans tab's My sharing: what this Character shares, one row per
  * plan with Stop sharing, and Add Skill plans for the rest. Unlike Blueprints and
  * Fittings there is no "share all": each plan is shared by hand, so the page
  * never offers more than the plans the Member picks. A shared plan follows its

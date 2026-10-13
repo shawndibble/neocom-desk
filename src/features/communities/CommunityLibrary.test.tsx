@@ -59,12 +59,18 @@ beforeAll(async () => {
   renderLibrary().unmount();
 }, 30_000);
 
+/** Picks a view from the Show select. */
+async function pickView(user: ReturnType<typeof userEvent.setup>, label: string) {
+  await user.click(await screen.findByRole('combobox', { name: l.filterLabel }));
+  await user.click(await screen.findByRole('option', { name: new RegExp(label) }));
+}
+
 describe('CommunityLibrary', () => {
   it('opens on each shared blueprint with its owner, place, ME / TE and runs', async () => {
     renderLibrary();
-    expect(
-      await screen.findByRole('button', { name: new RegExp(l.shared), pressed: true })
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: l.filterLabel })).toHaveTextContent(
+      l.shared
+    );
     const rows = within(screen.getByRole('table', { name: l.sharedLabel }))
       .getAllByRole('row')
       .slice(1)
@@ -89,7 +95,7 @@ describe('CommunityLibrary', () => {
   it('missing from the Community lists what nobody holds', async () => {
     const user = userEvent.setup();
     renderLibrary();
-    await user.click(await screen.findByRole('button', { name: new RegExp(l.missingCommunity) }));
+    await pickView(user, l.missingCommunity);
     await user.click(await screen.findByRole('button', { name: /Ships/ }));
     expect(screen.getByText('Merlin Blueprint')).toBeInTheDocument();
     expect(screen.queryByText('Rifter Blueprint')).not.toBeInTheDocument();
@@ -98,7 +104,7 @@ describe('CommunityLibrary', () => {
   it('missing from me lists what others hold, with the stale Member marked', async () => {
     const user = userEvent.setup();
     renderLibrary();
-    await user.click(await screen.findByRole('button', { name: new RegExp(l.missingFromMe) }));
+    await pickView(user, l.missingFromMe);
     await user.click(screen.getByRole('button', { name: /Ships/ }));
     expect(screen.getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(screen.queryByText('Merlin Blueprint')).not.toBeInTheDocument();
@@ -112,5 +118,10 @@ describe('CommunityLibrary', () => {
     renderLibrary();
     const link = await screen.findByRole('link', { name: en.communities.blueprints.browse });
     expect(link).toHaveAttribute('href', '/industry/sourcing?sourcing.src=community%2Cowned');
+    // What BPC Sourcing holds is a tooltip beside it, not a sentence on the page.
+    expect(
+      screen.getByRole('button', { name: en.communities.blueprints.browseAbout })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(en.communities.blueprints.browseHint)).not.toBeInTheDocument();
   });
 });

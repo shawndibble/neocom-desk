@@ -33,6 +33,18 @@ type Story = StoryObj<typeof meta>;
 /** @summary Two peer views on one page; the selected tab has an accent underline. */
 export const Basic: Story = {};
 
+/** @summary A tab that holds a countable list shows how many in a round badge after its label. */
+export const WithCount: Story = {
+  args: {
+    tabs: [
+      { id: 'blueprints', label: 'Blueprints' },
+      { id: 'members', label: 'Members', count: 12 },
+    ],
+    value: 'blueprints',
+    label: 'Community',
+  },
+};
+
 /** @summary More tabs than fit: the bar scrolls sideways instead of squeezing. Shown at 390 wide. */
 export const OverflowOnPhone: Story = {
   args: {
