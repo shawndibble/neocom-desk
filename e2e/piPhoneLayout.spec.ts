@@ -33,12 +33,10 @@ async function box(locator: Locator) {
 }
 
 test.describe('PI phone layout', () => {
-  test('Plan: "What matters more?" sits below the "Your planets" heading, not on it', async ({
-    page,
-  }) => {
+  test('Plan: "What matters more?" sits below the summary heading, not on it', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await open(page, 'plan');
-    const heading = page.getByRole('heading', { name: 'Your planets' });
+    const heading = page.getByRole('heading', { name: 'What you could add' });
     await expect(heading).toBeVisible({ timeout: 20_000 });
     const toggle = page.getByRole('group', { name: 'What matters more?' });
     const h = await box(heading);

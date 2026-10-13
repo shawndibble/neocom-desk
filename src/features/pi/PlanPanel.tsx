@@ -1,14 +1,13 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Panel, Spinner, TypeIcon } from '@/components/ui';
+import { EmptyState, Panel, Spinner } from '@/components/ui';
 import {
   disabledClassName,
   focusRingInsetClassName,
   rowInteractiveClassName,
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
-import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useUrlParam } from '@/lib/useUrlState';
 import { EsiDidntAnswer } from './EsiDidntAnswer';
@@ -17,7 +16,6 @@ import { FindBestPlan } from './FindBestPlan';
 import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel';
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
-import { PlanetImage } from './PlanetImage';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import {
   openingQuestion,
@@ -31,23 +29,19 @@ interface Props extends GoalPlannerPanelProps {
   seedingGoal: boolean;
 }
 
-/** Item icons the second question's tile shows: Ionic Solutions (P0) and Coolant (P2). */
-const FIND_BEST_ICONS = [2309, 9832] as const;
-
 function Option({
   selected,
   onSelect,
-  art,
   title,
-  hint,
+  note,
   unavailable = false,
 }: {
   unavailable?: boolean;
   selected: boolean;
   onSelect: () => void;
-  art: ReactNode;
   title: string;
-  hint: string;
+  /** Why an unavailable option can't be picked, beside its title. */
+  note?: string;
 }) {
   return (
     <button
@@ -57,24 +51,16 @@ function Option({
       onClick={unavailable ? undefined : onSelect}
       className={cx(
         unavailable && disabledClassName,
-        'flex min-h-16 min-w-0 items-center gap-3 border-l-2 px-3 py-3 text-left',
+        'flex min-h-11 min-w-0 items-center gap-2 border-l-2 px-3 py-2 text-left md:min-h-10',
         rowInteractiveClassName,
         focusRingInsetClassName,
         selected ? selectedRowClassName : 'border-l-transparent'
       )}
     >
-      <span className="flex shrink-0 items-center -space-x-2">{art}</span>
-      <span className="min-w-0 flex-1">
-        <span className={cx('block text-sm font-semibold', selected ? 'text-accent' : 'text-text')}>
-          {title}
-        </span>
-        <span className="block text-xs text-text-dim">{hint}</span>
+      <span className={cx('min-w-0 text-sm font-semibold', selected ? 'text-accent' : 'text-text')}>
+        {title}
       </span>
-      <Icon.Descend
-        size={Icon.ICON_SIZE.sm}
-        aria-hidden="true"
-        className="shrink-0 text-text-faint"
-      />
+      {note && <span className="min-w-0 truncate text-xs text-text-dim">{note}</span>}
     </button>
   );
 }
@@ -87,6 +73,7 @@ function Option({
 export function PlanPanel(props: Props) {
   const { t } = useTranslation();
   const { characterId, goals, seedingGoal } = props;
+  const pickerHeadingId = useId();
   const [loaded, setLoaded] = useState<{
     characterId: number;
     snapshot: GoalPlannerSnapshot;
@@ -150,7 +137,6 @@ export function PlanPanel(props: Props) {
   const wanted = picked ?? opening.question;
   // The URL may still say make-more; the view shows Find best until the colonies can be read.
   const question = unknown && wanted === 'make-more' ? 'find-best' : wanted;
-  const colonyTypes = snapshot.colonies.map((colony) => colony.planet_type);
 
   return (
     <div className="space-y-4">
@@ -165,7 +151,11 @@ export function PlanPanel(props: Props) {
         />
       )}
       <div ref={resultRef} tabIndex={-1} className="space-y-4 outline-none">
-        <Panel title={t('piPlan.picker.title')} padded={false}>
+        <Panel padded={false}>
+          {/* The picker reads as one compact row; its heading stays for screen readers. */}
+          <h2 id={pickerHeadingId} className="sr-only">
+            {t('piPlan.picker.title')}
+          </h2>
           <div
             role="group"
             aria-label={t('piPlan.picker.title')}
@@ -175,66 +165,40 @@ export function PlanPanel(props: Props) {
               selected={question === 'make-more'}
               unavailable={unknown}
               onSelect={() => setPicked('make-more')}
-              art={
-                colonyCount > 0 ? (
-                  colonyTypes
-                    .slice(0, 6)
-                    .map((type, i) => (
-                      <PlanetImage
-                        key={i}
-                        type={type}
-                        size={32}
-                        className="rounded-full ring-2 ring-panel"
-                      />
-                    ))
-                ) : (
-                  <PlanetImage type="barren" size={32} />
-                )
-              }
               title={t('piPlan.picker.makeMore')}
-              hint={
-                unknown
-                  ? t('piPlan.picker.makeMoreUnknown')
-                  : colonyCount > 0
-                    ? t('piPlan.picker.makeMoreHint', { count: colonyCount })
-                    : t('piPlan.picker.makeMoreNone')
-              }
+              note={unknown ? t('piPlan.picker.makeMoreUnknown') : undefined}
             />
             <Option
               selected={question === 'find-best'}
               onSelect={() => setPicked('find-best')}
-              art={
-                <>
-                  <PlanetImage type="gas" size={32} />
-                  {FIND_BEST_ICONS.map((id) => (
-                    <TypeIcon key={id} typeId={id} size={32} width={28} height={28} />
-                  ))}
-                </>
-              }
               title={t('piPlan.picker.findBest')}
-              hint={t('piPlan.picker.findBestHint')}
             />
             <Option
               selected={question === 'product'}
               onSelect={() => setPicked('product')}
-              art={
-                <Icon.Search
-                  size={Icon.ICON_SIZE.lg}
-                  aria-hidden="true"
-                  className="text-text-dim"
-                />
-              }
               title={t('piPlan.picker.product')}
-              hint={t('piPlan.picker.productHint')}
             />
           </div>
-          {picked === null && !esiFailed && (
-            <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-              {t(`piPlan.picker.opened.${unknown ? 'unknown' : opening.reason}`, {
-                count: colonyCount,
-              })}
-            </p>
-          )}
+          {/* Why this question opened, until the pilot picks; then what the picked one does. */}
+          <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
+            {picked === null && !esiFailed ? (
+              <span>
+                {t(`piPlan.picker.opened.${unknown ? 'unknown' : opening.reason}`, {
+                  count: colonyCount,
+                })}
+              </span>
+            ) : question === 'make-more' ? (
+              colonyCount > 0 ? (
+                t('piPlan.picker.makeMoreHint', { count: colonyCount })
+              ) : (
+                t('piPlan.picker.makeMoreNone')
+              )
+            ) : question === 'find-best' ? (
+              t('piPlan.picker.findBestHint')
+            ) : (
+              t('piPlan.picker.productHint')
+            )}
+          </p>
         </Panel>
         {question === 'make-more' && (
           <MakeMorePlan

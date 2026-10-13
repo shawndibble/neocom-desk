@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -253,6 +253,8 @@ describe('MakeMorePlan', () => {
 
   it('says Change for a rebuild and Keep for a colony already on its best', () => {
     renderPlan();
+    expect(screen.queryByText(/Keep Uttindar II/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /1 planet stays as it is/ }));
     const cards = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'));
     expect(cards).toHaveLength(2);
     expect(cards[0]).toHaveTextContent(/Change Hek VI \(Barren\) to make/);
@@ -260,7 +262,7 @@ describe('MakeMorePlan', () => {
     expect(cards[0]).toHaveTextContent(/Rebuild/);
     expect(cards[1]).toHaveTextContent(/Keep Uttindar II \(Barren\) on/);
     expect(cards[1]).toHaveTextContent(/already the best earner/);
-    expect(cards[1]).toHaveTextContent(/As-is/);
+    expect(cards[1]).not.toHaveTextContent(/As-is/);
   });
 
   it('never says Keep on raw ore: a raw-only colony points at the refinement when there is one', () => {
@@ -284,6 +286,7 @@ describe('MakeMorePlan', () => {
     const cardFor = (colony: typeof keeping) => {
       mockState = ready({ ...fixtureAdvice, colonies: [changing, colony] });
       const { unmount } = renderPlan();
+      fireEvent.click(screen.getByRole('button', { name: /1 planet stays as it is/ }));
       const card = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'))[1];
       const text = card.textContent ?? '';
       unmount();

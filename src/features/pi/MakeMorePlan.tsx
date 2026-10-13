@@ -11,6 +11,7 @@ import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import {
   ChecklistPanel,
   HaulingPanel,
+  PlanSummaryPanel,
   QuickWinsPanel,
   RebuildPanel,
   YourPlanetsPanel,
@@ -170,14 +171,11 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
       />
       <IskFigureGroup>
-        <YourPlanetsPanel
+        <PlanSummaryPanel
           view={view}
           preference={preference}
           onPreference={(value) => void setPreference(value)}
-          onFindBest={onFindBest}
           priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
-          haulBetween={haulBetween}
-          onHaulBetween={(on) => void setPiSettings(withHaulBetweenPlanets(piSettings, on))}
         />
       </IskFigureGroup>
       {view.quickWins.length > 0 && (
@@ -187,6 +185,14 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
       )}
       <IskFigureGroup>
         <RebuildPanel view={view} />
+      </IskFigureGroup>
+      <IskFigureGroup>
+        <YourPlanetsPanel
+          view={view}
+          onFindBest={onFindBest}
+          haulBetween={haulBetween}
+          onHaulBetween={(on) => void setPiSettings(withHaulBetweenPlanets(piSettings, on))}
+        />
       </IskFigureGroup>
       {haulBetween && (
         <IskFigureGroup>

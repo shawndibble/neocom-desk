@@ -9,9 +9,11 @@
  */
 import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import {
   Caret,
   Checkbox,
+  Disclosure,
   IskAmount,
   Panel,
   SegmentedControl,
@@ -104,30 +106,28 @@ function Hero({ value, caption }: { value: number; caption: ReactNode }) {
   );
 }
 
-export function YourPlanetsPanel({
+/**
+ * The plan in one glance: what the quick wins and a rebuild would add, the
+ * before/after figures, and the "What matters more?" switch that reshapes the
+ * rebuilds. It sits above the quick wins so the to-do list starts high.
+ */
+export function PlanSummaryPanel({
   view,
   preference,
   onPreference,
-  onFindBest,
   priceSource,
-  haulBetween,
-  onHaulBetween,
 }: {
   view: PlanView;
   preference: RebuildPreference;
   onPreference: (value: RebuildPreference) => void;
-  onFindBest: () => void;
   priceSource: string;
-  haulBetween: boolean;
-  onHaulBetween: (on: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const haulHintId = useId();
   const mdUp = useMediaQuery(MD_UP);
   const smUp = useMediaQuery(SM_UP);
   const { headline, stats } = view;
   // Beside the title from `sm`; on its own row under it below, where the
-  // header has no room and the label printed over the "Your planets" title.
+  // header has no room and the label printed over the title.
   const mattersToggle = (
     <span className="flex flex-wrap items-center justify-end gap-2">
       <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -147,21 +147,13 @@ export function YourPlanetsPanel({
   );
   return (
     <Panel
-      title={t('piPlan.make.planetsTitle')}
-      meta={
-        <span className="text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
-          {t('piPlan.make.planetsCount', {
-            used: view.slots.used,
-            allowed: Math.max(view.slots.allowed, view.slots.used),
-          })}
-        </span>
-      }
+      title={t('piPlan.make.summaryTitle')}
       actions={smUp ? mattersToggle : undefined}
       padded={false}
     >
-      <div className="space-y-3 p-3">
+      <div className="space-y-2 p-3">
         {!smUp && <div data-testid="pi-matters-row">{mattersToggle}</div>}
-        <div className="flex flex-wrap gap-x-8 gap-y-3">
+        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
           {headline.quickWinPerDay > 0 || view.quickWins.length > 0 ? (
             <Hero
               value={headline.quickWinPerDay}
@@ -178,9 +170,8 @@ export function YourPlanetsPanel({
                 { count: headline.rebuildCount }
               )}
             />
-          ) : (
-            <p className="text-sm text-text-dim">{t('piPlan.make.noRebuild')}</p>
-          )}
+          ) : null}
+          {/* With no rebuild, the Rebuild panel right below says so. */}
         </div>
         <StatChips>
           <StatChip
@@ -218,25 +209,42 @@ export function YourPlanetsPanel({
         <p className="text-[0.6875rem] text-text-dim">
           {t('piPlan.make.basis', { source: priceSource })}
         </p>
-        <label className={cx('flex w-fit cursor-pointer items-start gap-2', tappableRowClassName)}>
-          <Checkbox
-            className="mt-0.5"
-            checked={haulBetween}
-            aria-labelledby={`${haulHintId}-label`}
-            aria-describedby={haulHintId}
-            onChange={(e) => onHaulBetween(e.target.checked)}
-          />
-          <span className="text-xs">
-            <span id={`${haulHintId}-label`} className="text-text">
-              {t('piPlan.chains.optIn')}
-            </span>
-            <span id={haulHintId} className="block text-[0.6875rem] text-text-dim">
-              {t('piPlan.chains.optInHint')}
-            </span>
-          </span>
-        </label>
       </div>
-      <ul className="grid grid-cols-2 border-t border-line md:grid-cols-3 xl:grid-cols-6">
+    </Panel>
+  );
+}
+
+/**
+ * Each colony at a glance, the "haul between my planets" opt-in and the free
+ * planet slots. Below the rebuilds: it is context, not the to-do.
+ */
+export function YourPlanetsPanel({
+  view,
+  onFindBest,
+  haulBetween,
+  onHaulBetween,
+}: {
+  view: PlanView;
+  onFindBest: () => void;
+  haulBetween: boolean;
+  onHaulBetween: (on: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const haulHintId = useId();
+  return (
+    <Panel
+      title={t('piPlan.make.planetsTitle')}
+      meta={
+        <span className="text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
+          {t('piPlan.make.planetsCount', {
+            used: view.slots.used,
+            allowed: Math.max(view.slots.allowed, view.slots.used),
+          })}
+        </span>
+      }
+      padded={false}
+    >
+      <ul className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {view.strips.map((strip) => (
           <li
             key={strip.planetId}
@@ -285,6 +293,25 @@ export function YourPlanetsPanel({
           })}
         </p>
       )}
+      <div className="p-3">
+        <label className={cx('flex w-fit cursor-pointer items-start gap-2', tappableRowClassName)}>
+          <Checkbox
+            className="mt-0.5"
+            checked={haulBetween}
+            aria-labelledby={`${haulHintId}-label`}
+            aria-describedby={haulHintId}
+            onChange={(e) => onHaulBetween(e.target.checked)}
+          />
+          <span className="text-xs">
+            <span id={`${haulHintId}-label`} className="text-text">
+              {t('piPlan.chains.optIn')}
+            </span>
+            <span id={haulHintId} className="block text-[0.6875rem] text-text-dim">
+              {t('piPlan.chains.optInHint')}
+            </span>
+          </span>
+        </label>
+      </div>
       <SlotNudge slots={view.slots} onFindBest={onFindBest} />
     </Panel>
   );
@@ -628,6 +655,7 @@ function RebuildCard({
   haulDays: number;
   upgradeFrom: number | null;
 }) {
+  const changes = card.status === 'change';
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const altId = useId();
@@ -685,10 +713,8 @@ function RebuildCard({
                 </span>
               )}
             </span>
-            <VerbTag
-              verb={card.status === 'change' ? 'rebuild' : 'asIs'}
-              label={t(card.status === 'change' ? 'piPlan.make.tagRebuild' : 'piPlan.make.tagAsIs')}
-            />
+            {/* A kept colony sits under "stay as they are": an As-is tag would repeat it. */}
+            {changes && <VerbTag verb="rebuild" label={t('piPlan.make.tagRebuild')} />}
           </div>
         )}
       </div>
@@ -696,10 +722,36 @@ function RebuildCard({
   );
 }
 
+/**
+ * The rebuilds. Colonies that change stay in view; those that keep their
+ * setup (or can't be measured) fold under one disclosure, so a plan with
+ * nothing to change is one line, not a card per planet. A `#plan-<anchor>`
+ * link to a folded colony opens the fold so the page can scroll to it.
+ */
 export function RebuildPanel({ view }: { view: PlanView }) {
   const { t } = useTranslation();
+  const { hash } = useLocation();
   const upgradeFrom = new Map(
     view.checklist.map((column) => [column.planetId, column.fit?.upgradeFromLevel ?? null])
+  );
+  const changed = view.rebuilds.filter((card) => card.status === 'change');
+  const kept = view.rebuilds.filter((card) => card.status !== 'change');
+  const hashInKept = kept.some((card) => `#${card.anchor}` === hash);
+  const [open, setOpen] = useState(hashInKept);
+  // A new link to a folded colony opens the fold during render, so the card
+  // exists by the time the page's scroll effect looks for it.
+  const [seenHash, setSeenHash] = useState(hash);
+  if (hash !== seenHash) {
+    setSeenHash(hash);
+    if (hashInKept && !open) setOpen(true);
+  }
+  const card = (c: RebuildCardView) => (
+    <RebuildCard
+      key={c.planetId}
+      card={c}
+      haulDays={view.hauling.haulDays}
+      upgradeFrom={upgradeFrom.get(c.planetId) ?? null}
+    />
   );
   return (
     <Panel
@@ -716,16 +768,21 @@ export function RebuildPanel({ view }: { view: PlanView }) {
       }
       padded={false}
     >
-      <ul className="divide-y divide-line">
-        {view.rebuilds.map((card) => (
-          <RebuildCard
-            key={card.planetId}
-            card={card}
-            haulDays={view.hauling.haulDays}
-            upgradeFrom={upgradeFrom.get(card.planetId) ?? null}
-          />
-        ))}
-      </ul>
+      {changed.length > 0 ? (
+        <ul className="divide-y divide-line">{changed.map(card)}</ul>
+      ) : (
+        <p className="px-3 py-2.5 text-sm text-text-dim">{t('piPlan.make.noRebuild')}</p>
+      )}
+      {kept.length > 0 && (
+        <Disclosure
+          className="border-t border-line"
+          label={t('piPlan.make.keptGroup', { count: kept.length })}
+          expanded={open}
+          onToggle={() => setOpen(!open)}
+        >
+          <ul className="divide-y divide-line">{kept.map(card)}</ul>
+        </Disclosure>
+      )}
     </Panel>
   );
 }
