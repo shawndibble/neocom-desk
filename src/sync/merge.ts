@@ -333,7 +333,7 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
  * absent treated as 0/never), the same shape as `mergeRecords`' `updatedAt`
  * policy but scoped to that single field.
  *
- * `pushEligible` gates push-CREATE only — GLOSSARY.md's synced window (30 days
+ * `pushEligible` gates *introducing* a row — GLOSSARY.md's synced window (30 days
  * or 100 rows, whichever is smaller; see `rowsWithinSyncWindow` in
  * `features/notifications/feed.ts`) bounds which *new* rows a device starts
  * uploading, not what it will accept, and not corrections to a row the
@@ -346,6 +346,13 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
  * like the PULL direction, which always compares against every local row
  * passed in, never just the windowed subset, and never regresses an
  * already-recorded dismissal.
+ *
+ * A dismissal made after a row was uploaded is the exception to that gate: the
+ * remote side already holds the row, so it pushes through push-CREATE (the
+ * remote copy is absent from an incremental window) whenever the row is still
+ * inside the *age* bound — the 100-row cap does not apply. Otherwise a row
+ * that slid below rank 100 before being dismissed would stay live remotely,
+ * and a new device's full pull would show it as unread.
  *
  * What decides push-CREATE on an *incremental* pass is {@link LocalFeedRow}'s
  * `syncedAt`, not the pull cursor. Every other collection reads "local row,
@@ -421,7 +428,15 @@ export function mergeFeed<L extends LocalFeedRow, R extends RemoteFeedDoc>(
       // row has been uploaded. `syncedAt` says it outright. A dismissal made
       // after that upload still needs writing out, and the remote doc is
       // replaced wholesale, so it goes back through push-CREATE.
-      if (l.syncedAt !== undefined && (l.dismissedAt ?? 0) <= l.syncedAt) continue;
+      if (l.syncedAt !== undefined) {
+        // The remote side holds this row, so the 100-row cap (which only
+        // bounds what a device introduces) must not strand a dismissal made
+        // after the row slid below it. The age bound still applies: past it
+        // the remote copy is purged, not corrected.
+        if ((l.dismissedAt ?? 0) > l.syncedAt && l.firedAt >= purgeBefore)
+          result.pushCreate.push(l);
+        continue;
+      }
       if (pushEligible.has(id)) result.pushCreate.push(l);
       continue;
     }
