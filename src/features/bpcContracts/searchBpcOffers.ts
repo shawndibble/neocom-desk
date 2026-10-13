@@ -1,11 +1,7 @@
 /**
- * BPC Sourcing's search as one pure function: every source's rows narrowed,
- * ordered and summarised for one query (issues #608, #1241; ADR 0013, 0018).
- * It hides what the panel used to do inline: Space / Jump Range narrowing of
- * the contract rows, the six per-source row sets, the "searched types" rule
- * that confines LP and Community Offers to what the query names, and the
- * precedence the sources merge in. The Firestore snapshot, the market lookup
- * and the LP / Community hooks stay outside; this takes what they loaded.
+ * BPC Sourcing's search as pure functions, in two stages so a keystroke reruns only the second:
+ * `prepareBpcOffers` (narrowing, type options, offer stats) and `rankBpcOffers` (type query,
+ * suggestions, per-source rows, precedence). `searchBpcOffers` composes both (ADR 0013, 0018).
  */
 import {
   EMPTY_BPC_SEARCH_FILTER,
@@ -36,12 +32,12 @@ import type { SourceToggle } from './bpcSourcingUrl';
 import {
   cheaperBpo,
   cheapestBpoSourcesByType,
+  MARKET_BPO_LOOKUP_LIMIT,
   marketBpoOffers,
   type BpoOffer,
   type BpoSources,
   type MarketBpoBook,
 } from './bpoAvailability';
-import { MARKET_BPO_LOOKUP_LIMIT } from './useMarketBpoOrders';
 
 /** Rows of the typed-search type filter: the closest this many blueprint names. */
 const TYPE_SEARCH_LIMIT = 50;
@@ -144,8 +140,34 @@ export function bpcMarketLookup(
   };
 }
 
-export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferSearch {
-  const { filter: uiFilter, selectedTypeId, sources, spaceKinds, allowedSystems } = query;
+/** The slice of `BpcSourceData` stage 1 reads; none of it moves while the type query is typed. */
+export type BpcPrepareData = Pick<
+  BpcSourceData,
+  'contractRows' | 'originals' | 'contractLocations' | 'blueprintNames' | 'ownedBlueprints'
+>;
+
+/** What stage 1 reads of the query: everything except the type query and the picked blueprint. */
+export interface BpcPrepareInput {
+  filter: Omit<BpcSourcingFilter, 'typeQuery'>;
+  sources: ReadonlySet<SourceToggle>;
+  spaceKinds: ReadonlySet<SpaceKind> | null;
+  allowedSystems: ReadonlySet<number> | null;
+}
+
+/** Stage 1 output: independent of the type query. */
+export interface PreparedBpcOffers {
+  spaceFilteredRows: readonly BpcContractRow[];
+  spaceFilteredOriginals: readonly BpcContractRow[];
+  typeOptions: BlueprintTypeOption[];
+  /** Every filter except the blueprint itself: suggestion counts and the table answer the same question. */
+  nonTypeFilter: BpcSearchFilter;
+  /** Offer stats of `spaceFilteredRows` under `nonTypeFilter`, for the suggestions. */
+  offerStats: ReadonlyMap<number, BlueprintOfferStats>;
+}
+
+/** Stage 1: Space / Jump narrowing, the searchable type options and offer stats. */
+export function prepareBpcOffers(data: BpcPrepareData, input: BpcPrepareInput): PreparedBpcOffers {
+  const { filter: uiFilter, sources, spaceKinds, allowedSystems } = input;
   const { contractLocations } = data;
   const spaceFilteredRows = narrowByLocation(
     data.contractRows,
@@ -172,8 +194,6 @@ export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferS
     data.blueprintNames
   );
 
-  // Every filter except the blueprint itself: suggestion counts and the table
-  // must answer the same question.
   const nonTypeFilter: BpcSearchFilter = {
     ...EMPTY_BPC_SEARCH_FILTER,
     regionId: uiFilter.regionId,
@@ -186,14 +206,32 @@ export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferS
     hideAuctions: uiFilter.hideAuctions,
     hidePlexRequests: uiFilter.hidePlex,
   };
+  const offerStats = blueprintOfferStats(filterBpcContracts(spaceFilteredRows, nonTypeFilter));
+  return { spaceFilteredRows, spaceFilteredOriginals, typeOptions, nonTypeFilter, offerStats };
+}
+
+/** Stage 2: the type query's suggestions, per-source rows and precedence merge. */
+export function rankBpcOffers(
+  prepared: PreparedBpcOffers,
+  data: BpcSourceData,
+  query: BpcQuery
+): BpcOfferSearch {
+  const { filter: uiFilter, selectedTypeId, sources } = query;
+  const { contractLocations } = data;
+  const { spaceFilteredRows, spaceFilteredOriginals, typeOptions, nonTypeFilter, offerStats } =
+    prepared;
+  const hasTypeQuery = uiFilter.typeQuery.trim() !== '';
+  const typeMatches = (limit: number) =>
+    rankedSearch(typeOptions, blueprintSearchName(uiFilter.typeQuery), {
+      primary: (option) => blueprintSearchName(option.name),
+      limit,
+    });
+  const toSearchRows = (rows: readonly BpcContractRow[]) =>
+    rows.map((row) => contractRowToSearchRow(row, contractLocations.get(row.locationId)));
 
   const suggestions: BlueprintSuggestion[] = [];
-  if (selectedTypeId === null && uiFilter.typeQuery.trim() !== '') {
-    const offerStats = blueprintOfferStats(filterBpcContracts(spaceFilteredRows, nonTypeFilter));
-    for (const option of rankedSearch(typeOptions, blueprintSearchName(uiFilter.typeQuery), {
-      primary: (option) => blueprintSearchName(option.name),
-      limit: SUGGESTION_LIMIT,
-    })) {
+  if (selectedTypeId === null && hasTypeQuery) {
+    for (const option of typeMatches(SUGGESTION_LIMIT)) {
       // A blueprint with no offers left under the current filters is not a
       // candidate — picking it would resolve to an empty table.
       const stats = offerStats.get(option.typeId);
@@ -204,20 +242,13 @@ export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferS
   const typeIds =
     selectedTypeId !== null
       ? new Set([selectedTypeId])
-      : uiFilter.typeQuery.trim().length === 0
+      : !hasTypeQuery
         ? null
-        : new Set(
-            rankedSearch(typeOptions, blueprintSearchName(uiFilter.typeQuery), {
-              primary: (o) => blueprintSearchName(o.name),
-              limit: TYPE_SEARCH_LIMIT,
-            }).map((o) => o.typeId)
-          );
+        : new Set(typeMatches(TYPE_SEARCH_LIMIT).map((o) => o.typeId));
   const engineFilter: BpcSearchFilter = { ...nonTypeFilter, typeIds };
 
   const filteredRows = filterBpcContracts(spaceFilteredRows, engineFilter);
-  const contractSearchRows = filteredRows.map((row) =>
-    contractRowToSearchRow(row, contractLocations.get(row.locationId))
-  );
+  const contractSearchRows = toSearchRows(filteredRows);
 
   const ownedSearchRows = data.ownedBlueprints.map((bp) => {
     const location = data.ownedLocations.get(bp.location_id);
@@ -236,8 +267,8 @@ export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferS
   });
   const filteredOwnedRows = filterBpcSearchRows(ownedSearchRows, engineFilter);
 
-  const contractBpoSearchRows = filterBpcContracts(spaceFilteredOriginals, engineFilter).map(
-    (row) => contractRowToSearchRow(row, contractLocations.get(row.locationId))
+  const contractBpoSearchRows = toSearchRows(
+    filterBpcContracts(spaceFilteredOriginals, engineFilter)
   );
 
   // Already limited to the looked-up types, so filtered on everything but the
@@ -268,17 +299,15 @@ export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferS
 
   // LP and Community rows cover every blueprint; a typed or picked search
   // narrows them to the looked-up types.
-  const searched =
-    selectedTypeId !== null || uiFilter.typeQuery.trim() !== ''
-      ? new Set(data.marketTypeIds)
-      : null;
-  const narrowToSearched = (rows: readonly BpcSearchRow[]) =>
+  const searchedTypeIds =
+    selectedTypeId !== null || hasTypeQuery ? new Set(data.marketTypeIds) : null;
+  const narrowLpAndCommunity = (rows: readonly BpcSearchRow[]) =>
     filterBpcSearchRows(
-      searched ? rows.filter((row) => searched.has(row.typeId)) : rows,
+      searchedTypeIds ? rows.filter((row) => searchedTypeIds.has(row.typeId)) : rows,
       nonTypeFilter
     );
-  const lpSearchRows = narrowToSearched(data.lpRows);
-  const communitySearchRows = narrowToSearched(data.communityRows);
+  const lpSearchRows = narrowLpAndCommunity(data.lpRows);
+  const communitySearchRows = narrowLpAndCommunity(data.communityRows);
 
   // The cheapest BPO per blueprint type in the results: contract originals in
   // the Region filter's scope, market orders for the looked-up types only.
@@ -320,4 +349,9 @@ export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferS
     // what is on screen.
     summary: selectedTypeId === null ? null : bpcPriceSummary(filteredRows),
   };
+}
+
+/** Both stages composed; the panel memoises them separately. */
+export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferSearch {
+  return rankBpcOffers(prepareBpcOffers(data, query), data, query);
 }

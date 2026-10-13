@@ -66,7 +66,8 @@ import {
 import { bpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import {
   bpcMarketLookup,
-  searchBpcOffers,
+  prepareBpcOffers,
+  rankBpcOffers,
   type BlueprintSuggestion,
   type BpcQuery,
   type BpcSourceData,
@@ -101,12 +102,10 @@ import {
   bpoMayBeCheaper,
   cheapestComparableCopy,
   cheapestSourcingCard,
+  MARKET_BPO_LOOKUP_LIMIT,
   type BpoOffer,
 } from '@/features/bpcContracts/bpoAvailability';
-import {
-  MARKET_BPO_LOOKUP_LIMIT,
-  useMarketBpoOrders,
-} from '@/features/bpcContracts/useMarketBpoOrders';
+import { useMarketBpoOrders } from '@/features/bpcContracts/useMarketBpoOrders';
 import { useMarketHub } from '@/features/market/hub';
 import {
   useBpcHideAuctionsDefault,
@@ -771,9 +770,54 @@ export function BpcSourcingPanel() {
     }),
     [uiFilter, selectedTypeId, sources, activeSpaceKinds, jumpFilter.allowed]
   );
+  // Stage 1 never reads the type query (or what the lookup derives from it),
+  // so a keystroke reruns only stage 2.
+  const stableFilter = useMemo(
+    () => ({
+      regionId: uiFilter.regionId,
+      minMe: uiFilter.minMe,
+      minTe: uiFilter.minTe,
+      minRuns: uiFilter.minRuns,
+      maxPrice: uiFilter.maxPrice,
+      hideAuctions: uiFilter.hideAuctions,
+      hidePlex: uiFilter.hidePlex,
+    }),
+    [
+      uiFilter.regionId,
+      uiFilter.minMe,
+      uiFilter.minTe,
+      uiFilter.minRuns,
+      uiFilter.maxPrice,
+      uiFilter.hideAuctions,
+      uiFilter.hidePlex,
+    ]
+  );
+  const prepared = useMemo(
+    () =>
+      prepareBpcOffers(
+        { contractRows: rows, originals, contractLocations, blueprintNames, ownedBlueprints },
+        {
+          filter: stableFilter,
+          sources,
+          spaceKinds: activeSpaceKinds,
+          allowedSystems: jumpFilter.allowed,
+        }
+      ),
+    [
+      rows,
+      originals,
+      contractLocations,
+      blueprintNames,
+      ownedBlueprints,
+      stableFilter,
+      sources,
+      activeSpaceKinds,
+      jumpFilter.allowed,
+    ]
+  );
   const { suggestions, filteredRows, bpoSourcesByType, bpoByType, displayRows, summary } = useMemo(
-    () => searchBpcOffers(sourceData, query),
-    [sourceData, query]
+    () => rankBpcOffers(prepared, sourceData, query),
+    [prepared, sourceData, query]
   );
 
   const selectedName =

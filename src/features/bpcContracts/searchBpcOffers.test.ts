@@ -15,6 +15,8 @@ import type { SourceToggle } from './bpcSourcingUrl';
 import type { BpcSourcingFilter } from './bpcActiveFilters';
 import {
   bpcMarketLookup,
+  prepareBpcOffers,
+  rankBpcOffers,
   searchBpcOffers,
   type BpcQuery,
   type BpcSourceData,
@@ -415,6 +417,26 @@ describe('searchBpcOffers BPO sources', () => {
       query({ filter: { regionId: THE_FORGE }, spaceKinds: new Set(['lowsec']) })
     );
     expect(result.bpoByType.has(RIFTER)).toBe(false);
+  });
+});
+
+describe('two-stage search', () => {
+  const d = data({
+    contractRows: [contract(), contract({ contractId: 2, typeId: CARACAL })],
+    marketTypeIds: [RIFTER, CARACAL],
+  });
+
+  it('one prepared stage serves every type query and matches searchBpcOffers', () => {
+    // `prepareBpcOffers` takes no typeQuery, so typing never reruns it.
+    const prepared = prepareBpcOffers(d, query());
+    for (const typeQuery of ['', 'rif', 'cara']) {
+      const q = query({ filter: { typeQuery } });
+      expect(rankBpcOffers(prepared, d, q)).toEqual(searchBpcOffers(d, q));
+    }
+    expect(prepared.typeOptions.map((o) => o.typeId).sort((a, b) => a - b)).toEqual([
+      RIFTER,
+      CARACAL,
+    ]);
   });
 });
 
