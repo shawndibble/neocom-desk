@@ -119,7 +119,7 @@ export function WidgetMenu({ widget }: { widget: Widget }) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <IconButton
-            size="sm"
+            size="row"
             variant="plain"
             icon={<Icon.More />}
             label={t('overview.widgets.settingsFor', { title })}
