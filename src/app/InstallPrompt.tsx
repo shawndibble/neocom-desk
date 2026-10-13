@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigationType } from 'react-router-dom';
 import { Button } from '@/components/ui';
 import {
   useInstallPromptSeen,
+  useInstallPromptPageVisits,
   detectInstallPlatform,
   selectInstallPromptVariant,
+  INSTALL_PROMPT_MIN_PAGE_VISITS,
   type InstallPromptVariant,
-  type BeforeInstallPromptEvent,
 } from './installPromptRules';
-import { useInstallApp } from './installApp';
+import { useInstallApp, promptInstallApp } from './installApp';
 import { useOnboardingBannerSlot } from './onboardingBannerSlot';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 
@@ -19,42 +21,66 @@ const INSTRUCTION_KEYS = {
 } as const satisfies Record<Exclude<InstallPromptVariant, 'none' | 'native'>, string>;
 
 /**
+ * Counts pathname changes (tabs are pathnames) up to the threshold. The
+ * landing page is not a visit; a `replace` is a redirect (bare page path →
+ * default tab), so one tap that redirects counts once.
+ */
+function useCountPageVisits() {
+  const { pathname } = useLocation();
+  const navigationType = useNavigationType();
+  const { value, hydrated, hydrate, setValue } = useInstallPromptPageVisits();
+  const lastPathname = useRef(pathname);
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  // Ref untouched until hydrated, so a move during the first read still counts.
+  useEffect(() => {
+    if (!hydrated || pathname === lastPathname.current) return;
+    lastPathname.current = pathname;
+    if (navigationType === 'REPLACE') return;
+    if (value < INSTALL_PROMPT_MIN_PAGE_VISITS) void setValue(value + 1);
+  }, [pathname, navigationType, hydrated, value, setValue]);
+
+  return { pageVisits: value, hydrated };
+}
+
+/**
  * One-time, phones-and-tablets-only install CTA: uses the native
  * `beforeinstallprompt` event where Android Chromium fires it, otherwise
  * shows instructions for this browser's own menu on iOS and Firefox for
  * Android, which never fire the event. Shown once ever per device —
  * accepting or dismissing either variant permanently suppresses it
  * (GLOSSARY.md "Install Prompt"; decision 20261002-165619).
+ *
+ * Mounted in `Layout`: never on `/login`, `/callback` or public share pages,
+ * and only after a few page visits. The native event usually fires before
+ * `Layout` mounts, hence the boot-time `useInstallApp` store.
  */
 export function InstallPrompt() {
   const { t } = useTranslation();
   const { value: seen, hydrated, hydrate, setValue } = useInstallPromptSeen();
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const deferredPrompt = useInstallApp((state) => state.deferredPrompt);
+  const { pageVisits, hydrated: visitsHydrated } = useCountPageVisits();
   const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
 
-  useEffect(() => {
-    const handler = (event: Event) => {
-      event.preventDefault();
-      setDeferredPrompt(event as BeforeInstallPromptEvent);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const variant = hydrated
-    ? selectInstallPromptVariant({
-        seen,
-        isStandalone:
-          window.matchMedia('(display-mode: standalone)').matches ||
-          (navigator as { standalone?: boolean }).standalone === true,
-        deferredPromptAvailable: deferredPrompt !== null,
-        platform: detectInstallPlatform(navigator.userAgent, navigator.maxTouchPoints ?? 0),
-      })
-    : 'none';
+  const variant =
+    hydrated && visitsHydrated
+      ? selectInstallPromptVariant({
+          seen,
+          isStandalone:
+            window.matchMedia('(display-mode: standalone)').matches ||
+            (navigator as { standalone?: boolean }).standalone === true,
+          deferredPromptAvailable: deferredPrompt !== null,
+          platform: detectInstallPlatform(navigator.userAgent, navigator.maxTouchPoints ?? 0),
+          pageVisits,
+        })
+      : 'none';
 
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).
@@ -69,11 +95,7 @@ export function InstallPrompt() {
   const dismiss = () => void setValue(true);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    // A prompt event is single-use; Settings' copy of it is spent too.
-    useInstallApp.setState({ deferredPrompt: null });
-    await deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
+    await promptInstallApp();
     void setValue(true);
   };
 

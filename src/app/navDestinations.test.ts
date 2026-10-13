@@ -148,10 +148,6 @@ describe('listNavDestinations', () => {
     });
   });
 
-  it('keeps a real view that is off the tab bar (Market › Transactions)', () => {
-    expect(byPath('/market/history/transactions')).toBeDefined();
-  });
-
   it('drops standalone tabs and redirect-only aliases', () => {
     expect(byPath('/ships/fittings/edit')).toBeUndefined();
     expect(byPath('/wallet/transactions')).toBeUndefined();

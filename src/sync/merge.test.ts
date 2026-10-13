@@ -748,6 +748,41 @@ describe('mergeFeed: incremental pull', () => {
     expect(result.pushCreate).toEqual([row]);
   });
 
+  it('pushes a dismissal for an uploaded row that is no longer push-eligible', () => {
+    // The cap bounds what a device *introduces* to sync, not whether a row the
+    // remote side already holds can have its dismissal corrected. Without this
+    // the other devices' copy stays live and a new device pulls it as unread.
+    const row = feedLocal({ syncedAt: NOW - 500, dismissedAt: NOW - 100 });
+    const result = mergeFeedNow([row], new Set(), []);
+    expect(result.pushCreate).toEqual([row]);
+  });
+
+  it('does not push a post-upload dismissal for a row past the age bound', () => {
+    // The remote copy is purged at this age, not corrected: pushing would
+    // re-create what the purge deletes on the next pass.
+    const row = feedLocal({
+      firedAt: NOW - FEED_SYNC_WINDOW_MS - 1,
+      syncedAt: NOW - 500,
+      dismissedAt: NOW - 100,
+    });
+    expect(mergeFeedNow([row], new Set(), []).pushCreate).toEqual([]);
+  });
+
+  it('pushes a post-upload dismissal for a row exactly on the age bound', () => {
+    // `purgeRemote` is strictly-older, so a row on the cutoff is not purged.
+    const row = feedLocal({
+      firedAt: NOW - FEED_SYNC_WINDOW_MS,
+      syncedAt: NOW - 500,
+      dismissedAt: NOW - 100,
+    });
+    expect(mergeFeedNow([row], new Set(), []).pushCreate).toEqual([row]);
+  });
+
+  it('does not introduce a dismissed, never-uploaded row that is outside the cap', () => {
+    const row = feedLocal({ dismissedAt: NOW - 100 });
+    expect(mergeFeedNow([row], new Set(), []).pushCreate).toEqual([]);
+  });
+
   it('does not re-push a dismissal that was already uploaded with the row', () => {
     const row = feedLocal({ dismissedAt: NOW - 600, syncedAt: NOW - 500 });
     const result = mergeFeedNow([row], new Set(['occ-1']), []);

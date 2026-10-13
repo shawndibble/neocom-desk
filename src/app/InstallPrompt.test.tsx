@@ -1,10 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { useEffect } from 'react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { InstallPrompt } from './InstallPrompt';
-import { useInstallPromptSeen, INSTALL_PROMPT_SEEN_KEY } from './installPromptRules';
+import { useInstallApp } from './installApp';
+import {
+  useInstallPromptSeen,
+  useInstallPromptPageVisits,
+  INSTALL_PROMPT_SEEN_KEY,
+  INSTALL_PROMPT_PAGE_VISITS_KEY,
+  INSTALL_PROMPT_MIN_PAGE_VISITS,
+} from './installPromptRules';
 
 const desktopChromeUA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36';
@@ -34,9 +43,34 @@ function dispatchBeforeInstallPrompt(
   return event;
 }
 
+const router = { navigate: (() => {}) as NavigateFunction };
+function NavigateHandle() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    router.navigate = navigate;
+  }, [navigate]);
+  return null;
+}
+
+function renderPrompt() {
+  return render(
+    <MemoryRouter initialEntries={['/characters']}>
+      <NavigateHandle />
+      <InstallPrompt />
+    </MemoryRouter>
+  );
+}
+
 beforeEach(async () => {
   await db.settings.clear();
+  // Most cases are about what shows once the visit gate is met.
+  await db.settings.put({
+    key: INSTALL_PROMPT_PAGE_VISITS_KEY,
+    value: INSTALL_PROMPT_MIN_PAGE_VISITS,
+  });
   useInstallPromptSeen.setState({ value: false, hydrated: false });
+  useInstallPromptPageVisits.setState({ value: 0, hydrated: false });
+  useInstallApp.setState({ deferredPrompt: null });
   setUserAgent(desktopChromeUA);
 });
 
@@ -46,13 +80,13 @@ afterEach(() => {
 
 describe('InstallPrompt', () => {
   it('renders nothing when neither beforeinstallprompt fired nor on iOS', async () => {
-    render(<InstallPrompt />);
+    renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('stays hidden on desktop even when beforeinstallprompt fires', async () => {
-    render(<InstallPrompt />);
+    renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
     dispatchBeforeInstallPrompt();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -61,20 +95,20 @@ describe('InstallPrompt', () => {
 
   it('shows nothing on Android Chrome until beforeinstallprompt fires', async () => {
     setUserAgent(androidChromeUA);
-    render(<InstallPrompt />);
+    renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('shows menu instructions on Firefox for Android', async () => {
     setUserAgent(androidFirefoxUA);
-    render(<InstallPrompt />);
+    renderPrompt();
     expect(await screen.findByRole('alert')).toHaveTextContent(/add app to home screen/i);
   });
 
   it('shows the native install CTA after beforeinstallprompt fires on Android', async () => {
     setUserAgent(androidChromeUA);
-    render(<InstallPrompt />);
+    renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
     dispatchBeforeInstallPrompt();
     expect(await screen.findByRole('alert')).toHaveTextContent(/install/i);
@@ -84,7 +118,7 @@ describe('InstallPrompt', () => {
     const user = userEvent.setup();
     const promptFn = vi.fn().mockResolvedValue(undefined);
     setUserAgent(androidChromeUA);
-    render(<InstallPrompt />);
+    renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
     dispatchBeforeInstallPrompt({
       prompt: promptFn,
@@ -102,7 +136,7 @@ describe('InstallPrompt', () => {
 
   it('shows the iOS instructional banner on iOS Safari', async () => {
     setUserAgent(iosSafariUA);
-    render(<InstallPrompt />);
+    renderPrompt();
     expect(await screen.findByRole('alert')).toHaveTextContent(/tap share.*add to home screen/i);
   });
 
@@ -111,7 +145,7 @@ describe('InstallPrompt', () => {
     const clearance = () =>
       document.documentElement.style.getPropertyValue('--onboarding-banner-clearance');
     setUserAgent(iosSafariUA);
-    render(<InstallPrompt />);
+    renderPrompt();
     await screen.findByRole('alert');
     expect(clearance()).not.toBe('');
 
@@ -123,7 +157,7 @@ describe('InstallPrompt', () => {
   it('dismisses the iOS banner and records seen permanently', async () => {
     const user = userEvent.setup();
     setUserAgent(iosSafariUA);
-    render(<InstallPrompt />);
+    renderPrompt();
     await screen.findByRole('alert');
 
     await user.click(screen.getByRole('button', { name: /dismiss/i }));
@@ -137,7 +171,7 @@ describe('InstallPrompt', () => {
   it('does not render when already seen', async () => {
     await db.settings.put({ key: INSTALL_PROMPT_SEEN_KEY, value: true });
     setUserAgent(iosSafariUA);
-    render(<InstallPrompt />);
+    renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -157,8 +191,49 @@ describe('InstallPrompt', () => {
         }) as unknown as MediaQueryList
     );
     setUserAgent(iosSafariUA);
-    render(<InstallPrompt />);
+    renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('waits on iOS until the player has opened enough pages', async () => {
+    await db.settings.put({ key: INSTALL_PROMPT_PAGE_VISITS_KEY, value: 0 });
+    setUserAgent(iosSafariUA);
+    renderPrompt();
+    await waitFor(() => expect(useInstallPromptPageVisits.getState().hydrated).toBe(true));
+
+    for (let visit = 1; visit < INSTALL_PROMPT_MIN_PAGE_VISITS; visit++) {
+      act(() => void router.navigate(`/page-${visit}`));
+      await waitFor(() => expect(useInstallPromptPageVisits.getState().value).toBe(visit));
+    }
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    act(() => void router.navigate('/page-last'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/add to home screen/i);
+    await waitFor(async () => {
+      expect((await db.settings.get(INSTALL_PROMPT_PAGE_VISITS_KEY))?.value).toBe(
+        INSTALL_PROMPT_MIN_PAGE_VISITS
+      );
+    });
+  });
+
+  it('does not count a redirect as a visit', async () => {
+    await db.settings.put({ key: INSTALL_PROMPT_PAGE_VISITS_KEY, value: 0 });
+    renderPrompt();
+    await waitFor(() => expect(useInstallPromptPageVisits.getState().hydrated).toBe(true));
+
+    act(() => void router.navigate('/skills'));
+    act(() => void router.navigate('/skills/trained', { replace: true }));
+
+    await waitFor(() => expect(useInstallPromptPageVisits.getState().value).toBe(1));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(useInstallPromptPageVisits.getState().value).toBe(1);
+  });
+
+  it('uses a native prompt that fired before it mounted', async () => {
+    setUserAgent(androidChromeUA);
+    dispatchBeforeInstallPrompt();
+    renderPrompt();
+    expect(await screen.findByRole('button', { name: /install/i })).toBeInTheDocument();
   });
 });

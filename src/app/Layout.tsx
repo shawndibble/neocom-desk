@@ -41,6 +41,7 @@ import { AlertsPanelProvider } from '@/features/notifications/AlertsPanelContext
 import { useAlertBadge } from '@/features/notifications/useUnreadAlertCount';
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
+import { InstallPrompt } from './InstallPrompt';
 import { CommandPaletteHost } from '@/features/commandPalette/CommandPaletteHost';
 import { NAV_LOCK_PATHS } from './navDestinations';
 import { FOOTER_PAGES, viewPathFor } from './navRail';
@@ -441,11 +442,12 @@ export const Layout = memo(function Layout() {
           <CommandPaletteHost />
           <NotificationPermissionPrompt />
           {/*
-        In the shell rather than in `App`, unlike the install and reload
-        prompts: it is about the *active Character*, so it belongs inside
+        In the shell rather than in `App`, unlike the reload prompt: it is
+        about the *active Character*, so it belongs inside
         `RequireCharacter`, where there is always one.
       */}
           <CorpGrantPrompt />
+          <InstallPrompt />
           <ForegroundNotificationPoller />
           <NetWorthSnapshotRecorder />
 

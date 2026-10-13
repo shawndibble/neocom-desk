@@ -16,7 +16,7 @@ describe('currentPagePath', () => {
   it('names the page for its own path and for any tab under it', () => {
     expect(currentPagePath('/market')).toBe('/market');
     expect(currentPagePath('/market/orders')).toBe('/market');
-    expect(currentPagePath('/market/history/transactions')).toBe('/market');
+    expect(currentPagePath('/market/history')).toBe('/market');
   });
 
   it('names the page a sub-view belongs to, even where the path does not nest under it', () => {

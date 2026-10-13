@@ -19,8 +19,8 @@ describe('documentTitleFor', () => {
     expect(documentTitleFor('/market/orders', t)).toBe(
       `${i18n.t('market.sections.openOrders')} — Market — Neocom Desk`
     );
-    expect(documentTitleFor('/market/history/transactions', t)).toBe(
-      `${i18n.t('market.sections.transactions')} — Market — Neocom Desk`
+    expect(documentTitleFor('/market/history', t)).toBe(
+      `${i18n.t('market.sections.history')} — Market — Neocom Desk`
     );
     expect(documentTitleFor('/help/faq', t)).toBe(
       // Literal on purpose: a label key that resolves to nothing would echo

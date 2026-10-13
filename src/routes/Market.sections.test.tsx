@@ -67,8 +67,6 @@ const openOrder = {
   range: 'region',
 };
 
-const historyOrder = { ...openOrder, order_id: 2, state: 'expired' as const };
-
 const transactions = [
   {
     transaction_id: 1,
@@ -101,7 +99,7 @@ const server = setupServer(
     HttpResponse.json([openOrder])
   ),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders/history`, () =>
-    HttpResponse.json([historyOrder])
+    HttpResponse.json([])
   ),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, ({ request }) => {
     const fromId = new URL(request.url).searchParams.get('from_id');
@@ -149,7 +147,7 @@ describe('Market top-level tabs', () => {
     expect(screen.queryByRole('tab', { name: 'Hauling' })).not.toBeInTheDocument();
   });
 
-  it('switches to Open Orders, History and Transactions via the tab bar', async () => {
+  it('switches to Open Orders and History via the tab bar', async () => {
     window.history.pushState({}, '', '/market');
     const user = userEvent.setup();
     render(<App />);
@@ -167,11 +165,6 @@ describe('Market top-level tabs', () => {
     expect(screen.getByRole('button', { name: 'Sell' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'History' }));
-    expect(await screen.findByText('expired')).toBeInTheDocument();
-
-    // The second view is picked from the table's own header, not a nested tab.
-    await user.click(screen.getByRole('combobox', { name: 'History view' }));
-    await user.click(await screen.findByRole('option', { name: 'Transactions' }));
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
@@ -220,28 +213,16 @@ describe('Market top-level tabs', () => {
     expect(screen.queryByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'false');
   });
 
-  it('opens the Transactions view from a deep link, with History still the selected tab', async () => {
-    window.history.pushState({}, '', '/market/history/transactions');
-    const user = userEvent.setup();
+  it('moves an old /market/history/transactions link to History, keeping its query', async () => {
+    window.history.pushState({}, '', '/market/history/transactions?highlight=34');
     render(<App />);
 
-    // Both views are the character's past, so the tab stays History and the
-    // header's select says which of the two is showing.
+    await waitFor(() => expect(window.location.pathname).toBe('/market/history'));
+    expect(window.location.search).toBe('?highlight=34');
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('combobox', { name: 'History view' })).toHaveTextContent(
-      'Transactions'
-    );
-    expect(
-      screen.getByRole('button', { name: 'About ended orders and transactions' })
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('combobox', { name: 'History view' }));
-    await user.click(await screen.findByRole('option', { name: 'Ended orders' }));
-    expect(await screen.findByText('expired')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'History view' })).toHaveTextContent(
-      'Ended orders'
-    );
+    // One view, so no picker between Ended orders and Transactions.
+    expect(screen.queryByRole('combobox', { name: 'History view' })).not.toBeInTheDocument();
   });
 });
 
@@ -312,47 +293,9 @@ describe('Market Open Orders tab', () => {
   });
 });
 
-describe('Market History tab', () => {
-  it('shows order history directly via a /market/history deep link', async () => {
+describe('Market History tab (Transactions)', () => {
+  it('shows transactions with SDE item names resolved, directly via a /market/history deep link', async () => {
     window.history.pushState({}, '', '/market/history');
-    render(<App />);
-    expect(await screen.findByText('expired')).toBeInTheDocument();
-  });
-
-  it('falls back to cached history offline', async () => {
-    await db.esiCache.put({
-      characterId: CHAR_ID,
-      key: 'orders:history',
-      value: [historyOrder],
-      fetchedAt: STALE_FETCHED_AT,
-    });
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders/history`, () =>
-        HttpResponse.error()
-      )
-    );
-    window.history.pushState({}, '', '/market/history');
-    render(<App />);
-    expect(await screen.findByText('expired')).toBeInTheDocument();
-    expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
-  });
-
-  it('shows a re-login prompt when the orders scope was revoked', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders/history`, () =>
-        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
-      )
-    );
-    window.history.pushState({}, '', '/market/history');
-    render(<App />);
-    expect(await screen.findByText('Log in again to see your orders')).toBeInTheDocument();
-    expect(screen.queryByText(/^no order history$/i)).not.toBeInTheDocument();
-  });
-});
-
-describe('Market Transactions tab', () => {
-  it('shows transactions with SDE item names resolved, directly via a /market/history/transactions deep link', async () => {
-    window.history.pushState({}, '', '/market/history/transactions');
     render(<App />);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Sell')).toBeInTheDocument();
@@ -362,7 +305,7 @@ describe('Market Transactions tab', () => {
     const scrollIntoView = vi
       .spyOn(Element.prototype, 'scrollIntoView')
       .mockImplementation(() => {});
-    window.history.pushState({}, '', '/market/history/transactions?highlight=34');
+    window.history.pushState({}, '', '/market/history?highlight=34');
     render(<App />);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -387,7 +330,7 @@ describe('Market Transactions tab', () => {
   it('pulses nothing when the item has no sell of its own to point at', async () => {
     // Type 35 is in the list, but only as a buy — and the alert only ever
     // fires for a filled *sell* order.
-    window.history.pushState({}, '', '/market/history/transactions?highlight=35');
+    window.history.pushState({}, '', '/market/history?highlight=35');
     render(<App />);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -400,7 +343,7 @@ describe('Market Transactions tab', () => {
   });
 
   it('signs and colors transaction totals: buy negative red, sell positive green', async () => {
-    window.history.pushState({}, '', '/market/history/transactions');
+    window.history.pushState({}, '', '/market/history');
     render(<App />);
 
     const sellTotal = await screen.findByText('500.00');
@@ -418,7 +361,7 @@ describe('Market Transactions tab', () => {
         return HttpResponse.json([{ ...transactions[0], transaction_id: 1000 - calls }]);
       })
     );
-    window.history.pushState({}, '', '/market/history/transactions');
+    window.history.pushState({}, '', '/market/history');
     render(<App />);
 
     // Five identical Tritanium fills come back, one per page.
@@ -435,7 +378,7 @@ describe('Market Transactions tab', () => {
       value: transactions,
       fetchedAt: STALE_FETCHED_AT,
     });
-    window.history.pushState({}, '', '/market/history/transactions');
+    window.history.pushState({}, '', '/market/history');
     const user = userEvent.setup();
     render(<App />);
 
@@ -459,7 +402,7 @@ describe('Market Transactions tab', () => {
         HttpResponse.error()
       )
     );
-    window.history.pushState({}, '', '/market/history/transactions');
+    window.history.pushState({}, '', '/market/history');
     render(<App />);
     expect(await screen.findByText(/no transactions cached/i)).toBeInTheDocument();
   });

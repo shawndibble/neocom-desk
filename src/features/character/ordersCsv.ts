@@ -1,5 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { MarketOrder, MarketOrderHistory } from '@/esi/endpoints';
+import type { MarketOrder } from '@/esi/endpoints';
 
 /**
  * CSV columns for open orders: item, side, price, remaining volume, total
@@ -23,16 +23,5 @@ export function ordersCsvColumns(
     { header: t('orders.csvVolumeRemain'), value: (order) => order.volume_remain },
     { header: t('orders.csvVolumeTotal'), value: (order) => order.volume_total },
     { header: t('orders.issued'), value: (order) => order.issued },
-  ];
-}
-
-/** Open-order columns plus `state` (cancelled/expired), for the History tab. */
-export function orderHistoryCsvColumns(
-  t: CsvTranslate,
-  nameFor: (typeId: number) => string
-): CsvColumn<MarketOrderHistory>[] {
-  return [
-    ...ordersCsvColumns(t, nameFor),
-    { header: t('orders.state'), value: (order) => order.state },
   ];
 }
