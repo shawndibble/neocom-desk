@@ -33,6 +33,12 @@ import { ShareFittingsTab } from './ShareFittingsTab';
 
 const f = en.communities.fittings;
 
+/** Opens Add Fittings and returns the dialog. */
+async function openAdd(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: f.add }));
+  return screen.findByRole('dialog', { name: f.addTitle });
+}
+
 beforeEach(async () => {
   vi.clearAllMocks();
   await db.settings.clear();
@@ -78,25 +84,50 @@ describe('ShareFittingsTab', () => {
     expect(await loadFittingsAll(1, 'c1')).toEqual(new Set(['saved-b']));
   });
 
-  it('adds a Fitting from the search when not sharing all', async () => {
+  it('adds a Fitting from the Add Fittings dialog when not sharing all', async () => {
     const user = userEvent.setup();
     render(<ShareFittingsTab characterId={1} communityId="c1" />);
-    await user.type(await screen.findByRole('searchbox'), 'gamma');
-    const row = (await screen.findByText('Gamma Fit')).closest('li')!;
+    const dialog = await openAdd(user);
+    // Every unshared Fitting is listed without a search.
+    expect(within(dialog).getByText('Alpha Fit')).toBeInTheDocument();
+    await user.type(within(dialog).getByRole('searchbox'), 'gamma');
+    const row = within(dialog).getByText('Gamma Fit').closest('li')!;
     expect(within(row).getByText(f.inGame)).toBeInTheDocument();
     await user.click(within(row).getByRole('button', { name: f.share }));
     expect(store.shareFitting).toHaveBeenCalledWith(1, 'c1', expect.objectContaining({ key: '9' }));
+    await waitFor(() => expect(within(dialog).queryByText('Gamma Fit')).not.toBeInTheDocument());
     expect(await loadFittingsAll(1, 'c1')).toBeNull();
   });
 
-  it('says so when a Fitting cannot be shared', async () => {
+  it('shares a Fitting stopped under share-all again, so its later saves follow', async () => {
+    store.shared = new Set(['saved-a', 'game-9']);
+    await saveFittingsAll(1, 'c1', new Set(['saved-b']));
+    const user = userEvent.setup();
+    render(<ShareFittingsTab characterId={1} communityId="c1" />);
+    const dialog = await openAdd(user);
+    const row = within(dialog).getByText('Beta Fit').closest('li')!;
+    await user.click(within(row).getByRole('button', { name: f.share }));
+    await waitFor(async () => expect(await loadFittingsAll(1, 'c1')).toEqual(new Set()));
+    expect(store.shareFitting).toHaveBeenCalledWith(1, 'c1', expect.objectContaining({ key: 'b' }));
+  });
+
+  it('says so in the dialog when a Fitting cannot be shared', async () => {
     store.shareFitting.mockResolvedValue(false);
     const user = userEvent.setup();
     render(<ShareFittingsTab characterId={1} communityId="c1" />);
-    await user.type(await screen.findByRole('searchbox'), 'alpha');
-    const row = (await screen.findByText('Alpha Fit')).closest('li')!;
+    const dialog = await openAdd(user);
+    const row = within(dialog).getByText('Alpha Fit').closest('li')!;
     await user.click(within(row).getByRole('button', { name: f.share }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(f.cannot);
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(f.cannot);
+  });
+
+  it('filters only what is shared', async () => {
+    store.shared = new Set(['saved-a']);
+    const user = userEvent.setup();
+    render(<ShareFittingsTab characterId={1} communityId="c1" />);
+    await user.type(await screen.findByRole('searchbox', { name: f.filter }), 'beta');
+    expect(await screen.findByText(f.noMatch)).toBeInTheDocument();
+    expect(screen.queryByText('Beta Fit')).not.toBeInTheDocument();
   });
 
   it('asks before turning share-all off, then removes every shared Fitting', async () => {

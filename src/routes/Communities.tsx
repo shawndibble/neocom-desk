@@ -18,7 +18,8 @@ import {
 import { focusRingClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { CommunityDetail } from '@/features/communities/CommunityDetail';
-import { COMMUNITY_TABS } from '@/features/communities/communityTabs';
+import { COMMUNITY_TABS, INVITES_TAB_PARAM } from '@/features/communities/communityTabs';
+import { CONTENT_SCOPES } from '@/features/communities/contentScope';
 import { CreateCommunityDialog } from '@/features/communities/CreateCommunityDialog';
 import {
   isCommunityAdmin,
@@ -109,6 +110,8 @@ export function Communities() {
   const selected = communities?.find((community) => community.id === selectedId) ?? null;
   const tabParam = params.get('tab');
   const initialTab = COMMUNITY_TABS.find((tab) => tab === tabParam);
+  const viewParam = params.get('view');
+  const initialScope = CONTENT_SCOPES.find((scope) => scope === viewParam);
   const open = (id: string | null) => setParams(id ? { community: id } : {}, { replace: true });
 
   return (
@@ -192,11 +195,11 @@ export function Communities() {
                         {t('communities.memberCount', { count: community.memberCount })}
                       </span>
                     </span>
-                    {isCommunityAdmin(community, characterId) && (
-                      <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                        {t('communities.adminBadge')}
-                      </span>
-                    )}
+                    <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
+                      {isCommunityAdmin(community, characterId)
+                        ? t('communities.adminBadge')
+                        : t('communities.memberBadge')}
+                    </span>
                     <RowCaret />
                   </button>
                 </li>
@@ -212,6 +215,8 @@ export function Communities() {
             key={`${characterId}:${selected.id}`}
             community={selected}
             initialTab={initialTab}
+            initialScope={initialScope}
+            initialPanel={tabParam === INVITES_TAB_PARAM ? 'invites' : undefined}
             characterId={characterId}
             onChanged={() => refresh()}
             onPatch={(patch) =>

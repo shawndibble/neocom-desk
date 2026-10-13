@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import en from '@/i18n/locales/en.json';
 import { uidForCharacter } from '@/sync/uid';
@@ -39,13 +40,15 @@ const members = [
 
 function renderLibrary() {
   return render(
-    <CommunityLibrary
-      communityId="c1"
-      characterId={1}
-      members={members}
-      membersFailed={false}
-      now={NOW}
-    />
+    <MemoryRouter>
+      <CommunityLibrary
+        communityId="c1"
+        characterId={1}
+        members={members}
+        membersFailed={false}
+        now={NOW}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -73,5 +76,11 @@ describe('CommunityLibrary', () => {
       0
     );
     expect(screen.getByText(en.communities.staleBadge)).toBeInTheDocument();
+  });
+
+  it('links to BPC Sourcing narrowed to the Community and owned sources', async () => {
+    renderLibrary();
+    const link = await screen.findByRole('link', { name: en.communities.blueprints.browse });
+    expect(link).toHaveAttribute('href', '/industry/sourcing?sourcing.src=community%2Cowned');
   });
 });

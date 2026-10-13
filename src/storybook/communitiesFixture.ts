@@ -6,7 +6,14 @@
  *
  * Two Communities: one the active sample Character admins (every control
  * shows, a join request waits) and one it is only a Member of (Leave shows).
+ * Both carry shared blueprints, Fittings and Skill plans, so the content
+ * tabs' Everyone views fill, and the sample Character's own share shows under
+ * Mine.
  */
+import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
+import type { SharedFitting } from '@/engine/communities/sharedFittings';
+import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
+import type { SharedPlan } from '@/engine/communities/sharedPlans';
 import type {
   CommunityBackendOverride,
   CommunityMember,
@@ -82,6 +89,93 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
     ],
   };
 
+  const blueprint = (typeId: number, runs: number, place: string): SharedBlueprint => ({
+    typeId,
+    me: 10,
+    te: 20,
+    runs,
+    locationName: `${place} - Industry Hub`,
+    systemName: place,
+  });
+  const libraries: Record<string, MemberLibrary[]> = {
+    [SAMPLE_ADMIN_COMMUNITY_ID]: [
+      { uid: ME, items: [blueprint(691, -1, 'Efa'), blueprint(32881, 40, 'Efa')] },
+      { uid: OTHER, items: [blueprint(24699, -1, 'Amarr'), blueprint(950, 10, 'Amarr')] },
+      { uid: 'char:2119000001', items: [blueprint(2184, -1, 'Jita'), blueprint(691, 5, 'Jita')] },
+      { uid: 'char:2119000003', items: [blueprint(940, -1, 'Dodixie')] },
+    ],
+    [SAMPLE_MEMBER_COMMUNITY_ID]: [
+      { uid: OTHER, items: [blueprint(32881, -1, 'Amarr')] },
+      { uid: ME, items: [blueprint(691, -1, 'Efa')] },
+    ],
+  };
+
+  const fitting = (
+    communityId: string,
+    ownerUid: string,
+    key: string,
+    name: string,
+    hull: string,
+    source: 'saved' | 'game' = 'saved'
+  ): SharedFitting => ({
+    communityId,
+    id: `${ownerUid}~${source}-${key}`,
+    ownerUid,
+    source,
+    name,
+    hull,
+    // A sample, not a decodable Fitting Share Code: the list only links to it.
+    code: `sample-${key}`,
+    updatedAt: now - DAY,
+  });
+  const fittings: Record<string, SharedFitting[]> = {
+    [SAMPLE_ADMIN_COMMUNITY_ID]: [
+      fitting(SAMPLE_ADMIN_COMMUNITY_ID, ME, 'venture-gas', 'Gas Huffer', 'Venture'),
+      fitting(SAMPLE_ADMIN_COMMUNITY_ID, OTHER, 'drake-l4', 'L4 Missions Drake', 'Drake'),
+      fitting(SAMPLE_ADMIN_COMMUNITY_ID, OTHER, '17', 'Hauler (cargo)', 'Badger', 'game'),
+      fitting(
+        SAMPLE_ADMIN_COMMUNITY_ID,
+        'char:2119000001',
+        'rifter-brawl',
+        'Brawl Rifter',
+        'Rifter'
+      ),
+    ],
+    [SAMPLE_MEMBER_COMMUNITY_ID]: [
+      fitting(SAMPLE_MEMBER_COMMUNITY_ID, OTHER, 'procurer', 'Belt Procurer', 'Procurer'),
+    ],
+  };
+
+  const plan = (
+    communityId: string,
+    ownerUid: string,
+    planId: string,
+    name: string,
+    skills: number
+  ): SharedPlan => ({
+    communityId,
+    id: `${ownerUid}~${planId}`,
+    ownerUid,
+    planId,
+    name,
+    entries: Array.from({ length: skills }, (_, index) => ({
+      skillTypeID: 3300 + index,
+      targetLevel: 4,
+    })),
+    updatedAt: now - 2 * DAY,
+    sourceUpdatedAt: now - 2 * DAY,
+  });
+  const plans: Record<string, SharedPlan[]> = {
+    [SAMPLE_ADMIN_COMMUNITY_ID]: [
+      plan(SAMPLE_ADMIN_COMMUNITY_ID, OTHER, 'p1', 'Industry basics', 12),
+      plan(SAMPLE_ADMIN_COMMUNITY_ID, 'char:2119000002', 'p2', 'Marauder', 38),
+      plan(SAMPLE_ADMIN_COMMUNITY_ID, ME, 'p3', 'Mining foreman', 9),
+    ],
+    [SAMPLE_MEMBER_COMMUNITY_ID]: [
+      plan(SAMPLE_MEMBER_COMMUNITY_ID, OTHER, 'p4', 'Exhumer path', 21),
+    ],
+  };
+
   const byId = (id: string) => communities.find((community) => community.id === id);
   const patch = (id: string, change: Partial<CommunitySummary>) => {
     const community = byId(id);
@@ -92,6 +186,9 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
     loadMine: () => communities.map((community) => ({ ...community })),
     loadMembers: (id) => (members[id] ?? []).map((entry) => ({ ...entry })),
     loadRequests: (id) => (requests[id] ?? []).map((entry) => ({ ...entry })),
+    loadLibraries: (id) => libraries[id] ?? [],
+    loadFittings: (id) => (fittings[id] ?? []).map((entry) => ({ ...entry })),
+    loadPlans: (id) => (plans[id] ?? []).map((entry) => ({ ...entry })),
     call: (name, data) => {
       const { communityId, memberUid, accept, requireApproval } = data as {
         communityId: string;

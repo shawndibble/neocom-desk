@@ -9,7 +9,9 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
+import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
+import type { SharedPlan } from '@/engine/communities/sharedPlans';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
@@ -51,12 +53,23 @@ export interface CommunityBackendOverride {
   loadRequests: (communityId: string) => JoinRequest[];
   /** A callable by name; its result is what the real one would return. */
   call: (name: string, data: unknown) => unknown;
+  /** Every Member's Shared Blueprints, for the Community Library. */
+  loadLibraries?: (communityId: string) => MemberLibrary[];
+  /** Every Fitting shared into the Community, by anyone. */
+  loadFittings?: (communityId: string) => SharedFitting[];
+  /** Every Skill Plan shared into the Community, by anyone. */
+  loadPlans?: (communityId: string) => SharedPlan[];
 }
 
 let override: CommunityBackendOverride | null = null;
 
 export function setCommunityBackendOverride(next: CommunityBackendOverride | null): void {
   override = next;
+}
+
+/** The stand-in, for the shared-content clients beside this one; null in the app. */
+export function communityBackendOverride(): CommunityBackendOverride | null {
+  return override;
 }
 
 /** Where an invite link lands. The join page is its own ticket; this is its one address. */
@@ -143,6 +156,12 @@ export async function loadMemberLibraries(
   communityId: string,
   memberUids: readonly string[]
 ): Promise<MemberLibrary[]> {
+  if (override?.loadLibraries) {
+    const libraries = override.loadLibraries(communityId);
+    return memberUids.map(
+      (uid) => libraries.find((library) => library.uid === uid) ?? { uid, items: [] }
+    );
+  }
   await ensureSignedIn(characterId);
   const db = getSyncFirestore();
   return Promise.all(

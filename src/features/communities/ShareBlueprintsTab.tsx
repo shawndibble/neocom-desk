@@ -1,7 +1,6 @@
-import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import {
   copiesByPlace,
@@ -15,7 +14,6 @@ import {
   type BlueprintShare,
   type TypeStatus,
 } from '@/engine/communities/shareMode';
-import { bpcSourcingCommunityHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddBlueprintsDialog, type DialogPlaces } from './AddBlueprintsDialog';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -36,7 +34,7 @@ function neighbours<K>(keys: readonly K[], index: number, refs: Map<K, HTMLButto
 const NO_STATUS: ReadonlyMap<number, TypeStatus> = new Map();
 
 /**
- * The Blueprints tab of a Community (issue #3599 follow-up): what this
+ * The Blueprints tab's Mine view (issue #3599 follow-up): what this
  * Character shares, one row per blueprint with Stop sharing. "Share all my
  * blueprints" is a standing switch, so a blueprint acquired later is shared
  * too; under it a revoke is an exclusion. Add blueprints opens a dialog to
@@ -48,11 +46,9 @@ const NO_STATUS: ReadonlyMap<number, TypeStatus> = new Map();
 export function ShareBlueprintsTab({
   characterId,
   communityId,
-  onOpenLibrary,
 }: {
   characterId: number;
   communityId: string;
-  onOpenLibrary: () => void;
 }) {
   const { t } = useTranslation();
   const owned = useOwnedBlueprintTypes(characterId);
@@ -205,16 +201,7 @@ export function ShareBlueprintsTab({
         <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
           {t('communities.blueprints.add')}
         </Button>
-        <Button size="sm" onClick={onOpenLibrary}>
-          {t('communities.blueprints.openLibrary')}
-        </Button>
       </div>
-      <p className="text-xs">
-        <Link to={bpcSourcingCommunityHref()} className={inlineLinkClassName}>
-          {t('communities.blueprints.browse')}
-        </Link>
-        <span className="text-text-dim"> · {t('communities.blueprints.browseHint')}</span>
-      </p>
       {sharedLocations.length > 0 && (
         <section aria-label={t('communities.blueprints.sharedLocations')} className="space-y-1">
           <h3 className="text-xs font-semibold">{t('communities.blueprints.sharedLocations')}</h3>

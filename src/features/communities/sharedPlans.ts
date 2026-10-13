@@ -36,7 +36,7 @@ import {
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
-import { listCommunityIds } from './communityStore';
+import { communityBackendOverride, listCommunityIds } from './communityStore';
 import { markPlansShared } from './shareSelection';
 
 const MAX_NAME_LENGTH = 200;
@@ -93,6 +93,15 @@ export async function loadMySharedPlans(
   characterId: number,
   communityId: string
 ): Promise<Map<string, number>> {
+  const standIn = communityBackendOverride()?.loadPlans;
+  if (standIn) {
+    const me = uidForCharacter(characterId);
+    return new Map(
+      standIn(communityId)
+        .filter((plan) => plan.ownerUid === me)
+        .map((plan) => [plan.planId, plan.sourceUpdatedAt])
+    );
+  }
   const uid = await ensureSignedIn(characterId);
   const mine = await getDocs(query(plansOf(communityId), where('ownerUid', '==', uid)));
   const shared = new Map<string, number>();
@@ -108,6 +117,8 @@ export async function loadCommunityPlans(
   characterId: number,
   communityId: string
 ): Promise<SharedPlan[]> {
+  const standIn = communityBackendOverride()?.loadPlans;
+  if (standIn) return standIn(communityId);
   await ensureSignedIn(characterId);
   const snap = await getDocs(plansOf(communityId));
   const plans: SharedPlan[] = [];
@@ -138,6 +149,8 @@ export async function loadCommunityPlans(
  * next sweep.
  */
 export async function syncSharedPlans(characterId: number, communityId: string): Promise<void> {
+  // A stand-in backend (Storybook) has nothing to write to.
+  if (communityBackendOverride()) return;
   try {
     const shared = await loadMySharedPlans(characterId, communityId);
     if (shared.size === 0) return;

@@ -7,6 +7,7 @@ import en from '@/i18n/locales/en.json';
 import { db } from '@/db';
 import { configureClipboard } from '@/lib/clipboard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { CONTENT_SCOPE_KEY, useContentScopes } from '@/features/communities/contentScope';
 import { Communities } from './Communities';
 
 const store = vi.hoisted(() => ({
@@ -29,6 +30,26 @@ vi.mock('@/features/communities/communityStore', async (importOriginal) => ({
   ...store,
 }));
 vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn() }));
+// The content views have their own tests; here each is a marker, so the page's
+// own structure (tabs, Everyone / Mine, Manage) is what is under test.
+vi.mock('@/features/communities/CommunityLibrary', () => ({
+  CommunityLibrary: () => <p>everyone-blueprints</p>,
+}));
+vi.mock('@/features/communities/CommunitySharedFittings', () => ({
+  CommunitySharedFittings: () => <p>everyone-fittings</p>,
+}));
+vi.mock('@/features/communities/CommunitySharedPlans', () => ({
+  CommunitySharedPlans: () => <p>everyone-plans</p>,
+}));
+vi.mock('@/features/communities/ShareBlueprintsTab', () => ({
+  ShareBlueprintsTab: () => <p>mine-blueprints</p>,
+}));
+vi.mock('@/features/communities/ShareFittingsTab', () => ({
+  ShareFittingsTab: () => <p>mine-fittings</p>,
+}));
+vi.mock('@/features/communities/ShareSkillPlansTab', () => ({
+  ShareSkillPlansTab: () => <p>mine-plans</p>,
+}));
 
 const c = en.communities;
 const ME = 91;
@@ -58,9 +79,17 @@ function renderPage(path = '/communities') {
  * reads the Toast synchronously. The notice lasts 2.5s, so polling for it
  * (`findByText`) can lose to a starved CI worker; nothing here waits on a timer.
  */
-/** The admin's invite controls live on the Invites tab. */
+/** Opens the admin's Manage menu and picks an item. */
+async function pickFromManage(item: string | RegExp) {
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: /^Manage/ }));
+  await user.click(await screen.findByRole('menuitem', { name: item }));
+}
+
+/** The admin's invite controls live in Manage › Invites. */
 async function openInvites() {
-  fireEvent.click(await screen.findByRole('tab', { name: c.tabs.invites }));
+  await pickFromManage(/^Invites/);
+  return screen.findByRole('dialog', { name: c.manage.invitesTitle });
 }
 
 async function clickCopy() {
@@ -77,6 +106,11 @@ async function seed() {
   store.loadMailInviteStatus.mockResolvedValue({ remaining: 20, sent: [] });
   store.loadJoinRequests.mockResolvedValue([]);
   await db.characters.clear();
+  await db.settings.clear();
+  useContentScopes.setState({
+    value: { blueprints: 'everyone', fittings: 'everyone', plans: 'everyone' },
+    hydrated: false,
+  });
   await db.characters.put({ characterId: ME, name: 'Me', ownerHash: 'h', addedAt: 1 });
   useActiveCharacter.setState({ activeCharacterId: ME, hydrated: true });
 }
@@ -152,12 +186,12 @@ describe('Communities page', () => {
       renderPage('/communities?community=c1');
       await openInvites();
       await user.click(await screen.findByRole('button', { name: c.regenerate }));
-      const regen = await screen.findByRole('dialog');
+      const regen = await screen.findByRole('dialog', { name: c.regenerateTitle });
       await user.click(within(regen).getByRole('button', { name: c.regenerateAction }));
       await waitFor(() => expect(store.regenerateInvite).toHaveBeenCalledWith(ME, 'c1'));
 
       await user.click(await screen.findByRole('button', { name: c.revoke }));
-      const revoke = await screen.findByRole('dialog');
+      const revoke = await screen.findByRole('dialog', { name: c.revokeTitle });
       await user.click(within(revoke).getByRole('button', { name: c.revokeAction }));
       await waitFor(() => expect(store.revokeInvite).toHaveBeenCalledWith(ME, 'c1'));
     });
@@ -171,7 +205,7 @@ describe('Communities page', () => {
       expect(screen.getByRole('button', { name: c.regenerate })).toBeInTheDocument();
     });
 
-    it('turns approval for new Members on and off from the Invites tab', async () => {
+    it('turns approval for new Members on and off from Manage › Invites', async () => {
       store.setRequireApproval.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
@@ -191,8 +225,9 @@ describe('Communities page', () => {
       store.decideJoinRequest.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
-      const tab = await screen.findByRole('tab', { name: /2 waiting/ });
-      await user.click(tab);
+      // The waiting count shows on Manage, so a request is never out of sight.
+      expect(await screen.findByRole('button', { name: 'Manage · 2 waiting' })).toBeInTheDocument();
+      await pickFromManage('Invites · 2 waiting');
       const row = (await screen.findByText('Newbie')).closest('li')!;
       await user.click(within(row).getByRole('button', { name: c.requests.accept }));
       await waitFor(() =>
@@ -215,7 +250,7 @@ describe('Communities page', () => {
       });
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
-      await user.click(await screen.findByRole('tab', { name: /1 waiting/ }));
+      await pickFromManage(/^Invites/);
       await user.click(await screen.findByRole('button', { name: c.requests.accept }));
       expect(await screen.findByText(c.requests.full)).toBeInTheDocument();
     });
@@ -247,15 +282,81 @@ describe('Communities page', () => {
       await waitFor(() => expect(store.transferAdmin).toHaveBeenCalledWith(ME, 'c1', 'char:92'));
     });
 
+    it('transfers the admin role from Manage › Transfer admin', async () => {
+      store.transferAdmin.mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      renderPage('/communities?community=c1');
+      await pickFromManage(c.manage.transfer);
+      const picker = await screen.findByRole('dialog', { name: c.manage.transferTitle });
+      // The admin is not offered to itself.
+      expect(within(picker).queryByText('Me')).not.toBeInTheDocument();
+      const row = (await within(picker).findByText('Friend')).closest('li')!;
+      await user.click(within(row).getByRole('button', { name: c.makeAdminAction }));
+      const confirm = await screen.findByRole('dialog', { name: /Make Friend the admin/ });
+      await user.click(within(confirm).getByRole('button', { name: c.makeAdminAction }));
+      await waitFor(() => expect(store.transferAdmin).toHaveBeenCalledWith(ME, 'c1', 'char:92'));
+    });
+
     it('deletes the Community and closes it', async () => {
       store.deleteCommunity.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
-      await user.click(await screen.findByRole('tab', { name: en.communities.members }));
-      await user.click(await screen.findByRole('button', { name: c.delete }));
-      const dialog = await screen.findByRole('dialog');
+      await pickFromManage(c.delete);
+      const dialog = await screen.findByRole('dialog', { name: /Delete Pals/ });
       await user.click(within(dialog).getByRole('button', { name: c.deleteAction }));
       await waitFor(() => expect(store.deleteCommunity).toHaveBeenCalledWith(ME, 'c1'));
+    });
+  });
+
+  describe('content tabs', () => {
+    beforeEach(() => {
+      store.loadMyCommunities.mockResolvedValue([community()]);
+    });
+
+    it('opens on the Blueprints Community Library, Everyone first', async () => {
+      renderPage('/communities?community=c1');
+      expect(await screen.findByText('everyone-blueprints')).toBeInTheDocument();
+      const everyone = screen.getByRole('button', { name: c.scope.everyone });
+      expect(everyone).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+        c.tabs.blueprints,
+        c.tabs.fittings,
+        c.tabs.plans,
+        c.members,
+      ]);
+    });
+
+    it('switches a tab to Mine and remembers the pick for that tab only', async () => {
+      const user = userEvent.setup();
+      const view = renderPage('/communities?community=c1&tab=fittings');
+      expect(await screen.findByText('everyone-fittings')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: c.scope.mine }));
+      expect(await screen.findByText('mine-fittings')).toBeInTheDocument();
+      await waitFor(async () =>
+        expect((await db.settings.get(CONTENT_SCOPE_KEY))?.value).toEqual({
+          blueprints: 'everyone',
+          fittings: 'mine',
+          plans: 'everyone',
+        })
+      );
+      await user.click(screen.getByRole('tab', { name: c.tabs.plans }));
+      expect(await screen.findByText('everyone-plans')).toBeInTheDocument();
+      view.unmount();
+
+      renderPage('/communities?community=c1&tab=fittings');
+      expect(await screen.findByText('mine-fittings')).toBeInTheDocument();
+    });
+
+    it('opens on Mine from a ?view=mine link', async () => {
+      renderPage('/communities?community=c1&tab=plans&view=mine');
+      expect(await screen.findByText('mine-plans')).toBeInTheDocument();
+    });
+
+    it('opens Manage › Invites from an old ?tab=invites link', async () => {
+      renderPage('/communities?community=c1&tab=invites');
+      expect(
+        await screen.findByRole('dialog', { name: c.manage.invitesTitle })
+      ).toBeInTheDocument();
     });
   });
 
@@ -319,7 +420,7 @@ describe('Communities page', () => {
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
       await screen.findByRole('tab', { name: c.members });
-      expect(screen.queryByRole('tab', { name: c.tabs.invites })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Manage/ })).not.toBeInTheDocument();
       await user.click(await screen.findByRole('tab', { name: en.communities.members }));
       await screen.findByText('Friend');
       expect(screen.queryByRole('button', { name: c.copyLink })).not.toBeInTheDocument();

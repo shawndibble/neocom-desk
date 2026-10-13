@@ -1,17 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Modal, SearchInput, Spinner } from '@/components/ui';
+import { EmptyState, Modal, Spinner } from '@/components/ui';
 import type { PlanEntry } from '@/engine/types';
-import type { SharedPlan } from '@/engine/communities/sharedPlans';
 import { loadCommunityMembers, loadMyCommunities } from './communityStore';
 import { loadCommunityPlans } from './sharedPlans';
+import { SharedPlanList, type SharedPlanRow } from './SharedPlanList';
 
-interface Row extends SharedPlan {
-  communityName: string;
-  sharerName: string;
-}
-
-type State = { status: 'loading' } | { status: 'failed' } | { status: 'ready'; rows: Row[] };
+type State =
+  { status: 'loading' } | { status: 'failed' } | { status: 'ready'; rows: SharedPlanRow[] };
 
 /**
  * Browse the Skill Plans the active Character's Communities share (Skills ›
@@ -31,7 +27,6 @@ export function CommunityPlansDialog({
 }) {
   const { t } = useTranslation();
   const [state, setState] = useState<State>({ status: 'loading' });
-  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -46,11 +41,21 @@ export function CommunityPlansDialog({
                 loadCommunityMembers(characterId, community.id),
               ]);
               const names = new Map(members.map((member) => [member.uid, member.characterName]));
-              return plans.map((plan): Row => ({
-                ...plan,
-                communityName: community.name,
-                sharerName: names.get(plan.ownerUid) ?? t('communities.plansDialog.formerMember'),
-              }));
+              return plans.map((plan): SharedPlanRow => {
+                const sharerName =
+                  names.get(plan.ownerUid) ?? t('communities.plansDialog.formerMember');
+                return {
+                  key: `${plan.communityId}:${plan.id}`,
+                  name: plan.name,
+                  sharerName,
+                  detail: t('communities.plansDialog.detail', {
+                    name: sharerName,
+                    community: community.name,
+                    count: plan.entries.length,
+                  }),
+                  entries: plan.entries,
+                };
+              });
             })
           )
         ).flat();
@@ -63,17 +68,6 @@ export function CommunityPlansDialog({
       cancelled = true;
     };
   }, [characterId, t]);
-
-  const needle = query.trim().toLowerCase();
-  const shown = useMemo(() => {
-    if (state.status !== 'ready') return [];
-    return state.rows
-      .filter(
-        (row) =>
-          row.name.toLowerCase().includes(needle) || row.sharerName.toLowerCase().includes(needle)
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [state, needle]);
 
   return (
     <Modal open onClose={onClose} title={t('communities.plansDialog.title')}>
@@ -93,44 +87,11 @@ export function CommunityPlansDialog({
               hint={t('communities.plansDialog.emptyHint')}
             />
           ) : (
-            <>
-              <SearchInput
-                className="w-full"
-                value={query}
-                placeholder={t('communities.plansDialog.search')}
-                aria-label={t('communities.plansDialog.search')}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-              {shown.length === 0 ? (
-                <EmptyState title={t('communities.plansDialog.noMatch')} />
-              ) : (
-                <ul className="max-h-96 divide-y divide-line overflow-y-auto">
-                  {shown.map((row) => (
-                    <li
-                      key={`${row.communityId}:${row.id}`}
-                      className="flex items-center gap-2 py-1.5 text-xs"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{row.name}</span>
-                        <span className="block truncate text-text-dim">
-                          {t('communities.plansDialog.detail', {
-                            name: row.sharerName,
-                            community: row.communityName,
-                            count: row.entries.length,
-                          })}
-                        </span>
-                      </span>
-                      <Button
-                        size="sm"
-                        onClick={() => onCopy({ name: row.name, entries: row.entries })}
-                      >
-                        {t('communities.plansDialog.copy')}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+            <SharedPlanList
+              rows={state.rows}
+              onCopy={onCopy}
+              listClassName="max-h-96 overflow-y-auto"
+            />
           ))}
       </div>
     </Modal>

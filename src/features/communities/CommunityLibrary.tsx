@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { bpcSourcingCommunityHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { Caret, EmptyState, FilterChip, SearchInput, Spinner, Tooltip } from '@/components/ui';
 import {
   buildLibraryRows,
@@ -158,10 +161,12 @@ function LibraryGroup({
 }
 
 /**
- * The Community Library tab (issue #3601): every blueprint in the SDE against
- * the Members who share it. Filter chips pick "missing from the Community"
- * (default), "owned by me" or "missing from me"; the market-group tree counts
- * each category. A stale Member is greyed and badged, never hidden.
+ * The Community Library (issue #3601), the Blueprints tab's Everyone view:
+ * every blueprint in the SDE against the Members who share it. Filter chips
+ * pick "missing from the Community" (default), "owned by me" or "missing from
+ * me"; the market-group tree counts each category. A stale Member is greyed
+ * and badged, never hidden. BPC Sourcing, one link away, lists each shared
+ * copy with its owner, place and ME/TE/runs.
  */
 export function CommunityLibrary({
   communityId,
@@ -257,6 +262,12 @@ export function CommunityLibrary({
 
   return (
     <div className="space-y-3">
+      <p className="text-xs">
+        <Link to={bpcSourcingCommunityHref()} className={inlineLinkClassName}>
+          {t('communities.blueprints.browse')}
+        </Link>
+        <span className="text-text-dim"> · {t('communities.blueprints.browseHint')}</span>
+      </p>
       <div
         className="flex flex-wrap items-center gap-2"
         role="group"

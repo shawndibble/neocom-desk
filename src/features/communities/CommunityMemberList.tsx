@@ -22,8 +22,9 @@ const BADGE = 'rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim
 /**
  * The Members tab's roster: a portrait, the name and when their library was
  * last refreshed, an Admin or Stale badge, and, for the admin, a ⋮ on every
- * other Member (make admin, remove). Leave or Delete close the tab, set apart
- * from the roster so the most destructive control is never beside a row.
+ * other Member (make admin, remove). Any other Member's Leave closes the tab,
+ * set apart from the roster so it is never beside a row; the admin's Delete
+ * is in the header's Manage menu.
  */
 export function CommunityMemberList({
   members,
@@ -33,7 +34,7 @@ export function CommunityMemberList({
   now,
   onMakeAdmin,
   onRemove,
-  onLeaveOrDelete,
+  onLeave,
 }: {
   members: readonly CommunityMember[];
   adminUid: string;
@@ -42,7 +43,7 @@ export function CommunityMemberList({
   now: number;
   onMakeAdmin: (member: CommunityMember) => void;
   onRemove: (member: CommunityMember) => void;
-  onLeaveOrDelete: () => void;
+  onLeave: () => void;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -122,14 +123,16 @@ export function CommunityMemberList({
         </ul>
       )}
 
-      <section className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3">
-        <p className="min-w-0 flex-1 basis-48 text-xs text-text-dim">
-          {t(isAdmin ? 'communities.deleteHint' : 'communities.leaveHint')}
-        </p>
-        <Button variant="danger" size="sm" onClick={onLeaveOrDelete}>
-          {t(isAdmin ? 'communities.delete' : 'communities.leave')}
-        </Button>
-      </section>
+      {!isAdmin && (
+        <section className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3">
+          <p className="min-w-0 flex-1 basis-48 text-xs text-text-dim">
+            {t('communities.leaveHint')}
+          </p>
+          <Button variant="danger" size="sm" onClick={onLeave}>
+            {t('communities.leave')}
+          </Button>
+        </section>
+      )}
     </div>
   );
 }
