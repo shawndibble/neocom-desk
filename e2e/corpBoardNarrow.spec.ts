@@ -20,9 +20,11 @@ import {
   CHARACTER_NAME,
   CHARACTER_ID,
   CORPORATION_ID,
+  CORPORATION_NAME,
   OWNER_HASH,
   SCOPES,
 } from './support/fixtureData';
+import { signInAndGoto } from './support/authSeed';
 import { scopesForGroup } from '../src/esi/scopes';
 
 const NARROW = { width: 320, height: 720 };
@@ -230,3 +232,61 @@ for (const width of [390, 1024, 1280]) {
     });
   });
 }
+
+test.describe('corp Vitals rail division rows (#3676)', () => {
+  for (const { width, touch } of [
+    { width: 390, touch: true },
+    { width: 1280, touch: false },
+  ]) {
+    test(`division rows ${touch ? 'meet' : 'stay under'} the 44px touch tier at ${width}px`, async ({
+      page,
+    }) => {
+      const corp = `/corporations/${CORPORATION_ID}`;
+      await page.route('https://esi.evetech.net/**', async (route) => {
+        const path = new URL(route.request().url()).pathname;
+        const json = (body: unknown) =>
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(body),
+          });
+        if (path === `/characters/${CHARACTER_ID}/roles`) return json({ roles: ['Accountant'] });
+        if (path === `${corp}/wallets`) {
+          return json(
+            Array.from({ length: 7 }, (_, index) => ({
+              division: index + 1,
+              balance: 123_456_789_013 + index,
+            }))
+          );
+        }
+        if (path === `${corp}/divisions`) {
+          return json({
+            wallet: Array.from({ length: 7 }, (_, index) => ({
+              division: index + 1,
+              name: `Division ${index + 1}`,
+            })),
+          });
+        }
+        if (path.startsWith(`${corp}/`)) return json([]);
+        await route.fallback();
+      });
+
+      await page.setViewportSize({ width, height: 844 });
+      await signInAndGoto(page, './overview', [...SCOPES, ...scopesForGroup('corp')]);
+      await expect(page.getByText(CORPORATION_NAME).first()).toBeVisible();
+      await page.goto('./corp');
+
+      const rows = page.getByRole('link', { name: /^View .* in Corp wallet/ });
+      await expect(rows).toHaveCount(7);
+      for (const row of await rows.all()) {
+        const box = await row.boundingBox();
+        if (touch) expect(box!.height).toBeGreaterThanOrEqual(44);
+        else expect(box!.height).toBeLessThan(44);
+      }
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        `no overflow at ${width}`
+      ).toBe(true);
+    });
+  }
+});
