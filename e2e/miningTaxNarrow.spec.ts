@@ -915,7 +915,9 @@ async function openSplitWithSecondPayee(page: Page): Promise<Locator> {
   await seedPayeeBalance(page, { needsReview: true });
   await seedSecondPayee(page);
   await page.goto('./mining/tax');
-  await page.getByText('Needs Review', { exact: true }).first().click();
+  // The status pill is a focusable hint trigger and swallows the row click.
+  await page.getByRole('cell', { name: ENTRY_DATE }).first().click();
+  await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Give new ore to another Payee…' }).click();
   const dialog = page.getByRole('dialog', { name: /^Split — / });
   await expect(dialog).toBeVisible();
