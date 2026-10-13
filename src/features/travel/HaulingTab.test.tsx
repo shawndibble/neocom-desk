@@ -27,11 +27,7 @@ const { HaulingTab } = await import('./HaulingTab');
 function renderTab() {
   return render(
     <MemoryRouter>
-      <HaulingTab
-        tabBar={null}
-        tabsId="travel"
-        views={{ tabs: [], value: 'hauling', onChange: () => {} }}
-      />
+      <HaulingTab tabBar={null} tabsId="travel" />
     </MemoryRouter>
   );
 }

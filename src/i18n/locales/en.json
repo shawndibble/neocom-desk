@@ -4674,9 +4674,6 @@
     }
   },
   "common": {
-    "viewPicker": {
-      "label": "{{page}}, {{view}}. Change view"
-    },
     "opensInNewTab": "(opens in a new tab)",
     "iskAmountHint": "= {{amount}} ISK",
     "iskInvalid": "Not an ISK amount. Try 1.5b, 500m or 1,000,000.",

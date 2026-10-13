@@ -63,7 +63,7 @@ const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
 /** Same debounce as Mail's recipient search, which calls the same ESI search. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-export function PilotLookupPanel({ tabBar, tabsId, views }: TravelTabProps) {
+export function PilotLookupPanel({ tabBar, tabsId }: TravelTabProps) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
   const [resolved, setResolved] = useState<PilotSummary | null>(null);
@@ -88,7 +88,7 @@ export function PilotLookupPanel({ tabBar, tabsId, views }: TravelTabProps) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('travel.title')} views={views} />
+      <PageHeader title={t('travel.title')} />
       {tabBar}
       <TabPanel tabsId={tabsId} tabId="pilot" className="space-y-4">
         {/* Each Panel's backdrop-blur is its own stacking context; lifting this one keeps the suggestion list above the panel below. */}

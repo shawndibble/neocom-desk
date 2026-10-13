@@ -61,7 +61,7 @@ const THERA_PARAMS = {
   size: enumParam(SIZE_OPTIONS, DEFAULT_FILTERS.size),
 };
 
-export function TheraTab({ tabBar, tabsId, views }: TravelTabProps) {
+export function TheraTab({ tabBar, tabsId }: TravelTabProps) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(THERA_PARAMS);
   const current = useCurrentSystem();
@@ -91,7 +91,6 @@ export function TheraTab({ tabBar, tabsId, views }: TravelTabProps) {
     <div className="space-y-4">
       <PageHeader
         title={t('travel.title')}
-        views={views}
         meta={
           state.kind === 'ready' ? (
             <DataAgeBadge date={state.fetchedAt} note={t('travel.thera.dataAgeNote')} />

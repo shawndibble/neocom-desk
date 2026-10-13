@@ -1,5 +1,5 @@
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
-import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -25,10 +25,7 @@ import {
   Tabs,
   Toast,
   TypeIcon,
-  useTabPanelProps,
   useTabsId,
-  usesViewPicker,
-  type PageViews,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -275,32 +272,6 @@ function MarketGroupTree({
  * 12). The catalogue (groups/types/systems/stations/regions) is lazy-loaded,
  * not precached (GLOSSARY.md round 10) — most installs never open /market.
  */
-/**
- * The Market view's tab panel. On a phone the view picker replaces the strip,
- * so there is no tab to label the region by; it stays a plain container then
- * (same element either way, so the page does not remount across the breakpoint).
- */
-function MarketViewPanel({
-  tabsId,
-  tabId,
-  labelled,
-  children,
-}: {
-  tabsId: string;
-  tabId: string;
-  labelled: boolean;
-  children: ReactNode;
-}) {
-  const { className, ...panel } = useTabPanelProps(tabsId, tabId);
-  return labelled ? (
-    <div {...panel} className={className}>
-      {children}
-    </div>
-  ) : (
-    <div>{children}</div>
-  );
-}
-
 export function Market() {
   const { t } = useTranslation();
   const location = useLocation();
@@ -323,18 +294,7 @@ export function Market() {
   const { slots: headerSlots, metaSlot, actionsSlot } = usePageHeaderSlots();
   const viewsTabsId = useTabsId();
   const itemTabsId = useTabsId();
-  // Market's full view list: a strip on desktop, the title-row picker on a phone.
-  const marketViews: PageViews = {
-    value: tab,
-    onChange: (id) => changeTab(id as MarketTab),
-    tabs: [
-      { id: 'browser', label: t('market.sections.browser') },
-      { id: 'orders', label: t('market.sections.openOrders') },
-      { id: 'stock', label: t('market.sections.stock') },
-      { id: 'history', label: t('market.sections.history') },
-      { id: 'appraisal', label: t('market.sections.appraisal') },
-    ],
-  };
+  const marketTabs = MARKET_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }));
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // The Appraisal tab's other half of the same control pair as the header's hub picker.
@@ -844,7 +804,6 @@ export function Market() {
         {tab === 'orders' && <FromWalletCrumb />}
         <PageHeader
           title={t('market.title')}
-          views={marketViews}
           meta={tabOwnsHeader ? metaSlot : undefined}
           actions={
             usesHubPicker(tab) ? (
@@ -925,21 +884,15 @@ export function Market() {
           }
         />
 
-        {!usesViewPicker(marketViews.tabs.length, isPhone) && (
-          <Tabs
-            tabsId={viewsTabsId}
-            label={t('market.title')}
-            value={marketViews.value}
-            onChange={marketViews.onChange}
-            tabs={[...marketViews.tabs]}
-          />
-        )}
-
-        <MarketViewPanel
+        <Tabs
           tabsId={viewsTabsId}
-          tabId={marketViews.value}
-          labelled={!usesViewPicker(marketViews.tabs.length, isPhone)}
-        >
+          label={t('market.title')}
+          value={tab}
+          onChange={(id) => changeTab(id as MarketTab)}
+          tabs={marketTabs}
+        />
+
+        <TabPanel tabsId={viewsTabsId} tabId={tab}>
           {tab === 'orders' && <OpenOrdersPanel headerSlots={headerSlots} />}
           {tab === 'stock' && <StockTab activeCharacterId={activeCharacterId} />}
 
@@ -1410,7 +1363,7 @@ export function Market() {
               </Panel>
             </div>
           )}
-        </MarketViewPanel>
+        </TabPanel>
 
         {compareCount > 0 && (
           <CompareDrawer

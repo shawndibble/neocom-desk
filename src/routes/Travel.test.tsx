@@ -1426,16 +1426,14 @@ describe('Travel › Hauling (moved from Market, #3526)', () => {
     expect(window.location.search).toBe('');
   });
 
-  it('trades the strip for the title’s view picker on a phone', async () => {
+  it('keeps the tab strip on a phone', async () => {
     const matchMedia = phoneScreen();
     try {
       window.history.pushState({}, '', '/travel/hauling');
       render(<App />);
       expect(await screen.findByText(HAULING_FAILED)).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: 'Travel, Hauling. Change view' })
-      ).toBeInTheDocument();
-      expect(screen.queryByRole('tablist', { name: 'Travel' })).not.toBeInTheDocument();
+      expect(screen.getByRole('tablist', { name: 'Travel' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Hauling' })).toHaveAttribute('aria-selected', 'true');
     } finally {
       matchMedia.mockRestore();
     }
