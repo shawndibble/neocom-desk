@@ -1671,7 +1671,7 @@ export function getCharacterPlanets(
  * `pin_id, type_id, latitude, longitude`; `expiry_time`, `install_time`,
  * `last_cycle_start` and `schematic_id` are all optional, and
  * `extractor_details` itself requires only `heads`. Never assume a field is
- * present — `features/pi/adapters.ts` excludes a pin from the colony-health
+ * present — `engine/pi/colonyPins.ts` excludes a pin from the colony-health
  * math rather than substituting a default.
  */
 export interface PlanetPinExtractorDetails {

@@ -4,7 +4,7 @@
  * Colony health: an extractor program's expiry, the one field ESI keeps
  * current without the colony being opened in the client
  * (https://developers.eveonline.com/docs/guides/pi/). Adapted from the ESI
- * `pins[]` shape at the feature boundary (`features/pi/adapters.ts`), same
+ * `pins[]` shape in `engine/pi/colonyPins.ts`, same
  * convention as `engine/industry/types.ts`.
  *
  * Production chains: the shapes `chain.ts` expands and costs. They live here

@@ -4,7 +4,7 @@ import { parseChatLink } from '@/engine/import/chatLink';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
 import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
 import { FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
-import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { routeToHref } from '@/features/route/routeSafetyLink';
 import { entityInfoHref } from '@/lib/entityInfo';
 import { tabPath } from '@/lib/pageTabs';
 import {

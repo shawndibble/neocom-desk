@@ -16,7 +16,7 @@ import { useRouteHolesEnabled } from '@/features/route/routeHoleSettings';
 import { TravelSettingsPanel } from './TravelSettingsPanel';
 
 const loadPodKills = vi.fn<() => Promise<ReadonlyMap<number, number> | null>>();
-vi.mock('@/features/travel/routeSafetyData', () => ({ loadPodKills: () => loadPodKills() }));
+vi.mock('@/features/route/routeSafetyData', () => ({ loadPodKills: () => loadPodKills() }));
 vi.mock('@/sde/loadMarketSde', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/sde/loadMarketSde')>();
   return { ...actual, loadSolarSystems: async () => [] };

@@ -6,7 +6,7 @@ import { Button, Panel, Tooltip } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { AttributeName } from '@/engine/types';
 import type { VerdictSegment } from '@/engine/cloneVerdict';
-import { useViewRoute } from '@/features/travel/useViewRoute';
+import { useViewRoute } from '@/features/route/useViewRoute';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 

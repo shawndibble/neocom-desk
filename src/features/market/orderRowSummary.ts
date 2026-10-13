@@ -21,6 +21,21 @@ import type { UndercutScope } from '@/engine/market/undercut';
 import { undercutPrice, outbidPrice } from '@/engine/market/priceTick';
 import type { OpenOrderRow } from './openOrdersModel';
 
+export type OrderAdviceInput = Pick<
+  OpenOrderRow,
+  | 'problem'
+  | 'floor'
+  | 'station'
+  | 'deepUndercut'
+  | 'worstScope'
+  | 'expiry'
+  | 'isBuyOrder'
+  | 'price'
+  | 'costBasis'
+  | 'frequentlyUndercut'
+  | 'volumeRemain'
+>;
+
 /** What undercutting the rival's price would do to a unit, once the fees are paid. Only ever known when the order has a cost basis. */
 export interface MatchOutcome {
   kind: 'profit' | 'loss';
@@ -55,7 +70,7 @@ export type OrderRowSummary =
   | { kind: 'topBid' };
 
 /** `suggestedPrice` is already the legal undercut price (or null) — the margin is judged there, never against the rival's raw (tied) price. */
-function matchOutcome(row: OpenOrderRow, suggestedPrice: number | null): MatchOutcome | null {
+function matchOutcome(row: OrderAdviceInput, suggestedPrice: number | null): MatchOutcome | null {
   if (row.isBuyOrder || !row.floor || suggestedPrice === null) return null;
   const margin = suggestedPrice - row.floor.relist;
   return margin >= 0 ? { kind: 'profit', amount: margin } : { kind: 'loss', amount: -margin };
@@ -63,7 +78,7 @@ function matchOutcome(row: OpenOrderRow, suggestedPrice: number | null): MatchOu
 
 /** The rival to quote for `scope`: the deep book's when it has been read, else the cheap station aggregate. */
 function rivalFor(
-  row: OpenOrderRow,
+  row: OrderAdviceInput,
   scope: UndercutScope
 ): { price: number; gapIsk: number; sellersUnderMe: number | null } | null {
   const deep = row.deepUndercut?.byScope[scope];
@@ -79,7 +94,7 @@ function rivalFor(
  * honest to say — a badge with no backing numbers renders alone rather
  * than beside an invented claim.
  */
-export function orderRowSummary(row: OpenOrderRow): OrderRowSummary | null {
+export function orderRowSummary(row: OrderAdviceInput): OrderRowSummary | null {
   switch (row.problem) {
     case 'belowFloor':
       if (!row.floor) return null;

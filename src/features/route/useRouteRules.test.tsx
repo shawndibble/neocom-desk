@@ -15,7 +15,7 @@ import {
 } from './routeRules';
 
 const loadPodKills = vi.fn<() => Promise<ReadonlyMap<number, number> | null>>();
-vi.mock('@/features/travel/routeSafetyData', () => ({ loadPodKills: () => loadPodKills() }));
+vi.mock('@/features/route/routeSafetyData', () => ({ loadPodKills: () => loadPodKills() }));
 
 const UEDAMA = 30045328;
 const PODDED = 30002813;

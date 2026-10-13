@@ -1359,7 +1359,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // The per-character ESI reads are already caught inside
     // `loadAllCharactersIndustryJobs`; only its own Dexie reads can reject it,
     // so that is what this breaks.
-    vi.spyOn(db.tokens, 'get').mockRejectedValue(new Error('IndexedDB unavailable'));
+    vi.spyOn(db.tokens, 'bulkGet').mockRejectedValue(new Error('IndexedDB unavailable'));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     render(

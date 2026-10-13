@@ -1,6 +1,6 @@
 import { db } from '@/db';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
-import { factorySchematicId } from '@/features/pi/adapters';
+import { factorySchematicId } from '@/engine/pi/colonyPins';
 import { loadPiRosterSnapshot, type PiRosterSnapshot } from '@/features/pi/roster';
 import {
   loadPlanetName,

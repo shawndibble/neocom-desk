@@ -25,8 +25,8 @@ import {
   readCachedColonyDetails,
   KEYS as PI_KEYS,
 } from '@/features/pi/data';
-import { extractorProgramsFromPins } from '@/features/pi/adapters';
-import { colonyAttention, colonyStatus, sortColoniesByAttention } from '@/engine/pi/colonyStatus';
+import { colonyStatusFromPins } from '@/engine/pi/colonyPins';
+import { colonyAttention, sortColoniesByAttention } from '@/engine/pi/colonyStatus';
 import type { ColonyAttention, ColonyStatus } from '@/engine/pi/types';
 import { runningJobCountsByCategory, type JobSlotCategory } from '@/engine/industry/jobSlots';
 import { toJobSlotJobs } from '@/features/character/jobSlotSkills';
@@ -90,7 +90,7 @@ function statusFromPins(
   pins: CharacterPlanetDetail['pins'] | undefined,
   nowMs: number
 ): ColonyStatus {
-  return colonyStatus(extractorProgramsFromPins(pins ?? []), nowMs);
+  return colonyStatusFromPins(pins ?? [], nowMs);
 }
 
 async function cacheOnlyAttention(

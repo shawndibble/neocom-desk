@@ -25,14 +25,14 @@ import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { routeSafetyNetwork } from '@/engine/route/routeSafetyTrip';
 import type { TheraConnection } from '@/engine/route/theraConnections';
 import { routeHoles } from '@/engine/route/routeHoles';
-import { gatesOf, useAnsiblexGates } from '@/features/travel/ansiblexGates';
+import { gatesOf, useAnsiblexGates } from '@/features/route/ansiblexGates';
 import {
   bridgeEndsFromKey,
   bridgeKey,
   holeEndsFromKey,
   holeNetworkKey,
-} from '@/features/travel/routeSafetyKeys';
-import { useRouteHoles } from '@/features/travel/useRouteHoles';
+} from '@/features/route/routeSafetyKeys';
+import { useRouteHoles } from '@/features/route/useRouteHoles';
 import { findLocalJumps, type RouteGraphExtras } from './localRoute';
 import { loadTheraConnections } from '@/lib/eveScout';
 import { useRouteBridgeQuery, useRouteBridgesEnabled } from './routeBridgeSettings';

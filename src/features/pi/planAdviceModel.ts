@@ -96,7 +96,7 @@ import { colonyPlan } from './colonyPlan';
 import { colonyBudget } from './colonyBudget';
 import { type PiCadence, cadenceHours } from './cadencePref';
 import { highsecCustomsRate } from './customsRate';
-import { extractorProgramsFromPins } from './adapters';
+import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { localResourcesFor, type BuiltColonyAdvice, type PlanetAdvice } from './systemPlanetModel';
 import { builtColonyEarnings, saleableOutputPerHour } from './colonyEarningsModel';
 import { colonyHoursToFull } from './colonyThroughput';

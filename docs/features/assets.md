@@ -256,7 +256,7 @@ Root list and drill-in; total value chip (#1617); focus to heading (#1485); syst
 4. **Why can a location show "Location unresolved"?** Asset parent not in the fetched list and not resolvable as a structure (e.g. corp hangar). Row hint explains. `Assets.tsx:633`, `assetBrowserRows.tsx` `LocationRow`.
 5. **Why are jump counts blank for some rows?** Computed only for pinned, visible and open locations; needs location scope for the origin; unplaceable destinations say why in a tooltip. `Assets.tsx:1278-1293`, `assets.jumpsAway.unknownReason`.
 6. **How do pins work across Characters?** Cycle character → account; account pin from any Character wins; character pin only for that Character; synced. `stationPins.ts`, `Assets.tsx:810-825`.
-7. **How does cross-character search avoid refetching?** Cache by sorted id set in a ref; per-Character cache-or-live with skip on failure; only runs while searching. `Assets.tsx:760-798`, `assets.ts:fanOutCharacterAssets`.
+7. **How does cross-character search avoid refetching?** Cache by sorted id set in a ref; per-Character cache-or-live with skip on failure; only runs while searching. `Assets.tsx:760-798`, `allCharactersFanOut.ts:fanOutAllCharacters`.
 8. **Why does CSV export ignore the drill level and min value?** Export builds location-grouped rows from the active Character's whole list matching the search text only. `Assets.tsx:865-891,1523`.
 9. **How is a BPO distinguished from a BPC?** ESI flags copies; originals are blueprint typeIDs from SDE; badge appears only once the set loads. `engine/blueprintKind.ts`.
 10. **Why is the min-value filter not remembered while sort is?** A filter that hides assets reopened silently looks like lost items. `assetSortPreference.ts:13-17`.

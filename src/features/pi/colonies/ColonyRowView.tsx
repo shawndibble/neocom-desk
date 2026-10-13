@@ -22,7 +22,7 @@ import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemCo
 import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { groupFactoryPins } from '../adapters';
+import { groupFactoryPins } from '@/engine/pi/colonyPins';
 import {
   HOUR_MS,
   faultTagKey,

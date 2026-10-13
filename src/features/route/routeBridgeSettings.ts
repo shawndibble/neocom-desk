@@ -5,7 +5,7 @@
  * Route Safety only, like the hole settings beside it: no other page's jump
  * count should change with a private bridge list. Unlike them it is a
  * device-local default, not a synced one — the list it switches on lives on
- * this device alone (`features/travel/ansiblexGates.ts`), so on another
+ * this device alone (`features/route/ansiblexGates.ts`), so on another
  * device it would switch on nothing. Overridable in the page's link (`jb`).
  */
 import { useEffect } from 'react';

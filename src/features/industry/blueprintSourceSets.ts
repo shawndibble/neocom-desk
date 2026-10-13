@@ -15,6 +15,7 @@ import {
   type BlueprintSourceSets,
 } from '@/engine/industry/blueprintObtainability';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { bpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { loadCharacterLoyaltyPoints, PARAGON_CORPORATION_ID } from '@/features/character/loyalty';
 import { loadLoyaltyStoreOffers } from '@/features/loyalty/store';
@@ -75,8 +76,7 @@ async function contractBlueprints(characterIds: readonly number[]): Promise<Sour
   for (const characterId of characterIds) {
     const snapshot = await loadPublicBpcContracts(characterId).catch(() => null);
     if (!snapshot || snapshot.data.lastSyncedAt === null) continue;
-    const { rows, originals = [] } = snapshot.data;
-    return { ids: new Set([...rows, ...originals].map((row) => row.typeId)), ok: true };
+    return { ids: new Set(bpcOfferRows(snapshot.data).map((row) => row.typeId)), ok: true };
   }
   return FAILED;
 }

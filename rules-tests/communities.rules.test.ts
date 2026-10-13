@@ -48,6 +48,11 @@ beforeEach(async () => {
       code: 'CODE',
       updatedAt: 1,
     });
+    await setDoc(doc(db, `${C}/requests/char:9`), {
+      ownerHash: 'hash-9',
+      characterName: 'Nine',
+      requestedAt: 1,
+    });
     await setDoc(doc(db, `${C}/mailInvites/42`), {
       adminUid: 'char:1',
       targetName: 'Bob',
@@ -220,6 +225,13 @@ describe('mail invites', () => {
     await assertSucceeds(getDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-12')));
   });
 
+  it('lets the admin read a day’s count before any invite went out that day', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertSucceeds(getDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-13')));
+    const other = characterAuth(env, 2, 'hash-2').firestore();
+    await assertFails(getDoc(doc(other, 'characters/char:1/mailInviteQuota/2026-10-13')));
+  });
+
   it('hides them from other Members, non-Members and another Character’s quota', async () => {
     const member = characterAuth(env, 2, 'hash-2').firestore();
     await assertFails(getDoc(doc(member, `${C}/mailInvites/42`)));
@@ -246,6 +258,109 @@ describe('mail invites', () => {
     const db = characterAuth(env, 1, 'hash-1-new-owner').firestore();
     await assertFails(getDoc(doc(db, `${C}/mailInvites/42`)));
     await assertFails(getDoc(doc(db, 'characters/char:1/mailInviteQuota/2026-10-12')));
+  });
+});
+
+describe('join requests', () => {
+  it('lets the admin read the Characters waiting to join', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertSucceeds(getDoc(doc(db, `${C}/requests/char:9`)));
+    await assertSucceeds(getDocs(collection(db, `${C}/requests`)));
+  });
+
+  it('hides them from other Members, non-Members and the waiting Character', async () => {
+    const member = characterAuth(env, 2, 'hash-2').firestore();
+    await assertFails(getDoc(doc(member, `${C}/requests/char:9`)));
+    await assertFails(getDocs(collection(member, `${C}/requests`)));
+    const waiting = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(getDoc(doc(waiting, `${C}/requests/char:9`)));
+  });
+
+  it('denies every client write, the admin’s and the requester’s included', async () => {
+    const admin = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(admin, `${C}/requests/char:8`), { characterName: 'x' }));
+    await assertFails(deleteDoc(doc(admin, `${C}/requests/char:9`)));
+    const waiting = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(setDoc(doc(waiting, `${C}/requests/char:9`), { characterName: 'x' }));
+  });
+
+  it('denies a transferred admin Character the old admin’s requests', async () => {
+    const db = characterAuth(env, 1, 'hash-1-new-owner').firestore();
+    await assertFails(getDoc(doc(db, `${C}/requests/char:9`)));
+  });
+});
+
+describe('shared Skill Plans', () => {
+  const PLAN_1 = `${C}/skillPlans/char:1~plan-a1`;
+  const plan = (over: Record<string, unknown> = {}) => ({
+    ownerHash: 'hash-1',
+    ownerUid: 'char:1',
+    name: 'Marauder',
+    entries: [3300, 5, 1, 3301, 3, 2],
+    sourceUpdatedAt: 1000,
+    updatedAt: serverTimestamp(),
+    ...over,
+  });
+
+  it('lets a Member list and read them, and nobody else', async () => {
+    const member = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(getDocs(collection(member, `${C}/skillPlans`)));
+    const outsider = characterAuth(env, 3, 'hash-3').firestore();
+    await assertFails(getDocs(collection(outsider, `${C}/skillPlans`)));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), PLAN_1)));
+  });
+
+  it('lets a Member write, re-push and delete their own', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertSucceeds(setDoc(doc(db, PLAN_1), plan()));
+    await assertSucceeds(setDoc(doc(db, PLAN_1), plan({ sourceUpdatedAt: 2000 })));
+    await assertSucceeds(deleteDoc(doc(db, PLAN_1)));
+  });
+
+  it('denies writing or deleting under another Member’s id', async () => {
+    const db = characterAuth(env, 2, 'hash-2').firestore();
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ ownerHash: 'hash-2', ownerUid: 'char:2' })));
+    await assertFails(deleteDoc(doc(db, PLAN_1)));
+  });
+
+  it('denies an id that is not <uid>~<plan id>', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, `${C}/skillPlans/plain`), plan()));
+    await assertFails(setDoc(doc(db, `${C}/skillPlans/char:1~a~b`), plan()));
+    await assertFails(setDoc(doc(db, `${C}/skillPlans/char:1~`), plan()));
+  });
+
+  it('denies a non-Member and a transferred Character writing', async () => {
+    await assertFails(
+      setDoc(
+        doc(characterAuth(env, 3, 'hash-3').firestore(), `${C}/skillPlans/char:3~p`),
+        plan({ ownerHash: 'hash-3', ownerUid: 'char:3' })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(characterAuth(env, 1, 'hash-1-new-owner').firestore(), PLAN_1),
+        plan({ ownerHash: 'hash-1-new-owner' })
+      )
+    );
+  });
+
+  it('denies a forged owner, extra fields and a forged time', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ ownerHash: 'forged' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ ownerUid: 'char:2' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ notes: 'private' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ updatedAt: 5 })));
+  });
+
+  it('denies an empty or oversized name, entries that are not whole triples, and wrong types', async () => {
+    const db = characterAuth(env, 1, 'hash-1').firestore();
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ name: '' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ name: 'x'.repeat(201) })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ entries: [1, 2] })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ entries: new Array(1503).fill(1) })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ entries: 'nope' })));
+    await assertFails(setDoc(doc(db, PLAN_1), plan({ sourceUpdatedAt: 'now' })));
   });
 });
 

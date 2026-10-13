@@ -22,7 +22,7 @@ vi.mock('@/features/route/routeShip', async (importOriginal) => {
   };
 });
 
-vi.mock('@/features/travel/routeSafetyData', () => ({
+vi.mock('@/features/route/routeSafetyData', () => ({
   loadPodKills: async () => new Map<number, number>(),
 }));
 vi.mock('@/sde/loadMarketSde', async (importOriginal) => {

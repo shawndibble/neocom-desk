@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   addShared,
+  copiesByPlace,
   effectiveSelection,
+  noBlueprintsShared,
   noneShared,
   shareAll,
+  shareAllBlueprints,
+  sharesBlueprint,
+  shareLocation,
   stopSharing,
+  stopSharingLocation,
+  typeShareStatus,
+  type BlueprintShare,
   type ShareChoice,
 } from './shareMode';
 
@@ -60,5 +68,90 @@ describe('a choice over string keys (Fittings)', () => {
     expect([...effectiveSelection(['saved-a', 'saved-b'], stopped)]).toEqual(['saved-b']);
     const again = addShared(stopped, 'saved-a');
     expect([...effectiveSelection(['saved-a', 'saved-b'], again)]).toEqual(['saved-a', 'saved-b']);
+  });
+});
+
+describe('sharing blueprints by location', () => {
+  const allow = (...ids: number[]): BlueprintShare => ({
+    choice: { all: false, allowed: new Set(ids) },
+    locations: new Set(),
+  });
+
+  it('shares a copy whose type is allowed, wherever it is', () => {
+    expect(sharesBlueprint(allow(10), 10, 500)).toBe(true);
+    expect(sharesBlueprint(allow(10), 10, null)).toBe(true);
+    expect(sharesBlueprint(allow(10), 20, 500)).toBe(false);
+  });
+
+  it('shares every copy at a shared location, whatever its type', () => {
+    const share = shareLocation(allow(), 500);
+    expect(sharesBlueprint(share, 20, 500)).toBe(true);
+    expect(sharesBlueprint(share, 20, 600)).toBe(false);
+  });
+
+  it('never matches a location rule for a copy with no known place', () => {
+    expect(sharesBlueprint(shareLocation(allow(), 500), 20, null)).toBe(false);
+  });
+
+  it('ignores location rules under share-all: everything not stopped is shared', () => {
+    const share: BlueprintShare = {
+      choice: { all: true, excluded: new Set([20]) },
+      locations: new Set([500]),
+    };
+    expect(sharesBlueprint(share, 10, 600)).toBe(true);
+    expect(sharesBlueprint(share, 20, 500)).toBe(false);
+  });
+
+  it('stops a location rule without touching the types', () => {
+    const share = stopSharingLocation(shareLocation(allow(10), 500), 500);
+    expect(share).toEqual(allow(10));
+  });
+
+  it('starts share-all and stop-all with no location rules', () => {
+    expect(shareAllBlueprints()).toEqual({ choice: shareAll(), locations: new Set() });
+    expect(noBlueprintsShared()).toEqual({ choice: noneShared(), locations: new Set() });
+  });
+
+  describe('typeShareStatus', () => {
+    const copies = [
+      { typeId: 10, placeId: 500 },
+      { typeId: 10, placeId: 600 },
+      { typeId: 20, placeId: 500 },
+      { typeId: 30, placeId: null },
+    ];
+
+    it('says which types are shared directly and which shared locations hold them', () => {
+      const share = { ...shareLocation(shareLocation(allow(30), 600), 500) };
+      const status = typeShareStatus(copies, share);
+      expect(status.get(10)).toEqual({ direct: false, via: [500, 600] });
+      expect(status.get(20)).toEqual({ direct: false, via: [500] });
+      expect(status.get(30)).toEqual({ direct: true, via: [] });
+    });
+
+    it('lists no locations under share-all', () => {
+      const share: BlueprintShare = {
+        choice: { all: true, excluded: new Set([20]) },
+        locations: new Set([500]),
+      };
+      const status = typeShareStatus(copies, share);
+      expect(status.get(10)).toEqual({ direct: true, via: [] });
+      expect(status.get(20)).toEqual({ direct: false, via: [] });
+    });
+  });
+
+  it('counts the copies at each place, leaving out copies with no known place', () => {
+    expect(
+      copiesByPlace([
+        { typeId: 10, placeId: 500 },
+        { typeId: 20, placeId: 500 },
+        { typeId: 30, placeId: 600 },
+        { typeId: 40, placeId: null },
+      ])
+    ).toEqual(
+      new Map([
+        [500, 2],
+        [600, 1],
+      ])
+    );
   });
 });

@@ -19,7 +19,7 @@ import {
 } from '@/esi/cache';
 import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 
 export const KEYS = {
   balance: 'wallet:balance',
@@ -64,45 +64,19 @@ export interface WalletBalancesSnapshot {
 
 /**
  * Every authenticated Character's wallet balance, for the Wallet page's
- * cross-character view (issue #607). Mirrors `openOrdersData.ts`'s
- * `loadAllCharactersOpenOrders` exactly: the scope is checked UP FRONT per
- * Character rather than left to a live 403 — a live 403 is an auth failure
- * that raises the app-wide re-auth banner naming an alt the player never
- * asked about. A Character WITH the scope whose live call still answers
- * `needsReauth` stays in `entries` (not `skipped`) so its row can show its
- * own re-auth prompt instead of the row simply vanishing.
+ * cross-character view (issue #607). Scope pre-check, skipping and ordering
+ * live in `fanOutAllCharacters`. A Character WITH the scope whose live call
+ * still answers `needsReauth` stays in `entries` (not `skipped`) so its row
+ * can show its own re-auth prompt instead of the row simply vanishing.
  */
-export async function loadAllCharactersWalletBalances(): Promise<WalletBalancesSnapshot> {
-  const characters = await db.characters.toArray();
-  const tokens = await db.tokens.bulkGet(characters.map((character) => character.characterId));
-  const granted = tokens.map((token) => (token?.scopes ?? []).includes(WALLET_SCOPE));
-
-  const toFetch = characters.filter((_, i) => granted[i]);
-  const noScopeSkipped = characters
-    .filter((_, i) => !granted[i])
-    .map(({ characterId, name }) => ({ characterId, name }));
-
-  // Slotted by original index, not push-on-completion order — same reasoning
-  // as `openOrdersData.ts`: ordering stays stable regardless of which
-  // Character's fetch lands first.
-  const slots: (CharacterWalletBalance | null)[] = new Array(toFetch.length).fill(null);
-  const fetchFailedSkipped: { characterId: number; name: string }[] = [];
-  await mapWithConcurrencyLimit(
-    toFetch.map((character, index) => ({ character, index })),
-    ESI_FANOUT_CONCURRENCY,
-    async ({ character, index }) => {
-      const { characterId, name } = character;
-      try {
-        const { cached, needsReauth } = await loadWalletBalanceWithStatus(characterId);
-        slots[index] = { characterId, characterName: name, balanceResult: cached, needsReauth };
-      } catch {
-        fetchFailedSkipped.push({ characterId, name });
-      }
-    }
-  );
-
-  const entries = slots.filter((entry): entry is CharacterWalletBalance => entry !== null);
-  return { entries, skipped: [...noScopeSkipped, ...fetchFailedSkipped] };
+export function loadAllCharactersWalletBalances(): Promise<WalletBalancesSnapshot> {
+  return fanOutAllCharacters<CharacterWalletBalance>({
+    scope: WALLET_SCOPE,
+    load: async ({ characterId, name }) => {
+      const { cached, needsReauth } = await loadWalletBalanceWithStatus(characterId);
+      return { characterId, characterName: name, balanceResult: cached, needsReauth };
+    },
+  });
 }
 
 /** Sum of every entry that actually has a usable balance — a needsReauth or never-fetched entry is simply absent from the total, not counted as zero. */

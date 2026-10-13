@@ -56,10 +56,6 @@ import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useFocusHeading } from '@/lib/useFocusHeading';
-import {
-  useViewportBoundedHeight,
-  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
-} from '@/lib/useViewportBoundedHeight';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { useMailFolders } from '@/features/character/mailFolderPref';
 import { cx } from '@/lib/cx';
@@ -264,7 +260,7 @@ interface MailViewProps {
   scopeControl: ReactNode;
 }
 
-/** Mail's two-pane client for one scope: list beside reading pane, each scrolling independently (GLOSSARY.md round 18). */
+/** Mail's two-pane client for one scope: list beside reading pane, the list scrolls on its own, the reading pane grows with the page (docs/context/decisions/20261012-161659-mail-reading-pane-scrolls-with-the-page-not.md). */
 function MailView({ scope, scopeControl }: MailViewProps) {
   const { t } = useTranslation();
   const isAll = scope === 'all';
@@ -453,7 +449,6 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   // The pilot's Local/EVE-time preference, the same way Contracts,
   // Notifications and Clones thread it into their own timestamps.
   const timeZone = useTimeZone();
-  const [bodyScrollerRef, bodyMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   const owners = data?.owners ?? NO_OWNERS;
   const ownerById = useMemo(() => new Map(owners.map((o) => [o.characterId, o])), [owners]);
@@ -805,7 +800,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start xl:grid-cols-[24rem_1fr]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[24rem_minmax(0,1fr)]">
             <Panel padded={false} className={isDesktop || selectedKey === null ? '' : 'hidden'}>
               {listState === 'no-folders' ? (
                 // Deselecting every folder is allowed rather than refused — a
@@ -999,7 +994,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
             </Panel>
 
             <Panel
-              className={isDesktop || selectedKey !== null ? '' : 'hidden'}
+              className={isDesktop || selectedKey !== null ? 'min-w-0' : 'hidden'}
               // The folder the open mail sits in, not a repeat of the select
               // hint the empty body already renders — that string used to
               // appear twice on the same panel at once.
@@ -1081,13 +1076,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                   <EmptyState title={t('mail.emptyTitle')} className="py-4" />
                 </div>
               ) : (
-                <div
-                  ref={bodyScrollerRef}
-                  className="space-y-2 overflow-y-auto text-xs"
-                  style={
-                    isDesktop && bodyMaxHeight !== null ? { maxHeight: bodyMaxHeight } : undefined
-                  }
-                >
+                <div className="min-w-0 space-y-2 text-xs">
                   <h3
                     ref={(el) => {
                       readerHeadingRef.current = el;

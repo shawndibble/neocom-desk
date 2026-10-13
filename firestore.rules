@@ -113,9 +113,10 @@ service cloud.firestore {
       // 10-Communities cap and purgeStaleAccounts's cleanup.
       // Mail invites an admin sent today, by UTC day (issue #3604): a count
       // the Community callables keep. The Character may read its own, to show
-      // how many are left.
+      // how many are left. Nothing exists until the first invite of the day,
+      // and `resource.data` on a missing doc errors, so that read is allowed.
       match /mailInviteQuota/{day} {
-        allow get: if isOwner() && hashMatches();
+        allow get: if isOwner() && (resource == null || hashMatches());
         allow list: if isOwner();
         allow write: if false;
       }
@@ -480,6 +481,16 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Characters waiting to be let in when the Community approves new
+      // Members: one doc per Character, written and removed only by the join
+      // and decision callables. Only the admin reads them, to accept or decline.
+      match /requests/{requestUid} {
+        allow get, list: if isMember()
+          && get(/databases/$(database)/documents/communities/$(communityId)).data.adminUid
+            == request.auth.uid;
+        allow write: if false;
+      }
+
       // Shared Fittings (issue #3605): one flat collection per Community, so a
       // list is one query however many Members there are. The doc id is
       // `<uid>~saved-<fitting id>` or `<uid>~game-<ESI fitting id>`; binding
@@ -516,6 +527,39 @@ service cloud.firestore {
           && request.resource.data.code.size() <= 90000
           && request.resource.data.updatedAt == request.time;
         allow delete: if isMember() && ownsId();
+      }
+
+      // Shared Skill Plans: one flat collection per Community, like Fittings.
+      // The doc id is `<uid>~<plan id>`, which binds a write to its owner. A
+      // plan is the Member's own act to share, one at a time; the entries are a
+      // flat list of [skill type id, level, priority] triples (Firestore has no
+      // nested arrays). Deleted on leave/removal by the callables.
+      match /skillPlans/{planDocId} {
+        function planIdParts() {
+          return planDocId.split('~');
+        }
+        function ownsPlanId() {
+          return request.auth != null
+            && planIdParts().size() == 2
+            && planIdParts()[0] == request.auth.uid
+            && planIdParts()[1].matches('^[A-Za-z0-9-]{1,64}$');
+        }
+
+        allow get, list: if isMember();
+        allow create, update: if isMember() && ownsPlanId()
+          && request.resource.data.keys().hasOnly(
+            ['ownerHash', 'ownerUid', 'name', 'entries', 'sourceUpdatedAt', 'updatedAt'])
+          && request.resource.data.ownerHash == request.auth.token.ownerHash
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 200
+          && request.resource.data.entries is list
+          && request.resource.data.entries.size() <= 1500
+          && request.resource.data.entries.size() % 3 == 0
+          && request.resource.data.sourceUpdatedAt is number
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isMember() && ownsPlanId();
       }
 
       match /members/{memberUid} {

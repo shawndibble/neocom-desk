@@ -4,9 +4,11 @@ import { removeCharacter } from '@/features/character/removeCharacter';
 import {
   deleteShareSelections,
   hasShareSelections,
+  loadBlueprintShare,
   loadFittingsAll,
   loadShareChoice,
   loadShareSelection,
+  saveBlueprintShare,
   saveFittingsAll,
   saveShareChoice,
   saveShareSelection,
@@ -90,6 +92,56 @@ describe('share choice storage', () => {
     expect(await hasShareSelections([1])).toBe(true);
     await deleteShareSelections(1);
     expect(await db.settings.count()).toBe(0);
+  });
+});
+
+describe('blueprint share storage (location rules)', () => {
+  const byType = (...ids: number[]) => ({ all: false as const, allowed: new Set(ids) });
+
+  it('has no location rules until one is saved', async () => {
+    expect(await loadBlueprintShare(1, 'c1')).toEqual({
+      choice: { all: false, allowed: new Set() },
+      locations: new Set(),
+    });
+  });
+
+  it('round-trips the type choice and the shared locations together', async () => {
+    await saveBlueprintShare(1, 'c1', { choice: byType(5), locations: new Set([600, 500]) });
+    expect(await loadBlueprintShare(1, 'c1')).toEqual({
+      choice: byType(5),
+      locations: new Set([500, 600]),
+    });
+    expect(await loadShareChoice(1, 'c1')).toEqual(byType(5));
+  });
+
+  it('keeps location rules when only the type choice is saved', async () => {
+    await saveBlueprintShare(1, 'c1', { choice: byType(), locations: new Set([500]) });
+    await saveShareChoice(1, 'c1', byType(5));
+    expect((await loadBlueprintShare(1, 'c1')).locations).toEqual(new Set([500]));
+  });
+
+  it('is not read as an allowlist', async () => {
+    await saveBlueprintShare(1, 'c1', { choice: byType(), locations: new Set([500]) });
+    expect((await loadShareSelection(1, 'c1')).size).toBe(0);
+  });
+
+  it('counts a location rule alone as sharing, and deletes it with the Character', async () => {
+    await saveBlueprintShare(1, 'c1', { choice: byType(), locations: new Set([500]) });
+    expect(await hasShareSelections([1])).toBe(true);
+    await deleteShareSelections(1);
+    expect(await db.settings.count()).toBe(0);
+  });
+
+  it('drops the row when the last location rule stops, so nothing reads as shared', async () => {
+    await saveBlueprintShare(1, 'c1', { choice: byType(), locations: new Set([500]) });
+    await saveBlueprintShare(1, 'c1', { choice: byType(), locations: new Set() });
+    expect(await db.settings.count()).toBe(0);
+    expect(await hasShareSelections([1])).toBe(false);
+  });
+
+  it('ignores a malformed stored value', async () => {
+    await db.settings.put({ key: 'communityShare:1:c1:locations', value: ['x', 7] });
+    expect((await loadBlueprintShare(1, 'c1')).locations).toEqual(new Set([7]));
   });
 });
 

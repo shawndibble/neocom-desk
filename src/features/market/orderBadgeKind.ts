@@ -13,7 +13,7 @@
  * for i18n stays with the caller — this only decides *which* badge and what
  * short, already-formatted detail string (if any) goes beside it.
  */
-import type { OpenOrderRow } from './openOrdersModel';
+import type { OrderAdviceInput } from './orderRowSummary';
 import type { OrderBadgeKind } from './OrderProblemBadge';
 
 export interface OrderBadgeChoice {
@@ -42,7 +42,7 @@ export const ORDER_BADGE_KINDS: readonly OrderBadgeKind[] = [
 ];
 
 /** The one badge a row wears, and the short detail beside it. Null renders no badge — never a false "best"/"noCostBasis" claim the data can't back up. */
-export function orderBadgeFor(row: OpenOrderRow): OrderBadgeChoice | null {
+export function orderBadgeFor(row: OrderAdviceInput): OrderBadgeChoice | null {
   switch (row.problem) {
     case 'belowFloor': {
       if (!row.floor) return null;

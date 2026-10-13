@@ -150,7 +150,7 @@ export function planOwnedBlueprints(
  * The Reaction Location with its live cost index — `undefined` until both a
  * reaction facility is configured on the plan and its cost index has landed.
  */
-export function reactionFacilityFor(
+function reactionFacilityFor(
   plan: Parameters<typeof reactionPlanFacilityContextFor>[0],
   reactionSystemCostIndex: number | null | undefined
 ): ReactionFacilityContext | undefined {
@@ -167,10 +167,10 @@ export function reactionFacilityFor(
  * `makeOrBuyContext`: a tier resolved against a zeroed snapshot would change
  * once prices actually arrive. Takes `acquisitionFor`, not a pool, so a
  * caller that goes on to resolve nested sub-builds claims from the same pool
- * as this top-level claim (issue #860). Auto Build on a Build Group
- * (`autoBuildGroup.ts`) walks each member at this same ME.
+ * as this top-level claim (issue #860). `resolveMakeOrBuy` hands this
+ * same ME to Auto Build on a Build Group.
  */
-export function resolveTopLevelTier(
+function resolveTopLevelTier(
   plan: Pick<BuildPlanRecord, 'me' | 'te' | 'runs'>,
   blueprint: IndustryBlueprint,
   acquisitionFor: ReturnType<typeof acquisitionForLookup>,
@@ -190,12 +190,12 @@ export function resolveTopLevelTier(
   return { me: acquisition?.me ?? plan.me, te: acquisition?.te ?? plan.te, acquisition };
 }
 
-export function resolveBuildPlan(
+/** Everything both entry points derive from a plan's sources and prices before any blueprint is touched. */
+function prepareResolution(
   plan: BuildPlanRecord,
   sources: BuildPlanSources,
-  prices: BuildPlanPrices,
-  options: ResolveBuildPlanOptions = {}
-): ResolvedBuildPlan {
+  prices: BuildPlanPrices
+) {
   // The pilot's own cost index outranks ESI's (absent for J-Space), applied
   // here once so the page, Compare and every Group Rollup price the same fee.
   const snapshot = applyCostIndexOverride(prices.snapshot, plan.costIndexOverridePct);
@@ -221,6 +221,7 @@ export function resolveBuildPlan(
   const recipeFor = recipeForLookup(recipeSources);
   const materialPrices = materialPricesFor(snapshot, plan.materialPriceBasis);
   const reactionFacility = reactionFacilityFor(plan, prices.reactionSystemCostIndex);
+  // Null until real fees land: a fee-free quote would call almost everything worth building.
   const makeOrBuyContext: MakeOrBuyContext | null =
     snapshot && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null
       ? {
@@ -233,6 +234,74 @@ export function resolveBuildPlan(
           acquisitionFor: verdictAcquisitionFor(recipeSources, sources.includeBlueprintCost),
         }
       : null;
+  return {
+    snapshot,
+    recipeSources,
+    recipeFor,
+    materialPrices,
+    reactionFacility,
+    makeOrBuyContext,
+  };
+}
+
+function acquisitionForPool(
+  recipeSources: RecipeSources,
+  includeBlueprintCost: boolean,
+  pools: BlueprintTierPools
+) {
+  const raw = acquisitionForLookup(recipeSources, pools);
+  return includeBlueprintCost ? raw : withoutAcquisitionCost(raw);
+}
+
+/** What a make-or-buy verdict (or an Auto Build walk) needs for one plan. */
+export interface MakeOrBuyResolution {
+  blueprint: IndustryBlueprint;
+  recipeFor: ReturnType<typeof recipeForLookup>;
+  ctx: MakeOrBuyContext;
+  /** The ME/TE the plan itself is priced at — see `resolveTopLevelTier`. */
+  me: number;
+  te: number;
+}
+
+/**
+ * The make-or-buy half of `resolveBuildPlan`, without computing a result:
+ * the verdict context (facility, fees, Reaction Location, blueprint cost),
+ * the recipe lookup and the plan's resolved top-level tier, all derived
+ * exactly as `resolveBuildPlan` derives them. Null when the blueprint is missing
+ * or live fees have not landed (no context). Resolves the top-level tier
+ * against a fresh pool, same as the primary pass.
+ */
+export function resolveMakeOrBuy(
+  plan: BuildPlanRecord,
+  sources: BuildPlanSources,
+  prices: BuildPlanPrices
+): MakeOrBuyResolution | null {
+  const { recipeSources, recipeFor, materialPrices, makeOrBuyContext } = prepareResolution(
+    plan,
+    sources,
+    prices
+  );
+  const catalogEntry = sources.catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
+  if (!catalogEntry || !makeOrBuyContext) return null;
+  const blueprint = toIndustryBlueprint(catalogEntry.blueprint);
+  const { me, te } = resolveTopLevelTier(
+    plan,
+    blueprint,
+    acquisitionForPool(recipeSources, sources.includeBlueprintCost, new Map()),
+    makeOrBuyContext,
+    materialPrices
+  );
+  return { blueprint, recipeFor, ctx: makeOrBuyContext, me, te };
+}
+
+export function resolveBuildPlan(
+  plan: BuildPlanRecord,
+  sources: BuildPlanSources,
+  prices: BuildPlanPrices,
+  options: ResolveBuildPlanOptions = {}
+): ResolvedBuildPlan {
+  const { snapshot, recipeSources, recipeFor, materialPrices, reactionFacility, makeOrBuyContext } =
+    prepareResolution(plan, sources, prices);
 
   const base = {
     groupResult: null,
@@ -256,11 +325,9 @@ export function resolveBuildPlan(
 
   // One pool for this whole resolution — see the module doc comment.
   const blueprintPools: BlueprintTierPools = new Map();
-  const acquisitionForPool = (pools: BlueprintTierPools) => {
-    const raw = acquisitionForLookup(recipeSources, pools);
-    return sources.includeBlueprintCost ? raw : withoutAcquisitionCost(raw);
-  };
-  const acquisitionFor = acquisitionForPool(blueprintPools);
+  const acquisitionForPass = (pools: BlueprintTierPools) =>
+    acquisitionForPool(recipeSources, sources.includeBlueprintCost, pools);
+  const acquisitionFor = acquisitionForPass(blueprintPools);
 
   const {
     me: resolvedMe,
@@ -295,7 +362,7 @@ export function resolveBuildPlan(
   if (poolsAfterTopLevel) {
     ({ result: groupResult, error: groupError } = computeBuildPlan({
       ...common,
-      acquisitionFor: acquisitionForPool(poolsAfterTopLevel),
+      acquisitionFor: acquisitionForPass(poolsAfterTopLevel),
       ignoreOwnedStock: true,
     }));
   }

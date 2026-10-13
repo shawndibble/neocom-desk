@@ -7,7 +7,7 @@
  * nothing is shared.
  */
 import { db } from '@/db';
-import type { ShareChoice } from '@/engine/communities/shareMode';
+import type { BlueprintShare, ShareChoice } from '@/engine/communities/shareMode';
 
 const PREFIX = 'communityShare:';
 const keyFor = (characterId: number, communityId: string) =>
@@ -51,6 +51,16 @@ export async function markFittingsShared(characterId: number): Promise<void> {
   await db.settings.put({ key: `${PREFIX}${characterId}:fittings`, value: true });
 }
 
+/**
+ * Remembers on this device that the Character shared a Skill Plan, so the
+ * sweep refreshes it and the logout question is asked. Same prefix as the
+ * Fittings marker, so it is counted by `hasShareSelections` and deleted with
+ * the Character.
+ */
+export async function markPlansShared(characterId: number): Promise<void> {
+  await db.settings.put({ key: `${PREFIX}${characterId}:plans`, value: true });
+}
+
 /** Run inside `removeCharacter`'s transaction: a removed Character leaves no choices behind. */
 export async function deleteShareSelections(characterId: number): Promise<void> {
   await db.settings.where('key').startsWith(`${PREFIX}${characterId}:`).delete();
@@ -92,6 +102,45 @@ export async function saveShareChoice(
   await db.transaction('rw', db.settings, async () => {
     await db.settings.delete(allKey);
     await saveShareSelection(characterId, communityId, choice.allowed);
+  });
+}
+
+const locationsKeyFor = (characterId: number, communityId: string) =>
+  `${keyFor(characterId, communityId)}:locations`;
+
+/**
+ * The Character's blueprint choice plus its standing location rules: the
+ * resolved station or structure ids whose blueprints are all shared. They stay
+ * on this device (only the blueprints they match are published) in a
+ * `:locations` row under the same prefix, so `hasShareSelections` counts a
+ * location rule on its own and the Character's removal deletes it. The row is
+ * dropped when the last rule stops, so an empty one never reads as sharing.
+ */
+export async function loadBlueprintShare(
+  characterId: number,
+  communityId: string
+): Promise<BlueprintShare> {
+  const [choice, row] = await Promise.all([
+    loadShareChoice(characterId, communityId),
+    db.settings.get(locationsKeyFor(characterId, communityId)),
+  ]);
+  const ids = Array.isArray(row?.value) ? row.value : [];
+  return {
+    choice,
+    locations: new Set(ids.filter((id): id is number => Number.isInteger(id))),
+  };
+}
+
+export async function saveBlueprintShare(
+  characterId: number,
+  communityId: string,
+  share: BlueprintShare
+): Promise<void> {
+  const key = locationsKeyFor(characterId, communityId);
+  await db.transaction('rw', db.settings, async () => {
+    await saveShareChoice(characterId, communityId, share.choice);
+    if (share.locations.size === 0) await db.settings.delete(key);
+    else await db.settings.put({ key, value: [...share.locations].sort((a, b) => a - b) });
   });
 }
 

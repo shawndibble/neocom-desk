@@ -66,7 +66,7 @@ Hauling is also a Travel tab (`/travel/hauling`, moved from Market by `20261010-
 - Legacy: a defaulted `/travel?pilot=<id>` link redirects to `/travel/pilot` (only when the tab was defaulted, not explicit): `src/routes/Travel.tsx:25-31`.
 - Optional scopes:
   - `esi-ui.write_waypoint.v1` (Permission "Autopilot waypoints", default-on in Base Grant, fifth write exception): Set waypoints / Set waypoint in game. Decision `20261003-175151`.
-  - `esi-search.search_structures.v1` + `esi-universe.read_structures.v1`: Ansiblex structure search only (`ANSIBLEX_SEARCH_ENDPOINTS`, `src/features/travel/ansiblexGates.ts`).
+  - `esi-search.search_structures.v1` + `esi-universe.read_structures.v1`: Ansiblex structure search only (`ANSIBLEX_SEARCH_ENDPOINTS`, `src/features/route/ansiblexGates.ts`).
 - Tab bar `Tabs` label `travel.title`; tab state via `usePageTab(TRAVEL_TABS)`.
 
 ## Data sources
@@ -74,7 +74,7 @@ Hauling is also a Travel tab (`/travel/hauling`, moved from Market by `20261010-
 | Source                                                                | Used for                                                                                                                                              | Code                                                                        |
 | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Local stargate graph (SDE snapshot)                                   | Route, jumps, ways, distances                                                                                                                         | `src/engine/route/jumpRoute.ts`, `src/features/route/localRoute.ts`         |
-| ESI `GET /universe/system_kills/`, `/universe/system_jumps/` (public) | Last-hour ship/pod/NPC kills and jumps for every system; 2 requests per visit, ETag, global cache (not per Character)                                 | `src/features/travel/routeSafetyData.ts`                                    |
+| ESI `GET /universe/system_kills/`, `/universe/system_jumps/` (public) | Last-hour ship/pod/NPC kills and jumps for every system; 2 requests per visit, ETag, global cache (not per Character)                                 | `src/features/route/routeSafetyData.ts`                                     |
 | ESI `GET /incursions` (public)                                        | Incursions near you: every active Incursion; global cache to ESI expiry                                                                               | `src/features/travel/incursionsData.ts`                                     |
 | ESI `POST /universe/names`                                            | Region names not in `regions.json`; constellation names for Incursions (`loadConstellationNames`, once per session)                                   | `loadRouteRegionNames`                                                      |
 | ESI `GET /universe/stargates/{id}`                                    | Names a kill's gate + `destination.system_id` for "on your path"; once per session                                                                    | `routeKillsData.ts`                                                         |
@@ -90,7 +90,7 @@ Hauling is also a Travel tab (`/travel/hauling`, moved from Market by `20261010-
 
 Component `src/features/travel/RouteSafetyTab.tsx`. Layout: grid, rail (Stops, Route rules) + route from `xl` (1280); below that rail dissolves so order is Stops, route, Route rules (#2591). `PageHeader` shows `DataAgeBadge` of the ESI activity fetch when a route is drawn.
 
-### Link parameters (`src/features/travel/routeSafetyLink.ts:56`, `ROUTE_PARAMS`)
+### Link parameters (`src/features/route/routeSafetyLink.ts:56`, `ROUTE_PARAMS`)
 
 | Param                             | Meaning                                                                                                    |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------- |

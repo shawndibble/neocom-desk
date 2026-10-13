@@ -8,7 +8,7 @@
 import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
 import { HintText } from '@/components/ui/HintText';
-import { JumpsLink } from '@/features/travel/JumpsLink';
+import { JumpsLink } from '@/features/route/JumpsLink';
 import type { JumpsCellValue } from './currentSystem';
 
 /**

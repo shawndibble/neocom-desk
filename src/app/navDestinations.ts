@@ -243,7 +243,7 @@ export const NAV_PAGES = [
     labelKey: 'nav.communities',
     group: 'social',
     gating: 'ungated',
-    mobileTab: false,
+    mobileTab: true,
   },
   /*
    * Help is not a setting: FAQ and Support left Settings for this footer page.

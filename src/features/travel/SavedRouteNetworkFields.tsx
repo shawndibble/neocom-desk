@@ -14,7 +14,7 @@ import {
   useRouteHoleQuery,
 } from '@/features/route/routeHoleSettings';
 import { AnsiblexGatesDialog, type AnsiblexDialogMode } from './AnsiblexGatesDialog';
-import { useAnsiblexGates } from './ansiblexGates';
+import { useAnsiblexGates } from '@/features/route/ansiblexGates';
 import { RouteHoleFields } from './RouteRulesPanel';
 
 export function SavedRouteNetworkFields() {

@@ -449,7 +449,7 @@ export function fitColony(opts: FitColonyOptions): ColonyFit {
  *
  * `fitColony` answers "how big could this layout be"; this answers "what
  * could I still add to the layout I have". A built colony's `used` is read
- * off its own pins (`features/pi/adapters.ts`'s `colonyPinLoad`), so nothing
+ * off its own pins (`engine/pi/colonyPins.ts`'s `colonyPinLoad`), so nothing
  * here is an estimate, and the per-kind answer is what makes the CPU/Powergrid
  * meter actionable rather than decorative: one number says a colony is 87%
  * full, six say it has room for three more factories and no extractor at all.

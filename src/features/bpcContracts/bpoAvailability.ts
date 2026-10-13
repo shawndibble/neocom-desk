@@ -23,6 +23,9 @@ import {
   type MarketSellRow,
 } from '@/features/industry/blueprintAcquisitionSources';
 
+/** Most blueprint types a typed search checks the market for. */
+export const MARKET_BPO_LOOKUP_LIMIT = 10;
+
 /** One market BPO sell order, with the region it was read from. */
 export type MarketBpoOffer = MarketSellRow & { regionId: number };
 

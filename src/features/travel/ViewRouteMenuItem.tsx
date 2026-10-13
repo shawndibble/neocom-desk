@@ -6,7 +6,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { MenuItem } from '@/components/ui';
-import { useViewRoute } from './useViewRoute';
+import { useViewRoute } from '@/features/route/useViewRoute';
 
 export function ViewRouteMenuItem({ locationId }: { locationId: number }) {
   const { t } = useTranslation();

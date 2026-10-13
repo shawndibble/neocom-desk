@@ -3,6 +3,8 @@ import {
   MAX_COMMUNITIES_PER_CHARACTER,
   MAX_COMMUNITY_MEMBERS,
   decideCreate,
+  decideAdmit,
+  isPreApproved,
   decideJoin,
   decideMailInvite,
   decideMailRelease,
@@ -11,7 +13,9 @@ import {
   MAIL_RELEASE_WINDOW_MS,
   MAIL_RESERVATION_STALE_MS,
   MAX_MAIL_INVITES_PER_DAY,
+  parseJoinRequestDecisionInput,
   parseMailInviteInput,
+  parseRequireApprovalInput,
   utcDayKey,
   decideLeave,
   decideRemoveMember,
@@ -111,6 +115,93 @@ describe('decideJoin', () => {
     expect(decideJoin({ ...base, joinedCount: MAX_COMMUNITIES_PER_CHARACTER })).toBe(
       'too-many-communities'
     );
+  });
+
+  describe('when the Community approves new Members', () => {
+    const gated = { ...base, requiresApproval: true };
+
+    it('holds a join for approval', () => {
+      expect(decideJoin(gated)).toBe('needs-approval');
+    });
+    it('lets a Character the admin mailed an invite straight in', () => {
+      expect(decideJoin({ ...gated, preApproved: true })).toBe('ok');
+    });
+    it('still treats an existing Member as already joined', () => {
+      expect(decideJoin({ ...gated, alreadyMember: true })).toBe('already-member');
+    });
+    it('does not queue a request into a full Community or past the Character cap', () => {
+      expect(decideJoin({ ...gated, memberCount: MAX_COMMUNITY_MEMBERS })).toBe('community-full');
+      expect(decideJoin({ ...gated, joinedCount: MAX_COMMUNITIES_PER_CHARACTER })).toBe(
+        'too-many-communities'
+      );
+    });
+    it('still refuses a revoked invite first', () => {
+      expect(decideJoin({ ...gated, inviteMatches: false })).toBe('invalid-invite');
+    });
+  });
+});
+
+describe('isPreApproved (a mailed invite standing in for approval)', () => {
+  const sent = { adminUid: 'char:1', sentAt: 5, consumedAt: null };
+
+  it('counts a sent invite from the current admin', () => {
+    expect(isPreApproved(sent, 'char:1')).toBe(true);
+  });
+  it('does not count a reservation the mail never went out for', () => {
+    expect(isPreApproved({ ...sent, sentAt: null }, 'char:1')).toBe(false);
+  });
+  it('does not count an invite from a former admin', () => {
+    expect(isPreApproved(sent, 'char:2')).toBe(false);
+  });
+  it('is spent once the Character has joined on it, so leaving or removal does not keep it open', () => {
+    expect(isPreApproved({ ...sent, consumedAt: 9 }, 'char:1')).toBe(false);
+  });
+  it('is not there when no invite was ever mailed', () => {
+    expect(isPreApproved(null, 'char:1')).toBe(false);
+  });
+});
+
+describe('decideAdmit (accepting a waiting request)', () => {
+  const base = { memberCount: 3, joinedCount: 2, alreadyMember: false };
+
+  it('admits a waiting Character', () => {
+    expect(decideAdmit(base)).toBe('ok');
+  });
+  it('treats someone who became a Member meanwhile as already admitted', () => {
+    expect(decideAdmit({ ...base, alreadyMember: true })).toBe('already-member');
+  });
+  it('stops at the Community and Character caps', () => {
+    expect(decideAdmit({ ...base, memberCount: MAX_COMMUNITY_MEMBERS })).toBe('community-full');
+    expect(decideAdmit({ ...base, joinedCount: MAX_COMMUNITIES_PER_CHARACTER })).toBe(
+      'too-many-communities'
+    );
+  });
+});
+
+describe('approval input parsing', () => {
+  it('parses the approval switch', () => {
+    expect(parseRequireApprovalInput({ communityId: 'c1', requireApproval: true })).toEqual({
+      communityId: 'c1',
+      requireApproval: true,
+    });
+  });
+  it('rejects a switch that is not a boolean', () => {
+    expect(() =>
+      parseRequireApprovalInput({ communityId: 'c1', requireApproval: 'yes' })
+    ).toThrow();
+  });
+  it('parses a decision on a waiting request', () => {
+    expect(
+      parseJoinRequestDecisionInput({ communityId: 'c1', memberUid: 'char:9', accept: false })
+    ).toEqual({ communityId: 'c1', memberUid: 'char:9', accept: false });
+  });
+  it('rejects a decision with no accept flag or a path-escaping uid', () => {
+    expect(() =>
+      parseJoinRequestDecisionInput({ communityId: 'c1', memberUid: 'char:9' })
+    ).toThrow();
+    expect(() =>
+      parseJoinRequestDecisionInput({ communityId: 'c1', memberUid: 'a/b', accept: true })
+    ).toThrow();
   });
 });
 

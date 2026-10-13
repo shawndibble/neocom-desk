@@ -34,7 +34,7 @@ import { loadCharacterClones } from '@/features/character/clones';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { cloneJumpCooldownHours, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
-import { extractorProgramsFromPins } from '@/features/pi/adapters';
+import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { loadMailHeaders } from '@/features/character/mail';
 import { loadCharacterNotifications } from '@/features/character/notifications';
 import { loadStructureName } from '@/features/character/structures';

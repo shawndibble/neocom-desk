@@ -25,6 +25,8 @@ import {
   utcDayKey,
   MAX_MAIL_INVITES_PER_DAY,
   decideRemoveMember,
+  decideAdmit,
+  isPreApproved,
   decideTransferAdmin,
   newInviteCode,
   type CreateCommunityInput,
@@ -32,7 +34,9 @@ import {
 } from './communities.js';
 
 const LIBRARY_COLLECTION = 'library';
+const REQUESTS_COLLECTION = 'requests';
 const FITTINGS_COLLECTION = 'fittings';
+const SKILL_PLANS_COLLECTION = 'skillPlans';
 
 /** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */
 export interface CallerCharacter {
@@ -44,6 +48,9 @@ const communityRef = (db: Firestore, communityId: string) =>
   db.collection(COMMUNITIES_COLLECTION).doc(communityId);
 const memberRef = (db: Firestore, communityId: string, uid: string) =>
   communityRef(db, communityId).collection(COMMUNITY_MEMBERS_COLLECTION).doc(uid);
+/** A Character waiting for the admin to let them in (a Community that approves new Members). */
+const requestRef = (db: Firestore, communityId: string, uid: string) =>
+  communityRef(db, communityId).collection(REQUESTS_COLLECTION).doc(uid);
 const indexCollection = (db: Firestore, uid: string) =>
   db.collection('characters').doc(uid).collection(CHARACTER_COMMUNITIES_COLLECTION);
 
@@ -185,7 +192,7 @@ export async function joinCommunity(
   db: Firestore,
   caller: CallerCharacter,
   input: JoinCommunityInput
-): Promise<{ communityId: string; alreadyMember: boolean }> {
+): Promise<{ communityId: string; alreadyMember: boolean; pending?: boolean }> {
   const found = await db
     .collection(COMMUNITIES_COLLECTION)
     .where('inviteCode', '==', input.inviteCode)
@@ -194,16 +201,8 @@ export async function joinCommunity(
   if (found.empty) fail('invalid-invite');
   const ref = found.docs[0].ref;
   await pruneDanglingIndex(db, caller.uid);
-  // A Member doc under another ownerHash is the previous owner of a sold
-  // Character: their shared data goes, and this Character joins fresh. Chunks
-  // left by any earlier crashed removal are cleared too, since they would be
-  // readable again the moment this Member doc exists.
-  const existing = await memberRef(db, ref.id, caller.uid).get();
-  if (existing.exists && existing.get('ownerHash') !== caller.ownerHash) {
-    await removeMemberData(db, ref.id, caller.uid);
-  } else if (!existing.exists) {
-    await deleteMemberShares(db, ref.id, caller.uid);
-  }
+  await clearStaleMemberData(db, ref.id, caller.uid, caller.ownerHash);
+  const mailInvite = mailInviteRef(db, ref.id, characterIdOf(caller.uid));
 
   return db.runTransaction(async (tx) => {
     // Re-read inside the transaction: the invite may have been revoked, or
@@ -213,34 +212,165 @@ export async function joinCommunity(
     const joined = await tx.get(
       indexCollection(db, caller.uid).limit(MAX_COMMUNITIES_PER_CHARACTER)
     );
+    // The admin mailing this Character an invite is the approval already, once.
+    const mailed = await tx.get(mailInvite);
+    const preApproved = isPreApproved(
+      mailed.exists
+        ? {
+            adminUid: String(mailed.get('adminUid') ?? ''),
+            sentAt: typeof mailed.get('sentAt') === 'number' ? mailed.get('sentAt') : null,
+            consumedAt:
+              typeof mailed.get('consumedAt') === 'number' ? mailed.get('consumedAt') : null,
+          }
+        : null,
+      String(community.get('adminUid') ?? '')
+    );
     const decision = decideJoin({
       inviteMatches: community.exists && community.get('inviteCode') === input.inviteCode,
       alreadyMember: member.exists,
       memberCount: Number(community.get('memberCount') ?? 0),
       joinedCount: joined.size,
+      requiresApproval: community.get('requireApproval') === true,
+      preApproved,
     });
     if (decision === 'already-member') return { communityId: ref.id, alreadyMember: true };
+    if (decision === 'needs-approval') {
+      // Idempotent: asking again refreshes the one waiting request.
+      tx.set(requestRef(db, ref.id, caller.uid), {
+        ownerHash: caller.ownerHash,
+        characterName: input.characterName,
+        requestedAt: Date.now(),
+      });
+      return { communityId: ref.id, alreadyMember: false, pending: true };
+    }
     if (decision !== 'ok') fail(decision);
 
-    const now = Date.now();
-    tx.set(memberRef(db, ref.id, caller.uid), {
+    admit(tx, db, ref, caller.uid, {
       ownerHash: caller.ownerHash,
       characterName: input.characterName,
-      joinedAt: now,
     });
-    tx.set(indexCollection(db, caller.uid).doc(ref.id), {
-      ownerHash: caller.ownerHash,
-      communityId: ref.id,
-      joinedAt: now,
-    });
-    tx.update(ref, { memberCount: FieldValue.increment(1) });
+    tx.delete(requestRef(db, ref.id, caller.uid));
+    if (preApproved) tx.update(mailInvite, { consumedAt: Date.now() });
     return { communityId: ref.id, alreadyMember: false };
+  });
+}
+
+/** A Character's id from its Firebase uid `char:{id}`. */
+function characterIdOf(uid: string): number {
+  return Number(uid.slice('char:'.length));
+}
+
+/**
+ * Before a Character becomes a Member: a Member doc under another ownerHash is
+ * the previous owner of a sold Character, whose shared data goes. Chunks left
+ * by any earlier crashed removal are cleared too, since they would be readable
+ * again the moment the new Member doc exists.
+ */
+async function clearStaleMemberData(
+  db: Firestore,
+  communityId: string,
+  uid: string,
+  ownerHash: string
+): Promise<void> {
+  const existing = await memberRef(db, communityId, uid).get();
+  if (existing.exists && existing.get('ownerHash') !== ownerHash) {
+    await removeMemberData(db, communityId, uid);
+  } else if (!existing.exists) {
+    await deleteMemberShares(db, communityId, uid);
+  }
+}
+
+/** Writes the Member, the Character's index entry and the count: the one place a Member is made. */
+function admit(
+  tx: FirebaseFirestore.Transaction,
+  db: Firestore,
+  community: FirebaseFirestore.DocumentReference,
+  uid: string,
+  who: { ownerHash: string; characterName: string }
+): void {
+  const now = Date.now();
+  tx.set(memberRef(db, community.id, uid), {
+    ownerHash: who.ownerHash,
+    characterName: who.characterName,
+    joinedAt: now,
+  });
+  tx.set(indexCollection(db, uid).doc(community.id), {
+    ownerHash: who.ownerHash,
+    communityId: community.id,
+    joinedAt: now,
+  });
+  tx.update(community, { memberCount: FieldValue.increment(1) });
+}
+
+/** The admin turns "approve new Members" on or off. Requests already waiting stay until decided. */
+export async function setRequireApproval(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  requireApproval: boolean
+): Promise<void> {
+  const community = await requireAdmin(db, communityId, caller);
+  await community.ref.update({ requireApproval });
+}
+
+/**
+ * The admin accepts or declines one waiting request. Accepting makes the
+ * Character a Member under the same caps as a join; a cap that stops it is
+ * reported and the request stays. Declining just removes the request. Both are
+ * safe to repeat: a request already gone is not an error.
+ */
+export async function decideJoinRequest(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  requestUid: string,
+  accept: boolean
+): Promise<void> {
+  const community = await requireAdmin(db, communityId, caller);
+  const request = requestRef(db, communityId, requestUid);
+  if (!accept) {
+    await request.delete();
+    return;
+  }
+  const waiting = await request.get();
+  if (!waiting.exists) return;
+  // A Member already holds this Character: the request is stale (the Character
+  // was sold, or it joined another way). Drop it; never evict the Member.
+  if ((await memberRef(db, communityId, requestUid).get()).exists) {
+    await request.delete();
+    return;
+  }
+  await pruneDanglingIndex(db, requestUid);
+  await deleteMemberShares(db, communityId, requestUid);
+  await db.runTransaction(async (tx) => {
+    const [current, member, joined, stillWaiting] = await Promise.all([
+      tx.get(community.ref),
+      tx.get(memberRef(db, communityId, requestUid)),
+      tx.get(indexCollection(db, requestUid).limit(MAX_COMMUNITIES_PER_CHARACTER)),
+      tx.get(request),
+    ]);
+    if (!stillWaiting.exists) return;
+    const decision = decideAdmit({
+      alreadyMember: member.exists,
+      memberCount: Number(current.get('memberCount') ?? 0),
+      joinedCount: joined.size,
+    });
+    if (decision === 'already-member') {
+      tx.delete(request);
+      return;
+    }
+    if (decision !== 'ok') fail(decision);
+    admit(tx, db, community.ref, requestUid, {
+      ownerHash: String(stillWaiting.get('ownerHash')),
+      characterName: String(stillWaiting.get('characterName') ?? ''),
+    });
+    tx.delete(request);
   });
 }
 
 /**
  * Everything one Member shared into a Community: their blueprint library
- * chunks and their shared Fittings (issue #3605). Every delete-on-leave path
+ * chunks, their shared Fittings (issue #3605) and their shared Skill Plans. Every delete-on-leave path
  * goes through this so a new kind of shared data can't be missed in one.
  */
 async function deleteMemberShares(db: Firestore, communityId: string, uid: string): Promise<void> {
@@ -249,9 +379,13 @@ async function deleteMemberShares(db: Firestore, communityId: string, uid: strin
     .collection(FITTINGS_COLLECTION)
     .where('ownerUid', '==', uid)
     .get();
+  const plans = await communityRef(db, communityId)
+    .collection(SKILL_PLANS_COLLECTION)
+    .where('ownerUid', '==', uid)
+    .get();
   const writer = db.bulkWriter();
   // Awaited, so a delete that fails after its retries fails the leave rather than orphaning a readable copy.
-  const deletes = fittings.docs.map((fitting) => writer.delete(fitting.ref));
+  const deletes = [...fittings.docs, ...plans.docs].map((shared) => writer.delete(shared.ref));
   await writer.close();
   await Promise.all(deletes);
 }
@@ -277,6 +411,7 @@ export async function removeMemberData(
       if (community.exists) tx.update(community.ref, { memberCount: FieldValue.increment(-1) });
     }
     tx.delete(indexCollection(db, uid).doc(communityId));
+    tx.delete(requestRef(db, communityId, uid));
   });
   await deleteMemberShares(db, communityId, uid);
 }

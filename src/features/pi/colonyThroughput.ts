@@ -70,7 +70,7 @@
 
 import type { PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
-import { extractorProgramsFromPins } from './adapters';
+import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { checkThroughput } from '@/engine/pi/pinBudget';
 import { extractorCycleYields, hasYieldBaseline, programCycleCount } from '@/engine/pi/extraction';
 import type { ExtractorYieldProgram, PiChain, ThroughputCheck } from '@/engine/pi/types';

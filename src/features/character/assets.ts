@@ -7,7 +7,7 @@ import {
 } from '@/esi/cache';
 import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 
 const ASSETS_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
 
@@ -51,44 +51,28 @@ export interface FannedOutAssets {
 }
 
 /**
- * The shared per-Character fan-out: cache-or-live per `loadCharacterAssets`,
- * capped concurrency like `roster.ts`'s live mode.
- *
- * A Character that never granted the assets scope, or whose live call fails
- * with nothing cached, is skipped rather than failing the whole fan-out — and
- * a throw is caught here for the same reason. `loadCharacterAssets` really can
- * reject (a live call that fails outside the stale-grace path), and
- * `mapWithConcurrencyLimit` awaits its callback directly, so an uncaught
- * rejection would take every other Character down with it.
+ * Cache-or-live per `loadCharacterAssets` for one Character. Null (nothing
+ * cached) is skipped by `fanOutAllCharacters`, as is a throw —
+ * `loadCharacterAssets` really can reject (a live call that fails outside the
+ * stale-grace path) and that must not take the other Characters down.
  *
  * Skips are recorded rather than swallowed: a caller summing quantities across
  * Characters has to be able to say the total is short.
  */
-async function fanOutCharacterAssets(
-  characters: readonly { characterId: number; name: string }[]
-): Promise<FannedOutAssets> {
-  const entries: FannedOutCharacterAssets[] = [];
-  const skipped: SkippedCharacterAssets[] = [];
-  await mapWithConcurrencyLimit(characters, ESI_FANOUT_CONCURRENCY, async (character) => {
-    const { characterId, name } = character;
-    try {
-      const { cached } = await loadCharacterAssets(characterId);
-      if (cached) {
-        entries.push({
-          characterId,
-          name,
-          assets: cached.data,
-          truncated: cached.truncated,
-          fetchedAt: cached.fetchedAt,
-        });
-      } else {
-        skipped.push({ characterId, name });
-      }
-    } catch {
-      skipped.push({ characterId, name });
-    }
-  });
-  return { entries, skipped };
+async function loadFannedOutAssets(character: {
+  characterId: number;
+  name: string;
+}): Promise<FannedOutCharacterAssets | null> {
+  const { characterId, name } = character;
+  const { cached } = await loadCharacterAssets(characterId);
+  if (!cached) return null;
+  return {
+    characterId,
+    name,
+    assets: cached.data,
+    truncated: cached.truncated,
+    fetchedAt: cached.fetchedAt,
+  };
 }
 
 /**
@@ -103,7 +87,13 @@ export async function loadOtherCharactersAssets(
   const ids = new Set(characterIds);
   const characters = await db.characters.toArray();
   const matching = characters.filter((c) => ids.has(c.characterId));
-  const { entries } = await fanOutCharacterAssets(matching);
+  // Intentionally NO `scope`: the player explicitly picked these Characters in
+  // the filter, so a live 403 (and its re-auth banner) is the answer they asked
+  // for, unlike the unprompted Build Plan fan-out below.
+  const { entries } = await fanOutAllCharacters({
+    characters: matching,
+    load: loadFannedOutAssets,
+  });
   // Narrowed back to this function's own shape: the filter has no use for the
   // completeness detail, and its callers compare these objects wholesale.
   return entries.map(({ characterId, name, assets }) => ({ characterId, name, assets }));
@@ -116,28 +106,8 @@ export async function loadOtherCharactersAssets(
  * account owns — and it needs the skipped/truncated detail, because a total
  * summed over an incomplete set must be presented as a lower bound.
  */
-export async function loadAllCharactersAssets(): Promise<FannedOutAssets> {
-  const characters = await db.characters.toArray();
-  const granted = await Promise.all(
-    characters.map(async (character) => {
-      const token = await db.tokens.get(character.characterId);
-      return (token?.scopes ?? []).includes(ASSETS_SCOPE);
-    })
-  );
-
-  // Scope is checked up front rather than left to a 403, because this fan-out
-  // runs on every Build Plan open rather than behind an explicit toggle. A live
-  // 403 is an auth failure: it raises the app-wide re-auth banner naming an alt
-  // the player never asked about, and nothing caches it, so the same Character
-  // would trip it again on the next plan opened.
-  const { entries, skipped } = await fanOutCharacterAssets(characters.filter((_, i) => granted[i]));
-  return {
-    entries,
-    skipped: [
-      ...characters
-        .filter((_, i) => !granted[i])
-        .map(({ characterId, name }) => ({ characterId, name })),
-      ...skipped,
-    ],
-  };
+export function loadAllCharactersAssets(): Promise<FannedOutAssets> {
+  // Scope is pre-checked because this fan-out runs on every Build Plan open
+  // rather than behind an explicit toggle, and nothing caches a live 403.
+  return fanOutAllCharacters({ scope: ASSETS_SCOPE, load: loadFannedOutAssets });
 }

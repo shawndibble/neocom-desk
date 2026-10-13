@@ -8,7 +8,7 @@ import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import type { OpenOrderRow } from './openOrdersModel';
 import { OrderProblemBadge } from './OrderProblemBadge';
-import { orderBadgeFor } from './orderBadgeKind';
+import { adviseOrder } from './orderAdvice';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { isOffHubStation } from './hubStation';
 import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
@@ -56,7 +56,7 @@ export function OpenOrdersList({
   return (
     <ul ref={listRef} aria-label={label} className="divide-y divide-line">
       {rows.map((row) => {
-        const badge = orderBadgeFor(row);
+        const { badge, summary } = adviseOrder(row);
         const offHub = isOffHubStation(row.stationName, row.locationId);
         const listRow = (
           <li data-row-key={row.orderId} className="flex items-start">
@@ -83,7 +83,7 @@ export function OpenOrdersList({
                 {badge && (
                   <OrderProblemBadge kind={badge.kind} detail={badge.detail} interactive={false} />
                 )}
-                <OrderRowSummaryText row={row} interactive={false} />
+                <OrderRowSummaryText row={row} summary={summary} interactive={false} />
               </span>
               <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-dim tabular-nums">
                 <span>

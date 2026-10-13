@@ -206,6 +206,7 @@ here — they go one per file in `docs/context/decisions/`.
   Distinct from a **Build Group**, which groups plans, not people. The UI
   says "Communities"; the bare word "Group" stays unused here because it
   already names the Build Group.
+- **Join Request**: A Character that followed a **Community**'s invite link while the admin has "Approve new Members" on, and is waiting to be let in. It is not a **Member** and sees and shares nothing until the admin accepts it. A Character the admin mailed an invite to skips it. Distinct from a mail invite, which the admin sends.
 - **Community Library**: A **Community** page tab listing every blueprint
   against the **Members** who share it, with a "missing from the Community"
   filter. Its rows are every blueprint reachable by any route — market,
@@ -525,6 +526,7 @@ here — they go one per file in `docs/context/decisions/`.
   never notes, never the sharer's skills. Others open it like a **Load**ed
   Fitting, stated for their own skills. A saved Fitting's copy follows its
   owner's saves; an **In-game Fitting**'s is a snapshot, "as of" when shared.
+- **Shared Plan**: A **Skill Plan** a **Member** chose to share with a **Community**, kept there as its name and ordered skill targets only: never milestones, markers, implants, boosters or the sharer's skills. Shared one at a time, never all at once; it follows its owner's later edits, and others **Copy** it into a plan of their own that does not follow the original.
 - **Shared D-Scan**: A pasted D-Scan stored in a **Share Link** as its raw scan text, never just the counts; the recipient's **Fleet board** is rebuilt from that text. Read-only, and cannot be revoked: expiry is the only end of the link.
 - **Fleet board**: A D-Scan read as its ships grouped by role (Capitals, Industrial, Transport, Support, DPS, Drones and deployables, Structures and wrecks), with each role's count, percent and ship distances. Counts and distances only: D-Scan gives no bearing and never names a pilot.
 - **Danger read**: The answer a D-Scan view opens with: "am I in danger, and what should I watch?" A level (Clear on scan, Watch, Danger, Busy), then **Watch these** (ranked groups of identical hulls that can pin, reinforce, hurt or find the pilot) and **Leave or re-check if**. Read for the pilot's own ship; the rest sits beneath as the **Full scan**. States a condition, never a verdict.

@@ -7,7 +7,14 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Button, DataTable, Panel, Spinner, type DataTableColumn } from '@/components/ui';
+import {
+  Button,
+  DataTable,
+  IskAmount,
+  Panel,
+  Spinner,
+  type DataTableColumn,
+} from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { db } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -24,7 +31,6 @@ import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBu
 import { useItemActions } from '@/features/market/itemActions';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
-import { formatIskCompact } from '@/lib/isk';
 import { StockListNameDialog } from './StockListDialogs';
 import { StockStatusPill } from './StockStatus';
 
@@ -158,7 +164,7 @@ export function StockBuilderView({
   }
 
   const blueprintLabel = (bp: CharacterBlueprint | null) => {
-    if (!bp) return t('stockTargets.builder.noBlueprint');
+    if (!bp) return null;
     return bp.runs === -1
       ? t('stockTargets.builder.bpo', { me: bp.material_efficiency, te: bp.time_efficiency })
       : t('stockTargets.builder.bpc', { count: bp.runs, me: bp.material_efficiency });
@@ -182,14 +188,15 @@ export function StockBuilderView({
       render: (row) => row.toSource.toLocaleString(),
       sortValue: (row) => row.toSource,
     },
-    {
-      id: 'blueprint',
-      header: t('stockTargets.builder.blueprint'),
-      headerCellClassName: 'sm:w-44',
-      render: (row) => blueprintLabel(row.blueprint),
-    },
+    // Needs-blueprint table: no row has one; its heading says so.
     ...(withBlueprintColumns
       ? [
+          {
+            id: 'blueprint',
+            header: t('stockTargets.builder.blueprint'),
+            headerCellClassName: 'sm:w-44',
+            render: (row: BuilderRow) => blueprintLabel(row.blueprint),
+          },
           {
             id: 'time',
             header: t('stockTargets.builder.timePerRun'),
@@ -214,7 +221,9 @@ export function StockBuilderView({
         row.costToFill === null ? (
           <span className="text-text-dim">{t('stockTargets.table.noPrice')}</span>
         ) : (
-          `${formatIskCompact(row.costToFill)} ISK`
+          <>
+            <IskAmount value={row.costToFill} /> ISK
+          </>
         ),
       sortValue: (row) => row.costToFill ?? -1,
     },
@@ -270,10 +279,6 @@ export function StockBuilderView({
 
   return (
     <div className="space-y-3">
-      {/* Top right on desktop; a phone gets it full width under the lists. */}
-      {split.buildable.length > 0 && (
-        <div className="hidden justify-end sm:flex">{addButton('')}</div>
-      )}
       {split.buildable.length === 0 && split.needs.length === 0 ? (
         <p className="rounded-xs border border-dashed border-line px-3 py-3 text-sm text-text-dim">
           {t('stockTargets.builder.nothingShort')}
@@ -281,9 +286,13 @@ export function StockBuilderView({
       ) : (
         <>
           <section aria-labelledby={`${headingId}-can`} className="space-y-2">
-            <h3 id={`${headingId}-can`} className={sectionHeadingClassName}>
-              {t('stockTargets.builder.canBuild', { count: split.buildable.length })}
-            </h3>
+            {/* Desktop: on the heading line. Phone: full width under the lists. */}
+            <div className="flex items-end gap-2">
+              <h3 id={`${headingId}-can`} className={cx('flex-1', sectionHeadingClassName)}>
+                {t('stockTargets.builder.canBuild', { count: split.buildable.length })}
+              </h3>
+              {split.buildable.length > 0 && <div className="hidden sm:block">{addButton('')}</div>}
+            </div>
             {split.buildable.length > 0 ? (
               table(split.buildable, t('stockTargets.builder.canBuildLabel'), true)
             ) : (

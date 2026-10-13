@@ -470,7 +470,7 @@ export async function loadRouteSafetyWidget(): Promise<RouteSafetyWidgetData> {
   const [{ loadRouteKills24h }, { loadSolarSystemsById }, { routeStopsHref }] = await Promise.all([
     import('@/features/travel/routeKills24h'),
     import('@/sde/solarSystems'),
-    import('@/features/travel/routeSafetyLink'),
+    import('@/features/route/routeSafetyLink'),
   ]);
   const [kills, names] = await Promise.all([
     loadRouteKills24h(route.systems),
