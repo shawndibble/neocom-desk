@@ -25,6 +25,7 @@ import {
 } from '@/engine/communities/libraryMatrix';
 import { isLibraryStale } from '@/engine/communities/sharedLibrary';
 import {
+  blueprintGroupOfProductGroup,
   buildShareTree,
   type BlueprintTypeInfo,
   type ShareGroup,
@@ -47,6 +48,7 @@ const VIEWS: LibraryView[] = ['shared', ...FILTERS];
 type Loaded = {
   catalog: BlueprintTypeInfo[];
   groups: ShareMarketGroup[];
+  learned: Map<number, number>;
   libraries: MemberLibrary[];
 };
 
@@ -228,14 +230,17 @@ export function CommunityLibrary({
         ]);
         if (cancelled) return;
         const groupByType = new Map(marketTypes.map((type) => [type.typeId, type.marketGroupId]));
+        const catalog = Object.entries(blueprints).map(([typeId, blueprint]) => ({
+          typeId: Number(typeId),
+          name: blueprint.name,
+          marketGroupId: groupByType.get(Number(typeId)) ?? null,
+          productMarketGroupId: groupByType.get(blueprint.products[0]?.typeID) ?? null,
+        }));
         setLoaded({
           libraries,
           groups,
-          catalog: Object.entries(blueprints).map(([typeId, blueprint]) => ({
-            typeId: Number(typeId),
-            name: blueprint.name,
-            marketGroupId: groupByType.get(Number(typeId)) ?? null,
-          })),
+          catalog,
+          learned: blueprintGroupOfProductGroup(catalog, groups),
         });
         setFailed(false);
       } catch {
@@ -257,7 +262,10 @@ export function CommunityLibrary({
   );
   const rowsByType = useMemo(() => new Map(shown.map((row) => [row.typeId, row])), [shown]);
   const tree = useMemo(
-    () => (loaded ? buildShareTree(shown, loaded.groups, t('communities.library.other')) : []),
+    () =>
+      loaded
+        ? buildShareTree(shown, loaded.groups, t('communities.library.other'), loaded.learned)
+        : [],
     [loaded, shown, t]
   );
   const staleUids = useMemo(

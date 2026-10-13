@@ -8,6 +8,15 @@
  * and the later push (#3600) expands a chosen type to whatever instances are
  * owned then. Blueprints the market doesn't list (most T2 originals) go in a
  * trailing Other bucket so every owned blueprint can still be picked.
+ *
+ * Every row is a blueprint, so the tree's roots are the children of the
+ * "Blueprints & Reactions" market group (`BLUEPRINT_ROOT_GROUP_ID`), not that
+ * group itself. A blueprint the market doesn't list there (most T2 originals,
+ * or the odd one filed under Trade Goods) is placed by what it makes: the
+ * product's market group is looked up in `blueprintGroupOfProductGroup` (where
+ * the listed blueprints making that kind of product already sit); failing
+ * that its path is followed down the blueprint tree by name, and whatever part
+ * of the path has no blueprint twin is added as extra groups.
  */
 
 /** The market-group tree row, as `sde/marketTypes.ts` publishes it. */
@@ -22,9 +31,15 @@ export interface BlueprintTypeInfo {
   typeId: number;
   name: string;
   marketGroupId: number | null;
+  /** The market group of what the blueprint makes; places it when its own group can't. */
+  productMarketGroupId?: number | null;
 }
 
 export const OTHER_GROUP_ID = -1;
+/** The market group every blueprint and reaction formula hangs under. */
+export const BLUEPRINT_ROOT_GROUP_ID = 2;
+/** Groups added for a product's path get ids no market group has: below Other's. */
+const productGroupId = (marketGroupId: number) => -(marketGroupId + 1000);
 
 export interface ShareGroup {
   id: number;
@@ -50,31 +65,122 @@ function finish(group: Omit<ShareGroup, 'total'>): ShareGroup {
 }
 
 /**
+ * For each market group of products, the blueprint market group most of its
+ * listed blueprints sit in: the blueprint tree and the product tree are named
+ * differently in places (Turrets & Bays against Turrets & Launchers).
+ */
+export function blueprintGroupOfProductGroup(
+  blueprints: readonly BlueprintTypeInfo[],
+  groups: readonly ShareMarketGroup[]
+): Map<number, number> {
+  const byId = new Map(groups.map((group) => [group.id, group]));
+  const underRoot = (id: number) => {
+    for (let at = byId.get(id); at; at = at.parentId === null ? undefined : byId.get(at.parentId)) {
+      if (at.id === BLUEPRINT_ROOT_GROUP_ID) return true;
+    }
+    return false;
+  };
+  const counts = new Map<number, Map<number, number>>();
+  for (const { marketGroupId, productMarketGroupId } of blueprints) {
+    if (marketGroupId === null || productMarketGroupId == null || !underRoot(marketGroupId))
+      continue;
+    const forProduct = counts.get(productMarketGroupId) ?? new Map<number, number>();
+    forProduct.set(marketGroupId, (forProduct.get(marketGroupId) ?? 0) + 1);
+    counts.set(productMarketGroupId, forProduct);
+  }
+  const result = new Map<number, number>();
+  for (const [productGroup, forProduct] of counts) {
+    const [best] = [...forProduct].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+    result.set(productGroup, best[0]);
+  }
+  return result;
+}
+
+/**
  * Owned blueprint types nested under their market-group path. Groups holding
  * none are pruned; unlisted types go in a last root named `otherName`.
  */
 export function buildShareTree(
   owned: readonly BlueprintTypeInfo[],
   groups: readonly ShareMarketGroup[],
-  otherName: string
+  otherName: string,
+  learned: ReadonlyMap<number, number> = new Map()
 ): ShareGroup[] {
-  const groupsById = new Map(groups.map((group) => [group.id, group]));
+  const hasBlueprintRoot = groups.some((group) => group.id === BLUEPRINT_ROOT_GROUP_ID);
+  const rawById = new Map(groups.map((group) => [group.id, group]));
+  const pathOf = (id: number): ShareMarketGroup[] => {
+    const path: ShareMarketGroup[] = [];
+    for (
+      let at = rawById.get(id);
+      at;
+      at = at.parentId === null ? undefined : rawById.get(at.parentId)
+    ) {
+      path.unshift(at);
+    }
+    return path;
+  };
+  const underBlueprintRoot = (id: number) => pathOf(id)[0]?.id === BLUEPRINT_ROOT_GROUP_ID;
+  // The root itself disappears: its children become roots, and no other
+  // market tree is shown (a blueprint filed in one is placed by its product).
+  const allGroups: ShareMarketGroup[] = hasBlueprintRoot
+    ? groups
+        .filter((group) => group.id !== BLUEPRINT_ROOT_GROUP_ID && underBlueprintRoot(group.id))
+        .map((group) =>
+          group.parentId === BLUEPRINT_ROOT_GROUP_ID ? { ...group, parentId: null } : group
+        )
+    : [...groups];
+
+  // Where a product's path leaves the blueprint tree, groups are added.
+  const addedIds = new Set<number>();
+  function placeByProduct(productGroup: number | null | undefined): number | null {
+    if (productGroup == null || !rawById.has(productGroup)) return null;
+    const known = learned.get(productGroup);
+    if (known !== undefined) return known;
+    const path = pathOf(productGroup);
+    let parent: number | null = null;
+    let index = 0;
+    for (; index < path.length; index++) {
+      const twin = allGroups.find(
+        (group) => group.parentId === parent && group.name === path[index].name
+      );
+      if (!twin) break;
+      parent = twin.id;
+    }
+    for (; index < path.length; index++) {
+      const id = productGroupId(path[index].id);
+      if (!addedIds.has(id)) {
+        addedIds.add(id);
+        allGroups.push({ id, name: path[index].name, parentId: parent });
+      }
+      parent = id;
+    }
+    return parent;
+  }
+
   const unique = new Map(owned.map((type) => [type.typeId, type]));
+  const placeOf = new Map<number, number | null>();
+  for (const type of unique.values()) {
+    const own = type.marketGroupId;
+    const listed =
+      own !== null && rawById.has(own) && (!hasBlueprintRoot || underBlueprintRoot(own));
+    placeOf.set(type.typeId, listed ? own : placeByProduct(type.productMarketGroupId));
+  }
 
   const typesByGroup = new Map<number, BlueprintTypeInfo[]>();
   const unlisted: BlueprintTypeInfo[] = [];
   for (const type of unique.values()) {
-    if (type.marketGroupId !== null && groupsById.has(type.marketGroupId)) {
-      const list = typesByGroup.get(type.marketGroupId) ?? [];
-      list.push(type);
-      typesByGroup.set(type.marketGroupId, list);
-    } else {
+    const place = placeOf.get(type.typeId) ?? null;
+    if (place === null) {
       unlisted.push(type);
+      continue;
     }
+    const list = typesByGroup.get(place) ?? [];
+    list.push(type);
+    typesByGroup.set(place, list);
   }
 
   const childrenByParent = new Map<number | null, ShareMarketGroup[]>();
-  for (const group of groups) {
+  for (const group of allGroups) {
     const list = childrenByParent.get(group.parentId) ?? [];
     list.push(group);
     childrenByParent.set(group.parentId, list);

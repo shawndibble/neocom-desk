@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   OTHER_GROUP_ID,
+  blueprintGroupOfProductGroup,
   buildShareTree,
   countSelected,
   descendantTypeIds,
@@ -13,17 +14,17 @@ import {
 } from './shareTree';
 
 const groups = [
-  { id: 1, name: 'Ships', parentId: null, hasTypes: false },
-  { id: 2, name: 'Frigates', parentId: 1, hasTypes: true },
-  { id: 3, name: 'Cruisers', parentId: 1, hasTypes: true },
-  { id: 4, name: 'Modules', parentId: null, hasTypes: true },
-  { id: 5, name: 'Empty branch', parentId: null, hasTypes: true },
+  { id: 101, name: 'Ships', parentId: null, hasTypes: false },
+  { id: 102, name: 'Frigates', parentId: 101, hasTypes: true },
+  { id: 103, name: 'Cruisers', parentId: 101, hasTypes: true },
+  { id: 104, name: 'Modules', parentId: null, hasTypes: true },
+  { id: 105, name: 'Empty branch', parentId: null, hasTypes: true },
 ];
 const owned = [
-  { typeId: 10, name: 'Rifter Blueprint', marketGroupId: 2 },
-  { typeId: 11, name: 'Merlin Blueprint', marketGroupId: 2 },
-  { typeId: 12, name: 'Caracal Blueprint', marketGroupId: 3 },
-  { typeId: 13, name: 'Small Armor Repairer I Blueprint', marketGroupId: 4 },
+  { typeId: 10, name: 'Rifter Blueprint', marketGroupId: 102 },
+  { typeId: 11, name: 'Merlin Blueprint', marketGroupId: 102 },
+  { typeId: 12, name: 'Caracal Blueprint', marketGroupId: 103 },
+  { typeId: 13, name: 'Small Armor Repairer I Blueprint', marketGroupId: 104 },
   { typeId: 14, name: 'Hammerhead II Blueprint', marketGroupId: null },
   { typeId: 15, name: 'Mystery Blueprint', marketGroupId: 999 },
 ];
@@ -53,6 +54,66 @@ describe('buildShareTree', () => {
   it('lists each type once even when ESI reports several copies', () => {
     const dup = buildShareTree([...owned, owned[0]], groups, 'Other');
     expect(byName(dup, 'Ships').total).toBe(3);
+  });
+});
+
+describe('buildShareTree with the Blueprints & Reactions root', () => {
+  const market = [
+    { id: 2, name: 'Blueprints & Reactions', parentId: null },
+    { id: 204, name: 'Ships', parentId: 2 },
+    { id: 205, name: 'Frigates', parentId: 204 },
+    { id: 209, name: 'Ship Equipment', parentId: 2 },
+    { id: 4, name: 'Ships', parentId: null },
+    { id: 5, name: 'Frigates', parentId: 4 },
+    { id: 9, name: 'Ship Equipment', parentId: null },
+    { id: 10, name: 'Mining Lasers', parentId: 9 },
+    { id: 24, name: 'Implants & Boosters', parentId: null },
+    { id: 25, name: 'Boosters', parentId: 24 },
+    { id: 19, name: 'Trade Goods', parentId: null },
+  ];
+  const build = (types: Parameters<typeof buildShareTree>[0]) =>
+    buildShareTree(types, market, 'Other');
+
+  it('drops the root and keeps its children as roots', () => {
+    const roots = build([{ typeId: 1, name: 'Rifter Blueprint', marketGroupId: 205 }]);
+    expect(roots.map((g) => g.name)).toEqual(['Ships']);
+    expect(roots[0].children.map((g) => g.name)).toEqual(['Frigates']);
+  });
+
+  it('places an unlisted blueprint by its product, adding groups the blueprint tree lacks', () => {
+    const roots = build([
+      { typeId: 2, name: 'Miner II Blueprint', marketGroupId: null, productMarketGroupId: 10 },
+      { typeId: 3, name: 'Blue Pill Blueprint', marketGroupId: null, productMarketGroupId: 25 },
+    ]);
+    expect(roots.map((g) => g.name)).toEqual(['Implants & Boosters', 'Ship Equipment']);
+    const lasers = byName(byName(roots, 'Ship Equipment').children, 'Mining Lasers');
+    expect(lasers.types.map((t) => t.typeId)).toEqual([2]);
+    expect(byName(byName(roots, 'Implants & Boosters').children, 'Boosters').types).toHaveLength(1);
+  });
+
+  it('puts an unlisted blueprint beside the listed ones that make the same kind of product', () => {
+    const catalog = [
+      { typeId: 6, name: 'Miner I Blueprint', marketGroupId: 209, productMarketGroupId: 10 },
+      { typeId: 7, name: 'Miner II Blueprint', marketGroupId: null, productMarketGroupId: 10 },
+    ];
+    const learned = blueprintGroupOfProductGroup(catalog, market);
+    expect(learned.get(10)).toBe(209);
+    const roots = buildShareTree(catalog, market, 'Other', learned);
+    expect(roots.map((g) => g.name)).toEqual(['Ship Equipment']);
+    expect(roots[0].types.map((t) => t.typeId)).toEqual([6, 7]);
+  });
+
+  it('moves a blueprint filed outside the root (Trade Goods) under its product', () => {
+    const roots = build([
+      { typeId: 4, name: 'Stray Blueprint', marketGroupId: 19, productMarketGroupId: 5 },
+    ]);
+    expect(roots.map((g) => g.name)).toEqual(['Ships']);
+    expect(byName(roots[0].children, 'Frigates').types.map((t) => t.typeId)).toEqual([4]);
+  });
+
+  it('keeps Other for a blueprint whose product has no market group', () => {
+    const roots = build([{ typeId: 5, name: 'Odd Blueprint', marketGroupId: null }]);
+    expect(roots.map((g) => g.name)).toEqual(['Other']);
   });
 });
 
