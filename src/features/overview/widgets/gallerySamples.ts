@@ -374,18 +374,18 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       ],
     },
     survey: {
-      value: '6.4K',
+      value: '2h 14m',
       unit: t('overview.widgets.data.survey.unit'),
       note: t('overview.gallery.samples.survey.note'),
       rows: [
-        ['Arkonor', '', '6.4K'],
-        ['Bistot', '', '4.1K'],
-        ['Veldspar', '', '1.2K'],
+        ['Arkonor', '', '6.4K m³'],
+        ['Bistot', '', '4.1K m³'],
+        ['Veldspar', '', '1.2K m³'],
       ],
       chart: hbars([
-        ['Arkonor', 1, '6.4K'],
-        ['Bistot', 0.64, '4.1K'],
-        ['Veldspar', 0.19, '1.2K'],
+        ['Arkonor', 1, '6.4K m³'],
+        ['Bistot', 0.64, '4.1K m³'],
+        ['Veldspar', 0.19, '1.2K m³'],
       ]),
     },
     routeSafety: {

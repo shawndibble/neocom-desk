@@ -43,6 +43,7 @@ interface ScanTableRow {
 
 /** Left edge shared by both charts so their time axes line up. */
 const Y_AXIS_WIDTH = 52;
+const COMPACT_Y_AXIS_WIDTH = 36;
 const MARGIN = { top: 16, right: 12, bottom: 0, left: 0 };
 /** Room a label needs, in px: "301.8K" and "1,116" at 10px. */
 const DELTA_LABEL_GAP = 46;
@@ -82,10 +83,16 @@ interface NodeDotProps {
 export function SurveyCharts({
   summary,
   onRemoveScan,
+  compactHeight,
 }: {
   summary: SurveySummary;
   /** Offered to the survey's owner: the right-click menu on a scan's node removes it. */
   onRemoveScan?: (at: number) => void;
+  /**
+   * Draws only the volume chart at this height in px, as the Overview's Mining
+   * survey widget does: its own time axis, no scan nodes or labels, no rate chart.
+   */
+  compactHeight?: number;
 }) {
   const { t } = useTranslation();
   const [plotWidth, setPlotWidth] = useState(0);
@@ -249,14 +256,14 @@ export function SurveyCharts({
   }
 
   const plot = (
-    <div className="h-56 w-full">
+    <div className="w-full" style={{ height: compactHeight ?? 224 }}>
       <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
         {/* Recharts stacks in the order the areas first registered, and a re-sort only moves them, so a new order remounts the chart. */}
         <ComposedChart key={summary.oreNames.join('|')} data={chartRows} margin={MARGIN}>
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
-          {xAxis(true)}
+          {xAxis(compactHeight === undefined)}
           <YAxis
-            width={Y_AXIS_WIDTH}
+            width={compactHeight === undefined ? Y_AXIS_WIDTH : COMPACT_Y_AXIS_WIDTH}
             tickFormatter={formatCompactNumber}
             stroke="var(--color-line-bright)"
             tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
@@ -283,20 +290,22 @@ export function SurveyCharts({
             dataKey="total"
             stroke="var(--color-text-dim)"
             strokeWidth={1}
-            dot={nodeDot}
+            dot={compactHeight === undefined ? nodeDot : false}
             isAnimationActive={false}
             legendType="none"
           >
-            <LabelList
-              dataKey="totalLabel"
-              position="top"
-              offset={8}
-              fill="var(--color-text)"
-              fontSize={10}
-              formatter={(value: unknown) =>
-                typeof value === 'number' ? formatCompactNumber(value) : ''
-              }
-            />
+            {compactHeight === undefined && (
+              <LabelList
+                dataKey="totalLabel"
+                position="top"
+                offset={8}
+                fill="var(--color-text)"
+                fontSize={10}
+                formatter={(value: unknown) =>
+                  typeof value === 'number' ? formatCompactNumber(value) : ''
+                }
+              />
+            )}
           </Line>
           <Line
             type="linear"
@@ -327,6 +336,8 @@ export function SurveyCharts({
       </ResponsiveContainer>
     </div>
   );
+
+  if (compactHeight !== undefined) return plot;
 
   return (
     <div className="space-y-1">

@@ -8,6 +8,7 @@
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
 import { journalRefTypeBreakdown } from '@/features/character/walletJournalFilter';
+import { formatEveClock } from '@/engine/survey/chatMessage';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { eveToday, rangeDates, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { longestRemainingSeconds, secondsLeft } from '@/engine/jumpTimers';
@@ -251,57 +252,73 @@ const lp: Builder = (feeds, { t }) => {
 
 // --- Mining survey ------------------------------------------------------------------
 
-const SURVEY_CHART_ROWS = 6;
 const SURVEY_PATH = '/mining/survey';
 
-const survey: Builder = (feeds, { t }) => {
+const survey: Builder = (feeds, { t, now }) => {
   const feed = feeds.survey;
   const data = feed?.data ?? null;
   if (!data) return blank(SURVEY_PATH, statusOf(feed));
-  const best = data.ores[0];
-  const place = data.location ?? UNKNOWN;
+  const summary = data.summary;
   const note = t(`${C}.survey.note`);
-  return {
-    ...blank(SURVEY_PATH, statusOf(feed, { isEmpty: best === undefined })),
+  const base = {
+    ...blank(SURVEY_PATH, statusOf(feed, { isEmpty: summary === null })),
     emptyLinkLabel: t(`${W}.survey.emptyLink`),
     fetchedAt: data.fetchedAt,
-    number: best
-      ? {
-          value: formatIskCompact(best.iskPerM3),
-          unit: t(`${D}.survey.unit`),
-          secondary: {
-            text:
-              data.location === null
-                ? best.ore
-                : t(`${D}.survey.secondary`, { ore: best.ore, place: data.location }),
-          },
-          tone: 'clear',
-        }
-      : NEUTRAL_NUMBER,
+  };
+  if (summary === null) return { ...base, number: NEUTRAL_NUMBER, rows: [], summary: note };
+
+  const finish = summary.etaAt === null ? null : formatEveClock(summary.etaAt);
+  let number: NumberModel = {
+    value: UNKNOWN,
+    unit: t(`${D}.survey.noEta`),
+    tone: 'clear',
+  };
+  if (summary.finished) {
+    number = { value: t(`${D}.survey.finished`), tone: 'clear' };
+  } else if (summary.etaAt !== null && finish !== null) {
+    number = {
+      value: formatDuration(Math.max(0, summary.etaAt - now) / 1000),
+      unit: t(`${D}.survey.unit`),
+      secondary: {
+        text:
+          data.location === null
+            ? t(`${D}.survey.secondary`, { time: finish })
+            : t(`${D}.survey.secondaryAt`, { time: finish, place: data.location }),
+      },
+      tone: 'clear',
+    };
+  }
+
+  // An ore with nothing left is done with: it has no row.
+  const left = summary.ores.filter((o) => o.volume > 0);
+  return {
+    ...base,
+    number,
     rows: [],
     table: {
       columns: [
         { key: 'ore', label: t(`${W}.survey.col.ore`), priority: 0 },
-        { key: 'location', label: t(`${W}.survey.col.location`), priority: 2 },
-        { key: 'iskPerM3', label: t(`${W}.survey.col.iskPerM3`), align: 'end', priority: 1 },
+        { key: 'left', label: t(`${W}.survey.col.left`), align: 'end', priority: 0 },
       ],
-      rows: data.ores.map((o) => ({
+      rows: left.map((o) => ({
         key: o.ore,
-        cells: [o.ore, place, formatIskCompact(o.iskPerM3)],
+        cells: [o.ore, `${formatCompactNumber(o.volume)} m³`],
       })),
     },
     summary: note,
     chart:
-      hbarsFromRows(
-        t,
-        data.ores.slice(0, SURVEY_CHART_ROWS).map((o) => ({
-          key: o.ore,
-          label: o.ore,
-          value: o.iskPerM3,
-          text: formatIskCompact(o.iskPerM3),
-        })),
-        note
-      ) ?? undefined,
+      summary.points.length > 1
+        ? {
+            kind: 'survey',
+            data: summary,
+            note,
+            summary: t(`${C}.survey.summary`, {
+              percent: summary.percent,
+              left: formatCompactNumber(summary.leftVolume),
+              ores: left.map((o) => `${o.ore} ${formatCompactNumber(o.volume)} m³`).join(', '),
+            }),
+          }
+        : undefined,
   };
 };
 

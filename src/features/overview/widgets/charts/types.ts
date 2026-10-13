@@ -8,6 +8,8 @@
  * only signal, so every colour also has a label, a legend entry or a figure.
  */
 
+import type { SurveySummary } from '@/engine/survey/series';
+
 /**
  * Where a series' hue comes from. There is no chart palette (DESIGN.md "Chart
  * series": categorical sets borrow the app's existing tokens): `s1`..`s5` are
@@ -170,6 +172,12 @@ export interface GanttChartModel extends ChartBase {
   fallback: HBarsChartModel;
 }
 
+export interface SurveyChartModel extends ChartBase {
+  kind: 'survey';
+  /** The Survey tab's own series; drawn by its lazy Recharts volume chart, so this stays data. */
+  data: SurveySummary;
+}
+
 export type ChartModel =
   | AreaChartModel
   | BarsChartModel
@@ -180,6 +188,7 @@ export type ChartModel =
   | StackChartModel
   | StackedAreaChartModel
   | StackRowsChartModel
-  | SparkChartModel;
+  | SparkChartModel
+  | SurveyChartModel;
 
 export type ChartKind = ChartModel['kind'];
