@@ -136,7 +136,7 @@ const SEARCH_ANNOUNCE_DEBOUNCE_MS = 250;
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
-/** Trained skills for the active character: grouped by SDE group, with SP + attributes. */
+/** Every SDE skill for the active character, grouped by SDE group, with SP + attributes. */
 export function Skills() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -196,11 +196,8 @@ export function Skills() {
   const totalCount = groups.reduce((sum, group) => sum + group.total, 0);
   const queuedCount = groups.reduce((sum, group) => sum + group.queued, 0);
 
-  // Every plan this Character has (the skill Show info's Add targets one
-  // chosen plan; the mark reflects any of them), merged by
-  // skill at the highest level any of them asks. Drives the bar's planned
-  // mark: without it a skill already queued in a plan looks identical to one
-  // that isn't (issue: no indicator anywhere a skill can be added to a plan).
+  // Every plan this Character has, merged by skill at the highest level any
+  // asks: the bar's planned mark reflects any plan, not just Show info's target.
   const skillPlans = useLiveQuery(
     () =>
       activeCharacterId === null

@@ -52,7 +52,6 @@ function renderAdd(currentLevel = 2) {
       characterId={CHAR_ID}
       skillTypeID={3300}
       skillName="Gunnery"
-      currentLevel={currentLevel}
       engineSkills={ENGINE_SKILLS}
       trainedSkills={trainedSkills}
     />

@@ -9,23 +9,20 @@ interface SkillPlanAddProps {
   characterId: number;
   skillTypeID: number;
   skillName: string;
-  /** The character's trained level (0-5). */
-  currentLevel: number;
   /** For the levels the target plan trains as prerequisites of other entries. */
   engineSkills: ReadonlyMap<number, EngineSkill>;
+  /** Corrected trained levels; also gives this skill's own. */
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
 }
 
 /**
- * A skill's "Add to Skill Plan" (the Skills inspector, the skill Show info):
- * the first level neither trained nor already in the target plan, with the
- * plan picker and Undo `AddToPlanBar` carries.
+ * The skill Show info's "Add to Skill Plan": first level neither trained nor
+ * already in the target plan, with `AddToPlanBar`'s plan picker and Undo.
  */
 export function SkillPlanAdd({
   characterId,
   skillTypeID,
   skillName,
-  currentLevel,
   engineSkills,
   trainedSkills,
 }: SkillPlanAddProps) {
@@ -33,6 +30,7 @@ export function SkillPlanAdd({
   const target = useTargetPlan(characterId);
   const [added, setAdded] = useState<AddedToPlan | null>(null);
   const { plans, targetPlanId } = target;
+  const currentLevel = trainedSkills.get(skillTypeID)?.level ?? 0;
   const maxed = currentLevel >= 5;
   const plannedLevel = useMemo(
     () =>

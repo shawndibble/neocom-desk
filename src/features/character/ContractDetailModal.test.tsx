@@ -89,7 +89,7 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-/** `MarketItemLink` needs a router context — same wrapper `ImplantChip.test.tsx` uses. */
+/** `MarketItemLink` needs a router context — wrap in a router. */
 function renderModal(props: ContractDetailModalProps) {
   return render(
     <MemoryRouter>

@@ -1,6 +1,6 @@
 /**
- * Shared, read-only skill detail lookup (GLOSSARY.md round 49): description,
- * prerequisites (trained vs. still needed), and unlocks for one skill, opened
+ * Shared skill detail lookup (GLOSSARY.md round 49): description, price,
+ * prerequisites (trained vs. still needed), unlocks and Add to Skill Plan for one skill, opened
  * from any feature that renders a skill name via
  * `openSkillDetailModal`/`useSkillDetailModal` (`stores/skillDetailModal.ts`).
  * Mounted once in `App.tsx`, same "always mounted, driven by a global
@@ -41,7 +41,7 @@ type ModalState =
   | {
       status: 'ready';
       data: SkillRequirements;
-      /** What the Add to Skill Plan needs: the plan's derived prereqs and the trained level. */
+      /** With `trainedSkills`: `SkillPlanAdd`'s inputs. */
       engineSkills: ReadonlyMap<number, EngineSkill>;
       trainedSkills: ReadonlyMap<number, TrainedSkill>;
     };
@@ -168,7 +168,6 @@ export function SkillDetailModal() {
                 characterId={activeCharacterId}
                 skillTypeID={request.typeID}
                 skillName={state.data.name}
-                currentLevel={state.trainedSkills.get(request.typeID)?.level ?? 0}
                 engineSkills={state.engineSkills}
                 trainedSkills={state.trainedSkills}
               />

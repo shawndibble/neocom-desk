@@ -62,10 +62,8 @@ function skillName(catalog: SkillCatalog, typeID: number): string {
 }
 
 /**
- * A skill's prerequisites (trained vs. still needed) and what it unlocks, for
- * the skill inspector. Shared by every surface that lets a user select a
- * skill (the Skills page, the plan's SkillPicker) so the row-building logic
- * lives in one place.
+ * A skill's prerequisites (trained vs. still needed) and what it unlocks. One
+ * row builder for the skill Show info and the plan's SkillPicker.
  */
 export function buildSkillRequirements(
   catalog: SkillCatalog,

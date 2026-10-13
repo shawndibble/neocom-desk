@@ -217,7 +217,7 @@ export function useMarketBrowser({
     [searchParams]
   );
 
-  // Cross-page item links (MarketItemLink, ImplantChip, ItemContextMenu's
+  // Cross-page item links (MarketItemLink, ItemContextMenu's
   // "View in Market") land on `/market/browser?type=...` directly
   // (`engine/market/urlState.ts`'s `marketItemUrl`) — tab is a path segment,
   // so a click that means "browse this item" carries no "which tab is this?"

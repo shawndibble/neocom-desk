@@ -90,10 +90,7 @@ function NeedBookMarker() {
   );
 }
 
-/**
- * One skill row: the name is a real link to the skill Show info, and the rest
- * of the row opens the same Show info. Two siblings rather than a link inside a button.
- */
+/** One skill row: name links to the skill Show info, rest of the row opens it too. Siblings, not a link inside a button. */
 export function SkillBoardRow({
   skill,
   plannedLevel,
