@@ -6907,7 +6907,6 @@
       },
       "to": "to",
       "tagRebuild": "Rebuild",
-      "tagAsIs": "As-is",
       "alternative_one": "{{count}} alternative",
       "alternative_other": "{{count}} alternatives",
       "altP2": "A one-planet {{item}} factory here earns {{delta}}{{hauls}}.",
