@@ -172,7 +172,7 @@ describe('Widget states', () => {
   it('links the Mining survey empty state to the Mining Survey tab', () => {
     renderWidget(model({ kind: 'survey' }), (store) =>
       store.set('survey', {
-        data: { hasSurvey: false, location: null, ores: [], fetchedAt: null },
+        data: { hasSurvey: false, location: null, summary: null, fetchedAt: null },
         error: false,
         loading: false,
       })

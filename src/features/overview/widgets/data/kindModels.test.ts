@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { summarizeSurvey } from '@/engine/survey/series';
+import { formatDuration } from '@/lib/duration';
 import { resolveWidget } from '../state';
 import { buildView, feedsFor, KIND_FEEDS } from './models';
 import { humanizeRefType } from './kindModels';
@@ -678,13 +680,23 @@ describe('location table', () => {
 });
 
 describe('survey', () => {
+  const scan = (at: number, rocks: [string, number][]) => ({
+    at,
+    rocks: rocks.map(([ore, volume]) => ({ ore, volume })),
+  });
+  // 1,500 m³ mined in the hour between the scans, 1,500 left: another hour from the last scan, 30 minutes ago.
+  const summary = () =>
+    summarizeSurvey([
+      scan(NOW - 1.5 * HOUR, [
+        ['Arkonor', 500],
+        ['Veldspar', 2500],
+      ]),
+      scan(NOW - HOUR / 2, [['Veldspar', 1500]]),
+    ]);
   const data = (over: Partial<SurveyWidgetData> = {}): SurveyWidgetData => ({
     hasSurvey: true,
     location: 'Efa',
-    ores: [
-      { ore: 'Arkonor', iskPerM3: 6400, volume: 400, rocks: 2 },
-      { ore: 'Veldspar', iskPerM3: 1200, volume: 900, rocks: 5 },
-    ],
+    summary: summary(),
     fetchedAt: new Date(NOW),
     ...over,
   });
@@ -694,29 +706,48 @@ describe('survey', () => {
     expect(buildView('survey', { survey: ok(data()) }, ctx()).to).toBe('/mining/survey');
   });
 
-  it('leads with the best ore, tables every ore and charts them best first', () => {
+  it('leads with the time left until the field is mined out, and says when it finishes', () => {
     const view = buildView('survey', { survey: ok(data()) }, ctx());
     expect(stateOf(view)).toBe('ok');
-    expect(view.number.value).toBe('6.4K');
-    expect(view.number.secondary?.text).toContain('Arkonor');
+    const etaAt = summary()?.etaAt ?? 0;
+    expect(view.number.value).toBe(formatDuration((etaAt - NOW) / 1000));
+    expect(view.number.secondary?.text).toContain('secondaryAt');
     expect(view.number.secondary?.text).toContain('Efa');
-    expect(view.table?.rows.map((r) => r.cells)).toEqual([
-      ['Arkonor', 'Efa', '6.4K'],
-      ['Veldspar', 'Efa', '1.2K'],
-    ]);
-    if (view.chart?.kind !== 'hbars') throw new Error('hbars');
-    expect(view.chart.rows.map((r) => r.share)).toEqual([1, 1200 / 6400]);
   });
 
-  it('names just the ore when the survey has no location', () => {
+  it('says the field is due, not zero minutes, once its estimate has passed', () => {
+    const late = buildView('survey', { survey: ok(data()) }, ctx({ now: NOW + 5 * HOUR }));
+    expect(late.number.value).toBe('overview.widgets.data.survey.overdue');
+    expect(late.number.unit).toBeUndefined();
+  });
+
+  it('drops the place from the finish line when the survey has none', () => {
     const view = buildView('survey', { survey: ok(data({ location: null })) }, ctx());
-    expect(view.number.secondary?.text).toBe('Arkonor');
+    expect(view.number.secondary?.text).toContain('overview.widgets.data.survey.secondary{');
   });
 
-  it('is empty with no survey or no priced ore', () => {
-    const none = data({ hasSurvey: false, ores: [], location: null });
+  it('tables what is left of each ore and leaves out an ore that is finished', () => {
+    const view = buildView('survey', { survey: ok(data()) }, ctx());
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      ['Veldspar', expect.stringContaining('1.5K')],
+    ]);
+  });
+
+  it('draws the Survey tab volume chart once there are two scans', () => {
+    const view = buildView('survey', { survey: ok(data()) }, ctx());
+    expect(view.chart?.kind).toBe('survey');
+    const one = summarizeSurvey([scan(NOW, [['Veldspar', 100]])]);
+    expect(
+      buildView('survey', { survey: ok(data({ summary: one })) }, ctx()).chart
+    ).toBeUndefined();
+  });
+
+  it('is empty with no survey or no scans', () => {
+    const none = data({ hasSurvey: false, summary: null, location: null });
     expect(stateOf(buildView('survey', { survey: ok(none) }, ctx()))).toBe('empty');
-    expect(stateOf(buildView('survey', { survey: ok(data({ ores: [] })) }, ctx()))).toBe('empty');
+    expect(stateOf(buildView('survey', { survey: ok(data({ summary: null })) }, ctx()))).toBe(
+      'empty'
+    );
   });
 
   it('is loading before the first read and failed, keeping the last value, when a read fails', () => {
@@ -731,7 +762,7 @@ describe('survey', () => {
     const resolved = resolveWidget(failed.status);
     expect(resolved.state).toBe('failed');
     expect(resolved.showLastGood).toBe(true);
-    expect(failed.number.value).toBe('6.4K');
+    expect(failed.number.value).not.toBe('—');
   });
 });
 
