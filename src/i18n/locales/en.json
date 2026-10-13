@@ -4662,7 +4662,6 @@
       "danger": "Danger",
       "empty": "You are all caught up",
       "emptyHint": "New alerts will appear here and on the bell.",
-      "emptyChip": "Nothing for this type.",
       "notifyMe": "Notify me about…",
       "pushOn": "Push on this device: On",
       "pushOff": "Push on this device: Off",

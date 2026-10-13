@@ -69,7 +69,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const entries = useVisibleAlertEntries();
   const snoozeMap = useSnoozeStore((state) => state.value);
   const { permission } = useNotificationPermission();
-  const [selectedChip, setChip] = useState<AlertChip>('all');
+  const [selectedChip, setSelectedChip] = useState<AlertChip>('all');
   /** Group key → how many of its fires are listed; absent means collapsed. */
   const [opened, setOpened] = useState<ReadonlyMap<string, number>>(new Map());
   const characters = useLiveQuery(() => db.characters.toArray(), [], []);
@@ -174,7 +174,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
               key={id}
               label={t(`alerts.panel.chip.${id}`)}
               selected={chip === id}
-              onToggle={() => setChip(id)}
+              onToggle={() => setSelectedChip(id)}
               size={sheet ? 'md' : 'sm'}
             />
           ))}
@@ -184,7 +184,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
       {visible.length === 0 ? (
         <EmptyState
           title={t('alerts.panel.empty')}
-          hint={chip === 'all' ? t('alerts.panel.emptyHint') : t('alerts.panel.emptyChip')}
+          hint={t('alerts.panel.emptyHint')}
           className="py-8"
         />
       ) : (
