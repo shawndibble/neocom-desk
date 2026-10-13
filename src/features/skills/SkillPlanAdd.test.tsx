@@ -95,6 +95,19 @@ describe('SkillPlanAdd', () => {
     await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([]));
   });
 
+  it('Undo takes back every level added in a row, not just the last', async () => {
+    await db.skillPlans.add(plan('plan-1', 'PvP Fit', []));
+    const user = userEvent.setup();
+    renderAdd(2);
+
+    await user.click(await screen.findByRole('button', { name: 'Add level 3 to Skill Plan' }));
+    await user.click(await screen.findByRole('button', { name: 'Add level 4 to Skill Plan' }));
+    await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.entries).toHaveLength(2));
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([]));
+  });
+
   it('moves focus to Undo after Add, and back to Add after Undo', async () => {
     await db.skillPlans.add(plan('plan-1', 'PvP Fit', []));
     const user = userEvent.setup();

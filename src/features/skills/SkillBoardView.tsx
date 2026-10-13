@@ -1,16 +1,16 @@
 import { useTranslation } from 'react-i18next';
-import type { ReactNode, RefCallback } from 'react';
+import type { ReactNode } from 'react';
 import { SkillBar, Tooltip } from '@/components/ui';
 import {
   focusRingInsetClassName,
   rowInteractiveClassName,
-  selectedRowClassName,
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import { Caret } from '@/components/ui/Disclosure';
 import { cx } from '@/lib/cx';
 import { progressToNextLevel } from '@/engine/sp';
 import { SkillLink } from '@/features/entities/EntityLink';
+import { useSkillDetailModal } from '@/stores/skillDetailModal';
 import type { BoardGroup, BoardSkill } from './skillBoard';
 import { skillGroupIcon } from './skillGroupIcon';
 
@@ -91,26 +91,21 @@ function NeedBookMarker() {
 }
 
 /**
- * One skill row: the name opens the skill info modal (a real link), the rest of
- * the row opens the inspector. Two siblings rather than a link inside a button.
+ * One skill row: the name is a real link to the skill Show info, and the rest
+ * of the row opens the same Show info. Two siblings rather than a link inside a button.
  */
 export function SkillBoardRow({
   skill,
-  selected,
   plannedLevel,
   trainingChip,
-  buttonRef,
-  onSelect,
 }: {
   skill: BoardSkill;
-  selected: boolean;
   /** A Skill Plan's target for this skill; the queued level wins when higher. */
   plannedLevel: number | null;
   trainingChip?: ReactNode;
-  buttonRef: RefCallback<HTMLButtonElement>;
-  onSelect: () => void;
 }) {
   const { t } = useTranslation();
+  const { open: openSkillDetail } = useSkillDetailModal();
   const progress =
     skill.sp === null ? null : progressToNextLevel(skill.rank, skill.level, skill.sp);
   const planned = Math.max(skill.queuedLevel ?? 0, plannedLevel ?? 0);
@@ -123,12 +118,7 @@ export function SkillBoardRow({
     </SkillLink>
   );
   return (
-    <li
-      className={cx(
-        'flex items-center gap-2 text-xs',
-        selected ? selectedRowClassName : 'border-l-2 border-l-transparent'
-      )}
-    >
+    <li className="flex items-center gap-2 text-xs">
       {/* Below `sm` the chip drops under the name rather than squeezing it. */}
       <span className="flex min-w-0 flex-col items-start gap-0.5 py-1.5 sm:flex-row sm:items-center sm:gap-2">
         {skill.description ? <Tooltip content={skill.description}>{name}</Tooltip> : name}
@@ -136,10 +126,8 @@ export function SkillBoardRow({
       </span>
       <button
         type="button"
-        ref={buttonRef}
         aria-label={skill.name}
-        aria-pressed={selected}
-        onClick={onSelect}
+        onClick={() => openSkillDetail(skill.skillTypeID)}
         className={cx(
           tappableRowClassName,
           'flex min-w-0 flex-1 scroll-mt-14 items-center justify-end gap-3 py-1.5 text-left',
