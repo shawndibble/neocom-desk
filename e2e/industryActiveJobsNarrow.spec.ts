@@ -141,16 +141,21 @@ test.describe('Active Jobs phone card (#3684)', () => {
       expect(box.height).toBeLessThan(110);
     }
 
-    const endsIn = rows.nth(0).locator('td[data-label="Ends in"]');
+    // Sorted soonest-first, so locate rows by content rather than index.
+    const logButton = page.getByRole('button', { name: 'Log production…' });
+    const doneRow = rows.filter({ has: logButton });
+    const runningRow = rows.filter({ hasNot: logButton }).first();
+
+    const endsIn = runningRow.locator('td[data-label="Ends in"]');
     await expect(endsIn).toBeVisible();
-    const title = (await rows.nth(0).locator('td').first().boundingBox())!;
+    const title = (await runningRow.locator('td').first().boundingBox())!;
     const corner = (await endsIn.boundingBox())!;
     expect(corner.y).toBeLessThan(title.y + title.height);
 
-    await expect(rows.nth(0).getByRole('progressbar')).toBeVisible();
-    await expect(rows.nth(0).locator('td[data-label="Ends (EVE)"]')).toBeHidden();
+    await expect(runningRow.getByRole('progressbar')).toBeVisible();
+    await expect(runningRow.locator('td[data-label="Ends (EVE)"]')).toBeHidden();
 
-    const log = rows.nth(1).getByRole('button', { name: 'Log production…' });
+    const log = doneRow.getByRole('button', { name: 'Log production…' });
     await expect(log).toBeVisible();
     expect((await log.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
