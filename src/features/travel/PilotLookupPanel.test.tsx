@@ -104,12 +104,10 @@ function LocationProbe() {
   return null;
 }
 
-const NO_VIEWS = { tabs: [], value: 'pilot', onChange: () => {} };
-
 function renderTab(url = '/travel/pilot') {
   render(
     <MemoryRouter initialEntries={[url]}>
-      <PilotLookupPanel tabBar={null} tabsId="t" views={NO_VIEWS} />
+      <PilotLookupPanel tabBar={null} tabsId="t" />
       <LocationProbe />
     </MemoryRouter>
   );

@@ -1,9 +1,6 @@
 import type { ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import { AlertsBell } from './AlertsBell';
-import { useIsPhone } from '@/lib/useIsPhone';
-import { PageViewPicker } from './PageViewPicker';
-import { usesViewPicker, type PageViews } from './viewPicker';
 
 interface PageHeaderProps {
   /**
@@ -34,12 +31,6 @@ interface PageHeaderProps {
    * `tabListFlushClassName` rather than bringing a second baseline.
    */
   subNav?: ReactNode;
-  /**
-   * The page's full view list. On a phone, a list of four or more replaces the
-   * title with a `PageViewPicker` (the page then drops its own tab strip with
-   * `usesViewPicker`); otherwise ignored.
-   */
-  views?: PageViews;
   className?: string;
 }
 
@@ -69,16 +60,7 @@ interface PageHeaderProps {
  *
  * @summary A route's top line: the one `<h1>`, its data age beside it, and the page controls at the right.
  */
-export function PageHeader({
-  title,
-  meta,
-  actions,
-  subNav,
-  views,
-  className = '',
-}: PageHeaderProps) {
-  const isPhone = useIsPhone();
-  const picker = views && usesViewPicker(views.tabs.length, isPhone) ? views : null;
+export function PageHeader({ title, meta, actions, subNav, className = '' }: PageHeaderProps) {
   return (
     <header
       className={cx(
@@ -96,7 +78,7 @@ export function PageHeader({
           tabIndex={-1}
           className="max-w-full min-w-0 shrink-0 text-xl font-semibold tracking-widest break-words uppercase focus:outline-none"
         >
-          {picker ? <PageViewPicker title={title} {...picker} /> : title}
+          {title}
         </h1>
         {meta}
         {/* `md:order-1`: after the sub-nav, which sits between meta and actions at `md`. The bell is always there (dim at zero), so the cluster never collapses. */}

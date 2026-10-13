@@ -2,8 +2,6 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { SKILLS_VIEWS } from './skillsViews';
 import { cx } from '@/lib/cx';
-import { useIsPhone } from '@/lib/useIsPhone';
-import { usesViewPicker } from '@/components/ui';
 import {
   tabItemActiveClassName,
   tabItemClassName,
@@ -23,9 +21,6 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
  */
 export function SkillsSubNav() {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
-  // A phone's `SkillsPageHeader` carries the views as a picker instead.
-  if (usesViewPicker(SKILLS_VIEWS.length, isPhone)) return null;
   return (
     <div className={tabScrollerClassName}>
       <nav aria-label={t('nav.skills')} className={tabListClassName}>

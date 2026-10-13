@@ -1,8 +1,7 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Spinner, Tabs, usesViewPicker, useTabsId, type PageViews } from '@/components/ui';
+import { Spinner, Tabs, useTabsId } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { usePageTab } from '@/lib/usePageTab';
 import { TRAVEL_TABS } from '@/app/pageTabs';
 import { isTabRouteDefaulted, tabPath } from '@/lib/pageTabs';
@@ -26,7 +25,6 @@ export function Travel() {
   const tabsId = useTabsId();
   const location = useLocation();
   const navigate = useNavigate();
-  const isPhone = useIsPhone();
 
   // A shared `/travel?pilot=<id>` from before Pilot Lookup was a tab names no
   // tab, so `TabRoute` defaults it to Route Safety; the pilot it names belongs
@@ -57,12 +55,10 @@ export function Travel() {
     else setTab(next);
   };
   const tabs = TRAVEL_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }));
-  const views: PageViews = { tabs, value: tab, onChange };
-  // 4+ tabs: on a phone the title's view picker replaces the strip (DESIGN.md §6c).
-  const tabBar = usesViewPicker(tabs.length, isPhone) ? null : (
+  const tabBar = (
     <Tabs tabsId={tabsId} label={t('travel.title')} value={tab} onChange={onChange} tabs={tabs} />
   );
-  const tabProps = { tabBar, tabsId, views };
+  const tabProps = { tabBar, tabsId };
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">

@@ -31,7 +31,6 @@ const UNSTORIED = [
   'MenuSub',
   'MenuSubContent',
   'MenuSubTrigger',
-  'PageViewPicker',
   'RegionSelect',
   'RowActionsMenu',
   'RowCaret',
@@ -41,7 +40,7 @@ const UNSTORIED = [
 ];
 
 /** Pinned size. Removing a name means lowering this; adding a name fails. */
-const PINNED_COUNT = 25;
+const PINNED_COUNT = 24;
 
 /** Component name -> source module, from the value (non-type) re-exports in index.ts. */
 function exportedComponents(): Map<string, string> {
