@@ -1636,6 +1636,32 @@ export function BpcSourcingPanel({
     );
   }
 
+  const capNote =
+    sources.size > 0 && displayRows.length > shownRows.length
+      ? t('bpcContracts.resultsCapped', {
+          shown: shownRows.length.toLocaleString(),
+          total: displayRows.length.toLocaleString(),
+        })
+      : null;
+  const marketNote =
+    marketLookup.typeIds.length === 0 || marketRegionId === null
+      ? t('bpcContracts.marketScopeNeedsSearch')
+      : [
+          market.loading
+            ? t('bpcContracts.marketScopeChecking')
+            : uiFilter.regionId === null
+              ? t('bpcContracts.marketScopeHub', { hub: marketHub.systemName })
+              : t('bpcContracts.marketScopeRegion', { region: marketRegionLabel }),
+          market.failedTypeIds.size > 0
+            ? t('bpcContracts.marketScopeFailed', { count: market.failedTypeIds.size })
+            : null,
+          marketLookup.capped
+            ? t('bpcContracts.marketScopeCapped', { count: MARKET_BPO_LOOKUP_LIMIT })
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' ');
+
   return (
     // No header of its own: the tab above already reads "BPC Search", the
     // data age sits beside the page title and Refresh beside the settings
@@ -1928,28 +1954,6 @@ export function BpcSourcingPanel({
             </div>
           )}
 
-          {(marketLookup.typeIds.length > 0 || sources.has('market')) && (
-            <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-              {marketLookup.typeIds.length === 0 || marketRegionId === null
-                ? t('bpcContracts.marketScopeNeedsSearch')
-                : [
-                    market.loading
-                      ? t('bpcContracts.marketScopeChecking')
-                      : uiFilter.regionId === null
-                        ? t('bpcContracts.marketScopeHub', { hub: marketHub.systemName })
-                        : t('bpcContracts.marketScopeRegion', { region: marketRegionLabel }),
-                    market.failedTypeIds.size > 0
-                      ? t('bpcContracts.marketScopeFailed', { count: market.failedTypeIds.size })
-                      : null,
-                    marketLookup.capped
-                      ? t('bpcContracts.marketScopeCapped', { count: MARKET_BPO_LOOKUP_LIMIT })
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-            </p>
-          )}
-
           {sources.size === 0 ? (
             <EmptyState title={t('bpcContracts.noSourceSelected')} className="py-8" />
           ) : displayRows.length === 0 ? (
@@ -1965,15 +1969,6 @@ export function BpcSourcingPanel({
             />
           ) : (
             <>
-              {displayRows.length > shownRows.length && (
-                // The phone's sort bar says it instead (`stackSummary` below).
-                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim max-sm:hidden">
-                  {t('bpcContracts.resultsCapped', {
-                    shown: shownRows.length.toLocaleString(),
-                    total: displayRows.length.toLocaleString(),
-                  })}
-                </p>
-              )}
               <DataTable
                 {...sourcingExport.tableProps}
                 label={t('bpcContracts.title')}
@@ -2078,6 +2073,16 @@ export function BpcSourcingPanel({
             </>
           )}
         </>
+      )}
+
+      {/* One quiet line under the table: what the list was capped to and
+          which market was checked. The cap follows the phone's sort bar
+          (`stackSummary`) there, so it is left off at that width. */}
+      {(marketLookup.typeIds.length > 0 || sources.has('market') || capNote !== null) && (
+        <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+          {capNote !== null && <span className="max-sm:hidden">{capNote} </span>}
+          {marketNote}
+        </p>
       )}
 
       {openRow !== null && (
