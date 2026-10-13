@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useMarketHub } from '@/features/market/hub';
 import '@/i18n';
 import { db } from '@/db';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
@@ -699,28 +700,71 @@ describe('BpcSourcingPanel', () => {
     );
   });
 
-  it('compares the cheapest offer per region for the picked blueprint', async () => {
-    loadPublicBpcContracts.mockResolvedValue(
-      cachedSnapshot([
-        row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 }),
-        row({ contractId: 2, typeId: 638, price: 3_000_000, regionId: 10000002 }),
-        row({ contractId: 3, typeId: 638, price: 9_000_000, regionId: 10000043 }),
-      ])
-    );
-    const user = userEvent.setup();
-    render(<App />);
-    await screen.findByRole('table', { name: 'BPC Sourcing' });
+  describe('Cheapest by region', () => {
+    async function pickRifter(user: ReturnType<typeof userEvent.setup>) {
+      render(<App />);
+      await screen.findByRole('table', { name: 'BPC Sourcing' });
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+      await user.click(
+        within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
+      );
+      return screen.getByRole('list', { name: 'Cheapest by region' });
+    }
 
-    await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
-    await user.click(
-      within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
-    );
+    it('always shows The Forge, the pricing baseline, and no region the pilot does not price at', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([
+          row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 }),
+          row({ contractId: 2, typeId: 638, price: 3_000_000, regionId: 10000002 }),
+          // Domain and Sinq Laison are neither the hub (Jita) nor near anything known.
+          row({ contractId: 3, typeId: 638, price: 9_000_000, regionId: 10000043 }),
+          row({ contractId: 4, typeId: 638, price: 1_000_000, regionId: 10000032 }),
+        ])
+      );
+      const strip = await pickRifter(userEvent.setup());
 
-    const strip = screen.getByText('Cheapest by region').parentElement as HTMLElement;
-    expect(within(strip).getByText('2 offers')).toBeInTheDocument();
-    expect(within(strip).getByText('1 offer')).toBeInTheDocument();
-    // Cheapest region first, so the order itself carries the answer.
-    expect(within(strip).getAllByRole('listitem')[0]).toHaveTextContent('The Forge');
+      const cells = within(strip).getAllByRole('listitem');
+      expect(cells).toHaveLength(1);
+      expect(cells[0]).toHaveTextContent('The Forge');
+      expect(cells[0]).toHaveTextContent('3,000,000.00 ISK');
+      expect(within(strip).getByText('2 offers')).toBeInTheDocument();
+    });
+
+    it("adds the pilot's market hub region, and says so when it has no offers", async () => {
+      useMarketHub.setState({ value: 'amarr', hydrated: true });
+      try {
+        loadPublicBpcContracts.mockResolvedValue(
+          cachedSnapshot([
+            row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 }),
+          ])
+        );
+        const strip = await pickRifter(userEvent.setup());
+
+        await waitFor(() => expect(within(strip).getAllByRole('listitem')).toHaveLength(2));
+        const [forge, domain] = within(strip).getAllByRole('listitem');
+        expect(forge).toHaveTextContent('The Forge');
+        expect(domain).toHaveTextContent('Domain');
+        expect(domain).toHaveTextContent('No offers');
+      } finally {
+        useMarketHub.setState({ value: 'jita' });
+      }
+    });
+
+    it('is hidden under a Region filter, which already narrows the rows to one', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 })])
+      );
+      window.history.pushState({}, '', '/industry/sourcing?sourcing.region=10000002');
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole('table', { name: 'BPC Sourcing' });
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+      await user.click(
+        within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
+      );
+
+      expect(screen.queryByRole('list', { name: 'Cheapest by region' })).not.toBeInTheDocument();
+    });
   });
 
   it('sorts price on what a row costs, so a stray buyout on an exchange cannot jump the queue', async () => {
@@ -1608,7 +1652,11 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(
         within(marketCard).getByText('2,000,000.00 ISK', { selector: '.sr-only' })
       ).toBeInTheDocument();
-      expect(marketCard).toHaveTextContent('incl. NPC-seeded');
+      // The NPC-seeded caveat is a hint beside the price, not a line of text.
+      expect(
+        within(marketCard).getByRole('button', { name: 'About this market price' })
+      ).toBeInTheDocument();
+      expect(marketCard).not.toHaveTextContent('NPC-seeded');
       // System plus its security, never the station or region name.
       await waitFor(() => expect(marketCard).toHaveTextContent('Jita 0.9'));
       expect(marketCard).not.toHaveTextContent('Jita IV - Moon 4');
@@ -1622,16 +1670,19 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         within(contractCard).getByText('40,000,000.00 ISK', { selector: '.sr-only' })
       ).toBeInTheDocument();
       // The group header names the source: no per-card "BPO" cue line, so
-      // the card is as tall as a region card (three lines).
+      // the card is as tall as a region card (two lines).
       expect(within(contractCard).queryByText('BPO')).not.toBeInTheDocument();
-      expect(contractCard.children).toHaveLength(3);
       // Accent only on the cheapest box in the row: the 2M market BPO beats
       // every copy (3M+) and the 40M contract BPO, so it alone is lit.
       expect(marketCard).toHaveClass('border-accent-dim');
       expect(contractCard).not.toHaveClass('border-accent-dim');
       expect(contractCard).not.toHaveClass('bg-accent/10');
-      expect(marketCard.children).toHaveLength(3);
-      expect(contractCard).toHaveTextContent('ME 8 / TE 16');
+      // Two lines, as tall as a region cell: price, then system.
+      expect(marketCard.children).toHaveLength(2);
+      expect(contractCard.children).toHaveLength(2);
+      // The research reads "8/16", the full wording on hover.
+      expect(contractCard).toHaveTextContent('8/16');
+      expect(contractCard).not.toHaveTextContent('ME 8');
       await waitFor(() => expect(contractCard).toHaveTextContent('Jita 0.9'));
       expect(contractCard).not.toHaveTextContent('Jita IV - Moon 4');
       expect(contractCard).not.toHaveTextContent('The Forge');

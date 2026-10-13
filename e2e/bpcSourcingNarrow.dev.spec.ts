@@ -255,7 +255,7 @@ test.describe('BPC Sourcing — cheapest-per-run chip (issue #1782)', () => {
 });
 
 test.describe('BPC Sourcing — cheapest by region on a phone', () => {
-  test('scrolls inside its own row, never the page', async ({ page }) => {
+  test('shows only the pricing baseline, inside the page width', async ({ page }) => {
     await stubSyncConfigured(page);
     await refuseSyncBackend(page);
     await page.route(/\/markets\/\d+\/orders/, async (route) => {
@@ -263,8 +263,10 @@ test.describe('BPC Sourcing — cheapest by region on a phone', () => {
     });
     await page.setViewportSize(PHONE);
 
-    // Five regions: five cells are wider than a 390px screen, so the row
-    // must scroll — the bug was the whole page scrolling with it.
+    // Five regions are listed, but the strip shows the regions a pilot prices
+    // at (The Forge, their hub's, the nearest hub's: three at most) — here The
+    // Forge alone, with Jita as the hub and no current system. The bug it
+    // guards is the strip widening the page past the screen.
     const regions = [
       [THE_FORGE, 'The Forge'],
       [10000043, 'Domain'],
@@ -285,13 +287,11 @@ test.describe('BPC Sourcing — cheapest by region on a phone', () => {
     await page.goto(`./industry/sourcing?sourcing.type=${BLUEPRINT_TYPE_ID}`);
 
     const row = page.getByRole('list', { name: 'Cheapest by region' });
-    await expect(row).toContainText('Metropolis', COLD_LOAD);
+    await expect(row).toContainText('The Forge', COLD_LOAD);
+    await expect(row).not.toContainText('Metropolis');
+    expect(await row.getByRole('listitem').count()).toBeLessThanOrEqual(3);
 
-    const { pageWidth, rowScrolls } = await row.evaluate((ul) => ({
-      pageWidth: document.documentElement.scrollWidth,
-      rowScrolls: ul.scrollWidth > ul.clientWidth,
-    }));
-    expect(rowScrolls, 'the region row should overflow and scroll on its own').toBe(true);
+    const pageWidth = await row.evaluate(() => document.documentElement.scrollWidth);
     expect(pageWidth).toBeLessThanOrEqual(PHONE.width);
   });
 });
