@@ -7694,7 +7694,13 @@
       "copyQuality": "ME {{me}} · TE {{te}} · {{runs}} runs"
     },
     "resultsCapped": "Showing {{shown}} of {{total}} results. Narrow the search to see the rest.",
-    "cheapestByRegionCapped": "Cheapest by region ({{shown}} of {{total}})",
+    "regionNoOffers": "No offers",
+    "regionReason": {
+      "forge": "The Forge, Jita's region: the usual pricing baseline",
+      "hub": "Your market hub's region",
+      "nearest": "The region of the trade hub nearest you",
+      "here": "The region you are in"
+    },
     "suggestionsHeading": "Pick a blueprint",
     "priceLabel": "Price",
     "meTeLabel": "ME / TE",

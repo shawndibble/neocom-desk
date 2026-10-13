@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useMarketHub } from '@/features/market/hub';
 import '@/i18n';
 import { db } from '@/db';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
@@ -699,28 +700,71 @@ describe('BpcSourcingPanel', () => {
     );
   });
 
-  it('compares the cheapest offer per region for the picked blueprint', async () => {
-    loadPublicBpcContracts.mockResolvedValue(
-      cachedSnapshot([
-        row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 }),
-        row({ contractId: 2, typeId: 638, price: 3_000_000, regionId: 10000002 }),
-        row({ contractId: 3, typeId: 638, price: 9_000_000, regionId: 10000043 }),
-      ])
-    );
-    const user = userEvent.setup();
-    render(<App />);
-    await screen.findByRole('table', { name: 'BPC Sourcing' });
+  describe('Cheapest by region', () => {
+    async function pickRifter(user: ReturnType<typeof userEvent.setup>) {
+      render(<App />);
+      await screen.findByRole('table', { name: 'BPC Sourcing' });
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+      await user.click(
+        within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
+      );
+      return screen.getByRole('list', { name: 'Cheapest by region' });
+    }
 
-    await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
-    await user.click(
-      within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
-    );
+    it('always shows The Forge, the pricing baseline, and no region the pilot does not price at', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([
+          row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 }),
+          row({ contractId: 2, typeId: 638, price: 3_000_000, regionId: 10000002 }),
+          // Domain and Sinq Laison are neither the hub (Jita) nor near anything known.
+          row({ contractId: 3, typeId: 638, price: 9_000_000, regionId: 10000043 }),
+          row({ contractId: 4, typeId: 638, price: 1_000_000, regionId: 10000032 }),
+        ])
+      );
+      const strip = await pickRifter(userEvent.setup());
 
-    const strip = screen.getByText('Cheapest by region').parentElement as HTMLElement;
-    expect(within(strip).getByText('2 offers')).toBeInTheDocument();
-    expect(within(strip).getByText('1 offer')).toBeInTheDocument();
-    // Cheapest region first, so the order itself carries the answer.
-    expect(within(strip).getAllByRole('listitem')[0]).toHaveTextContent('The Forge');
+      const cells = within(strip).getAllByRole('listitem');
+      expect(cells).toHaveLength(1);
+      expect(cells[0]).toHaveTextContent('The Forge');
+      expect(cells[0]).toHaveTextContent('3,000,000.00 ISK');
+      expect(within(strip).getByText('2 offers')).toBeInTheDocument();
+    });
+
+    it("adds the pilot's market hub region, and says so when it has no offers", async () => {
+      useMarketHub.setState({ value: 'amarr', hydrated: true });
+      try {
+        loadPublicBpcContracts.mockResolvedValue(
+          cachedSnapshot([
+            row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 }),
+          ])
+        );
+        const strip = await pickRifter(userEvent.setup());
+
+        await waitFor(() => expect(within(strip).getAllByRole('listitem')).toHaveLength(2));
+        const [forge, domain] = within(strip).getAllByRole('listitem');
+        expect(forge).toHaveTextContent('The Forge');
+        expect(domain).toHaveTextContent('Domain');
+        expect(domain).toHaveTextContent('No offers');
+      } finally {
+        useMarketHub.setState({ value: 'jita' });
+      }
+    });
+
+    it('is hidden under a Region filter, which already narrows the rows to one', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 })])
+      );
+      window.history.pushState({}, '', '/industry/sourcing?sourcing.region=10000002');
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole('table', { name: 'BPC Sourcing' });
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+      await user.click(
+        within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
+      );
+
+      expect(screen.queryByRole('list', { name: 'Cheapest by region' })).not.toBeInTheDocument();
+    });
   });
 
   it('sorts price on what a row costs, so a stray buyout on an exchange cannot jump the queue', async () => {

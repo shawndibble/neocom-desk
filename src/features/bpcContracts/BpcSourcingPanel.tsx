@@ -115,6 +115,7 @@ import {
   useBpcHidePlexDefault,
 } from '@/features/bpcContracts/sourcingDefaults';
 import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
+import { baselineRegions, nearestHub } from '@/engine/contracts/baselineRegions';
 import { DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
 import {
   useCurrentSystem,
@@ -240,9 +241,6 @@ async function loadBpcContractsSnapshot(
 }
 
 type UiFilter = BpcSourcingFilter;
-
-/** Region cells shown in the cheapest-by-region strip, in cheapest-first order — six keeps the strip (plus the BPO cards beside it) from wrapping into rows that would outsize the table below it. */
-const REGION_CELL_LIMIT = 6;
 
 /**
  * Rows the table shows, taken from the top of the current sort. A broad
@@ -1091,17 +1089,44 @@ export function BpcSourcingPanel({
         : contractLocations.get(bpo.locationId)?.name) ?? null,
     [market.locations, contractLocations]
   );
-  const regionPrices = useMemo(
-    () => (selectedTypeId === null ? [] : cheapestByRegion(filteredRows)),
-    [selectedTypeId, filteredRows]
+  // The regions a pilot prices against, not every region the blueprint is
+  // listed in (`baselineRegions`): The Forge, their market hub's, the nearest
+  // hub's, and where they are when one of those coincides: three at most. Hidden under a Region filter, which already narrows the rows to one.
+  const nearestHubRegionId = nearestHub(TRADE_HUBS, jumpFilter.jumps)?.regionId ?? null;
+  const currentRegionId =
+    currentSystem.systemId === null
+      ? null
+      : (solarSystems?.get(currentSystem.systemId)?.regionId ?? null);
+  const regionCells = useMemo(() => {
+    if (selectedTypeId === null || uiFilter.regionId !== null) return [];
+    const priced = new Map(cheapestByRegion(filteredRows).map((r) => [r.regionId, r]));
+    return baselineRegions({
+      hubRegionId: marketHub.regionId,
+      nearestHubRegionId,
+      currentRegionId,
+    }).map((baseline) => ({ ...baseline, listing: priced.get(baseline.regionId) ?? null }));
+  }, [
+    selectedTypeId,
+    uiFilter.regionId,
+    filteredRows,
+    marketHub.regionId,
+    nearestHubRegionId,
+    currentRegionId,
+  ]);
+  const cheapestRegionId = regionCells.reduce<{ regionId: number; price: number } | null>(
+    (best, cell) =>
+      cell.listing !== null && (best === null || cell.listing.cheapest < best.price)
+        ? { regionId: cell.regionId, price: cell.listing.cheapest }
+        : best,
+    null
   );
-  // One accent for the whole row: the leading region cell, or a BPO card
-  // only when it is strictly the cheapest box shown (region cells render
-  // only when there are two or more regions).
-  const cheapestCard = cheapestSourcingCard(
-    regionPrices.length > 1 ? regionPrices[0].cheapest : null,
-    selectedBpoCards
-  );
+  // One accent for the whole row: the cheapest region cell, or a BPO card
+  // only when it is strictly the cheapest box shown (the row needs two boxes).
+  const cheapestCard = cheapestSourcingCard(cheapestRegionId?.price ?? null, selectedBpoCards);
+  const baselineRegionName = (regionId: number) =>
+    regionNames.get(regionId) ??
+    TRADE_HUBS.find((hub) => hub.regionId === regionId)?.regionName ??
+    `#${regionId}`;
 
   const blueprintPicked = selectedTypeId !== null;
   const isPhone = useIsPhone();
@@ -1787,27 +1812,18 @@ export function BpcSourcingPanel({
             </div>
           )}
 
-          {(regionPrices.length > 1 || selectedBpoCards.length > 0) && (
+          {(regionCells.length > 0 || selectedBpoCards.length > 0) && (
             // One wrapping row: [Cheapest by region] [Market BPOs] [Contract BPOs],
             // every card the same width; on a phone the region cells take the
             // first line (scrolling sideways) and the two BPO groups share the
             // next in two columns. A group with no card is left out.
             <div className="grid grid-cols-2 gap-x-2 gap-y-2 border-b border-line px-3 py-2 sm:flex sm:flex-row sm:flex-wrap sm:gap-x-4">
-              {regionPrices.length > 1 && (
+              {regionCells.length > 0 && (
                 <div className="col-span-2 min-w-0 max-w-full">
-                  {/* Says so when it is showing a subset: the cheapest region always
-                    survives the slice, but a blueprint listed in twenty regions
-                    would otherwise show six with nothing admitting it. */}
-                  <p className={SOURCING_GROUP_HEADER}>
-                    {regionPrices.length > REGION_CELL_LIMIT
-                      ? t('bpcContracts.cheapestByRegionCapped', {
-                          shown: REGION_CELL_LIMIT,
-                          total: regionPrices.length,
-                        })
-                      : t('bpcContracts.cheapestByRegion')}
-                  </p>
-                  {/* Cheapest first, so the ordering carries the answer and the
-                    accent on the leading cell is only reinforcement (DESIGN.md §7). */}
+                  <p className={SOURCING_GROUP_HEADER}>{t('bpcContracts.cheapestByRegion')}</p>
+                  {/* A fixed order (The Forge first), so a cell stays where the pilot
+                    looks for it; the accent marks the cheapest. Hovering a name says
+                    why the region is here. */}
                   {/* `relative` makes the row the containing block of each
                     price's absolutely positioned screen-reader text
                     (`IskAmount`'s `sr-only`). Without it that text escaped
@@ -1817,36 +1833,44 @@ export function BpcSourcingPanel({
                     aria-label={t('bpcContracts.cheapestByRegion')}
                     className="relative flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap"
                   >
-                    {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
-                      <li
-                        key={region.regionId}
-                        className={cx(
-                          'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-1.5',
-                          REGION_CELL_WIDTH,
-                          index === 0 && cheapestCard === 'region'
-                            ? 'border-accent-dim'
-                            : 'border-line'
-                        )}
-                      >
-                        <span className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                          {regionNames.get(region.regionId) ?? `#${region.regionId}`}
-                        </span>
-                        {/* Price and offer count share a line: two lines a cell, not three. */}
-                        <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-                          <span
-                            className={cx(
-                              'text-sm tabular-nums',
-                              index === 0 && cheapestCard === 'region' && 'text-accent'
-                            )}
+                    {regionCells.map((cell) => {
+                      const accent =
+                        cheapestCard === 'region' && cell.regionId === cheapestRegionId?.regionId;
+                      return (
+                        <li
+                          key={cell.regionId}
+                          className={cx(
+                            'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-1.5',
+                            REGION_CELL_WIDTH,
+                            accent ? 'border-accent-dim' : 'border-line'
+                          )}
+                        >
+                          <HintText
+                            className="max-w-full self-start truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                            content={cell.reasons
+                              .map((reason) => t(`bpcContracts.regionReason.${reason}`))
+                              .join(' · ')}
                           >
-                            <IskAmount value={region.cheapest} />
-                          </span>
-                          <span className="truncate text-[0.6875rem] tabular-nums text-text-dim">
-                            {t('bpcContracts.regionOffers', { count: region.offerCount })}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
+                            {baselineRegionName(cell.regionId)}
+                          </HintText>
+                          {/* Price and offer count share a line: two lines a cell, not three. */}
+                          {cell.listing === null ? (
+                            <span className="text-[0.6875rem] text-text-dim">
+                              {t('bpcContracts.regionNoOffers')}
+                            </span>
+                          ) : (
+                            <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                              <span className={cx('text-sm tabular-nums', accent && 'text-accent')}>
+                                <IskAmount value={cell.listing.cheapest} />
+                              </span>
+                              <span className="truncate text-[0.6875rem] tabular-nums text-text-dim">
+                                {t('bpcContracts.regionOffers', { count: cell.listing.offerCount })}
+                              </span>
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
