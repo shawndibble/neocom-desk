@@ -109,6 +109,22 @@ export function filterByChip<G extends Pick<AlertTypeGroup, 'key' | 'severity'>>
   return groups.filter((group) => typeChipOfGroupKey(group.key) === chip);
 }
 
+/**
+ * The chips worth showing: a chip only earns its place when it narrows the list,
+ * so those matching nothing, or every type, are left out, and with none left
+ * (one type, or all alike) there is nothing to filter and no chips at all.
+ */
+export function usefulChips(
+  groups: readonly Pick<AlertTypeGroup, 'key' | 'severity'>[]
+): AlertChip[] {
+  const narrowing = ALERT_CHIPS.filter((chip) => {
+    if (chip === 'all') return false;
+    const matched = filterByChip(groups, chip).length;
+    return matched > 0 && matched < groups.length;
+  });
+  return narrowing.length === 0 ? [] : ['all', ...narrowing];
+}
+
 /** Price alerts are the one type where "not now, ask again later" is honest. */
 export function isSnoozable(group: Pick<AlertTypeGroup, 'key'>): boolean {
   return group.key === alertGroupKey({ eventId: 'priceAlertTriggered' });

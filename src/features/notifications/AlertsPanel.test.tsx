@@ -132,12 +132,33 @@ describe('AlertsPanel', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     expect(screen.queryByText('Structure Under Attack')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Industry' }));
-    expect(screen.getByText('Nothing for this type.')).toBeInTheDocument();
+    // A chip with no alerts behind it is not offered.
+    expect(screen.queryByRole('button', { name: 'Industry' })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Danger' }));
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     expect(screen.getByText('Structure Under Attack')).toBeInTheDocument();
+  });
+
+  it('shows no chips when there is nothing to filter, and drops a chip once its alerts are gone', async () => {
+    await db.notificationFeed.bulkPut([MAIL]);
+    renderPanel();
+    await screen.findByText('New Mail');
+    expect(screen.queryByRole('group', { name: 'Alert types' })).not.toBeInTheDocument();
+
+    await db.notificationFeed.bulkPut([ATTACK]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Mail' }));
+    await userEvent.click(
+      within((await screen.findByText('New Mail')).closest('li') as HTMLElement).getByRole(
+        'button',
+        {
+          name: /^Dismiss/,
+        }
+      )
+    );
+    await waitFor(() => expect(screen.queryByText('New Mail')).not.toBeInTheDocument());
+    expect(screen.getByText('Structure Under Attack')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mail' })).not.toBeInTheDocument();
   });
 
   it('offers Snooze 1h on price alerts only, and a snoozed type leaves the list', async () => {

@@ -42,13 +42,13 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useNow } from '@/lib/useNow';
 import { alertGroupLabel, groupAlertsByType, type AlertTypeGroup } from './alertGroups';
 import {
-  ALERT_CHIPS,
   alertViewPath,
   bellBadge,
   filterByChip,
   isSnoozable,
   markAllReadTargets,
   type AlertChip,
+  usefulChips,
 } from './dangerAlert';
 import { dismissFeedEntriesAndSync } from './feedSync';
 import { dedupeCharacterName } from './notificationBody';
@@ -69,7 +69,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const entries = useVisibleAlertEntries();
   const snoozeMap = useSnoozeStore((state) => state.value);
   const { permission } = useNotificationPermission();
-  const [chip, setChip] = useState<AlertChip>('all');
+  const [selectedChip, setSelectedChip] = useState<AlertChip>('all');
   /** Group key → how many of its fires are listed; absent means collapsed. */
   const [opened, setOpened] = useState<ReadonlyMap<string, number>>(new Map());
   const characters = useLiveQuery(() => db.characters.toArray(), [], []);
@@ -84,6 +84,9 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
   const sheet = variant === 'sheet';
 
   const groups = useMemo(() => groupAlertsByType(entries), [entries]);
+  const chips = useMemo(() => usefulChips(groups), [groups]);
+  // A chip whose alerts have all been dismissed is gone from the bar; fall back to All.
+  const chip = chips.includes(selectedChip) ? selectedChip : 'all';
   const visible = useMemo(() => filterByChip(groups, chip), [groups, chip]);
   const { count } = useMemo(() => bellBadge(entries), [entries]);
   const readable = useMemo(() => markAllReadTargets(entries), [entries]);
@@ -160,26 +163,28 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
         </span>
       </div>
 
-      <div
-        role="group"
-        aria-label={t('alerts.panel.chipsLabel')}
-        className="flex flex-wrap gap-1.5 border-b border-line px-3.5 py-2"
-      >
-        {ALERT_CHIPS.map((id) => (
-          <FilterChip
-            key={id}
-            label={t(`alerts.panel.chip.${id}`)}
-            selected={chip === id}
-            onToggle={() => setChip(id)}
-            size={sheet ? 'md' : 'sm'}
-          />
-        ))}
-      </div>
+      {chips.length > 0 && (
+        <div
+          role="group"
+          aria-label={t('alerts.panel.chipsLabel')}
+          className="flex flex-wrap gap-1.5 border-b border-line px-3.5 py-2"
+        >
+          {chips.map((id) => (
+            <FilterChip
+              key={id}
+              label={t(`alerts.panel.chip.${id}`)}
+              selected={chip === id}
+              onToggle={() => setSelectedChip(id)}
+              size={sheet ? 'md' : 'sm'}
+            />
+          ))}
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <EmptyState
           title={t('alerts.panel.empty')}
-          hint={chip === 'all' ? t('alerts.panel.emptyHint') : t('alerts.panel.emptyChip')}
+          hint={t('alerts.panel.emptyHint')}
           className="py-8"
         />
       ) : (
