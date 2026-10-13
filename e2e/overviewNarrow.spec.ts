@@ -324,8 +324,9 @@ for (const size of ['S', 'M'] as const) {
 
     await trigger.click();
     await expect(page.getByRole('menuitemcheckbox', { name: 'Show on phone' })).toBeVisible();
-    await expect(page.getByText('View', { exact: true })).toBeVisible();
-    await expect(page.getByText('Character scope')).toBeVisible();
+    const menu = page.getByRole('menu');
+    await expect(menu.getByText('View', { exact: true })).toBeVisible();
+    await expect(menu.getByText('Character', { exact: true })).toBeVisible();
   });
 }
 
