@@ -373,7 +373,19 @@ export function FittingStartScreen({
                                 : 'border-l-2 border-l-transparent'
                             )}
                           >
-                            <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                            <span className="min-w-0 flex-1 py-1">
+                              <span className="block truncate">{row.name}</span>
+                              {row.source === 'shared' && (
+                                <span className="block truncate text-xs text-text-dim">
+                                  {[
+                                    row.sharer ?? t('fittings.share.unknownSharer'),
+                                    row.communityNames.join(', '),
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </span>
+                              )}
+                            </span>
                             {row.source === 'shared' ? (
                               <Tooltip
                                 content={t(
