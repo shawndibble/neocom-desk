@@ -168,8 +168,7 @@ test.describe('Active Jobs phone card (#3684)', () => {
   test('desktop keeps the table columns', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto('./industry/jobs');
-    const caret = page.getByRole('button', { name: 'Show job list' });
-    if (await caret.isVisible()) await caret.click();
+    await page.getByRole('button', { name: 'Show job list' }).click();
     await expect(page.getByRole('columnheader', { name: 'Ends (EVE)' })).toBeVisible();
   });
 });
