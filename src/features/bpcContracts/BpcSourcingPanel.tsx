@@ -527,6 +527,17 @@ function BpcFilterBar({
 }
 
 /**
+ * What the Industry page header shows for this tab: when the contract snapshot
+ * last synced (beside the title) and the Refresh button (beside the settings
+ * gear). `null` while the tab is not mounted.
+ */
+export interface BpcSourcingHeaderState {
+  dataAge: Date | null;
+  busy: boolean;
+  refresh: () => void;
+}
+
+/**
  * Public BPC contract search (issue #608, ADR 0013): searches a server-synced
  * snapshot of every publicly contracted blueprint copy for sale, across every
  * region. Not per-character — read-only, cached for offline.
@@ -538,17 +549,6 @@ function BpcFilterBar({
  * data — this one is global and Firestore-backed, Industry's is per-character
  * and ESI-backed.
  */
-/**
- * What the Industry page header shows for this tab: when the contract snapshot
- * last synced (beside the title) and the Refresh button (beside the settings
- * gear). `null` while the tab is not mounted.
- */
-export interface BpcSourcingHeaderState {
-  dataAge: Date | null;
-  busy: boolean;
-  refresh: () => void;
-}
-
 export function BpcSourcingPanel({
   onHeaderChange,
 }: {
