@@ -1068,7 +1068,7 @@ describe('disprovenExtractorOccurrences', () => {
   });
 
   it('claims nothing when ESI omitted the replacement program install time', () => {
-    // `install_time` is spec-optional (`features/pi/adapters.ts`). Without it
+    // `install_time` is spec-optional (`engine/pi/colonyPins.ts`). Without it
     // there is no evidence the old program was cut short, and a retraction on
     // a guess would erase a true "extraction done" from the feed.
     const prev = planetarySnapshot(

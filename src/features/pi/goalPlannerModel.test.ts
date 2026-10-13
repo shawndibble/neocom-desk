@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
-import { extractorProgramsFromPins } from './adapters';
+import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { colonyBudget } from './colonyBudget';
 import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
 import { planBest } from '@/engine/pi/planBest';

@@ -440,7 +440,7 @@ export interface ColonyExtractorSnapshot {
   thresholdMs: number;
   /**
    * When this program was installed, or absent when ESI omitted it —
-   * `install_time` is spec-optional (`features/pi/adapters.ts`).
+   * `install_time` is spec-optional (`engine/pi/colonyPins.ts`).
    *
    * Not part of any warning: `expiry_time` alone answers idle and
    * expiring-soon (ADR 0005). It is here for

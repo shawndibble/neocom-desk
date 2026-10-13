@@ -6,7 +6,9 @@ import {
   factorySchematicId,
   groupFactoryPins,
   colonyPinLoad,
-} from './adapters';
+  colonyStatusFromPins,
+} from '@/engine/pi/colonyPins';
+import { colonyStatus } from '@/engine/pi/colonyStatus';
 import type { PlanetPin } from '@/esi/endpoints';
 import { piFixture } from '@/sde/__fixtures__/pi';
 
@@ -411,5 +413,32 @@ describe('colonyPinLoad', () => {
       expect(result.linkLoad).toBeNull();
       expect(result.newLinkLoad).toBeNull();
     });
+  });
+});
+
+describe('colonyStatusFromPins', () => {
+  const ex = (id: number, expiry?: string): PlanetPin =>
+    ({
+      pin_id: id,
+      type_id: 1,
+      latitude: 0,
+      longitude: 0,
+      extractor_details: { heads: extractorHeads },
+      ...(expiry ? { expiry_time: expiry } : {}),
+    }) as PlanetPin;
+
+  it('equals colonyStatus over the extractor programs', () => {
+    const pins = [ex(1, '2026-01-02T00:00:00Z'), ex(2)];
+    const now = Date.parse('2026-01-01T00:00:00Z');
+    expect(colonyStatusFromPins(pins, now)).toEqual(
+      colonyStatus(extractorProgramsFromPins(pins), now)
+    );
+    expect(colonyStatusFromPins(pins, now).soonestExpiryMs).toBe(
+      Date.parse('2026-01-02T00:00:00Z')
+    );
+  });
+
+  it('reads an empty pin list as idle:false, no expiry', () => {
+    expect(colonyStatusFromPins([], 0)).toEqual({ idle: false, soonestExpiryMs: null });
   });
 });

@@ -53,7 +53,7 @@ import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import { DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR } from '@/engine/pi/stopTier';
 import { salesTaxPct } from '@/engine/industry/fees';
 import { builtAdvice, localResourcesFor, type BuiltColonyAdvice } from './systemPlanetModel';
-import { extractorProgramsFromPins } from './adapters';
+import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { currentProductTypeIds, meanHeadsPerExtractor } from './stopTierModel';
 import { medianNewLinkLoad } from './unbuiltPlanModel';
 import {

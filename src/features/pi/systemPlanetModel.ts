@@ -42,7 +42,7 @@ import {
   hasUnverifiedExtractors,
   type ColonyPinLoad,
   type FactoryPinGroup,
-} from './adapters';
+} from '@/engine/pi/colonyPins';
 
 /** One planet as the system lookup found it, before any colony is matched to it. */
 export interface SystemPlanet {

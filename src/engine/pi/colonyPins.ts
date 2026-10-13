@@ -1,13 +1,17 @@
 /**
- * ESI `pins[]` -> engine `ExtractorProgram[]`. Impure-adjacent glue kept out
- * of `engine/pi` (docs/ARCHITECTURE.md's engine/feature split): a pin missing
+ * The one place a colony's ESI `pins[]` shape is read: extractor programs,
+ * factory groups, pin load, unverified-extractor flag, colony health. Pure
+ * (type-only `@/esi/endpoints` import, as other `engine/` modules do), so it
+ * lives in `engine/pi` and every feature — pi, character, overview,
+ * notifications — asks it questions instead of touching pin fields. A pin missing
  * a trustworthy `expiry_time`, or without `extractor_details` at all, is
  * excluded from the colony-health math rather than given a substitute value
  * — the route still lists it in the pin table with an "unavailable" state.
  */
 import type { PlanetPin } from '@/esi/endpoints';
-import type { ExtractorProgram, PinCounts, PinLoad } from '@/engine/pi/types';
+import type { ColonyStatus, ExtractorProgram, PinCounts, PinLoad } from '@/engine/pi/types';
 import type { PiData, PiPinKind } from '@/sde/types';
+import { colonyStatus } from '@/engine/pi/colonyStatus';
 import { pinsLoad } from '@/engine/pi/pinBudget';
 import { linksLoad, newLinkLoad, type LinkGeometry } from '@/engine/pi/linkCost';
 import type { PlanetLink } from '@/esi/endpoints';
@@ -245,4 +249,9 @@ export function colonyPinLoad(
     linkCount: links.length,
     unknownTypeIds,
   };
+}
+
+/** A colony's health straight from its ESI pins — the question outside callers ask. */
+export function colonyStatusFromPins(pins: readonly PlanetPin[], nowMs: number): ColonyStatus {
+  return colonyStatus(extractorProgramsFromPins(pins), nowMs);
 }

@@ -22,8 +22,7 @@ import { formatDuration } from '@/lib/duration';
 import { useExpiringWindowMs } from '../expiringWindow';
 import { cadenceHours, useCadence, type PiCadenceDays } from '../cadencePref';
 import { loadPlanetName } from '../names';
-import { extractorProgramsFromPins } from '../adapters';
-import { colonyStatus } from '@/engine/pi/colonyStatus';
+import { colonyStatusFromPins } from '@/engine/pi/colonyPins';
 import { useShowAltColonies } from '../showAltColoniesPref';
 import type { RosterCharacter } from '../roster';
 import { PricesUnavailable } from '../PricesUnavailable';
@@ -458,9 +457,7 @@ export function ColoniesTab({
         makesPerDay: altAdvice?.get(altId)?.makesPerDay ?? null,
         colonies: sorted.map((row) => ({ ...byKey.get(row.key)!, row })),
         summary: altGroupSummary(
-          group.colonies.map((entry) =>
-            colonyStatus(entry.detail ? extractorProgramsFromPins(entry.detail.pins) : [], nowMs)
-          )
+          group.colonies.map((entry) => colonyStatusFromPins(entry.detail?.pins ?? [], nowMs))
         ),
       };
     });
