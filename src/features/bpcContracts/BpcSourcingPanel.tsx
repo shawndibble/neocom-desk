@@ -1091,7 +1091,8 @@ export function BpcSourcingPanel({
   );
   // The regions a pilot prices against, not every region the blueprint is
   // listed in (`baselineRegions`): The Forge, their market hub's, the nearest
-  // hub's, and where they are when one of those coincides: three at most. Hidden under a Region filter, which already narrows the rows to one.
+  // hub's, and where they are when one of those coincides: three at most.
+  // Hidden under a Region filter, which already narrows the rows to one.
   const nearestHubRegionId = nearestHub(TRADE_HUBS, jumpFilter.jumps)?.regionId ?? null;
   const currentRegionId =
     currentSystem.systemId === null
@@ -1123,9 +1124,38 @@ export function BpcSourcingPanel({
   // One accent for the whole row: the cheapest region cell, or a BPO card
   // only when it is strictly the cheapest box shown (the row needs two boxes).
   const cheapestCard = cheapestSourcingCard(cheapestRegionId?.price ?? null, selectedBpoCards);
+  // A hub's region is named already; the pilot's own region may have no
+  // contract to name it, so its name is read from the SDE like the market region's.
+  const [loadedRegionNames, setLoadedRegionNames] = useState<ReadonlyMap<number, string>>(
+    new Map()
+  );
+  const unnamedCellRegionIds = regionCells
+    .map((cell) => cell.regionId)
+    .filter(
+      (id) =>
+        !regionNames.has(id) &&
+        !loadedRegionNames.has(id) &&
+        !TRADE_HUBS.some((hub) => hub.regionId === id)
+    );
+  const unnamedKey = unnamedCellRegionIds.join();
+  useEffect(() => {
+    if (unnamedKey === '') return;
+    let cancelled = false;
+    for (const id of unnamedKey.split(',').map(Number)) {
+      void loadRegionName(id)
+        .then((name) => {
+          if (!cancelled && name) setLoadedRegionNames((prev) => new Map(prev).set(id, name));
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [unnamedKey]);
   const baselineRegionName = (regionId: number) =>
     regionNames.get(regionId) ??
     TRADE_HUBS.find((hub) => hub.regionId === regionId)?.regionName ??
+    loadedRegionNames.get(regionId) ??
     `#${regionId}`;
 
   const blueprintPicked = selectedTypeId !== null;
