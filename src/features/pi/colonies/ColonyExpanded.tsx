@@ -24,7 +24,7 @@ import {
   extractorProgramsFromPins,
   groupFactoryPins,
   pinRole,
-} from '../adapters';
+} from '@/engine/pi/colonyPins';
 import { HOUR_MS, type ColonyCheckRow } from './coloniesModel';
 import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { quickWinLine } from './coloniesText';

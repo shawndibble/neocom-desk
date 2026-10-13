@@ -18,7 +18,7 @@ import type { IndustryJob } from '@/esi/endpoints';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { loadAllColonyDetails, loadCharacterPlanets } from '@/features/pi/data';
 import { loadPlanetName } from '@/features/pi/names';
-import { extractorProgramsFromPins } from '@/features/pi/adapters';
+import { extractorProgramsFromPins } from '@/engine/pi/colonyPins';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadContracts } from '@/features/character/contracts';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
@@ -39,7 +39,7 @@ import type { CalendarEventSummary } from '@/esi/endpoints';
  * route is code-split, `app/routeChunks.ts`), so anything this module names
  * statically is in the first paint's graph. Two rules follow:
  *
- * - The PI fetch layer (`pi/data`, `pi/names`, `pi/adapters`) and
+ * - The PI fetch layer (`pi/data`, `pi/names`, `engine/pi/colonyPins`) and
  *   `character/typeNames` are imported statically. The boot graph already
  *   holds them — `app/prefetch.ts`, the notification poller and the Calendar
  *   route warmer all name them — so an `import()` here cannot move them out

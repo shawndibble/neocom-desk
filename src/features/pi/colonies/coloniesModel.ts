@@ -30,7 +30,7 @@
  */
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
-import { colonyAttention, colonyStatus } from '@/engine/pi/colonyStatus';
+import { colonyAttention } from '@/engine/pi/colonyStatus';
 import { fractionOfFirstDayRate, hasYieldBaseline } from '@/engine/pi/extraction';
 import { volumeOf } from '@/engine/pi/haulEffort';
 import { quickWinMinutes, type QuickWin } from '@/engine/pi/planAdvice';
@@ -38,10 +38,11 @@ import type { ColonyStatus } from '@/engine/pi/types';
 import {
   extractorExpiryMs,
   extractorInstallMs,
+  colonyStatusFromPins,
   extractorProgramsFromPins,
   hasUnverifiedExtractors,
   pinRole,
-} from '../adapters';
+} from '@/engine/pi/colonyPins';
 import { builtAdvice } from '../systemPlanetModel';
 import { colonyPlan } from '../colonyPlan';
 import { colonyStorage } from '../colonyThroughput';
@@ -334,7 +335,7 @@ const fraction = (used: number, budget: number): number | null =>
 export function colonyCheckRow(input: RowInput): ColonyCheckRow {
   const { planet, detail, pi, nowMs, windowMs, haulHours } = input;
   const pins = detail?.pins ?? [];
-  const status = colonyStatus(extractorProgramsFromPins(pins), nowMs);
+  const status = colonyStatusFromPins(pins, nowMs);
   const verified = detail !== null && !hasUnverifiedExtractors(pins);
 
   const built = detail && pi ? builtAdvice(planet, detail, pi, input.radiusKm, nowMs) : null;
