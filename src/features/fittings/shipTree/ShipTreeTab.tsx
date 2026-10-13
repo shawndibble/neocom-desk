@@ -72,7 +72,7 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
 
   const viewSwitch = (
     <SegmentedControl<ShipTreeView>
-      size="sm"
+      size="md"
       label={t('ships.tree.view.label')}
       options={[
         { value: 'map', label: t('ships.tree.view.map') },

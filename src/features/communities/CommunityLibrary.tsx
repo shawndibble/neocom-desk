@@ -332,7 +332,7 @@ export function CommunityLibrary({
         </Select>
         {/* Sourcing a copy leaves the Library, so it sits apart at the row's end. */}
         <span className="flex items-center gap-1 sm:ml-auto">
-          <Link to={bpcSourcingCommunityHref()} className={buttonClassName({ size: 'sm' })}>
+          <Link to={bpcSourcingCommunityHref()} className={buttonClassName({ size: 'md' })}>
             {t('communities.blueprints.browse')}
           </Link>
           <InfoTooltip
