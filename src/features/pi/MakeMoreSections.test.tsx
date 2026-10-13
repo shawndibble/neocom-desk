@@ -7,6 +7,7 @@ import { buildPlanView } from './planView';
 import { colony, fixtureAdvice, fixturePi } from './planViewFixture';
 
 const NO_TICKS = { has: () => false, toggle: () => {} };
+const NO_REVEAL = { anchor: null, navKey: 'default' };
 
 function renderRebuilds(reason: string) {
   const view = buildPlanView(
@@ -25,7 +26,7 @@ function renderRebuilds(reason: string) {
   );
   render(
     <MemoryRouter>
-      <RebuildPanel view={view} ticks={NO_TICKS} />
+      <RebuildPanel view={view} ticks={NO_TICKS} reveal={NO_REVEAL} />
     </MemoryRouter>
   );
   // A colony with nothing to change folds under "with no rebuild".
@@ -65,7 +66,7 @@ describe('RebuildPanel, colonies that keep their setup', () => {
     );
     render(
       <MemoryRouter>
-        <RebuildPanel view={view} ticks={NO_TICKS} />
+        <RebuildPanel view={view} ticks={NO_TICKS} reveal={NO_REVEAL} />
       </MemoryRouter>
     );
     expect(screen.getByText('No rebuild is worth the trouble at your prices.')).toBeInTheDocument();
@@ -92,11 +93,18 @@ describe('RebuildPanel, colonies that keep their setup', () => {
       (id) => `Planet ${id}`
     );
     const anchor = view.rebuilds[0].anchor;
-    render(
-      <MemoryRouter initialEntries={[`/#${anchor}`]}>
-        <RebuildPanel view={view} ticks={NO_TICKS} />
+    const panel = (navKey: string) => (
+      <MemoryRouter>
+        <RebuildPanel view={view} ticks={NO_TICKS} reveal={{ anchor, navKey }} />
       </MemoryRouter>
     );
+    const { rerender } = render(panel('first'));
+    expect(document.getElementById(anchor)).not.toBeNull();
+
+    // Folded by the pilot, then the same link followed again: it opens once more.
+    fireEvent.click(screen.getByRole('button', { name: /1 planet with no rebuild/ }));
+    expect(document.getElementById(anchor)).toBeNull();
+    rerender(panel('second'));
     expect(document.getElementById(anchor)).not.toBeNull();
   });
 });
@@ -106,7 +114,7 @@ describe('RebuildPanel in-game steps', () => {
     const view = buildPlanView(fixtureAdvice, fixturePi, (id) => `Planet ${id}`);
     render(
       <MemoryRouter>
-        <RebuildPanel view={view} ticks={NO_TICKS} />
+        <RebuildPanel view={view} ticks={NO_TICKS} reveal={NO_REVEAL} />
       </MemoryRouter>
     );
     fireEvent.click(screen.getByRole('button', { name: /^In-game steps for / }));

@@ -569,7 +569,7 @@ export function ColoniesTab({
             }
             padded={false}
           >
-            {/* Over the first rows: never over the empty state an alt-only list opens with. */}
+            {/* Header over the first real rows (own, else alts); never over the empty state. */}
             {ownRows.length > 0 && <ColonyListHeader haulHours={haulHours} />}
             {ownRows.length === 0 ? (
               <EmptyState

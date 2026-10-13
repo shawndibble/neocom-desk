@@ -54,6 +54,7 @@ import {
   productAccessibleName,
   tierName,
   verdictGlyph,
+  VERDICT_TONE,
 } from './mapText';
 import {
   tileChainIsk,
@@ -533,9 +534,7 @@ export function MapBoard(props: MapBoardProps) {
                             <span
                               className={cx(
                                 'text-[11px] leading-[11px] font-bold',
-                                glyph === '▲' && 'text-success',
-                                glyph === '▼' && 'text-danger',
-                                glyph === '≈' && 'text-text-dim'
+                                VERDICT_TONE[glyph]
                               )}
                             >
                               {glyph}

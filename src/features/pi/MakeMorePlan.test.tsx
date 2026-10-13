@@ -371,7 +371,7 @@ describe('MakeMorePlan', () => {
   it("opens a rebuild's in-game steps in its own row, with its Command Center fit", async () => {
     const user = userEvent.setup();
     renderPlan();
-    // No separate checklist panel at the foot of the page: the steps live with their rebuild.
+    // Steps live in their rebuild row, not a panel of their own.
     expect(screen.queryByRole('heading', { name: 'What to do in-game' })).not.toBeInTheDocument();
     const toggle = screen.getByRole('button', { name: /^In-game steps for Hek VI/ });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');

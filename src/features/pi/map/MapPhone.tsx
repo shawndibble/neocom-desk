@@ -21,7 +21,14 @@ import { clickOnSpace } from '@/lib/clickOnSpace';
 import { formatIskCompact } from '@/lib/isk';
 import * as Icon from '@/components/ui/icons';
 import { PlanetImage } from '../PlanetImage';
-import { comparisonSentence, figureSentence, planetName, tierName, verdictGlyph } from './mapText';
+import {
+  comparisonSentence,
+  figureSentence,
+  planetName,
+  tierName,
+  verdictGlyph,
+  VERDICT_TONE,
+} from './mapText';
 import { ChainTileFigure } from './ChainTileFigure';
 import { tileChainIsk, type MapGraph, type MapTier, type ProductFigure } from './mapModel';
 
@@ -183,16 +190,7 @@ export function MapPhone(props: MapPhoneProps) {
                       aria-hidden="true"
                       className="flex shrink-0 items-center gap-1 text-xs tabular-nums"
                     >
-                      <span
-                        className={cx(
-                          'font-bold',
-                          glyph === '▲' && 'text-success',
-                          glyph === '▼' && 'text-danger',
-                          glyph === '≈' && 'text-text-dim'
-                        )}
-                      >
-                        {glyph}
-                      </span>
+                      <span className={cx('font-bold', VERDICT_TONE[glyph])}>{glyph}</span>
                       {formatIskCompact(figure.iskPerDay)}
                       {figure.needsCcLevel && (
                         <span className="rounded-xs border border-warning/60 px-1 text-[10px] leading-[14px] font-semibold text-warning">

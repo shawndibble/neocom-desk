@@ -183,7 +183,11 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         </IskFigureGroup>
       )}
       <IskFigureGroup>
-        <RebuildPanel view={view} ticks={ticks} />
+        <RebuildPanel
+          view={view}
+          ticks={ticks}
+          reveal={{ anchor: scrollTarget, navKey: location.key }}
+        />
       </IskFigureGroup>
       <IskFigureGroup>
         <YourPlanetsPanel

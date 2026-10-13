@@ -9,7 +9,6 @@
  */
 import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
 import {
   Caret,
   Checkbox,
@@ -109,7 +108,7 @@ function Hero({ value, caption }: { value: number; caption: ReactNode }) {
 /**
  * The plan in one glance: what the quick wins and a rebuild would add, the
  * before/after figures, and the "What matters more?" switch that reshapes the
- * rebuilds. It sits above the quick wins so the to-do list starts high.
+ * rebuilds.
  */
 export function PlanSummaryPanel({
   view,
@@ -126,8 +125,8 @@ export function PlanSummaryPanel({
   const mdUp = useMediaQuery(MD_UP);
   const smUp = useMediaQuery(SM_UP);
   const { headline, stats } = view;
-  // Beside the title from `sm`; on its own row under it below, where the
-  // header has no room and the label printed over the title.
+  // Beside the title from `sm`; own row below that, where the header has no room
+  // and the label would overlap the title.
   const mattersToggle = (
     <span className="flex flex-wrap items-center justify-end gap-2">
       <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -171,7 +170,7 @@ export function PlanSummaryPanel({
               )}
             />
           ) : null}
-          {/* With no rebuild, the Rebuild panel right below says so. */}
+          {/* With no rebuild, the Rebuild panel says so. */}
         </div>
         <StatChips>
           <StatChip
@@ -646,16 +645,40 @@ function formatTimes(ratio: number): string {
   return ratio >= 10 ? String(Math.round(ratio)) : (Math.round(ratio * 10) / 10).toString();
 }
 
+/** A caret text action that opens a block in place, below its row. */
+function InlineToggle({
+  expanded,
+  controls,
+  onToggle,
+  children,
+}: {
+  expanded: boolean;
+  controls: string;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      aria-controls={controls}
+      onClick={onToggle}
+      className={textActionClassName('gap-1 whitespace-nowrap')}
+    >
+      <Caret expanded={expanded} />
+      {children}
+    </button>
+  );
+}
+
 function RebuildCard({
   card,
   haulDays,
-  upgradeFrom,
   steps,
   ticks,
 }: {
   card: RebuildCardView;
   haulDays: number;
-  upgradeFrom: number | null;
   /** The in-game steps for a change; null for a colony that keeps its setup. */
   steps: ChecklistColumn | null;
   ticks: Ticks;
@@ -667,9 +690,8 @@ function RebuildCard({
   const stepsId = useId();
   const nowItem = card.sells[0];
   const doneCount = steps ? steps.steps.filter((step) => ticks.has(step.id)).length : 0;
-  // Opens once a step is ticked (part-way through, even when ticks load late) and stays
-  // open: unticking the last step must not fold the list away under the pilot. The
-  // pilot's own toggle wins over both.
+  // Opens once a step is ticked (ticks may load late) and stays open: unticking the last
+  // one must not fold the list under the pilot. The pilot's own toggle wins.
   const [stepsChoice, setStepsChoice] = useState<boolean | null>(null);
   const [autoOpened, setAutoOpened] = useState(doneCount > 0);
   if (doneCount > 0 && !autoOpened) setAutoOpened(true);
@@ -680,19 +702,20 @@ function RebuildCard({
         <PlanetImage type={card.planetType} size={44} />
         <div className="min-w-0 flex-1">
           <p className="text-sm text-text">
-            <RebuildSentence card={card} haulDays={haulDays} upgradeFrom={upgradeFrom} />
+            <RebuildSentence
+              card={card}
+              haulDays={haulDays}
+              upgradeFrom={steps?.fit?.upgradeFromLevel ?? null}
+            />
           </p>
           {(steps || card.alternative) && (
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               {steps && (
-                <button
-                  type="button"
-                  aria-expanded={stepsOpen}
-                  aria-controls={stepsId}
-                  onClick={() => setStepsChoice(!stepsOpen)}
-                  className={textActionClassName('gap-1 whitespace-nowrap')}
+                <InlineToggle
+                  expanded={stepsOpen}
+                  controls={stepsId}
+                  onToggle={() => setStepsChoice(!stepsOpen)}
                 >
-                  <Caret expanded={stepsOpen} />
                   {t('piPlan.make.steps.toggle')}{' '}
                   <span className="sr-only">
                     {t('piPlan.make.steps.forName', { name: steps.name })}
@@ -712,7 +735,7 @@ function RebuildCard({
                       </span>
                     )}
                   </span>
-                </button>
+                </InlineToggle>
               )}
               {steps && card.alternative && (
                 <span aria-hidden="true" className="text-text-dim">
@@ -720,16 +743,9 @@ function RebuildCard({
                 </span>
               )}
               {card.alternative && (
-                <button
-                  type="button"
-                  aria-expanded={open}
-                  aria-controls={altId}
-                  onClick={() => setOpen(!open)}
-                  className={textActionClassName('gap-1 whitespace-nowrap')}
-                >
-                  <Caret expanded={open} />
+                <InlineToggle expanded={open} controls={altId} onToggle={() => setOpen(!open)}>
                   {t('piPlan.make.alternative', { count: 1 })}
-                </button>
+                </InlineToggle>
               )}
             </div>
           )}
@@ -743,7 +759,7 @@ function RebuildCard({
         {(card.status !== 'unknown' || card.toPerDay !== null) && (
           <div className="flex shrink-0 items-center gap-3 max-sm:order-last max-sm:basis-full max-sm:pl-14">
             <span className="flex items-center gap-1.5 text-xs text-text-dim tabular-nums">
-              {card.status === 'change' && card.fromPerDay !== null && (
+              {isChange && card.fromPerDay !== null && (
                 <>
                   {nowItem && <TypeIcon typeId={nowItem.typeId} size={32} width={20} height={20} />}
                   <IskAmount value={card.fromPerDay} decimals={0} />
@@ -753,7 +769,7 @@ function RebuildCard({
                   )}
                 </>
               )}
-              {card.status !== 'change' && nowItem && (
+              {!isChange && nowItem && (
                 <TypeIcon typeId={nowItem.typeId} size={32} width={20} height={20} />
               )}
               {card.toPerDay !== null && (
@@ -775,39 +791,39 @@ function RebuildCard({
 }
 
 /**
- * The rebuilds. Colonies that change stay in view; those that keep their
- * setup (or can't be measured) fold under one disclosure, so a plan with
- * nothing to change is one line, not a card per planet. A `#plan-<anchor>`
- * link to a folded colony opens the fold so the page can scroll to it.
+ * The rebuilds. Changes stay in view; kept or unmeasured colonies fold under one
+ * disclosure, so nothing-to-change is one line, not a card per planet.
  */
-export function RebuildPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) {
+export function RebuildPanel({
+  view,
+  ticks,
+  reveal,
+}: {
+  view: PlanView;
+  ticks: Ticks;
+  /** The card a `#plan-<anchor>` link points at, and that navigation's key. */
+  reveal: { anchor: string | null; navKey: string };
+}) {
   const { t } = useTranslation();
-  const { hash, key } = useLocation();
   const stepsFor = new Map(view.checklist.map((column) => [column.planetId, column]));
   const changed = view.rebuilds.filter((card) => card.status === 'change');
   const kept = view.rebuilds.filter((card) => card.status !== 'change');
-  const hashInKept = kept.some((card) => `#${card.anchor}` === hash);
-  const [open, setOpen] = useState(hashInKept);
-  // Each link to a folded colony (a repeat of the same one too) opens the fold during
-  // render, so the card exists by the time the page's scroll effect looks for it.
-  const [seenLink, setSeenLink] = useState(key);
-  if (key !== seenLink) {
-    setSeenLink(key);
-    if (hashInKept && !open) setOpen(true);
-  }
-  const renderCard = (c: RebuildCardView) => {
-    const steps = stepsFor.get(c.planetId) ?? null;
-    return (
-      <RebuildCard
-        key={c.planetId}
-        card={c}
-        haulDays={view.hauling.haulDays}
-        upgradeFrom={steps?.fit?.upgradeFromLevel ?? null}
-        steps={steps}
-        ticks={ticks}
-      />
-    );
-  };
+  // A link to a folded card opens the fold in the same render, so the card exists when
+  // the page scrolls to it; following the link again reopens it. A toggle made since wins.
+  const [choice, setChoice] = useState<{ open: boolean; navKey: string } | null>(null);
+  const linkedIntoKept =
+    reveal.anchor !== null && kept.some((card) => card.anchor === reveal.anchor);
+  const open =
+    choice?.navKey === reveal.navKey ? choice.open : linkedIntoKept || (choice?.open ?? false);
+  const renderCard = (c: RebuildCardView) => (
+    <RebuildCard
+      key={c.planetId}
+      card={c}
+      haulDays={view.hauling.haulDays}
+      steps={stepsFor.get(c.planetId) ?? null}
+      ticks={ticks}
+    />
+  );
   return (
     <Panel
       title={t(
@@ -833,7 +849,7 @@ export function RebuildPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) 
           className="border-t border-line"
           label={t('piPlan.make.keptGroup', { count: kept.length })}
           expanded={open}
-          onToggle={() => setOpen(!open)}
+          onToggle={() => setChoice({ open: !open, navKey: reveal.navKey })}
         >
           <ul className="divide-y divide-line">{kept.map(renderCard)}</ul>
         </Disclosure>
@@ -936,7 +952,7 @@ export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName:
   );
 }
 
-// --- In-game steps (opened inside a rebuild row) ----------------------------------------
+// --- In-game steps --------------------------------------------------------------------
 
 const PIN_KEY: Record<PiPinKind, string> = {
   extractorControlUnit: 'extractor',

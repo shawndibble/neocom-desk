@@ -264,9 +264,30 @@ const ROW_GRID =
   'lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)_12rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
 
 /**
- * Column labels, once above the rows from `lg`, with each column's help. A
- * narrower row is a stacked card and labels its own cells instead.
+ * A column's label and help. In a row (`inRow`) the list header shows both from `lg`,
+ * so the row keeps the label for screen readers only; below `lg` the row shows both.
  */
+function ColumnLabel({
+  label,
+  help,
+  inRow = false,
+}: {
+  label: string;
+  help: string;
+  inRow?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <span className={`flex items-center gap-1 ${MICRO}`}>
+      <span className={inRow ? 'lg:sr-only' : undefined}>{label}</span>
+      <span className={inRow ? 'lg:hidden' : undefined}>
+        <InfoTooltip label={t('common.aboutLabel', { label })} content={help} />
+      </span>
+    </span>
+  );
+}
+
+/** Column labels, once above the rows from `lg`; a narrower row is a stacked card that labels its own cells. */
 export function ColonyListHeader({ haulHours }: { haulHours: number }) {
   const { t } = useTranslation();
   return (
@@ -274,20 +295,11 @@ export function ColonyListHeader({ haulHours }: { haulHours: number }) {
       className={`grid gap-x-4 border-b border-line px-3 py-1.5 max-lg:hidden ${ROW_GRID} ${MICRO}`}
     >
       <span className="pl-24">{t('piColonies.colonyColumn')}</span>
-      <span className="flex items-center gap-1">
-        {t('piColonies.extractors')}
-        <InfoTooltip
-          label={t('common.aboutLabel', { label: t('piColonies.extractors') })}
-          content={t('piColonies.help.extractors')}
-        />
-      </span>
-      <span className="flex items-center gap-1">
-        {t('piColonies.storageFull')}
-        <InfoTooltip
-          label={t('common.aboutLabel', { label: t('piColonies.storageFull') })}
-          content={t('piColonies.help.storage', { hours: Math.round(haulHours) })}
-        />
-      </span>
+      <ColumnLabel label={t('piColonies.extractors')} help={t('piColonies.help.extractors')} />
+      <ColumnLabel
+        label={t('piColonies.storageFull')}
+        help={t('piColonies.help.storage', { hours: Math.round(haulHours) })}
+      />
       <span className="text-center">{t('piColonies.actionColumn')}</span>
       <span />
     </div>
@@ -381,7 +393,6 @@ export function ColonyRowView(props: ColonyRowViewProps) {
       : storage.fillsBeforeHaul
         ? t('piColonies.stalls', { span: hoursLabel(storage.stallHours) })
         : t('piColonies.afterHaul', { haul: props.haulLabel });
-  // Drawn only when storage fills before the haul.
   const storageFraction =
     storage.fillsBeforeHaul && storage.hoursToFull !== null
       ? Math.max(0, storage.hoursToFull) / storage.haulHours
@@ -508,16 +519,11 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
             <div className="min-w-0 space-y-1">
               <div className="flex items-center justify-between gap-2 lg:justify-start lg:gap-0">
-                {/* From lg the list header shows the label and its help; a screen reader still hears it per row. */}
-                <span className={`flex items-center gap-1 ${MICRO}`}>
-                  <span className="lg:sr-only">{t('piColonies.extractors')}</span>
-                  <span className="lg:hidden">
-                    <InfoTooltip
-                      label={t('common.aboutLabel', { label: t('piColonies.extractors') })}
-                      content={t('piColonies.help.extractors')}
-                    />
-                  </span>
-                </span>
+                <ColumnLabel
+                  inRow
+                  label={t('piColonies.extractors')}
+                  help={t('piColonies.help.extractors')}
+                />
                 <span
                   className={`text-xs font-semibold tabular-nums ${stopped ? 'text-danger' : row.status === 'expiring' ? 'text-warning' : 'text-text'}`}
                 >
@@ -533,26 +539,18 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
             <div className="min-w-0 space-y-1">
               <div className="flex items-center justify-between gap-2 lg:justify-start lg:gap-0">
-                {/* From lg the list header shows the label and its help; a screen reader still hears it per row. */}
-                <span className={`flex items-center gap-1 ${MICRO}`}>
-                  <span className="lg:sr-only">{t('piColonies.storageFull')}</span>
-                  <span className="lg:hidden">
-                    <InfoTooltip
-                      label={t('common.aboutLabel', { label: t('piColonies.storageFull') })}
-                      content={t('piColonies.help.storage', {
-                        hours: Math.round(storage.haulHours),
-                      })}
-                    />
-                  </span>
-                </span>
+                <ColumnLabel
+                  inRow
+                  label={t('piColonies.storageFull')}
+                  help={t('piColonies.help.storage', { hours: Math.round(storage.haulHours) })}
+                />
                 <span
                   className={`text-xs font-semibold tabular-nums ${storage.fillsBeforeHaul ? (storage.hoursToFull !== null && storage.hoursToFull < 24 ? 'text-danger' : 'text-warning') : 'text-text'}`}
                 >
                   {storageRight}
                 </span>
               </div>
-              {/* A bar only when storage fills before the haul: a full green bar for
-                  "fine" read as "storage is full", and an unknown one as "empty". */}
+              {/* Bar only when storage fills before the haul: a full "fine" bar looks full, an unknown one empty. */}
               {storageFraction !== null && (
                 <Meter
                   fraction={storageFraction}

@@ -796,12 +796,13 @@ describe('PlanMap: how-to line', () => {
     expect(screen.queryByText(/Hover|Click/)).toBeNull();
   });
 
-  it('explains the tile marks in a legend beside the title', () => {
+  it('explains the tile marks in a legend beside the title, only the marks the board draws', () => {
     renderMap();
     const legend = screen.getByLabelText('Map legend');
     expect(legend).toHaveTextContent('ISK a day from one planet');
     expect(legend).toHaveTextContent("worse than that planet's simplest product");
-    expect(legend).toHaveTextContent('Est.');
+    // No multi-planet chain on this board, so no Est. entry.
+    expect(legend).not.toHaveTextContent('Est.');
   });
 });
 
@@ -967,6 +968,7 @@ describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets',
     expect(product('Camera Drones')).toHaveAccessibleName(
       /With a Lava planet added, a Bigger chain on your planets \(multi-planet estimate, needs hauling\): about 50,000 ISK a day across 2 planets/
     );
+    expect(screen.getByLabelText('Map legend')).toHaveTextContent('Est.');
     const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
     expect(within(dialog).getByText('Bigger chains with it')).toBeInTheDocument();
     const card = within(dialog).getByRole('link', { name: 'Camera Drones' }).closest('li')!;

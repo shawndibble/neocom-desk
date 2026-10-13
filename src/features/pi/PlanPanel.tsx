@@ -29,7 +29,7 @@ interface Props extends GoalPlannerPanelProps {
   seedingGoal: boolean;
 }
 
-/** What each answer does, under the picker once the pilot has picked. */
+/** What each answer does. */
 const QUESTION_HINT: Record<PlanQuestion, string> = {
   'make-more': 'piPlan.picker.makeMoreHint',
   'find-best': 'piPlan.picker.findBestHint',
@@ -159,7 +159,7 @@ export function PlanPanel(props: Props) {
       )}
       <div ref={resultRef} tabIndex={-1} className="space-y-4 outline-none">
         <Panel padded={false}>
-          {/* The picker reads as one compact row; its heading stays for screen readers. */}
+          {/* Heading sr-only: the options name the picker visibly. */}
           <h2 id={pickerHeadingId} className="sr-only">
             {t('piPlan.picker.title')}
           </h2>
@@ -186,7 +186,7 @@ export function PlanPanel(props: Props) {
               title={t('piPlan.picker.product')}
             />
           </div>
-          {/* Why this question opened, until the pilot picks; then what the picked one does. */}
+          {/* Until the pilot picks (and ESI answered): why this question opened; then what it does. */}
           <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
             {picked === null && !esiFailed
               ? t(`piPlan.picker.opened.${unknown ? 'unknown' : opening.reason}`, {

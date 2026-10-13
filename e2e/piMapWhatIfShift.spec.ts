@@ -1,5 +1,5 @@
 /**
- * PI Map (#2796): the how-to and what-if box keeps one height from
+ * PI Map: the how-to and what-if box keeps one height from
  * placeholder to hover to ticked, so the page below it never jumps.
  */
 import type { Page } from '@playwright/test';
