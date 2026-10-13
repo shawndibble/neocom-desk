@@ -23,8 +23,11 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  TabPanel,
+  Tabs,
   textActionClassName,
   useOpenAfterMenu,
+  useTabsId,
 } from '@/components/ui';
 import { ExternalLink, ExternalMark } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
@@ -55,6 +58,29 @@ function Cue({ rule, note, children }: { rule: string; note?: string; children: 
       </p>
       <div className="flex flex-wrap items-center gap-3 text-sm">{children}</div>
       {note && <p className="text-xs text-text-dim">{note}</p>}
+    </div>
+  );
+}
+
+/** A tab bar whose roster tab carries its count (the Community page's Members). */
+function TabCountSample({ k }: { k: (key: string) => string }) {
+  const tabsId = useTabsId();
+  const [tab, setTab] = useState('content');
+  return (
+    <div className="w-full">
+      <Tabs
+        tabsId={tabsId}
+        tabs={[
+          { id: 'content', label: k('samples.tabContent') },
+          { id: 'members', label: k('samples.tabMembers'), count: 12 },
+        ]}
+        value={tab}
+        onChange={setTab}
+        label={k('samples.tabsLabel')}
+      />
+      <TabPanel tabsId={tabsId} tabId={tab} className="sr-only">
+        {tab === 'members' ? k('samples.tabMembers') : k('samples.tabContent')}
+      </TabPanel>
     </div>
   );
 }
@@ -277,6 +303,9 @@ export function InteractionGrammar() {
         </Cue>
         <Cue rule={k('rules.menuOpensDialog')} note={k('notes.menuOpensDialog')}>
           <MenuOpensDialogSample k={k} />
+        </Cue>
+        <Cue rule={k('rules.tabCount')} note={k('notes.tabCount')}>
+          <TabCountSample k={k} />
         </Cue>
         <Cue rule={k('rules.selectedRow')} note={k('notes.selectedRow')}>
           <div className="w-full">

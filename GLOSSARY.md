@@ -207,7 +207,8 @@ here — they go one per file in `docs/context/decisions/`.
   says "Communities"; the bare word "Group" stays unused here because it
   already names the Build Group.
 - **Join Request**: A Character that followed a **Community**'s invite link while the admin has "Approve new Members" on, and is waiting to be let in. It is not a **Member** and sees and shares nothing until the admin accepts it. A Character the admin mailed an invite to skips it. Distinct from a mail invite, which the admin sends.
-- **Community Library**: The **Community** page's Blueprints › Everyone view.
+- **Community Library**: The **Community** page's Blueprints tab: every blueprint the Community's Members share. This Character's own sharing opens over it in **My sharing**.
+- **My sharing**: The slide-out on a **Community** content tab (Blueprints, Fittings, Skill plans) holding what this Character shares there and how: share-all, the shared list with Stop sharing, and Add. Opened from the tab's sharing line. Formerly the tab's Mine view.
   It opens on every **Shared Blueprint** with its **Member**, place, ME / TE
   and runs; its other filters list every blueprint against the **Members** who
   share it, with a "missing from the Community" filter. Those rows are every

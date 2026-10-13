@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { Modal } from './Modal';
 import { SlideOver } from './SlideOver';
 
 describe('SlideOver', () => {
@@ -43,6 +44,25 @@ describe('SlideOver', () => {
     const afterEscape = onClose.mock.calls.length;
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(afterEscape + 1);
+  });
+
+  it('leaves an Escape to a Modal opened from inside it', async () => {
+    const onClose = vi.fn();
+    render(
+      <SlideOver open onClose={onClose} title="My sharing">
+        <Modal open onClose={() => {}} title="Add blueprints">
+          <button type="button">Inside</button>
+        </Modal>
+      </SlideOver>
+    );
+    // Armed once an Escape outside any window closes the panel.
+    await waitFor(() => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalled();
+    });
+    onClose.mockClear();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Inside' }), { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 

@@ -24,7 +24,6 @@ const PINNED = [
   'calendarHiddenKinds',
   'calendarView',
   'characterFilterPicks',
-  'communityContentScope',
   'corp.assetsExpanded',
   'industryLastOpenedPlan',
   'loyaltyStorePriceBasis',

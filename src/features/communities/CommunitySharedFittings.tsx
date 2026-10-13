@@ -23,16 +23,26 @@ export function CommunitySharedFittings({
   characterId,
   communityId,
   members,
+  onMineCount,
 }: {
   characterId: number;
   communityId: string;
   /** For the sharer's name; null while the roster loads. */
   members: readonly CommunityMember[] | null;
+  /** How many of the listed Fittings are this Character's, once loaded (the tab's sharing line). */
+  onMineCount?: (count: number) => void;
 }) {
   const { t } = useTranslation();
   const [state, setState] = useState<State>({ status: 'loading' });
   const [query, setQuery] = useState('');
   const myUid = uidForCharacter(characterId);
+  const mine =
+    state.status === 'ready'
+      ? state.fittings.filter((fitting) => fitting.ownerUid === myUid).length
+      : null;
+  useEffect(() => {
+    if (mine !== null) onMineCount?.(mine);
+  }, [mine, onMineCount]);
 
   useEffect(() => {
     let cancelled = false;

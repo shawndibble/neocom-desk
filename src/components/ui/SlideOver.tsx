@@ -88,6 +88,14 @@ export function SlideOver({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Content
           onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => {
+            // A Modal opened from inside the panel (Add, a confirm) owns this
+            // Escape and closes alone; Radix would otherwise close both.
+            const target = event.target;
+            if (target instanceof Element && target.closest('dialog[open]')) {
+              event.preventDefault();
+            }
+          }}
           aria-describedby={undefined}
           tabIndex={-1}
           onOpenAutoFocus={(event) => {

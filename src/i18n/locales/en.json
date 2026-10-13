@@ -7765,21 +7765,41 @@
     "adminBadge": "Admin",
     "asOf": "as of {{age}}",
     "staleBadge": "Stale",
-    "scope": {
-      "label": "Show",
-      "everyone": "Everyone",
-      "mine": "Mine"
+    "sharing": {
+      "open": "My sharing",
+      "title": "My sharing",
+      "subtitle": "{{tab}} in {{community}}",
+      "blueprintCount_one": "{{count}} blueprint",
+      "blueprintCount_other": "{{count}} blueprints",
+      "placeCount_one": "{{count}} station or structure",
+      "placeCount_other": "{{count}} stations or structures",
+      "blueprintsAll": "You share all your blueprints, including ones you get later.",
+      "blueprintsPicked": "You share {{picked}} you picked.",
+      "blueprintsPlaces": "You share every blueprint at {{places}}.",
+      "blueprintsBoth": "You share {{picked}} you picked, and every blueprint at {{places}}.",
+      "blueprintsNone": "You share no blueprints here yet.",
+      "fittingsAll": "You share all your Fittings, including ones you save later.",
+      "fittingsCount_one": "You share {{count}} Fitting.",
+      "fittingsCount_other": "You share {{count}} Fittings.",
+      "fittingsNone": "You share no Fittings here yet.",
+      "plansCount_one": "You share {{count}} Skill plan.",
+      "plansCount_other": "You share {{count}} Skill plans.",
+      "plansNone": "You share no Skill plans here yet."
+    },
+    "header": {
+      "more_one": "{{names}} and {{count}} more",
+      "more_other": "{{names}} and {{count}} more"
     },
     "everyone": {
       "fittingsLoading": "Loading shared Fittings…",
       "fittingsFailed": "Couldn't load the shared Fittings.",
       "noFittings": "No Fittings shared yet",
-      "noFittingsHint": "Share yours under Mine.",
+      "noFittingsHint": "Share yours from My sharing.",
       "fittingsSearch": "Search by Fitting, hull or sharer",
       "fittingDetail": "{{hull}} · {{name}}",
       "planDetail_one": "{{name}} · {{count}} skill",
       "planDetail_other": "{{name}} · {{count}} skills",
-      "noPlansHint": "Share yours under Mine.",
+      "noPlansHint": "Share yours from My sharing.",
       "copyFailed": "Couldn't copy the plan. Try again."
     },
     "manage": {
@@ -7831,7 +7851,8 @@
     },
     "removeSharedOption_one": "Also remove the blueprints and Fittings this Character shared with Communities",
     "removeSharedOption_other": "Also remove the blueprints and Fittings these Characters shared with Communities",
-    "create": "Create a Community",
+    "create": "Create",
+    "createLabel": "Create a Community",
     "createTitle": "Create a Community",
     "nameLabel": "Name",
     "createAction": "Create",
@@ -8002,7 +8023,8 @@
     "blueprints": {
       "shareAll": "Share all my blueprints",
       "allShared": "All {{count}} shared, including ones you get later",
-      "browse": "Browse every shared blueprint in BPC Sourcing",
+      "browse": "Browse in BPC Sourcing",
+      "browseAbout": "About BPC Sourcing",
       "browseHint": "Your blueprints and your Communities' shared ones only, no market, contract or LP store offers.",
       "filter": "Search your shared blueprints",
       "add": "Add blueprints",
@@ -11639,6 +11661,7 @@
         "dialogOpener": "… ending a label: dialog needing input or confirmation",
         "rowMenu": "⋮: a row's menu of two or more real actions",
         "menuOpensDialog": "Menu item that opens a dialog: focus comes back to the menu button",
+        "tabCount": "Round count badge after a tab label: how many things the tab holds",
         "selectedRow": "Accent 2px left border: selected row",
         "stateRest": "Rest: variants",
         "stateHoverPressed": "Hover and pressed",
@@ -11657,6 +11680,7 @@
         "dialogOpener": "Ellipsis on the first. A button that only shows a window has none.",
         "rowMenu": "Only where the row has two or more actions nothing else reaches. Right-click and touch-and-hold open the same menu.",
         "menuOpensDialog": "The dialog opens after the menu closes (useOpenAfterMenu). Open it with the keyboard and press Escape.",
+        "tabCount": "Part of the tab's name (Members 12). Never a control, a status or a waiting count.",
         "selectedRow": "Click a row. Selected never looks like hover.",
         "states": "Hover, pressed and focus can't be forced on real components. Try them on the samples below.",
         "hoverPressed": "Hover with a pointer: one step brighter. Press and hold: a step darker.",
@@ -11668,6 +11692,9 @@
         "fieldCaret": "The box is a control (§6); the caret says it opens a list."
       },
       "samples": {
+        "tabsLabel": "Community",
+        "tabContent": "Blueprints",
+        "tabMembers": "Members",
         "segmentOn": "Selected",
         "segmentOff": "Idle",
         "option": "Option",

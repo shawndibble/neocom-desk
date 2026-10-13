@@ -34,7 +34,7 @@ function neighbours<K>(keys: readonly K[], index: number, refs: Map<K, HTMLButto
 const NO_STATUS: ReadonlyMap<number, TypeStatus> = new Map();
 
 /**
- * The Blueprints tab's Mine view (issue #3599 follow-up): what this
+ * The Blueprints tab's My sharing (issue #3599 follow-up): what this
  * Character shares, one row per blueprint with Stop sharing. "Share all my
  * blueprints" is a standing switch, so a blueprint acquired later is shared
  * too; under it a revoke is an exclusion. Add blueprints opens a dialog to

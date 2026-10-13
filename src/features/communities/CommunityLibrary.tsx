@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { bpcSourcingCommunityHref } from '@/features/bpcContracts/bpcSourcingUrl';
-import { Caret, EmptyState, FilterChip, SearchInput, Spinner, Tooltip } from '@/components/ui';
+import {
+  buttonClassName,
+  Caret,
+  EmptyState,
+  InfoTooltip,
+  SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
+  Tooltip,
+} from '@/components/ui';
 import {
   buildLibraryRows,
   filterLibraryRows,
@@ -292,26 +304,7 @@ export function CommunityLibrary({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs">
-        <Link to={bpcSourcingCommunityHref()} className={inlineLinkClassName}>
-          {t('communities.blueprints.browse')}
-        </Link>
-        <span className="text-text-dim"> · {t('communities.blueprints.browseHint')}</span>
-      </p>
-      <div
-        className="flex flex-wrap items-center gap-2"
-        role="group"
-        aria-label={t('communities.library.filterLabel')}
-      >
-        {VIEWS.map((id) => (
-          <FilterChip
-            key={id}
-            label={t(`communities.library.${id}`)}
-            count={counts[id]}
-            selected={view === id}
-            onToggle={() => setView(id)}
-          />
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
         <SearchInput
           className="min-w-40 flex-1"
           value={query}
@@ -319,6 +312,32 @@ export function CommunityLibrary({
           placeholder={t('communities.library.search')}
           aria-label={t('communities.library.search')}
         />
+        <Select value={view} onValueChange={(id) => setView(id as LibraryView)}>
+          <SelectTrigger
+            aria-label={t('communities.library.filterLabel')}
+            className="w-full sm:w-72"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {VIEWS.map((id) => (
+              <SelectItem key={id} value={id}>
+                {`${t(`communities.library.${id}`)} · ${counts[id]}`}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* Sourcing a copy leaves the Library, so it sits apart at the row's end. */}
+        <span className="flex items-center gap-1 sm:ml-auto">
+          <Link to={bpcSourcingCommunityHref()} className={buttonClassName({ size: 'sm' })}>
+            {t('communities.blueprints.browse')}
+          </Link>
+          <InfoTooltip
+            label={t('communities.blueprints.browseAbout')}
+            content={t('communities.blueprints.browseHint')}
+            glyph="info"
+          />
+        </span>
       </div>
 
       <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-dim">

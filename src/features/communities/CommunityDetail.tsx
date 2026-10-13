@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   Modal,
   Panel,
-  SegmentedControl,
+  SlideOver,
   Spinner,
   TabPanel,
   Tabs,
@@ -24,18 +24,21 @@ import { NOTICE_MS } from '@/components/ui/useTimedToast';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { uidForCharacter } from '@/sync/uid';
+import { CommunityHeader } from './CommunityHeader';
 import { CommunityLibrary } from './CommunityLibrary';
 import { CommunitySharedFittings } from './CommunitySharedFittings';
 import { CommunitySharedPlans } from './CommunitySharedPlans';
-import type { CommunityTab } from './communityTabs';
+import { isContentTab, type CommunityTab, type ContentTab } from './communityTabs';
 import { CommunityMemberList } from './CommunityMemberList';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CommunityInvites } from './CommunityInvites';
-import { useContentScopes, type ContentScope, type ContentTab } from './contentScope';
 import { JoinRequestsList } from './JoinRequestsList';
 import { ShareFittingsTab } from './ShareFittingsTab';
 import { ShareSkillPlansTab } from './ShareSkillPlansTab';
 import { ShareBlueprintsTab } from './ShareBlueprintsTab';
+import { SharingLine } from './SharingLine';
+import { loadBlueprintShare, loadFittingsAll } from './shareSelection';
+import { blueprintSharing, itemSharing, type SharingSummary } from './sharingSummary';
 import {
   deleteCommunity,
   isCommunityAdmin,
@@ -58,18 +61,18 @@ type Dialog =
 /** The admin's Manage windows. */
 type ManagePanel = 'invites' | 'transfer';
 
-const isContentTab = (tab: CommunityTab): tab is ContentTab => tab !== 'members';
-
 /**
- * One Community, as the open Character sees it (scope decision
- * `20261012-224358-communities-page-leads-with-shared-content`): what its Members
- * share comes first. Blueprints, Fittings and Skill plans each open on
- * Everyone (the Community's content) with Mine (what this Character shares,
- * and Add) one segment away; the pick per tab is remembered on this device.
- * Members is the roster. The admin's chores sit in the header's Manage menu:
- * Invites (join requests, approval, the link, mail invites), Transfer admin
- * and Delete. Any other Member leaves from the foot of the Members tab. Every
- * change refetches through `onChanged`, since Firestore here has no listeners.
+ * One Community, as the open Character sees it (scope decisions
+ * `20261012-224358-communities-page-leads-with-shared-content` and
+ * `20261013-072418-communities-my-sharing-slide-out-and-community-header`):
+ * a header card with the admin's Manage menu in its corner, then what its
+ * Members share. Blueprints, Fittings and Skill plans each show the
+ * Community's content, under a line saying what this Character shares there;
+ * the line's My sharing opens that tab's share controls in a slide-out.
+ * Members is the roster, its count on the tab. Manage holds Invites (join
+ * requests, approval, the link, mail invites), Transfer admin and Delete. Any
+ * other Member leaves from the foot of the Members tab. Every change
+ * refetches through `onChanged`, since Firestore here has no listeners.
  */
 export function CommunityDetail({
   community,
@@ -78,7 +81,7 @@ export function CommunityDetail({
   onPatch,
   onGone,
   initialTab = 'blueprints',
-  initialScope,
+  initialSharing = false,
   initialPanel,
 }: {
   community: CommunitySummary;
@@ -91,8 +94,8 @@ export function CommunityDetail({
   onGone: () => void;
   /** The tab to open on (`?tab=`); Blueprints unless a link says otherwise. */
   initialTab?: CommunityTab;
-  /** Everyone or Mine for the opening tab (`?view=`), over the remembered pick. */
-  initialScope?: ContentScope;
+  /** Open the opening tab's My sharing (an old `?view=mine` link). */
+  initialSharing?: boolean;
   /** A Manage window to open on (`?tab=invites`, the old Invites tab's link). */
   initialPanel?: ManagePanel;
 }) {
@@ -113,19 +116,53 @@ export function CommunityDetail({
   const manageMenu = useOpenAfterMenu();
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
 
-  const scopes = useContentScopes((s) => s.value);
-  const scopesHydrated = useContentScopes((s) => s.hydrated);
-  const setScopes = useContentScopes((s) => s.setValue);
-  const hydrateScopes = useContentScopes((s) => s.hydrate);
+  const [sharingOpen, setSharingOpen] = useState(initialSharing && isContentTab(initialTab));
+  // Bumped as My sharing closes: the tab's list and its sharing line reread
+  // what changed there, since the list stays on screen under the slide-out.
+  const [contentKey, setContentKey] = useState(0);
+  const [blueprintSummary, setBlueprintSummary] = useState<SharingSummary | null>(null);
+  const [fittingsAll, setFittingsAll] = useState(false);
+  const [mineCounts, setMineCounts] = useState<Record<'fittings' | 'plans', number | null>>({
+    fittings: null,
+    plans: null,
+  });
+  // The blueprint choice and the Fittings switch live on this device: no read leaves it.
   useEffect(() => {
-    void hydrateScopes();
-  }, [hydrateScopes]);
-  // A `?view=` link wins on the tab it opened, until the pilot picks again.
-  const [linkScope, setLinkScope] = useState(
-    initialScope && isContentTab(initialTab) ? { tab: initialTab, scope: initialScope } : null
+    let cancelled = false;
+    Promise.all([
+      loadBlueprintShare(characterId, community.id),
+      loadFittingsAll(characterId, community.id),
+    ]).then(
+      ([share, all]) => {
+        if (cancelled) return;
+        setBlueprintSummary(blueprintSharing(share));
+        setFittingsAll(all !== null);
+      },
+      // The line then holds My sharing alone, as it does while loading.
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [characterId, community.id, contentKey]);
+  const onFittingsMine = useCallback(
+    (count: number) => setMineCounts((prev) => ({ ...prev, fittings: count })),
+    []
   );
-  const scopeOf = (content: ContentTab): ContentScope =>
-    linkScope?.tab === content ? linkScope.scope : scopes[content];
+  const onPlansMine = useCallback(
+    (count: number) => setMineCounts((prev) => ({ ...prev, plans: count })),
+    []
+  );
+  const summaries: Record<ContentTab, SharingSummary | null> = {
+    blueprints: blueprintSummary,
+    fittings: itemSharing(fittingsAll, mineCounts.fittings),
+    // Skill plans are shared one at a time, never all at once.
+    plans: itemSharing(false, mineCounts.plans),
+  };
+  const closeSharing = () => {
+    setSharingOpen(false);
+    setContentKey((n) => n + 1);
+  };
 
   // Bumped after a change that alters the Member list, to refetch it.
   const [reload, setReload] = useState(0);
@@ -180,118 +217,131 @@ export function CommunityDetail({
   const waiting = admin ? requests.length : 0;
 
   const ids = { characterId, communityId: community.id };
-  // One entry per content tab: what Everyone and Mine show there.
-  const contentViews: Record<ContentTab, Record<ContentScope, () => ReactNode>> = {
-    blueprints: {
-      everyone: () => (
-        <CommunityLibrary {...ids} members={members} membersFailed={membersFailed} now={now} />
-      ),
-      mine: () => <ShareBlueprintsTab {...ids} />,
-    },
-    fittings: {
-      everyone: () => <CommunitySharedFittings {...ids} members={members} />,
-      mine: () => <ShareFittingsTab {...ids} />,
-    },
-    plans: {
-      everyone: () => <CommunitySharedPlans {...ids} members={members} />,
-      mine: () => <ShareSkillPlansTab {...ids} />,
-    },
+  const tabLabels: Record<ContentTab, string> = {
+    blueprints: t('communities.tabs.blueprints'),
+    fittings: t('communities.tabs.fittings'),
+    plans: t('communities.tabs.plans'),
+  };
+  // What each content tab shows: the Community's content, and, in My sharing, this Character's.
+  const everyoneViews: Record<ContentTab, () => ReactNode> = {
+    blueprints: () => (
+      <CommunityLibrary {...ids} members={members} membersFailed={membersFailed} now={now} />
+    ),
+    fittings: () => (
+      <CommunitySharedFittings {...ids} members={members} onMineCount={onFittingsMine} />
+    ),
+    plans: () => <CommunitySharedPlans {...ids} members={members} onMineCount={onPlansMine} />,
+  };
+  const mineViews: Record<ContentTab, () => ReactNode> = {
+    blueprints: () => <ShareBlueprintsTab {...ids} />,
+    fittings: () => <ShareFittingsTab {...ids} />,
+    plans: () => <ShareSkillPlansTab {...ids} />,
   };
 
   return (
-    <Panel
-      title={community.name}
-      meta={t('communities.memberCount', { count: community.memberCount })}
-      actions={
-        admin && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm">
-                {waiting > 0
-                  ? t('communities.manage.triggerWaiting', { count: waiting })
-                  : t('communities.manage.trigger')}
-                <Expanded aria-hidden />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="min-w-56"
-              onCloseAutoFocus={manageMenu.onCloseAutoFocus}
-            >
-              <DropdownMenuItem onSelect={() => manageMenu.run(() => setPanel('invites'))}>
-                {waiting > 0
-                  ? t('communities.manage.invitesWaiting', { count: waiting })
-                  : t('communities.manage.invites')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => manageMenu.run(() => setPanel('transfer'))}>
-                {t('communities.manage.transfer')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-danger"
-                onSelect={() => manageMenu.run(() => setDialog({ kind: 'delete' }))}
+    <div className="space-y-3">
+      <CommunityHeader
+        community={community}
+        admin={admin}
+        members={members}
+        actions={
+          admin && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm">
+                  {waiting > 0
+                    ? t('communities.manage.triggerWaiting', { count: waiting })
+                    : t('communities.manage.trigger')}
+                  <Expanded aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="min-w-56"
+                onCloseAutoFocus={manageMenu.onCloseAutoFocus}
               >
-                {t('communities.delete')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )
-      }
-    >
-      <Tabs
-        tabsId={tabsId}
-        tabs={[
-          { id: 'blueprints', label: t('communities.tabs.blueprints') },
-          { id: 'fittings', label: t('communities.tabs.fittings') },
-          { id: 'plans', label: t('communities.tabs.plans') },
-          { id: 'members', label: t('communities.members') },
-        ]}
-        value={tab}
-        onChange={(id) => setTab(id as CommunityTab)}
-        label={t('communities.tabs.label')}
-        className="mb-2"
+                <DropdownMenuItem onSelect={() => manageMenu.run(() => setPanel('invites'))}>
+                  {waiting > 0
+                    ? t('communities.manage.invitesWaiting', { count: waiting })
+                    : t('communities.manage.invites')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => manageMenu.run(() => setPanel('transfer'))}>
+                  {t('communities.manage.transfer')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-danger"
+                  onSelect={() => manageMenu.run(() => setDialog({ kind: 'delete' }))}
+                >
+                  {t('communities.delete')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
+        }
       />
-      <TabPanel tabsId={tabsId} tabId={tab}>
-        {isContentTab(tab) ? (
-          <div className="space-y-3">
-            <SegmentedControl
-              label={t('communities.scope.label')}
-              value={scopeOf(tab)}
-              onChange={(scope) => {
-                setLinkScope(null);
-                void setScopes({ ...scopes, [tab]: scope });
-              }}
-              options={[
-                { value: 'everyone', label: t('communities.scope.everyone') },
-                { value: 'mine', label: t('communities.scope.mine') },
-              ]}
-            />
-            {/* Wait for the remembered pick, so a Mine pilot never loads Everyone first. */}
-            {scopesHydrated || linkScope?.tab === tab ? (
-              contentViews[tab][scopeOf(tab)]()
-            ) : (
-              <Spinner size="sm" label={t('communities.loading')} />
-            )}
-          </div>
-        ) : membersFailed ? (
-          <p role="alert" className="text-xs text-danger">
-            {t('communities.membersLoadFailed')}
-          </p>
-        ) : members === null ? (
-          <Spinner size="sm" label={t('communities.loading')} />
-        ) : (
-          <CommunityMemberList
-            members={members}
-            adminUid={community.adminUid}
-            myUid={myUid}
-            isAdmin={admin}
-            now={now}
-            onMakeAdmin={(member) => setDialog({ kind: 'makeAdmin', member })}
-            onRemove={(member) => setDialog({ kind: 'remove', member })}
-            onLeave={() => setDialog({ kind: 'leave' })}
-          />
-        )}
-      </TabPanel>
+      <div>
+        <Tabs
+          tabsId={tabsId}
+          tabs={[
+            { id: 'blueprints', label: tabLabels.blueprints },
+            { id: 'fittings', label: tabLabels.fittings },
+            { id: 'plans', label: tabLabels.plans },
+            { id: 'members', label: t('communities.members'), count: community.memberCount },
+          ]}
+          value={tab}
+          onChange={(id) => {
+            const next = id as CommunityTab;
+            // My sharing follows the content tabs; the roster has none.
+            if (!isContentTab(next) && sharingOpen) closeSharing();
+            setTab(next);
+          }}
+          label={t('communities.tabs.label')}
+          className="mb-3"
+        />
+        <TabPanel tabsId={tabsId} tabId={tab}>
+          {isContentTab(tab) ? (
+            <div className="space-y-3">
+              <SharingLine tab={tab} summary={summaries[tab]} onOpen={() => setSharingOpen(true)} />
+              <Panel key={contentKey}>{everyoneViews[tab]()}</Panel>
+            </div>
+          ) : (
+            <Panel>
+              {membersFailed ? (
+                <p role="alert" className="text-xs text-danger">
+                  {t('communities.membersLoadFailed')}
+                </p>
+              ) : members === null ? (
+                <Spinner size="sm" label={t('communities.loading')} />
+              ) : (
+                <CommunityMemberList
+                  members={members}
+                  adminUid={community.adminUid}
+                  myUid={myUid}
+                  isAdmin={admin}
+                  now={now}
+                  onMakeAdmin={(member) => setDialog({ kind: 'makeAdmin', member })}
+                  onRemove={(member) => setDialog({ kind: 'remove', member })}
+                  onLeave={() => setDialog({ kind: 'leave' })}
+                />
+              )}
+            </Panel>
+          )}
+        </TabPanel>
+      </div>
+
+      <SlideOver
+        open={sharingOpen && isContentTab(tab)}
+        onClose={closeSharing}
+        title={t('communities.sharing.title')}
+        subtitle={
+          isContentTab(tab)
+            ? t('communities.sharing.subtitle', { tab: tabLabels[tab], community: community.name })
+            : undefined
+        }
+      >
+        {isContentTab(tab) && mineViews[tab]()}
+      </SlideOver>
 
       <Modal
         open={shownPanel === 'invites'}
@@ -451,6 +501,6 @@ export function CommunityDetail({
           onChanged();
         }}
       />
-    </Panel>
+    </div>
   );
 }

@@ -41,7 +41,7 @@ interface Loaded {
 }
 
 /**
- * The Fittings tab's Mine view (issue #3605): what this Character shares, one
+ * The Fittings tab's My sharing (issue #3605): what this Character shares, one
  * row per Fitting with Stop sharing, and Add Fittings for the rest. "Share all
  * my Fittings" is a standing switch: later saves are pushed too
  * (`followSavedFitting`), and a Fitting stopped under it is remembered so a

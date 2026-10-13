@@ -42,7 +42,7 @@ export const List: Story = {};
 /** @summary The same list in the phone shell. */
 export const ListPhone: Story = { globals: phone };
 
-/** @summary A Community you admin, opening on Blueprints › Everyone: the Community Library, with Manage (2 waiting) in the header. */
+/** @summary A Community you admin, opening on Blueprints: the Community Library under your sharing line, with Manage (2 waiting) in the header card. */
 export const AdminEveryone: Story = {
   parameters: { shell: { path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}` } },
 };
@@ -50,21 +50,21 @@ export const AdminEveryone: Story = {
 /** @summary The Community Library in the phone shell. */
 export const AdminEveryonePhone: Story = { ...AdminEveryone, globals: phone };
 
-/** @summary Fittings › Everyone: every Member's shared Fittings, each opening the editor. */
+/** @summary Fittings: every Member's shared Fittings, each opening the editor. */
 export const AdminFittingsEveryone: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}&tab=fittings` },
   },
 };
 
-/** @summary Skill plans › Everyone: the Community's shared plans with Copy to my plans. */
+/** @summary Skill plans: the Community's shared plans with Copy to my plans. */
 export const AdminPlansEveryone: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}&tab=plans` },
   },
 };
 
-/** @summary Fittings › Mine: the share-all switch, what you share with Stop sharing, and Add Fittings. */
+/** @summary Fittings › My sharing open: the share-all switch, what you share with Stop sharing, and Add Fittings. */
 export const AdminFittingsMine: Story = {
   parameters: {
     shell: {
@@ -73,7 +73,7 @@ export const AdminFittingsMine: Story = {
   },
 };
 
-/** @summary Skill plans › Mine in the phone shell. */
+/** @summary Skill plans › My sharing in the phone shell. */
 export const MemberPlansMinePhone: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_MEMBER_COMMUNITY_ID}&tab=plans&view=mine` },
@@ -81,7 +81,7 @@ export const MemberPlansMinePhone: Story = {
   globals: phone,
 };
 
-/** @summary A Community you only belong to, on Fittings › Everyone: no Manage menu. */
+/** @summary A Community you only belong to, on Fittings: no Manage menu in its header card. */
 export const MemberEveryone: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_MEMBER_COMMUNITY_ID}&tab=fittings` },
