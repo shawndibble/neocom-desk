@@ -650,16 +650,27 @@ function RebuildCard({
   card,
   haulDays,
   upgradeFrom,
+  steps,
+  ticks,
 }: {
   card: RebuildCardView;
   haulDays: number;
   upgradeFrom: number | null;
+  /** The in-game steps for a change; null for a colony that keeps its setup. */
+  steps: ChecklistColumn | null;
+  ticks: Ticks;
 }) {
   const changes = card.status === 'change';
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // Steps start open once the pilot has ticked one (they are part-way through);
+  // after that, the pilot's own toggle wins.
+  const [stepsChoice, setStepsChoice] = useState<boolean | null>(null);
   const altId = useId();
+  const stepsId = useId();
   const nowItem = card.sells[0];
+  const doneCount = steps ? steps.steps.filter((step) => ticks.has(step.id)).length : 0;
+  const stepsOpen = stepsChoice ?? doneCount > 0;
   return (
     <li id={card.anchor} tabIndex={-1} className="scroll-mt-4 px-3 py-3 outline-none">
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
@@ -668,25 +679,58 @@ function RebuildCard({
           <p className="text-sm text-text">
             <RebuildSentence card={card} haulDays={haulDays} upgradeFrom={upgradeFrom} />
           </p>
-          {card.alternative && (
-            <>
-              <button
-                type="button"
-                aria-expanded={open}
-                aria-controls={altId}
-                onClick={() => setOpen(!open)}
-                className={textActionClassName('mt-1 gap-1 whitespace-nowrap')}
-              >
-                <Caret expanded={open} />
-                {t('piPlan.make.alternative', { count: 1 })}
-              </button>
-              {open && (
-                <div id={altId} className="mt-1.5">
-                  <AlternativeBody alt={card.alternative} />
-                </div>
+          {(steps || card.alternative) && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+              {steps && (
+                <button
+                  type="button"
+                  aria-expanded={stepsOpen}
+                  aria-controls={stepsId}
+                  onClick={() => setStepsChoice(!stepsOpen)}
+                  className={textActionClassName('gap-1 whitespace-nowrap')}
+                >
+                  <Caret expanded={stepsOpen} />
+                  {t('piPlan.make.steps.toggle')}{' '}
+                  <span className="sr-only">
+                    {t('piPlan.make.steps.forName', { name: steps.name })}
+                  </span>{' '}
+                  <span className="font-normal tracking-normal text-text-dim normal-case">
+                    {'· '}
+                    {t('piPlan.make.steps.count', { count: steps.steps.length })}
+                    {' · '}
+                    {t('piPlan.make.minutes', { count: steps.minutes })}
+                    {doneCount > 0 && (
+                      <span className="text-success">
+                        {' · '}
+                        {t('piPlan.make.steps.done', {
+                          done: doneCount,
+                          count: steps.steps.length,
+                        })}
+                      </span>
+                    )}
+                  </span>
+                </button>
               )}
-            </>
+              {card.alternative && (
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={altId}
+                  onClick={() => setOpen(!open)}
+                  className={textActionClassName('gap-1 whitespace-nowrap')}
+                >
+                  <Caret expanded={open} />
+                  {t('piPlan.make.alternative', { count: 1 })}
+                </button>
+              )}
+            </div>
           )}
+          {card.alternative && open && (
+            <div id={altId} className="mt-1.5">
+              <AlternativeBody alt={card.alternative} />
+            </div>
+          )}
+          {steps && stepsOpen && <RebuildSteps id={stepsId} column={steps} ticks={ticks} />}
         </div>
         {(card.status !== 'unknown' || card.toPerDay !== null) && (
           <div className="flex shrink-0 items-center gap-3 max-sm:order-last max-sm:basis-full max-sm:pl-14">
@@ -728,12 +772,10 @@ function RebuildCard({
  * nothing to change is one line, not a card per planet. A `#plan-<anchor>`
  * link to a folded colony opens the fold so the page can scroll to it.
  */
-export function RebuildPanel({ view }: { view: PlanView }) {
+export function RebuildPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) {
   const { t } = useTranslation();
   const { hash } = useLocation();
-  const upgradeFrom = new Map(
-    view.checklist.map((column) => [column.planetId, column.fit?.upgradeFromLevel ?? null])
-  );
+  const stepsFor = new Map(view.checklist.map((column) => [column.planetId, column]));
   const changed = view.rebuilds.filter((card) => card.status === 'change');
   const kept = view.rebuilds.filter((card) => card.status !== 'change');
   const hashInKept = kept.some((card) => `#${card.anchor}` === hash);
@@ -750,7 +792,9 @@ export function RebuildPanel({ view }: { view: PlanView }) {
       key={c.planetId}
       card={c}
       haulDays={view.hauling.haulDays}
-      upgradeFrom={upgradeFrom.get(c.planetId) ?? null}
+      upgradeFrom={stepsFor.get(c.planetId)?.fit?.upgradeFromLevel ?? null}
+      steps={stepsFor.get(c.planetId) ?? null}
+      ticks={ticks}
     />
   );
   return (
@@ -881,7 +925,7 @@ export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName:
   );
 }
 
-// --- What to do in-game --------------------------------------------------------------
+// --- In-game steps (opened inside a rebuild row) ----------------------------------------
 
 const PIN_KEY: Record<PiPinKind, string> = {
   extractorControlUnit: 'extractor',
@@ -969,33 +1013,28 @@ function StepVerb({ verb }: { verb: ChecklistStep['verb'] }) {
   return <VerbTag verb={STEP_TAG[verb]} label={t(`piPlan.make.verb.${verb}`)} />;
 }
 
-function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks: Ticks }) {
+/**
+ * A rebuild's in-game steps, opened in its own row: the row already names the
+ * planet and the change, so the steps carry no header of their own.
+ */
+function RebuildSteps({
+  id,
+  column,
+  ticks,
+}: {
+  id: string;
+  column: ChecklistColumn;
+  ticks: Ticks;
+}) {
   const { t } = useTranslation();
   const baseId = useId();
   const { fit } = column;
   return (
     <section
-      aria-label={t('piPlan.make.columnLabel', { index: column.index, name: column.name })}
-      className="flex min-w-0 flex-col border-line md:border-r md:last:border-r-0"
+      id={id}
+      aria-label={t('piPlan.make.steps.region', { name: column.name })}
+      className="mt-2 bg-panel-2"
     >
-      <header className="flex items-center gap-3 border-b border-line px-3 py-2.5">
-        <PlanetImage type={column.planetType} size={36} />
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-xs font-semibold text-text">
-            {column.index}. {column.name}
-          </h3>
-          <p className="truncate text-[0.6875rem] text-text-dim">
-            {column.change.from.length > 0 && (
-              <>
-                <ItemList items={column.change.from} />
-                {' → '}
-              </>
-            )}
-            <ItemLink item={column.change.to} />
-          </p>
-        </div>
-        <Minutes value={column.minutes} />
-      </header>
       <ul className="divide-y divide-line">
         {column.steps.map((step) => {
           const ticked = ticks.has(step.id);
@@ -1030,7 +1069,7 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
         })}
       </ul>
       {fit && (
-        <div className="mt-auto space-y-1 px-3 py-3">
+        <div className="grid gap-x-6 gap-y-1 border-t border-line px-3 py-2 sm:grid-cols-[auto_minmax(0,14rem)_minmax(0,14rem)] sm:items-center">
           <p
             className={cx(
               'text-[0.6875rem]',
@@ -1050,25 +1089,5 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
         </div>
       )}
     </section>
-  );
-}
-
-export function ChecklistPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) {
-  const { t } = useTranslation();
-  if (view.checklist.length === 0) return null;
-  return (
-    <Panel
-      title={t('piPlan.make.checklistTitle')}
-      meta={
-        <span className="text-[0.6875rem] text-text-dim">{t('piPlan.make.checklistHint')}</span>
-      }
-      padded={false}
-    >
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-        {view.checklist.map((column) => (
-          <ChecklistColumnView key={column.planetId} column={column} ticks={ticks} />
-        ))}
-      </div>
-    </Panel>
   );
 }

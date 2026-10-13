@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { ChecklistPanel, RebuildPanel } from './MakeMoreSections';
+import { RebuildPanel } from './MakeMoreSections';
 import { buildPlanView } from './planView';
 import { colony, fixtureAdvice, fixturePi } from './planViewFixture';
+
+const NO_TICKS = { has: () => false, toggle: () => {} };
 
 function renderRebuilds(reason: string) {
   const view = buildPlanView(
@@ -23,7 +25,7 @@ function renderRebuilds(reason: string) {
   );
   render(
     <MemoryRouter>
-      <RebuildPanel view={view} />
+      <RebuildPanel view={view} ticks={NO_TICKS} />
     </MemoryRouter>
   );
   // A colony with nothing to change folds under "stays as it is".
@@ -63,7 +65,7 @@ describe('RebuildPanel, colonies that keep their setup', () => {
     );
     render(
       <MemoryRouter>
-        <RebuildPanel view={view} />
+        <RebuildPanel view={view} ticks={NO_TICKS} />
       </MemoryRouter>
     );
     expect(screen.getByText('No rebuild is worth the trouble at your prices.')).toBeInTheDocument();
@@ -92,21 +94,22 @@ describe('RebuildPanel, colonies that keep their setup', () => {
     const anchor = view.rebuilds[0].anchor;
     render(
       <MemoryRouter initialEntries={[`/#${anchor}`]}>
-        <RebuildPanel view={view} />
+        <RebuildPanel view={view} ticks={NO_TICKS} />
       </MemoryRouter>
     );
     expect(document.getElementById(anchor)).not.toBeNull();
   });
 });
 
-describe('ChecklistPanel', () => {
+describe('RebuildPanel in-game steps', () => {
   it('says how many factories each SET covers, as PLACE does', () => {
     const view = buildPlanView(fixtureAdvice, fixturePi, (id) => `Planet ${id}`);
     render(
       <MemoryRouter>
-        <ChecklistPanel view={view} ticks={{ has: () => false, toggle: () => {} }} />
+        <RebuildPanel view={view} ticks={NO_TICKS} />
       </MemoryRouter>
     );
+    fireEvent.click(screen.getByRole('button', { name: /^In-game steps for / }));
     expect(screen.getByText(/^1 × Advanced factory →/)).toBeInTheDocument();
   });
 });

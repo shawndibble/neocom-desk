@@ -6949,9 +6949,14 @@
       },
       "shipFits": "(fits)",
       "shipNoFit": "(does not fit)",
-      "checklistTitle": "What to do in-game",
-      "checklistHint": "Tick steps off as you go",
-      "columnLabel": "{{index}}. {{name}}",
+      "steps": {
+        "toggle": "In-game steps",
+        "forName": "for {{name}}",
+        "count_one": "{{count}} step",
+        "count_other": "{{count}} steps",
+        "done": "{{done}} of {{count}} done",
+        "region": "In-game steps for {{name}}"
+      },
       "verb": {
         "upgrade": "Upgrade",
         "remove": "Remove",

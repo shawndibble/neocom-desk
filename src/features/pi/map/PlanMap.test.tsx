@@ -909,6 +909,14 @@ describe('PlanMap with hub prices unreadable', () => {
     expect(screen.getByText(/Picks need hub prices/)).toBeInTheDocument();
     expect(screen.getByRole('group', { name: /^Planet map|^Planets$/ })).toBeInTheDocument();
   });
+
+  it('drops the figure legend: no tile has a figure or a mark to explain', () => {
+    const unpriced = buildPlanAdvice(
+      adviceInput('lean', { books: hubBooks({ prices: {}, buyPrices: {} }, 5) })
+    );
+    renderMap({ advice: unpriced, pricesFailed: true });
+    expect(screen.queryByLabelText('Map legend')).not.toBeInTheDocument();
+  });
 });
 
 describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets', () => {

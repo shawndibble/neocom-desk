@@ -18,6 +18,12 @@ on purpose; a mockup comparison should not flag it.
 - **Plan, Rebuild: planets that keep their setup fold.** Changed rows stay
   visible; "N planets stay as they are" is a closed `Disclosure`, opened by a
   `#plan-<slug>` link to a card inside it. The As-is tag went (the group says it).
+- **Plan: a rebuild's in-game steps open inside its row.** The "What to do
+  in-game" panel at the foot of the page is gone; each changed rebuild row has
+  an "In-game steps" toggle (count, minutes, how many are ticked) that opens
+  the steps right under it, and starts open once one is ticked. Measured on a
+  6-colony account, the old panel began ~1.5 screens down, below Your planets
+  and Hauling, far from the rebuild it explained.
 - **Map: one how-to line, a legend, no "Got it".** The dismissible hint row
   merged into the what-if line's idle text. The Planet map header carries a
   legend for ▲ ≈ ▼, the figure and the Est. chip. Empty gap slots lost their

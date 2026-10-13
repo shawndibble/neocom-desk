@@ -728,7 +728,8 @@ export function PlanMap({
         : t('piMap.detail.panelTitleEmpty');
 
   // What a tile's figure and marks mean, where the tiles are: the help drawer has the long form.
-  const legend = (
+  // With prices down no tile carries a figure or a mark, so there is nothing to explain.
+  const legend = pricesFailed ? null : (
     <p
       aria-label={t('piMap.legend.label')}
       className={cx(

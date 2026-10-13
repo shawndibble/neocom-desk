@@ -6,6 +6,7 @@ import '@/i18n';
 import type { PlanAdviceState } from './usePlanAdvice';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
+import { buildPlanView } from './planView';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
 import { P2_B, RAW, fixtureAdvice, fixturePi } from './planViewFixture';
 import type { PlanAdvice } from './planAdviceModel';
@@ -367,12 +368,41 @@ describe('MakeMorePlan', () => {
     await waitFor(() => expect(usePlanPreference.getState().value).toBe('haul'));
   });
 
-  it('draws one checklist column per changed colony, with its Command Center fit', () => {
+  it("opens a rebuild's in-game steps in its own row, with its Command Center fit", async () => {
+    const user = userEvent.setup();
     renderPlan();
-    const column = screen.getByRole('region', { name: '1. Hek VI' });
+    // No separate checklist panel at the foot of the page: the steps live with their rebuild.
+    expect(screen.queryByRole('heading', { name: 'What to do in-game' })).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /^In-game steps for Hek VI/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const column = screen.getByRole('region', { name: 'In-game steps for Hek VI' });
+    expect(toggle.closest('li')).toContainElement(column);
     expect(within(column).getAllByRole('checkbox').length).toBeGreaterThan(0);
     expect(column).toHaveTextContent('Fits your Command Center (upgrade level 4)');
     expect(within(column).getAllByRole('progressbar')).toHaveLength(2);
+  });
+
+  it('counts ticked steps on the toggle', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+    const toggle = screen.getByRole('button', { name: /^In-game steps for Hek VI/ });
+    await user.click(toggle);
+    const region = screen.getByRole('region', { name: 'In-game steps for Hek VI' });
+    const boxes = within(region).getAllByRole('checkbox');
+    await user.click(boxes[0]);
+    await waitFor(() => expect(toggle).toHaveTextContent(`1 of ${boxes.length} done`));
+  });
+
+  it('starts with the steps open once one of them is ticked', async () => {
+    const steps = buildPlanView(withChains, fixturePi, (id) => `Planet ${id}`).checklist[0].steps;
+    await usePlanTicks.getState().setValue([steps[0].id]);
+    renderPlan();
+    expect(screen.getByRole('button', { name: /^In-game steps for Hek VI/ })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
   });
 
   it.each([
@@ -388,7 +418,8 @@ describe('MakeMorePlan', () => {
       ),
     });
     renderPlan();
-    const column = screen.getByRole('region', { name: '1. Hek VI' });
+    fireEvent.click(screen.getByRole('button', { name: /^In-game steps for Hek VI/ }));
+    const column = screen.getByRole('region', { name: 'In-game steps for Hek VI' });
     expect(column).toHaveTextContent(text);
     expect(column).not.toHaveTextContent('piPlan.make.fitNeedsUpgrade');
   });

@@ -9,7 +9,6 @@ import { assumedCustomsNames } from './colonyCustoms';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import {
-  ChecklistPanel,
   HaulingPanel,
   PlanSummaryPanel,
   QuickWinsPanel,
@@ -184,7 +183,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         </IskFigureGroup>
       )}
       <IskFigureGroup>
-        <RebuildPanel view={view} />
+        <RebuildPanel view={view} ticks={ticks} />
       </IskFigureGroup>
       <IskFigureGroup>
         <YourPlanetsPanel
@@ -201,9 +200,6 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
       )}
       <IskFigureGroup>
         <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
-      </IskFigureGroup>
-      <IskFigureGroup>
-        <ChecklistPanel view={view} ticks={ticks} />
       </IskFigureGroup>
     </div>
   );
