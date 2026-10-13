@@ -23,6 +23,8 @@ export interface IndustryHeaderProps {
   tabsActivation?: 'automatic' | 'manual';
   /** Beside the page title — the current tab's `DataAgeBadge`, when it has one. */
   meta?: ReactNode;
+  /** Before the settings gear — the current tab's own buttons (BPC Sourcing's Refresh). */
+  actions?: ReactNode;
 }
 
 /**
@@ -71,13 +73,27 @@ export function IndustryHeader({
   blueprintsNeedsReauth,
   tabsActivation = 'automatic',
   meta,
+  actions,
 }: IndustryHeaderProps) {
   const { t } = useTranslation();
   const tabs = industryTabs(t);
   const onChange = (id: string) => onTabChange(id as IndustryTab);
   return (
     <>
-      <PageHeader title={t('nav.industry')} meta={meta} actions={tabSettings(activeTab, t)} />
+      <PageHeader
+        title={t('nav.industry')}
+        meta={meta}
+        actions={
+          actions ? (
+            <>
+              {actions}
+              {tabSettings(activeTab, t)}
+            </>
+          ) : (
+            tabSettings(activeTab, t)
+          )
+        }
+      />
       <ActiveJobsPanel characterId={activeCharacterId} />
 
       {blueprintsNeedsReauth && (
