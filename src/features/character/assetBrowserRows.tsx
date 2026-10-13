@@ -27,7 +27,7 @@ import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import type { PinState } from '@/features/character/stationPins';
 import type { SelectionState } from '@/features/character/assetSelection';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
-import { PlaceJumpsLink } from '@/features/travel/JumpsLink';
+import { PlaceJumpsLink } from '@/features/route/JumpsLink';
 import { SelectionCheckbox } from './SelectionCheckbox';
 import type { BlueprintKind } from '@/engine/blueprintKind';
 

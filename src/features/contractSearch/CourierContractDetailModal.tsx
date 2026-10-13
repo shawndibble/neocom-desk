@@ -51,7 +51,7 @@ import {
 } from '@/engine/contracts/courierGoingRate';
 import { LawlessTag } from '@/features/travel/LawlessTag';
 import { useLawlessSystems } from '@/features/travel/useLawlessSystems';
-import { routeExposure, type RouteExposure } from '@/features/contractSearch/routeExposure';
+import { routeExposure, type RouteExposure } from '@/features/route/routeExposure';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { formatMagnitude } from '@/lib/magnitude';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';

@@ -19,7 +19,7 @@ import {
   summarizeJobs,
 } from '@/features/industry/jobs';
 import { structureStateLabel } from '@/features/corp/boardSources';
-import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { routeToHref } from '@/features/route/routeSafetyLink';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { formatCompactNumber } from '@/lib/compactNumber';

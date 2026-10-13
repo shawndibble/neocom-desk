@@ -11,7 +11,7 @@ const routes = vi.hoisted(() => ({ jumps: {} as Record<number, number> }));
 vi.mock('@/features/route/jumpBasis', () => ({
   useJumpBasis: () => ({ rules: {}, network: {}, key: 'k', hydrated: true }),
 }));
-vi.mock('@/features/contractSearch/routeExposure', () => ({
+vi.mock('@/features/route/routeExposure', () => ({
   routeExposure: vi.fn(async (_from: number, to: number) => {
     const n = routes.jumps[to];
     if (n === undefined) return { kind: 'unknown' };

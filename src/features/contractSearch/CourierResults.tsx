@@ -10,7 +10,7 @@
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { HintText } from '@/components/ui/HintText';
-import { JumpsLink } from '@/features/travel/JumpsLink';
+import { JumpsLink } from '@/features/route/JumpsLink';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {

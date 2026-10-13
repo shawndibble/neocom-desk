@@ -31,7 +31,7 @@ import {
 import { formatMarketIsk } from '@/lib/isk';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { SetDestinationButton } from './SetDestinationButton';
-import { PlaceJumpsLink } from '@/features/travel/JumpsLink';
+import { PlaceJumpsLink } from '@/features/route/JumpsLink';
 
 export type BookSide = 'sell' | 'buy';
 

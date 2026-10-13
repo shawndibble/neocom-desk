@@ -15,7 +15,7 @@ import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
 import { shipItemsEditLocation } from '@/features/fittings/assetShipLocation';
-import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { routeToHref } from '@/features/route/routeSafetyLink';
 import * as Icon from '@/components/ui/icons';
 import {
   focusRingClassName,

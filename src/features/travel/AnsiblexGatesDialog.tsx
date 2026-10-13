@@ -24,7 +24,7 @@ import {
   savePastedGates,
   useAnsiblexGates,
   type FindGatesOutcome,
-} from './ansiblexGates';
+} from '@/features/route/ansiblexGates';
 
 /** Which way in the dialog was opened for: the paste box takes focus for `paste`. */
 export type AnsiblexDialogMode = 'search' | 'paste';

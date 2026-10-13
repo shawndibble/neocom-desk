@@ -4,14 +4,14 @@ import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { CourierEndpoint, CourierRouteRow } from '@/engine/contracts/courierSearch';
-import type { RouteExposure } from '@/features/contractSearch/routeExposure';
+import type { RouteExposure } from '@/features/route/routeExposure';
 import {
   CourierContractDetailModal,
   type CourierJumps,
 } from '@/features/contractSearch/CourierContractDetailModal';
 
 const routeExposure = vi.fn<() => Promise<RouteExposure>>();
-vi.mock('@/features/contractSearch/routeExposure', () => ({
+vi.mock('@/features/route/routeExposure', () => ({
   routeExposure: () => routeExposure(),
 }));
 
