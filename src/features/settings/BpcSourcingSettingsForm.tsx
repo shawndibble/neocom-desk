@@ -1,10 +1,22 @@
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Field, Fields, Spinner } from '@/components/ui';
+import {
+  Checkbox,
+  Field,
+  Fields,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
+} from '@/components/ui';
 import {
   useBpcHideAuctionsDefault,
   useBpcHidePlexDefault,
 } from '@/features/bpcContracts/sourcingDefaults';
+import { useMarketHub } from '@/features/market/hub';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { DefaultsSyncHint } from './settingsFields';
 import { useHydratedStore } from './useHydratedStore';
 
@@ -16,14 +28,37 @@ export function BpcSourcingSettingsForm() {
   const hidePlex = useBpcHidePlexDefault((state) => state.value);
   const setHidePlex = useBpcHidePlexDefault((state) => state.setValue);
 
+  const hub = useMarketHub((state) => state.value);
+  const setHub = useMarketHub((state) => state.setValue);
+
   const hideAuctionsHydrated = useHydratedStore(useBpcHideAuctionsDefault);
   const hidePlexHydrated = useHydratedStore(useBpcHidePlexDefault);
-  if (!hideAuctionsHydrated || !hidePlexHydrated) return <Spinner />;
+  const hubHydrated = useHydratedStore(useMarketHub);
+  if (!hideAuctionsHydrated || !hidePlexHydrated || !hubHydrated) return <Spinner />;
 
   return (
     <div className="space-y-4">
       <DefaultsSyncHint />
       <Fields variant="form">
+        {/* The same synced Default trade hub as Settings → Market defaults. */}
+        <Field
+          label={t('settings.bpcMarketHubLabel')}
+          htmlFor="settings-bpc-hub"
+          note={t('settings.bpcMarketHubHint')}
+        >
+          <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
+            <SelectTrigger id="settings-bpc-hub" aria-label={t('settings.bpcMarketHubLabel')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TRADE_HUBS.map((tradeHub) => (
+                <SelectItem key={tradeHub.id} value={tradeHub.id}>
+                  {tradeHub.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
         <Field
           label={t('settings.bpcHideAuctionsLabel')}
           htmlFor="settings-bpc-hide-auctions"

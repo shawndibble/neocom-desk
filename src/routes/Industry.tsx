@@ -7,12 +7,14 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
+  IconButton,
   Modal,
   Spinner,
   TabPanel,
   Toast,
   useTimedToast,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { preloadRouteChunk } from '@/app/routeChunks';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { loadActivityFacilityDefaults } from '@/features/industry/facilityDefaults';
@@ -38,7 +40,10 @@ import {
   type OpportunityRow,
 } from '@/features/industry/opportunities';
 import { ProductionLogPanel } from '@/features/industry/ProductionLogPanel';
-import { BpcSourcingPanel } from '@/features/bpcContracts/BpcSourcingPanel';
+import {
+  BpcSourcingPanel,
+  type BpcSourcingHeaderState,
+} from '@/features/bpcContracts/BpcSourcingPanel';
 import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBuildPlan';
 import {
   blueprintPriceSourcing,
@@ -252,6 +257,7 @@ export function Industry() {
   const [comparing, setComparing] = useState(false);
   // Build Opportunities' blueprint data age, shown beside the page title.
   const [opportunitiesDataAge, setOpportunitiesDataAge] = useState<Date | null>(null);
+  const [bpcSourcingHeader, setBpcSourcingHeader] = useState<BpcSourcingHeaderState | null>(null);
 
   // One plan per "Plan" click: set from the click until this page leaves
   // for the new plan, so a second tap while the first is still saving (the
@@ -701,6 +707,18 @@ export function Industry() {
           meta={
             tab === 'opportunities' && opportunitiesDataAge ? (
               <DataAgeBadge date={opportunitiesDataAge} />
+            ) : tab === 'sourcing' && bpcSourcingHeader?.dataAge ? (
+              <DataAgeBadge date={bpcSourcingHeader.dataAge} />
+            ) : undefined
+          }
+          actions={
+            tab === 'sourcing' && bpcSourcingHeader ? (
+              <IconButton
+                icon={<Icon.Refresh />}
+                label={t('bpcContracts.refresh')}
+                onClick={bpcSourcingHeader.refresh}
+                busy={bpcSourcingHeader.busy}
+              />
             ) : undefined
           }
         />
@@ -713,7 +731,7 @@ export function Industry() {
           ) : (
             <>
               {tab === 'sourcing' ? (
-                <BpcSourcingPanel />
+                <BpcSourcingPanel onHeaderChange={setBpcSourcingHeader} />
               ) : tab === 'opportunities' ? (
                 <div className="flex flex-col gap-4">
                   {/* "What's profitable" (the market-wide scan) always leads,

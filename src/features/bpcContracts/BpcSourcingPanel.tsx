@@ -3,6 +3,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   type InputHTMLAttributes,
   type KeyboardEvent,
@@ -18,7 +19,6 @@ import { applyPlanSeed } from '@/features/industry/planSeed';
 import {
   Button,
   ColumnPickerMenu,
-  DataAgeBadge,
   DataTable,
   DataTableDenseCell,
   EmptyState,
@@ -260,10 +260,10 @@ const SOURCING_GROUP_HEADER =
  * share a row. On a phone a region cell is narrower and the row scrolls
  * sideways rather than wrapping six cells into three rows above the offers.
  */
-const REGION_CELL_WIDTH = 'w-28 shrink-0 sm:w-36';
+const REGION_CELL_WIDTH = 'w-28 shrink-0 sm:w-32';
 
 /** A BPO card keeps the region cell's three lines; on a phone the Market and Contract groups share a two-column row instead of one full-width line each. */
-const BPO_CARD_LAYOUT = 'w-full sm:w-36';
+const BPO_CARD_LAYOUT = 'w-full sm:w-32';
 
 /** The market lookup's region: the Region filter's, else the pilot's market hub's once known. */
 function marketLookupRegion(
@@ -538,7 +538,22 @@ function BpcFilterBar({
  * data — this one is global and Firestore-backed, Industry's is per-character
  * and ESI-backed.
  */
-export function BpcSourcingPanel() {
+/**
+ * What the Industry page header shows for this tab: when the contract snapshot
+ * last synced (beside the title) and the Refresh button (beside the settings
+ * gear). `null` while the tab is not mounted.
+ */
+export interface BpcSourcingHeaderState {
+  dataAge: Date | null;
+  busy: boolean;
+  refresh: () => void;
+}
+
+export function BpcSourcingPanel({
+  onHeaderChange,
+}: {
+  onHeaderChange?: (state: BpcSourcingHeaderState | null) => void;
+} = {}) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -671,6 +686,26 @@ export function BpcSourcingPanel() {
   }, [hydrateMarketHub]);
   const marketHub = getTradeHub(marketHubId) ?? DEFAULT_TRADE_HUB;
   const [marketRefreshTick, setMarketRefreshTick] = useState(0);
+  // Refresh lives in the page header, not in this panel: it re-reads the
+  // contract snapshot and re-checks the market. A ref keeps the callback the
+  // header holds stable while `refresh` changes identity.
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+  const refreshAll = useCallback(() => {
+    refreshRef.current();
+    setMarketRefreshTick((tick) => tick + 1);
+  }, []);
+  const lastSyncedAt = contractsResult?.data?.lastSyncedAt ?? null;
+  useEffect(() => {
+    onHeaderChange?.({
+      dataAge: lastSyncedAt ? new Date(lastSyncedAt) : null,
+      busy: loading,
+      refresh: refreshAll,
+    });
+    return () => onHeaderChange?.(null);
+  }, [onHeaderChange, lastSyncedAt, loading, refreshAll]);
 
   /** `null` when every kind is checked — the filter's own default, a no-op. */
   const activeSpaceKinds = useMemo(
@@ -1547,19 +1582,11 @@ export function BpcSourcingPanel() {
   }
 
   return (
-    <Panel
-      padded={false}
-      // No title of its own: the tab immediately above already reads "BPC
-      // Search", and repeating it in the panel header directly beneath reads
-      // as a stutter. The header still renders — `meta` and `actions` are
-      // enough — so the badge and Refresh keep the toolbar they moved onto,
-      // and the table keeps its own accessible name from `bpcContracts.title`.
-      meta={
-        contractsResult?.data?.lastSyncedAt && (
-          <DataAgeBadge date={new Date(contractsResult.data.lastSyncedAt)} />
-        )
-      }
-    >
+    // No header of its own: the tab above already reads "BPC Search", the
+    // data age sits beside the page title and Refresh beside the settings
+    // gear (`onHeaderChange`). The table keeps its accessible name from
+    // `bpcContracts.title`.
+    <Panel padded={false}>
       {loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
@@ -1597,9 +1624,6 @@ export function BpcSourcingPanel() {
             currentSystem={currentSystem}
             searchComboboxProps={searchComboboxProps}
             actions={
-              // Export and Refresh ride the search row rather than a header
-              // of their own: that header held nothing else, and on a phone
-              // it pushed the results a whole row further down.
               <>
                 <ColumnPickerMenu
                   available={BPC_SEARCH_COLUMN_IDS}
@@ -1610,18 +1634,12 @@ export function BpcSourcingPanel() {
                   menuTitle={t('bpcContracts.columnsMenuTitle')}
                 />
                 {displayRows.length > 0 && (
-                  <TableActionsMenu name={t('bpcContracts.title')} tableExport={sourcingExport} />
+                  <TableActionsMenu
+                    name={t('bpcContracts.title')}
+                    tableExport={sourcingExport}
+                    size="md"
+                  />
                 )}
-                <IconButton
-                  icon={<Icon.Refresh />}
-                  label={t('bpcContracts.refresh')}
-                  size="sm"
-                  onClick={() => {
-                    refresh();
-                    setMarketRefreshTick((tick) => tick + 1);
-                  }}
-                  busy={loading}
-                />
               </>
             }
           />
@@ -1803,7 +1821,7 @@ export function BpcSourcingPanel() {
                       <li
                         key={region.regionId}
                         className={cx(
-                          'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
+                          'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-1.5',
                           REGION_CELL_WIDTH,
                           index === 0 && cheapestCard === 'region'
                             ? 'border-accent-dim'
@@ -1813,16 +1831,19 @@ export function BpcSourcingPanel() {
                         <span className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                           {regionNames.get(region.regionId) ?? `#${region.regionId}`}
                         </span>
-                        <span
-                          className={cx(
-                            'text-sm tabular-nums',
-                            index === 0 && cheapestCard === 'region' && 'text-accent'
-                          )}
-                        >
-                          <IskAmount value={region.cheapest} />
-                        </span>
-                        <span className="text-[0.6875rem] tabular-nums text-text-dim">
-                          {t('bpcContracts.regionOffers', { count: region.offerCount })}
+                        {/* Price and offer count share a line: two lines a cell, not three. */}
+                        <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                          <span
+                            className={cx(
+                              'text-sm tabular-nums',
+                              index === 0 && cheapestCard === 'region' && 'text-accent'
+                            )}
+                          >
+                            <IskAmount value={region.cheapest} />
+                          </span>
+                          <span className="truncate text-[0.6875rem] tabular-nums text-text-dim">
+                            {t('bpcContracts.regionOffers', { count: region.offerCount })}
+                          </span>
                         </span>
                       </li>
                     ))}

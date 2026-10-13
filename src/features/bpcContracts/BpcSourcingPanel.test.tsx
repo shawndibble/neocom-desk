@@ -908,6 +908,22 @@ describe('BpcSourcingPanel row identity', () => {
   });
 });
 
+describe('BpcSourcingPanel page header', () => {
+  it('puts Refresh in the Industry header, re-reading the snapshot, and no panel title bar', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+    const calls = loadPublicBpcContracts.mock.calls.length;
+
+    await user.click(screen.getByRole('button', { name: 'Refresh BPC Sourcing' }));
+
+    await waitFor(() => expect(loadPublicBpcContracts.mock.calls.length).toBeGreaterThan(calls));
+    // One Refresh button on the page: the panel keeps none of its own.
+    expect(screen.getAllByRole('button', { name: 'Refresh BPC Sourcing' })).toHaveLength(1);
+  });
+});
+
 describe('BpcSourcingPanel source multiselect', () => {
   it('defaults to every source on, showing contract and owned rows together', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
