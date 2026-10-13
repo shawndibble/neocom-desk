@@ -186,6 +186,14 @@ export function routeOverJumps(
   return route.kind === 'route' ? { kind: 'route', systems: route.systems } : route;
 }
 
+/**
+ * A route with more jumps than the gate route: no reason to fly it. With no
+ * gate route at all, nothing is longer.
+ */
+export function longerThanGates(systems: readonly number[], gates: JumpRouteResult): boolean {
+  return gates.kind === 'route' && systems.length > gates.systems.length;
+}
+
 /** One way to fly a leg: by gates alone, the cheapest way through a hub, or over the bridges. */
 export interface LegWay {
   way: 'gates' | TheraHub | 'ansiblex' | 'jump';
@@ -197,8 +205,9 @@ const HUBS: readonly TheraHub[] = ['thera', 'turnur'];
 /**
  * Every way to fly a leg: gates only, always — even when no gate route flies
  * it, which is itself the fact to show — then each hub with a qualifying hole
- * whose way through actually reaches, then Via Ansiblex when a known bridge
- * is on the way. `options` are the planner's, holes and all.
+ * whose way through actually reaches in no more jumps than the gates, then
+ * Via Ansiblex when a known bridge is on the way. `options` are the
+ * planner's, holes and all.
  */
 export function legWays(
   graph: JumpGraph,
@@ -209,14 +218,15 @@ export function legWays(
   bridges: readonly AnsiblexGate[] = [],
   jump: JumpContext | null = null
 ): LegWay[] {
-  const ways: LegWay[] = [
-    { way: 'gates', route: findJumpRoute(graph, from, to, gatesOnlyOptions(options)) },
-  ];
+  const gates = findJumpRoute(graph, from, to, gatesOnlyOptions(options));
+  const ways: LegWay[] = [{ way: 'gates', route: gates }];
   for (const hub of HUBS) {
     const hubHoles = holes.filter((hole) => hole.hub === hub);
     if (hubHoles.length === 0) continue;
     const route = routeThroughHoles(graph, from, to, hubHoles, options);
-    if (route.kind === 'route') ways.push({ way: hub, route });
+    if (route.kind === 'route' && !longerThanGates(route.systems, gates)) {
+      ways.push({ way: hub, route });
+    }
   }
   const overBridges = routeOverBridges(graph, from, to, bridges, options);
   if (overBridges.kind === 'route') ways.push({ way: 'ansiblex', route: overBridges });

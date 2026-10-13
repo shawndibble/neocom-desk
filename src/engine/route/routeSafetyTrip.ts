@@ -24,9 +24,11 @@
 import { bridgeBetween, bridgeConnections, type AnsiblexGate } from './ansiblex';
 import { lightYearDistance, type SystemPosition } from './jumpDrive';
 import { jumpWayFacts, type JumpDriveOptions, type JumpHop, type JumpWayFacts } from './jumpLegs';
-import type { FindJumpRouteOptions, JumpGraph } from './jumpRoute';
+import { findJumpRoute, type FindJumpRouteOptions, type JumpGraph } from './jumpRoute';
 import {
+  gatesOnlyOptions,
   legWays,
+  longerThanGates,
   type JumpContext,
   parseLegPin,
   pinWaitsOnHoleList,
@@ -47,8 +49,8 @@ import {
   type RouteSafetySystemEntry,
   type SystemKills,
 } from './routeSafety';
-import type { TheraConnection } from './theraConnections';
-import type { TripPlan } from './tripPlan';
+import { HUB_SYSTEM_IDS, type TheraConnection } from './theraConnections';
+import type { TripLeg, TripPlan } from './tripPlan';
 
 /** How a route entered a system from the one before it. */
 export type RouteStep =
@@ -138,6 +140,56 @@ export interface LegAlternatives {
   ways: LegWay[];
   /** `null` with no pin, and while a hole or hub pin waits on the hole list. */
   pinned: PinnedLegRoute<PinnableHole> | null;
+}
+
+const HUB_IDS: ReadonlySet<number> = new Set(Object.values(HUB_SYSTEM_IDS));
+
+/** A route that steps into or out of a hub by something other than a gate: a hole jump. */
+function crossesHole(graph: JumpGraph, systems: readonly number[]): boolean {
+  return systems.some(
+    (id, index) =>
+      index > 0 &&
+      (HUB_IDS.has(id) || HUB_IDS.has(systems[index - 1])) &&
+      !graph.get(systems[index - 1])?.includes(id)
+  );
+}
+
+/** The same search without the holes: the bridges, preference and Avoided Systems stay. */
+function withoutHoles(options: FindJumpRouteOptions): FindJumpRouteOptions {
+  return {
+    ...options,
+    extraConnections: options.extraConnections?.filter(
+      ([a, b]) => !HUB_IDS.has(a) && !HUB_IDS.has(b)
+    ),
+    freeSystems: undefined,
+  };
+}
+
+/**
+ * The trip with each leg the planner sent through Thera or Turnur in more
+ * jumps than the gates flown without the holes instead. A biased preference
+ * can cost a long hole route below a short gate one, since the hub is free;
+ * a longer hole route is never offered as a way, so it is never the pick.
+ * An optimized order's jumps are recounted on the new routes. The same trip
+ * back when no leg changes.
+ */
+export function gatesOverLongerHoles<T extends PlannedTrip>(trip: T): T {
+  const { plan, graph, options } = trip;
+  let changed = false;
+  const legs = plan.legs.map((leg): TripLeg => {
+    if (leg.route.kind !== 'route' || !crossesHole(graph, leg.route.systems)) return leg;
+    const gates = findJumpRoute(graph, leg.from, leg.to, gatesOnlyOptions(options));
+    if (!longerThanGates(leg.route.systems, gates)) return leg;
+    changed = true;
+    return { ...leg, route: findJumpRoute(graph, leg.from, leg.to, withoutHoles(options)) };
+  });
+  if (!changed) return trip;
+  const jumps = legs.reduce(
+    (sum, leg) => sum + (leg.route.kind === 'route' ? leg.route.systems.length - 1 : 0),
+    0
+  );
+  const reordered = plan.reordered && { ...plan.reordered, jumps };
+  return { ...trip, plan: { ...plan, legs, reordered } };
 }
 
 /**
@@ -385,7 +437,7 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
       pinNote = pinned.kind;
     }
 
-    // The pinned hole, gates only, each hub: one entry per distinct route.
+    // The pinned hole or hub, gates only, each hub: one entry per distinct route.
     const candidates: {
       kind: RouteSafetyWay['kind'];
       pin: string | null;
@@ -393,6 +445,10 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
     }[] = [];
     if (pinned?.kind === 'route' && pin?.kind === 'hole') {
       candidates.push({ kind: 'hole', pin: token, systems: pinned.systems });
+    }
+    // A hub pin is flown even when its way is longer than the gates and so not listed.
+    if (pinned?.kind === 'route' && pin?.kind === 'hub') {
+      candidates.push({ kind: pin.hub, pin: token, systems: pinned.systems });
     }
     for (const way of ways) {
       candidates.push({
