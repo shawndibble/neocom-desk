@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import i18n from '@/i18n';
-import { renderJumpsCell } from './jumpsCell';
+import { jumpsCellSortValue, renderJumpsCell } from './jumpsCell';
 
 describe('renderJumpsCell', () => {
   it('names the count link so a screen reader hears what it opens', () => {
@@ -20,5 +20,19 @@ describe('renderJumpsCell', () => {
     );
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
+  });
+});
+
+describe('jumpsCellSortValue', () => {
+  it('sorts by a settled count', () => {
+    expect(jumpsCellSortValue({ kind: 'value', count: 0 })).toBe(0);
+    expect(jumpsCellSortValue({ kind: 'value', count: 7 })).toBe(7);
+  });
+
+  it('has no value, so the row sinks, for an unknown count or an unready column', () => {
+    expect(jumpsCellSortValue({ kind: 'value', count: null })).toBeUndefined();
+    expect(jumpsCellSortValue({ kind: 'loading' })).toBeUndefined();
+    expect(jumpsCellSortValue({ kind: 'no-origin' })).toBeUndefined();
+    expect(jumpsCellSortValue({ kind: 'unknown' })).toBeUndefined();
   });
 });

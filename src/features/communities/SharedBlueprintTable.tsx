@@ -12,12 +12,13 @@ import {
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { ItemInfoLink } from '@/features/entities/EntityLink';
 import { BuildPlanMenuItem } from '@/features/industry/BuildPlanContextMenu';
+import { usePlannableIndexOnOpen } from '@/features/industry/usePlannableIndexOnOpen';
 import {
   useCurrentSystem,
   useJumpRangeFilter,
   type JumpsCellValue,
 } from '@/features/route/currentSystem';
-import { renderJumpsCell } from '@/features/route/jumpsCell';
+import { jumpsCellSortValue, renderJumpsCell } from '@/features/route/jumpsCell';
 import { routeToHref } from '@/features/route/routeSafetyLink';
 import { openItemInfo } from '@/stores/itemInfoModal';
 import { placeNamesSystem, type SharedBlueprintRow } from './sharedBlueprintCopies';
@@ -35,15 +36,20 @@ function SharedBlueprintMenu({
   children,
 }: {
   row: SharedBlueprintRow;
-  systemId: number | null;
+  /** `undefined` while the system list loads, `null` when the system is not in it. */
+  systemId: number | null | undefined;
   children: ReactElement;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  // Resolved as the menu first opens and kept for this row, as
+  // `BuildPlanContextMenu` does.
+  const { index, onOpenChange } = usePlannableIndexOnOpen();
   return (
     <RowActionsMenu
       name={row.name}
       linksKeepBrowserMenu
+      onOpenChange={onOpenChange}
       items={
         <>
           <MenuItem onSelect={() => openItemInfo(row.typeId, row.name)}>
@@ -51,12 +57,15 @@ function SharedBlueprintMenu({
           </MenuItem>
           <BuildPlanMenuItem
             typeId={row.typeId}
+            index={index}
             seed={row.runs < 0 ? null : { me: row.me, te: row.te, runs: row.runs }}
           />
           <MenuItem onSelect={() => navigate(bpcSourcingHref(row.typeId))}>
             {t('communities.library.openInSourcing')}
           </MenuItem>
-          {systemId === null ? (
+          {systemId === undefined ? (
+            <MenuItem disabled>{t('communities.library.viewRouteChecking')}</MenuItem>
+          ) : systemId === null ? (
             <DisabledMenuItem reason={t('communities.library.systemUnknown')}>
               {t('travel.waypoints.viewRoute')}
             </DisabledMenuItem>
@@ -99,21 +108,21 @@ export function SharedBlueprintTable({
   const currentSystem = useCurrentSystem();
   const jumpFilter = useJumpRangeFilter(currentSystem, 'any');
   const systemIdOf = useCallback(
-    (row: SharedBlueprintRow): number | null =>
-      systemIds?.get(row.systemName.toLowerCase()) ?? null,
+    (row: SharedBlueprintRow): number | null | undefined =>
+      systemIds === null ? undefined : (systemIds.get(row.systemName.toLowerCase()) ?? null),
     [systemIds]
   );
   const rowJumps = useCallback(
     (row: SharedBlueprintRow): JumpsCellValue => {
       if (jumpFilter.jumpsStatus !== 'ready') return { kind: jumpFilter.jumpsStatus };
-      if (systemIds === null) return { kind: 'loading' };
       const systemId = systemIdOf(row);
+      if (systemId === undefined) return { kind: 'loading' };
       return {
         kind: 'value',
         count: systemId === null ? null : (jumpFilter.jumps?.get(systemId) ?? null),
       };
     },
-    [jumpFilter, systemIds, systemIdOf]
+    [jumpFilter, systemIdOf]
   );
 
   if (rows.length === 0) return <EmptyState title={t('communities.library.none')} />;
@@ -162,10 +171,7 @@ export function SharedBlueprintTable({
       header: t('communities.library.columns.jumps'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => {
-        const cell = rowJumps(row);
-        return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
-      },
+      sortValue: (row) => jumpsCellSortValue(rowJumps(row)),
       render: (row) =>
         renderJumpsCell(rowJumps(row), t, 'communities.library.jumpsUnavailable', systemIdOf(row)),
     },

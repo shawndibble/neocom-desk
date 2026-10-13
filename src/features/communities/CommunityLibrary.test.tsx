@@ -26,16 +26,18 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 const JITA = 30000142;
 const EFA = 30003070;
-const systems = vi.hoisted(() => ({ readable: true }));
+const systems = vi.hoisted(() => ({ readable: true, pending: false }));
 vi.mock('@/sde/solarSystems', () => ({
-  loadSolarSystemsById: async () =>
-    systems.readable
-      ? new Map([
-          [JITA, { id: JITA, name: 'Jita', security: 0.95, regionId: 1 }],
-          [EFA, { id: EFA, name: 'Efa', security: -0.2, regionId: 2 }],
-        ])
-      : null,
+  loadSolarSystemsById: () => (systems.pending ? new Promise(() => {}) : loadSystems()),
 }));
+async function loadSystems() {
+  return systems.readable
+    ? new Map([
+        [JITA, { id: JITA, name: 'Jita', security: 0.95, regionId: 1 }],
+        [EFA, { id: EFA, name: 'Efa', security: -0.2, regionId: 2 }],
+      ])
+    : null;
+}
 // Jita is 3 jumps out; Efa has no stargate route from here.
 const jumps = new Map([[JITA, 3]]);
 vi.mock('@/features/route/currentSystem', () => ({
@@ -134,6 +136,26 @@ describe('CommunityLibrary', () => {
       expect(within(table).queryByText('…')).not.toBeInTheDocument();
     } finally {
       systems.readable = true;
+    }
+  });
+
+  it('the row menu says View route is still checking while the system list loads', async () => {
+    systems.pending = true;
+    try {
+      const user = userEvent.setup();
+      renderLibrary();
+      const table = await screen.findByRole('table', { name: l.sharedLabel });
+      const [more] = within(table).getAllByRole('button', {
+        name: en.common.moreActionsLabel.replace('{{name}}', 'Rifter Blueprint'),
+      });
+      await user.click(more!);
+      expect(screen.getByRole('menuitem', { name: l.viewRouteChecking })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
+      expect(screen.queryByText(l.systemUnknown)).not.toBeInTheDocument();
+    } finally {
+      systems.pending = false;
     }
   });
 

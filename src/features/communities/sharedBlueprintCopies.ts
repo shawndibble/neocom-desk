@@ -64,10 +64,16 @@ export function sharedBlueprintRows(
  * Whether a station's or structure's name already says its system: an NPC
  * station's always starts with it ("Jita IV - Moon 4 - …") and an Upwell
  * structure's too ("Efa - Home"), so the Location cell prints the system
- * under the name only when it does not.
+ * under the name only when it does not. The system must be a whole word at
+ * the start: followed by the end, a space or " -".
  */
 export function placeNamesSystem(locationName: string, systemName: string): boolean {
-  return locationName.toLowerCase().startsWith(systemName.toLowerCase());
+  const name = locationName.toLowerCase();
+  const system = systemName.toLowerCase();
+  if (!name.startsWith(system)) return false;
+  // A whole word: "Jitanomics" does not name Jita. " -" starts with the space.
+  const rest = name.slice(system.length);
+  return rest === '' || rest.startsWith(' ');
 }
 
 /**

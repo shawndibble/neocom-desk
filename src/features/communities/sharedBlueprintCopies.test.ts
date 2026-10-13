@@ -70,6 +70,15 @@ describe('placeNamesSystem', () => {
     expect(placeNamesSystem('Home Fortizar', 'Efa')).toBe(false);
     // Naming another system somewhere inside is not naming its own.
     expect(placeNamesSystem('Perimeter - Jita overflow', 'Jita')).toBe(false);
+    // A longer word that merely begins with the system's name is not it.
+    expect(placeNamesSystem('Jitanomics Trade Hub', 'Jita')).toBe(false);
+    expect(placeNamesSystem('Efatopia Keepstar', 'Efa')).toBe(false);
+  });
+
+  it('is true for the bare system name, or the name then a space or " -"', () => {
+    expect(placeNamesSystem('Efa', 'Efa')).toBe(true);
+    expect(placeNamesSystem('Efa - Home', 'Efa')).toBe(true);
+    expect(placeNamesSystem('Amarr VIII (Oris) - Emperor Family Academy', 'Amarr')).toBe(true);
   });
 });
 

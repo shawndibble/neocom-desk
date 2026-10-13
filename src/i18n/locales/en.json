@@ -7831,6 +7831,7 @@
       },
       "jumpsUnavailable": "No stargate route reaches this system from yours, or its system could not be found.",
       "openInSourcing": "Open in BPC Sourcing",
+      "viewRouteChecking": "View route (checking…)",
       "systemUnknown": "This blueprint's system could not be found.",
       "runs_one": "{{count}} run",
       "runs_other": "{{count}} runs",

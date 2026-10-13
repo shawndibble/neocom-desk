@@ -29,7 +29,7 @@
  * caller opts in with `rowMoreActions` on the table rather than rendering a
  * second copy of the button here.
  */
-import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from './industryTabs';
@@ -37,12 +37,9 @@ import { MenuItem as RowMenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { useCompareSet } from '@/features/market/compareSet';
-import {
-  loadPlannableIndex,
-  plannableProductTypeID,
-  type PlannableIndex,
-} from './plannableProduct';
+import { plannableProductTypeID, type PlannableIndex } from './plannableProduct';
 import { applyPlanSeed, type BuildPlanSeed } from './planSeed';
+import { usePlannableIndexOnOpen } from './usePlannableIndexOnOpen';
 
 export interface BuildPlanContextMenuProps {
   /** The row's own type — a blueprint on the BPC table, anything at all in a contract. */
@@ -70,52 +67,13 @@ export interface BuildPlanContextMenuProps {
 }
 
 /**
- * Resolves the plannable-product index on first open. Shared by the
- * right-click menu and the visible button (issue #1498) — each trigger owns
- * its own instance (same reasoning as `ItemContextMenu`'s per-trigger
- * `alertOpen`), so a failed fetch on one retries on that trigger's own next
- * open rather than depending on the other having been opened first.
- * `loadBlueprints` underneath is already memoized, so two instances resolving
- * independently still only fetches `blueprints.json` once.
- */
-function usePlannableIndexOnOpen(): {
-  index: PlannableIndex | null;
-  onOpenChange: (open: boolean) => void;
-} {
-  const [index, setIndex] = useState<PlannableIndex | null>(null);
-  /** Bumped on every open until the index resolves, so a failed fetch retries on the next open instead of reading "checking…" forever. */
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    if (attempt === 0 || index) return;
-    let cancelled = false;
-    void loadPlannableIndex().then(
-      (next) => {
-        if (!cancelled) setIndex(next);
-      },
-      () => {
-        // Leave the label in its checking state; the next open retries.
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [attempt, index]);
-
-  return {
-    index,
-    onOpenChange: (open) => {
-      if (open && !index) setAttempt((n) => n + 1);
-    },
-  };
-}
-
-/**
  * "Build Plan" for `typeId`: opens a new plan for what it builds, seeded with
  * the copy's ME/TE/runs when given. "checking…" until `index` loads, off when
- * nothing plannable comes of it.
+ * nothing plannable comes of it. Exported for a row menu that lists its own
+ * actions (the Community Library's Shared Blueprints), which resolves `index`
+ * with `usePlannableIndexOnOpen` as this menu does.
  */
-function PlanMenuItem({
+export function BuildPlanMenuItem({
   typeId,
   seed,
   index,
@@ -145,37 +103,6 @@ function PlanMenuItem({
           : t('industry.contextMenu.buildPlan')}
     </RowMenuItem>
   );
-}
-
-/**
- * The same "Build Plan" entry on its own, for a row menu that lists its own
- * actions (the Community Library's Shared Blueprints). It mounts as the menu
- * opens, so the index resolves then; a failed read stays "checking…" until the
- * next open mounts it again.
- */
-export function BuildPlanMenuItem({
-  typeId,
-  seed,
-}: {
-  typeId: number;
-  seed?: BuildPlanSeed | null;
-}) {
-  const [index, setIndex] = useState<PlannableIndex | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void loadPlannableIndex().then(
-      (next) => {
-        if (!cancelled) setIndex(next);
-      },
-      () => {
-        // Left at "checking…"; the next open retries.
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return <PlanMenuItem typeId={typeId} seed={seed} index={index} />;
 }
 
 /** The item list `BuildPlanContextMenu` publishes, to both its own right-click trigger and any `RowMoreActions` reading its `RowActionsContext`. */
@@ -216,7 +143,7 @@ function useBuildPlanMenuNodes(
       </RowMenuItem>
     );
   }
-  nodes.push(<PlanMenuItem key="buildPlan" typeId={typeId} seed={seed} index={index} />);
+  nodes.push(<BuildPlanMenuItem key="buildPlan" typeId={typeId} seed={seed} index={index} />);
   return nodes;
 }
 

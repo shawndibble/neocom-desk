@@ -127,7 +127,7 @@ import {
   JumpRangeNote,
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
-import { renderJumpsCell } from '@/features/route/jumpsCell';
+import { jumpsCellSortValue, renderJumpsCell } from '@/features/route/jumpsCell';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { loadCharacterBlueprints } from '@/features/industry/data';
@@ -1131,10 +1131,7 @@ export function BpcSourcingPanel() {
         header: t('bpcContracts.jumpsColumn'),
         align: 'right',
         className: 'tabular-nums',
-        sortValue: (row) => {
-          const cell = bpcRowJumps(row);
-          return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
-        },
+        sortValue: (row) => jumpsCellSortValue(bpcRowJumps(row)),
         // The dense phone card has no header row, and a bare "7" beside a
         // system name says nothing about what it counts.
         stackAffix: { before: t('bpcContracts.mobile.jumpsAffix') },
