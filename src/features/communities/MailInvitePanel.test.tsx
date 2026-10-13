@@ -91,7 +91,7 @@ describe('Invite by mail panel', () => {
     expect(recipients).toEqual([{ recipient_id: 42, recipient_type: 'character' }]);
     expect(subject).toBe('Invitation to join Pals');
     expect(body).toContain('Boss');
-    expect(body).toContain('/communities/join/CODE1');
+    expect(body).toMatch(/<a href="[^"]*\/communities\/join\/CODE1">[^<]*<\/a>/);
     await waitFor(() => expect(store.confirmMailInvite).toHaveBeenCalledWith(ME, 'c1', 42, 'Bob'));
     expect(await screen.findByText('19 mail invites left today')).toBeInTheDocument();
   });
@@ -163,7 +163,8 @@ describe('Invite by mail panel', () => {
     await user.click(screen.getByRole('button', { name: m.send }));
     await waitFor(() => expect(mail.sendMail).toHaveBeenCalled());
     const [, , subject, body] = mail.sendMail.mock.calls[0];
-    expect(`${subject}${body}`).not.toMatch(/[<>]/);
+    expect(subject).not.toMatch(/[<>]/);
+    expect(body.replace(/<a href="[^"]*">[^<]*<\/a>/, '')).not.toMatch(/[<>]/);
   });
 
   it('gives the slot back when ESI refuses the mail', async () => {

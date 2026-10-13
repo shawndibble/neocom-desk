@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { BlueprintTypeInfo, ShareMarketGroup } from '@/engine/communities/shareTree';
+import {
+  blueprintGroupOfProductGroup,
+  type BlueprintTypeInfo,
+  type ShareMarketGroup,
+} from '@/engine/communities/shareTree';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadBlueprints } from '@/sde/loadSde';
@@ -8,7 +12,12 @@ export type OwnedBlueprintTypes =
   | { status: 'loading' }
   | { status: 'needsReauth' }
   | { status: 'failed' }
-  | { status: 'ready'; owned: BlueprintTypeInfo[]; groups: ShareMarketGroup[] };
+  | {
+      status: 'ready';
+      owned: BlueprintTypeInfo[];
+      groups: ShareMarketGroup[];
+      learned: Map<number, number>;
+    };
 
 /**
  * The blueprint types a Character owns, with names and market groups, for the
@@ -39,13 +48,25 @@ export function useOwnedBlueprintTypes(characterId: number, enabled = true): Own
         } else {
           const groupByType = new Map(marketTypes.map((type) => [type.typeId, type.marketGroupId]));
           const typeIds = [...new Set(result.cached.data.map((blueprint) => blueprint.type_id))];
+          const productGroupOf = (typeId: number) =>
+            groupByType.get(blueprintMap[typeId]?.products[0]?.typeID ?? 0) ?? null;
           value = {
             status: 'ready',
             groups,
+            learned: blueprintGroupOfProductGroup(
+              Object.keys(blueprintMap).map((id) => ({
+                typeId: Number(id),
+                name: '',
+                marketGroupId: groupByType.get(Number(id)) ?? null,
+                productMarketGroupId: productGroupOf(Number(id)),
+              })),
+              groups
+            ),
             owned: typeIds.map((typeId) => ({
               typeId,
               name: blueprintMap[typeId]?.name ?? `Type ${typeId}`,
               marketGroupId: groupByType.get(typeId) ?? null,
+              productMarketGroupId: productGroupOf(typeId),
             })),
           };
         }

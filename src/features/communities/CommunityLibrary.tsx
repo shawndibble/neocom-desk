@@ -25,6 +25,7 @@ import {
 } from '@/engine/communities/libraryMatrix';
 import { isLibraryStale } from '@/engine/communities/sharedLibrary';
 import {
+  blueprintGroupOfProductGroup,
   buildShareTree,
   type BlueprintTypeInfo,
   type ShareGroup,
@@ -48,6 +49,7 @@ const VIEWS: LibraryView[] = ['shared', ...FILTERS];
 type Loaded = {
   catalog: BlueprintTypeInfo[];
   groups: ShareMarketGroup[];
+  learned: Map<number, number>;
   libraries: MemberLibrary[];
 };
 
@@ -183,8 +185,9 @@ function LibraryGroup({
  * The Community Library (issue #3601), the Blueprints tab's Everyone view:
  * what the Members share. It opens on "Shared in the Community": each shared
  * blueprint with its Member, station or structure, jumps from here, ME / TE
- * and runs, and a ⋮ to Show info, plan a build, source it or route there. The other chips turn to every blueprint in the SDE against the
- * Members who share it: "missing from the Community", "owned by me" or
+ * and runs, and a ⋮ to Show info, plan a build, source it or route there. The
+ * other chips turn to every blueprint in the SDE against the Members who share
+ * it: "missing from the Community", "owned by me" or
  * "missing from me", in a market-group tree that counts each category. A
  * stale Member is greyed and badged, never hidden. BPC Sourcing is one link
  * away, to source a copy.
@@ -242,14 +245,17 @@ export function CommunityLibrary({
         ]);
         if (cancelled) return;
         const groupByType = new Map(marketTypes.map((type) => [type.typeId, type.marketGroupId]));
+        const catalog = Object.entries(blueprints).map(([typeId, blueprint]) => ({
+          typeId: Number(typeId),
+          name: blueprint.name,
+          marketGroupId: groupByType.get(Number(typeId)) ?? null,
+          productMarketGroupId: groupByType.get(blueprint.products[0]?.typeID) ?? null,
+        }));
         setLoaded({
           libraries,
           groups,
-          catalog: Object.entries(blueprints).map(([typeId, blueprint]) => ({
-            typeId: Number(typeId),
-            name: blueprint.name,
-            marketGroupId: groupByType.get(Number(typeId)) ?? null,
-          })),
+          catalog,
+          learned: blueprintGroupOfProductGroup(catalog, groups),
         });
         setFailed(false);
       } catch {
@@ -271,7 +277,10 @@ export function CommunityLibrary({
   );
   const rowsByType = useMemo(() => new Map(shown.map((row) => [row.typeId, row])), [shown]);
   const tree = useMemo(
-    () => (loaded ? buildShareTree(shown, loaded.groups, t('communities.library.other')) : []),
+    () =>
+      loaded
+        ? buildShareTree(shown, loaded.groups, t('communities.library.other'), loaded.learned)
+        : [],
     [loaded, shown, t]
   );
   const staleUids = useMemo(

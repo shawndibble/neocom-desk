@@ -10,6 +10,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import * as download from '@/lib/download';
 import { beginEveLogin } from '@/app/loginFlow';
 import { OpenOrdersPanel } from './OpenOrdersPanel';
+import { WithPageHeaderSlots } from './__fixtures__/pageHeaderSlots';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
 import { loadOrderCostBases, type ProductionRunBasis } from './orderCostBasis';
@@ -140,7 +141,12 @@ function renderPanel(initialEntry = '/market/orders') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <FakeItemActions actions={actions}>
-        {withOrderDetailLoaders(<OpenOrdersPanel />, loaders)}
+        {withOrderDetailLoaders(
+          <WithPageHeaderSlots>
+            {(slots) => <OpenOrdersPanel headerSlots={slots} />}
+          </WithPageHeaderSlots>,
+          loaders
+        )}
       </FakeItemActions>
     </MemoryRouter>
   );
@@ -157,7 +163,12 @@ function renderPanelWithLocation(initialEntry: string) {
     <MemoryRouter initialEntries={[initialEntry]}>
       <CurrentSearch />
       <FakeItemActions actions={actions}>
-        {withOrderDetailLoaders(<OpenOrdersPanel />, loaders)}
+        {withOrderDetailLoaders(
+          <WithPageHeaderSlots>
+            {(slots) => <OpenOrdersPanel headerSlots={slots} />}
+          </WithPageHeaderSlots>,
+          loaders
+        )}
       </FakeItemActions>
     </MemoryRouter>
   );
@@ -516,7 +527,7 @@ describe('OpenOrdersPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('exports every group from the title-bar menu as one file', async () => {
+  it('exports every group from the page-header menu as one file', async () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(
@@ -536,7 +547,12 @@ describe('OpenOrdersPanel', () => {
     renderPanel();
     await screen.findByTestId('order-group-belowFloor');
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Open orders' }), {
+    const header = screen.getByRole('banner');
+    expect(
+      within(header).getByRole('button', { name: 'Refresh orders & market prices' })
+    ).toBeInTheDocument();
+    expect(header.querySelector('time')).not.toBeNull();
+    fireEvent.pointerDown(within(header).getByRole('button', { name: 'Export Open orders' }), {
       button: 0,
       pointerType: 'mouse',
     });
@@ -1059,7 +1075,12 @@ describe('OpenOrdersPanel', () => {
             ]}
           >
             <FakeItemActions actions={actions}>
-              {withOrderDetailLoaders(<OpenOrdersPanel />, loaders)}
+              {withOrderDetailLoaders(
+                <WithPageHeaderSlots>
+                  {(slots) => <OpenOrdersPanel headerSlots={slots} />}
+                </WithPageHeaderSlots>,
+                loaders
+              )}
             </FakeItemActions>
           </MemoryRouter>
         );

@@ -106,7 +106,7 @@ export function CorpVitalsRail({
                 key={division.division}
                 to={`/corp/wallet?division=${division.division}`}
                 className={cx(
-                  'group flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0',
+                  'group flex items-center justify-between gap-3 border-b border-line py-2 min-h-11 md:min-h-0 last:border-b-0',
                   rowInteractiveClassName,
                   focusRingInsetClassName
                 )}

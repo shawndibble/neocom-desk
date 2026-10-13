@@ -24,4 +24,11 @@ describe('MailBodyView', () => {
       screen.getByRole('cell', { name: '5' }).className
     );
   });
+
+  it('turns an http link in prose into a new-tab link', () => {
+    render(<MailBodyView text={'Open this:\nhttps://a.example/join/X1'} />);
+    const link = screen.getByRole('link', { name: /https:\/\/a\.example\/join\/X1/ });
+    expect(link).toHaveAttribute('href', 'https://a.example/join/X1');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
 });

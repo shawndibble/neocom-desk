@@ -874,3 +874,89 @@ test.describe('Mining Tax ledger — checkbox names and toolbar clearance (#3391
     });
   }
 });
+
+/**
+ * Split dialog collector radios — touch target (#3674): the "further ore goes
+ * to" radios were bare 16px `text-xs` rows. Each label is now a
+ * `tappableRowClassName` row: 44px on phone, compact on a fine-pointer desktop.
+ */
+const SECOND_PAYEE_ID = 'e2e-payee-2';
+/** 40 characters: must wrap inside the label, not overflow the page. */
+const SECOND_PAYEE_NAME = 'Second Payee With A Very Long Name Indeed';
+
+async function seedSecondPayee(page: Page): Promise<void> {
+  await page.evaluate(
+    async ({ characterId, payeeId, payeeName }) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('neocom');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      await new Promise<void>((resolve, reject) => {
+        const tx = database.transaction('payees', 'readwrite');
+        tx.objectStore('payees').put({
+          id: payeeId,
+          characterId,
+          name: payeeName,
+          defaultTaxPct: 10,
+          updatedAt: Date.now(),
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      database.close();
+    },
+    { characterId: CHARACTER_ID, payeeId: SECOND_PAYEE_ID, payeeName: SECOND_PAYEE_NAME }
+  );
+}
+
+async function openSplitWithSecondPayee(page: Page): Promise<Locator> {
+  await signInAndGoto(page);
+  await seedPayeeBalance(page, { needsReview: true });
+  await seedSecondPayee(page);
+  await page.goto('./mining/tax');
+  // The status pill is a focusable hint trigger and swallows the row click.
+  await page.getByRole('cell', { name: ENTRY_DATE }).first().click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Give new ore to another Payee…' }).click();
+  const dialog = page.getByRole('dialog', { name: /^Split — / });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('combobox', { name: 'Move part of this day to' }).click();
+  await page.getByRole('option', { name: SECOND_PAYEE_NAME }).click();
+  return dialog;
+}
+
+test.describe('Split dialog collector radios — touch target (#3674)', () => {
+  test('phone: both labels are 44px, apart, and nothing overflows', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    const dialog = await openSplitWithSecondPayee(page);
+
+    const labels = dialog
+      .locator('label')
+      .filter({ has: page.locator('input[name="split-collector"]') });
+    await expect(labels).toHaveCount(2);
+    const first = (await labels.nth(0).boundingBox())!;
+    const second = (await labels.nth(1).boundingBox())!;
+    expect(first.height).toBeGreaterThanOrEqual(44);
+    expect(second.height).toBeGreaterThanOrEqual(44);
+    expect(first.y + first.height).toBeLessThanOrEqual(second.y + 1);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test('desktop: rows stay compact', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    const dialog = await openSplitWithSecondPayee(page);
+
+    const labels = dialog
+      .locator('label')
+      .filter({ has: page.locator('input[name="split-collector"]') });
+    await expect(labels).toHaveCount(2);
+    for (const i of [0, 1]) {
+      expect((await labels.nth(i).boundingBox())!.height).toBeLessThan(44);
+    }
+  });
+});

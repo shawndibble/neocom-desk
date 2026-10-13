@@ -7939,7 +7939,7 @@
       "sentAt": "Sent {{when}}",
       "sentTo": "Invite sent to {{name}}.",
       "subject": "Invitation to join {{community}}",
-      "body": "{{admin}} invites you to join the Community \"{{community}}\" on Neocom Desk.\n\nOpen this link to join:\n{{link}}",
+      "body": "{{admin}} invites you to join the Community \"{{community}}\" on Neocom Desk.\n\nOpen this link to join:\n<a href=\"{{link}}\">{{link}}</a>",
       "grantTitle": "Permission to send mail",
       "grantHint": "Inviting by mail sends an in-game mail from this Character. Grant that permission to turn it on.",
       "grantAction": "Grant permission",
