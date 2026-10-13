@@ -748,6 +748,15 @@ describe('mergeFeed: incremental pull', () => {
     expect(result.pushCreate).toEqual([row]);
   });
 
+  it('pushes a dismissal for an uploaded row that has since slid out of the 100-row cap', () => {
+    // The cap bounds what a device *introduces* to sync, not whether a row the
+    // remote side already holds can have its dismissal corrected. Without this
+    // the other devices' copy stays live and a new device pulls it as unread.
+    const row = feedLocal({ syncedAt: NOW - 500, dismissedAt: NOW - 100 });
+    const result = mergeFeedNow([row], new Set(), []);
+    expect(result.pushCreate).toEqual([row]);
+  });
+
   it('does not re-push a dismissal that was already uploaded with the row', () => {
     const row = feedLocal({ dismissedAt: NOW - 600, syncedAt: NOW - 500 });
     const result = mergeFeedNow([row], new Set(['occ-1']), []);

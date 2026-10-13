@@ -421,7 +421,15 @@ export function mergeFeed<L extends LocalFeedRow, R extends RemoteFeedDoc>(
       // row has been uploaded. `syncedAt` says it outright. A dismissal made
       // after that upload still needs writing out, and the remote doc is
       // replaced wholesale, so it goes back through push-CREATE.
-      if (l.syncedAt !== undefined && (l.dismissedAt ?? 0) <= l.syncedAt) continue;
+      if (l.syncedAt !== undefined) {
+        // The remote side holds this row, so the 100-row cap (which only
+        // bounds what a device introduces) must not strand a dismissal made
+        // after the row slid below it. The age bound still applies: past it
+        // the remote copy is purged, not corrected.
+        if ((l.dismissedAt ?? 0) > l.syncedAt && l.firedAt >= purgeBefore)
+          result.pushCreate.push(l);
+        continue;
+      }
       if (pushEligible.has(id)) result.pushCreate.push(l);
       continue;
     }
