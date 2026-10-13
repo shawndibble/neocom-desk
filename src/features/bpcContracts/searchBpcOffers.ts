@@ -1,7 +1,7 @@
 /**
  * BPC Sourcing's search as pure functions, in two stages so a keystroke reruns only the second:
  * `prepareBpcOffers` (narrowing, type options, offer stats) and `rankBpcOffers` (type query,
- * suggestions, per-source rows, precedence). `searchBpcOffers` composes both (ADR 0013, 0018).
+ * suggestions, per-source rows, source order). `searchBpcOffers` composes both (ADR 0013, 0018).
  */
 import {
   EMPTY_BPC_SEARCH_FILTER,
@@ -219,7 +219,7 @@ export function prepareBpcOffers(data: BpcPrepareData, input: BpcPrepareInput): 
   return { spaceFilteredRows, spaceFilteredOriginals, typeOptions, nonTypeFilter, offerStats };
 }
 
-/** Stage 2: the type query's suggestions, per-source rows and precedence merge. */
+/** Stage 2: the type query's suggestions, per-source rows and the source-ordered merge. */
 export function rankBpcOffers(
   prepared: PreparedBpcOffers,
   data: BpcSourceData,

@@ -170,7 +170,7 @@ const ALL_SOURCES = new Set<SourceToggle>([
 
 const sourcesOf = (rows: readonly BpcSearchRow[]) => rows.map((r) => r.source);
 
-describe('searchBpcOffers merge precedence', () => {
+describe('searchBpcOffers merge order', () => {
   const full = data({
     contractRows: [contract()],
     originals: [contract({ contractId: 2, runs: -1 })],
