@@ -7693,7 +7693,7 @@
       "offerCountCapped": "Top {{shown}} of {{total}} offers",
       "copyQuality": "ME {{me}} · TE {{te}} · {{runs}} runs"
     },
-    "resultsCapped": "Showing {{shown}} of {{total}} results. Narrow the search to see the rest.",
+    "resultsCapped": "Showing {{shown}} of {{total}} · narrow the search for the rest.",
     "regionNoOffers": "No offers",
     "regionReason": {
       "forge": "The Forge, Jita's region: the usual pricing baseline",
@@ -7742,8 +7742,8 @@
     "bpoCardNpcSeededLabel": "About this market price",
     "bpoCardNpcSeededHint": "Includes NPC-seeded orders, which are not told apart from a player's.",
     "bpoCardMayBeCheaperHint": "The full BPO price is at or below the cheapest copy offer shown. Runs are not compared.",
-    "marketScopeRegion": "Market BPOs checked in {{region}}.",
-    "marketScopeHub": "Market BPOs checked in the {{hub}} region (your market hub). Pick a region to check another.",
+    "marketScopeRegion": "Market BPOs: {{region}}.",
+    "marketScopeHub": "Market BPOs: {{hub}} region.",
     "marketScopeChecking": "Checking the market for BPOs…",
     "marketScopeNeedsSearch": "Search a blueprint name to check the market for BPOs.",
     "marketScopeFailed_one": "Couldn't check the market for {{count}} blueprint — try Refresh.",

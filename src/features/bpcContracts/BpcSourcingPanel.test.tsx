@@ -823,7 +823,7 @@ describe('BpcSourcingPanel result cap', () => {
 
     await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(
-      await screen.findByText('Showing 200 of 201 results. Narrow the search to see the rest.')
+      await screen.findByText('Showing 200 of 201 · narrow the search for the rest.')
     ).toBeInTheDocument();
   });
 
@@ -832,7 +832,7 @@ describe('BpcSourcingPanel result cap', () => {
     render(<App />);
 
     await screen.findByRole('table', { name: 'BPC Sourcing' });
-    expect(screen.queryByText(/Narrow the search to see the rest/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/narrow the search for the rest/)).not.toBeInTheDocument();
   });
 });
 
@@ -1728,7 +1728,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       // "All regions" reads the pilot's market hub (Jita by default) region.
       expect(getOrderBook).toHaveBeenCalledWith(10000002, 638);
       expect(getOrderBook.mock.calls.every(([regionId]) => regionId === 10000002)).toBe(true);
-      expect(screen.getByText(/Market BPOs checked in the Jita region/)).toBeInTheDocument();
+      expect(screen.getByText(/Market BPOs: Jita region/)).toBeInTheDocument();
 
       expect(
         within(table).queryByText('2,000,000.00 ISK', { selector: '.sr-only' })
