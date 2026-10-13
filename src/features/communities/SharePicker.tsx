@@ -121,12 +121,15 @@ function GroupNode({
 export function SharePicker({
   owned,
   groups,
+  learned,
   selected,
   onChange,
   disabled = false,
 }: {
   owned: readonly BlueprintTypeInfo[];
   groups: readonly ShareMarketGroup[];
+  /** `blueprintGroupOfProductGroup` over every blueprint, so unlisted ones land beside their kin. */
+  learned?: ReadonlyMap<number, number>;
   selected: ReadonlySet<number>;
   onChange: (next: Set<number>) => void;
   disabled?: boolean;
@@ -134,8 +137,8 @@ export function SharePicker({
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const tree = useMemo(
-    () => buildShareTree(owned, groups, t('communities.share.other')),
-    [owned, groups, t]
+    () => buildShareTree(owned, groups, t('communities.share.other'), learned),
+    [owned, groups, learned, t]
   );
   const shown = useMemo(() => filterShareTree(tree, query), [tree, query]);
   const searching = query.trim() !== '';
@@ -214,6 +217,7 @@ export function CharacterSharePicker({
     <SharePicker
       owned={state.owned}
       groups={state.groups}
+      learned={state.learned}
       selected={selected}
       onChange={onChange}
       disabled={disabled}
