@@ -179,6 +179,8 @@ class, not a case.
 - **A picture of data already on screen** is not a mobile fix.
 - **Unprovable at 390px.** If no narrow-viewport spec can assert the fix, an
   agent cannot show it worked and the next refactor undoes it.
+  Communities has no Playwright Firebase seam: a finding there must be
+  provable in jsdom (component test, store mocked) or it is unprovable.
 - **Hand-computed row height is not evidence.** `padding + font-size` arithmetic
   routinely undercounts: an arbitrary `text-[…]` size with no paired `leading-*`
   inherits this app's ambient 1.5 line-height rather than the tighter one a
