@@ -262,17 +262,8 @@ const SOURCING_GROUP_HEADER =
  */
 const REGION_CELL_WIDTH = 'w-28 shrink-0 sm:w-36';
 
-/** A BPO card on a phone is one full-width line (price · system · detail), not a third half-width box. */
-const BPO_CARD_LAYOUT =
-  'w-full max-sm:flex-row max-sm:flex-wrap max-sm:items-baseline max-sm:gap-x-2 sm:w-36';
-
-/**
- * The Cheapest chip as the picked blueprint's headline on a phone: its own
- * line, label over a large figure, instead of one more 11px chip. CSS only,
- * so the same chip reads as the desktop strip's first chip from `sm` up.
- */
-const CHEAPEST_HEADLINE_CHIP =
-  'max-sm:h-auto max-sm:basis-full max-sm:flex-col max-sm:items-start max-sm:gap-0 max-sm:before:hidden max-sm:[&>span:last-child]:text-3xl max-sm:[&>span:last-child]:font-bold';
+/** A BPO card keeps the region cell's three lines; on a phone the Market and Contract groups share a two-column row instead of one full-width line each. */
+const BPO_CARD_LAYOUT = 'w-full sm:w-36';
 
 /** The market lookup's region: the Region filter's, else the pilot's market hub's once known. */
 function marketLookupRegion(
@@ -392,7 +383,7 @@ function BpcFilterBar({
           value={filter.typeQuery}
           onChange={(event) => onChange({ ...filter, typeQuery: event.target.value })}
           placeholder={t('bpcContracts.searchPlaceholder')}
-          className="min-w-48 flex-1"
+          className="min-w-32 flex-1 sm:min-w-48"
           {...searchComboboxProps}
         />
       }
@@ -799,7 +790,14 @@ export function BpcSourcingPanel() {
   const prepared = useMemo(
     () =>
       prepareBpcOffers(
-        { contractRows: rows, originals, contractLocations, blueprintNames, ownedBlueprints },
+        {
+          contractRows: rows,
+          originals,
+          contractLocations,
+          blueprintNames,
+          ownedBlueprints,
+          communityRows: communityOffers.rows,
+        },
         {
           filter: stableFilter,
           sources: stableSources,
@@ -813,6 +811,7 @@ export function BpcSourcingPanel() {
       contractLocations,
       blueprintNames,
       ownedBlueprints,
+      communityOffers.rows,
       stableFilter,
       stableSources,
       activeSpaceKinds,
@@ -935,9 +934,16 @@ export function BpcSourcingPanel() {
       case 'hidePlex':
         return t(`bpcContracts.chips.${chip.id}`);
       case 'sources':
-        return t('bpcContracts.chips.sources', {
-          list: chip.value.map((source) => t(SOURCE_LABEL_KEYS[source])).join(', '),
-        });
+        // Names for a short pick; a count for a long one, which would
+        // otherwise run the chip off the edge of a phone.
+        return chip.value.length <= 2
+          ? t('bpcContracts.chips.sources', {
+              list: chip.value.map((source) => t(SOURCE_LABEL_KEYS[source])).join(', '),
+            })
+          : t('bpcContracts.chips.sourcesCount', {
+              count: chip.value.length,
+              total: SOURCE_TOGGLES.length,
+            });
       case 'space':
         return t('bpcContracts.chips.space', {
           list: chip.value.map((kind) => t(`common.spaceOption.${kind}`)).join(', '),
@@ -1196,17 +1202,18 @@ export function BpcSourcingPanel() {
         // Ref's CSV carries a buyout on non-auction contracts too whenever the
         // field parses, so an item_exchange row with `buyout: 0` sorted to the
         // top of the table while rendering — and now summarising — at its real
-        // price. Owned rows sort last (Infinity) rather than reading as cheapest.
+        // price. An owned row costs nothing, so it sorts at 0 beside Community
+        // rows: sorted last it fell past the result cap and never showed.
         sortValue: (row) => {
           if (row.source === 'market' || row.source === 'lp' || row.source === 'community') {
             return row.price;
           }
           const contract = asContract(row);
-          if (!contract) return Infinity;
+          if (!contract) return 0;
           // A PLEX-for-item barter's real ask isn't ISK at all (issue #1105)
           // — sorting it at its `0` ISK price would put it above every real
-          // priced offer as "cheapest", which it isn't. Sorts last, the same
-          // stance an owned row (no price to judge) already takes.
+          // priced offer as "cheapest", which it isn't. Sorts last, unlike an
+          // owned or Community row, whose free price is real.
           if (contract.requestedPlex) return Infinity;
           return effectivePrice(contract);
         },
@@ -1214,6 +1221,7 @@ export function BpcSourcingPanel() {
           if (row.source === 'market' || row.source === 'community') {
             return <IskAmount value={row.price} />;
           }
+          if (row.source === 'owned') return <IskAmount value={0} />;
           if (row.source === 'lp') {
             return (
               <HintText
@@ -1344,8 +1352,8 @@ export function BpcSourcingPanel() {
         id: 'expires',
         header: t('bpcContracts.expiresColumn'),
         className: 'whitespace-nowrap text-text-dim',
-        // Infinity sorts an owned row last, same as price, rather than epoch 0
-        // reading as "expires soonest."
+        // Infinity sorts an owned row last, rather than epoch 0 reading as
+        // "expires soonest."
         sortValue: (row) => asContract(row)?.dateExpired ?? Infinity,
         stackAffix: { before: t('bpcContracts.mobile.expiresAffix') },
         render: (row) => {
@@ -1549,23 +1557,6 @@ export function BpcSourcingPanel() {
           <DataAgeBadge date={new Date(contractsResult.data.lastSyncedAt)} />
         )
       }
-      actions={
-        <span className="flex items-center gap-2">
-          {displayRows.length > 0 && (
-            <TableActionsMenu name={t('bpcContracts.title')} tableExport={sourcingExport} />
-          )}
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('bpcContracts.refresh')}
-            size="sm"
-            onClick={() => {
-              refresh();
-              setMarketRefreshTick((tick) => tick + 1);
-            }}
-            busy={loading}
-          />
-        </span>
-      }
     >
       {loading && !data ? (
         <div className="flex justify-center py-16">
@@ -1604,14 +1595,32 @@ export function BpcSourcingPanel() {
             currentSystem={currentSystem}
             searchComboboxProps={searchComboboxProps}
             actions={
-              <ColumnPickerMenu
-                available={BPC_SEARCH_COLUMN_IDS}
-                visible={visibleColumns}
-                columnsById={bpcColumnsById}
-                onToggle={toggleColumn}
-                buttonLabel={t('bpcContracts.columnsButton')}
-                menuTitle={t('bpcContracts.columnsMenuTitle')}
-              />
+              // Export and Refresh ride the search row rather than a header
+              // of their own: that header held nothing else, and on a phone
+              // it pushed the results a whole row further down.
+              <>
+                <ColumnPickerMenu
+                  available={BPC_SEARCH_COLUMN_IDS}
+                  visible={visibleColumns}
+                  columnsById={bpcColumnsById}
+                  onToggle={toggleColumn}
+                  buttonLabel={t('bpcContracts.columnsButton')}
+                  menuTitle={t('bpcContracts.columnsMenuTitle')}
+                />
+                {displayRows.length > 0 && (
+                  <TableActionsMenu name={t('bpcContracts.title')} tableExport={sourcingExport} />
+                )}
+                <IconButton
+                  icon={<Icon.Refresh />}
+                  label={t('bpcContracts.refresh')}
+                  size="sm"
+                  onClick={() => {
+                    refresh();
+                    setMarketRefreshTick((tick) => tick + 1);
+                  }}
+                  busy={loading}
+                />
+              </>
             }
           />
           {activeChips.length > 0 && (
@@ -1619,18 +1628,19 @@ export function BpcSourcingPanel() {
             // above, so it already shows what it is set to. Below it they
             // hide in the funnel's sheet, where a count badge was the only
             // sign any was on.
-            <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 md:hidden">
+            <div className="flex items-center gap-2 overflow-x-auto border-b border-line px-3 py-1.5 md:hidden">
               {activeChips.map((chip) => (
                 <FilterChip
                   key={chip.id}
                   label={filterChipLabel(chip)}
                   selected
+                  className="shrink-0"
                   onToggle={() => applyFilterState(chip.clear(filterState))}
                 />
               ))}
               <button
                 type="button"
-                className={textActionClassName()}
+                className={cx(textActionClassName(), 'shrink-0 whitespace-nowrap')}
                 onClick={() =>
                   applyFilterState(
                     activeChips.reduce((state, chip) => chip.clear(state), filterState)
@@ -1709,61 +1719,62 @@ export function BpcSourcingPanel() {
           )}
 
           {selectedName !== null && summary !== null && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-3 py-2">
-              <div className="min-w-0 max-sm:w-full">
+            // Name and close share the first line on a phone; the stats strip
+            // wraps beneath instead of the close button taking a line of its own.
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2">
+              <div className="min-w-0 max-sm:flex-1">
                 <p className="truncate text-base font-semibold">{selectedName}</p>
                 {/* The phone's sort bar counts the offers instead. */}
                 <p className="text-[0.6875rem] text-text-dim max-sm:hidden">
                   {t('bpcContracts.offersOnContract', { count: summary.offerCount })}
                 </p>
               </div>
-              <div className="flex flex-wrap items-start gap-2 max-sm:w-full sm:items-center md:ml-auto">
-                <StatChips className="max-sm:flex-1">
-                  {summary.cheapest !== null && (
-                    <StatChip
-                      className={CHEAPEST_HEADLINE_CHIP}
-                      label={t('bpcContracts.cheapestLabel')}
-                      value={<IskAmount value={summary.cheapest} />}
-                    />
-                  )}
-                  {summary.cheapestPerRun !== null && (
-                    <StatChip
-                      label={t('bpcContracts.cheapestPerRunLabel')}
-                      value={<IskAmount value={summary.cheapestPerRun} />}
-                    />
-                  )}
-                  {summary.median !== null && (
-                    <StatChip
-                      label={t('bpcContracts.medianLabel')}
-                      value={<IskAmount value={summary.median} />}
-                    />
-                  )}
-                  {summary.bestMe !== null && summary.bestTe !== null && (
-                    <StatChip
-                      label={t('bpcContracts.bestMeTeLabel')}
-                      value={`${summary.bestMe} / ${summary.bestTe}`}
-                    />
-                  )}
-                </StatChips>
-                <IconButton
-                  icon={<Icon.Close />}
-                  label={t('bpcContracts.clearBlueprint', { name: selectedName })}
-                  tooltip={t('bpcContracts.clearBlueprintShort')}
-                  size="sm"
-                  onClick={clearBlueprint}
-                />
-              </div>
+              <IconButton
+                icon={<Icon.Close />}
+                label={t('bpcContracts.clearBlueprint', { name: selectedName })}
+                tooltip={t('bpcContracts.clearBlueprintShort')}
+                size="sm"
+                className="sm:order-3"
+                onClick={clearBlueprint}
+              />
+              <StatChips className="max-sm:order-3 max-sm:w-full md:ml-auto">
+                {summary.cheapest !== null && (
+                  <StatChip
+                    emphasis
+                    label={t('bpcContracts.cheapestLabel')}
+                    value={<IskAmount value={summary.cheapest} />}
+                  />
+                )}
+                {summary.cheapestPerRun !== null && (
+                  <StatChip
+                    label={t('bpcContracts.cheapestPerRunLabel')}
+                    value={<IskAmount value={summary.cheapestPerRun} />}
+                  />
+                )}
+                {summary.median !== null && (
+                  <StatChip
+                    label={t('bpcContracts.medianLabel')}
+                    value={<IskAmount value={summary.median} />}
+                  />
+                )}
+                {summary.bestMe !== null && summary.bestTe !== null && (
+                  <StatChip
+                    label={t('bpcContracts.bestMeTeLabel')}
+                    value={`${summary.bestMe} / ${summary.bestTe}`}
+                  />
+                )}
+              </StatChips>
             </div>
           )}
 
           {(regionPrices.length > 1 || selectedBpoCards.length > 0) && (
             // One wrapping row: [Cheapest by region] [Market BPOs] [Contract BPOs],
-            // every card the same width; groups stack on a phone, where the
-            // region cells scroll sideways and a BPO is one line. A group
-            // with no card is left out.
-            <div className="flex flex-col gap-3 border-b border-line px-3 py-2 sm:flex-row sm:flex-wrap sm:gap-x-4">
+            // every card the same width; on a phone the region cells take the
+            // first line (scrolling sideways) and the two BPO groups share the
+            // next in two columns. A group with no card is left out.
+            <div className="grid grid-cols-2 gap-x-2 gap-y-2 border-b border-line px-3 py-2 sm:flex sm:flex-row sm:flex-wrap sm:gap-x-4">
               {regionPrices.length > 1 && (
-                <div className="min-w-0 max-w-full">
+                <div className="col-span-2 min-w-0 max-w-full">
                   {/* Says so when it is showing a subset: the cheapest region always
                     survives the slice, but a blueprint listed in twenty regions
                     would otherwise show six with nothing admitting it. */}

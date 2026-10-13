@@ -340,6 +340,8 @@ const FILTER_FIELD: Record<string, string> = {
   Owned: 'Source',
   'Market BPOs': 'Source',
   'Contract BPOs': 'Source',
+  'LP Store': 'Source',
+  Community: 'Source',
   Auctions: 'Exclude',
   'PLEX contracts': 'Exclude',
   Highsec: 'Space',
@@ -907,7 +909,7 @@ describe('BpcSourcingPanel row identity', () => {
 });
 
 describe('BpcSourcingPanel source multiselect', () => {
-  it('defaults to both sources on, showing contract and owned rows together', async () => {
+  it('defaults to every source on, showing contract and owned rows together', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
@@ -961,13 +963,13 @@ describe('BpcSourcingPanel source multiselect', () => {
   /**
    * The synced contract snapshot can run to six figures (ADR 0013), while a
    * character's owned blueprints realistically number in the dozens. The
-   * owned row sorts after every priced contract row, so it has to stay
-   * reachable by scrolling rather than fall past a cap (issue #1777).
+   * owned row is free, so it sorts ahead of every priced contract row and
+   * never falls past the result cap (issues #1777, BPC Sourcing rework).
    */
-  it('keeps an owned row reachable when far more contract rows exist than fit on screen', async () => {
+  it('lists an owned row first, ahead of far more contract rows than fit on screen', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot(
-        Array.from({ length: 60 }, (_, i) => row({ contractId: i + 1, typeId: 638, price: i }))
+        Array.from({ length: 60 }, (_, i) => row({ contractId: i + 1, typeId: 638, price: i + 1 }))
       )
     );
     loadCharacterBlueprints.mockResolvedValue(
@@ -976,13 +978,8 @@ describe('BpcSourcingPanel source multiselect', () => {
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-    Object.defineProperty(window, 'scrollY', { configurable: true, value: 1_000_000 });
-    try {
-      fireEvent.scroll(window);
-      expect(await within(table).findByText('Caracal Blueprint')).toBeInTheDocument();
-    } finally {
-      Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
-    }
+    const firstBodyRow = within(table).getAllByRole('row')[1];
+    expect(within(firstBodyRow).getByText('Caracal Blueprint')).toBeInTheDocument();
   });
 
   it('tags an owned row as Owned in the Item cell regardless of visible columns (issue #1782)', async () => {
@@ -1056,8 +1053,16 @@ describe('BpcSourcingPanel source multiselect', () => {
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
-    await toggleFilterOption(user, 'Contracts');
-    await toggleFilterOption(user, 'Owned');
+    for (const option of [
+      'Contracts',
+      'Contract BPOs',
+      'Market BPOs',
+      'LP Store',
+      'Community',
+      'Owned',
+    ]) {
+      await toggleFilterOption(user, option);
+    }
 
     expect(screen.getByText('Select at least one source to search.')).toBeInTheDocument();
   });
@@ -1214,8 +1219,11 @@ describe('BpcSourcingPanel remembered Source', () => {
     await revisit(unmount);
     expect(window.location.search).toBe('');
     await openFilters(user);
-    for (const option of ['Contracts', 'Owned', 'Contract BPOs', 'Market BPOs']) {
+    for (const option of ['Contracts', 'Owned']) {
       expect(await filterOptionChecked(user, option)).toBe('true');
+    }
+    for (const option of ['Contract BPOs', 'Market BPOs']) {
+      expect(await filterOptionChecked(user, option)).toBe('false');
     }
   });
 
@@ -1248,12 +1256,12 @@ describe('BpcSourcingPanel remembered Source', () => {
     await toggleFilterOption(user, 'Market BPOs');
     await toggleFilterOption(user, 'Contracts');
     await toggleFilterOption(user, 'Owned');
-    // Only Market BPOs is left, and the row is a contract, so nothing matches.
+    // Nothing left matches, so Reset filters is the way back to the defaults.
     await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
 
     await revisit(unmount);
     await openFilters(user);
-    expect(await filterOptionChecked(user, 'Market BPOs')).toBe('false');
+    expect(await filterOptionChecked(user, 'Market BPOs')).toBe('true');
     expect(await filterOptionChecked(user, 'Contracts')).toBe('true');
     expect(await filterOptionChecked(user, 'Owned')).toBe('true');
   });
@@ -1641,6 +1649,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         fetchedAt: 0,
       }));
       loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
+      window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,owned');
       const user = userEvent.setup();
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -1678,6 +1687,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         fetchedAt: 0,
       }));
       loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
+      window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,owned');
       const user = userEvent.setup();
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
@@ -1793,6 +1803,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       loadCharacterBlueprints.mockResolvedValue(
         ownedResult([ownedBlueprint({ item_id: 1, type_id: 638 })])
       );
+      window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,owned');
       const user = userEvent.setup();
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
