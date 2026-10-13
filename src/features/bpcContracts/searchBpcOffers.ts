@@ -142,7 +142,12 @@ export function bpcMarketLookup(
 /** The slice of `BpcSourceData` stage 1 reads; none of it moves while the type query is typed. */
 export type BpcPrepareData = Pick<
   BpcSourceData,
-  'contractRows' | 'originals' | 'contractLocations' | 'blueprintNames' | 'ownedBlueprints'
+  | 'contractRows'
+  | 'originals'
+  | 'contractLocations'
+  | 'blueprintNames'
+  | 'ownedBlueprints'
+  | 'communityRows'
 >;
 
 /** What stage 1 reads of the query: everything except the type query and the picked blueprint. */
@@ -183,15 +188,18 @@ export function prepareBpcOffers(data: BpcPrepareData, input: BpcPrepareInput): 
     contractLocations
   );
 
-  // Owned typeIds join the options (gated on the Owned toggle) so free-text
-  // search narrows an Owned-only result, never displacing a real contract
-  // match from the ranked window when Owned is off.
+  // Owned and Community typeIds join the options (gated on their toggles) so
+  // free-text search finds a blueprint only they hold, never displacing a real
+  // contract match from the ranked window when the source is off.
   const ownedTypeIds = sources.has('owned')
     ? data.ownedBlueprints.map((bp) => ({ typeId: bp.type_id }))
     : [];
+  const communityTypeIds = sources.has('community')
+    ? data.communityRows.map((row) => ({ typeId: row.typeId }))
+    : [];
   const listedOriginals = sources.has('contractBpo') ? spaceFilteredOriginals : [];
   const typeOptions = listedBlueprintTypeOptions(
-    [...spaceFilteredRows, ...listedOriginals, ...ownedTypeIds],
+    [...spaceFilteredRows, ...listedOriginals, ...ownedTypeIds, ...communityTypeIds],
     data.blueprintNames
   );
 
@@ -229,16 +237,6 @@ export function rankBpcOffers(
     });
   const toSearchRows = (rows: readonly BpcContractRow[]) =>
     rows.map((row) => contractRowToSearchRow(row, contractLocations.get(row.locationId)));
-
-  const suggestions: BlueprintSuggestion[] = [];
-  if (selectedTypeId === null && hasTypeQuery) {
-    for (const option of typeMatches(SUGGESTION_LIMIT)) {
-      // A blueprint with no offers left under the current filters is not a
-      // candidate — picking it would resolve to an empty table.
-      const stats = offerStats.get(option.typeId);
-      if (stats) suggestions.push({ ...option, ...stats });
-    }
-  }
 
   let typeIds: Set<number> | null = null;
   if (selectedTypeId !== null) typeIds = new Set([selectedTypeId]);
@@ -298,7 +296,9 @@ export function rankBpcOffers(
   // LP and Community rows cover every blueprint; a typed or picked search
   // narrows them to the looked-up types.
   const searchedTypeIds =
-    selectedTypeId !== null || hasTypeQuery ? new Set(data.marketTypeIds) : null;
+    selectedTypeId !== null || hasTypeQuery
+      ? new Set([...data.marketTypeIds, ...(typeIds ?? [])])
+      : null;
   const narrowLpAndCommunity = (rows: readonly BpcSearchRow[]) =>
     filterBpcSearchRows(
       searchedTypeIds ? rows.filter((row) => searchedTypeIds.has(row.typeId)) : rows,
@@ -306,6 +306,31 @@ export function rankBpcOffers(
     );
   const lpSearchRows = narrowLpAndCommunity(data.lpRows);
   const communitySearchRows = narrowLpAndCommunity(data.communityRows);
+
+  // Offers a blueprint has beyond the contract snapshot: an owned or community
+  // blueprint is a pickable result too, even when nobody has contracted it.
+  const suggestionStats = new Map(offerStats);
+  const extraRows = [
+    ...(sources.has('owned') ? filteredOwnedRows : []),
+    ...(sources.has('community') ? communitySearchRows : []),
+  ];
+  for (const row of extraRows) {
+    const existing = suggestionStats.get(row.typeId);
+    suggestionStats.set(row.typeId, {
+      offerCount: (existing?.offerCount ?? 0) + 1,
+      bestMe: Math.max(existing?.bestMe ?? 0, row.me),
+      bestTe: Math.max(existing?.bestTe ?? 0, row.te),
+    });
+  }
+  const suggestions: BlueprintSuggestion[] = [];
+  if (selectedTypeId === null && hasTypeQuery) {
+    for (const option of typeMatches(SUGGESTION_LIMIT)) {
+      // A blueprint with no offers left under the current filters is not a
+      // candidate — picking it would resolve to an empty table.
+      const stats = suggestionStats.get(option.typeId);
+      if (stats) suggestions.push({ ...option, ...stats });
+    }
+  }
 
   // The cheapest BPO per blueprint type in the results: contract originals in
   // the Region filter's scope, market orders for the looked-up types only.

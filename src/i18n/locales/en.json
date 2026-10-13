@@ -7676,6 +7676,7 @@
       "hideAuctions": "No auctions",
       "hidePlex": "No PLEX contracts",
       "sources": "Source: {{list}}",
+      "sourcesCount": "Sources: {{count}} of {{total}}",
       "space": "Space: {{list}}",
       "clearAll": "Clear all"
     },

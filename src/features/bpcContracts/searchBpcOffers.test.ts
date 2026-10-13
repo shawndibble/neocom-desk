@@ -367,6 +367,30 @@ describe('searchBpcOffers type search, suggestions and summary', () => {
     expect(suggestions.map((s) => s.offerCount)).toEqual([1]);
   });
 
+  it('suggests a blueprint only a Community Member holds, and finds its row', () => {
+    const only = data({ communityRows: [community(CARACAL)] });
+    const result = searchBpcOffers(
+      only,
+      query({ sources: ALL_SOURCES, filter: { typeQuery: 'caracal' } })
+    );
+    expect(result.suggestions.map((s) => s.typeId)).toEqual([CARACAL]);
+    expect(sourcesOf(result.displayRows)).toEqual(['community']);
+  });
+
+  it('suggests a blueprint only the pilot owns, but not once Owned is off', () => {
+    const only = data({ ownedBlueprints: [owned({ type_id: CARACAL })] });
+    const typed = { filter: { typeQuery: 'caracal' } };
+    expect(
+      searchBpcOffers(only, query({ sources: ALL_SOURCES, ...typed })).suggestions.map(
+        (s) => s.typeId
+      )
+    ).toEqual([CARACAL]);
+    expect(
+      searchBpcOffers(only, query({ sources: new Set<SourceToggle>(['contract']), ...typed }))
+        .suggestions
+    ).toEqual([]);
+  });
+
   it('offers no suggestions once a blueprint is picked or with no text', () => {
     expect(searchBpcOffers(d, query({ selectedTypeId: RIFTER })).suggestions).toEqual([]);
     expect(searchBpcOffers(d, query()).suggestions).toEqual([]);
