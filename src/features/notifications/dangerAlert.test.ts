@@ -10,6 +10,7 @@ import {
   markAllReadTargets,
   alertViewPath,
   selectDangerBanner,
+  usefulChips,
   typeChipOfGroupKey,
 } from './dangerAlert';
 
@@ -111,6 +112,38 @@ describe('chips', () => {
     expect(keys('mail')).toEqual(['event:newMail']);
     expect(keys('market')).toEqual(['event:priceAlertTriggered']);
     expect(keys('industry')).toEqual([]);
+  });
+});
+
+describe('usefulChips', () => {
+  const chips = (...entries: NotificationFeedRecord[]) => usefulChips(groupAlertsByType(entries));
+
+  it('is empty with no alerts or a single type', () => {
+    expect(chips()).toEqual([]);
+    expect(chips(mail('a', 1), mail('b', 2))).toEqual([]);
+    expect(chips(attack('a', 1))).toEqual([]);
+  });
+
+  it('is empty when every type files under the same chip', () => {
+    expect(chips(entry('p', 'priceAlertTriggered', 1), entry('f', 'marketOrderFilled', 2))).toEqual(
+      []
+    );
+  });
+
+  it('lists All plus only the chips that narrow the list', () => {
+    expect(chips(mail('m', 1), entry('p', 'priceAlertTriggered', 2), attack('a', 3))).toEqual([
+      'all',
+      'danger',
+      'market',
+      'mail',
+      'structures',
+    ]);
+  });
+
+  it('keeps a chip that matches some but not all types', () => {
+    expect(
+      chips(mail('m', 1), entry('o', 'eveNotification', 2, { eveType: 'CorpAllBillMsg' }))
+    ).toEqual(['all', 'mail']);
   });
 });
 
