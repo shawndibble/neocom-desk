@@ -102,3 +102,29 @@ test.describe('Build Plan list — group header vs. member name indent', () => {
     expect(await measureIndent(page)).toBeCloseTo(EXPECTED_INDENT_PX, 0);
   });
 });
+
+test('Profit sort button hit area spans 44px at 390px (#3680)', async ({ page }) => {
+  await signInAndGoto(page);
+  await seedGroupedPlan(page);
+  await page.setViewportSize(PHONE);
+  await page.goto('./industry');
+  const sort = page.getByRole('button', { name: /Profit/ }).first();
+  await expect(sort).toBeVisible();
+  const box = (await sort.boundingBox())!;
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  // The hit area is a `::after` box, so the button's own box stays small;
+  // hit-test just inside 22px above and below its centre instead.
+  for (const dy of [-21, 21]) {
+    const hitsSort = await sort.evaluate(
+      (el, [x, y]) => el.contains(document.elementFromPoint(x, y)),
+      [cx, cy + dy]
+    );
+    expect(hitsSort).toBe(true);
+  }
+  await sort.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(page.getByRole('button', { name: /sorted/i }).first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
+});

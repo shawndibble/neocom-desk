@@ -151,7 +151,7 @@ function SortHeader({
             : t('industry.sortBy', { column: label })
         }
         aria-pressed={active}
-        className={`inline-flex items-center gap-px rounded-xs uppercase tracking-widest hover:text-text ${interactiveClassName} ${focusRingClassName} ${active ? 'text-text' : ''}`}
+        className={`relative inline-flex items-center gap-px rounded-xs uppercase tracking-widest after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-[""] md:after:hidden hover:text-text ${interactiveClassName} ${focusRingClassName} ${active ? 'text-text' : ''}`}
       >
         {label}
         <Glyph
