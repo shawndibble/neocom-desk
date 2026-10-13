@@ -53,6 +53,27 @@ test.describe('PI Plan — Goal Planner', () => {
     expect(goalsBox.y).toBeLessThan(headlineBox.y);
     await assertNoOverflow(page);
   });
+
+  test.describe('held-back reason on touch (issue #3681)', () => {
+    test.use({ hasTouch: true });
+
+    test('a tap on a partly made line shows why, with no native title', async ({ page }) => {
+      await page.setViewportSize(PHONE);
+      await signInAndGoto(page, './planetary-industry/colonies');
+      await mockPlannerColonies(page);
+      await mockHubPrices(page);
+      await page.goto(`./planetary-industry/plan?goals=${GOALS}`);
+
+      const table = page.getByRole('table', { name: 'Everything the goals need, by tier' });
+      await expect(table).toBeAttached({ timeout: 20_000 });
+      const heldBack = table.getByText(/\d+% made/).first();
+      await expect(heldBack).toBeVisible();
+      await expect(heldBack).not.toHaveAttribute('title');
+
+      await heldBack.tap();
+      await expect(page.getByRole('tooltip')).toContainText('a scarcer input elsewhere');
+    });
+  });
 });
 
 test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {

@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { DataTable, Panel, type DataTableColumn } from '@/components/ui';
+import { DataTable, Panel, Tooltip, type DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { DemandLine, DemandSource, PlanetType } from '@/engine/pi/goalTypes';
@@ -126,13 +126,20 @@ export function Flow({
         render: (line) => {
           const heldBack =
             (line.source === 'made' || line.source === 'extracted') && line.madeFraction < WHOLE;
-          return (
+          const label = (
             <span
               className={heldBack ? 'text-warning' : SOURCE_TONE[line.source]}
-              title={heldBack ? t('piPlan.sourceHeldBackTooltip') : undefined}
+              tabIndex={heldBack ? 0 : undefined}
             >
               {sourceLabel(line, t)}
             </span>
+          );
+          return heldBack ? (
+            <Tooltip content={t('piPlan.sourceHeldBackTooltip')} openOnTap>
+              {label}
+            </Tooltip>
+          ) : (
+            label
           );
         },
       },
