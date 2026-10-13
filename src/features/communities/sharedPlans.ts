@@ -36,7 +36,8 @@ import {
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
-import { communityBackendOverride, listCommunityIds } from './communityStore';
+import { communityBackendOverride } from './backendOverride';
+import { listCommunityIds } from './communityStore';
 import { markPlansShared } from './shareSelection';
 
 const MAX_NAME_LENGTH = 200;

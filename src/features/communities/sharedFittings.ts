@@ -38,12 +38,8 @@ import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { loadTypes } from '@/sde/loadSde';
 import { loadFittingsAll, markFittingsShared } from './shareSelection';
-import {
-  communityBackendOverride,
-  loadCommunityMembers,
-  loadMyCommunities,
-  type CommunitySummary,
-} from './communityStore';
+import { communityBackendOverride } from './backendOverride';
+import { loadCommunityMembers, loadMyCommunities, type CommunitySummary } from './communityStore';
 
 /** firestore.rules caps; a Fitting past them is left unshared rather than failing the batch. */
 const MAX_CODE_LENGTH = 90_000;
