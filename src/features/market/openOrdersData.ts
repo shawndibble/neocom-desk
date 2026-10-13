@@ -18,10 +18,9 @@
  * rejects outright (the rare case `loadOrders` really can throw — see
  * `assets.ts`'s fan-out for why), lands in `skipped`.
  */
-import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import type { MarketOrder } from '@/esi/endpoints';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 import { loadOrders } from '@/features/character/orders';
 
 const ORDERS_SCOPE = ESI_REGISTRY.getCharacterOrders.scope;
@@ -42,64 +41,24 @@ export interface OpenOrdersSnapshot {
   skipped: { characterId: number; name: string }[];
 }
 
-type FanOutOutcome =
-  | { kind: 'entry'; value: CharacterOpenOrders }
-  | { kind: 'skipped'; value: { characterId: number; name: string } };
-
 /**
  * Every authenticated Character's open market orders, active one included —
  * this page IS the cross-character view, so there is no "active Character"
  * to exclude the way `loadOtherCharactersAssets`'s toggle does.
  */
-export async function loadAllCharactersOpenOrders(): Promise<OpenOrdersSnapshot> {
-  const characters = await db.characters.toArray();
-  const granted = await Promise.all(
-    characters.map(async (character) => {
-      const token = await db.tokens.get(character.characterId);
-      return (token?.scopes ?? []).includes(ORDERS_SCOPE);
-    })
-  );
-
-  const toFetch = characters.filter((_, i) => granted[i]);
-  const noScopeSkipped = characters
-    .filter((_, i) => !granted[i])
-    .map(({ characterId, name }) => ({ characterId, name }));
-
-  // Slotted by original index, not push-on-completion order, so a slower
-  // Character's fetch can never reorder the snapshot relative to a faster
-  // one's — "ordering is stable" holds regardless of which response lands
-  // first.
-  const outcomes: FanOutOutcome[] = new Array(toFetch.length);
-  await mapWithConcurrencyLimit(
-    toFetch.map((character, index) => ({ character, index })),
-    ESI_FANOUT_CONCURRENCY,
-    async ({ character, index }) => {
-      const { characterId, name } = character;
-      try {
-        const { cached, needsReauth } = await loadOrders(characterId);
-        outcomes[index] = {
-          kind: 'entry',
-          value: {
-            characterId,
-            characterName: name,
-            orders: cached?.data ?? [],
-            fetchedAt: cached?.fetchedAt.getTime() ?? 0,
-            fromCache: cached?.fromCache ?? false,
-            needsReauth,
-          },
-        };
-      } catch {
-        outcomes[index] = { kind: 'skipped', value: { characterId, name } };
-      }
-    }
-  );
-
-  const entries: CharacterOpenOrders[] = [];
-  const fetchFailedSkipped: { characterId: number; name: string }[] = [];
-  for (const outcome of outcomes) {
-    if (outcome.kind === 'entry') entries.push(outcome.value);
-    else fetchFailedSkipped.push(outcome.value);
-  }
-
-  return { entries, skipped: [...noScopeSkipped, ...fetchFailedSkipped] };
+export function loadAllCharactersOpenOrders(): Promise<OpenOrdersSnapshot> {
+  return fanOutAllCharacters<CharacterOpenOrders>({
+    scope: ORDERS_SCOPE,
+    load: async ({ characterId, name }) => {
+      const { cached, needsReauth } = await loadOrders(characterId);
+      return {
+        characterId,
+        characterName: name,
+        orders: cached?.data ?? [],
+        fetchedAt: cached?.fetchedAt.getTime() ?? 0,
+        fromCache: cached?.fromCache ?? false,
+        needsReauth,
+      };
+    },
+  });
 }
