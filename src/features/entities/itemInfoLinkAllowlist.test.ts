@@ -11,6 +11,7 @@ const REVIEWED = new Set<string>([
   'src/features/character/assetBrowserRows.tsx',
   'src/features/character/ContractDetailModal.tsx',
   'src/features/character/JournalDescriptionCell.tsx',
+  'src/features/communities/SharedBlueprintTable.tsx',
   'src/features/contracts/PublicContractDetailModal.tsx',
   'src/features/corp/CorpBoardRow.tsx',
   'src/features/corp/CorpRoster.tsx',
