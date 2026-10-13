@@ -111,6 +111,21 @@ describe('ShareFittingsTab', () => {
     expect(store.shareFitting).toHaveBeenCalledWith(1, 'c1', expect.objectContaining({ key: 'b' }));
   });
 
+  it('keeps a stopped Fitting excluded when sharing it again does not go through', async () => {
+    store.shared = new Set(['saved-a', 'game-9']);
+    await saveFittingsAll(1, 'c1', new Set(['saved-b']));
+    store.shareFitting.mockRejectedValue(new Error('offline'));
+    const user = userEvent.setup();
+    render(<ShareFittingsTab characterId={1} communityId="c1" />);
+    const dialog = await openAdd(user);
+    const row = within(dialog).getByText('Beta Fit').closest('li')!;
+    await user.click(within(row).getByRole('button', { name: f.share }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(f.failed);
+    expect(await loadFittingsAll(1, 'c1')).toEqual(new Set(['saved-b']));
+    // The truth is re-read: Beta is still offered, not listed as shared.
+    expect(within(dialog).getByText('Beta Fit')).toBeInTheDocument();
+  });
+
   it('says so in the dialog when a Fitting cannot be shared', async () => {
     store.shareFitting.mockResolvedValue(false);
     const user = userEvent.setup();

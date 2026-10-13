@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, SearchInput, Spinner } from '@/components/ui';
+import { Link } from 'react-router-dom';
+import { Button, buttonClassName, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import { db, type SkillPlanRecord } from '@/db';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddSharedItemsDialog } from './AddSharedItemsDialog';
@@ -150,21 +151,28 @@ export function ShareSkillPlansTab({
     return { ...current, shared };
   }
 
+  // With no plans of its own the pilot needs somewhere to make one.
+  const makePlan = (
+    <Link to="/skills/plans" className={buttonClassName({ size: 'sm' })}>
+      {t('communities.plans.makePlan')}
+    </Link>
+  );
+
   return (
     <div className="space-y-2">
       <p className="text-xs text-text-dim">{t('communities.plans.hint')}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p role="status" className="text-xs text-text-dim">
+          {t('communities.plans.count', { count: loaded.shared.size })}
+        </p>
+        <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
+          {t('communities.plans.add')}
+        </Button>
+      </div>
       {loaded.plans.length === 0 ? (
-        <EmptyState title={t('communities.plans.noPlans')} />
+        <EmptyState title={t('communities.plans.noPlans')} action={makePlan} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <p role="status" className="text-xs text-text-dim">
-              {t('communities.plans.count', { count: loaded.shared.size })}
-            </p>
-            <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
-              {t('communities.plans.add')}
-            </Button>
-          </div>
           <SearchInput
             ref={search}
             className="w-full"
@@ -223,7 +231,12 @@ export function ShareSkillPlansTab({
         title={t('communities.plans.addTitle')}
         searchLabel={t('communities.plans.addSearch')}
         shareLabel={t('communities.plans.share')}
-        nothingToAdd={t('communities.plans.nothingToAdd')}
+        nothingToAdd={
+          loaded.plans.length === 0
+            ? t('communities.plans.noPlans')
+            : t('communities.plans.nothingToAdd')
+        }
+        nothingAction={loaded.plans.length === 0 ? makePlan : undefined}
         notice={notice}
         items={addable.map((plan) => ({
           key: plan.id,

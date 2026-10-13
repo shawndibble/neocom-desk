@@ -103,6 +103,23 @@ export function Communities() {
     });
   }, [openId]);
 
+  // The old Invites tab's `?tab=invites` opens Manage › Invites once. Dropped
+  // from the URL as soon as the Community is on screen, so a reload or a
+  // Character switch does not open it again.
+  const legacyInvites = params.get('tab') === INVITES_TAB_PARAM;
+  const openShown = communities?.some((community) => community.id === openId) ?? false;
+  useEffect(() => {
+    if (!legacyInvites || !openShown) return;
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('tab');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [legacyInvites, openShown, setParams]);
+
   if (!hydrated) return <Spinner label={t('communities.loading')} />;
   if (characterId === null) return <Navigate to="/characters" replace />;
 
@@ -195,11 +212,12 @@ export function Communities() {
                         {t('communities.memberCount', { count: community.memberCount })}
                       </span>
                     </span>
-                    <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                      {isCommunityAdmin(community, characterId)
-                        ? t('communities.adminBadge')
-                        : t('communities.memberBadge')}
-                    </span>
+                    {/* Only the exception is marked: every row is a Community the Character is a Member of. */}
+                    {isCommunityAdmin(community, characterId) && (
+                      <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
+                        {t('communities.adminBadge')}
+                      </span>
+                    )}
                     <RowCaret />
                   </button>
                 </li>

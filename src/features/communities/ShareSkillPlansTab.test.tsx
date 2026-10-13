@@ -122,9 +122,15 @@ describe('ShareSkillPlansTab', () => {
     expect(await screen.findByText('Alpha Plan')).toBeInTheDocument();
   });
 
-  it('says there is nothing to share when the Character has no plans', async () => {
+  it('says there is nothing to share when the Character has no plans, and where to make one', async () => {
     await db.skillPlans.clear();
+    const user = userEvent.setup();
     renderTab();
     expect(await screen.findByText(p.noPlans)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: p.makePlan })).toHaveAttribute('href', '/skills/plans');
+    // Add stays where it always is.
+    const dialog = await openAdd(user);
+    expect(within(dialog).getByText(p.noPlans)).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: p.makePlan })).toBeInTheDocument();
   });
 });

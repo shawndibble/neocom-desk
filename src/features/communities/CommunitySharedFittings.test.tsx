@@ -80,6 +80,17 @@ describe('CommunitySharedFittings', () => {
     expect(screen.getByRole('link', { name: /Old Fit/ })).toBeInTheDocument();
   });
 
+  it('matches the sharer as shown, so "you" finds this Character’s own', async () => {
+    const user = userEvent.setup();
+    renderList();
+    await user.type(
+      await screen.findByRole('searchbox', { name: e.fittingsSearch }),
+      en.communities.you
+    );
+    expect(screen.getByRole('link', { name: /Mining Venture/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Brawl Rifter/ })).not.toBeInTheDocument();
+  });
+
   it('says so when nothing is shared yet', async () => {
     store.loadCommunityFittings.mockResolvedValue([]);
     renderList();

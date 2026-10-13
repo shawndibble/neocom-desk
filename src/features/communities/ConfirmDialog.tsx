@@ -11,6 +11,7 @@ export function ConfirmDialog({
   danger = true,
   onConfirm,
   onClose,
+  returnFocusFallback,
 }: {
   open: boolean;
   title: string;
@@ -20,6 +21,8 @@ export function ConfirmDialog({
   /** Rejects to keep the dialog open and show the failure. */
   onConfirm: () => Promise<void>;
   onClose: () => void;
+  /** Where focus goes on close when the control that opened it is gone (`Modal`'s). */
+  returnFocusFallback?: () => HTMLElement | null;
 }) {
   const { t } = useTranslation();
   const [working, setWorking] = useState(false);
@@ -45,6 +48,7 @@ export function ConfirmDialog({
         if (!working) onClose();
       }}
       title={title}
+      returnFocusFallback={returnFocusFallback}
     >
       <p className="text-xs text-text-dim">{body}</p>
       {failed && (

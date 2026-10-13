@@ -26,6 +26,7 @@ export function AddSharedItemsDialog({
   searchLabel,
   shareLabel,
   nothingToAdd,
+  nothingAction,
   items,
   notice,
   onShare,
@@ -38,6 +39,8 @@ export function AddSharedItemsDialog({
   shareLabel: string;
   /** Shown when everything is already shared. */
   nothingToAdd: string;
+  /** A way forward when there is nothing to add (a link to make one). */
+  nothingAction?: ReactNode;
   items: readonly AddableItem[];
   /** A failure from the last Share; shown in here, since the page behind is inert while the dialog is open. */
   notice: string | null;
@@ -61,7 +64,7 @@ export function AddSharedItemsDialog({
     >
       <div className="space-y-2">
         {items.length === 0 ? (
-          <EmptyState title={nothingToAdd} />
+          <EmptyState title={nothingToAdd} action={nothingAction} />
         ) : (
           <>
             <SearchInput

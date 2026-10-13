@@ -202,17 +202,29 @@ export function ShareFittingsTab({
 
   async function add(current: Loaded, input: SharedFittingInput): Promise<Loaded> {
     const key = fittingChoiceKey(input);
-    if (!(await shareFitting(characterId, communityId, input))) {
-      setNotice(t('communities.fittings.cannot'));
-      return current;
-    }
     // Under "share all" a stopped Fitting is an exclusion: adding it back lifts
-    // it, so its later saves follow again.
-    let allExcluded = current.allExcluded;
-    if (allExcluded?.has(key)) {
-      allExcluded = new Set(allExcluded);
+    // it, so its later saves follow again. Lifted first, so a failure here
+    // shares nothing (run() then reloads the truth); a share that does not go
+    // through puts the exclusion back.
+    const before = current.allExcluded;
+    const lifted = before?.has(key) ?? false;
+    let allExcluded = before;
+    if (before && lifted) {
+      allExcluded = new Set(before);
       allExcluded.delete(key);
       await saveFittingsAll(characterId, communityId, allExcluded);
+    }
+    let shared: boolean;
+    try {
+      shared = await shareFitting(characterId, communityId, input);
+    } catch (error) {
+      if (lifted) await saveFittingsAll(characterId, communityId, before);
+      throw error;
+    }
+    if (!shared) {
+      if (lifted) await saveFittingsAll(characterId, communityId, before);
+      setNotice(t('communities.fittings.cannot'));
+      return current;
     }
     return { ...current, allExcluded, shared: new Set(current.shared).add(key) };
   }

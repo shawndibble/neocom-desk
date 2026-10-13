@@ -23,8 +23,14 @@ import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadBlueprints } from '@/sde/loadSde';
 import { uidForCharacter } from '@/sync/uid';
 import { loadMemberLibraries, type CommunityMember } from './communityStore';
+import { sharedBlueprintRows } from './sharedBlueprintCopies';
+import { SharedBlueprintTable } from './SharedBlueprintTable';
 
 const FILTERS: LibraryFilter[] = ['missingCommunity', 'ownedByMe', 'missingFromMe'];
+
+/** "Shared in the Community" (each shared blueprint, the default) or one of the matrix filters. */
+type LibraryView = 'shared' | LibraryFilter;
+const VIEWS: LibraryView[] = ['shared', ...FILTERS];
 
 type Loaded = {
   catalog: BlueprintTypeInfo[];
@@ -162,11 +168,13 @@ function LibraryGroup({
 
 /**
  * The Community Library (issue #3601), the Blueprints tab's Everyone view:
- * every blueprint in the SDE against the Members who share it. Filter chips
- * pick "missing from the Community" (default), "owned by me" or "missing from
- * me"; the market-group tree counts each category. A stale Member is greyed
- * and badged, never hidden. BPC Sourcing, one link away, lists each shared
- * copy with its owner, place and ME/TE/runs.
+ * what the Members share. It opens on "Shared in the Community": each shared
+ * blueprint with its Member, station or structure and system, ME / TE and
+ * runs. The other chips turn to every blueprint in the SDE against the
+ * Members who share it: "missing from the Community", "owned by me" or
+ * "missing from me", in a market-group tree that counts each category. A
+ * stale Member is greyed and badged, never hidden. BPC Sourcing is one link
+ * away, to source a copy.
  */
 export function CommunityLibrary({
   communityId,
@@ -183,7 +191,8 @@ export function CommunityLibrary({
 }) {
   const { t } = useTranslation();
   const myUid = uidForCharacter(characterId);
-  const [filter, setFilter] = useState<LibraryFilter>('missingCommunity');
+  const [view, setView] = useState<LibraryView>('shared');
+  const filter: LibraryFilter = view === 'shared' ? 'missingCommunity' : view;
   const [query, setQuery] = useState('');
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
@@ -239,12 +248,37 @@ export function CommunityLibrary({
     () => (loaded ? buildShareTree(shown, loaded.groups, t('communities.library.other')) : []),
     [loaded, shown, t]
   );
+  const staleUids = useMemo(
+    () =>
+      new Set(
+        (members ?? [])
+          .filter((member) => isLibraryStale(member.libraryAsOf, now))
+          .map((member) => member.uid)
+      ),
+    [members, now]
+  );
+  const copies = useMemo(
+    () =>
+      loaded
+        ? sharedBlueprintRows(
+            loaded.libraries,
+            members ?? [],
+            new Map(loaded.catalog.map((type) => [type.typeId, type.name])),
+            staleUids,
+            query
+          )
+        : [],
+    [loaded, members, staleUids, query]
+  );
   const counts = useMemo(
     () =>
-      Object.fromEntries(
-        FILTERS.map((id) => [id, filterLibraryRows(allRows, myUid, id, query).length])
-      ) as Record<LibraryFilter, number>,
-    [allRows, myUid, query]
+      ({
+        shared: copies.length,
+        ...Object.fromEntries(
+          FILTERS.map((id) => [id, filterLibraryRows(allRows, myUid, id, query).length])
+        ),
+      }) as Record<LibraryView, number>,
+    [allRows, myUid, query, copies]
   );
 
   if (membersFailed || (failed && !loaded)) {
@@ -255,10 +289,6 @@ export function CommunityLibrary({
     );
   }
   if (!members || !loaded) return <Spinner size="sm" label={t('communities.loading')} />;
-
-  const staleUids = new Set(
-    members.filter((member) => isLibraryStale(member.libraryAsOf, now)).map((member) => member.uid)
-  );
 
   return (
     <div className="space-y-3">
@@ -273,13 +303,13 @@ export function CommunityLibrary({
         role="group"
         aria-label={t('communities.library.filterLabel')}
       >
-        {FILTERS.map((id) => (
+        {VIEWS.map((id) => (
           <FilterChip
             key={id}
             label={t(`communities.library.${id}`)}
             count={counts[id]}
-            selected={filter === id}
-            onToggle={() => setFilter(id)}
+            selected={view === id}
+            onToggle={() => setView(id)}
           />
         ))}
         <SearchInput
@@ -306,12 +336,13 @@ export function CommunityLibrary({
           </li>
         ))}
       </ul>
-      <p className="text-xs text-text-dim">{t('communities.library.legend')}</p>
-
-      {tree.length === 0 ? (
+      {view === 'shared' ? (
+        <SharedBlueprintTable rows={copies} />
+      ) : tree.length === 0 ? (
         <EmptyState title={t('communities.library.none')} />
       ) : (
         <div className="overflow-x-auto">
+          <p className="mb-2 text-xs text-text-dim">{t('communities.library.legend')}</p>
           <div className="hidden items-center justify-end md:flex">
             {members.map((member) => {
               const stale = staleUids.has(member.uid);
