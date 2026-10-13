@@ -5,6 +5,7 @@
  * and when a published library reads as stale. Pure: the push itself is
  * `features/communities/libraryPush.ts`.
  */
+import { sharesBlueprint, type BlueprintShare } from './shareMode';
 
 /** What a Member shares of one blueprint. Never a container, hangar or item id. */
 export interface SharedBlueprint {
@@ -43,22 +44,27 @@ export interface ResolvedPlace {
 }
 
 /**
- * The blueprints to publish: those whose type is selected and whose station or
- * structure and system are known. `placeOf` returns null for one in a
- * container with no resolvable station, or an unresolvable structure; that
- * blueprint is left out rather than shared with a guessed place, and counted
- * in `skipped` so the Member can be told how many.
+ * The blueprints to publish: the copies the share covers (`sharesBlueprint`:
+ * by type, or by their station or structure under a location rule) whose
+ * station or structure and system are known. `placeIdOf` is a copy's resolved
+ * station or structure id, null in a container with no resolvable station;
+ * `placeOf` names a place, null for an unresolvable structure. Such a copy is
+ * left out rather than shared with a guessed place, and counted in `skipped`
+ * so the Member can be told how many. Place ids are only matched here, never
+ * published.
  */
 export function splitSharedBlueprints<B extends OwnedBlueprintInput>(
   owned: readonly B[],
-  selected: ReadonlySet<number>,
-  placeOf: (blueprint: B) => ResolvedPlace | null
+  share: BlueprintShare,
+  placeIdOf: (blueprint: B) => number | null,
+  placeOf: (placeId: number) => ResolvedPlace | null
 ): { shared: SharedBlueprint[]; skipped: number } {
   const shared: SharedBlueprint[] = [];
   let skipped = 0;
   for (const blueprint of owned) {
-    if (!selected.has(blueprint.type_id)) continue;
-    const place = placeOf(blueprint);
+    const placeId = placeIdOf(blueprint);
+    if (!sharesBlueprint(share, blueprint.type_id, placeId)) continue;
+    const place = placeId === null ? null : placeOf(placeId);
     if (!place) {
       skipped += 1;
       continue;
@@ -77,10 +83,11 @@ export function splitSharedBlueprints<B extends OwnedBlueprintInput>(
 
 export function selectSharedBlueprints<B extends OwnedBlueprintInput>(
   owned: readonly B[],
-  selected: ReadonlySet<number>,
-  placeOf: (blueprint: B) => ResolvedPlace | null
+  share: BlueprintShare,
+  placeIdOf: (blueprint: B) => number | null,
+  placeOf: (placeId: number) => ResolvedPlace | null
 ): SharedBlueprint[] {
-  return splitSharedBlueprints(owned, selected, placeOf).shared;
+  return splitSharedBlueprints(owned, share, placeIdOf, placeOf).shared;
 }
 
 function compareShared(a: SharedBlueprint, b: SharedBlueprint): number {
