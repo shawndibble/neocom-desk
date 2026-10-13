@@ -42,7 +42,7 @@ import {
   todayCheck,
   type ColonyCheckRow,
 } from './coloniesModel';
-import { ColonyRowView } from './ColonyRowView';
+import { ColonyListHeader, ColonyRowView } from './ColonyRowView';
 import { PlanetImage } from '../PlanetImage';
 import { TodayPanel } from './TodayPanel';
 
@@ -526,7 +526,6 @@ export function ColoniesTab({
               nowMs={nowMs}
               nameOf={nameOf}
               characterNameOf={characterNameOf}
-              activeCharacterId={characterId}
               pricesFailed={planAdvice.pricesFailed}
               todayPerDay={advice?.totals.todayPerDay ?? null}
               fixCount={advice?.quickWins.length ?? 0}
@@ -546,13 +545,6 @@ export function ColoniesTab({
             names={assumedCustomsNames(advice?.colonies ?? [], (id) => t('pi.planetLabel', { id }))}
           />
 
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-dim">
-            <span>
-              <b className="text-text">{t('piColonies.cantSee.lead')}</b>{' '}
-              {t('piColonies.cantSee.body')}
-            </span>
-            <InfoTooltip label={t('pi.stalenessLabel')} content={t('pi.stalenessTooltip')} />
-          </p>
           {planetsResult?.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
@@ -562,8 +554,13 @@ export function ColoniesTab({
               count: ownRows.length + (showAltColonies ? roster.colonies.length : 0),
             })}
             meta={
-              <span className="text-[0.6875rem] font-normal text-text-dim normal-case max-md:hidden">
-                {t('piColonies.attentionFirst')}
+              <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-normal text-text-dim normal-case">
+                <span className="max-md:hidden">{t('piColonies.attentionFirst')}</span>
+                {/* What the figures cannot know: a caveat on every row, kept one hover away. */}
+                <InfoTooltip
+                  label={t('pi.stalenessLabel')}
+                  content={`${t('piColonies.cantSee.lead')} ${t('piColonies.cantSee.body')} ${t('pi.stalenessTooltip')}`}
+                />
               </span>
             }
             actions={
@@ -577,6 +574,7 @@ export function ColoniesTab({
             }
             padded={false}
           >
+            {(ownRows.length > 0 || includeAlts) && <ColonyListHeader haulHours={haulHours} />}
             {ownRows.length === 0 ? (
               <EmptyState
                 title={t('pi.noOwnColoniesTitle')}

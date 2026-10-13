@@ -71,35 +71,6 @@ function Meter({
   );
 }
 
-function LoadLine({ label, fraction }: { label: string; fraction: number | null }) {
-  const { t } = useTranslation();
-  const percent = fraction === null ? null : Math.round(fraction * 100);
-  return (
-    <div className="flex items-center gap-2 text-[0.6875rem]">
-      <span className="w-12 shrink-0 font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </span>
-      <div
-        role="meter"
-        aria-label={t('piColonies.loadMeter', { axis: label })}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent ?? undefined}
-        aria-valuetext={percent === null ? t('piColonies.unknown') : `${percent}%`}
-        className="min-w-0 flex-1"
-      >
-        <Meter
-          fraction={fraction}
-          tone={fraction !== null && fraction >= 0.9 ? 'warning' : 'accent'}
-        />
-      </div>
-      <span className="w-8 shrink-0 text-right text-text-dim tabular-nums">
-        {percent === null ? '—' : `${percent}%`}
-      </span>
-    </div>
-  );
-}
-
 /** A translated line whose `<isk/>` slot is an `IskAmount` (shorthand, exact on hover/focus/screen reader). */
 function iskTrans(
   t: TFunction,
@@ -285,6 +256,45 @@ function FaultTags({ tags, planetName }: { tags: readonly FaultTag[]; planetName
   );
 }
 
+/**
+ * The row grid from `md`: colony, extractors, storage, next step, ⋮. The ⋮
+ * column has a fixed width so `ColonyListHeader`'s labels sit over the cells.
+ */
+const ROW_GRID =
+  'md:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)_12rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
+
+/**
+ * Column labels, once above the rows from `md`, with each column's help. A
+ * phone row is a stacked card and labels its own cells instead.
+ */
+export function ColonyListHeader({ haulHours }: { haulHours: number }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      aria-hidden="true"
+      className={`grid gap-x-4 border-b border-line px-3 py-1.5 max-md:hidden ${ROW_GRID} ${MICRO}`}
+    >
+      <span className="pl-24">{t('piColonies.colonyColumn')}</span>
+      <span className="flex items-center gap-1">
+        {t('piColonies.extractors')}
+        <InfoTooltip
+          label={t('common.aboutLabel', { label: t('piColonies.extractors') })}
+          content={t('piColonies.help.extractors')}
+        />
+      </span>
+      <span className="flex items-center gap-1">
+        {t('piColonies.storageFull')}
+        <InfoTooltip
+          label={t('common.aboutLabel', { label: t('piColonies.storageFull') })}
+          content={t('piColonies.help.storage', { hours: Math.round(haulHours) })}
+        />
+      </span>
+      <span className="text-center">{t('piColonies.actionColumn')}</span>
+      <span />
+    </div>
+  );
+}
+
 export interface ColonyRowViewProps {
   row: ColonyCheckRow;
   planet: CharacterPlanet;
@@ -444,12 +454,11 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               return;
             props.onToggle();
           }}
-          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-start min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] min-[90rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_15rem_auto]"
+          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:items-start ${ROW_GRID}`}
         >
           {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
-            {/* Below 82rem the six columns cannot fit: name, action and menu share row 1, the three meters row 2. */}
-            <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11 md:col-span-2 md:row-start-1 min-[82rem]:col-span-1 min-[82rem]:row-auto">
+            <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11">
               <button
                 type="button"
                 id={buttonId}
@@ -467,9 +476,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                   <SystemLink systemId={row.systemId}>{planetName}</SystemLink>
                   {/* A stopped colony's red bar, time and Restart button say so; the word stays for screen readers only. */}
                   <span className={stopped ? 'sr-only' : 'text-xs font-normal'}>
-                    <span className="mr-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('piColonies.statusLabel')}
-                    </span>
+                    <span className="sr-only">{t('piColonies.statusLabel')} </span>
                     <StatusWord status={row.status} />
                   </span>
                 </h3>
@@ -503,7 +510,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
             <div className="min-w-0 space-y-1">
               <div className="flex items-center justify-between gap-2">
-                <span className={`flex items-center gap-1 ${MICRO}`}>
+                <span className={`flex items-center gap-1 md:hidden ${MICRO}`}>
                   {t('piColonies.extractors')}
                   <InfoTooltip
                     label={t('common.aboutLabel', { label: t('piColonies.extractors') })}
@@ -522,7 +529,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
             <div className="min-w-0 space-y-1">
               <div className="flex items-center justify-between gap-2">
-                <span className={`flex items-center gap-1 ${MICRO}`}>
+                <span className={`flex items-center gap-1 md:hidden ${MICRO}`}>
                   {t('piColonies.storageFull')}
                   <InfoTooltip
                     label={t('common.aboutLabel', { label: t('piColonies.storageFull') })}
@@ -553,28 +560,17 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               </p>
             </div>
 
-            <div className="min-w-0 space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className={MICRO}>{t('piColonies.load')}</span>
-                <span className="text-[0.6875rem] text-text-dim">
-                  {t('piColonies.ccLevel', { level: row.load.ccLevel })}
-                </span>
-              </div>
-              <LoadLine label={t('piColonies.cpu')} fraction={row.load.cpu} />
-              <LoadLine label={t('piColonies.power')} fraction={row.load.power} />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-1 md:col-start-3 md:row-start-1 md:items-stretch min-[82rem]:col-auto min-[82rem]:row-auto">
+            <div className="flex min-w-0 flex-col gap-1 md:items-stretch">
               {actionWithExact}
               <p className="text-center text-[0.6875rem] text-text-dim">{note}</p>
             </div>
 
-            <div className="flex justify-end max-md:absolute max-md:top-1 max-md:right-1 md:col-start-4 md:row-start-1 md:items-start min-[82rem]:col-auto min-[82rem]:row-auto">
+            <div className="flex justify-end max-md:absolute max-md:top-1 max-md:right-1 md:items-start">
               <RowMoreActions />
             </div>
 
             {row.tags.length > 0 && (
-              <div className="md:col-span-4 md:col-start-1 md:pl-[4.6rem] min-[82rem]:col-span-6">
+              <div className="md:col-span-full md:pl-[4.6rem]">
                 <FaultTags tags={row.tags} planetName={planetName} />
               </div>
             )}

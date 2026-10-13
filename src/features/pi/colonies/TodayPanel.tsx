@@ -44,7 +44,6 @@ interface TodayPanelProps {
   /** Planet name for a row. */
   nameOf: (row: ColonyCheckRow) => string;
   characterNameOf: (characterId: number) => string;
-  activeCharacterId: number;
   /** The first row's ISK a day, summed from Plan's own model; null without prices. */
   todayPerDay: number | null;
   /** Hub prices could not be read: the price notice says so, so the "still loading" line stays out. */
@@ -301,7 +300,6 @@ function LoginNext({
 export function TodayPanel(props: TodayPanelProps) {
   const { t } = useTranslation();
   const { rows, check, nowMs, nameOf, characterNameOf } = props;
-  const stripRows = rows;
 
   return (
     <Panel
@@ -320,26 +318,6 @@ export function TodayPanel(props: TodayPanelProps) {
         <div className="space-y-3 p-3">
           <Hero check={check} rows={rows} nowMs={nowMs} nameOf={nameOf} />
           <CountChips check={check} fixCount={props.fixCount} fixGainPerDay={props.fixGainPerDay} />
-          <ul
-            className="flex flex-wrap gap-x-5 gap-y-3 border-t border-line pt-3"
-            aria-label={t('piColonies.today.stripLabel')}
-          >
-            {stripRows.map((row) => (
-              <li
-                key={row.key}
-                className="flex w-24 flex-col items-center gap-1 text-center text-[0.6875rem]"
-              >
-                <PlanetImage type={row.planetType} size={36} />
-                <span className="w-full truncate text-text-dim">
-                  {props.includesOthers && row.characterId !== props.activeCharacterId
-                    ? `${initials(characterNameOf(row.characterId))} · ${nameOf(row)}`
-                    : nameOf(row)}
-                </span>
-                {/* The count chip and each row already say "Stopped". */}
-                {row.status !== 'stopped' && <StatusWord status={row.status} />}
-              </li>
-            ))}
-          </ul>
           <p className="text-xs text-text-dim">
             {props.todayPerDay === null ? (
               props.pricesFailed ? null : (

@@ -7236,8 +7236,8 @@
     "ccLevel": "CC level {{level}}",
     "cpu": "CPU",
     "power": "Power",
-    "load": "Load",
-    "loadMeter": "{{axis}} load",
+    "colonyColumn": "Colony",
+    "actionColumn": "Next step",
     "extractors": "Extractors",
     "storageFull": "Storage full in",
     "attentionFirst": "needs attention first",
@@ -7273,7 +7273,6 @@
       "whyHaul": "Launchpad full in {{in}}, before your haul",
       "bringsBackLead": "restarting brings back",
       "savesLead": "hauling now saves",
-      "stripLabel": "Your colonies",
       "noFigures": "No ISK figures yet: prices or skills are still loading, or this pilot has nothing measurable.",
       "summary": "Your {{count}} colonies make about <today/> ISK/day. The small fixes add +<fixes/>/day: the same list as <plan>Plan's Quick wins</plan>."
     },
