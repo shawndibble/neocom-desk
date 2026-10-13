@@ -299,3 +299,40 @@ test('Open Orders sort headers stay compact with a fine pointer at 1280px', asyn
     expect(box.height).toBeLessThan(30);
   }
 });
+
+for (const size of ['S', 'M'] as const) {
+  test(`a ${size} widget's settings menu meets the 44px touch floor at 390px`, async ({ page }) => {
+    await seedAndOpen(page, size, 4, PHONE);
+    const triggers = page.locator('main section button[aria-label^="Settings for"]');
+    await expect(triggers).toHaveCount(4);
+    for (let i = 0; i < 4; i += 1) {
+      // Polled: a card remounted as its reads land measures as a null box.
+      await expect
+        .poll(async () => (await triggers.nth(i).boundingBox())?.width ?? 0)
+        .toBeGreaterThanOrEqual(44);
+      await expect
+        .poll(async () => (await triggers.nth(i).boundingBox())?.height ?? 0)
+        .toBeGreaterThanOrEqual(44);
+    }
+    const trigger = triggers.first();
+    const title = page.locator('main section h2 a').first();
+    const headerBox = (await page.locator('main section h2').first().locator('..').boundingBox())!;
+    const [t, l] = [(await trigger.boundingBox())!, (await title.boundingBox())!];
+    expect(l.x + l.width).toBeLessThanOrEqual(t.x + 1);
+    expect(headerBox.height).toBeLessThanOrEqual(45);
+    expect(await hasHorizontalOverflow(page)).toBe(false);
+
+    await trigger.click();
+    await expect(page.getByRole('menuitemcheckbox', { name: 'Show on phone' })).toBeVisible();
+    await expect(page.getByText('View', { exact: true })).toBeVisible();
+    await expect(page.getByText('Character scope')).toBeVisible();
+  });
+}
+
+test('the widget settings trigger stays compact with a fine pointer at 1280px', async ({
+  page,
+}) => {
+  await seedAndOpen(page, 'M', 4, { width: 1280, height: 900 });
+  const trigger = page.locator('main section button[aria-label^="Settings for"]').first();
+  await expect.poll(async () => (await trigger.boundingBox())?.height ?? 99).toBeLessThan(40);
+});
