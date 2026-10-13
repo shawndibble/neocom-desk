@@ -27,7 +27,6 @@ import {
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
 import { useUrlFilter } from '@/lib/useUrlState';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { ItemInfoLink } from '@/features/entities';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -44,6 +43,8 @@ import {
 } from '@/features/character/walletTransactionsCsv';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import { transactionMargins } from './transactionMargins';
+import { PageHeaderPortals } from './PageHeaderPortals';
+import type { PageHeaderSlots } from './pageHeaderSlots';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { highlightedTransactionId } from './transactionHighlight';
 
@@ -95,9 +96,12 @@ const transactionRowKey = (txn: WalletTransaction) => txn.transaction_id;
  * the corporation's fills live on `/corp/wallet`, beside the corp journal
  * they reconcile against.
  */
-export function TransactionsPanel() {
+interface TransactionsPanelProps {
+  headerSlots: PageHeaderSlots;
+}
+
+export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
@@ -238,81 +242,95 @@ export function TransactionsPanel() {
     [t, typeNames, timeZone, nameFor, margins]
   );
 
+  const headerChrome = (
+    <PageHeaderPortals
+      slots={headerSlots}
+      meta={transactionsResult && <DataAgeBadge date={transactionsResult.fetchedAt} />}
+      actions={
+        <>
+          <IconButton icon={<Icon.Refresh />} label={t('wallet.refresh')} onClick={refresh} />
+          {transactionsResult && (
+            <TableActionsMenu
+              name={t('market.sections.transactions')}
+              tableExport={transactionsExport}
+              size="md"
+            />
+          )}
+        </>
+      }
+    />
+  );
+
   if (!hydrated) {
     return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
+      <>
+        {headerChrome}
+        <div className="flex justify-center py-16">
+          <Spinner label={t('common.loading')} />
+        </div>
+      </>
     );
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   if (loading && !data) {
     return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
+      <>
+        {headerChrome}
+        <div className="flex justify-center py-16">
+          <Spinner label={t('common.loading')} />
+        </div>
+      </>
     );
   }
   if (error) {
-    return <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />;
+    return (
+      <>
+        {headerChrome}
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+      </>
+    );
   }
 
+  const hasRows = !transactionsNeedsReauth && transactions.length > 0;
+
   return (
-    <Panel
-      padded={false}
-      actions={
-        <span className="flex items-center gap-2">
-          <IconButton
-            size={isPhone ? 'md' : 'sm'}
-            icon={<Icon.Refresh />}
-            label={t('wallet.refresh')}
-            onClick={refresh}
+    <div className="space-y-4">
+      {headerChrome}
+      {hasRows && filteredTransactions.length > 0 && (
+        <TransactionsSummaryStrip transactions={filteredTransactions} />
+      )}
+      <Panel padded={false}>
+        {transactionsNeedsReauth ? (
+          <div className="px-3 py-2">
+            <GrantBanner
+              characterId={activeCharacterId}
+              endpoints={['getCharacterWalletTransactions']}
+              title={t('wallet.transactionsReauthTitle')}
+              hint={t('wallet.transactionsReauthHint')}
+              actionLabel={t('wallet.reauthAction')}
+            />
+          </div>
+        ) : !transactionsResult || !hasRows ? (
+          <CachedEmptyState
+            result={transactionsResult}
+            title={t('wallet.transactionsEmptyTitle')}
+            hint={t('wallet.transactionsEmptyHint')}
+            fetchedTitle={t('wallet.transactionsEmptyFetchedTitle')}
+            className="py-8"
           />
-          {transactionsResult && (
-            <>
-              <TableActionsMenu
-                name={t('market.sections.transactions')}
-                tableExport={transactionsExport}
-                size={isPhone ? 'md' : 'sm'}
-              />
-              <DataAgeBadge date={transactionsResult.fetchedAt} />
-            </>
-          )}
-        </span>
-      }
-    >
-      {transactionsNeedsReauth ? (
-        <div className="px-3 py-2">
-          <GrantBanner
-            characterId={activeCharacterId}
-            endpoints={['getCharacterWalletTransactions']}
-            title={t('wallet.transactionsReauthTitle')}
-            hint={t('wallet.transactionsReauthHint')}
-            actionLabel={t('wallet.reauthAction')}
-          />
-        </div>
-      ) : !transactionsResult || transactions.length === 0 ? (
-        <CachedEmptyState
-          result={transactionsResult}
-          title={t('wallet.transactionsEmptyTitle')}
-          hint={t('wallet.transactionsEmptyHint')}
-          fetchedTitle={t('wallet.transactionsEmptyFetchedTitle')}
-          className="py-8"
-        />
-      ) : (
-        <>
-          {transactionsResult.fromCache && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t(offlineTitleKey)}
-            </p>
-          )}
-          {transactionsTruncated && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
-            </p>
-          )}
+        ) : (
           <>
+            {transactionsResult.fromCache && (
+              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                {t(offlineTitleKey)}
+              </p>
+            )}
+            {transactionsTruncated && (
+              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
+              </p>
+            )}
             <TransactionsFilterBar filter={filter} onChange={setFilter} />
             {filteredTransactions.length === 0 ? (
               <EmptyState
@@ -326,28 +344,25 @@ export function TransactionsPanel() {
                 }
               />
             ) : (
-              <>
-                <TransactionsSummaryStrip transactions={filteredTransactions} className="mb-3" />
-                <div className="overflow-x-auto">
-                  <DataTable
-                    {...transactionsExport.tableProps}
-                    label={t('wallet.transactionsTab')}
-                    columns={columns}
-                    rows={filteredTransactions}
-                    rowKey={transactionRowKey}
-                    highlightRowKey={highlightId}
-                    virtualize="auto"
-                    responsive="table"
-                    // `transactions` already arrives newest-first (the `sort` above) —
-                    // matches that so a header click is the first thing that reorders it.
-                    defaultSort={{ columnId: 'date', direction: 'desc' }}
-                  />
-                </div>
-              </>
+              <div className="overflow-x-auto">
+                <DataTable
+                  {...transactionsExport.tableProps}
+                  label={t('wallet.transactionsTab')}
+                  columns={columns}
+                  rows={filteredTransactions}
+                  rowKey={transactionRowKey}
+                  highlightRowKey={highlightId}
+                  virtualize="auto"
+                  responsive="table"
+                  // `transactions` already arrives newest-first (the `sort` above) —
+                  // matches that so a header click is the first thing that reorders it.
+                  defaultSort={{ columnId: 'date', direction: 'desc' }}
+                />
+              </div>
             )}
           </>
-        </>
-      )}
-    </Panel>
+        )}
+      </Panel>
+    </div>
   );
 }
