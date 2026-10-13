@@ -1,6 +1,6 @@
 /**
- * The PI Map tab's body: the map panel (hint, "Your picks", the what-if line,
- * the board) and the detail panel beside or over it.
+ * The PI Map tab's body: the map panel ("Your picks", the how-to and what-if
+ * line, the board) and the detail panel beside or over it.
  *
  * Presentational over a `PlanAdvice`: it reads every figure from it (picks via
  * `planPicks`, per-product figures via `productFigure`), plus P3/P4 chain
@@ -102,7 +102,6 @@ import { MapPhone } from './MapPhone';
 import { ColonyRichness } from './ColonyRichness';
 import { PiDrawer } from './PiDrawer';
 import { PlanetImage } from '../PlanetImage';
-import { readMapHintDismissed, writeMapHintDismissed } from './mapHintPref';
 import {
   canMake,
   detailMode,
@@ -241,7 +240,6 @@ export function PlanMap({
   /** The "add a planet" drawer; the product drawer is open while the URL names one. */
   const [planetOpen, setPlanetOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [hintDismissed, setHintDismissed] = useState(readMapHintDismissed);
 
   // The colony whose richness drawer the URL has open; an unknown id is dropped.
   const planetRaw = parsePiPlanet(location.search);
@@ -582,10 +580,6 @@ export function PlanMap({
     }
     setPlanetOpen(true);
   };
-  const dismissHint = () => {
-    writeMapHintDismissed();
-    setHintDismissed(true);
-  };
   const clearTrace = () => {
     setUserTraced(null);
     if (linked !== null) dropProduct();
@@ -733,17 +727,44 @@ export function PlanMap({
           })
         : t('piMap.detail.panelTitleEmpty');
 
-  const hint = !hintDismissed && (
-    <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5 text-xs text-text-dim">
-      <span>{t('piMap.hint', { context })}</span>
-      <Button
-        size={phone ? 'md' : 'sm'}
-        className="shrink-0 whitespace-nowrap"
-        onClick={dismissHint}
-      >
-        {t('piMap.hintDismiss')}
-      </Button>
-    </div>
+  // What a tile's figure and marks mean, where the tiles are: the help drawer has the long form.
+  const legend = (
+    <p
+      aria-label={t('piMap.legend.label')}
+      className={cx(
+        'flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-normal tracking-normal text-text-dim normal-case',
+        // Beside the title it gives way first and wraps, so "Planet map" never truncates.
+        phone ? 'border-b border-line px-3 py-1.5' : 'min-w-0 flex-1 basis-0'
+      )}
+    >
+      <span>{t('piMap.legend.figure')}</span>
+      <span aria-hidden="true">·</span>
+      <span>
+        <span aria-hidden="true" className="font-bold text-success">
+          ▲
+        </span>{' '}
+        {t('piMap.legend.better')}
+      </span>
+      <span>
+        <span aria-hidden="true" className="font-bold">
+          ≈
+        </span>{' '}
+        {t('piMap.legend.same')}
+      </span>
+      <span>
+        <span aria-hidden="true" className="font-bold text-danger">
+          ▼
+        </span>{' '}
+        {t('piMap.legend.worse')}
+      </span>
+      <span aria-hidden="true">·</span>
+      <span className="inline-flex items-center gap-1">
+        <span className="rounded-xs border border-warning/60 px-1 text-[0.625rem] leading-[0.875rem] font-semibold text-warning">
+          {t('piShared.estimateBadge')}
+        </span>
+        {t('piMap.legend.estimate')}
+      </span>
+    </p>
   );
 
   const picksStrip = (
@@ -881,9 +902,8 @@ export function PlanMap({
           className={cx(layer, active !== null && 'invisible')}
           aria-hidden={active ? true : undefined}
         >
-          <span className="text-[11px] font-semibold tracking-widest uppercase">
-            {t('piMap.whatIfBlank')}
-          </span>
+          {/* The one line that says what each click does: filter, trace, what-if. */}
+          <span className="text-text">{t('piMap.hint', { context })}</span>
           <span>
             {noColonies
               ? t(coloniesUnknown ? 'piMap.whatIfUnknownColonies' : 'piMap.whatIfNoColonies')
@@ -939,6 +959,7 @@ export function PlanMap({
       >
         <Panel
           title={t('piMap.title')}
+          meta={phone ? undefined : legend}
           padded={false}
           actions={
             <Button
@@ -953,13 +974,13 @@ export function PlanMap({
             </Button>
           }
         >
-          {hint}
           <AssumedCustomsNote
             className="border-b border-line px-3 py-1.5"
             names={assumedCustomsNames(advice.colonies, (id) => t('pi.planetLabel', { id }))}
           />
           {picksStrip}
           {phone ? null : whatIfLine}
+          {phone && legend}
           {phone ? (
             <MapPhone
               graph={graph}

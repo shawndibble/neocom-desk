@@ -73,7 +73,7 @@ export function MapHelp() {
           {t('piMap.help.legend.whatIf')}
         </li>
         <li className="flex items-center gap-2.5">
-          <Sample className="border-transparent bg-panel-2/60" />
+          <Sample className="border-transparent" />
           {t('piMap.help.legend.ghost')}
         </li>
       </ul>
