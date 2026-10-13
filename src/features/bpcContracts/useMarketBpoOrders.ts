@@ -28,9 +28,6 @@ import {
   type ContractLocationInfo,
 } from '@/features/bpcContracts/blueprintLocation';
 
-/** Most blueprint types a typed search checks the market for. */
-export const MARKET_BPO_LOOKUP_LIMIT = 10;
-
 /** Long enough to skip the intermediate keystrokes of a typed name. */
 export const MARKET_BPO_LOOKUP_DEBOUNCE_MS = 300;
 

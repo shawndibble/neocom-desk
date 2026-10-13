@@ -31,6 +31,16 @@ export const SOURCE_TOGGLES: readonly SourceToggle[] = [
   'owned',
 ];
 /** Both on by default (until the pilot picks their own, `bpcSourcesPref.ts`): an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
+/** Content key of a source set, order-independent: equal sets share a key. */
+export function sourceToggleKey(sources: ReadonlySet<SourceToggle>): string {
+  return SOURCE_TOGGLES.filter((source) => sources.has(source)).join();
+}
+
+/** Inverse of `sourceToggleKey`, so a memo keyed on the key holds a stable Set. */
+export function sourceToggleSet(key: string): ReadonlySet<SourceToggle> {
+  return new Set(key === '' ? [] : (key.split(',') as SourceToggle[]));
+}
+
 export const DEFAULT_SOURCE_TOGGLES: readonly SourceToggle[] = ['contract', 'owned'];
 
 export const BPC_SOURCING_PARAMS = {

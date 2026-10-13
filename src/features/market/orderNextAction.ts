@@ -11,9 +11,8 @@
  * the headline must not disagree with the verdict sentence that already
  * states this exact figure.
  */
-import type { OpenOrderRow } from './openOrdersModel';
 import type { OrderVerdict } from './orderVerdict';
-import { orderRowSummary } from './orderRowSummary';
+import { orderRowSummary, type OrderAdviceInput, type OrderRowSummary } from './orderRowSummary';
 
 export type NextAction =
   | { kind: 'raisePrice'; price: number }
@@ -22,7 +21,12 @@ export type NextAction =
   | { kind: 'cheapestRival'; price: number }
   | { kind: 'badgeAdvice' };
 
-export function orderNextAction(row: OpenOrderRow, verdict: OrderVerdict | null): NextAction {
+/** `summary` is only read when there is no verdict; `adviseOrder` passes its once-derived one. */
+export function orderNextAction(
+  row: OrderAdviceInput,
+  verdict: OrderVerdict | null,
+  summary?: OrderRowSummary | null
+): NextAction {
   if (verdict) {
     switch (verdict.kind) {
       case 'raisePrice':
@@ -46,9 +50,9 @@ export function orderNextAction(row: OpenOrderRow, verdict: OrderVerdict | null)
   // stating even then, just never as advice to match it (owner decision,
   // issue #1428).
   if (!row.isBuyOrder) {
-    const summary = orderRowSummary(row);
-    if (summary?.kind === 'undercut') {
-      return { kind: 'cheapestRival', price: summary.rivalPrice };
+    const s = summary === undefined ? orderRowSummary(row) : summary;
+    if (s?.kind === 'undercut') {
+      return { kind: 'cheapestRival', price: s.rivalPrice };
     }
   }
 

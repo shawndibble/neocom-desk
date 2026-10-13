@@ -102,10 +102,9 @@ import { useOpenOrdersLocationFilterPref } from './openOrdersLocationFilterPref'
 import { buildOpenOrdersView, isGroupFolded } from './openOrdersView';
 import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
-import { orderBadgeFor } from './orderBadgeKind';
+import { adviseOrder } from './orderAdvice';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
-import { orderRowSummary } from './orderRowSummary';
 import { priceClipboardText } from './priceClipboardText';
 import { writeToClipboard } from '@/lib/clipboard';
 import { OrderDetailModal } from './OrderDetailModal';
@@ -538,11 +537,11 @@ export function OpenOrdersPanel() {
               id: 'problem',
               header: t('market.orders.filter.problem'),
               render: (row) => {
-                const badge = orderBadgeFor(row);
+                const { badge, summary } = adviseOrder(row);
                 return (
                   <span className="flex flex-col items-start gap-1">
                     {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
-                    <OrderRowSummaryText row={row} copyRelistPrice />
+                    <OrderRowSummaryText row={row} summary={summary} copyRelistPrice />
                   </span>
                 );
               },
@@ -651,7 +650,7 @@ export function OpenOrdersPanel() {
 
   /** Same menu Transactions carries — an order row names an item like any other. */
   function rowContextMenu(row: OpenOrderRow, tr: ReactElement) {
-    const summary = orderRowSummary(row);
+    const { summary } = adviseOrder(row);
     const relistPrice =
       summary?.kind === 'undercut' || summary?.kind === 'outbid' ? summary.suggestedPrice : null;
     return (

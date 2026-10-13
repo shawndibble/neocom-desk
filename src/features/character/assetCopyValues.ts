@@ -35,9 +35,8 @@ export type LoadBlueprints = () => Promise<
  */
 async function loadCopyOffers(characterId: number): Promise<readonly BpcContractRow[]> {
   try {
-    const { loadPublicBpcContracts } = await import('@/features/bpcContracts/syncedContracts');
-    const snapshot = (await loadPublicBpcContracts(characterId))?.data;
-    return snapshot ? [...snapshot.rows, ...(snapshot.originals ?? [])] : [];
+    const { loadBpcOfferRows } = await import('@/features/bpcContracts/bpcOfferRows');
+    return (await loadBpcOfferRows(characterId)) ?? [];
   } catch {
     return [];
   }

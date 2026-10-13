@@ -22,7 +22,7 @@
  * rather than by reading `isPricingReady` themselves — see their own callers.
  */
 import { useEffect, useMemo } from 'react';
-import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
+import { loadBpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
   effectivePrice,
@@ -120,16 +120,9 @@ export function offersForRegion(
 export async function loadBpcContractRows(
   characterId: number
 ): Promise<readonly BpcContractRow[] | null> {
-  try {
-    const cached = await loadPublicBpcContracts(characterId);
-    if (!cached) return null;
-    const { rows, originals } = cached.data;
-    // Originals ride beside the copies (`runs: -1`), so automatic selection
-    // can price a blueprint only ever listed as an original.
-    return originals?.length ? [...rows, ...originals] : rows;
-  } catch {
-    return null;
-  }
+  // Originals ride beside the copies (`runs: -1`), so automatic selection
+  // can price a blueprint only ever listed as an original.
+  return loadBpcOfferRows(characterId);
 }
 
 /** A missing snapshot rejects, which `useWarmLoad` reads as "keep what is showing". */

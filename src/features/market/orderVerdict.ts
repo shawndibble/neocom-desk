@@ -14,8 +14,7 @@
  * the problem and is the same on the row and in the modal; this is a
  * judgement the row has no space for.
  */
-import type { OpenOrderRow } from './openOrdersModel';
-import { orderRowSummary } from './orderRowSummary';
+import { orderRowSummary, type OrderAdviceInput, type OrderRowSummary } from './orderRowSummary';
 import { roundPriceUp } from '@/engine/market/priceTick';
 
 export type OrderVerdictKind = 'letGo' | 'matchThem' | 'raisePrice' | 'leaveItAlone';
@@ -28,7 +27,11 @@ export interface OrderVerdict {
   price: number | null;
 }
 
-export function orderVerdict(row: OpenOrderRow): OrderVerdict | null {
+/** `summary` is the row's already-derived `orderRowSummary` (`adviseOrder` passes it so it is computed once). */
+export function orderVerdict(
+  row: OrderAdviceInput,
+  summary: OrderRowSummary | null = orderRowSummary(row)
+): OrderVerdict | null {
   // A buy order's floor is a sell-side idea; nothing here applies to one.
   if (row.isBuyOrder || !row.floor) return null;
 
@@ -40,7 +43,6 @@ export function orderVerdict(row: OpenOrderRow): OrderVerdict | null {
     };
   }
 
-  const summary = orderRowSummary(row);
   if (summary?.kind === 'undercut' && summary.match) {
     return summary.match.kind === 'loss'
       ? { kind: 'letGo', amount: summary.match.amount, price: summary.suggestedPrice }
