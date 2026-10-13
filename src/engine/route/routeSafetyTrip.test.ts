@@ -231,6 +231,34 @@ describe('gatesOverLongerHoles', () => {
     ]);
   });
 
+  it('keeps the known bridges on the route it falls back to', () => {
+    const options = routeSafetyNetwork([ends(VIA_FAR), ends(VIA_EXIT)], [BRIDGE]);
+    const tripPlan: TripPlan = {
+      legs: [{ from: START, to: END, route: { kind: 'route', systems: THROUGH_FAR } }],
+      reordered: null,
+      unreachable: false,
+    };
+    const trip = { plan: tripPlan, graph: GRAPH, options };
+    expect(gatesOverLongerHoles(trip).plan.legs[0].route).toEqual({
+      kind: 'route',
+      systems: [START, W1, W4, END],
+    });
+  });
+
+  it('recounts an optimized order’s jumps on the routes it now flies', () => {
+    const tripPlan: TripPlan = {
+      legs: [{ from: START, to: END, route: { kind: 'route', systems: THROUGH_FAR } }],
+      reordered: { stops: [END], typedJumps: 9, jumps: 6 },
+      unreachable: false,
+    };
+    const trip = { plan: tripPlan, graph: GRAPH, options: {} };
+    expect(gatesOverLongerHoles(trip).plan.reordered).toEqual({
+      stops: [END],
+      typedJumps: 9,
+      jumps: 5,
+    });
+  });
+
   it('leaves a trip with no longer hole route as it was', () => {
     const { tripPlan } = plan({ holes: THERA_HOLES });
     const trip = { plan: tripPlan, graph: GRAPH, options: {} };

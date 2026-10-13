@@ -154,12 +154,24 @@ function crossesHole(graph: JumpGraph, systems: readonly number[]): boolean {
   );
 }
 
+/** The same search without the holes: the bridges, preference and Avoided Systems stay. */
+function withoutHoles(options: FindJumpRouteOptions): FindJumpRouteOptions {
+  return {
+    ...options,
+    extraConnections: options.extraConnections?.filter(
+      ([a, b]) => !HUB_IDS.has(a) && !HUB_IDS.has(b)
+    ),
+    freeSystems: undefined,
+  };
+}
+
 /**
  * The trip with each leg the planner sent through Thera or Turnur in more
- * jumps than the gates flown by the gates instead. A biased preference can
- * cost a long hole route below a short gate one, since the hub is free; a
- * longer hole route is never offered as a way, so it is never the pick.
- * The same trip back when no leg changes.
+ * jumps than the gates flown without the holes instead. A biased preference
+ * can cost a long hole route below a short gate one, since the hub is free;
+ * a longer hole route is never offered as a way, so it is never the pick.
+ * An optimized order's jumps are recounted on the new routes. The same trip
+ * back when no leg changes.
  */
 export function gatesOverLongerHoles<T extends PlannedTrip>(trip: T): T {
   const { plan, graph, options } = trip;
@@ -167,11 +179,17 @@ export function gatesOverLongerHoles<T extends PlannedTrip>(trip: T): T {
   const legs = plan.legs.map((leg): TripLeg => {
     if (leg.route.kind !== 'route' || !crossesHole(graph, leg.route.systems)) return leg;
     const gates = findJumpRoute(graph, leg.from, leg.to, gatesOnlyOptions(options));
-    if (gates.kind !== 'route' || !longerThanGates(leg.route.systems, gates)) return leg;
+    if (!longerThanGates(leg.route.systems, gates)) return leg;
     changed = true;
-    return { ...leg, route: gates };
+    return { ...leg, route: findJumpRoute(graph, leg.from, leg.to, withoutHoles(options)) };
   });
-  return changed ? { ...trip, plan: { ...plan, legs } } : trip;
+  if (!changed) return trip;
+  const jumps = legs.reduce(
+    (sum, leg) => sum + (leg.route.kind === 'route' ? leg.route.systems.length - 1 : 0),
+    0
+  );
+  const reordered = plan.reordered && { ...plan.reordered, jumps };
+  return { ...trip, plan: { ...plan, legs, reordered } };
 }
 
 /**
@@ -419,7 +437,7 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
       pinNote = pinned.kind;
     }
 
-    // The pinned hole, gates only, each hub: one entry per distinct route.
+    // The pinned hole or hub, gates only, each hub: one entry per distinct route.
     const candidates: {
       kind: RouteSafetyWay['kind'];
       pin: string | null;
