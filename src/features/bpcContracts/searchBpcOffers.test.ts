@@ -11,6 +11,7 @@ import {
   type BpcSearchRow,
 } from '@/engine/contracts/bpcSearch';
 import type { CharacterBlueprint, RegionOrder } from '@/esi/endpoints';
+import { sortRows } from '@/components/ui/dataTableSort';
 import type { SourceToggle } from './bpcSourcingUrl';
 import type { BpcSourcingFilter } from './bpcActiveFilters';
 import {
@@ -180,19 +181,28 @@ describe('searchBpcOffers merge precedence', () => {
     communityRows: [community(RIFTER)],
   });
 
-  it('orders owned, community, market, contract BPO, LP, then contract copies', () => {
+  it('orders owned, community, LP, then market and contracts', () => {
     const { displayRows } = searchBpcOffers(full, query({ sources: ALL_SOURCES }));
     expect(sourcesOf(displayRows)).toEqual([
       'owned',
       'community',
+      'lp',
       'market',
       'contract',
-      'lp',
       'contract',
     ]);
-    // The contract BPO (runs -1) comes before the LP row, the copy last.
-    expect(displayRows[3].runs).toBe(-1);
+    // The contract BPO (runs -1) comes before the copy.
+    expect(displayRows[4].runs).toBe(-1);
     expect(displayRows[5].runs).toBe(5);
+  });
+
+  it('is the tiebreak under any column sort: the pilot sorts first, this order breaks ties', () => {
+    const { displayRows } = searchBpcOffers(full, query({ sources: ALL_SOURCES }));
+    // ME 10 on the owned, community and both contract rows, ME 0 on LP and
+    // market: descending puts the ME 10 rows first and, within each group,
+    // keeps source order.
+    const byMe = sortRows(displayRows, { sortValue: (row) => row.me }, 'desc');
+    expect(sourcesOf(byMe)).toEqual(['owned', 'community', 'contract', 'contract', 'lp', 'market']);
   });
 
   it('lists only the toggled-on sources', () => {
