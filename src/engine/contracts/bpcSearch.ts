@@ -4,7 +4,7 @@
  * narrows the row set, which is the part a table's `sortValue` callbacks
  * can't express.
  */
-import type { SpaceKind } from '@/engine/space';
+import { classifySpace, type SpaceKind } from '@/engine/space';
 
 /** One searched row — a for-sale blueprint copy joined to its contract. Built out of the Public Contract Offers snapshot by `contractOffers.ts`; issue #907 retired the blueprint-only row the sync used to publish, so this shape is the client's alone. */
 export interface BpcContractRow {
@@ -230,12 +230,12 @@ export type BpcSearchRow =
       communityNames: string[];
       stale: boolean;
       asOf: number | null;
-      /** The Member's station or structure, by name; its system is in `systemName`. No ids are shared, so a Region, Space or Jump Range filter drops the row. */
+      /** The Member's station or structure, by name; its system is in `systemName`. No ids are shared, so the client places the row by that name: unplaced, a Region, Space or Jump Range filter drops it. */
       locationName: string;
       systemName: string;
-      regionId: null;
-      space: null;
-      systemId: null;
+      regionId: number | null;
+      space: SpaceKind | null;
+      systemId: number | null;
     };
 
 /**
@@ -312,21 +312,29 @@ export function lpOfferToSearchRow(offer: LpOfferInput): BpcSearchRow {
   };
 }
 
-/** A Community Offer (`buildCommunityOffers`) as a BPC Sourcing row. */
-export function communityOfferToSearchRow(offer: {
-  uid: string;
-  memberName: string;
-  typeId: number;
-  me: number;
-  te: number;
-  runs: number;
-  quantity: number;
-  communityNames: string[];
-  stale: boolean;
-  asOf: number | null;
-  locationName: string;
-  systemName: string;
-}): BpcSearchRow {
+/**
+ * A Community Offer (`buildCommunityOffers`) as a BPC Sourcing row. A Shared
+ * Blueprint carries only its system's *name*, so the caller resolves it
+ * (`system`) for the row to have a region, space and a system a Jump Range
+ * can measure to; unresolved, those stay `null`.
+ */
+export function communityOfferToSearchRow(
+  offer: {
+    uid: string;
+    memberName: string;
+    typeId: number;
+    me: number;
+    te: number;
+    runs: number;
+    quantity: number;
+    communityNames: string[];
+    stale: boolean;
+    asOf: number | null;
+    locationName: string;
+    systemName: string;
+  },
+  system?: { id: number; name: string; security: number; regionId: number }
+): BpcSearchRow {
   return {
     source: 'community',
     typeId: offer.typeId,
@@ -342,9 +350,9 @@ export function communityOfferToSearchRow(offer: {
     asOf: offer.asOf,
     locationName: offer.locationName,
     systemName: offer.systemName,
-    regionId: null,
-    space: null,
-    systemId: null,
+    regionId: system?.regionId ?? null,
+    space: system ? classifySpace(system.name, system.security) : null,
+    systemId: system?.id ?? null,
   };
 }
 

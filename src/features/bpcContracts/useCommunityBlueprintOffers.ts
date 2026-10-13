@@ -16,6 +16,7 @@ import {
   loadMemberLibraries,
   loadMyCommunities,
 } from '@/features/communities/communityStore';
+import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { uidForCharacter } from '@/sync/uid';
 
 const NONE: readonly BpcSearchRow[] = [];
@@ -47,9 +48,15 @@ async function loadCommunityOfferRows(characterId: number): Promise<readonly Bpc
       }
     })
   );
+  // A Shared Blueprint names its system but has no id; the snapshot places it
+  // (region, space, Jump Range). No snapshot leaves the rows unplaced.
+  const byId = await loadSolarSystemsById();
+  const byName = new Map(
+    [...(byId?.values() ?? [])].map((entry) => [entry.name.toLowerCase(), entry])
+  );
   // The Character's own library is its Owned rows already.
   return buildCommunityOffers(sources, Date.now(), new Set([uidForCharacter(characterId)])).map(
-    communityOfferToSearchRow
+    (offer) => communityOfferToSearchRow(offer, byName.get(offer.systemName.toLowerCase()))
   );
 }
 
