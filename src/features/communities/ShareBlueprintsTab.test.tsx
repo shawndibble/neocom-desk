@@ -51,13 +51,11 @@ import { ShareBlueprintsTab } from './ShareBlueprintsTab';
 const b = en.communities.blueprints;
 
 function renderTab() {
-  const onOpenLibrary = vi.fn();
   render(
     <MemoryRouter>
-      <ShareBlueprintsTab characterId={1} communityId="c1" onOpenLibrary={onOpenLibrary} />
+      <ShareBlueprintsTab characterId={1} communityId="c1" />
     </MemoryRouter>
   );
-  return { onOpenLibrary };
 }
 
 beforeEach(async () => {
@@ -315,18 +313,5 @@ describe('ShareBlueprintsTab', () => {
     results[0]!({ outcome: 'full', skipped: 9 });
     expect(await screen.findByText(/3 blueprints are not shared/)).toBeInTheDocument();
     expect(screen.queryByText(/9 blueprints are not shared/)).not.toBeInTheDocument();
-  });
-
-  it('links to BPC Sourcing narrowed to the Community and owned sources', async () => {
-    renderTab();
-    const link = await screen.findByRole('link', { name: b.browse });
-    expect(link).toHaveAttribute('href', '/industry/sourcing?sourcing.src=community%2Cowned');
-  });
-
-  it('opens the Community Library', async () => {
-    const user = userEvent.setup();
-    const { onOpenLibrary } = renderTab();
-    await user.click(await screen.findByRole('button', { name: b.openLibrary }));
-    expect(onOpenLibrary).toHaveBeenCalled();
   });
 });

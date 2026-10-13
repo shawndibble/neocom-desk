@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import { fittingChoiceKey } from '@/engine/communities/sharedFittings';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import { AddSharedItemsDialog } from './AddSharedItemsDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { collectFittingsToShare } from './shareAllFittings';
 import { loadFittingsAll, saveFittingsAll } from './shareSelection';
@@ -39,11 +41,11 @@ interface Loaded {
 }
 
 /**
- * The Fittings tab of a Community (issue #3605): what this Character shares,
- * one row per Fitting with Stop sharing. "Share all my Fittings" is a standing
- * switch: later saves are pushed too (`followSavedFitting`), and a Fitting
- * stopped under it is remembered so a re-save does not bring it back. With it
- * off, Fittings are added one at a time from the search. The Community's own
+ * The Fittings tab's Mine view (issue #3605): what this Character shares, one
+ * row per Fitting with Stop sharing, and Add Fittings for the rest. "Share all
+ * my Fittings" is a standing switch: later saves are pushed too
+ * (`followSavedFitting`), and a Fitting stopped under it is remembered so a
+ * re-save does not bring it back, until it is added again. The Community's own
  * copy is the truth for what is shared; only the switch is kept on this device.
  */
 export function ShareFittingsTab({
@@ -58,7 +60,11 @@ export function ShareFittingsTab({
   const [loadFailed, setLoadFailed] = useState(false);
   const [query, setQuery] = useState('');
   const [confirmingOff, setConfirmingOff] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const stopButtons = useRef(new Map<string, HTMLButtonElement>());
+  const focusAfterCommit = useFocusAfterCommit();
   const latest = useRef<Loaded | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const loads = useRef(0);
@@ -134,15 +140,17 @@ export function ShareFittingsTab({
     );
     return namedLike(rows, needle);
   }, [fittings, loaded, needle, unavailable]);
+  const shownRows = sharedRows.slice(0, ROW_LIMIT);
+  // Everything not shared now, including a Fitting stopped under "share all".
   const addable = useMemo(
     () =>
-      loaded && loaded.allExcluded === null && needle !== ''
+      loaded
         ? namedLike(
             fittings.filter((input) => !loaded.shared.has(fittingChoiceKey(input))),
-            needle
+            ''
           )
         : [],
-    [fittings, loaded, needle]
+    [fittings, loaded]
   );
 
   if (loadFailed) {
@@ -193,11 +201,20 @@ export function ShareFittingsTab({
   }
 
   async function add(current: Loaded, input: SharedFittingInput): Promise<Loaded> {
+    const key = fittingChoiceKey(input);
     if (!(await shareFitting(characterId, communityId, input))) {
       setNotice(t('communities.fittings.cannot'));
       return current;
     }
-    return { ...current, shared: new Set(current.shared).add(fittingChoiceKey(input)) };
+    // Under "share all" a stopped Fitting is an exclusion: adding it back lifts
+    // it, so its later saves follow again.
+    let allExcluded = current.allExcluded;
+    if (allExcluded?.has(key)) {
+      allExcluded = new Set(allExcluded);
+      allExcluded.delete(key);
+      await saveFittingsAll(characterId, communityId, allExcluded);
+    }
+    return { ...current, allExcluded, shared: new Set(current.shared).add(key) };
   }
 
   const row = (input: SharedFittingInput, action: ReactNode) => (
@@ -234,29 +251,18 @@ export function ShareFittingsTab({
                 total: fittings.length,
               })}
         </span>
+        <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
+          {t('communities.fittings.add')}
+        </Button>
       </div>
       <SearchInput
+        ref={search}
         className="w-full"
         value={query}
-        placeholder={all ? t('communities.fittings.filter') : t('communities.fittings.search')}
-        aria-label={t('communities.fittings.search')}
+        placeholder={t('communities.fittings.filter')}
+        aria-label={t('communities.fittings.filter')}
         onChange={(event) => setQuery(event.target.value)}
       />
-      {addable.length > 0 && (
-        <section aria-label={t('communities.fittings.addable')} className="space-y-1">
-          <h3 className="text-xs font-semibold">{t('communities.fittings.addable')}</h3>
-          <ul className="divide-y divide-line">
-            {addable.slice(0, ROW_LIMIT).map((input) =>
-              row(
-                input,
-                <Button size="sm" onClick={() => void run((current) => add(current, input))}>
-                  {t('communities.fittings.share')}
-                </Button>
-              )
-            )}
-          </ul>
-        </section>
-      )}
       {sharedRows.length === 0 ? (
         <EmptyState
           title={
@@ -265,17 +271,34 @@ export function ShareFittingsTab({
         />
       ) : (
         <ul className="divide-y divide-line">
-          {sharedRows.slice(0, ROW_LIMIT).map((input) =>
+          {shownRows.map((input, index) =>
             row(
               input,
-              <Button size="sm" onClick={() => void run((current) => stop(current, input))}>
+              <Button
+                size="sm"
+                ref={(el) => {
+                  const key = fittingChoiceKey(input);
+                  if (el) stopButtons.current.set(key, el);
+                  else stopButtons.current.delete(key);
+                }}
+                onClick={() => {
+                  // Stopping removes the row: focus the next Stop sharing, else the search.
+                  const near = [shownRows[index + 1], shownRows[index - 1]].map(
+                    (other) => () =>
+                      other ? (stopButtons.current.get(fittingChoiceKey(other)) ?? null) : null
+                  );
+                  focusAfterCommit(...near, search);
+                  void run((current) => stop(current, input));
+                }}
+              >
                 {t('communities.fittings.stop')}
               </Button>
             )
           )}
         </ul>
       )}
-      {notice !== null && (
+      {/* While Add is open the notice shows in it: the page behind is inert. */}
+      {notice !== null && !adding && (
         <p role="alert" className="text-xs text-danger">
           {notice}
         </p>
@@ -287,6 +310,28 @@ export function ShareFittingsTab({
         actionLabel={t('communities.fittings.offAction')}
         onClose={() => setConfirmingOff(false)}
         onConfirm={() => run(turnOff)}
+      />
+      <AddSharedItemsDialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        title={t('communities.fittings.addTitle')}
+        searchLabel={t('communities.fittings.addSearch')}
+        shareLabel={t('communities.fittings.share')}
+        nothingToAdd={t('communities.fittings.nothingToAdd')}
+        notice={notice}
+        items={addable.map((input) => ({
+          key: fittingChoiceKey(input),
+          name: input.name,
+          note: input.source === 'game' && (
+            <span className="text-[0.6875rem] text-text-dim">
+              {t('communities.fittings.inGame')}
+            </span>
+          ),
+        }))}
+        onShare={(key) => {
+          const input = addable.find((candidate) => fittingChoiceKey(candidate) === key);
+          if (input) void run((current) => add(current, input));
+        }}
       />
     </div>
   );

@@ -38,6 +38,7 @@ import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { loadTypes } from '@/sde/loadSde';
 import { loadFittingsAll, markFittingsShared } from './shareSelection';
+import { communityBackendOverride } from './backendOverride';
 import { loadCommunityMembers, loadMyCommunities, type CommunitySummary } from './communityStore';
 
 /** firestore.rules caps; a Fitting past them is left unshared rather than failing the batch. */
@@ -90,6 +91,8 @@ export async function loadCommunityFittings(
   characterId: number,
   communityId: string
 ): Promise<SharedFitting[]> {
+  const standIn = communityBackendOverride()?.loadFittings;
+  if (standIn) return standIn(communityId);
   await ensureSignedIn(characterId);
   const snap = await getDocs(fittingsOf(getSyncFirestore(), communityId));
   const loaded: SharedFitting[] = [];
@@ -118,6 +121,18 @@ export async function loadMySharedFittingKeys(
   characterId: number,
   communityId: string
 ): Promise<Set<string>> {
+  const standIn = communityBackendOverride()?.loadFittings;
+  if (standIn) {
+    const me = uidForCharacter(characterId);
+    return new Set(
+      standIn(communityId)
+        .filter((fitting) => fitting.ownerUid === me)
+        .flatMap((fitting) => {
+          const parsed = parseSharedFittingId(fitting.id);
+          return parsed ? [fittingChoiceKey(parsed)] : [];
+        })
+    );
+  }
   const uid = await ensureSignedIn(characterId);
   const mine = await getDocs(
     query(fittingsOf(getSyncFirestore(), communityId), where('ownerUid', '==', uid))

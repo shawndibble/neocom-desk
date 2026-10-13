@@ -13,6 +13,11 @@ import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
+import {
+  communityBackendOverride,
+  setCommunityBackendOverride,
+  type CommunityBackendOverride,
+} from './backendOverride';
 
 export interface CommunitySummary {
   id: string;
@@ -40,24 +45,7 @@ export interface CommunityMember {
   libraryAsOf: number | null;
 }
 
-/**
- * A stand-in for the backend, for Storybook and its smoke test: set, the three
- * reads and every callable answer from memory, so a page story shows sample
- * Communities without a network or a sign-in. Never set by the app itself.
- */
-export interface CommunityBackendOverride {
-  loadMine: () => CommunitySummary[];
-  loadMembers: (communityId: string) => CommunityMember[];
-  loadRequests: (communityId: string) => JoinRequest[];
-  /** A callable by name; its result is what the real one would return. */
-  call: (name: string, data: unknown) => unknown;
-}
-
-let override: CommunityBackendOverride | null = null;
-
-export function setCommunityBackendOverride(next: CommunityBackendOverride | null): void {
-  override = next;
-}
+export { setCommunityBackendOverride, type CommunityBackendOverride };
 
 /** Where an invite link lands. The join page is its own ticket; this is its one address. */
 export function communityInviteUrl(inviteCode: string): string {
@@ -77,6 +65,7 @@ export async function listCommunityIds(characterId: number): Promise<string[]> {
 }
 
 export async function loadMyCommunities(characterId: number): Promise<CommunitySummary[]> {
+  const override = communityBackendOverride();
   if (override) return override.loadMine();
   const uid = await ensureSignedIn(characterId);
   const db = getSyncFirestore();
@@ -105,6 +94,7 @@ export async function loadCommunityMembers(
   characterId: number,
   communityId: string
 ): Promise<CommunityMember[]> {
+  const override = communityBackendOverride();
   if (override) return override.loadMembers(communityId);
   await ensureSignedIn(characterId);
   const snap = await getDocs(collection(getSyncFirestore(), 'communities', communityId, 'members'));
@@ -123,6 +113,7 @@ export async function loadJoinRequests(
   characterId: number,
   communityId: string
 ): Promise<JoinRequest[]> {
+  const override = communityBackendOverride();
   if (override) return override.loadRequests(communityId);
   await ensureSignedIn(characterId);
   const snap = await getDocs(
@@ -143,6 +134,13 @@ export async function loadMemberLibraries(
   communityId: string,
   memberUids: readonly string[]
 ): Promise<MemberLibrary[]> {
+  const standIn = communityBackendOverride()?.loadLibraries;
+  if (standIn) {
+    const libraries = standIn(communityId);
+    return memberUids.map(
+      (uid) => libraries.find((library) => library.uid === uid) ?? { uid, items: [] }
+    );
+  }
   await ensureSignedIn(characterId);
   const db = getSyncFirestore();
   return Promise.all(
@@ -172,6 +170,7 @@ function libraryAsOf(data: Record<string, unknown>): number | null {
 }
 
 async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
+  const override = communityBackendOverride();
   if (override) return override.call(name, data) as Out;
   await ensureSignedIn(characterId);
   const result = await httpsCallable<In, Out>(getSyncFunctions(), name)(data);
@@ -286,7 +285,7 @@ export async function loadMailInviteStatus(
   communityId: string,
   now = Date.now()
 ): Promise<{ remaining: number; sent: SentMailInvite[] }> {
-  if (override) return { remaining: MAX_MAIL_INVITES_PER_DAY, sent: [] };
+  if (communityBackendOverride()) return { remaining: MAX_MAIL_INVITES_PER_DAY, sent: [] };
   const uid = await ensureSignedIn(characterId);
   const db = getSyncFirestore();
   const day = new Date(now).toISOString().slice(0, 10);

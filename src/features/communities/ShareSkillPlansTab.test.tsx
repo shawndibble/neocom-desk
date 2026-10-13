@@ -34,6 +34,12 @@ const record = (id: string, name: string, skills = 2) => ({
   updatedAt: 1,
 });
 
+/** Opens Add Skill plans and returns the dialog. */
+async function openAdd(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: p.add }));
+  return screen.findByRole('dialog', { name: p.addTitle });
+}
+
 function renderTab() {
   render(
     <MemoryRouter>
@@ -70,11 +76,13 @@ describe('ShareSkillPlansTab', () => {
     expect(store.syncSharedPlans).toHaveBeenCalledWith(1, 'c1');
   });
 
-  it('adds a plan from the search, and lists it with its skill count', async () => {
+  it('adds a plan from the Add Skill plans dialog, which lists its skill count', async () => {
     const user = userEvent.setup();
     renderTab();
-    await user.type(await screen.findByRole('searchbox'), 'beta');
-    const row = (await screen.findByText('Beta Plan')).closest('li')!;
+    const dialog = await openAdd(user);
+    expect(within(dialog).getByText('Alpha Plan')).toBeInTheDocument();
+    await user.type(within(dialog).getByRole('searchbox'), 'beta');
+    const row = within(dialog).getByText('Beta Plan').closest('li')!;
     expect(within(row).getByText('5 skills')).toBeInTheDocument();
     await user.click(within(row).getByRole('button', { name: p.share }));
     await waitFor(() =>
@@ -97,10 +105,10 @@ describe('ShareSkillPlansTab', () => {
     store.sharePlan.mockResolvedValue(false);
     const user = userEvent.setup();
     renderTab();
-    await user.type(await screen.findByRole('searchbox'), 'gamma');
-    const row = (await screen.findByText('Gamma Plan')).closest('li')!;
+    const dialog = await openAdd(user);
+    const row = within(dialog).getByText('Gamma Plan').closest('li')!;
     await user.click(within(row).getByRole('button', { name: p.share }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(p.cannot);
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(p.cannot);
   });
 
   it('reloads the truth when an update fails', async () => {
@@ -112,12 +120,6 @@ describe('ShareSkillPlansTab', () => {
     await user.click(within(row).getByRole('button', { name: p.stop }));
     expect(await screen.findByRole('alert')).toHaveTextContent(p.failed);
     expect(await screen.findByText('Alpha Plan')).toBeInTheDocument();
-  });
-
-  it('links to the Community plan browse on the Skills page', async () => {
-    renderTab();
-    const link = await screen.findByRole('link', { name: p.browse });
-    expect(link).toHaveAttribute('href', '/skills/plans?browse=community');
   });
 
   it('says there is nothing to share when the Character has no plans', async () => {
