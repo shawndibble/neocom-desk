@@ -65,7 +65,7 @@ export function CorpOfflineServices({ items }: CorpOfflineServicesProps) {
               size={Icon.ICON_SIZE.sm}
               className="shrink-0 text-warning"
             />
-            <span className="min-w-0 text-text-dim wrap-anywhere">{item.subject}</span>
+            <span className="min-w-0 break-words text-text-dim">{item.subject}</span>
             <span className="shrink-0 whitespace-nowrap">{structureStateLabel(item.detail)}</span>
           </li>
         ))}
