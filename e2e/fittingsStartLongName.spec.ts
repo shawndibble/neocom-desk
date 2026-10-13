@@ -57,7 +57,7 @@ for (const size of [
     }));
     expect(dims.scrollWidth).toBe(dims.clientWidth);
 
-    const nameSpan = longRow.locator('span').first();
+    const nameSpan = longRow.locator('span.truncate').first();
     const nameDims = await nameSpan.evaluate((el) => ({
       scrollWidth: el.scrollWidth,
       clientWidth: el.clientWidth,
