@@ -44,7 +44,7 @@ type Dialog =
 /**
  * One Community, as the open Character sees it. The admin gets the invite link
  * (copy, regenerate, revoke), a ⋮ on every other Member (make admin, remove)
- * and Delete; any other Member gets Leave. Both close the Members tab. Every change refetches through
+ * and Delete; any other Member gets Leave. Both sit at the foot of the Members tab. Every change refetches through
  * `onChanged`, since Firestore here has no listeners.
  */
 export function CommunityDetail({

@@ -18,7 +18,7 @@ import {
 import { focusRingClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { CommunityDetail } from '@/features/communities/CommunityDetail';
-import { COMMUNITY_TABS, type CommunityTab } from '@/features/communities/communityTabs';
+import { COMMUNITY_TABS } from '@/features/communities/communityTabs';
 import { CreateCommunityDialog } from '@/features/communities/CreateCommunityDialog';
 import {
   isCommunityAdmin,
@@ -108,7 +108,7 @@ export function Communities() {
   const selectedId = params.get('community');
   const selected = communities?.find((community) => community.id === selectedId) ?? null;
   const tabParam = params.get('tab');
-  const initialTab = COMMUNITY_TABS.find((tab) => tab === tabParam) as CommunityTab | undefined;
+  const initialTab = COMMUNITY_TABS.find((tab) => tab === tabParam);
   const open = (id: string | null) => setParams(id ? { community: id } : {}, { replace: true });
 
   return (
@@ -118,8 +118,8 @@ export function Communities() {
         actions={
           // Primary only while it is the one thing to do; once in a Community it steps back.
           <Button
-            variant={communities?.length ? 'ghost' : 'primary'}
-            size={communities?.length ? 'sm' : 'md'}
+            variant={communities?.length === 0 ? 'primary' : 'ghost'}
+            size={communities?.length === 0 ? 'md' : 'sm'}
             onClick={() => setCreating(true)}
           >
             {t('communities.create')}
@@ -128,6 +128,11 @@ export function Communities() {
       />
       <p className="text-xs text-text-dim">{t('communities.intro')}</p>
 
+      {failed && selected && (
+        <p role="alert" className="text-xs text-danger">
+          {t('communities.loadFailed')}
+        </p>
+      )}
       {selected && communities ? (
         // Inside a Community the list steps back into a switcher: the open one
         // by name, the others a pick away, and "All Communities" for the list.
@@ -136,7 +141,7 @@ export function Communities() {
             value={selected.id}
             onValueChange={(id) => {
               open(id === ALL ? null : id);
-              scrollToDetail.current = id !== ALL;
+              scrollToDetail.current = id !== ALL && id !== selected.id;
             }}
           >
             <SelectTrigger aria-label={t('communities.switch')} className="w-full">
@@ -171,8 +176,8 @@ export function Communities() {
                     className={`group flex w-full items-center gap-2.5 px-1 text-left text-xs hover:bg-surface-2 aria-[current=true]:bg-surface-2 ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
                     aria-current={community.id === selected?.id ? 'true' : undefined}
                     onClick={() => {
+                      scrollToDetail.current = community.id !== selected?.id;
                       open(community.id);
-                      scrollToDetail.current = true;
                     }}
                   >
                     <span
