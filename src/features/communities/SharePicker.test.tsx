@@ -9,12 +9,12 @@ import { SharePicker } from './SharePicker';
 const s = en.communities.share;
 const groups = [
   { id: 1, name: 'Ships', parentId: null },
-  { id: 2, name: 'Frigates', parentId: 1 },
+  { id: 102, name: 'Frigates', parentId: 1 },
   { id: 4, name: 'Modules', parentId: null },
 ];
 const owned = [
-  { typeId: 10, name: 'Rifter Blueprint', marketGroupId: 2 },
-  { typeId: 11, name: 'Merlin Blueprint', marketGroupId: 2 },
+  { typeId: 10, name: 'Rifter Blueprint', marketGroupId: 102 },
+  { typeId: 11, name: 'Merlin Blueprint', marketGroupId: 102 },
   { typeId: 13, name: 'Armor Repairer Blueprint', marketGroupId: 4 },
   { typeId: 14, name: 'Hammerhead II Blueprint', marketGroupId: null },
 ];

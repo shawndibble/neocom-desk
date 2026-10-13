@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { ExternalLink } from '@/components/ui/ExternalLink';
+import { linkifyText } from '@/engine/linkifyText';
 import { splitMailBody } from '@/engine/mailBodyBlocks';
 import { cx } from '@/lib/cx';
 
@@ -15,7 +17,15 @@ export function MailBodyView({ text }: { text: string }) {
       {blocks.map((block, index) =>
         block.kind === 'text' ? (
           <p key={index} className="whitespace-pre-wrap">
-            {block.text}
+            {linkifyText(block.text).map((part, i) =>
+              part.kind === 'link' ? (
+                <ExternalLink key={i} href={part.href}>
+                  {part.href}
+                </ExternalLink>
+              ) : (
+                part.text
+              )
+            )}
           </p>
         ) : (
           <div key={index} className="overflow-x-auto">

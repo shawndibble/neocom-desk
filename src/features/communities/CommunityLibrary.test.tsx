@@ -20,8 +20,8 @@ vi.mock('@/sde/loadMarketSde', () => ({
 }));
 vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: async () => ({
-    '10': { name: 'Rifter Blueprint' },
-    '11': { name: 'Merlin Blueprint' },
+    '10': { name: 'Rifter Blueprint', products: [] },
+    '11': { name: 'Merlin Blueprint', products: [] },
   }),
 }));
 vi.mock('./communityStore', () => ({
