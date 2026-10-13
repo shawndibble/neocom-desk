@@ -149,13 +149,7 @@ describe('Skills', () => {
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Level 5 of 5' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
-    const implantTrigger = (await screen.findByText('Ocular Filter - Basic')).closest('a')!;
     const frigateTrigger = screen.getByText('Frigate').closest('a')!;
-    // Tooltip content only mounts once its trigger is focused/hovered, and
-    // Radix closes any other open tooltip document-wide when a new one opens
-    // — so check each one right after focusing it, not both at once.
-    fireEvent.focus(implantTrigger);
-    expect(screen.getByRole('tooltip')).toHaveTextContent('A basic ocular filter implant.');
     fireEvent.focus(frigateTrigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('Pilots a Frigate-class starship.');
 
@@ -167,6 +161,8 @@ describe('Skills', () => {
     ).toBeInTheDocument();
     // Unbonused attributes show the base value plainly.
     expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
+    // Implants count toward attributes but are not listed on this page.
+    expect(screen.queryByText('Ocular Filter - Basic')).not.toBeInTheDocument();
   });
 
   it('marks a skill already in a Skill Plan on its level bar, regardless of which plan it is in', async () => {
@@ -194,12 +190,10 @@ describe('Skills', () => {
     ).toBeInTheDocument();
   });
 
-  it('recovers an implant name and its attribute bonus from a transient type lookup failure, instead of stalling on "#id"', async () => {
-    // loadUniverseType (shared by the implant name lookup here and the
-    // attribute-bonus sum) is one live call per implant with no batch to
-    // fall back to. Before the retry this added, a single transient failure
-    // meant the implant's row read "#9899" instead of its real name AND its
-    // perception bonus never reached the attribute chip below.
+  it('recovers an implant attribute bonus from a transient type lookup failure', async () => {
+    // loadUniverseType is one live call per implant with no batch to fall
+    // back to: without its retry, one transient failure drops the implant's
+    // perception bonus from the attribute chip.
     let typeRequests = 0;
     server.use(
       http.get('https://esi.evetech.net/universe/types/9899', () => {
@@ -218,42 +212,9 @@ describe('Skills', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Ocular Filter - Basic')).toBeInTheDocument();
-    expect(screen.queryByText('#9899')).not.toBeInTheDocument();
     expect(
       await screen.findByText('19 base + 3 implant = 22', { selector: '.sr-only' })
     ).toBeInTheDocument();
-  });
-
-  it('counts only attribute-enhancer implants toward "N of 5 slots empty", not skill hardwirings (#405)', async () => {
-    // ESI's /characters/{id}/implants returns every fitted implant
-    // undifferentiated by slot. A hardwiring (bonuses something other than
-    // one of dogma.ts's five attribute-bonus ids 175-179) must not count as
-    // filling one of the 5 attribute-enhancer slots, or the count reads as
-    // "more full" than the character's attributes actually are.
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () =>
-        HttpResponse.json([9899, 20355])
-      ),
-      http.get('https://esi.evetech.net/universe/types/20355', () =>
-        HttpResponse.json({
-          type_id: 20355,
-          name: 'Zainou "Deadeye" Small Hybrid Turret SH-603',
-          description: '',
-          group_id: 300,
-          published: true,
-          dogma_attributes: [{ attribute_id: 999, value: 5.0 }],
-        })
-      )
-    );
-
-    render(<App />);
-
-    expect(await screen.findByText('Ocular Filter - Basic')).toBeInTheDocument();
-    expect(
-      await screen.findByText('Zainou "Deadeye" Small Hybrid Turret SH-603')
-    ).toBeInTheDocument();
-    expect(await screen.findByText('4 of 5 slots empty')).toBeInTheDocument();
   });
 
   it('detects a cerebral accelerator and shows it as a third term, separate from implants', async () => {
@@ -572,7 +533,7 @@ describe('Skills', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('opens the skill info modal from the skill name, while the rest of the row opens the inspector', async () => {
+  it('opens the skill info modal from the skill name and from the rest of the row', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -581,11 +542,8 @@ describe('Skills', () => {
     expect(link).toHaveAttribute('href', expect.stringContaining('info=skill-2'));
 
     await user.click(screen.getByRole('button', { name: 'Frigate' }));
-    expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument();
-    expect(window.location.search).not.toContain('info=');
-
-    await user.click(link);
     await waitFor(() => expect(window.location.search).toContain('info=skill-2'));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
   it('shows the queued level beside the trained one, and queued pips', async () => {
@@ -690,7 +648,8 @@ describe('Skills', () => {
     const frigateRow = await screen.findByRole('button', { name: /^Frigate/ });
     fireEvent.click(frigateRow);
 
-    const prereqsHeading = await screen.findByText('Prerequisites');
+    const dialog = await screen.findByRole('dialog');
+    const prereqsHeading = await within(dialog).findByText('Prerequisites');
     const prereqsSection = prereqsHeading.closest('section')!;
     // Frigate needs Small Hybrid Turret III; the character has it trained to V.
     expect(within(prereqsSection).getByText('Small Hybrid Turret')).toBeInTheDocument();
@@ -704,7 +663,8 @@ describe('Skills', () => {
     const turretRow = await screen.findByRole('button', { name: /^Small Hybrid Turret/ });
     fireEvent.click(turretRow);
 
-    const unlocksHeading = await screen.findByText('Unlocks');
+    const dialog = await screen.findByRole('dialog');
+    const unlocksHeading = await within(dialog).findByText('Unlocks');
     const unlocksSection = unlocksHeading.closest('section')!;
     expect(within(unlocksSection).getByText('Frigate')).toBeInTheDocument();
     expect(within(unlocksSection).getByText('Level 3')).toBeInTheDocument();
@@ -718,69 +678,18 @@ describe('Skills', () => {
     expect(turretRow.closest('li')?.querySelector('[role="tooltip"]')).toBeNull();
   });
 
-  it("shows the selected skill's description above its prerequisites", async () => {
-    render(<App />);
-
-    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
-    fireEvent.click(await screen.findByRole('button', { name: /^Frigate/ }));
-
-    const prereqsHeading = await screen.findByText('Prerequisites');
-    const panel = screen.getByRole('button', { name: /close/i }).closest('section')!;
-    const description = within(panel).getByText('Pilots a Frigate-class starship.');
-    expect(
-      description.compareDocumentPosition(prereqsHeading) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-  });
-
-  it('offers Add to Skill Plan in the inspector, not on the row, and keeps its Undo state per skill', async () => {
+  it('offers Add to Skill Plan in the skill info modal, not on the row', async () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
     fireEvent.click(await screen.findByRole('button', { name: /^Frigate/ }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Create Skill Plan and add' }));
-    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /^Gunnery/ }));
-    fireEvent.click(await screen.findByRole('button', { name: /^Small Hybrid Turret/ }));
-    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
-  });
-
-  it('deselects a skill (closing the inspector) on a second click', async () => {
-    render(<App />);
-
-    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
-    const frigateRow = await screen.findByRole('button', { name: /^Frigate/ });
-    fireEvent.click(frigateRow);
-    expect(await screen.findByText('Prerequisites')).toBeInTheDocument();
-
-    fireEvent.click(frigateRow);
-    expect(screen.queryByText('Prerequisites')).not.toBeInTheDocument();
-  });
-
-  it('announces the inspector without moving focus, and returns focus to the row on Close', async () => {
-    render(<App />);
-
-    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
-    const frigateRow = await screen.findByRole('button', { name: /^Frigate/ });
-    frigateRow.focus();
-    fireEvent.click(frigateRow);
-    expect(await screen.findByText('Prerequisites')).toBeInTheDocument();
-    expect(frigateRow).toHaveFocus();
-    await waitFor(() =>
-      expect(
-        screen
-          .getAllByRole('status')
-          .some((el) => /details for frigate/i.test(el.textContent ?? ''))
-      ).toBe(true)
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(
+      await within(dialog).findByRole('button', { name: 'Create Skill Plan and add' })
     );
-
-    const close = screen.getByRole('button', { name: /^Close$/ });
-    close.focus();
-    fireEvent.click(close);
-    await waitFor(() => expect(screen.getByRole('button', { name: /^Frigate/ })).toHaveFocus());
-    expect(screen.queryByText(/details for frigate/i)).not.toBeInTheDocument();
+    expect(await within(dialog).findByRole('button', { name: 'Undo' })).toBeInTheDocument();
   });
 
   it('starts every group collapsed, expands on header click, and collapses again on a second click', async () => {
@@ -867,25 +776,5 @@ describe('Skills', () => {
       target: { value: 'nonexistent' },
     });
     expect(await screen.findByText('No skills match your search.')).toBeInTheDocument();
-  });
-
-  it('scrolls the inspector into view on selection, since it renders above the sticky search bar (#1712)', async () => {
-    const scrollIntoView = vi
-      .spyOn(Element.prototype, 'scrollIntoView')
-      .mockImplementation(() => {});
-
-    try {
-      render(<App />);
-
-      fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
-      fireEvent.click(screen.getByRole('button', { name: /^Frigate/ }));
-
-      const closeButton = await screen.findByRole('button', { name: 'Close' });
-      const inspectorContainer = closeButton.closest('section')!.parentElement!;
-      expect(scrollIntoView.mock.instances).toContain(inspectorContainer);
-      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
-    } finally {
-      scrollIntoView.mockRestore();
-    }
   });
 });

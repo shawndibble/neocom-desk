@@ -179,8 +179,8 @@ describe('resolveMarketLocation', () => {
 });
 
 describe('marketLinkParams', () => {
-  // Shared by ItemContextMenu's "View in Market" and ImplantChip's Market
-  // link (#405): preserve whatever region/hub the current page is already
+  // Shared by ItemContextMenu's "View in Market" and MarketItemLink:
+  // preserve whatever region/hub the current page is already
   // scoped to, so a link from inside /market carries that scope over rather
   // than resetting to the device's Location Mode default.
   it('preserves an existing region param', () => {

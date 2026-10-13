@@ -27,7 +27,6 @@ const REVIEWED = new Set<string>([
   'src/features/market/OrderHistoryPanel.tsx',
   'src/features/market/TransactionsPanel.tsx',
   'src/features/market/UsedInSection.tsx',
-  'src/features/skills/ImplantChip.tsx',
   'src/features/travel/PilotShips.tsx',
   'src/features/travel/ZkillStatsSection.tsx',
   'src/routes/Clones.tsx',

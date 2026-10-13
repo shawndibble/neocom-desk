@@ -1,50 +1,72 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { EngineSkill, TrainedSkill } from '@/engine/types';
 import { AddToPlanBar, type AddedToPlan } from './AddToPlanBar';
-import { isEntryCovered } from './planner/reorder';
+import { plannedLevels } from './skillRequirements';
 import { targetPlanEntries, useTargetPlan } from './useTargetPlan';
 
 interface SkillPlanAddProps {
   characterId: number;
   skillTypeID: number;
   skillName: string;
-  /** The character's trained level (0-5); the add targets the next one. */
-  currentLevel: number;
+  /** For the levels the target plan trains as prerequisites of other entries. */
+  engineSkills: ReadonlyMap<number, EngineSkill>;
+  /** Corrected trained levels; also gives this skill's own. */
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
 }
 
 /**
- * The selected skill's "Add to Skill Plan" (the Skills list rows have no menu
- * of their own): the next level into the target plan, with the plan picker
- * and Undo `AddToPlanBar` carries.
+ * The skill Show info's "Add to Skill Plan": first level neither trained nor
+ * already in the target plan, with `AddToPlanBar`'s plan picker and Undo.
  */
 export function SkillPlanAdd({
   characterId,
   skillTypeID,
   skillName,
-  currentLevel,
+  engineSkills,
+  trainedSkills,
 }: SkillPlanAddProps) {
   const { t } = useTranslation();
   const target = useTargetPlan(characterId);
   const [added, setAdded] = useState<AddedToPlan | null>(null);
-  if (currentLevel >= 5) {
+  const { plans, targetPlanId } = target;
+  const currentLevel = trainedSkills.get(skillTypeID)?.level ?? 0;
+  const maxed = currentLevel >= 5;
+  const plannedLevel = useMemo(
+    () =>
+      maxed
+        ? 0
+        : (plannedLevels(
+            targetPlanEntries({ plans, targetPlanId }),
+            engineSkills,
+            trainedSkills
+          ).get(skillTypeID) ?? 0),
+    [maxed, plans, targetPlanId, engineSkills, trainedSkills, skillTypeID]
+  );
+  if (maxed) {
     return <p className="text-xs text-text-dim">{t('skills.inspector.maxLevel')}</p>;
   }
-  const targetLevel = currentLevel + 1;
-  const covered = isEntryCovered(targetPlanEntries(target), skillTypeID, targetLevel);
+  const targetLevel = Math.max(currentLevel, plannedLevel) + 1;
+  const planMaxed = targetLevel > 5;
 
   async function add() {
     const entry = { skillTypeID, targetLevel };
     const result = await target.addEntries([entry], skillName);
     if (result.added.length === 0) return;
-    setAdded({ planId: result.planId, planName: result.planName, entries: result.added });
+    // Adds chain (level III, then IV): Undo takes back every one into this plan, not just the last.
+    setAdded((prev) => ({
+      planId: result.planId,
+      planName: result.planName,
+      entries: prev?.planId === result.planId ? [...prev.entries, ...result.added] : result.added,
+    }));
   }
 
   return (
     <div className="space-y-1">
       <AddToPlanBar
         target={target}
-        unplannedCount={covered ? 0 : 1}
-        addLabel={t('skills.inspector.addToPlan')}
+        unplannedCount={planMaxed ? 0 : 1}
+        addLabel={t('skills.inspector.addLevelToPlan', { level: targetLevel })}
         added={added}
         onAdd={() => void add()}
         onUndo={() => {
@@ -53,7 +75,7 @@ export function SkillPlanAdd({
           setAdded(null);
         }}
       />
-      {covered && !added && (
+      {planMaxed && !added && (
         <p className="text-right text-xs text-success">{t('skills.fitCheck.inPlan')}</p>
       )}
     </div>

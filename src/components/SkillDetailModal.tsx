@@ -1,6 +1,6 @@
 /**
- * Shared, read-only skill detail lookup (GLOSSARY.md round 49): description,
- * prerequisites (trained vs. still needed), and unlocks for one skill, opened
+ * Shared skill detail lookup (GLOSSARY.md round 49): description, price,
+ * prerequisites (trained vs. still needed), unlocks and Add to Skill Plan for one skill, opened
  * from any feature that renders a skill name via
  * `openSkillDetailModal`/`useSkillDetailModal` (`stores/skillDetailModal.ts`).
  * Mounted once in `App.tsx`, same "always mounted, driven by a global
@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
+import { SkillPlanAdd } from '@/features/skills/SkillPlanAdd';
 import { SkillPriceSection } from '@/features/skills/SkillPriceSection';
 import { SkillRequirementsList } from '@/features/skills/SkillRequirementsList';
 import {
@@ -30,14 +31,20 @@ import { loadSkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
-import type { TrainedSkill } from '@/engine/types';
+import type { EngineSkill, TrainedSkill } from '@/engine/types';
 
 type ModalState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'not-found' }
-  | { status: 'ready'; data: SkillRequirements };
+  | {
+      status: 'ready';
+      data: SkillRequirements;
+      /** With `trainedSkills`: `SkillPlanAdd`'s inputs. */
+      engineSkills: ReadonlyMap<number, EngineSkill>;
+      trainedSkills: ReadonlyMap<number, TrainedSkill>;
+    };
 
 const IDLE: ModalState = { status: 'idle' };
 
@@ -85,7 +92,16 @@ export function SkillDetailModal() {
           request.planEntries
         );
         if (cancelled) return;
-        setState(requirements ? { status: 'ready', data: requirements } : { status: 'not-found' });
+        setState(
+          requirements
+            ? {
+                status: 'ready',
+                data: requirements,
+                engineSkills: catalog.engineSkills,
+                trainedSkills,
+              }
+            : { status: 'not-found' }
+        );
       } catch {
         if (!cancelled) setState({ status: 'error' });
       }
@@ -146,6 +162,16 @@ export function SkillDetailModal() {
                 })}
               </p>
             </div>
+            {activeCharacterId !== null && (
+              <SkillPlanAdd
+                key={request.typeID}
+                characterId={activeCharacterId}
+                skillTypeID={request.typeID}
+                skillName={state.data.name}
+                engineSkills={state.engineSkills}
+                trainedSkills={state.trainedSkills}
+              />
+            )}
             <SkillPriceSection typeID={request.typeID} npcPrice={state.data.npcPrice} />
             <SkillRequirementsList
               prereqs={state.data.prereqs}

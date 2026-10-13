@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import {
@@ -20,14 +19,9 @@ import { GrantBanner } from '@/app/GrantNote';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributeChips } from '@/features/skills/AttributeChips';
-import { ImplantChip } from '@/features/skills/ImplantChip';
-import { SkillInspector } from '@/features/skills/SkillInspector';
-import { SkillPlanAdd } from '@/features/skills/SkillPlanAdd';
-import { buildSkillRequirements } from '@/features/skills/skillRequirements';
 import {
   loadSkillCatalog,
   toAttributeBaseline,
-  toTrainedSkillsMap,
   type SkillCatalog,
 } from '@/features/skills/skillMap';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
@@ -47,7 +41,6 @@ import {
   type CompletedLevel,
 } from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
-import { typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
 import { skillCsvColumns, skillCsvRows } from '@/features/skills/skillsCsv';
 import { boardCsvGroups, buildSkillBoard } from '@/features/skills/skillBoard';
@@ -57,24 +50,6 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
-
-/** A character has 5 implant slots (game mechanic, not a config value — see `whatIfImplants.ts`'s own "always all five keys"). */
-const IMPLANT_SLOTS = 5;
-
-interface ImplantDetail {
-  typeId: number;
-  name: string;
-  description: string | null;
-  /**
-   * Whether this implant fills one of the 5 attribute-enhancer slots, vs. a
-   * skill hardwiring or other implant type (slots 6-10) — ESI's
-   * `/characters/{id}/implants` returns every fitted implant undifferentiated
-   * by slot, so "N of 5 slots empty" (#405) has to derive slot occupancy from
-   * whether the implant carries one of `dogma.ts`'s attribute-bonus
-   * attributes, the same signal `implantBonuses` already keys off of.
-   */
-  attributeSlot: boolean;
-}
 
 interface Snapshot {
   catalog: SkillCatalog;
@@ -96,7 +71,6 @@ interface Snapshot {
   completedSp: number;
   /** Older of /skills' and the queue's fetchedAt — the true freshness of the corrected total. */
   fetchedAt: Date | null;
-  implantDetails: ImplantDetail[];
   implantBonuses: Implants;
   /** Null when ESI's attributes couldn't be read — nothing to classify. */
   attributeBaseline: AttributeBaseline | null;
@@ -134,15 +108,6 @@ async function loadSkillsSnapshot(
   // be discarded.
   const implantIds = signal.cancelled ? [] : (implantsResult?.data ?? []);
   const implantTypes = await Promise.all(implantIds.map((id) => loadUniverseType(id)));
-  const implantDetails: ImplantDetail[] = implantIds.map((id, i) => {
-    const info = implantTypes[i]?.data;
-    return {
-      typeId: id,
-      name: info?.name ?? `#${id}`,
-      description: typeDescription(info?.description),
-      attributeSlot: Object.keys(extractAttributeBonuses(info?.dogma_attributes)).length > 0,
-    };
-  });
   const implantBonuses = sumAttributeBonuses(
     implantTypes.map((r) => extractAttributeBonuses(r?.data?.dogma_attributes))
   );
@@ -160,7 +125,6 @@ async function loadSkillsSnapshot(
     queuedLevels,
     completedSp,
     fetchedAt,
-    implantDetails,
     implantBonuses,
     attributeBaseline,
   };
@@ -172,7 +136,7 @@ const SEARCH_ANNOUNCE_DEBOUNCE_MS = 250;
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
-/** Trained skills for the active character: grouped by SDE group, with SP + attributes/implants. */
+/** Every SDE skill for the active character, grouped by SDE group, with SP + attributes. */
 export function Skills() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -198,31 +162,8 @@ export function Skills() {
     </span>
   );
   const fetchedAt = data?.fetchedAt ?? null;
-  const implantDetails = data?.implantDetails ?? [];
-  const attributeSlotsFilled = implantDetails.filter((i) => i.attributeSlot).length;
   const implantBonuses = data?.implantBonuses ?? {};
   const attributeBaseline = data?.attributeBaseline ?? null;
-
-  const [selectedSkillTypeID, setSelectedSkillTypeID] = useState<number | null>(null);
-  const inspectorRef = useRef<HTMLDivElement>(null);
-  const rowButtons = useRef(new Map<number, HTMLButtonElement>());
-  const focusAfterCommit = useFocusAfterCommit();
-
-  // The inspector renders above the sticky search bar and the row that
-  // opened it, so a plain selection change can leave it off-screen.
-  useEffect(() => {
-    if (selectedSkillTypeID !== null) {
-      inspectorRef.current?.scrollIntoView({ block: 'nearest' });
-    }
-  }, [selectedSkillTypeID]);
-
-  // Drop the inspector selection when switching characters, without an effect
-  // (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
-  const [inspectorForCharacter, setInspectorForCharacter] = useState(activeCharacterId);
-  if (inspectorForCharacter !== activeCharacterId) {
-    setInspectorForCharacter(activeCharacterId);
-    setSelectedSkillTypeID(null);
-  }
 
   // Every SDE skill, grouped, with the character's corrected level, queued
   // level and whether the book is still missing (#3643).
@@ -255,16 +196,8 @@ export function Skills() {
   const totalCount = groups.reduce((sum, group) => sum + group.total, 0);
   const queuedCount = groups.reduce((sum, group) => sum + group.queued, 0);
 
-  const trainedSkillsMap = useMemo(
-    () => toTrainedSkillsMap(skillsResult?.data?.skills ?? []),
-    [skillsResult]
-  );
-
-  // Every plan this row's own context menu can add into (the inspector's Add
-  // targets one chosen plan; the mark reflects any of them), merged by
-  // skill at the highest level any of them asks. Drives the bar's planned
-  // mark: without it a skill already queued in a plan looks identical to one
-  // that isn't (issue: no indicator anywhere a skill can be added to a plan).
+  // Every plan this Character has, merged by skill at the highest level any
+  // asks: the bar's planned mark reflects any plan, not just Show info's target.
   const skillPlans = useLiveQuery(
     () =>
       activeCharacterId === null
@@ -284,21 +217,6 @@ export function Skills() {
     }
     return levels;
   }, [skillPlans]);
-
-  const selectedSkill = useMemo(
-    () =>
-      selectedSkillTypeID === null
-        ? null
-        : (groups
-            .flatMap((group) => group.skills)
-            .find((skill) => skill.skillTypeID === selectedSkillTypeID) ?? null),
-    [groups, selectedSkillTypeID]
-  );
-
-  const inspector = useMemo(() => {
-    if (selectedSkillTypeID === null || !catalog) return null;
-    return buildSkillRequirements(catalog, trainedSkillsMap, selectedSkillTypeID);
-  }, [selectedSkillTypeID, catalog, trainedSkillsMap]);
 
   // All groups start collapsed on every load (GLOSSARY.md round 17); nothing
   // seeds this set from a previous visit.
@@ -390,9 +308,6 @@ export function Skills() {
         }
       />
       <SkillsSubNav />
-      <LiveStatus>
-        {inspector ? t('skills.inspector.shownAnnouncement', { name: inspector.name }) : null}
-      </LiveStatus>
 
       <StatChips>
         {totalCount > 0 && (
@@ -450,63 +365,7 @@ export function Skills() {
               implantBonuses={implantBonuses}
               boosterBonus={acceleratorBonusOf(attributeBaseline)}
             />
-            <div className="mt-3">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('skills.implants')}
-              </p>
-              {implantDetails.length > 0 ? (
-                <>
-                  <ul className="mt-1 flex flex-wrap gap-2 text-xs">
-                    {implantDetails.map((implant) => (
-                      <li key={implant.typeId}>
-                        <ImplantChip
-                          typeId={implant.typeId}
-                          name={implant.name}
-                          description={implant.description}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                  {attributeSlotsFilled < IMPLANT_SLOTS && (
-                    <p className="mt-1 text-xs text-text-dim">
-                      {t('skills.implantsSlotsEmpty', {
-                        count: IMPLANT_SLOTS - attributeSlotsFilled,
-                      })}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="mt-1 text-xs text-text-dim">{t('skills.implantsNone')}</p>
-              )}
-            </div>
           </Panel>
-
-          {inspector && (
-            <div ref={inspectorRef}>
-              <SkillInspector
-                skillName={inspector.name}
-                description={inspector.description}
-                prereqs={inspector.prereqs}
-                unlocks={inspector.unlocks}
-                onClose={() => {
-                  const opener = selectedSkillTypeID;
-                  setSelectedSkillTypeID(null);
-                  if (opener !== null) focusAfterCommit(() => rowButtons.current.get(opener));
-                }}
-                planAction={
-                  selectedSkill && (
-                    <SkillPlanAdd
-                      key={selectedSkill.skillTypeID}
-                      characterId={activeCharacterId}
-                      skillTypeID={selectedSkill.skillTypeID}
-                      skillName={selectedSkill.name}
-                      currentLevel={selectedSkill.level}
-                    />
-                  )
-                }
-              />
-            </div>
-          )}
 
           {groups.length > 0 && (
             <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-bg py-2">
@@ -574,19 +433,9 @@ export function Skills() {
                           <SkillBoardRow
                             key={skill.skillTypeID}
                             skill={skill}
-                            selected={selectedSkillTypeID === skill.skillTypeID}
                             plannedLevel={plannedLevels.get(skill.skillTypeID) ?? null}
                             trainingChip={
                               training?.skillTypeID === skill.skillTypeID ? trainingChip : null
-                            }
-                            buttonRef={(el) => {
-                              if (el) rowButtons.current.set(skill.skillTypeID, el);
-                              else rowButtons.current.delete(skill.skillTypeID);
-                            }}
-                            onSelect={() =>
-                              setSelectedSkillTypeID((current) =>
-                                current === skill.skillTypeID ? null : skill.skillTypeID
-                              )
                             }
                           />
                         ))}

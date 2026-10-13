@@ -1,5 +1,5 @@
 /**
- * "What does this skill cost to buy right now?" — the skill inspector's price
+ * "What does this skill cost to buy right now?" — the skill Show info's price
  * rows (GLOSSARY.md round 49 follow-up): lowest sell at the Trade Hub station
  * and anywhere in its region, the fixed NPC price, a hub picker (the same
  * synced default `PriceHubSelect` already drives for Fittings), and links into

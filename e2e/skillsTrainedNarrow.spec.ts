@@ -63,9 +63,13 @@ async function caldariFrigateRow(page: Page) {
   return row;
 }
 
-test('trained-skill row meets the 44px touch floor at 390px, and still selects', async ({
+test('trained-skill row meets the 44px touch floor at 390px, and opens the skill info', async ({
   page,
 }) => {
+  // The skill info's price section reads the order book on open.
+  await page.route('https://esi.evetech.net/markets/*/orders*', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  );
   await gotoTrainedSkills(page);
   await page.setViewportSize(PHONE);
 
@@ -74,7 +78,7 @@ test('trained-skill row meets the 44px touch floor at 390px, and still selects',
   expect(height).toBeGreaterThanOrEqual(44);
 
   await row.click();
-  await expect(row).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('dialog', { name: 'Caldari Frigate' })).toBeVisible();
 });
 
 test('trained-skill row keeps its 28px pointer height at and above md (1280px)', async ({
@@ -86,43 +90,6 @@ test('trained-skill row keeps its 28px pointer height at and above md (1280px)',
   const row = await caldariFrigateRow(page);
   const height = await row.evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBeCloseTo(28, 0);
-});
-
-/**
- * The inspector renders above the sticky search bar, i.e. above the row that
- * opened it — with no scroll-into-view, selecting a row scrolled below the
- * top of the page left the inspector rendered entirely off-screen (#1712).
- *
- * Scrolls to the bottom before clicking: clicking a row that's already
- * on-screen leaves the page scrolled little enough that the inspector can
- * land in view by coincidence, proving nothing about the fix under test.
- */
-async function assertInspectorScrollsIntoView(page: Page) {
-  const row = await caldariFrigateRow(page);
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await row.click();
-
-  const inspector = page.locator('section').filter({
-    has: page.getByRole('heading', { name: 'Caldari Frigate' }),
-  });
-  const inspectorClose = inspector.getByRole('button', { name: 'Close' });
-  await expect(inspectorClose).toBeInViewport();
-  // In-viewport alone doesn't rule out the sticky search bar painting over
-  // it — a real click only succeeds if the button actually receives it.
-  await inspectorClose.click();
-  await expect(row).toHaveAttribute('aria-pressed', 'false');
-}
-
-test('selecting a trained skill scrolls its inspector into view at 390px', async ({ page }) => {
-  await gotoTrainedSkills(page);
-  await page.setViewportSize(PHONE);
-  await assertInspectorScrollsIntoView(page);
-});
-
-test('selecting a trained skill scrolls its inspector into view at 1280px', async ({ page }) => {
-  await gotoTrainedSkills(page);
-  await page.setViewportSize(DESKTOP);
-  await assertInspectorScrollsIntoView(page);
 });
 
 /**
@@ -235,7 +202,7 @@ async function openTrainingRow(page: Page, size: { width: number; height: number
 }
 
 test('the training row shows its full name with the chip under it at 390px', async ({ page }) => {
-  const { row, button, name, chip } = await openTrainingRow(page, PHONE);
+  const { row, name, chip } = await openTrainingRow(page, PHONE);
 
   const fits = await name.evaluate((el) => el.scrollHeight <= el.clientHeight);
   expect(fits).toBe(true);
@@ -247,8 +214,6 @@ test('the training row shows its full name with the chip under it at 390px', asy
   expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
   expect(rowBox.height).toBeGreaterThanOrEqual(44);
 
-  await button.click();
-  await expect(button).toHaveAttribute('aria-pressed', 'true');
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
   );
