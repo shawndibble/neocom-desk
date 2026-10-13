@@ -27,7 +27,10 @@ const choice = vi.hoisted(() => ({
   current: { all: false, allowed: new Set([100]) } as
     { all: false; allowed: Set<number> } | { all: true; excluded: Set<number> },
 }));
-vi.mock('./shareSelection', () => ({ loadShareChoice: async () => choice.current }));
+const locations = vi.hoisted(() => ({ current: new Set<number>() }));
+vi.mock('./shareSelection', () => ({
+  loadBlueprintShare: async () => ({ choice: choice.current, locations: locations.current }),
+}));
 vi.mock('@/features/industry/data', () => ({
   loadCharacterBlueprints: async () => ({
     cached: {
@@ -83,6 +86,7 @@ describe('publishSharedLibrary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     choice.current = { all: false, allowed: new Set([100]) };
+    locations.current = new Set();
     location.mockResolvedValue({ name: 'Jita IV - Moon 4', systemId: 30000142 });
   });
 
@@ -121,6 +125,30 @@ describe('publishSharedLibrary', () => {
     await publishSharedLibrary(1, 'c1');
     expect(
       (setDoc.mock.calls[1]![1] as { items: { typeId: number }[] }).items.map((i) => i.typeId)
+    ).toEqual([100, 200]);
+  });
+
+  it('publishes every blueprint at a shared location, whatever its type', async () => {
+    choice.current = { all: false, allowed: new Set() };
+    locations.current = new Set([60003760]);
+    memberDoc({ ownerHash: 'owner-1' });
+    await expect(publishSharedLibrary(1, 'c1')).resolves.toMatchObject({ outcome: 'full' });
+    expect((setDoc.mock.calls[0]![1] as { items: unknown[] }).items).toEqual(published);
+    // Only the shared location is looked up, and its id is never published.
+    expect(location.mock.calls.map((call) => call[1])).toEqual([60003760]);
+    expect(JSON.stringify(setDoc.mock.calls[0]![1])).not.toContain('60003760');
+  });
+
+  it('adds a location rule to the picked types', async () => {
+    location.mockImplementation(async (_char: number, id: number) => ({
+      name: id === 60003760 ? 'Jita IV - Moon 4' : 'Fort Knox',
+      systemId: 30000142,
+    }));
+    locations.current = new Set([1034000000001]);
+    memberDoc({ ownerHash: 'owner-1' });
+    await publishSharedLibrary(1, 'c1');
+    expect(
+      (setDoc.mock.calls[0]![1] as { items: { typeId: number }[] }).items.map((i) => i.typeId)
     ).toEqual([100, 200]);
   });
 

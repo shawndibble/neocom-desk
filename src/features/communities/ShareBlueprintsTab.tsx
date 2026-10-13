@@ -5,16 +5,22 @@ import { Link } from 'react-router-dom';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import {
   addShared,
-  effectiveSelection,
-  noneShared,
-  shareAll,
+  copiesByPlace,
+  noBlueprintsShared,
+  shareAllBlueprints,
+  shareLocation,
   stopSharing,
-  type ShareChoice,
+  stopSharingLocation,
+  typeShareStatus,
+  type BlueprintShare,
 } from '@/engine/communities/shareMode';
 import { bpcSourcingCommunityHref } from '@/features/bpcContracts/bpcSourcingUrl';
+import { AddBlueprintsDialog } from './AddBlueprintsDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { publishSharedLibrary, type PublishResult } from './libraryPush';
-import { loadShareChoice, saveShareChoice } from './shareSelection';
+import { PlaceName, ViaLabel, type TypeStatus } from './sharedBlueprintRows';
+import { loadBlueprintShare, saveBlueprintShare } from './shareSelection';
+import { useBlueprintCopies, usePlaceLabels } from './useBlueprintPlaces';
 import { useOwnedBlueprintTypes } from './useOwnedBlueprintTypes';
 
 /** A long list shows this many rows; the search narrows it. */
@@ -27,13 +33,17 @@ function namedLike<T extends { name: string }>(types: readonly T[], needle: stri
   return types.filter((type) => type.name.toLowerCase().includes(needle)).sort(byName);
 }
 
+const NO_STATUS: ReadonlyMap<number, TypeStatus> = new Map();
+
 /**
  * The Blueprints tab of a Community (issue #3599 follow-up): what this
  * Character shares, one row per blueprint with Stop sharing. "Share all my
  * blueprints" is a standing switch, so a blueprint acquired later is shared
- * too; under it a revoke is an exclusion. With it off, blueprints are added
- * one at a time from the search. Every change is saved on this device and
- * then published.
+ * too; under it a revoke is an exclusion. Add blueprints opens a dialog to
+ * share one blueprint type, or (switch off) every blueprint at a station or
+ * structure as a standing rule; shared locations are listed here, and a
+ * blueprint shared only through one says so instead of offering Stop sharing.
+ * Every change is saved on this device and then published.
  */
 export function ShareBlueprintsTab({
   characterId,
@@ -46,8 +56,10 @@ export function ShareBlueprintsTab({
 }) {
   const { t } = useTranslation();
   const owned = useOwnedBlueprintTypes(characterId);
-  const [choice, setChoice] = useState<ShareChoice | null>(null);
+  const copies = useBlueprintCopies(characterId);
+  const [share, setShare] = useState<BlueprintShare | null>(null);
   const [query, setQuery] = useState('');
+  const [adding, setAdding] = useState(false);
   const [confirmingOff, setConfirmingOff] = useState(false);
   const [failed, setFailed] = useState(false);
   const [published, setPublished] = useState<PublishResult | null>(null);
@@ -62,13 +74,13 @@ export function ShareBlueprintsTab({
 
   useEffect(() => {
     let cancelled = false;
-    void loadShareChoice(characterId, communityId).then((saved) => {
+    void loadBlueprintShare(characterId, communityId).then((saved) => {
       if (cancelled) return;
-      setChoice(saved);
+      setShare(saved);
       // Opening the tab checks what the Community holds against this device, so
       // blueprints left out show up here without waiting for a change. Nothing
       // is chosen, nothing to check.
-      if (saved.all || saved.allowed.size > 0)
+      if (saved.choice.all || saved.choice.allowed.size > 0 || saved.locations.size > 0)
         report(publishSharedLibrary(characterId, communityId));
     });
     return () => {
@@ -77,63 +89,69 @@ export function ShareBlueprintsTab({
   }, [characterId, communityId, report]);
 
   const types = useMemo(() => (owned.status === 'ready' ? owned.owned : []), [owned]);
-  const typeIds = useMemo(() => types.map((type) => type.typeId), [types]);
-  const sharedIds = useMemo(
-    () => (choice ? effectiveSelection(typeIds, choice) : new Set<number>()),
-    [choice, typeIds]
+  // Until the places load, every type still gets a status from the by-type choice.
+  const placed = useMemo(
+    () => copies ?? types.map((type) => ({ typeId: type.typeId, placeId: null })),
+    [copies, types]
+  );
+  const status = useMemo(
+    () => (share ? typeShareStatus(placed, share) : NO_STATUS),
+    [share, placed]
+  );
+  const sharedTypes = useMemo(
+    () =>
+      types.filter((type) => {
+        const entry = status.get(type.typeId);
+        return entry !== undefined && (entry.direct || entry.via.length > 0);
+      }),
+    [types, status]
   );
   const needle = query.trim().toLowerCase();
-  const sharedRows = useMemo(
-    () =>
-      namedLike(
-        types.filter((type) => sharedIds.has(type.typeId)),
-        needle
-      ),
-    [types, sharedIds, needle]
+  const sharedRows = useMemo(() => namedLike(sharedTypes, needle), [sharedTypes, needle]);
+  const places = useMemo(() => copiesByPlace(placed), [placed]);
+  // Under share-all location rules are moot (and turning it on clears them).
+  const sharedLocations = useMemo(
+    () => (share && !share.choice.all ? [...share.locations].sort((a, b) => a - b) : []),
+    [share]
   );
-  const addable = useMemo(
-    () =>
-      choice && !choice.all && needle !== ''
-        ? namedLike(
-            types.filter((type) => !sharedIds.has(type.typeId)),
-            needle
-          )
-        : [],
-    [types, sharedIds, choice, needle]
+  const wanted = useMemo(
+    () => (adding ? [...places.keys(), ...sharedLocations] : sharedLocations),
+    [adding, places, sharedLocations]
   );
+  const labels = usePlaceLabels(characterId, wanted);
 
   // Saves run one after another, each from the choice the one before left, so
   // two quick clicks never build from the same base and a failed save rolls
   // back exactly its own change.
-  const latest = useRef<ShareChoice | null>(null);
+  const latest = useRef<BlueprintShare | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const publishes = useRef(0);
   useEffect(() => {
-    latest.current = choice;
-  }, [choice]);
+    latest.current = share;
+  }, [share]);
 
-  function update(change: (current: ShareChoice) => ShareChoice): Promise<void> {
+  function update(change: (current: BlueprintShare) => BlueprintShare): Promise<void> {
     setFailed(false);
     queue.current = queue.current.then(async () => {
       const base = latest.current;
       if (!base) return;
       const next = change(base);
       latest.current = next;
-      setChoice(next);
+      setShare(next);
       try {
-        await saveShareChoice(characterId, communityId, next);
+        await saveBlueprintShare(characterId, communityId, next);
         // Never rejects: 'unavailable' means nothing reached the Community this time.
         report(publishSharedLibrary(characterId, communityId));
       } catch {
         latest.current = base;
-        setChoice(base);
+        setShare(base);
         setFailed(true);
       }
     });
     return queue.current;
   }
 
-  if (owned.status === 'loading' || choice === null) {
+  if (owned.status === 'loading' || share === null) {
     return <Spinner size="sm" label={t('communities.share.loading')} />;
   }
   if (owned.status === 'needsReauth') {
@@ -153,20 +171,23 @@ export function ShareBlueprintsTab({
       <div className="flex flex-wrap items-center gap-2">
         <label className={`flex items-center gap-2 text-xs font-medium ${tappableRowClassName}`}>
           <Checkbox
-            checked={choice.all}
+            checked={share.choice.all}
             onChange={(event) => {
-              if (event.target.checked) update(shareAll);
+              if (event.target.checked) update(shareAllBlueprints);
               else setConfirmingOff(true);
             }}
           />
           {t('communities.blueprints.shareAll')}
         </label>
         <span role="status" className="text-xs text-text-dim">
-          {choice.all
-            ? t('communities.blueprints.allShared', { count: sharedIds.size })
-            : t('communities.share.count', { count: sharedIds.size, total: types.length })}
+          {share.choice.all
+            ? t('communities.blueprints.allShared', { count: sharedTypes.length })
+            : t('communities.share.count', { count: sharedTypes.length, total: types.length })}
         </span>
-        <Button size="sm" className="ml-auto" onClick={onOpenLibrary}>
+        <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
+          {t('communities.blueprints.add')}
+        </Button>
+        <Button size="sm" onClick={onOpenLibrary}>
           {t('communities.blueprints.openLibrary')}
         </Button>
       </div>
@@ -176,33 +197,31 @@ export function ShareBlueprintsTab({
         </Link>
         <span className="text-text-dim"> · {t('communities.blueprints.browseHint')}</span>
       </p>
-      <SearchInput
-        className="w-full"
-        value={query}
-        placeholder={
-          choice.all ? t('communities.blueprints.filter') : t('communities.blueprints.search')
-        }
-        aria-label={t('communities.share.search')}
-        onChange={(event) => setQuery(event.target.value)}
-      />
-      {addable.length > 0 && (
-        <section aria-label={t('communities.blueprints.addable')} className="space-y-1">
-          <h3 className="text-xs font-semibold">{t('communities.blueprints.addable')}</h3>
+      {sharedLocations.length > 0 && (
+        <section aria-label={t('communities.blueprints.sharedLocations')} className="space-y-1">
+          <h3 className="text-xs font-semibold">{t('communities.blueprints.sharedLocations')}</h3>
           <ul className="divide-y divide-line">
-            {addable.slice(0, ROW_LIMIT).map((type) => (
-              <li key={type.typeId} className="flex items-center gap-2 py-1 text-xs">
-                <span className="min-w-0 flex-1 truncate">{type.name}</span>
+            {sharedLocations.map((placeId) => (
+              <li key={placeId} className="flex items-center gap-2 py-1 text-xs">
+                <PlaceName label={labels.get(placeId)} count={places.get(placeId) ?? 0} />
                 <Button
                   size="sm"
-                  onClick={() => update((current) => addShared(current, type.typeId))}
+                  onClick={() => update((current) => stopSharingLocation(current, placeId))}
                 >
-                  {t('communities.blueprints.share')}
+                  {t('communities.blueprints.stop')}
                 </Button>
               </li>
             ))}
           </ul>
         </section>
       )}
+      <SearchInput
+        className="w-full"
+        value={query}
+        placeholder={t('communities.blueprints.filter')}
+        aria-label={t('communities.share.search')}
+        onChange={(event) => setQuery(event.target.value)}
+      />
       {sharedRows.length === 0 ? (
         <EmptyState
           title={
@@ -211,17 +230,31 @@ export function ShareBlueprintsTab({
         />
       ) : (
         <ul className="divide-y divide-line">
-          {sharedRows.slice(0, ROW_LIMIT).map((type) => (
-            <li key={type.typeId} className="flex items-center gap-2 py-1 text-xs">
-              <span className="min-w-0 flex-1 truncate">{type.name}</span>
-              <Button
-                size="sm"
-                onClick={() => update((current) => stopSharing(current, type.typeId))}
-              >
-                {t('communities.blueprints.stop')}
-              </Button>
-            </li>
-          ))}
+          {sharedRows.slice(0, ROW_LIMIT).map((type) => {
+            const entry = status.get(type.typeId);
+            return (
+              <li key={type.typeId} className="flex items-center gap-2 py-1 text-xs">
+                <span className="min-w-0 flex-1 truncate">
+                  {type.name}
+                  <ViaLabel via={entry?.via ?? []} labels={labels} />
+                </span>
+                {/* Shared only through a location: stopping that location is the way out. */}
+                {entry?.direct && (
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      update((current) => ({
+                        ...current,
+                        choice: stopSharing(current.choice, type.typeId),
+                      }))
+                    }
+                  >
+                    {t('communities.blueprints.stop')}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
       {sharedRows.length > ROW_LIMIT && (
@@ -250,7 +283,22 @@ export function ShareBlueprintsTab({
         body={t('communities.blueprints.offBody')}
         actionLabel={t('communities.blueprints.offAction')}
         onClose={() => setConfirmingOff(false)}
-        onConfirm={() => update(noneShared)}
+        onConfirm={() => update(noBlueprintsShared)}
+      />
+      <AddBlueprintsDialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        shareAll={share.choice.all}
+        types={types}
+        status={status}
+        places={copies === null ? null : places}
+        sharedLocations={share.locations}
+        labels={labels}
+        onShareType={(typeId) =>
+          update((current) => ({ ...current, choice: addShared(current.choice, typeId) }))
+        }
+        onShareLocation={(placeId) => update((current) => shareLocation(current, placeId))}
+        onStopLocation={(placeId) => update((current) => stopSharingLocation(current, placeId))}
       />
     </div>
   );

@@ -18,7 +18,7 @@ import {
   type Timestamp,
 } from 'firebase/firestore/lite';
 import { db } from '@/db';
-import { effectiveSelection, type ShareChoice } from '@/engine/communities/shareMode';
+import { sharesBlueprint, type BlueprintShare } from '@/engine/communities/shareMode';
 import {
   chunkLibrary,
   libraryHash,
@@ -36,7 +36,7 @@ import { lookupSolarSystem } from '@/sde/solarSystems';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { listCommunityIds } from './communityStore';
-import { loadShareChoice } from './shareSelection';
+import { loadBlueprintShare } from './shareSelection';
 
 /**
  * What one publish did. `skipped` counts the selected blueprints left out
@@ -62,52 +62,59 @@ function memberRef(communityId: string, uid: string) {
 }
 
 /**
- * The selected blueprints with their station or structure and system. Null
+ * The shared blueprints with their station or structure and system. Null
  * when the inputs aren't all on hand (no cached blueprints or assets, scope
  * lost): the caller publishes nothing rather than shrinking the library.
  */
-async function buildLibrary(characterId: number, choice: ShareChoice) {
+async function buildLibrary(characterId: number, share: BlueprintShare) {
   const [blueprints, assets] = await Promise.all([
     loadCharacterBlueprints(characterId),
     loadCharacterAssets(characterId),
   ]);
   if (!blueprints.cached || !assets.cached) return null;
 
-  const selected = effectiveSelection(
-    [...new Set(blueprints.cached.data.map((blueprint) => blueprint.type_id))],
-    choice
-  );
+  // Every copy's place first (local, no requests): a location rule shares a
+  // copy whose type was never picked, so filtering by type first would miss it.
   const assetsByItemId = new Map(assets.cached.data.map((asset) => [asset.item_id, asset]));
-  const owned = blueprints.cached.data.filter((blueprint) => selected.has(blueprint.type_id));
   const placeIds = new Map<number, number>();
-  for (const blueprint of owned) {
+  for (const blueprint of blueprints.cached.data) {
     const placement = resolveBlueprintPlacement(blueprint, assetsByItemId);
     if (placement.kind === 'place') placeIds.set(blueprint.item_id, placement.locationId);
   }
+  const placeIdOf = (blueprint: { item_id: number }) => placeIds.get(blueprint.item_id) ?? null;
+  const owned = blueprints.cached.data.filter((blueprint) =>
+    sharesBlueprint(share, blueprint.type_id, placeIdOf(blueprint))
+  );
 
+  // Only the places of shared copies are named: one request each at most.
   const places = new Map<number, ResolvedPlace>();
   await Promise.all(
-    [...new Set(placeIds.values())].map(async (locationId) => {
-      const location = await loadBlueprintLocation(characterId, locationId);
-      const system = location.systemId == null ? null : await lookupSolarSystem(location.systemId);
-      if (location.name && system) {
-        places.set(locationId, { locationName: location.name, systemName: system.name });
+    [...new Set(owned.map(placeIdOf).filter((id): id is number => id !== null))].map(
+      async (locationId) => {
+        const location = await loadBlueprintLocation(characterId, locationId);
+        const system =
+          location.systemId == null ? null : await lookupSolarSystem(location.systemId);
+        if (location.name && system) {
+          places.set(locationId, { locationName: location.name, systemName: system.name });
+        }
       }
-    })
+    )
   );
 
   // One blueprint in a structure nobody can read must not hold back the rest:
   // it is left out and counted, and the next sweep picks it up if the place
   // resolves by then (the hash changes, so the library is pushed again).
-  return splitSharedBlueprints(owned, selected, (blueprint) => {
-    const locationId = placeIds.get(blueprint.item_id);
-    return locationId === undefined ? null : (places.get(locationId) ?? null);
-  });
+  return splitSharedBlueprints(
+    owned,
+    share,
+    placeIdOf,
+    (locationId) => places.get(locationId) ?? null
+  );
 }
 
 async function publish(characterId: number, communityId: string): Promise<PublishResult> {
-  const [choice, character] = await Promise.all([
-    loadShareChoice(characterId, communityId),
+  const [share, character] = await Promise.all([
+    loadBlueprintShare(characterId, communityId),
     db.characters.get(characterId),
   ]);
   if (!character?.ownerHash) return unavailable;
@@ -122,7 +129,7 @@ async function publish(characterId: number, communityId: string): Promise<Publis
       : null;
   const oldChunkCount = Number(data.chunkCount ?? 0);
 
-  const built = await buildLibrary(characterId, choice);
+  const built = await buildLibrary(characterId, share);
   if (!built) return unavailable;
   const { shared: items, skipped } = built;
   const hash = libraryHash(items);
