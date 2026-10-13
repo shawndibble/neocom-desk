@@ -44,6 +44,7 @@ const hbars = (rows: [label: string, share: number, text: string][]): ChartModel
 });
 
 function buildSamples(t: TFunction): Record<string, Sample> {
+  const vol = (amount: string) => t('overview.widgets.data.survey.volume', { amount });
   return {
     training: {
       value: '4h 12m',
@@ -374,18 +375,18 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       ],
     },
     survey: {
-      value: '6.4K',
+      value: '2h 14m',
       unit: t('overview.widgets.data.survey.unit'),
       note: t('overview.gallery.samples.survey.note'),
       rows: [
-        ['Arkonor', '', '6.4K'],
-        ['Bistot', '', '4.1K'],
-        ['Veldspar', '', '1.2K'],
+        ['Arkonor', '', vol('6.4K')],
+        ['Bistot', '', vol('4.1K')],
+        ['Veldspar', '', vol('1.2K')],
       ],
       chart: hbars([
-        ['Arkonor', 1, '6.4K'],
-        ['Bistot', 0.64, '4.1K'],
-        ['Veldspar', 0.19, '1.2K'],
+        ['Arkonor', 1, vol('6.4K')],
+        ['Bistot', 0.64, vol('4.1K')],
+        ['Veldspar', 0.19, vol('1.2K')],
       ]),
     },
     routeSafety: {

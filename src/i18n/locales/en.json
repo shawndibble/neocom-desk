@@ -3807,7 +3807,8 @@
           "average": "avg {{value}}/day"
         },
         "survey": {
-          "note": "ISK per m³ by ore, best first"
+          "note": "Volume left in the field over time, by ore",
+          "summary": "{{percent}}% of the field is mined and {{left}} m³ is left: {{ores}}."
         },
         "routeSafety": {
           "note": "Player kills per hour across the route",
@@ -3877,8 +3878,13 @@
           "securityLabel": "Security"
         },
         "survey": {
-          "unit": "ISK/m³",
-          "secondary": "{{ore}} at {{place}}"
+          "unit": "until mined out",
+          "secondary": "Done {{time}} EVE",
+          "secondaryAt": "Done {{time}} EVE at {{place}}",
+          "finished": "Mined out",
+          "overdue": "Due now",
+          "volume": "{{amount}} m³",
+          "noEta": "no estimate yet"
         },
         "hauling": {
           "unit": "ISK profit",
@@ -4121,12 +4127,11 @@
       },
       "survey": {
         "title": "Mining survey",
-        "description": "The best ores in your latest survey",
+        "description": "When your survey will be mined out, and what is left",
         "empty": "No survey yet",
         "col": {
           "ore": "Ore",
-          "location": "Location",
-          "iskPerM3": "ISK/m³"
+          "left": "Left"
         },
         "emptyLink": "Open Mining Survey"
       },
@@ -4540,7 +4545,7 @@
           "contract": "Re: contract"
         },
         "survey": {
-          "note": "Veldspar Prime at Efa IV"
+          "note": "Done 14:32 EVE at Efa IV"
         },
         "hauling": {
           "note": "Best haul from your last scan"

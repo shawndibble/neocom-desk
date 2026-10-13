@@ -180,7 +180,7 @@ const SPECS: Record<string, Spec> = {
   survey: {
     category: 'industry',
     views: NCT,
-    view: 'number',
+    view: 'chart',
     size: 'M',
     endpoints: [],
   },

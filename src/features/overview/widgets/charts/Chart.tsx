@@ -19,6 +19,7 @@ import { Sparklines } from './Sparklines';
 import { StackBar } from './StackBar';
 import { StackedArea } from './StackedArea';
 import { StackRows } from './StackRows';
+import { SurveyVolume } from './SurveyVolume';
 import { donutSize, ganttRows, hbarRows, sparkRows } from './sizing';
 import type { ChartModel } from './types';
 
@@ -49,6 +50,8 @@ function Drawing({ model, size }: { model: ChartModel; size: WidgetSize }) {
       return <StackRows model={model} maxRows={hbarRows(size)} />;
     case 'spark':
       return <Sparklines model={model} maxRows={sparkRows(size)} />;
+    case 'survey':
+      return <SurveyVolume summary={model.data} size={size} />;
   }
 }
 

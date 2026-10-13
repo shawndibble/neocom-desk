@@ -12,7 +12,7 @@
 import { db } from '@/db';
 import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
 import { layerValues, type LayerValues } from '@/engine/netWorth/series';
-import type { BestOre } from '@/engine/survey/bestOres';
+import type { SurveySummary } from '@/engine/survey/series';
 import type { RouteKillSystem } from '@/engine/route/routeKillTrend';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
 import type { WalletJournalEntry } from '@/esi/endpoints';
@@ -327,15 +327,20 @@ export interface SurveyWidgetData {
   hasSurvey: boolean;
   /** Where the survey was taken, when its owner said. */
   location: string | null;
-  /** Ores left in the latest scan, best ISK per m³ first. */
-  ores: BestOre[];
+  /** The survey read as a series of scans; null while there is nothing to read. */
+  summary: SurveySummary | null;
   fetchedAt: Date | null;
 }
 
-const NO_SURVEY: SurveyWidgetData = { hasSurvey: false, location: null, ores: [], fetchedAt: null };
+const NO_SURVEY: SurveyWidgetData = {
+  hasSurvey: false,
+  location: null,
+  summary: null,
+  fetchedAt: null,
+};
 
 /**
- * The best ores in the survey this device is tracking. A survey is a Firestore
+ * The survey this device is tracking, summarised: what is left of each ore and when the field runs out. A survey is a Firestore
  * share link and its prices are a market read, so all of it is behind
  * `import()`. A failed read throws, which keeps the last good figure on show.
  */
@@ -354,14 +359,14 @@ export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
     { useMarketHub },
     { DEFAULT_TRADE_HUB, getTradeHub },
     { loadOrePrices },
-    { countedScans },
-    { bestOres },
+    { countedScans, summarizeSurvey },
+    { priceScans },
   ] = await Promise.all([
     import('@/features/market/hub'),
     import('@/market/hubs'),
     import('@/features/survey/orePrices'),
     import('@/engine/survey/series'),
-    import('@/engine/survey/bestOres'),
+    import('@/engine/survey/pricing'),
   ]);
   await useMarketHub.getState().hydrate();
   const hub = getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
@@ -373,7 +378,7 @@ export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
   return {
     hasSurvey: true,
     location: survey.info?.location?.name ?? null,
-    ores: bestOres(scans, prices),
+    summary: summarizeSurvey(priceScans(scans, prices), prices),
     fetchedAt: new Date(),
   };
 }
