@@ -1,10 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  PageHeader,
+  Panel,
+  RowCaret,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
+} from '@/components/ui';
+import { focusRingClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { CommunityDetail } from '@/features/communities/CommunityDetail';
+import { COMMUNITY_TABS, type CommunityTab } from '@/features/communities/communityTabs';
 import { CreateCommunityDialog } from '@/features/communities/CreateCommunityDialog';
 import {
   isCommunityAdmin,
@@ -12,6 +26,17 @@ import {
   type CommunitySummary,
 } from '@/features/communities/communityStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+
+/** The switcher's "back to the list" value; no Community id can equal it. */
+const ALL = '__all';
+
+/** Two letters for the tile beside a Community's name: the first letters of its first two words. */
+function communityInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return (
+    words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '?').slice(0, 2)
+  ).toUpperCase();
+}
 
 /**
  * Communities (issue #3597, ADR 0018): the Communities the active Character
@@ -39,6 +64,10 @@ export function Communities() {
   const [failedFor, setFailedFor] = useState<number | null>(null);
   const failed = failedFor === characterId;
   const [creating, setCreating] = useState(false);
+  // On a phone the open Community stacks under the list, so a tap on a row
+  // scrolls it into view rather than changing something off screen.
+  const detailRef = useRef<HTMLDivElement>(null);
+  const scrollToDetail = useRef(false);
 
   // Bumped after a change, to refetch the list.
   const [reload, setReload] = useState(0);
@@ -62,11 +91,24 @@ export function Communities() {
     };
   }, [characterId, reload]);
 
+  const openId = params.get('community');
+  useEffect(() => {
+    if (!scrollToDetail.current) return;
+    scrollToDetail.current = false;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    detailRef.current?.scrollIntoView?.({
+      block: 'start',
+      behavior: reduced ? 'auto' : 'smooth',
+    });
+  }, [openId]);
+
   if (!hydrated) return <Spinner label={t('communities.loading')} />;
   if (characterId === null) return <Navigate to="/characters" replace />;
 
   const selectedId = params.get('community');
   const selected = communities?.find((community) => community.id === selectedId) ?? null;
+  const tabParam = params.get('tab');
+  const initialTab = COMMUNITY_TABS.find((tab) => tab === tabParam) as CommunityTab | undefined;
   const open = (id: string | null) => setParams(id ? { community: id } : {}, { replace: true });
 
   return (
@@ -74,70 +116,116 @@ export function Communities() {
       <PageHeader
         title={t('communities.title')}
         actions={
-          <Button variant="primary" onClick={() => setCreating(true)}>
+          // Primary only while it is the one thing to do; once in a Community it steps back.
+          <Button
+            variant={communities?.length ? 'ghost' : 'primary'}
+            size={communities?.length ? 'sm' : 'md'}
+            onClick={() => setCreating(true)}
+          >
             {t('communities.create')}
           </Button>
         }
       />
       <p className="text-xs text-text-dim">{t('communities.intro')}</p>
 
-      <Panel title={t('communities.yourCommunities')}>
-        {failed ? (
-          <p role="alert" className="text-xs text-danger">
-            {t('communities.loadFailed')}
-          </p>
-        ) : communities === null ? (
-          <Spinner label={t('communities.loading')} />
-        ) : communities.length === 0 ? (
-          <EmptyState title={t('communities.empty')} hint={t('communities.emptyHint')} />
-        ) : (
-          <ul className="divide-y divide-line">
-            {communities.map((community) => (
-              <li key={community.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 py-2 text-left text-xs hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-                  aria-current={community.id === selected?.id ? 'true' : undefined}
-                  onClick={() => open(community.id)}
-                >
-                  <span className="min-w-0 flex-1 truncate font-medium">{community.name}</span>
-                  {isCommunityAdmin(community, characterId) && (
-                    <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                      {t('communities.adminBadge')}
+      {selected && communities ? (
+        // Inside a Community the list steps back into a switcher: the open one
+        // by name, the others a pick away, and "All Communities" for the list.
+        communities.length > 1 && (
+          <Select
+            value={selected.id}
+            onValueChange={(id) => {
+              open(id === ALL ? null : id);
+              scrollToDetail.current = id !== ALL;
+            }}
+          >
+            <SelectTrigger aria-label={t('communities.switch')} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {communities.map((community) => (
+                <SelectItem key={community.id} value={community.id}>
+                  {community.name}
+                </SelectItem>
+              ))}
+              <SelectItem value={ALL}>{t('communities.allCommunities')}</SelectItem>
+            </SelectContent>
+          </Select>
+        )
+      ) : (
+        <Panel title={t('communities.yourCommunities')}>
+          {failed ? (
+            <p role="alert" className="text-xs text-danger">
+              {t('communities.loadFailed')}
+            </p>
+          ) : communities === null ? (
+            <Spinner label={t('communities.loading')} />
+          ) : communities.length === 0 ? (
+            <EmptyState title={t('communities.empty')} hint={t('communities.emptyHint')} />
+          ) : (
+            <ul className="divide-y divide-line">
+              {communities.map((community) => (
+                <li key={community.id}>
+                  <button
+                    type="button"
+                    className={`group flex w-full items-center gap-2.5 px-1 text-left text-xs hover:bg-surface-2 aria-[current=true]:bg-surface-2 ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
+                    aria-current={community.id === selected?.id ? 'true' : undefined}
+                    onClick={() => {
+                      open(community.id);
+                      scrollToDetail.current = true;
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="grid size-8 shrink-0 place-items-center rounded-xs border border-line bg-surface-2 text-[0.6875rem] font-semibold text-text-dim"
+                    >
+                      {communityInitials(community.name)}
                     </span>
-                  )}
-                  <span className="text-text-dim">
-                    {t('communities.memberCount', { count: community.memberCount })}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{community.name}</span>
+                      <span className="block text-text-dim">
+                        {t('communities.memberCount', { count: community.memberCount })}
+                      </span>
+                    </span>
+                    {isCommunityAdmin(community, characterId) && (
+                      <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
+                        {t('communities.adminBadge')}
+                      </span>
+                    )}
+                    <RowCaret />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      )}
 
       {selected && (
-        <CommunityDetail
-          key={`${characterId}:${selected.id}`}
-          community={selected}
-          characterId={characterId}
-          onChanged={() => refresh()}
-          onPatch={(patch) =>
-            setLoaded(
-              (prev) =>
-                prev && {
-                  ...prev,
-                  list: prev.list.map((community) =>
-                    community.id === selected.id ? { ...community, ...patch } : community
-                  ),
-                }
-            )
-          }
-          onGone={() => {
-            open(null);
-            refresh();
-          }}
-        />
+        <div ref={detailRef} className="scroll-mt-4">
+          <CommunityDetail
+            key={`${characterId}:${selected.id}`}
+            community={selected}
+            initialTab={initialTab}
+            characterId={characterId}
+            onChanged={() => refresh()}
+            onPatch={(patch) =>
+              setLoaded(
+                (prev) =>
+                  prev && {
+                    ...prev,
+                    list: prev.list.map((community) =>
+                      community.id === selected.id ? { ...community, ...patch } : community
+                    ),
+                  }
+              )
+            }
+            onGone={() => {
+              open(null);
+              refresh();
+            }}
+          />
+        </div>
       )}
 
       <CreateCommunityDialog
