@@ -75,7 +75,12 @@ export function CommunityInvites({
               <code className="min-w-0 flex-1 truncate rounded bg-surface-2 px-2 py-1 text-xs">
                 {inviteUrl}
               </code>
-              <Button size="sm" variant="primary" onClick={() => onCopy(inviteUrl)}>
+              <Button
+                size="sm"
+                variant="primary"
+                data-invite-focus=""
+                onClick={() => onCopy(inviteUrl)}
+              >
                 {t('communities.copyLink')}
               </Button>
               <Button size="sm" onClick={onRegenerate}>
@@ -89,7 +94,7 @@ export function CommunityInvites({
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-text-dim">{t('communities.inviteOff')}</p>
-            <Button size="sm" onClick={onRegenerate}>
+            <Button size="sm" data-invite-focus="" onClick={onRegenerate}>
               {t('communities.regenerate')}
             </Button>
           </div>

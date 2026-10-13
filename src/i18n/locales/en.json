@@ -7768,7 +7768,6 @@
     "memberCount_one": "{{count}} Member",
     "memberCount_other": "{{count}} Members",
     "adminBadge": "Admin",
-    "memberBadge": "Member",
     "asOf": "as of {{age}}",
     "staleBadge": "Stale",
     "scope": {
@@ -7785,7 +7784,8 @@
       "fittingDetail": "{{hull}} · {{name}}",
       "planDetail_one": "{{name}} · {{count}} skill",
       "planDetail_other": "{{name}} · {{count}} skills",
-      "noPlansHint": "Share yours under Mine."
+      "noPlansHint": "Share yours under Mine.",
+      "copyFailed": "Couldn't copy the plan. Try again."
     },
     "manage": {
       "trigger": "Manage",
@@ -7797,11 +7797,24 @@
       "invitesTitle": "Invites",
       "transfer": "Transfer admin…",
       "transferTitle": "Transfer admin",
-      "transferHint": "Pick the Member who becomes admin. You become a regular Member."
+      "transferHint": "Pick the Member who becomes admin. You become a regular Member.",
+      "transferNobody": "Nobody to hand it to yet",
+      "transferNobodyHint": "You are the only Member. Invite someone first."
     },
     "library": {
       "legend": "BPO: shares the original. BPC: shares copies only. Stale Members are greyed.",
       "filterLabel": "Show blueprints",
+      "shared": "Shared in the Community",
+      "sharedLabel": "Shared blueprints",
+      "columns": {
+        "blueprint": "Blueprint",
+        "member": "Member",
+        "location": "Location",
+        "meTe": "ME / TE",
+        "runs": "Runs"
+      },
+      "runs_one": "{{count}} run",
+      "runs_other": "{{count}} runs",
       "missingCommunity": "Missing from the Community",
       "ownedByMe": "Owned by me",
       "missingFromMe": "Missing from me",
@@ -7835,6 +7848,7 @@
     "noMemberMatch": "No Member matches that name.",
     "leaveHint": "Leaving deletes what you share here.",
     "membersLoadFailed": "Could not load the Members.",
+    "retry": "Retry",
     "you": "you",
     "invite": "Invite link",
     "inviteHint": "Anyone with this link can join, up to 100 Members. Revoke it to stop new joins. Regenerating or revoking also voids links already mailed.",
@@ -7943,6 +7957,7 @@
     "plans": {
       "hint": "Skill plans are shared one at a time, never all at once. Members can copy a shared plan to their own plans; it keeps your later edits up to date here.",
       "noPlans": "You have no Skill plans to share yet.",
+      "makePlan": "Open Skill plans",
       "count_one": "{{count}} plan shared",
       "count_other": "{{count}} plans shared",
       "filter": "Search your shared Skill plans",

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   DropdownMenu,
+  EmptyState,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -168,32 +169,34 @@ export function CommunityDetail({
     setReload((n) => n + 1);
     onChanged();
   };
+  const others = (members ?? []).filter((member) => member.uid !== community.adminUid);
+  // A changed or revoked link swaps the buttons out from under the confirm:
+  // focus goes back to the invite controls' first action instead of the page top.
+  const invitesBody = useRef<HTMLDivElement>(null);
+  const inviteFocus = () =>
+    invitesBody.current?.querySelector<HTMLElement>('[data-invite-focus]') ?? null;
   // Manage is the admin's; if the role moves away, its windows close with it.
   const shownPanel = admin ? panel : null;
   const waiting = admin ? requests.length : 0;
 
-  function contentView(content: ContentTab, scope: ContentScope) {
-    if (scope === 'everyone') {
-      if (content === 'blueprints') {
-        return (
-          <CommunityLibrary
-            communityId={community.id}
-            characterId={characterId}
-            members={members}
-            membersFailed={membersFailed}
-            now={now}
-          />
-        );
-      }
-      const Everyone = content === 'fittings' ? CommunitySharedFittings : CommunitySharedPlans;
-      return <Everyone characterId={characterId} communityId={community.id} members={members} />;
-    }
-    if (content === 'blueprints') {
-      return <ShareBlueprintsTab characterId={characterId} communityId={community.id} />;
-    }
-    const Mine = content === 'fittings' ? ShareFittingsTab : ShareSkillPlansTab;
-    return <Mine characterId={characterId} communityId={community.id} />;
-  }
+  const ids = { characterId, communityId: community.id };
+  // One entry per content tab: what Everyone and Mine show there.
+  const contentViews: Record<ContentTab, Record<ContentScope, () => ReactNode>> = {
+    blueprints: {
+      everyone: () => (
+        <CommunityLibrary {...ids} members={members} membersFailed={membersFailed} now={now} />
+      ),
+      mine: () => <ShareBlueprintsTab {...ids} />,
+    },
+    fittings: {
+      everyone: () => <CommunitySharedFittings {...ids} members={members} />,
+      mine: () => <ShareFittingsTab {...ids} />,
+    },
+    plans: {
+      everyone: () => <CommunitySharedPlans {...ids} members={members} />,
+      mine: () => <ShareSkillPlansTab {...ids} />,
+    },
+  };
 
   return (
     <Panel
@@ -265,7 +268,7 @@ export function CommunityDetail({
             />
             {/* Wait for the remembered pick, so a Mine pilot never loads Everyone first. */}
             {scopesHydrated || linkScope?.tab === tab ? (
-              contentView(tab, scopeOf(tab))
+              contentViews[tab][scopeOf(tab)]()
             ) : (
               <Spinner size="sm" label={t('communities.loading')} />
             )}
@@ -305,19 +308,21 @@ export function CommunityDetail({
             changed();
           }}
         />
-        <CommunityInvites
-          community={community}
-          characterId={characterId}
-          onCopy={(url) =>
-            void writeToClipboard(url).then(
-              () => setCopied(t('communities.copied')),
-              () => setCopied(t('communities.copyFailed'))
-            )
-          }
-          onRegenerate={() => setDialog({ kind: 'regenerate' })}
-          onRevoke={() => setDialog({ kind: 'revoke' })}
-          onPatch={onPatch}
-        />
+        <div ref={invitesBody}>
+          <CommunityInvites
+            community={community}
+            characterId={characterId}
+            onCopy={(url) =>
+              void writeToClipboard(url).then(
+                () => setCopied(t('communities.copied')),
+                () => setCopied(t('communities.copyFailed'))
+              )
+            }
+            onRegenerate={() => setDialog({ kind: 'regenerate' })}
+            onRevoke={() => setDialog({ kind: 'revoke' })}
+            onPatch={onPatch}
+          />
+        </div>
         {/* Inside the window that raised it: the page behind is inert while it is open. */}
         {copied && <Toast message={copied} onClose={() => setCopied(null)} />}
       </Modal>
@@ -329,26 +334,38 @@ export function CommunityDetail({
       >
         <div className="space-y-2">
           <p className="text-xs text-text-dim">{t('communities.manage.transferHint')}</p>
-          {members === null ? (
+          {membersFailed ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <p role="alert" className="min-w-0 flex-1 text-xs text-danger">
+                {t('communities.membersLoadFailed')}
+              </p>
+              <Button size="sm" onClick={() => setReload((n) => n + 1)}>
+                {t('communities.retry')}
+              </Button>
+            </div>
+          ) : members === null ? (
             <Spinner size="sm" label={t('communities.loading')} />
+          ) : others.length === 0 ? (
+            <EmptyState
+              title={t('communities.manage.transferNobody')}
+              hint={t('communities.manage.transferNobodyHint')}
+            />
           ) : (
             <ul className="divide-y divide-line">
-              {members
-                .filter((member) => member.uid !== community.adminUid)
-                .map((member) => (
-                  <li key={member.uid} className="flex items-center gap-2 py-1 text-xs">
-                    <span className="min-w-0 flex-1 truncate">{member.characterName}</span>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setPanel(null);
-                        setDialog({ kind: 'makeAdmin', member });
-                      }}
-                    >
-                      {t('communities.makeAdminAction')}
-                    </Button>
-                  </li>
-                ))}
+              {others.map((member) => (
+                <li key={member.uid} className="flex items-center gap-2 py-1 text-xs">
+                  <span className="min-w-0 flex-1 truncate">{member.characterName}</span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setPanel(null);
+                      setDialog({ kind: 'makeAdmin', member });
+                    }}
+                  >
+                    {t('communities.makeAdminAction')}
+                  </Button>
+                </li>
+              ))}
             </ul>
           )}
         </div>
@@ -360,6 +377,7 @@ export function CommunityDetail({
         body={t('communities.regenerateBody')}
         actionLabel={t('communities.regenerateAction')}
         danger={false}
+        returnFocusFallback={inviteFocus}
         onClose={close}
         onConfirm={async () => {
           const { inviteCode } = await regenerateInvite(characterId, community.id);
@@ -372,6 +390,7 @@ export function CommunityDetail({
         title={t('communities.revokeTitle')}
         body={t('communities.revokeBody')}
         actionLabel={t('communities.revokeAction')}
+        returnFocusFallback={inviteFocus}
         onClose={close}
         onConfirm={async () => {
           await revokeInvite(characterId, community.id);

@@ -36,6 +36,7 @@ export function CommunitySharedPlans({
   const navigate = useNavigate();
   const [state, setState] = useState<State>({ status: 'loading' });
   const copying = useRef(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const myUid = uidForCharacter(characterId);
 
   useEffect(() => {
@@ -78,11 +79,15 @@ export function CommunitySharedPlans({
     // A second click while the first is still adding must not make a second plan.
     if (copying.current) return;
     copying.current = true;
+    setCopyFailed(false);
     try {
       const plan = { ...newPlan(characterId, shared.name), entries: shared.entries };
       await db.skillPlans.add(plan);
       if (isSyncConfigured()) scheduleSync(characterId);
+      // Opening the new plan is the confirmation.
       navigate(`/skills/plans/${plan.id}`);
+    } catch {
+      setCopyFailed(true);
     } finally {
       copying.current = false;
     }
@@ -106,5 +111,14 @@ export function CommunitySharedPlans({
       />
     );
   }
-  return <SharedPlanList rows={rows} onCopy={(plan) => void copy(plan)} />;
+  return (
+    <div className="space-y-2">
+      <SharedPlanList rows={rows} onCopy={(plan) => void copy(plan)} />
+      {copyFailed && (
+        <p role="alert" className="text-xs text-danger">
+          {t('communities.everyone.copyFailed')}
+        </p>
+      )}
+    </div>
+  );
 }

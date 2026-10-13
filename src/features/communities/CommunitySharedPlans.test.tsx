@@ -81,6 +81,17 @@ describe('CommunitySharedPlans', () => {
     });
   });
 
+  it('says so when the copy cannot be saved, and stays put', async () => {
+    const add = vi.spyOn(db.skillPlans, 'add').mockRejectedValueOnce(new Error('quota'));
+    const user = userEvent.setup();
+    renderList();
+    const row = (await screen.findByText('Marauder')).closest('li')!;
+    await user.click(within(row).getByRole('button', { name: d.copy }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(en.communities.everyone.copyFailed);
+    expect(screen.queryByText('plan page')).not.toBeInTheDocument();
+    add.mockRestore();
+  });
+
   it('says so when nothing is shared yet', async () => {
     store.loadCommunityPlans.mockResolvedValue([]);
     renderList();

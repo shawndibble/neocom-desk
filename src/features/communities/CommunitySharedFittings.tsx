@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { EmptyState, RowCaret, SearchInput, Spinner } from '@/components/ui';
@@ -53,22 +53,25 @@ export function CommunitySharedFittings({
     () => new Map((members ?? []).map((member) => [member.uid, member.characterName])),
     [members]
   );
-  const sharerOf = (uid: string) =>
-    uid === myUid
-      ? t('communities.you')
-      : (names.get(uid) ?? t('communities.plansDialog.formerMember'));
+  // The label the row shows is the one the search matches ("you" for this Character's own).
+  const sharerOf = useCallback(
+    (uid: string) =>
+      uid === myUid
+        ? t('communities.you')
+        : (names.get(uid) ?? t('communities.plansDialog.formerMember')),
+    [myUid, names, t]
+  );
   const needle = query.trim().toLowerCase();
   const shown = useMemo(() => {
     if (state.status !== 'ready') return [];
     return state.fittings
-      .filter(
-        (fitting) =>
-          fitting.name.toLowerCase().includes(needle) ||
-          fitting.hull.toLowerCase().includes(needle) ||
-          (names.get(fitting.ownerUid) ?? '').toLowerCase().includes(needle)
+      .filter((fitting) =>
+        [fitting.name, fitting.hull, sharerOf(fitting.ownerUid)].some((text) =>
+          text.toLowerCase().includes(needle)
+        )
       )
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [state, needle, names]);
+  }, [state, needle, sharerOf]);
 
   if (state.status === 'loading') {
     return <Spinner size="sm" label={t('communities.everyone.fittingsLoading')} />;

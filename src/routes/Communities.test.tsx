@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import en from '@/i18n/locales/en.json';
 import { db } from '@/db';
@@ -66,10 +66,16 @@ const members = [
   { uid: 'char:92', characterName: 'Friend', joinedAt: 2 },
 ];
 
+/** The router's current search string, on screen for assertions. */
+function SearchProbe() {
+  return <output data-testid="search">{useLocation().search}</output>;
+}
+
 function renderPage(path = '/communities') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Communities />
+      <SearchProbe />
     </MemoryRouter>
   );
 }
@@ -192,8 +198,14 @@ describe('Communities page', () => {
 
       await user.click(await screen.findByRole('button', { name: c.revoke }));
       const revoke = await screen.findByRole('dialog', { name: c.revokeTitle });
+      // The refetch after the change sees the link revoked, as the backend would.
+      store.loadMyCommunities.mockResolvedValue([community({ inviteCode: null })]);
       await user.click(within(revoke).getByRole('button', { name: c.revokeAction }));
       await waitFor(() => expect(store.revokeInvite).toHaveBeenCalledWith(ME, 'c1'));
+      // Revoke's own button is gone: focus lands on what the invite controls offer now.
+      await waitFor(() =>
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: c.regenerate }))
+      );
     });
 
     it('offers only Regenerate once the link is revoked', async () => {
@@ -352,11 +364,46 @@ describe('Communities page', () => {
       expect(await screen.findByText('mine-plans')).toBeInTheDocument();
     });
 
-    it('opens Manage › Invites from an old ?tab=invites link', async () => {
+    it('opens Manage › Invites from an old ?tab=invites link, then drops the param', async () => {
       renderPage('/communities?community=c1&tab=invites');
       expect(
         await screen.findByRole('dialog', { name: c.manage.invitesTitle })
       ).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('search').textContent).toBe('?community=c1'));
+      // Still open after the URL changes.
+      expect(screen.getByRole('dialog', { name: c.manage.invitesTitle })).toBeInTheDocument();
+    });
+
+    it('says there is nobody to transfer to when the admin is the only Member', async () => {
+      store.loadCommunityMembers.mockResolvedValue([members[0]]);
+      renderPage('/communities?community=c1');
+      await pickFromManage(c.manage.transfer);
+      const picker = await screen.findByRole('dialog', { name: c.manage.transferTitle });
+      expect(await within(picker).findByText(c.manage.transferNobody)).toBeInTheDocument();
+    });
+
+    it('offers Retry in Transfer admin when the Members did not load', async () => {
+      store.loadCommunityMembers.mockRejectedValueOnce(new Error('offline'));
+      const user = userEvent.setup();
+      renderPage('/communities?community=c1');
+      await pickFromManage(c.manage.transfer);
+      const picker = await screen.findByRole('dialog', { name: c.manage.transferTitle });
+      expect(await within(picker).findByRole('alert')).toHaveTextContent(c.membersLoadFailed);
+      await user.click(within(picker).getByRole('button', { name: c.retry }));
+      expect(await within(picker).findByText('Friend')).toBeInTheDocument();
+    });
+
+    it('marks only the Communities the Character admins', async () => {
+      store.loadMyCommunities.mockResolvedValue([
+        community(),
+        community({ id: 'c2', name: 'Other', adminUid: 'char:92' }),
+      ]);
+      renderPage('/communities');
+      const mine = (await screen.findByText('Pals')).closest('button')!;
+      const other = screen.getByText('Other').closest('button')!;
+      expect(within(mine).getByText(c.adminBadge)).toBeInTheDocument();
+      expect(within(other).queryByText(c.adminBadge)).not.toBeInTheDocument();
+      expect(within(other).queryByText('Member')).not.toBeInTheDocument();
     });
   });
 
