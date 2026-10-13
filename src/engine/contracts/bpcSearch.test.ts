@@ -843,6 +843,27 @@ describe('communityOfferToSearchRow', () => {
     });
   });
 
+  it('takes its system, region and space from a resolved system, so a Jump Range can place it', () => {
+    const row = communityOfferToSearchRow(
+      {
+        uid: 'u1',
+        memberName: 'Ann',
+        typeId: 33078,
+        me: 10,
+        te: 20,
+        runs: 5,
+        quantity: 1,
+        communityNames: ['Alpha'],
+        stale: false,
+        asOf: 1,
+        locationName: 'Rens 6 - Moon 8 - Brutor Tribe Treasury',
+        systemName: 'Rens',
+      },
+      { id: 30002510, name: 'Rens', security: 0.9, regionId: 10000030 }
+    );
+    expect(row).toMatchObject({ systemId: 30002510, regionId: 10000030, space: 'highsec' });
+  });
+
   it('passes a max price and min runs filter for a shared original, never hides a stale row', () => {
     const rows = [offer({ runs: -1 }), offer({ stale: true })];
     const kept = filterBpcSearchRows(rows, {
