@@ -433,7 +433,7 @@ describe('ProductionLogPanel', () => {
     expect(onOpenRun).not.toHaveBeenCalled();
   });
 
-  it("deletes a run from the runs table's Sold menu — the Records tab's only delete", async () => {
+  it("deletes a run from the runs table's Sold menu — the Logs tab's only delete", async () => {
     await addRun({ id: 'run-1' });
 
     const user = userEvent.setup();

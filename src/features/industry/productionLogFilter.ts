@@ -1,7 +1,7 @@
 import type { ProductionRunRecord } from '@/db';
 import { formatLocalDate } from '@/lib/localDate';
 
-/** The Records tab's date-range filter (issue #525). `null` means that bound is inactive. */
+/** The Logs tab's date-range filter (issue #525). `null` means that bound is inactive. */
 export interface ProductionLogFilter {
   /** Inclusive `YYYY-MM-DD`. */
   startDate: string | null;

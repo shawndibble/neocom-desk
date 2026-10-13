@@ -7,6 +7,7 @@ import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
+import { useHasProductionLogs } from './useHasProductionLogs';
 import { INDUSTRY_TABS_ID, industryTabs, type IndustryTab } from './industryTabs';
 
 export interface IndustryHeaderProps {
@@ -51,7 +52,7 @@ function tabSettings(tab: IndustryTab, t: TFunction): ReactNode {
           <BpcSourcingSettingsForm />
         </PageSettingsButton>
       );
-    case 'records':
+    case 'logs':
       return undefined;
   }
 }
@@ -76,7 +77,8 @@ export function IndustryHeader({
   actions,
 }: IndustryHeaderProps) {
   const { t } = useTranslation();
-  const tabs = industryTabs(t);
+  const showLogs = useHasProductionLogs();
+  const tabs = industryTabs(t, { showLogs, activeTab });
   const onChange = (id: string) => onTabChange(id as IndustryTab);
   return (
     <>

@@ -7,6 +7,7 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { mobileSheetPaths, type MobileTabPath } from '@/lib/mobileTabs';
+import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { useCommandPalette } from '@/features/commandPalette/store';
 import { listNavDestinations, railGroups, type NavPage } from './navDestinations';
@@ -62,6 +63,7 @@ export function MobileMoreSheet({
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const corpVisible = useCorpNavVisible();
+  const hiddenTabPaths = useHiddenTabPaths();
   const hidden = useHiddenNav((state) => state.value);
   const recent = useRecentNav((state) => state.value);
   const [showHidden, setShowHidden] = useState(false);
@@ -77,8 +79,9 @@ export function MobileMoreSheet({
         corpVisible: true,
         corpCapabilities: ALL_CORP_VIEWS,
         t,
+        hiddenTabPaths,
       }),
-    [t]
+    [t, hiddenTabPaths]
   );
   const byPath = useMemo(
     () => new Map(destinations.map((destination) => [destination.path, destination])),

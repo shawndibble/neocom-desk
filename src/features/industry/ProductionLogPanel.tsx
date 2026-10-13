@@ -65,7 +65,7 @@ import { isoDateParam, optionalSortParam, type UrlSort } from '@/lib/urlState';
 /**
  * Dynamic import, not a static one: `ProductionProfitChart.tsx` statically
  * imports Recharts, so this is the boundary that keeps the library out of
- * the initial page bundle — it only loads once the Records tab actually
+ * the initial page bundle — it only loads once the Logs tab actually
  * renders a chart (see `character/WalletBalanceChart.tsx`'s bundle-size
  * precedent).
  */
@@ -137,7 +137,7 @@ function TotalRow({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * The Records tab's From/To pair — copies `Wallet.tsx`'s `JournalDateRange`
+ * The Logs tab's From/To pair — copies `Wallet.tsx`'s `JournalDateRange`
  * layout exactly (a visible `<label>` rather than `FilterField`, so the
  * caption shows inline as well as in the mobile sheet) since this is the same
  * shape of control: two `date` inputs bounding one collection by a stored

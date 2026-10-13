@@ -107,7 +107,7 @@ describe('isTabRedirectPath', () => {
 describe('a tabbed page with its own nested detail routes (Industry)', () => {
   it('treats a declared tab as the tabbed page', () => {
     expect(pageKeyFor('/industry/sourcing')).toBe('/industry');
-    expect(tabbedPagePathFor('/industry/records')).toBe('/industry/records');
+    expect(tabbedPagePathFor('/industry/logs')).toBe('/industry/logs');
     expect(isTabRedirectPath('/industry')).toBe(true);
     expect(isTabRedirectPath('/industry/plans')).toBe(false);
   });

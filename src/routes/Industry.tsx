@@ -738,7 +738,7 @@ export function Industry() {
                     open; the owned-blueprint ranking follows it. */}
                   {opportunitiesPanels}
                 </div>
-              ) : tab === 'records' ? (
+              ) : tab === 'logs' ? (
                 <ProductionLogPanel
                   characterId={activeCharacterId}
                   catalog={catalog}

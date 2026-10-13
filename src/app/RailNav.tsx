@@ -15,6 +15,7 @@ import {
 import { commandPaletteDisplayKey, isApplePlatform } from '@/lib/shortcuts';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useActiveCorporationId } from '@/features/corp/owner';
+import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCommandPalette } from '@/features/commandPalette/store';
 import { useLockedRoutes } from './useGrantedScopes';
 import {
@@ -226,10 +227,19 @@ const RailNavBody = memo(function RailNavBody({
   });
   if (open.for !== current) setOpen({ for: current, path: current });
 
+  const hiddenTabPaths = useHiddenTabPaths();
   const views = useMemo(
     () =>
-      viewsByPage(listNavDestinations({ locked, corpVisible, corpCapabilities: capabilities, t })),
-    [locked, corpVisible, capabilities, t]
+      viewsByPage(
+        listNavDestinations({
+          locked,
+          corpVisible,
+          corpCapabilities: capabilities,
+          t,
+          hiddenTabPaths,
+        })
+      ),
+    [locked, corpVisible, capabilities, t, hiddenTabPaths]
   );
 
   const [moreOpen, setMoreOpen] = useState(false);

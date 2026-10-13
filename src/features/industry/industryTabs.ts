@@ -9,17 +9,26 @@
 import type { TFunction } from 'i18next';
 import { definePageTabs, tabPath } from '@/lib/pageTabs';
 
-export type IndustryTab = 'plans' | 'records' | 'sourcing' | 'opportunities';
+export type IndustryTab = 'plans' | 'logs' | 'sourcing' | 'opportunities';
 
 export const INDUSTRY_TABS = definePageTabs<IndustryTab>('/industry', [
   { id: 'plans', labelKey: 'industry.buildPlansTab' },
-  { id: 'records', labelKey: 'industry.recordsTab' },
+  { id: 'logs', labelKey: 'industry.logsTab' },
   { id: 'sourcing', labelKey: 'industry.bpcSearchTab' },
   { id: 'opportunities', labelKey: 'industry.opportunitiesTab' },
 ]);
 
-export function industryTabs(t: TFunction): { id: IndustryTab; label: string }[] {
-  return INDUSTRY_TABS.tabs.map((tab) => ({ id: tab.id, label: t(tab.labelKey) }));
+/**
+ * The tab strip's tabs. Logs only shows once a Production Run is logged — or
+ * while it is the open tab, so its own bar never loses the active tab.
+ */
+export function industryTabs(
+  t: TFunction,
+  { showLogs, activeTab }: { showLogs: boolean; activeTab?: IndustryTab }
+): { id: IndustryTab; label: string }[] {
+  return INDUSTRY_TABS.tabs
+    .filter((tab) => tab.id !== 'logs' || showLogs || activeTab === 'logs')
+    .map((tab) => ({ id: tab.id, label: t(tab.labelKey) }));
 }
 
 /** A tab's own path — where clicking it from a plan/group detail page goes. */

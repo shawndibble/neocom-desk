@@ -362,6 +362,8 @@ export interface ListNavDestinationsOptions {
   /** `useCorpAccess().capabilities` — each Corp view shows only for its capability, as in `CorpSubNav`. */
   readonly corpCapabilities: Pick<CorpCapabilities, CorpViewCapability>;
   readonly t: (key: string) => string;
+  /** Tab paths left out for now (Industry › Logs until a Production Run is logged). */
+  readonly hiddenTabPaths?: ReadonlySet<string>;
 }
 
 export const BREADCRUMB_SEPARATOR = ' › ';
@@ -377,6 +379,7 @@ export function listNavDestinations({
   corpVisible,
   corpCapabilities,
   t,
+  hiddenTabPaths,
 }: ListNavDestinationsOptions): NavDestination[] {
   const out: NavDestination[] = [];
   for (const page of NAV_PAGES as readonly NavPage[]) {
@@ -414,6 +417,7 @@ export function listNavDestinations({
     };
     for (const tab of navTabs(page)) {
       if (page.corpTabs?.includes(tab.id) && !corpVisible) continue;
+      if (hiddenTabPaths?.has(tab.path)) continue;
       out.push(tabEntry(tab.path, tab.labelKey, pageLocked));
     }
     for (const view of page.subViews ?? []) {

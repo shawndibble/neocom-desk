@@ -3,7 +3,7 @@
  * (issue #1053): `SoldSplitButton` renders its own `justify-end` wrapper,
  * which `.dt-stack td`'s CSS cannot reach — jsdom has no real layout engine,
  * so only a real browser can show the regression. Covers both consumers:
- * Industry's Records tab (`ProductionLogPanel`) and a Build Plan's own
+ * Industry's Logs tab (`ProductionLogPanel`) and a Build Plan's own
  * Production Runs panel (`ProductionRunsPanel`).
  *
  * A run (and, for the Build Plan panel, its plan) is seeded directly into
@@ -123,9 +123,9 @@ test.describe('Sold action buttons — stacked phone card', () => {
     await seedFixtures(page);
   });
 
-  test('Records tab: starts at the card label gutter below sm', async ({ page }) => {
+  test('Logs tab: starts at the card label gutter below sm', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('./industry/records');
+    await page.goto('./industry/logs');
     await expandRunsTable(page, 'Show all production runs', 'All production runs');
 
     const { justifyContent, wrapperLeft, siblingTextLeft } = await measure(
@@ -136,9 +136,9 @@ test.describe('Sold action buttons — stacked phone card', () => {
     expect(Math.abs(wrapperLeft - siblingTextLeft)).toBeLessThanOrEqual(2);
   });
 
-  test('Records tab: stays right-aligned at and above sm', async ({ page }) => {
+  test('Logs tab: stays right-aligned at and above sm', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto('./industry/records');
+    await page.goto('./industry/logs');
     await expandRunsTable(page, 'Show all production runs', 'All production runs');
 
     expect((await measure(page, 'All production runs')).justifyContent).toBe('flex-end');
@@ -162,7 +162,7 @@ test.describe('By item card — margin on units sold (issue #1785)', () => {
     await signInAndGoto(page);
     await seedFixtures(page);
     await page.setViewportSize(PHONE);
-    await page.goto('./industry/records');
+    await page.goto('./industry/logs');
 
     const row = page
       .locator('tbody tr', { has: page.locator('td[data-label="Unsold cost"]') })
@@ -180,7 +180,7 @@ test.describe('Realized-profit hero — captions folded into a tooltip (issue #3
       await signInAndGoto(page);
       await seedFixtures(page);
       await page.setViewportSize({ width, height: 900 });
-      await page.goto('./industry/records');
+      await page.goto('./industry/logs');
 
       const hero = page
         .getByRole('button', { name: 'About total realized profit' })
