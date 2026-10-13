@@ -170,7 +170,18 @@ export const PAGE_LEGACY_LOCATIONS: Partial<
 > = {
   '/assets': legacyAssetsLocation,
   '/market': legacyMarketLocation,
+  '/industry': legacyIndustryLocation,
 };
+
+/** The Logs tab was called Records until the Logs rename. */
+function legacyIndustryLocation(
+  pathname: string,
+  search: string
+): { pathname: string; search: string } | null {
+  return pathname === '/industry/records' || pathname === '/industry/records/'
+    ? { pathname: tabPath(INDUSTRY_TABS, 'logs'), search }
+    : null;
+}
 
 /**
  * Hauling was a Market tab until #3526; it is a Travel tab now. LP Store was

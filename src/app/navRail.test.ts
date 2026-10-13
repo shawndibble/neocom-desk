@@ -54,7 +54,7 @@ describe('viewPathFor', () => {
 describe('canHide', () => {
   it('lets a pilot hide an ordinary page or a view', () => {
     expect(canHide('/mining')).toBe(true);
-    expect(canHide('/industry/records')).toBe(true);
+    expect(canHide('/industry/logs')).toBe(true);
   });
 
   it('never hides the pages that are the only way to something', () => {

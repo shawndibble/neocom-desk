@@ -2727,7 +2727,7 @@
     "unsoldCost": "Unsold cost",
     "total": "Total",
     "buildPlansTab": "Build Plans",
-    "recordsTab": "Records",
+    "logsTab": "Logs",
     "productionRunColumnItem": "Item",
     "allProductionRuns": "All production runs",
     "productionLogFilteredEmptyTitle": "No production runs in this period",

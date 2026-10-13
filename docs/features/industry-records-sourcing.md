@@ -6,7 +6,7 @@ Terms per `GLOSSARY.md`: **Production Log**, **Production Run**, **BPC Sourcing*
 
 Where brief items actually live (code differs from the obvious guess):
 
-- Records tab renders only `ProductionLogPanel`. Nothing else.
+- Logs tab (was Records; `/industry/records` redirects) renders only `ProductionLogPanel`. Nothing else.
 - Jobs panel (Active / History segments; personal + corp jobs, jobs CSV, Log production) is in `IndustryHeader`: shows above every tab and on plan/group pages.
 - Owned blueprints panel + `ownedBlueprints` CSV = Opportunities tab "All owned" view (`opps.view=owned`).
 - Corp blueprints = toggle inside All owned. Corp stock (`corpOwnedStock.ts`) and corp blueprints (`corpOwnedBlueprints.ts`) as plan sources = Build Plan "Corp Assets" toggle (other doc).
@@ -22,7 +22,7 @@ Where brief items actually live (code differs from the obvious guess):
 | Deep links `?product=` `?material=` + seed | `Industry.tsx`, `planSeed.ts`                                                                                         | Opens/creates plan, redirects to plan page                                                                    |
 | Jobs panel                                 | header, all tabs `ActiveJobsPanel.tsx`                                                                                | Personal + corp jobs, filters, CSV, slot readout, Log production                                              |
 | Log production from job                    | job row button, `LogProductionFromJobDialog.tsx`, `logProductionFromJob.ts`                                           | Finished mfg/reaction personal jobs only; 0/1/many plan resolve                                               |
-| Production Log (Records)                   | `/industry/records` `ProductionLogPanel.tsx`                                                                          | Totals, profit chart, By item table, folded All runs table, date range, 2 CSVs                                |
+| Production Log (Records)                   | `/industry/logs` `ProductionLogPanel.tsx`                                                                             | Totals, profit chart, By item table, folded All runs table, date range, 2 CSVs                                |
 | Sold split button + modals                 | Records runs table `SaleLinkingControls.tsx`, `useSaleLinking.ts`                                                     | Link Past Sale, Watch Open Order, Manual Sale, Delete run                                                     |
 | Realized profit breakdown                  | `RealizedProfitCell` / `RealizedProfitBreakdown.tsx`                                                                  | Modal per run                                                                                                 |
 | BPC Sourcing search                        | `/industry/sourcing` `BpcSourcingPanel.tsx`                                                                           | 5 sources, filters, autocomplete, strip, 200-row table, CSV                                                   |
@@ -59,7 +59,7 @@ Where brief items actually live (code differs from the obvious guess):
 
 ## 2. Industry shell (`src/routes/Industry.tsx`)
 
-- Route `/industry/*`; `INDUSTRY_TABS` = plans (default), records, sourcing, opportunities. Labels: Build Plans, Records, BPC Sourcing, Opportunities (`en.json` `industry.buildPlansTab` etc.). `usePageTab` reads path segment; switch = history push; unknown segment -> `TabRoute` replaces with default. `/bpc-contracts` redirects to `/industry/sourcing` (`src/app/App.tsx:201`). Nav: one entry `/industry`, `mobileTab: true`, `gating: 'scope'` (`src/app/navDestinations.ts`); tabs come from `PAGE_TABS` (`src/app/pageTabs.ts`).
+- Route `/industry/*`; `INDUSTRY_TABS` = plans (default), logs, sourcing, opportunities. Logs shows in the tab strip, rail and palette only once the active Character has a Production Run (`useHasProductionLogs`). Labels: Build Plans, Logs, BPC Sourcing, Opportunities (`en.json` `industry.buildPlansTab` etc.). `usePageTab` reads path segment; switch = history push; unknown segment -> `TabRoute` replaces with default. `/bpc-contracts` redirects to `/industry/sourcing` (`src/app/App.tsx:201`). Nav: one entry `/industry`, `mobileTab: true`, `gating: 'scope'` (`src/app/navDestinations.ts`); tabs come from `PAGE_TABS` (`src/app/pageTabs.ts`).
 - Route is `UNGATED` in `src/app/routeScopes.ts` (comment: multi-scope page, panel-level gating). Plan/group routes the same.
 - Workspace not `hydrated` -> full spinner; then no active Character -> redirect to `/characters`; header renders, and a second inline spinner shows under it until `plans`, `catalog`, build groups, expanded groups load.
 - Header (`IndustryHeader.tsx`): `PageHeader` title "Industry" + `meta` (Opportunities tab only: `DataAgeBadge` = oldest blueprint fetch reported by `OpportunitiesPanel` via `onDataAgeChange`), tab settings gear, `ActiveJobsPanel`, blueprints reauth `GrantBanner`, `Tabs` (`activation` automatic on index, manual on plan/group pages where pick navigates away).
@@ -107,7 +107,7 @@ Observed gaps:
 - No row context menu or row click on a job; ItemInfoLink only.
 - UX-REVIEW §2 noted empty state with no reconnect action; code now renders `GrantBanner` with an action (historical).
 
-## 4. Records tab: Production Log (`/industry/records`, `ProductionLogPanel.tsx`)
+## 4. Records tab: Production Log (`/industry/logs`, `ProductionLogPanel.tsx`)
 
 What: account-wide (active Character) realized-profit rollup of every logged **Production Run**, grouped by product. Distinct from the per-plan `ProductionRunsPanel` on plan page (same sale-linking hook/columns, other doc).
 

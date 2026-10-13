@@ -12,6 +12,7 @@ import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { listNavDestinations, NAV_LOCK_PATHS } from '@/app/navDestinations';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { useHiddenTabPaths } from '@/app/useHiddenTabPaths';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { openPublicInfoModal } from '@/stores/publicInfoModal';
 import { CONTACT_TYPE_KEY } from '@/features/character/contactsFilter';
@@ -53,6 +54,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
   const navigate = useNavigate();
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
   const corpVisible = useCorpNavVisible();
+  const hiddenTabPaths = useHiddenTabPaths();
   const { capabilities } = useCorpAccess();
   const characters = useLiveQuery(() => db.characters.toArray(), [], NO_CHARACTERS);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -64,8 +66,15 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
   const assetsScope = useLiveQuery(loadPaletteAssetsScope, []);
 
   const destinations = useMemo(
-    () => listNavDestinations({ locked, corpVisible, corpCapabilities: capabilities, t }),
-    [locked, corpVisible, capabilities, t]
+    () =>
+      listNavDestinations({
+        locked,
+        corpVisible,
+        corpCapabilities: capabilities,
+        t,
+        hiddenTabPaths,
+      }),
+    [locked, corpVisible, capabilities, t, hiddenTabPaths]
   );
 
   // Its own memo, keyed only on what it reads: the provider holds the loaded

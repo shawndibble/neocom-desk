@@ -165,6 +165,7 @@ async function resetSession() {
   await db.skillPlans.clear();
   await db.esiCache.clear();
   await db.buildPlans.clear();
+  await db.productionRuns.clear();
   await db.quickbars.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   // Module-scope store, so it outlives a test unless it is put back — same
@@ -208,19 +209,35 @@ beforeAll(async () => {
   clearCostIndexCache();
 }, 30_000);
 
+async function seedRun() {
+  await db.productionRuns.add({
+    id: 'run-1',
+    characterId: CHAR_ID,
+    buildPlanId: 'plan-1',
+    productTypeID: 587,
+    quantity: 1,
+    materialCost: 1,
+    jobFee: 0,
+    totalCost: 1,
+    loggedAt: 1,
+    updatedAt: 1,
+  });
+}
+
 beforeEach(resetSession);
 
 describe('Industry: tabs are paths (issue #1300)', () => {
   it('sends bare /industry to the Build Plans tab, and a tab click pushes its own path', async () => {
+    await seedRun();
     const user = userEvent.setup();
     render(<App />);
 
     await screen.findByRole('searchbox', { name: 'Add build plan' });
     expect(window.location.pathname).toBe('/industry/plans');
 
-    await user.click(screen.getByRole('tab', { name: 'Records' }));
-    await waitFor(() => expect(window.location.pathname).toBe('/industry/records'));
-    expect(screen.getByRole('tab', { name: 'Records' })).toHaveAttribute('aria-selected', 'true');
+    await user.click(screen.getByRole('tab', { name: 'Logs' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/logs'));
+    expect(screen.getByRole('tab', { name: 'Logs' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it("shows the plan's own runs in the Runs column", async () => {
@@ -234,6 +251,7 @@ describe('Industry: tabs are paths (issue #1300)', () => {
   });
 
   it('gives each tab the gear for its own settings, and none to a tab that has none', async () => {
+    await seedRun();
     const user = userEvent.setup();
     render(<App />);
 
@@ -246,16 +264,36 @@ describe('Industry: tabs are paths (issue #1300)', () => {
     ).toBeInTheDocument();
     await user.keyboard('{Escape}');
 
-    await user.click(screen.getByRole('tab', { name: 'Records' }));
-    await waitFor(() => expect(window.location.pathname).toBe('/industry/records'));
+    await user.click(screen.getByRole('tab', { name: 'Logs' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/logs'));
     expect(screen.queryByRole('button', { name: /settings$/ })).not.toBeInTheDocument();
   });
 
-  it('opens the tab its path names', async () => {
+  it('hides the Logs tab until a Production Run is logged', async () => {
+    render(<App />);
+
+    await screen.findByRole('searchbox', { name: 'Add build plan' });
+    expect(screen.queryByRole('tab', { name: 'Logs' })).not.toBeInTheDocument();
+    await seedRun();
+    expect(await screen.findByRole('tab', { name: 'Logs' })).toBeInTheDocument();
+  });
+
+  it('sends the old /industry/records path to Logs', async () => {
     window.history.pushState({}, '', '/industry/records');
     render(<App />);
 
-    const tab = await screen.findByRole('tab', { name: 'Records' });
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/logs'));
+    expect(await screen.findByRole('tab', { name: 'Logs' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
+  it('opens the tab its path names', async () => {
+    window.history.pushState({}, '', '/industry/logs');
+    render(<App />);
+
+    const tab = await screen.findByRole('tab', { name: 'Logs' });
     expect(tab).toHaveAttribute('aria-selected', 'true');
   });
 });

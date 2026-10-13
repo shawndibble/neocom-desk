@@ -23,7 +23,7 @@ const PHONE = { width: 390, height: 844 };
 const PLAN_ID = 'e2e-profit-plan-1';
 const RUN_ID_SMALL = 'e2e-profit-run-small';
 const RUN_ID_LARGE = 'e2e-profit-run-large';
-/** Rifter / Rifter Blueprint — same pair the industry Records spec above uses. */
+/** Rifter / Rifter Blueprint — same pair the industry Logs spec above uses. */
 const PRODUCT_TYPE_ID = 587;
 const BLUEPRINT_TYPE_ID = 691;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -138,7 +138,7 @@ test.describe('production profit chart — 390px width', () => {
     await signInAndGoto(page);
     await seedProfitHistory(page);
 
-    await page.goto('./industry/records');
+    await page.goto('./industry/logs');
 
     const chart = page.getByRole('img', { name: 'Realized profit over time' });
     await expect(chart).toBeVisible();
