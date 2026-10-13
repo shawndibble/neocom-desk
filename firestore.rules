@@ -113,9 +113,10 @@ service cloud.firestore {
       // 10-Communities cap and purgeStaleAccounts's cleanup.
       // Mail invites an admin sent today, by UTC day (issue #3604): a count
       // the Community callables keep. The Character may read its own, to show
-      // how many are left.
+      // how many are left. Nothing exists until the first invite of the day,
+      // and `resource.data` on a missing doc errors, so that read is allowed.
       match /mailInviteQuota/{day} {
-        allow get: if isOwner() && hashMatches();
+        allow get: if isOwner() && (resource == null || hashMatches());
         allow list: if isOwner();
         allow write: if false;
       }
