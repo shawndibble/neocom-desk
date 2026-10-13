@@ -20,16 +20,23 @@ vi.mock('./useOwnedBlueprintTypes', () => ({
   }),
 }));
 
-vi.mock('./useBlueprintPlaces', () => ({
-  useBlueprintCopies: () => [
+const READY = {
+  status: 'ready',
+  copies: [
     { typeId: 10, placeId: 500 },
+    { typeId: 10, placeId: 700 },
     { typeId: 20, placeId: 500 },
     { typeId: 30, placeId: 600 },
   ],
+};
+const copies = vi.hoisted(() => ({ current: {} as unknown }));
+vi.mock('./useBlueprintPlaces', () => ({
+  useBlueprintCopies: () => copies.current,
   usePlaceLabels: () =>
     new Map([
       [500, { name: 'Jita IV - Moon 4', systemName: 'Jita' }],
       [600, { name: null, systemName: null }],
+      [700, { name: 'Amarr VIII', systemName: 'Amarr' }],
     ]),
 }));
 
@@ -55,6 +62,7 @@ function renderTab() {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  copies.current = READY;
   publish.mockResolvedValue({ outcome: 'full', skipped: 0 });
   await db.settings.clear();
 });
@@ -95,7 +103,7 @@ describe('ShareBlueprintsTab', () => {
     const user = userEvent.setup();
     renderTab();
     const dialog = await openAdd(user);
-    await user.click(within(dialog).getByRole('tab', { name: b.tabBlueprints }));
+    await user.click(within(dialog).getByRole('button', { name: b.tabBlueprints }));
     await user.type(within(dialog).getByRole('searchbox'), 'gamma');
     const row = within(dialog).getByText('Gamma Blueprint').closest('li')!;
     await user.click(within(row).getByRole('button', { name: b.share }));
@@ -162,7 +170,7 @@ describe('ShareBlueprintsTab', () => {
     const user = userEvent.setup();
     renderTab();
     const dialog = await openAdd(user);
-    await user.click(within(dialog).getByRole('tab', { name: b.tabBlueprints }));
+    await user.click(within(dialog).getByRole('button', { name: b.tabBlueprints }));
     const row = within(dialog).getByText('Alpha Blueprint').closest('li')!;
     expect(row).toHaveTextContent('via Jita IV - Moon 4');
     expect(within(row).getByRole('button', { name: b.share })).toBeInTheDocument();
@@ -173,7 +181,7 @@ describe('ShareBlueprintsTab', () => {
     const user = userEvent.setup();
     renderTab();
     const dialog = await openAdd(user);
-    expect(within(dialog).queryByRole('tab')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: b.tabLocations })).not.toBeInTheDocument();
     expect(within(dialog).queryByText('Alpha Blueprint')).not.toBeInTheDocument();
     const row = within(dialog).getByText('Beta Blueprint').closest('li')!;
     await user.click(within(row).getByRole('button', { name: b.share }));
@@ -196,6 +204,59 @@ describe('ShareBlueprintsTab', () => {
         locations: new Set(),
       })
     );
+  });
+
+  it('waits for the places before listing, so a location-only share never flashes as none', async () => {
+    copies.current = { status: 'loading' };
+    await saveBlueprintShare(1, 'c1', {
+      choice: { all: false, allowed: new Set() },
+      locations: new Set([500]),
+    });
+    renderTab();
+    expect(
+      await screen.findByRole('status', { name: en.communities.share.loading })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(b.noneShared)).not.toBeInTheDocument();
+  });
+
+  it('says locations need assets instead of offering a Share that does nothing', async () => {
+    copies.current = { status: 'unavailable' };
+    const user = userEvent.setup();
+    renderTab();
+    const dialog = await openAdd(user);
+    expect(within(dialog).getByText(b.locationsNeedAssets)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: b.share })).not.toBeInTheDocument();
+  });
+
+  it('names the first of several locations and the rest in a tooltip', async () => {
+    await saveBlueprintShare(1, 'c1', {
+      choice: { all: false, allowed: new Set() },
+      locations: new Set([500, 700]),
+    });
+    renderTab();
+    const row = (await screen.findByText('Alpha Blueprint')).closest('li')!;
+    expect(row).toHaveTextContent('via Jita IV - Moon 4 +1 more');
+  });
+
+  it('moves focus to the next Stop sharing when a row goes', async () => {
+    await saveShareChoice(1, 'c1', { all: false, allowed: new Set([10, 20]) });
+    const user = userEvent.setup();
+    renderTab();
+    const alpha = (await screen.findByText('Alpha Blueprint')).closest('li')!;
+    await user.click(within(alpha).getByRole('button', { name: b.stop }));
+    const beta = screen.getByText('Beta Blueprint').closest('li')!;
+    await waitFor(() => expect(within(beta).getByRole('button', { name: b.stop })).toHaveFocus());
+  });
+
+  it('moves focus to the next blueprint in the dialog when one is shared', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    const dialog = await openAdd(user);
+    await user.click(within(dialog).getByRole('button', { name: b.tabBlueprints }));
+    const alpha = within(dialog).getByText('Alpha Blueprint').closest('li')!;
+    await user.click(within(alpha).getByRole('button', { name: b.share }));
+    const beta = within(dialog).getByText('Beta Blueprint').closest('li')!;
+    await waitFor(() => expect(within(beta).getByRole('button', { name: b.share })).toHaveFocus());
   });
 
   it('checks the Community on open when only a location is shared', async () => {

@@ -4,33 +4,33 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import {
-  addShared,
   copiesByPlace,
   noBlueprintsShared,
   shareAllBlueprints,
   shareLocation,
-  stopSharing,
+  shareType,
   stopSharingLocation,
+  stopSharingType,
   typeShareStatus,
   type BlueprintShare,
+  type TypeStatus,
 } from '@/engine/communities/shareMode';
 import { bpcSourcingCommunityHref } from '@/features/bpcContracts/bpcSourcingUrl';
-import { AddBlueprintsDialog } from './AddBlueprintsDialog';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import { AddBlueprintsDialog, type DialogPlaces } from './AddBlueprintsDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { publishSharedLibrary, type PublishResult } from './libraryPush';
-import { PlaceName, ViaLabel, type TypeStatus } from './sharedBlueprintRows';
+import { BlueprintName, PlaceName } from './sharedBlueprintRows';
+import { namedLike, needleOf, ROW_LIMIT } from './shareLists';
 import { loadBlueprintShare, saveBlueprintShare } from './shareSelection';
 import { useBlueprintCopies, usePlaceLabels } from './useBlueprintPlaces';
 import { useOwnedBlueprintTypes } from './useOwnedBlueprintTypes';
 
-/** A long list shows this many rows; the search narrows it. */
-const ROW_LIMIT = 100;
-
-const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
-
-/** The types whose name contains the search text (all of them when it is empty), by name. */
-function namedLike<T extends { name: string }>(types: readonly T[], needle: string): T[] {
-  return types.filter((type) => type.name.toLowerCase().includes(needle)).sort(byName);
+/** The next element, else the previous, among those still on the page: where focus goes when a row's control goes away. */
+function neighbours<K>(keys: readonly K[], index: number, refs: Map<K, HTMLButtonElement>) {
+  const after = keys.slice(index + 1);
+  const before = keys.slice(0, index).reverse();
+  return [...after, ...before].map((key) => () => refs.get(key) ?? null);
 }
 
 const NO_STATUS: ReadonlyMap<number, TypeStatus> = new Map();
@@ -89,9 +89,13 @@ export function ShareBlueprintsTab({
   }, [characterId, communityId, report]);
 
   const types = useMemo(() => (owned.status === 'ready' ? owned.owned : []), [owned]);
-  // Until the places load, every type still gets a status from the by-type choice.
+  // Without cached assets nothing is placed (and nothing publishes): every type
+  // still gets a status from the by-type choice.
   const placed = useMemo(
-    () => copies ?? types.map((type) => ({ typeId: type.typeId, placeId: null })),
+    () =>
+      copies.status === 'ready'
+        ? copies.copies
+        : types.map((type) => ({ typeId: type.typeId, placeId: null })),
     [copies, types]
   );
   const status = useMemo(
@@ -106,9 +110,13 @@ export function ShareBlueprintsTab({
       }),
     [types, status]
   );
-  const needle = query.trim().toLowerCase();
+  const needle = needleOf(query);
   const sharedRows = useMemo(() => namedLike(sharedTypes, needle), [sharedTypes, needle]);
   const places = useMemo(() => copiesByPlace(placed), [placed]);
+  const dialogPlaces = useMemo<DialogPlaces>(
+    () => (copies.status === 'ready' ? { status: 'ready', counts: places } : copies),
+    [copies, places]
+  );
   // Under share-all location rules are moot (and turning it on clears them).
   const sharedLocations = useMemo(
     () => (share && !share.choice.all ? [...share.locations].sort((a, b) => a - b) : []),
@@ -119,6 +127,10 @@ export function ShareBlueprintsTab({
     [adding, places, sharedLocations]
   );
   const labels = usePlaceLabels(characterId, wanted);
+  const shownRows = sharedRows.slice(0, ROW_LIMIT);
+  const stoppable = shownRows
+    .filter((type) => status.get(type.typeId)?.direct)
+    .map((type) => type.typeId);
 
   // Saves run one after another, each from the choice the one before left, so
   // two quick clicks never build from the same base and a failed save rolls
@@ -126,6 +138,10 @@ export function ShareBlueprintsTab({
   const latest = useRef<BlueprintShare | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const publishes = useRef(0);
+  const search = useRef<HTMLInputElement>(null);
+  const locationButtons = useRef(new Map<number, HTMLButtonElement>());
+  const stopButtons = useRef(new Map<number, HTMLButtonElement>());
+  const focusAfterCommit = useFocusAfterCommit();
   useEffect(() => {
     latest.current = share;
   }, [share]);
@@ -151,7 +167,9 @@ export function ShareBlueprintsTab({
     return queue.current;
   }
 
-  if (owned.status === 'loading' || share === null) {
+  // Until the places load, a blueprint shared only through a location would
+  // read as not shared: wait rather than flash "No blueprints shared yet".
+  if (owned.status === 'loading' || share === null || copies.status === 'loading') {
     return <Spinner size="sm" label={t('communities.share.loading')} />;
   }
   if (owned.status === 'needsReauth') {
@@ -201,12 +219,25 @@ export function ShareBlueprintsTab({
         <section aria-label={t('communities.blueprints.sharedLocations')} className="space-y-1">
           <h3 className="text-xs font-semibold">{t('communities.blueprints.sharedLocations')}</h3>
           <ul className="divide-y divide-line">
-            {sharedLocations.map((placeId) => (
+            {sharedLocations.map((placeId, index) => (
               <li key={placeId} className="flex items-center gap-2 py-1 text-xs">
-                <PlaceName label={labels.get(placeId)} count={places.get(placeId) ?? 0} />
+                <PlaceName
+                  label={labels.get(placeId)}
+                  count={copies.status === 'ready' ? (places.get(placeId) ?? 0) : undefined}
+                />
                 <Button
                   size="sm"
-                  onClick={() => update((current) => stopSharingLocation(current, placeId))}
+                  ref={(el) => {
+                    if (el) locationButtons.current.set(placeId, el);
+                    else locationButtons.current.delete(placeId);
+                  }}
+                  onClick={() => {
+                    focusAfterCommit(
+                      ...neighbours(sharedLocations, index, locationButtons.current),
+                      search
+                    );
+                    void update((current) => stopSharingLocation(current, placeId));
+                  }}
                 >
                   {t('communities.blueprints.stop')}
                 </Button>
@@ -216,6 +247,7 @@ export function ShareBlueprintsTab({
         </section>
       )}
       <SearchInput
+        ref={search}
         className="w-full"
         value={query}
         placeholder={t('communities.blueprints.filter')}
@@ -230,24 +262,28 @@ export function ShareBlueprintsTab({
         />
       ) : (
         <ul className="divide-y divide-line">
-          {sharedRows.slice(0, ROW_LIMIT).map((type) => {
+          {shownRows.map((type) => {
             const entry = status.get(type.typeId);
             return (
               <li key={type.typeId} className="flex items-center gap-2 py-1 text-xs">
-                <span className="min-w-0 flex-1 truncate">
-                  {type.name}
-                  <ViaLabel via={entry?.via ?? []} labels={labels} />
-                </span>
+                <BlueprintName name={type.name} via={entry?.via ?? []} labels={labels} />
                 {/* Shared only through a location: stopping that location is the way out. */}
                 {entry?.direct && (
                   <Button
                     size="sm"
-                    onClick={() =>
-                      update((current) => ({
-                        ...current,
-                        choice: stopSharing(current.choice, type.typeId),
-                      }))
-                    }
+                    ref={(el) => {
+                      if (el) stopButtons.current.set(type.typeId, el);
+                      else stopButtons.current.delete(type.typeId);
+                    }}
+                    onClick={() => {
+                      // The button goes (and usually its row): focus the next Stop sharing.
+                      const index = stoppable.indexOf(type.typeId);
+                      focusAfterCommit(
+                        ...neighbours(stoppable, index, stopButtons.current),
+                        search
+                      );
+                      void update((current) => stopSharingType(current, type.typeId));
+                    }}
                   >
                     {t('communities.blueprints.stop')}
                   </Button>
@@ -291,12 +327,10 @@ export function ShareBlueprintsTab({
         shareAll={share.choice.all}
         types={types}
         status={status}
-        places={copies === null ? null : places}
+        places={dialogPlaces}
         sharedLocations={share.locations}
         labels={labels}
-        onShareType={(typeId) =>
-          update((current) => ({ ...current, choice: addShared(current.choice, typeId) }))
-        }
+        onShareType={(typeId) => update((current) => shareType(current, typeId))}
         onShareLocation={(placeId) => update((current) => shareLocation(current, placeId))}
         onStopLocation={(placeId) => update((current) => stopSharingLocation(current, placeId))}
       />

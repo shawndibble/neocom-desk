@@ -12,13 +12,6 @@ export type ShareChoice<K = number> =
 export const noneShared = <K = number>(): ShareChoice<K> => ({ all: false, allowed: new Set() });
 export const shareAll = <K = number>(): ShareChoice<K> => ({ all: true, excluded: new Set() });
 
-/** The owned entries this choice shares right now. */
-export function effectiveSelection<K>(owned: readonly K[], choice: ShareChoice<K>): Set<K> {
-  return new Set(
-    owned.filter((key) => (choice.all ? !choice.excluded.has(key) : choice.allowed.has(key)))
-  );
-}
-
 function without<K>(set: ReadonlySet<K>, key: K): Set<K> {
   const next = new Set(set);
   next.delete(key);
@@ -79,6 +72,16 @@ export function sharesBlueprint(
   return !share.choice.all && placeId !== null && share.locations.has(placeId);
 }
 
+/** Share one blueprint type (every copy of it); the location rules stay as they are. */
+export function shareType(share: BlueprintShare, typeId: number): BlueprintShare {
+  return { ...share, choice: addShared(share.choice, typeId) };
+}
+
+/** Stop sharing one type by type; a shared location still covers its copies there. */
+export function stopSharingType(share: BlueprintShare, typeId: number): BlueprintShare {
+  return { ...share, choice: stopSharing(share.choice, typeId) };
+}
+
 export function shareLocation(share: BlueprintShare, placeId: number): BlueprintShare {
   return { ...share, locations: new Set(share.locations).add(placeId) };
 }
@@ -88,14 +91,20 @@ export function stopSharingLocation(share: BlueprintShare, placeId: number): Blu
 }
 
 /**
- * For every owned type: whether the by-type choice shares it (`direct`, the
- * one a Stop sharing button undoes) and which shared locations hold a copy of
- * it (`via`, ascending; always empty under share-all).
+ * One type's share: whether the by-type choice shares it (`direct`, the one a
+ * Stop sharing button undoes) and which shared locations hold a copy of it
+ * (`via`, ascending; always empty under share-all).
  */
+export interface TypeStatus {
+  direct: boolean;
+  via: number[];
+}
+
+/** Every owned type's `TypeStatus`. */
 export function typeShareStatus(
   copies: readonly BlueprintCopy[],
   share: BlueprintShare
-): Map<number, { direct: boolean; via: number[] }> {
+): Map<number, TypeStatus> {
   const via = new Map<number, Set<number>>();
   for (const { typeId, placeId } of copies) {
     if (!via.has(typeId)) via.set(typeId, new Set());
