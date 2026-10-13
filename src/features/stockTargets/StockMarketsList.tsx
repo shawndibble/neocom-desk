@@ -12,6 +12,7 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  IskAmount,
   LiveStatus,
   Panel,
   RowCaret,
@@ -21,7 +22,6 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { marketNeed } from '@/engine/stockTargets/markets';
 import type { StockList } from '@/engine/stockTargets/stockLists';
-import { formatIskCompact } from '@/lib/isk';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import type { TradeHub } from '@/market/hubs';
 import { StockNeedPill } from './StockStatus';
@@ -115,8 +115,16 @@ export function StockMarketsList({
       align: 'right',
       headerCellClassName: 'sm:w-20',
       className: 'tabular-nums',
-      // Off the phone card, which reads by its need pill and counts.
-      render: (market) => <span data-dense-omit>{market.items.toLocaleString()}</span>,
+      // Leads the phone card's meta line, so a stocked market's card still says something.
+      render: (market) => (
+        <>
+          {market.items.toLocaleString()}
+          <span className="sm:hidden">
+            {' '}
+            {t('stockTargets.markets.itemsAffix', { count: market.items })}
+          </span>
+        </>
+      ),
       sortValue: (market) => market.items,
     },
     {
@@ -169,7 +177,9 @@ export function StockMarketsList({
       stackAffix: { after: ` ${t('stockTargets.markets.toSourceAffix')}` },
       render: (market) =>
         market.costToFill > 0 ? (
-          `${formatIskCompact(market.costToFill)} ISK`
+          <>
+            <IskAmount value={market.costToFill} /> ISK
+          </>
         ) : (
           <span data-dense-omit className="text-text-dim">
             —
@@ -191,6 +201,8 @@ export function StockMarketsList({
       header: '',
       align: 'right',
       headerCellClassName: 'sm:w-8',
+      // Closes the phone card's meta line at its right edge, rather than adding a "·" to it.
+      stackEdge: 'end',
       render: () => <RowCaret />,
     },
   ];

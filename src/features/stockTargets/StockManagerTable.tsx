@@ -7,6 +7,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
+  IskAmount,
   MenuItem,
   MenuSeparator,
   TextInput,
@@ -18,7 +19,6 @@ import type { StockRow } from '@/engine/stockTargets/stockRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
 import { cx } from '@/lib/cx';
-import { formatIskCompact } from '@/lib/isk';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { StockFillBar, StockStatusPill } from './StockStatus';
 
@@ -189,7 +189,7 @@ export function StockManagerTable({
       id: 'inHangar',
       header: t('stockTargets.table.inHangar'),
       align: 'right',
-      headerCellClassName: 'sm:w-24',
+      headerCellClassName: 'sm:w-28 whitespace-nowrap',
       className: 'tabular-nums',
       stackAffix: { after: ` ${t('stockTargets.table.inHangarAffix')}` },
       render: (row) =>
@@ -216,24 +216,6 @@ export function StockManagerTable({
       ),
     },
     {
-      id: 'shortfall',
-      header: t('stockTargets.table.shortfall'),
-      align: 'right',
-      headerCellClassName: 'sm:w-20',
-      className: 'tabular-nums',
-      stackAffix: { before: `${t('stockTargets.table.shortfallAffix')} ` },
-      // Off the phone card: its Restock text already says how many are short.
-      render: (row) =>
-        row.shortfall > 0 ? (
-          <span data-dense-omit>{row.shortfall.toLocaleString()}</span>
-        ) : (
-          <span data-dense-omit className="text-text-dim">
-            {t('stockTargets.table.none')}
-          </span>
-        ),
-      sortValue: (row) => row.shortfall,
-    },
-    {
       id: 'restock',
       header: t('stockTargets.table.restock'),
       render: (row) =>
@@ -257,7 +239,8 @@ export function StockManagerTable({
             )}
           </span>
         ),
-      sortValue: (row) => row.fromHangar,
+      // Sorts by Shortfall; the cell shows it as its two halves.
+      sortValue: (row) => row.shortfall,
     },
     {
       id: 'cost',
@@ -270,7 +253,9 @@ export function StockManagerTable({
         row.costToFill === null ? (
           <span className="text-text-dim">{t('stockTargets.table.noPrice')}</span>
         ) : row.costToFill > 0 ? (
-          `${formatIskCompact(row.costToFill)} ISK`
+          <>
+            <IskAmount value={row.costToFill} /> ISK
+          </>
         ) : (
           <span data-dense-omit className="text-text-dim">
             —

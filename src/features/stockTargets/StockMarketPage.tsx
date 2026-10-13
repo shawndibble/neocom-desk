@@ -24,9 +24,15 @@ import {
   EmptyState,
   FilterChip,
   IconButton,
+  IskAmount,
   LiveStatus,
   Panel,
   SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   StatChip,
   StatChips,
@@ -47,7 +53,6 @@ import {
 } from '@/engine/stockTargets/stockLists';
 import { STOCK_STATUSES, summarizeStock, type StockStatus } from '@/engine/stockTargets/stockRows';
 import { writeToClipboard } from '@/lib/clipboard';
-import { formatIskCompact } from '@/lib/isk';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import type { TradeHub } from '@/market/hubs';
 import { MarketDialog } from './MarketDialog';
@@ -69,6 +74,9 @@ type View = 'manager' | 'builder';
 type Dialog = 'rename' | 'change' | 'delete' | 'add' | 'paste' | null;
 /** The status chips plus one for items the hangar can restock. */
 type Filter = StockStatus | 'ready' | null;
+
+/** The group select's "no group" value: Radix Select items cannot hold an empty string. */
+const ALL_GROUPS = '__all__';
 
 export const STOCK_PATH = '/market/stock';
 /** The Stock tab's query param carrying a shared market's code. */
@@ -227,7 +235,9 @@ export function StockMarketPage({
   const groupNames = [
     ...new Set(rows.map((row) => groupOf(row.typeId)).filter((g): g is string => !!g)),
   ].sort((a, b) => a.localeCompare(b));
-  const inGroup = (typeId: number) => groupFilter === null || groupOf(typeId) === groupFilter;
+  // An edit can empty the picked group: the filter then lets go rather than hide every row.
+  const activeGroup = groupFilter !== null && groupNames.includes(groupFilter) ? groupFilter : null;
+  const inGroup = (typeId: number) => activeGroup === null || groupOf(typeId) === activeGroup;
   const matches = (row: (typeof rows)[number], f: Filter) =>
     f === null || (f === 'ready' ? row.fromHangar > 0 : row.status === f);
   const filteredRows = rows.filter((row) => matches(row, filter) && inGroup(row.typeId));
@@ -262,8 +272,9 @@ export function StockMarketPage({
           ‹ {t('stockTargets.markets.back')}
         </Link>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
+      {/* Name wraps in its own column, never under the actions. */}
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
           <h2
             data-stock-market-title
             tabIndex={-1}
@@ -279,6 +290,10 @@ export function StockMarketPage({
             </p>
           )}
         </div>
+        <Button variant="primary" onClick={() => setDialog('add')}>
+          {t('stockTargets.add.open')}
+        </Button>
+        {/* Rare actions share one ⋮ (§6c header tier 3). */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconButton
@@ -287,13 +302,27 @@ export function StockMarketPage({
             />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onCloseAutoFocus={menu.onCloseAutoFocus}>
+            <DropdownMenuItem onSelect={() => menu.run(() => setDialog('paste'))}>
+              {t('stockTargets.add.pasteOpen')}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void addListed()}>
               {t('stockTargets.list.addListed')}
             </DropdownMenuItem>
+            {list.items.length > 0 && (
+              <DropdownMenuItem
+                onSelect={() =>
+                  void writeToClipboard(shareUrl()).then(() =>
+                    setToast(t('stockTargets.share.copied'))
+                  )
+                }
+              >
+                {t('stockTargets.share.copy')}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => menu.run(onNew)}>
               {t('stockTargets.list.new')}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => menu.run(() => setDialog('rename'))}>
               {t('stockTargets.list.renameEllipsis')}
             </DropdownMenuItem>
@@ -305,46 +334,37 @@ export function StockMarketPage({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {list.items.length > 0 && (
-          <Button
-            onClick={() =>
-              void writeToClipboard(shareUrl()).then(() => setToast(t('stockTargets.share.copied')))
-            }
-          >
-            {t('stockTargets.share.copy')}
-          </Button>
-        )}
-        <Button variant="primary" onClick={() => setDialog('add')}>
-          {t('stockTargets.add.open')}
-        </Button>
       </div>
 
+      {/* Manager counts Out, Low and Ready to list on its filter chips; Builder, with no chips, here. */}
       {summary && (
         <StatChips>
           <StatChip
-            label={t('stockTargets.summary.out')}
-            value={t('stockTargets.summary.items', { count: summary.out })}
-            tone={summary.out > 0 ? 'danger' : 'default'}
-            emphasis
-          />
-          <StatChip
-            label={t('stockTargets.summary.low')}
-            value={t('stockTargets.summary.items', { count: summary.low })}
-            tone={summary.low > 0 ? 'warning' : 'default'}
-            emphasis
-          />
-          <StatChip
-            label={t('stockTargets.summary.ready')}
-            value={t('stockTargets.summary.items', { count: summary.readyToList })}
-            tooltip={t('stockTargets.summary.readyHint')}
-            emphasis
-          />
-          <StatChip
             label={t('stockTargets.summary.toSource')}
-            value={`${formatIskCompact(summary.costToFill)} ISK`}
+            value={
+              <>
+                <IskAmount value={summary.costToFill} /> ISK
+              </>
+            }
             tooltip={t('stockTargets.summary.toSourceHint', { hub: hub.name })}
             emphasis
           />
+          {view === 'builder' && (
+            <>
+              <StatChip
+                label={t('stockTargets.status.out')}
+                value={summary.out}
+                tone={summary.out > 0 ? 'danger' : 'default'}
+                emphasis
+              />
+              <StatChip
+                label={t('stockTargets.status.low')}
+                value={summary.low}
+                tone={summary.low > 0 ? 'warning' : 'default'}
+                emphasis
+              />
+            </>
+          )}
           {data?.oldestFetchedAt && <DataAgeBadge date={data.oldestFetchedAt} alwaysVisible />}
           {loading && <Spinner size="sm" label={t('common.loading')} />}
         </StatChips>
@@ -385,31 +405,33 @@ export function StockMarketPage({
             <FilterChip
               label={t('stockTargets.filterReady')}
               count={countOf('ready')}
+              tooltip={t('stockTargets.summary.readyHint')}
               selected={filter === 'ready'}
               onToggle={() => setFilter(filter === 'ready' ? null : 'ready')}
             />
           </div>
         )}
         {view === 'manager' && groupNames.length > 1 && (
-          // Desktop only: on a phone the status chips are the one filter row.
-          <div
-            role="group"
-            aria-label={t('stockTargets.groupFilterLabel')}
-            className="hidden flex-wrap items-center gap-1.5 sm:flex"
+          <Select
+            value={activeGroup ?? ALL_GROUPS}
+            onValueChange={(value) => setGroupFilter(value === ALL_GROUPS ? null : value)}
           >
-            {groupNames.map((group) => (
-              <FilterChip
-                key={group}
-                label={group}
-                selected={groupFilter === group}
-                onToggle={() => setGroupFilter(groupFilter === group ? null : group)}
-              />
-            ))}
-          </div>
-        )}
-        <span className="flex-1" />
-        {view === 'manager' && (
-          <Button onClick={() => setDialog('paste')}>{t('stockTargets.add.pasteOpen')}</Button>
+            <SelectTrigger
+              size="sm"
+              aria-label={t('stockTargets.groupFilterLabel')}
+              className="ml-auto max-w-[50%] min-w-0 sm:max-w-64"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_GROUPS}>{t('stockTargets.groupAll')}</SelectItem>
+              {groupNames.map((group) => (
+                <SelectItem key={group} value={group}>
+                  {group}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
       </div>
 

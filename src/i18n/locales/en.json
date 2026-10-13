@@ -11675,6 +11675,7 @@
     "liveSummary": "{{out}} out, {{low}} low",
     "filterLabel": "Status",
     "groupFilterLabel": "Market group",
+    "groupAll": "All groups",
     "filterAll": "All",
     "filterReady": "Ready to list",
     "markets": {
@@ -11683,6 +11684,8 @@
       "label": "Markets",
       "market": "Market",
       "items": "Items",
+      "itemsAffix_one": "item",
+      "itemsAffix_other": "items",
       "out": "Out",
       "low": "Low",
       "ready": "Ready to list",
@@ -11761,11 +11764,6 @@
       "confirm": "Add"
     },
     "summary": {
-      "out": "Out",
-      "low": "Low",
-      "items_one": "{{count}} item",
-      "items_other": "{{count}} items",
-      "ready": "Ready to list",
       "readyHint": "Items you can restock from your hangar at this station, with no hauling or building.",
       "toSource": "To buy or build",
       "toSourceHint": "What your hangar here can't cover, at the lowest sell price at {{hub}}. Items with no price there are left out."
@@ -11786,9 +11784,6 @@
       "listedAffix": "listed",
       "inHangar": "In hangar",
       "inHangarAffix": "in hangar",
-      "shortfall": "Short",
-      "shortfallAffix": "short",
-      "none": "None",
       "restock": "Restock",
       "fromHangar": "List {{n}} from hangar",
       "toSource": "Buy or build {{n}}",
@@ -11827,7 +11822,6 @@
       "noneBuildableHint": "The active character holds no blueprint for anything this market still needs after the hangar.",
       "nothingShort": "Nothing here needs building or buying: your listings and hangar cover it.",
       "blueprint": "Your blueprint",
-      "noBlueprint": "No blueprint",
       "bpo": "BPO ME {{me}} / TE {{te}}",
       "bpc_one": "BPC {{count}} run, ME {{me}}",
       "bpc_other": "BPC {{count}} runs, ME {{me}}",
