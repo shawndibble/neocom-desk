@@ -325,14 +325,14 @@ describe('Wallet', () => {
   it('redirects /wallet/transactions to Market › History (issue #1749)', async () => {
     window.history.pushState({}, '', '/wallet/transactions');
     render(<App />);
-    await waitFor(() => expect(window.location.pathname).toBe('/market/history/transactions'));
+    await waitFor(() => expect(window.location.pathname).toBe('/market/history'));
   });
 
-  it('links the personal Journal header to Market › History › Transactions (issue #1749)', async () => {
+  it('links the personal Journal header to Market › History (issue #1749)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
     const link = await screen.findByRole('link', { name: 'Transactions' });
-    expect(link).toHaveAttribute('href', '/market/history/transactions');
+    expect(link).toHaveAttribute('href', '/market/history');
     // Rests in the accent colour so it reads as a link (issue #2019).
     expect(link).toHaveClass('text-accent');
   });

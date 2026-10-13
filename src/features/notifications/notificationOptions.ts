@@ -72,7 +72,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // written down — what sold, how many, for how much, to whom.
   // `notificationUrlForSubject` adds `?highlight=` where the fire knows its
   // subject, which pulses that row on arrival.
-  marketOrderFilled: '/market/history/transactions',
+  marketOrderFilled: '/market/history',
   // Open Orders, not History — the order this fires about is (still) an open
   // one (issue #1423). `notificationUrlForSubject` adds `?highlight=`, which
   // pulses that row on arrival, same as `marketOrderFilled`'s destination.
