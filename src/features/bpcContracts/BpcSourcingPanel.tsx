@@ -1212,8 +1212,8 @@ export function BpcSourcingPanel() {
           if (!contract) return 0;
           // A PLEX-for-item barter's real ask isn't ISK at all (issue #1105)
           // — sorting it at its `0` ISK price would put it above every real
-          // priced offer as "cheapest", which it isn't. Sorts last, the same
-          // stance an owned row (no price to judge) already takes.
+          // priced offer as "cheapest", which it isn't. Sorts last, unlike an
+          // owned or Community row, whose free price is real.
           if (contract.requestedPlex) return Infinity;
           return effectivePrice(contract);
         },
@@ -1352,8 +1352,8 @@ export function BpcSourcingPanel() {
         id: 'expires',
         header: t('bpcContracts.expiresColumn'),
         className: 'whitespace-nowrap text-text-dim',
-        // Infinity sorts an owned row last, same as price, rather than epoch 0
-        // reading as "expires soonest."
+        // Infinity sorts an owned row last, rather than epoch 0 reading as
+        // "expires soonest."
         sortValue: (row) => asContract(row)?.dateExpired ?? Infinity,
         stackAffix: { before: t('bpcContracts.mobile.expiresAffix') },
         render: (row) => {
@@ -1769,9 +1769,9 @@ export function BpcSourcingPanel() {
 
           {(regionPrices.length > 1 || selectedBpoCards.length > 0) && (
             // One wrapping row: [Cheapest by region] [Market BPOs] [Contract BPOs],
-            // every card the same width; groups stack on a phone, where the
-            // region cells scroll sideways and a BPO is one line. A group
-            // with no card is left out.
+            // every card the same width; on a phone the region cells take the
+            // first line (scrolling sideways) and the two BPO groups share the
+            // next in two columns. A group with no card is left out.
             <div className="grid grid-cols-2 gap-x-2 gap-y-2 border-b border-line px-3 py-2 sm:flex sm:flex-row sm:flex-wrap sm:gap-x-4">
               {regionPrices.length > 1 && (
                 <div className="col-span-2 min-w-0 max-w-full">
