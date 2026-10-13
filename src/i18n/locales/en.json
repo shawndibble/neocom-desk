@@ -7829,7 +7829,6 @@
         "meTe": "ME / TE",
         "runs": "Runs"
       },
-      "jumpsAffix": "Jumps ",
       "jumpsUnavailable": "No stargate route reaches this system from yours, or its system could not be found.",
       "openInSourcing": "Open in BPC Sourcing",
       "systemUnknown": "This blueprint's system could not be found.",

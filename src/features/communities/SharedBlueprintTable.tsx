@@ -83,8 +83,8 @@ function SharedBlueprintMenu({
  * a Build Plan and BPC Sourcing.
  *
  * `systemIds` finds a row's system id by its name (lowercase); `null` while
- * the system list is loading or when it could not be read, which leaves the
- * Jumps cell at its placeholder.
+ * the system list is loading. A row whose system is not in it (or an empty
+ * lookup, when the list could not be read) shows the Jumps placeholder.
  */
 export function SharedBlueprintTable({
   rows,
@@ -166,8 +166,6 @@ export function SharedBlueprintTable({
         const cell = rowJumps(row);
         return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
       },
-      // A phone card has no header row; a bare "7" says nothing on its own.
-      stackAffix: { before: t('communities.library.jumpsAffix') },
       render: (row) =>
         renderJumpsCell(rowJumps(row), t, 'communities.library.jumpsUnavailable', systemIdOf(row)),
     },

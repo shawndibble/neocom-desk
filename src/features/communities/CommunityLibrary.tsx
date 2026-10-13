@@ -215,7 +215,8 @@ export function CommunityLibrary({
   useEffect(() => {
     let cancelled = false;
     void loadSolarSystemsById().then((systems) => {
-      if (!cancelled && systems) setSystemIds(systemIdsByName(systems.values()));
+      // Unreadable: an empty lookup, so every Jumps cell settles on "—".
+      if (!cancelled) setSystemIds(systems ? systemIdsByName(systems.values()) : new Map());
     });
     return () => {
       cancelled = true;
@@ -345,7 +346,8 @@ export function CommunityLibrary({
         </Select>
         {/* Sourcing a copy leaves the Library, so it sits apart at the row's end. */}
         <span className="flex items-center gap-1 sm:ml-auto">
-          <Link to={bpcSourcingCommunityHref()} className={buttonClassName({ size: 'sm' })}>
+          {/* `md`, level with the search and the Show select beside it (DESIGN.md §3). */}
+          <Link to={bpcSourcingCommunityHref()} className={buttonClassName()}>
             {t('communities.blueprints.browse')}
           </Link>
           <InfoTooltip

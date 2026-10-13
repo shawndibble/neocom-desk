@@ -26,12 +26,15 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 const JITA = 30000142;
 const EFA = 30003070;
+const systems = vi.hoisted(() => ({ readable: true }));
 vi.mock('@/sde/solarSystems', () => ({
   loadSolarSystemsById: async () =>
-    new Map([
-      [JITA, { id: JITA, name: 'Jita', security: 0.95, regionId: 1 }],
-      [EFA, { id: EFA, name: 'Efa', security: -0.2, regionId: 2 }],
-    ]),
+    systems.readable
+      ? new Map([
+          [JITA, { id: JITA, name: 'Jita', security: 0.95, regionId: 1 }],
+          [EFA, { id: EFA, name: 'Efa', security: -0.2, regionId: 2 }],
+        ])
+      : null,
 }));
 // Jita is 3 jumps out; Efa has no stargate route from here.
 const jumps = new Map([[JITA, 3]]);
@@ -120,6 +123,18 @@ describe('CommunityLibrary', () => {
       .getAllByRole('row')
       .find((row) => row.textContent?.includes('Efa VII'))!;
     expect(within(efa).getByText('—')).toBeInTheDocument();
+  });
+
+  it('shows a dash for every jumps cell when the system list cannot be read', async () => {
+    systems.readable = false;
+    try {
+      renderLibrary();
+      const table = await screen.findByRole('table', { name: l.sharedLabel });
+      expect(await within(table).findAllByText('—')).toHaveLength(2);
+      expect(within(table).queryByText('…')).not.toBeInTheDocument();
+    } finally {
+      systems.readable = true;
+    }
   });
 
   it('sorts by jumps, the unknown last either way', async () => {
