@@ -76,6 +76,7 @@ import {
   loadPublicBpcContracts,
   type PublicBpcContractsSnapshot,
 } from '@/features/bpcContracts/syncedContracts';
+import { bpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import {
   loadBlueprintLocation,
@@ -203,10 +204,7 @@ async function loadBpcContractsSnapshot(
   // Already superseded: skip the region-name fan-out, its result would be discarded.
   // Originals ride along (issue #1241): the Contract BPOs source and the BPO
   // badge name their region and station too.
-  const rows = [
-    ...(contractsResult?.data?.rows ?? []),
-    ...(contractsResult?.data?.originals ?? []),
-  ];
+  const rows = contractsResult?.data ? bpcOfferRows(contractsResult.data) : [];
   const regionIds = signal.cancelled ? [] : [...new Set(rows.map((r) => r.regionId))];
   const regionEntries = await Promise.all(
     regionIds.map(async (id): Promise<[number, string] | null> => {
