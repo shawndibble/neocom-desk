@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
+import { SkillPlanAdd } from '@/features/skills/SkillPlanAdd';
 import { SkillPriceSection } from '@/features/skills/SkillPriceSection';
 import { SkillRequirementsList } from '@/features/skills/SkillRequirementsList';
 import {
@@ -30,14 +31,20 @@ import { loadSkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
-import type { TrainedSkill } from '@/engine/types';
+import type { EngineSkill, TrainedSkill } from '@/engine/types';
 
 type ModalState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'not-found' }
-  | { status: 'ready'; data: SkillRequirements };
+  | {
+      status: 'ready';
+      data: SkillRequirements;
+      /** What the Add to Skill Plan needs: the plan's derived prereqs and the trained level. */
+      engineSkills: ReadonlyMap<number, EngineSkill>;
+      trainedSkills: ReadonlyMap<number, TrainedSkill>;
+    };
 
 const IDLE: ModalState = { status: 'idle' };
 
@@ -85,7 +92,16 @@ export function SkillDetailModal() {
           request.planEntries
         );
         if (cancelled) return;
-        setState(requirements ? { status: 'ready', data: requirements } : { status: 'not-found' });
+        setState(
+          requirements
+            ? {
+                status: 'ready',
+                data: requirements,
+                engineSkills: catalog.engineSkills,
+                trainedSkills,
+              }
+            : { status: 'not-found' }
+        );
       } catch {
         if (!cancelled) setState({ status: 'error' });
       }
@@ -146,6 +162,17 @@ export function SkillDetailModal() {
                 })}
               </p>
             </div>
+            {activeCharacterId !== null && (
+              <SkillPlanAdd
+                key={request.typeID}
+                characterId={activeCharacterId}
+                skillTypeID={request.typeID}
+                skillName={state.data.name}
+                currentLevel={state.trainedSkills.get(request.typeID)?.level ?? 0}
+                engineSkills={state.engineSkills}
+                trainedSkills={state.trainedSkills}
+              />
+            )}
             <SkillPriceSection typeID={request.typeID} npcPrice={state.data.npcPrice} />
             <SkillRequirementsList
               prereqs={state.data.prereqs}

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
+import type { EngineSkill, TrainedSkill } from '@/engine/types';
 import { SkillPlanAdd } from './SkillPlanAdd';
 
 const scheduleSyncMock = vi.fn();
@@ -18,13 +19,42 @@ vi.mock('@/app/syncStatus', async (importOriginal) => ({
 
 const CHAR_ID = 91;
 
+// Gunnery (3300) is a prerequisite of Small Hybrid Turret (3301) at level 4.
+const ENGINE_SKILLS: ReadonlyMap<number, EngineSkill> = new Map([
+  [
+    3300,
+    {
+      typeID: 3300,
+      name: 'Gunnery',
+      rank: 1,
+      primary: 'perception',
+      secondary: 'willpower',
+      prereqs: [],
+    },
+  ],
+  [
+    3301,
+    {
+      typeID: 3301,
+      name: 'Small Hybrid Turret',
+      rank: 1,
+      primary: 'perception',
+      secondary: 'willpower',
+      prereqs: [{ typeID: 3300, level: 4 }],
+    },
+  ],
+]);
+
 function renderAdd(currentLevel = 2) {
+  const trainedSkills = new Map<number, TrainedSkill>([[3300, { level: currentLevel, sp: 0 }]]);
   return render(
     <SkillPlanAdd
       characterId={CHAR_ID}
       skillTypeID={3300}
       skillName="Gunnery"
       currentLevel={currentLevel}
+      engineSkills={ENGINE_SKILLS}
+      trainedSkills={trainedSkills}
     />
   );
 }
@@ -53,7 +83,7 @@ describe('SkillPlanAdd', () => {
     const user = userEvent.setup();
     renderAdd(2);
 
-    await user.click(await screen.findByRole('button', { name: 'Add to Skill Plan' }));
+    await user.click(await screen.findByRole('button', { name: 'Add level 3 to Skill Plan' }));
     await waitFor(async () => {
       expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([
         { skillTypeID: 3300, targetLevel: 3 },
@@ -70,12 +100,12 @@ describe('SkillPlanAdd', () => {
     const user = userEvent.setup();
     renderAdd(2);
 
-    await user.click(await screen.findByRole('button', { name: 'Add to Skill Plan' }));
+    await user.click(await screen.findByRole('button', { name: 'Add level 3 to Skill Plan' }));
     const undo = await screen.findByRole('button', { name: 'Undo' });
     await waitFor(() => expect(undo).toHaveFocus());
 
     await user.click(undo);
-    const add = await screen.findByRole('button', { name: 'Add to Skill Plan' });
+    const add = await screen.findByRole('button', { name: 'Add level 3 to Skill Plan' });
     await waitFor(() => expect(add).toHaveFocus());
   });
 
@@ -86,7 +116,7 @@ describe('SkillPlanAdd', () => {
 
     await user.click(await screen.findByRole('combobox', { name: 'Adding to' }));
     await user.click(await screen.findByRole('option', { name: 'Mining' }));
-    await user.click(screen.getByRole('button', { name: 'Add to Skill Plan' }));
+    await user.click(screen.getByRole('button', { name: 'Add level 3 to Skill Plan' }));
     await waitFor(async () =>
       expect((await db.skillPlans.get('plan-2'))?.entries).toEqual([
         { skillTypeID: 3300, targetLevel: 3 },
@@ -105,11 +135,33 @@ describe('SkillPlanAdd', () => {
     });
   });
 
-  it('shows Planned instead of a button when the plan already covers the level', async () => {
+  it('offers the level after the one the plan already has', async () => {
     await db.skillPlans.add(plan('plan-1', 'PvP Fit', [{ skillTypeID: 3300, targetLevel: 3 }]));
+    const user = userEvent.setup();
+    renderAdd(2);
+
+    await user.click(await screen.findByRole('button', { name: 'Add level 4 to Skill Plan' }));
+    await waitFor(async () =>
+      expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([
+        { skillTypeID: 3300, targetLevel: 3 },
+        { skillTypeID: 3300, targetLevel: 4 },
+      ])
+    );
+  });
+
+  it('counts a level the plan trains as a prerequisite as planned', async () => {
+    await db.skillPlans.add(plan('plan-1', 'PvP Fit', [{ skillTypeID: 3301, targetLevel: 1 }]));
+    renderAdd(2);
+    expect(
+      await screen.findByRole('button', { name: 'Add level 5 to Skill Plan' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows Planned instead of a button when the plan already reaches level 5', async () => {
+    await db.skillPlans.add(plan('plan-1', 'PvP Fit', [{ skillTypeID: 3300, targetLevel: 5 }]));
     renderAdd(2);
     expect(await screen.findByText('Planned')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Add to Skill Plan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Skill Plan/ })).toBeNull();
   });
 
   it('says so at level 5 and offers nothing', async () => {

@@ -37,7 +37,7 @@ export interface SkillRequirements {
  * Spaceship Command III too). A plan that can't be scheduled counts its
  * entries alone — reporting the cycle is the Skill Plan editor's job.
  */
-function plannedLevels(
+export function plannedLevels(
   planEntries: readonly PlanEntry[],
   skills: ReadonlyMap<number, EngineSkill>,
   trainedSkills: ReadonlyMap<number, TrainedSkill>

@@ -128,6 +128,44 @@ describe('SkillDetailModal', () => {
     expect(within(dialog).getByText('Trained · Level 3')).toBeInTheDocument();
   });
 
+  it('adds the first level neither trained nor planned to the Skill Plan', async () => {
+    await db.skillPlans.clear();
+    await db.skillPlans.add({
+      id: 'plan-1',
+      characterId: CHAR_ID,
+      name: 'PvP Fit',
+      entries: [{ skillTypeID: 2, targetLevel: 2 }],
+      remapCount: 0,
+      updatedAt: 0,
+    });
+    useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
+    mockSkills(CHAR_ID, [{ skill_id: 2, trained_skill_level: 1 }]);
+    const user = userEvent.setup();
+
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(2));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(
+      await within(dialog).findByRole('button', { name: 'Add level 3 to Skill Plan' })
+    );
+    await vi.waitFor(async () =>
+      expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([
+        { skillTypeID: 2, targetLevel: 2 },
+        { skillTypeID: 2, targetLevel: 3 },
+      ])
+    );
+  });
+
+  it('offers no Add to Skill Plan without a character', async () => {
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(2));
+
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Frigate');
+    expect(within(dialog).queryByRole('button', { name: /Skill Plan/ })).not.toBeInTheDocument();
+  });
+
   it("leads with the skill's facts: group, rank and training attributes", async () => {
     renderModal();
     act(() => useSkillDetailModalStore.getState().open(2));

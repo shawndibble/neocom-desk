@@ -494,13 +494,16 @@ export function Skills() {
                   if (opener !== null) focusAfterCommit(() => rowButtons.current.get(opener));
                 }}
                 planAction={
-                  selectedSkill && (
+                  selectedSkill &&
+                  catalog && (
                     <SkillPlanAdd
                       key={selectedSkill.skillTypeID}
                       characterId={activeCharacterId}
                       skillTypeID={selectedSkill.skillTypeID}
                       skillName={selectedSkill.name}
                       currentLevel={selectedSkill.level}
+                      engineSkills={catalog.engineSkills}
+                      trainedSkills={trainedSkillsMap}
                     />
                   )
                 }
