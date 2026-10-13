@@ -8,7 +8,9 @@ import { bpcOfferRows, loadBpcOfferRows } from './bpcOfferRows';
 
 const row = (contractId: number): BpcContractRow => ({ contractId }) as BpcContractRow;
 
-beforeEach(() => loadPublicBpcContracts.mockReset());
+beforeEach(() => {
+  loadPublicBpcContracts.mockReset();
+});
 
 describe('bpcOfferRows', () => {
   it('lists copies, then originals', () => {
