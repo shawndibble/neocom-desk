@@ -44,6 +44,8 @@ interface ScanTableRow {
 /** Left edge shared by both charts so their time axes line up. */
 const Y_AXIS_WIDTH = 52;
 const COMPACT_Y_AXIS_WIDTH = 36;
+/** The Survey tab's volume chart height, px (Tailwind h-56). */
+const FULL_HEIGHT = 224;
 const MARGIN = { top: 16, right: 12, bottom: 0, left: 0 };
 /** Room a label needs, in px: "301.8K" and "1,116" at 10px. */
 const DELTA_LABEL_GAP = 46;
@@ -95,6 +97,7 @@ export function SurveyCharts({
   compactHeight?: number;
 }) {
   const { t } = useTranslation();
+  const compact = compactHeight !== undefined;
   const [plotWidth, setPlotWidth] = useState(0);
   // A little past the finish, so its marker and label sit inside the plot.
   const end = summary.etaAt ?? summary.lastAt;
@@ -256,14 +259,14 @@ export function SurveyCharts({
   }
 
   const plot = (
-    <div className="w-full" style={{ height: compactHeight ?? 224 }}>
+    <div className="w-full" style={{ height: compactHeight ?? FULL_HEIGHT }}>
       <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
         {/* Recharts stacks in the order the areas first registered, and a re-sort only moves them, so a new order remounts the chart. */}
         <ComposedChart key={summary.oreNames.join('|')} data={chartRows} margin={MARGIN}>
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
-          {xAxis(compactHeight === undefined)}
+          {xAxis(!compact)}
           <YAxis
-            width={compactHeight === undefined ? Y_AXIS_WIDTH : COMPACT_Y_AXIS_WIDTH}
+            width={compact ? COMPACT_Y_AXIS_WIDTH : Y_AXIS_WIDTH}
             tickFormatter={formatCompactNumber}
             stroke="var(--color-line-bright)"
             tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
@@ -290,11 +293,11 @@ export function SurveyCharts({
             dataKey="total"
             stroke="var(--color-text-dim)"
             strokeWidth={1}
-            dot={compactHeight === undefined ? nodeDot : false}
+            dot={compact ? false : nodeDot}
             isAnimationActive={false}
             legendType="none"
           >
-            {compactHeight === undefined && (
+            {!compact && (
               <LabelList
                 dataKey="totalLabel"
                 position="top"
@@ -337,7 +340,7 @@ export function SurveyCharts({
     </div>
   );
 
-  if (compactHeight !== undefined) return plot;
+  if (compact) return plot;
 
   return (
     <div className="space-y-1">

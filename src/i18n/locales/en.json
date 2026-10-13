@@ -3882,6 +3882,8 @@
           "secondary": "Done {{time}} EVE",
           "secondaryAt": "Done {{time}} EVE at {{place}}",
           "finished": "Mined out",
+          "overdue": "Due now",
+          "volume": "{{amount}} m³",
           "noEta": "no estimate yet"
         },
         "hauling": {

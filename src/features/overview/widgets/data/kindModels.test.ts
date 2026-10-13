@@ -684,14 +684,14 @@ describe('survey', () => {
     at,
     rocks: rocks.map(([ore, volume]) => ({ ore, volume })),
   });
-  // Mined 1,000 m³ of Veldspar and all the Arkonor in an hour: 1,000 m³ left, so one more hour.
+  // 1,500 m³ mined in the hour between the scans, 1,500 left: another hour from the last scan, 30 minutes ago.
   const summary = () =>
     summarizeSurvey([
-      scan(NOW - 2 * HOUR, [
+      scan(NOW - 1.5 * HOUR, [
         ['Arkonor', 500],
         ['Veldspar', 2500],
       ]),
-      scan(NOW - HOUR, [['Veldspar', 1500]]),
+      scan(NOW - HOUR / 2, [['Veldspar', 1500]]),
     ]);
   const data = (over: Partial<SurveyWidgetData> = {}): SurveyWidgetData => ({
     hasSurvey: true,
@@ -715,6 +715,12 @@ describe('survey', () => {
     expect(view.number.secondary?.text).toContain('Efa');
   });
 
+  it('says the field is due, not zero minutes, once its estimate has passed', () => {
+    const late = buildView('survey', { survey: ok(data()) }, ctx({ now: NOW + 5 * HOUR }));
+    expect(late.number.value).toBe('overview.widgets.data.survey.overdue');
+    expect(late.number.unit).toBeUndefined();
+  });
+
   it('drops the place from the finish line when the survey has none', () => {
     const view = buildView('survey', { survey: ok(data({ location: null })) }, ctx());
     expect(view.number.secondary?.text).toContain('overview.widgets.data.survey.secondary{');
@@ -722,7 +728,9 @@ describe('survey', () => {
 
   it('tables what is left of each ore and leaves out an ore that is finished', () => {
     const view = buildView('survey', { survey: ok(data()) }, ctx());
-    expect(view.table?.rows.map((r) => r.cells)).toEqual([['Veldspar', '1.5K m³']]);
+    expect(view.table?.rows.map((r) => r.cells)).toEqual([
+      ['Veldspar', expect.stringContaining('1.5K')],
+    ]);
   });
 
   it('draws the Survey tab volume chart once there are two scans', () => {

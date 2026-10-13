@@ -267,6 +267,7 @@ const survey: Builder = (feeds, { t, now }) => {
   };
   if (summary === null) return { ...base, number: NEUTRAL_NUMBER, rows: [], summary: note };
 
+  const volume = (m3: number) => t(`${D}.survey.volume`, { amount: formatCompactNumber(m3) });
   const finish = summary.etaAt === null ? null : formatEveClock(summary.etaAt);
   let number: NumberModel = {
     value: UNKNOWN,
@@ -276,9 +277,11 @@ const survey: Builder = (feeds, { t, now }) => {
   if (summary.finished) {
     number = { value: t(`${D}.survey.finished`), tone: 'clear' };
   } else if (summary.etaAt !== null && finish !== null) {
+    // Past its estimate with no scan to say so: the field is due, not confirmed gone.
+    const overdue = summary.etaAt <= now;
     number = {
-      value: formatDuration(Math.max(0, summary.etaAt - now) / 1000),
-      unit: t(`${D}.survey.unit`),
+      value: overdue ? t(`${D}.survey.overdue`) : formatDuration((summary.etaAt - now) / 1000),
+      unit: overdue ? undefined : t(`${D}.survey.unit`),
       secondary: {
         text:
           data.location === null
@@ -302,7 +305,7 @@ const survey: Builder = (feeds, { t, now }) => {
       ],
       rows: left.map((o) => ({
         key: o.ore,
-        cells: [o.ore, `${formatCompactNumber(o.volume)} m³`],
+        cells: [o.ore, volume(o.volume)],
       })),
     },
     summary: note,
@@ -315,7 +318,7 @@ const survey: Builder = (feeds, { t, now }) => {
             summary: t(`${C}.survey.summary`, {
               percent: summary.percent,
               left: formatCompactNumber(summary.leftVolume),
-              ores: left.map((o) => `${o.ore} ${formatCompactNumber(o.volume)} m³`).join(', '),
+              ores: left.map((o) => `${o.ore} ${volume(o.volume)}`).join(', '),
             }),
           }
         : undefined,
