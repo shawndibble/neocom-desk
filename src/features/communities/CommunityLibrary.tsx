@@ -322,7 +322,10 @@ export function CommunityLibrary({
           <SelectContent>
             {VIEWS.map((id) => (
               <SelectItem key={id} value={id}>
-                {`${t(`communities.library.${id}`)} · ${counts[id]}`}
+                {t('communities.library.viewOption', {
+                  label: t(`communities.library.${id}`),
+                  count: counts[id],
+                })}
               </SelectItem>
             ))}
           </SelectContent>

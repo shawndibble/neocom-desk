@@ -89,12 +89,11 @@ export function SlideOver({
         <DialogPrimitive.Content
           onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => {
-            // A Modal opened from inside the panel (Add, a confirm) owns this
-            // Escape and closes alone; Radix would otherwise close both.
-            const target = event.target;
-            if (target instanceof Element && target.closest('dialog[open]')) {
-              event.preventDefault();
-            }
+            // An open Modal (Add or a confirm opened from inside the panel)
+            // owns this Escape and closes alone; Radix would otherwise close
+            // both. Asked of the page, not the event target: focus may be on
+            // the body while the Modal is up.
+            if (document.querySelector('dialog[open]')) event.preventDefault();
           }}
           aria-describedby={undefined}
           tabIndex={-1}

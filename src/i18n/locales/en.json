@@ -7819,6 +7819,7 @@
     "library": {
       "legend": "BPO: shares the original. BPC: shares copies only. Stale Members are greyed.",
       "filterLabel": "Show blueprints",
+      "viewOption": "{{label}} · {{count}}",
       "shared": "Shared in the Community",
       "sharedLabel": "Shared blueprints",
       "columns": {

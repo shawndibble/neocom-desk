@@ -18,6 +18,7 @@ import {
 import { focusRingClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { CommunityDetail } from '@/features/communities/CommunityDetail';
+import { communityBadgeClassName } from '@/features/communities/communityBadge';
 import { communityInitials } from '@/features/communities/communityInitials';
 import {
   COMMUNITY_TABS,
@@ -211,9 +212,7 @@ export function Communities() {
                     </span>
                     {/* Only the exception is marked: every row is a Community the Character is a Member of. */}
                     {isCommunityAdmin(community, characterId) && (
-                      <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                        {t('communities.adminBadge')}
-                      </span>
+                      <span className={communityBadgeClassName}>{t('communities.adminBadge')}</span>
                     )}
                     <RowCaret />
                   </button>

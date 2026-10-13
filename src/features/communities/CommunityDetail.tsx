@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -37,8 +37,7 @@ import { ShareFittingsTab } from './ShareFittingsTab';
 import { ShareSkillPlansTab } from './ShareSkillPlansTab';
 import { ShareBlueprintsTab } from './ShareBlueprintsTab';
 import { SharingLine } from './SharingLine';
-import { loadBlueprintShare, loadFittingsAll } from './shareSelection';
-import { blueprintSharing, itemSharing, type SharingSummary } from './sharingSummary';
+import { useTabSharing } from './useTabSharing';
 import {
   deleteCommunity,
   isCommunityAdmin,
@@ -120,45 +119,11 @@ export function CommunityDetail({
   // Bumped as My sharing closes: the tab's list and its sharing line reread
   // what changed there, since the list stays on screen under the slide-out.
   const [contentKey, setContentKey] = useState(0);
-  const [blueprintSummary, setBlueprintSummary] = useState<SharingSummary | null>(null);
-  const [fittingsAll, setFittingsAll] = useState(false);
-  const [mineCounts, setMineCounts] = useState<Record<'fittings' | 'plans', number | null>>({
-    fittings: null,
-    plans: null,
-  });
-  // The blueprint choice and the Fittings switch live on this device: no read leaves it.
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      loadBlueprintShare(characterId, community.id),
-      loadFittingsAll(characterId, community.id),
-    ]).then(
-      ([share, all]) => {
-        if (cancelled) return;
-        setBlueprintSummary(blueprintSharing(share));
-        setFittingsAll(all !== null);
-      },
-      // The line then holds My sharing alone, as it does while loading.
-      () => {}
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, community.id, contentKey]);
-  const onFittingsMine = useCallback(
-    (count: number) => setMineCounts((prev) => ({ ...prev, fittings: count })),
-    []
+  const { sharing, onFittingsMine, onPlansMine } = useTabSharing(
+    characterId,
+    community.id,
+    contentKey
   );
-  const onPlansMine = useCallback(
-    (count: number) => setMineCounts((prev) => ({ ...prev, plans: count })),
-    []
-  );
-  const summaries: Record<ContentTab, SharingSummary | null> = {
-    blueprints: blueprintSummary,
-    fittings: itemSharing(fittingsAll, mineCounts.fittings),
-    // Skill plans are shared one at a time, never all at once.
-    plans: itemSharing(false, mineCounts.plans),
-  };
   const closeSharing = () => {
     setSharingOpen(false);
     setContentKey((n) => n + 1);
@@ -287,7 +252,12 @@ export function CommunityDetail({
             { id: 'blueprints', label: tabLabels.blueprints },
             { id: 'fittings', label: tabLabels.fittings },
             { id: 'plans', label: tabLabels.plans },
-            { id: 'members', label: t('communities.members'), count: community.memberCount },
+            {
+              id: 'members',
+              label: t('communities.members'),
+              // The roster once loaded, so the tab and the header card never disagree.
+              count: members?.length ?? community.memberCount,
+            },
           ]}
           value={tab}
           onChange={(id) => {
@@ -302,7 +272,11 @@ export function CommunityDetail({
         <TabPanel tabsId={tabsId} tabId={tab}>
           {isContentTab(tab) ? (
             <div className="space-y-3">
-              <SharingLine tab={tab} summary={summaries[tab]} onOpen={() => setSharingOpen(true)} />
+              <SharingLine
+                sharing={sharing[tab]}
+                open={sharingOpen}
+                onOpen={() => setSharingOpen(true)}
+              />
               <Panel key={contentKey}>{everyoneViews[tab]()}</Panel>
             </div>
           ) : (

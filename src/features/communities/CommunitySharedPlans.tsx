@@ -12,6 +12,7 @@ import { uidForCharacter } from '@/sync/uid';
 import type { CommunityMember } from './communityStore';
 import { loadCommunityPlans } from './sharedPlans';
 import { SharedPlanList, type SharedPlanRow } from './SharedPlanList';
+import { useReportMineCount } from './useTabSharing';
 
 type State =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; plans: SharedPlan[] };
@@ -41,11 +42,7 @@ export function CommunitySharedPlans({
   const copying = useRef(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const myUid = uidForCharacter(characterId);
-  const mine =
-    state.status === 'ready' ? state.plans.filter((plan) => plan.ownerUid === myUid).length : null;
-  useEffect(() => {
-    if (mine !== null) onMineCount?.(mine);
-  }, [mine, onMineCount]);
+  useReportMineCount(state.status === 'ready' ? state.plans : null, myUid, onMineCount);
 
   useEffect(() => {
     let cancelled = false;

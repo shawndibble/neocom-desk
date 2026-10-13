@@ -9,6 +9,7 @@ import { uidForCharacter } from '@/sync/uid';
 import type { CommunityMember } from './communityStore';
 import { ROW_LIMIT } from './shareLists';
 import { loadCommunityFittings } from './sharedFittings';
+import { useReportMineCount } from './useTabSharing';
 
 type State =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; fittings: SharedFitting[] };
@@ -36,13 +37,7 @@ export function CommunitySharedFittings({
   const [state, setState] = useState<State>({ status: 'loading' });
   const [query, setQuery] = useState('');
   const myUid = uidForCharacter(characterId);
-  const mine =
-    state.status === 'ready'
-      ? state.fittings.filter((fitting) => fitting.ownerUid === myUid).length
-      : null;
-  useEffect(() => {
-    if (mine !== null) onMineCount?.(mine);
-  }, [mine, onMineCount]);
+  useReportMineCount(state.status === 'ready' ? state.fittings : null, myUid, onMineCount);
 
   useEffect(() => {
     let cancelled = false;

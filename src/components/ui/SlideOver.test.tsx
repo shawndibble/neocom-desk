@@ -48,20 +48,24 @@ describe('SlideOver', () => {
 
   it('leaves an Escape to a Modal opened from inside it', async () => {
     const onClose = vi.fn();
-    render(
+    const panel = (modalOpen: boolean) => (
       <SlideOver open onClose={onClose} title="My sharing">
-        <Modal open onClose={() => {}} title="Add blueprints">
+        <Modal open={modalOpen} onClose={() => {}} title="Add blueprints">
           <button type="button">Inside</button>
         </Modal>
       </SlideOver>
     );
-    // Armed once an Escape outside any window closes the panel.
+    const { rerender } = render(panel(false));
+    // Armed once an Escape with no window up closes the panel.
     await waitFor(() => {
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(onClose).toHaveBeenCalled();
     });
     onClose.mockClear();
+    rerender(panel(true));
     fireEvent.keyDown(screen.getByRole('button', { name: 'Inside' }), { key: 'Escape' });
+    // Focus on the page itself while the Modal is up: still the Modal's Escape.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
   });
 });

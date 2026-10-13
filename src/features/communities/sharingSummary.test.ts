@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blueprintSharing, itemSharing } from './sharingSummary';
+import { blueprintSharing, fittingSharing, planSharing } from './sharingSummary';
 
 describe('blueprintSharing', () => {
   it('is all under share-all, whatever was stopped since', () => {
@@ -24,18 +24,26 @@ describe('blueprintSharing', () => {
   });
 });
 
-describe('itemSharing', () => {
+describe('fittingSharing', () => {
   it('is all while the share-all switch is on', () => {
-    expect(itemSharing(true, 4)).toEqual({ kind: 'all' });
-    expect(itemSharing(true, null)).toEqual({ kind: 'all' });
+    expect(fittingSharing(true, 4)).toEqual({ kind: 'all' });
+    expect(fittingSharing(true, null)).toEqual({ kind: 'all' });
   });
 
   it('is unknown until the shared list has loaded', () => {
-    expect(itemSharing(false, null)).toBeNull();
+    expect(fittingSharing(false, null)).toBeNull();
   });
 
   it('counts what this Character shares, none at zero', () => {
-    expect(itemSharing(false, 2)).toEqual({ kind: 'count', count: 2 });
-    expect(itemSharing(false, 0)).toEqual({ kind: 'none' });
+    expect(fittingSharing(false, 2)).toEqual({ kind: 'count', count: 2 });
+    expect(fittingSharing(false, 0)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('planSharing', () => {
+  it('counts the shared plans once the list has loaded', () => {
+    expect(planSharing(null)).toBeNull();
+    expect(planSharing(0)).toEqual({ kind: 'none' });
+    expect(planSharing(3)).toEqual({ kind: 'count', count: 3 });
   });
 });
