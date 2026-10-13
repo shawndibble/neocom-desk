@@ -11678,6 +11678,8 @@
       "label": "Markets",
       "market": "Market",
       "items": "Items",
+      "itemsAffix_one": "item",
+      "itemsAffix_other": "items",
       "out": "Out",
       "low": "Low",
       "ready": "Ready to list",

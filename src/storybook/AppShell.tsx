@@ -23,7 +23,7 @@ export interface AppShellParameters {
   routes?: () => FixtureRoute[];
   /** Scopes the sample Characters hold; defaults to the wallet's. Keep the reference stable (module-level). */
   scopes?: readonly string[];
-  /** Writes the page's own Dexie rows (settings, saved lists) after the sample account is seeded. */
+  /** Writes the page's own Dexie rows after the sample account is seeded. Keep the reference stable (module-level). */
   seed?: () => Promise<void>;
 }
 
@@ -74,6 +74,7 @@ async function seedSampleAccount(
     }))
   );
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: SAMPLE_ACTIVE_CHARACTER.characterId });
+  if (isCancelled()) return;
   await seed?.();
   if (isCancelled()) return;
   // `App`'s Root does this at boot; the shell stands in for it.

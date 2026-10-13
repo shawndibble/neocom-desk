@@ -26,9 +26,13 @@ import {
   IconButton,
   IskAmount,
   LiveStatus,
-  NativeSelect,
   Panel,
   SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   StatChip,
   StatChips,
@@ -70,6 +74,9 @@ type View = 'manager' | 'builder';
 type Dialog = 'rename' | 'change' | 'delete' | 'add' | 'paste' | null;
 /** The status chips plus one for items the hangar can restock. */
 type Filter = StockStatus | 'ready' | null;
+
+/** The group select's "no group" value: Radix Select items cannot hold an empty string. */
+const ALL_GROUPS = '__all__';
 
 export const STOCK_PATH = '/market/stock';
 /** The Stock tab's query param carrying a shared market's code. */
@@ -228,7 +235,9 @@ export function StockMarketPage({
   const groupNames = [
     ...new Set(rows.map((row) => groupOf(row.typeId)).filter((g): g is string => !!g)),
   ].sort((a, b) => a.localeCompare(b));
-  const inGroup = (typeId: number) => groupFilter === null || groupOf(typeId) === groupFilter;
+  // An edit can empty the picked group: the filter then lets go rather than hide every row.
+  const activeGroup = groupFilter !== null && groupNames.includes(groupFilter) ? groupFilter : null;
+  const inGroup = (typeId: number) => activeGroup === null || groupOf(typeId) === activeGroup;
   const matches = (row: (typeof rows)[number], f: Filter) =>
     f === null || (f === 'ready' ? row.fromHangar > 0 : row.status === f);
   const filteredRows = rows.filter((row) => matches(row, filter) && inGroup(row.typeId));
@@ -327,7 +336,7 @@ export function StockMarketPage({
         </DropdownMenu>
       </div>
 
-      {/* Out, Low and Ready to list are counted once, on the filter chips below. */}
+      {/* Manager counts Out, Low and Ready to list on its filter chips; Builder, with no chips, here. */}
       {summary && (
         <StatChips>
           <StatChip
@@ -340,6 +349,22 @@ export function StockMarketPage({
             tooltip={t('stockTargets.summary.toSourceHint', { hub: hub.name })}
             emphasis
           />
+          {view === 'builder' && (
+            <>
+              <StatChip
+                label={t('stockTargets.status.out')}
+                value={summary.out}
+                tone={summary.out > 0 ? 'danger' : 'default'}
+                emphasis
+              />
+              <StatChip
+                label={t('stockTargets.status.low')}
+                value={summary.low}
+                tone={summary.low > 0 ? 'warning' : 'default'}
+                emphasis
+              />
+            </>
+          )}
           {data?.oldestFetchedAt && <DataAgeBadge date={data.oldestFetchedAt} alwaysVisible />}
           {loading && <Spinner size="sm" label={t('common.loading')} />}
         </StatChips>
@@ -387,20 +412,26 @@ export function StockMarketPage({
           </div>
         )}
         {view === 'manager' && groupNames.length > 1 && (
-          <NativeSelect
-            size="sm"
-            aria-label={t('stockTargets.groupFilterLabel')}
-            className="ml-auto w-auto max-w-[50%] sm:max-w-64"
-            value={groupFilter ?? ''}
-            onChange={(e) => setGroupFilter(e.target.value || null)}
+          <Select
+            value={activeGroup ?? ALL_GROUPS}
+            onValueChange={(value) => setGroupFilter(value === ALL_GROUPS ? null : value)}
           >
-            <option value="">{t('stockTargets.groupAll')}</option>
-            {groupNames.map((group) => (
-              <option key={group} value={group}>
-                {group}
-              </option>
-            ))}
-          </NativeSelect>
+            <SelectTrigger
+              size="sm"
+              aria-label={t('stockTargets.groupFilterLabel')}
+              className="ml-auto max-w-[50%] min-w-0 sm:max-w-64"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_GROUPS}>{t('stockTargets.groupAll')}</SelectItem>
+              {groupNames.map((group) => (
+                <SelectItem key={group} value={group}>
+                  {group}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
       </div>
 

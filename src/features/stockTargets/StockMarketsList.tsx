@@ -116,8 +116,15 @@ export function StockMarketsList({
       headerCellClassName: 'sm:w-20',
       className: 'tabular-nums',
       // Leads the phone card's meta line, so a stocked market's card still says something.
-      stackAffix: { after: ` ${t('stockTargets.markets.items').toLowerCase()}` },
-      render: (market) => market.items.toLocaleString(),
+      render: (market) => (
+        <>
+          {market.items.toLocaleString()}
+          <span className="sm:hidden">
+            {' '}
+            {t('stockTargets.markets.itemsAffix', { count: market.items })}
+          </span>
+        </>
+      ),
       sortValue: (market) => market.items,
     },
     {

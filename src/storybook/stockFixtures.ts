@@ -60,7 +60,12 @@ const TAMA_LINES: Line[] = [
 ];
 
 const MARKETS: Array<{ id: string; name: string; locationId: number; lines: Line[] }> = [
-  { id: 'sample-dodixie', name: 'Dodixie home', locationId: DODIXIE, lines: DODIXIE_LINES },
+  {
+    id: 'sample-dodixie',
+    name: 'Dodixie Federation Navy hub restock',
+    locationId: DODIXIE,
+    lines: DODIXIE_LINES,
+  },
   { id: 'sample-hek', name: 'Hek seed', locationId: HEK, lines: HEK_LINES },
   { id: 'sample-tama', name: 'Tama staging', locationId: TAMA_FORT, lines: TAMA_LINES },
 ];
