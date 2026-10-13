@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PlanAdviceState } from './usePlanAdvice';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
+import { buildPlanView } from './planView';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
 import { P2_B, RAW, fixtureAdvice, fixturePi } from './planViewFixture';
 import type { PlanAdvice } from './planAdviceModel';
@@ -253,6 +254,8 @@ describe('MakeMorePlan', () => {
 
   it('says Change for a rebuild and Keep for a colony already on its best', () => {
     renderPlan();
+    expect(screen.queryByText(/Keep Uttindar II/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /1 planet with no rebuild/ }));
     const cards = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'));
     expect(cards).toHaveLength(2);
     expect(cards[0]).toHaveTextContent(/Change Hek VI \(Barren\) to make/);
@@ -260,7 +263,7 @@ describe('MakeMorePlan', () => {
     expect(cards[0]).toHaveTextContent(/Rebuild/);
     expect(cards[1]).toHaveTextContent(/Keep Uttindar II \(Barren\) on/);
     expect(cards[1]).toHaveTextContent(/already the best earner/);
-    expect(cards[1]).toHaveTextContent(/As-is/);
+    expect(cards[1]).not.toHaveTextContent(/As-is/);
   });
 
   it('never says Keep on raw ore: a raw-only colony points at the refinement when there is one', () => {
@@ -284,6 +287,7 @@ describe('MakeMorePlan', () => {
     const cardFor = (colony: typeof keeping) => {
       mockState = ready({ ...fixtureAdvice, colonies: [changing, colony] });
       const { unmount } = renderPlan();
+      fireEvent.click(screen.getByRole('button', { name: /1 planet with no rebuild/ }));
       const card = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'))[1];
       const text = card.textContent ?? '';
       unmount();
@@ -364,12 +368,52 @@ describe('MakeMorePlan', () => {
     await waitFor(() => expect(usePlanPreference.getState().value).toBe('haul'));
   });
 
-  it('draws one checklist column per changed colony, with its Command Center fit', () => {
+  it("opens a rebuild's in-game steps in its own row, with its Command Center fit", async () => {
+    const user = userEvent.setup();
     renderPlan();
-    const column = screen.getByRole('region', { name: '1. Hek VI' });
+    // Steps live in their rebuild row, not a panel of their own.
+    expect(screen.queryByRole('heading', { name: 'What to do in-game' })).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /^In-game steps for Hek VI/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const column = screen.getByRole('region', { name: 'In-game steps for Hek VI' });
+    expect(toggle.closest('li')).toContainElement(column);
     expect(within(column).getAllByRole('checkbox').length).toBeGreaterThan(0);
     expect(column).toHaveTextContent('Fits your Command Center (upgrade level 4)');
     expect(within(column).getAllByRole('progressbar')).toHaveLength(2);
+  });
+
+  it('counts ticked steps on the toggle', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+    const toggle = screen.getByRole('button', { name: /^In-game steps for Hek VI/ });
+    await user.click(toggle);
+    const region = screen.getByRole('region', { name: 'In-game steps for Hek VI' });
+    const boxes = within(region).getAllByRole('checkbox');
+    await user.click(boxes[0]);
+    await waitFor(() => expect(toggle).toHaveTextContent(`1 of ${boxes.length} done`));
+  });
+
+  it('keeps the steps open when the pilot unticks the last ticked one', async () => {
+    const user = userEvent.setup();
+    const steps = buildPlanView(withChains, fixturePi, (id) => `Planet ${id}`).checklist[0].steps;
+    await usePlanTicks.getState().setValue([steps[0].id]);
+    renderPlan();
+    const region = screen.getByRole('region', { name: 'In-game steps for Hek VI' });
+    await user.click(within(region).getAllByRole('checkbox')[0]);
+    await waitFor(() => expect(usePlanTicks.getState().value).toEqual([]));
+    expect(screen.getByRole('region', { name: 'In-game steps for Hek VI' })).toBeInTheDocument();
+  });
+
+  it('starts with the steps open once one of them is ticked', async () => {
+    const steps = buildPlanView(withChains, fixturePi, (id) => `Planet ${id}`).checklist[0].steps;
+    await usePlanTicks.getState().setValue([steps[0].id]);
+    renderPlan();
+    expect(screen.getByRole('button', { name: /^In-game steps for Hek VI/ })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
   });
 
   it.each([
@@ -385,7 +429,8 @@ describe('MakeMorePlan', () => {
       ),
     });
     renderPlan();
-    const column = screen.getByRole('region', { name: '1. Hek VI' });
+    fireEvent.click(screen.getByRole('button', { name: /^In-game steps for Hek VI/ }));
+    const column = screen.getByRole('region', { name: 'In-game steps for Hek VI' });
     expect(column).toHaveTextContent(text);
     expect(column).not.toHaveTextContent('piPlan.make.fitNeedsUpgrade');
   });

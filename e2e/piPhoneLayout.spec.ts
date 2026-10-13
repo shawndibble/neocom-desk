@@ -1,6 +1,6 @@
 /**
  * PI phone layout (#2696): the Plan "What matters more?" row, the header
- * strip's buyback picker, the Map's Planets column head and "Got it".
+ * strip's buyback picker and the Map's Planets column head.
  * Bounding boxes, not screenshots, since only a real layout engine can tell
  * overlap. `PI_SHOTS=<dir>` also writes screenshots for the side by side with
  * `docs/design/pi-tabs/ref/`.
@@ -33,12 +33,10 @@ async function box(locator: Locator) {
 }
 
 test.describe('PI phone layout', () => {
-  test('Plan: "What matters more?" sits below the "Your planets" heading, not on it', async ({
-    page,
-  }) => {
+  test('Plan: "What matters more?" sits below the summary heading, not on it', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await open(page, 'plan');
-    const heading = page.getByRole('heading', { name: 'Your planets' });
+    const heading = page.getByRole('heading', { name: 'What you could add' });
     await expect(heading).toBeVisible({ timeout: 20_000 });
     const toggle = page.getByRole('group', { name: 'What matters more?' });
     const h = await box(heading);
@@ -64,9 +62,7 @@ test.describe('PI phone layout', () => {
     ['phone', PHONE],
     ['desktop', DESKTOP],
   ] as const) {
-    test(`Map ${label}: the Planets "?" clears the next column, "Got it" is one line`, async ({
-      page,
-    }) => {
+    test(`Map ${label}: the Planets "?" clears the next column`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await open(page, 'map');
       if (label === 'phone') {
@@ -87,14 +83,6 @@ test.describe('PI phone layout', () => {
       expect(i.x + i.width).toBeLessThanOrEqual(r.x);
       expect(p.x + p.width).toBeLessThanOrEqual(r.x);
 
-      const gotIt = page.getByRole('button', { name: 'Got it' });
-      // One line: the label's own text box is no taller than a line of it.
-      const wrapped = await gotIt.evaluate((el) => {
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        return range.getClientRects().length > 1;
-      });
-      expect(wrapped).toBe(false);
       await shot(page, `map-${label}`);
     });
   }

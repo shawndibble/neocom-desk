@@ -64,7 +64,6 @@ describe('buildPlanView', () => {
   it('builds a checklist column per changed colony, steps keyed by recommendation', () => {
     expect(view.checklist).toHaveLength(1);
     const column = view.checklist[0];
-    expect(column.index).toBe(1);
     expect(column.steps.map((s) => s.verb)).toEqual(['remove', 'set', 'route']);
     expect(column.steps[1].id).toBe(`1:${P2_A}:1:set`);
     expect(column.steps[1].count).toBe(1);

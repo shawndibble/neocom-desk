@@ -14,7 +14,6 @@ function renderPanel(pricesFailed: boolean) {
         nowMs={0}
         nameOf={() => 'x'}
         characterNameOf={() => 'y'}
-        activeCharacterId={1}
         todayPerDay={null}
         pricesFailed={pricesFailed}
         fixCount={0}
@@ -67,7 +66,6 @@ describe('TodayPanel login list initials chip', () => {
           nowMs={0}
           nameOf={() => 'Planet'}
           characterNameOf={(id) => names[id]}
-          activeCharacterId={1}
           todayPerDay={null}
           pricesFailed={false}
           fixCount={0}

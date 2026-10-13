@@ -71,35 +71,6 @@ function Meter({
   );
 }
 
-function LoadLine({ label, fraction }: { label: string; fraction: number | null }) {
-  const { t } = useTranslation();
-  const percent = fraction === null ? null : Math.round(fraction * 100);
-  return (
-    <div className="flex items-center gap-2 text-[0.6875rem]">
-      <span className="w-12 shrink-0 font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </span>
-      <div
-        role="meter"
-        aria-label={t('piColonies.loadMeter', { axis: label })}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent ?? undefined}
-        aria-valuetext={percent === null ? t('piColonies.unknown') : `${percent}%`}
-        className="min-w-0 flex-1"
-      >
-        <Meter
-          fraction={fraction}
-          tone={fraction !== null && fraction >= 0.9 ? 'warning' : 'accent'}
-        />
-      </div>
-      <span className="w-8 shrink-0 text-right text-text-dim tabular-nums">
-        {percent === null ? '—' : `${percent}%`}
-      </span>
-    </div>
-  );
-}
-
 /** A translated line whose `<isk/>` slot is an `IskAmount` (shorthand, exact on hover/focus/screen reader). */
 function iskTrans(
   t: TFunction,
@@ -285,6 +256,56 @@ function FaultTags({ tags, planetName }: { tags: readonly FaultTag[]; planetName
   );
 }
 
+/**
+ * The row grid from `lg`: colony, extractors, storage, next step, ⋮. The ⋮
+ * column has a fixed width so `ColonyListHeader`'s labels sit over the cells.
+ */
+const ROW_GRID =
+  'lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)_12rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
+
+/**
+ * A column's label and help. In a row (`inRow`) the list header shows both from `lg`,
+ * so the row keeps the label for screen readers only; below `lg` the row shows both.
+ */
+function ColumnLabel({
+  label,
+  help,
+  inRow = false,
+}: {
+  label: string;
+  help: string;
+  inRow?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <span className={`flex items-center gap-1 ${MICRO}`}>
+      <span className={inRow ? 'lg:sr-only' : undefined}>{label}</span>
+      <span className={inRow ? 'lg:hidden' : undefined}>
+        <InfoTooltip label={t('common.aboutLabel', { label })} content={help} />
+      </span>
+    </span>
+  );
+}
+
+/** Column labels, once above the rows from `lg`; a narrower row is a stacked card that labels its own cells. */
+export function ColonyListHeader({ haulHours }: { haulHours: number }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className={`grid gap-x-4 border-b border-line px-3 py-1.5 max-lg:hidden ${ROW_GRID} ${MICRO}`}
+    >
+      <span className="pl-24">{t('piColonies.colonyColumn')}</span>
+      <ColumnLabel label={t('piColonies.extractors')} help={t('piColonies.help.extractors')} />
+      <ColumnLabel
+        label={t('piColonies.storageFull')}
+        help={t('piColonies.help.storage', { hours: Math.round(haulHours) })}
+      />
+      <span className="text-center">{t('piColonies.actionColumn')}</span>
+      <span />
+    </div>
+  );
+}
+
 export interface ColonyRowViewProps {
   row: ColonyCheckRow;
   planet: CharacterPlanet;
@@ -373,11 +394,9 @@ export function ColonyRowView(props: ColonyRowViewProps) {
         ? t('piColonies.stalls', { span: hoursLabel(storage.stallHours) })
         : t('piColonies.afterHaul', { haul: props.haulLabel });
   const storageFraction =
-    storage.hoursToFull === null
-      ? null
-      : storage.fillsBeforeHaul
-        ? Math.max(0, storage.hoursToFull) / storage.haulHours
-        : 1;
+    storage.fillsBeforeHaul && storage.hoursToFull !== null
+      ? Math.max(0, storage.hoursToFull) / storage.haulHours
+      : null;
 
   const { label, labelGain, note } = actionText(action, t);
   const variant =
@@ -444,12 +463,11 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               return;
             props.onToggle();
           }}
-          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-start min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] min-[90rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_15rem_auto]"
+          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 lg:items-start ${ROW_GRID}`}
         >
           {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
-            {/* Below 82rem the six columns cannot fit: name, action and menu share row 1, the three meters row 2. */}
-            <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11 md:col-span-2 md:row-start-1 min-[82rem]:col-span-1 min-[82rem]:row-auto">
+            <div className="flex min-w-0 items-start gap-2.5 max-lg:pr-11">
               <button
                 type="button"
                 id={buttonId}
@@ -467,9 +485,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                   <SystemLink systemId={row.systemId}>{planetName}</SystemLink>
                   {/* A stopped colony's red bar, time and Restart button say so; the word stays for screen readers only. */}
                   <span className={stopped ? 'sr-only' : 'text-xs font-normal'}>
-                    <span className="mr-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('piColonies.statusLabel')}
-                    </span>
+                    <span className="sr-only">{t('piColonies.statusLabel')} </span>
                     <StatusWord status={row.status} />
                   </span>
                 </h3>
@@ -502,50 +518,48 @@ export function ColonyRowView(props: ColonyRowViewProps) {
             </div>
 
             <div className="min-w-0 space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className={`flex items-center gap-1 ${MICRO}`}>
-                  {t('piColonies.extractors')}
-                  <InfoTooltip
-                    label={t('common.aboutLabel', { label: t('piColonies.extractors') })}
-                    content={t('piColonies.help.extractors')}
-                  />
-                </span>
+              <div className="flex items-center justify-between gap-2 lg:justify-start lg:gap-0">
+                <ColumnLabel
+                  inRow
+                  label={t('piColonies.extractors')}
+                  help={t('piColonies.help.extractors')}
+                />
                 <span
                   className={`text-xs font-semibold tabular-nums ${stopped ? 'text-danger' : row.status === 'expiring' ? 'text-warning' : 'text-text'}`}
                 >
                   {extractorRight}
                 </span>
               </div>
-              <Meter fraction={stopped ? 1 : extractor.remainingFraction} tone={extractorTone} />
+              {/* No extractors, no bar: an empty track would read as "empty". */}
+              {extractor.expiryMs !== null && (
+                <Meter fraction={stopped ? 1 : extractor.remainingFraction} tone={extractorTone} />
+              )}
               {extractorNote && <p className="text-[0.6875rem] text-text-dim">{extractorNote}</p>}
             </div>
 
             <div className="min-w-0 space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className={`flex items-center gap-1 ${MICRO}`}>
-                  {t('piColonies.storageFull')}
-                  <InfoTooltip
-                    label={t('common.aboutLabel', { label: t('piColonies.storageFull') })}
-                    content={t('piColonies.help.storage', { hours: Math.round(storage.haulHours) })}
-                  />
-                </span>
+              <div className="flex items-center justify-between gap-2 lg:justify-start lg:gap-0">
+                <ColumnLabel
+                  inRow
+                  label={t('piColonies.storageFull')}
+                  help={t('piColonies.help.storage', { hours: Math.round(storage.haulHours) })}
+                />
                 <span
                   className={`text-xs font-semibold tabular-nums ${storage.fillsBeforeHaul ? (storage.hoursToFull !== null && storage.hoursToFull < 24 ? 'text-danger' : 'text-warning') : 'text-text'}`}
                 >
                   {storageRight}
                 </span>
               </div>
-              <Meter
-                fraction={storageFraction}
-                tone={
-                  storage.fillsBeforeHaul
-                    ? storage.hoursToFull !== null && storage.hoursToFull < 24
-                      ? 'danger'
-                      : 'warning'
-                    : 'success'
-                }
-                rest="stall"
-              />
+              {/* Bar only when storage fills before the haul: a full "fine" bar looks full, an unknown one empty. */}
+              {storageFraction !== null && (
+                <Meter
+                  fraction={storageFraction}
+                  tone={
+                    storage.hoursToFull !== null && storage.hoursToFull < 24 ? 'danger' : 'warning'
+                  }
+                  rest="stall"
+                />
+              )}
               <p
                 className={`text-[0.6875rem] ${storage.fillsBeforeHaul ? 'text-warning' : 'text-text-dim'}`}
               >
@@ -553,28 +567,17 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               </p>
             </div>
 
-            <div className="min-w-0 space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className={MICRO}>{t('piColonies.load')}</span>
-                <span className="text-[0.6875rem] text-text-dim">
-                  {t('piColonies.ccLevel', { level: row.load.ccLevel })}
-                </span>
-              </div>
-              <LoadLine label={t('piColonies.cpu')} fraction={row.load.cpu} />
-              <LoadLine label={t('piColonies.power')} fraction={row.load.power} />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-1 md:col-start-3 md:row-start-1 md:items-stretch min-[82rem]:col-auto min-[82rem]:row-auto">
+            <div className="flex min-w-0 flex-col gap-1 lg:items-stretch">
               {actionWithExact}
               <p className="text-center text-[0.6875rem] text-text-dim">{note}</p>
             </div>
 
-            <div className="flex justify-end max-md:absolute max-md:top-1 max-md:right-1 md:col-start-4 md:row-start-1 md:items-start min-[82rem]:col-auto min-[82rem]:row-auto">
+            <div className="flex justify-end max-lg:absolute max-lg:top-1 max-lg:right-1 lg:items-start">
               <RowMoreActions />
             </div>
 
             {row.tags.length > 0 && (
-              <div className="md:col-span-4 md:col-start-1 md:pl-[4.6rem] min-[82rem]:col-span-6">
+              <div className="lg:col-span-full lg:pl-[4.6rem]">
                 <FaultTags tags={row.tags} planetName={planetName} />
               </div>
             )}

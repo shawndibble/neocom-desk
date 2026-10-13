@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Caret,
   Checkbox,
+  Disclosure,
   IskAmount,
   Panel,
   SegmentedControl,
@@ -104,30 +105,28 @@ function Hero({ value, caption }: { value: number; caption: ReactNode }) {
   );
 }
 
-export function YourPlanetsPanel({
+/**
+ * The plan in one glance: what the quick wins and a rebuild would add, the
+ * before/after figures, and the "What matters more?" switch that reshapes the
+ * rebuilds.
+ */
+export function PlanSummaryPanel({
   view,
   preference,
   onPreference,
-  onFindBest,
   priceSource,
-  haulBetween,
-  onHaulBetween,
 }: {
   view: PlanView;
   preference: RebuildPreference;
   onPreference: (value: RebuildPreference) => void;
-  onFindBest: () => void;
   priceSource: string;
-  haulBetween: boolean;
-  onHaulBetween: (on: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const haulHintId = useId();
   const mdUp = useMediaQuery(MD_UP);
   const smUp = useMediaQuery(SM_UP);
   const { headline, stats } = view;
-  // Beside the title from `sm`; on its own row under it below, where the
-  // header has no room and the label printed over the "Your planets" title.
+  // Beside the title from `sm`; own row below that, where the header has no room
+  // and the label would overlap the title.
   const mattersToggle = (
     <span className="flex flex-wrap items-center justify-end gap-2">
       <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -147,21 +146,13 @@ export function YourPlanetsPanel({
   );
   return (
     <Panel
-      title={t('piPlan.make.planetsTitle')}
-      meta={
-        <span className="text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
-          {t('piPlan.make.planetsCount', {
-            used: view.slots.used,
-            allowed: Math.max(view.slots.allowed, view.slots.used),
-          })}
-        </span>
-      }
+      title={t('piPlan.make.summaryTitle')}
       actions={smUp ? mattersToggle : undefined}
       padded={false}
     >
-      <div className="space-y-3 p-3">
+      <div className="space-y-2 p-3">
         {!smUp && <div data-testid="pi-matters-row">{mattersToggle}</div>}
-        <div className="flex flex-wrap gap-x-8 gap-y-3">
+        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
           {headline.quickWinPerDay > 0 || view.quickWins.length > 0 ? (
             <Hero
               value={headline.quickWinPerDay}
@@ -178,9 +169,8 @@ export function YourPlanetsPanel({
                 { count: headline.rebuildCount }
               )}
             />
-          ) : (
-            <p className="text-sm text-text-dim">{t('piPlan.make.noRebuild')}</p>
-          )}
+          ) : null}
+          {/* With no rebuild, the Rebuild panel says so. */}
         </div>
         <StatChips>
           <StatChip
@@ -218,25 +208,42 @@ export function YourPlanetsPanel({
         <p className="text-[0.6875rem] text-text-dim">
           {t('piPlan.make.basis', { source: priceSource })}
         </p>
-        <label className={cx('flex w-fit cursor-pointer items-start gap-2', tappableRowClassName)}>
-          <Checkbox
-            className="mt-0.5"
-            checked={haulBetween}
-            aria-labelledby={`${haulHintId}-label`}
-            aria-describedby={haulHintId}
-            onChange={(e) => onHaulBetween(e.target.checked)}
-          />
-          <span className="text-xs">
-            <span id={`${haulHintId}-label`} className="text-text">
-              {t('piPlan.chains.optIn')}
-            </span>
-            <span id={haulHintId} className="block text-[0.6875rem] text-text-dim">
-              {t('piPlan.chains.optInHint')}
-            </span>
-          </span>
-        </label>
       </div>
-      <ul className="grid grid-cols-2 border-t border-line md:grid-cols-3 xl:grid-cols-6">
+    </Panel>
+  );
+}
+
+/**
+ * Each colony at a glance, the "haul between my planets" opt-in and the free
+ * planet slots. Below the rebuilds: it is context, not the to-do.
+ */
+export function YourPlanetsPanel({
+  view,
+  onFindBest,
+  haulBetween,
+  onHaulBetween,
+}: {
+  view: PlanView;
+  onFindBest: () => void;
+  haulBetween: boolean;
+  onHaulBetween: (on: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const haulHintId = useId();
+  return (
+    <Panel
+      title={t('piPlan.make.planetsTitle')}
+      meta={
+        <span className="text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
+          {t('piPlan.make.planetsCount', {
+            used: view.slots.used,
+            allowed: Math.max(view.slots.allowed, view.slots.used),
+          })}
+        </span>
+      }
+      padded={false}
+    >
+      <ul className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {view.strips.map((strip) => (
           <li
             key={strip.planetId}
@@ -285,6 +292,25 @@ export function YourPlanetsPanel({
           })}
         </p>
       )}
+      <div className="p-3">
+        <label className={cx('flex w-fit cursor-pointer items-start gap-2', tappableRowClassName)}>
+          <Checkbox
+            className="mt-0.5"
+            checked={haulBetween}
+            aria-labelledby={`${haulHintId}-label`}
+            aria-describedby={haulHintId}
+            onChange={(e) => onHaulBetween(e.target.checked)}
+          />
+          <span className="text-xs">
+            <span id={`${haulHintId}-label`} className="text-text">
+              {t('piPlan.chains.optIn')}
+            </span>
+            <span id={haulHintId} className="block text-[0.6875rem] text-text-dim">
+              {t('piPlan.chains.optInHint')}
+            </span>
+          </span>
+        </label>
+      </div>
       <SlotNudge slots={view.slots} onFindBest={onFindBest} />
     </Panel>
   );
@@ -619,51 +645,121 @@ function formatTimes(ratio: number): string {
   return ratio >= 10 ? String(Math.round(ratio)) : (Math.round(ratio * 10) / 10).toString();
 }
 
+/** A caret text action that opens a block in place, below its row. */
+function InlineToggle({
+  expanded,
+  controls,
+  onToggle,
+  children,
+}: {
+  expanded: boolean;
+  controls: string;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      aria-controls={controls}
+      onClick={onToggle}
+      className={textActionClassName('gap-1 whitespace-nowrap')}
+    >
+      <Caret expanded={expanded} />
+      {children}
+    </button>
+  );
+}
+
 function RebuildCard({
   card,
   haulDays,
-  upgradeFrom,
+  steps,
+  ticks,
 }: {
   card: RebuildCardView;
   haulDays: number;
-  upgradeFrom: number | null;
+  /** The in-game steps for a change; null for a colony that keeps its setup. */
+  steps: ChecklistColumn | null;
+  ticks: Ticks;
 }) {
+  const isChange = card.status === 'change';
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const altId = useId();
+  const stepsId = useId();
   const nowItem = card.sells[0];
+  const doneCount = steps ? steps.steps.filter((step) => ticks.has(step.id)).length : 0;
+  // Opens once a step is ticked (ticks may load late) and stays open: unticking the last
+  // one must not fold the list under the pilot. The pilot's own toggle wins.
+  const [stepsChoice, setStepsChoice] = useState<boolean | null>(null);
+  const [autoOpened, setAutoOpened] = useState(doneCount > 0);
+  if (doneCount > 0 && !autoOpened) setAutoOpened(true);
+  const stepsOpen = stepsChoice ?? autoOpened;
   return (
     <li id={card.anchor} tabIndex={-1} className="scroll-mt-4 px-3 py-3 outline-none">
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <PlanetImage type={card.planetType} size={44} />
         <div className="min-w-0 flex-1">
           <p className="text-sm text-text">
-            <RebuildSentence card={card} haulDays={haulDays} upgradeFrom={upgradeFrom} />
+            <RebuildSentence
+              card={card}
+              haulDays={haulDays}
+              upgradeFrom={steps?.fit?.upgradeFromLevel ?? null}
+            />
           </p>
-          {card.alternative && (
-            <>
-              <button
-                type="button"
-                aria-expanded={open}
-                aria-controls={altId}
-                onClick={() => setOpen(!open)}
-                className={textActionClassName('mt-1 gap-1 whitespace-nowrap')}
-              >
-                <Caret expanded={open} />
-                {t('piPlan.make.alternative', { count: 1 })}
-              </button>
-              {open && (
-                <div id={altId} className="mt-1.5">
-                  <AlternativeBody alt={card.alternative} />
-                </div>
+          {(steps || card.alternative) && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {steps && (
+                <InlineToggle
+                  expanded={stepsOpen}
+                  controls={stepsId}
+                  onToggle={() => setStepsChoice(!stepsOpen)}
+                >
+                  {t('piPlan.make.steps.toggle')}{' '}
+                  <span className="sr-only">
+                    {t('piPlan.make.steps.forName', { name: steps.name })}
+                  </span>{' '}
+                  <span className="font-normal tracking-normal text-text-dim normal-case">
+                    {'· '}
+                    {t('piPlan.make.steps.count', { count: steps.steps.length })}
+                    {' · '}
+                    {t('piPlan.make.minutes', { count: steps.minutes })}
+                    {doneCount > 0 && (
+                      <span className="text-success">
+                        {' · '}
+                        {t('piPlan.make.steps.done', {
+                          done: doneCount,
+                          count: steps.steps.length,
+                        })}
+                      </span>
+                    )}
+                  </span>
+                </InlineToggle>
               )}
-            </>
+              {steps && card.alternative && (
+                <span aria-hidden="true" className="text-text-dim">
+                  ·
+                </span>
+              )}
+              {card.alternative && (
+                <InlineToggle expanded={open} controls={altId} onToggle={() => setOpen(!open)}>
+                  {t('piPlan.make.alternative', { count: 1 })}
+                </InlineToggle>
+              )}
+            </div>
           )}
+          {card.alternative && open && (
+            <div id={altId} className="mt-1.5">
+              <AlternativeBody alt={card.alternative} />
+            </div>
+          )}
+          {steps && stepsOpen && <RebuildSteps id={stepsId} column={steps} ticks={ticks} />}
         </div>
         {(card.status !== 'unknown' || card.toPerDay !== null) && (
           <div className="flex shrink-0 items-center gap-3 max-sm:order-last max-sm:basis-full max-sm:pl-14">
             <span className="flex items-center gap-1.5 text-xs text-text-dim tabular-nums">
-              {card.status === 'change' && card.fromPerDay !== null && (
+              {isChange && card.fromPerDay !== null && (
                 <>
                   {nowItem && <TypeIcon typeId={nowItem.typeId} size={32} width={20} height={20} />}
                   <IskAmount value={card.fromPerDay} decimals={0} />
@@ -673,7 +769,7 @@ function RebuildCard({
                   )}
                 </>
               )}
-              {card.status !== 'change' && nowItem && (
+              {!isChange && nowItem && (
                 <TypeIcon typeId={nowItem.typeId} size={32} width={20} height={20} />
               )}
               {card.toPerDay !== null && (
@@ -685,10 +781,8 @@ function RebuildCard({
                 </span>
               )}
             </span>
-            <VerbTag
-              verb={card.status === 'change' ? 'rebuild' : 'asIs'}
-              label={t(card.status === 'change' ? 'piPlan.make.tagRebuild' : 'piPlan.make.tagAsIs')}
-            />
+            {/* A kept colony sits under its own fold: an As-is tag would repeat it. */}
+            {isChange && <VerbTag verb="rebuild" label={t('piPlan.make.tagRebuild')} />}
           </div>
         )}
       </div>
@@ -696,10 +790,39 @@ function RebuildCard({
   );
 }
 
-export function RebuildPanel({ view }: { view: PlanView }) {
+/**
+ * The rebuilds. Changes stay in view; kept or unmeasured colonies fold under one
+ * disclosure, so nothing-to-change is one line, not a card per planet.
+ */
+export function RebuildPanel({
+  view,
+  ticks,
+  reveal,
+}: {
+  view: PlanView;
+  ticks: Ticks;
+  /** The card a `#plan-<anchor>` link points at, and that navigation's key. */
+  reveal: { anchor: string | null; navKey: string };
+}) {
   const { t } = useTranslation();
-  const upgradeFrom = new Map(
-    view.checklist.map((column) => [column.planetId, column.fit?.upgradeFromLevel ?? null])
+  const stepsFor = new Map(view.checklist.map((column) => [column.planetId, column]));
+  const changed = view.rebuilds.filter((card) => card.status === 'change');
+  const kept = view.rebuilds.filter((card) => card.status !== 'change');
+  // A link to a folded card opens the fold in the same render, so the card exists when
+  // the page scrolls to it; following the link again reopens it. A toggle made since wins.
+  const [choice, setChoice] = useState<{ open: boolean; navKey: string } | null>(null);
+  const linkedIntoKept =
+    reveal.anchor !== null && kept.some((card) => card.anchor === reveal.anchor);
+  const open =
+    choice?.navKey === reveal.navKey ? choice.open : linkedIntoKept || (choice?.open ?? false);
+  const renderCard = (c: RebuildCardView) => (
+    <RebuildCard
+      key={c.planetId}
+      card={c}
+      haulDays={view.hauling.haulDays}
+      steps={stepsFor.get(c.planetId) ?? null}
+      ticks={ticks}
+    />
   );
   return (
     <Panel
@@ -716,16 +839,21 @@ export function RebuildPanel({ view }: { view: PlanView }) {
       }
       padded={false}
     >
-      <ul className="divide-y divide-line">
-        {view.rebuilds.map((card) => (
-          <RebuildCard
-            key={card.planetId}
-            card={card}
-            haulDays={view.hauling.haulDays}
-            upgradeFrom={upgradeFrom.get(card.planetId) ?? null}
-          />
-        ))}
-      </ul>
+      {changed.length > 0 ? (
+        <ul className="divide-y divide-line">{changed.map(renderCard)}</ul>
+      ) : (
+        <p className="px-3 py-2.5 text-sm text-text-dim">{t('piPlan.make.noRebuild')}</p>
+      )}
+      {kept.length > 0 && (
+        <Disclosure
+          className="border-t border-line"
+          label={t('piPlan.make.keptGroup', { count: kept.length })}
+          expanded={open}
+          onToggle={() => setChoice({ open: !open, navKey: reveal.navKey })}
+        >
+          <ul className="divide-y divide-line">{kept.map(renderCard)}</ul>
+        </Disclosure>
+      )}
     </Panel>
   );
 }
@@ -824,7 +952,7 @@ export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName:
   );
 }
 
-// --- What to do in-game --------------------------------------------------------------
+// --- In-game steps --------------------------------------------------------------------
 
 const PIN_KEY: Record<PiPinKind, string> = {
   extractorControlUnit: 'extractor',
@@ -912,33 +1040,28 @@ function StepVerb({ verb }: { verb: ChecklistStep['verb'] }) {
   return <VerbTag verb={STEP_TAG[verb]} label={t(`piPlan.make.verb.${verb}`)} />;
 }
 
-function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks: Ticks }) {
+/**
+ * A rebuild's in-game steps, opened in its own row: the row already names the
+ * planet and the change, so the steps carry no header of their own.
+ */
+function RebuildSteps({
+  id,
+  column,
+  ticks,
+}: {
+  id: string;
+  column: ChecklistColumn;
+  ticks: Ticks;
+}) {
   const { t } = useTranslation();
   const baseId = useId();
   const { fit } = column;
   return (
     <section
-      aria-label={t('piPlan.make.columnLabel', { index: column.index, name: column.name })}
-      className="flex min-w-0 flex-col border-line md:border-r md:last:border-r-0"
+      id={id}
+      aria-label={t('piPlan.make.steps.region', { name: column.name })}
+      className="mt-2 bg-panel-2"
     >
-      <header className="flex items-center gap-3 border-b border-line px-3 py-2.5">
-        <PlanetImage type={column.planetType} size={36} />
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-xs font-semibold text-text">
-            {column.index}. {column.name}
-          </h3>
-          <p className="truncate text-[0.6875rem] text-text-dim">
-            {column.change.from.length > 0 && (
-              <>
-                <ItemList items={column.change.from} />
-                {' → '}
-              </>
-            )}
-            <ItemLink item={column.change.to} />
-          </p>
-        </div>
-        <Minutes value={column.minutes} />
-      </header>
       <ul className="divide-y divide-line">
         {column.steps.map((step) => {
           const ticked = ticks.has(step.id);
@@ -973,7 +1096,7 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
         })}
       </ul>
       {fit && (
-        <div className="mt-auto space-y-1 px-3 py-3">
+        <div className="grid gap-x-6 gap-y-1 border-t border-line px-3 py-2 sm:grid-cols-[auto_minmax(0,14rem)_minmax(0,14rem)] sm:items-center">
           <p
             className={cx(
               'text-[0.6875rem]',
@@ -993,25 +1116,5 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
         </div>
       )}
     </section>
-  );
-}
-
-export function ChecklistPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) {
-  const { t } = useTranslation();
-  if (view.checklist.length === 0) return null;
-  return (
-    <Panel
-      title={t('piPlan.make.checklistTitle')}
-      meta={
-        <span className="text-[0.6875rem] text-text-dim">{t('piPlan.make.checklistHint')}</span>
-      }
-      padded={false}
-    >
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-        {view.checklist.map((column) => (
-          <ChecklistColumnView key={column.planetId} column={column} ticks={ticks} />
-        ))}
-      </div>
-    </Panel>
   );
 }

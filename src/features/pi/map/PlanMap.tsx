@@ -1,6 +1,6 @@
 /**
- * The PI Map tab's body: the map panel (hint, "Your picks", the what-if line,
- * the board) and the detail panel beside or over it.
+ * The PI Map tab's body: the map panel ("Your picks", the how-to and what-if
+ * line, the board) and the detail panel beside or over it.
  *
  * Presentational over a `PlanAdvice`: it reads every figure from it (picks via
  * `planPicks`, per-product figures via `productFigure`), plus P3/P4 chain
@@ -96,24 +96,25 @@ import {
 } from '../piPlanLink';
 import { usePlanPreference } from '../planTicksPref';
 import { AddPlanetDetail, ProductDetail, type FinderOrigin } from './MapDetail';
+import { ChainEstimateMark } from './ChainTileFigure';
 import { MapBoard } from './MapBoard';
 import { MapHelp } from './MapHelp';
 import { MapPhone } from './MapPhone';
 import { ColonyRichness } from './ColonyRichness';
 import { PiDrawer } from './PiDrawer';
 import { PlanetImage } from '../PlanetImage';
-import { readMapHintDismissed, writeMapHintDismissed } from './mapHintPref';
 import {
   canMake,
   detailMode,
   productFigure,
+  tileChainIsk,
   traceProduct,
   unlockedBy,
   unlockedRecipe,
   type MapGraph,
   type ProductFigure,
 } from './mapModel';
-import { planetName } from './mapText';
+import { planetName, verdictGlyph, VERDICT_TONE } from './mapText';
 import { buildProductDetail } from './productDetailModel';
 
 const PHONE_QUERY = '(max-width: 47.99rem)';
@@ -241,7 +242,6 @@ export function PlanMap({
   /** The "add a planet" drawer; the product drawer is open while the URL names one. */
   const [planetOpen, setPlanetOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [hintDismissed, setHintDismissed] = useState(readMapHintDismissed);
 
   // The colony whose richness drawer the URL has open; an unknown id is dropped.
   const planetRaw = parsePiPlanet(location.search);
@@ -473,6 +473,14 @@ export function PlanMap({
     [advice, graph, pricesFailed, chainOf, chainCards, whatIfChainKey, whatIfTypes]
   );
   const figureOf = useCallback((typeId: number) => figures.get(typeId)!, [figures]);
+  // The legend explains only the marks the board can draw: none with prices down.
+  const marks = useMemo(() => {
+    const all = [...figures.values()];
+    return {
+      verdict: all.some((figure) => verdictGlyph(figure) !== null),
+      estimate: all.some((figure) => tileChainIsk(figure) !== null),
+    };
+  }, [figures]);
   const colonySales = useMemo(
     () =>
       advice.colonies.map((c) => ({
@@ -581,10 +589,6 @@ export function PlanMap({
       });
     }
     setPlanetOpen(true);
-  };
-  const dismissHint = () => {
-    writeMapHintDismissed();
-    setHintDismissed(true);
   };
   const clearTrace = () => {
     setUserTraced(null);
@@ -733,18 +737,47 @@ export function PlanMap({
           })
         : t('piMap.detail.panelTitleEmpty');
 
-  const hint = !hintDismissed && (
-    <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5 text-xs text-text-dim">
-      <span>{t('piMap.hint', { context })}</span>
-      <Button
-        size={phone ? 'md' : 'sm'}
-        className="shrink-0 whitespace-nowrap"
-        onClick={dismissHint}
+  // What a tile's figure and marks mean, where the tiles are: the help drawer has the long form.
+  const legend =
+    !marks.verdict && !marks.estimate ? null : (
+      <div
+        role="group"
+        aria-label={t('piMap.legend.label')}
+        className={cx(
+          'flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.6875rem] font-normal tracking-normal text-text-dim normal-case',
+          // Beside the title it gives way first and wraps, so "Planet map" never truncates.
+          phone ? 'border-b border-line px-3 py-1.5' : 'min-w-0 flex-1 basis-0'
+        )}
       >
-        {t('piMap.hintDismiss')}
-      </Button>
-    </div>
-  );
+        {marks.verdict && (
+          <>
+            <span>{t('piMap.legend.figure')}</span>
+            <span aria-hidden="true">·</span>
+            {(
+              [
+                ['▲', 'piMap.legend.better'],
+                ['≈', 'piMap.legend.same'],
+                ['▼', 'piMap.legend.worse'],
+              ] as const
+            ).map(([glyph, key]) => (
+              <span key={glyph}>
+                <span aria-hidden="true" className={cx('font-bold', VERDICT_TONE[glyph])}>
+                  {glyph}
+                </span>{' '}
+                {t(key)}
+              </span>
+            ))}
+          </>
+        )}
+        {marks.verdict && marks.estimate && <span aria-hidden="true">·</span>}
+        {marks.estimate && (
+          <span className="inline-flex items-center gap-1">
+            <ChainEstimateMark />
+            {t('piMap.legend.estimate')}
+          </span>
+        )}
+      </div>
+    );
 
   const picksStrip = (
     <div
@@ -881,9 +914,8 @@ export function PlanMap({
           className={cx(layer, active !== null && 'invisible')}
           aria-hidden={active ? true : undefined}
         >
-          <span className="text-[11px] font-semibold tracking-widest uppercase">
-            {t('piMap.whatIfBlank')}
-          </span>
+          {/* The one line that says what each click does: filter, trace, what-if. */}
+          <span className="text-text">{t('piMap.hint', { context })}</span>
           <span>
             {noColonies
               ? t(coloniesUnknown ? 'piMap.whatIfUnknownColonies' : 'piMap.whatIfNoColonies')
@@ -939,6 +971,7 @@ export function PlanMap({
       >
         <Panel
           title={t('piMap.title')}
+          meta={phone ? undefined : legend}
           padded={false}
           actions={
             <Button
@@ -953,13 +986,13 @@ export function PlanMap({
             </Button>
           }
         >
-          {hint}
           <AssumedCustomsNote
             className="border-b border-line px-3 py-1.5"
             names={assumedCustomsNames(advice.colonies, (id) => t('pi.planetLabel', { id }))}
           />
           {picksStrip}
           {phone ? null : whatIfLine}
+          {phone && legend}
           {phone ? (
             <MapPhone
               graph={graph}

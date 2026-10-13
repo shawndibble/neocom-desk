@@ -41,7 +41,7 @@ import {
   todayCheck,
   type ColonyCheckRow,
 } from './coloniesModel';
-import { ColonyRowView } from './ColonyRowView';
+import { ColonyListHeader, ColonyRowView } from './ColonyRowView';
 import { PlanetImage } from '../PlanetImage';
 import { TodayPanel } from './TodayPanel';
 
@@ -523,7 +523,6 @@ export function ColoniesTab({
               nowMs={nowMs}
               nameOf={nameOf}
               characterNameOf={characterNameOf}
-              activeCharacterId={characterId}
               pricesFailed={planAdvice.pricesFailed}
               todayPerDay={advice?.totals.todayPerDay ?? null}
               fixCount={advice?.quickWins.length ?? 0}
@@ -543,13 +542,6 @@ export function ColoniesTab({
             names={assumedCustomsNames(advice?.colonies ?? [], (id) => t('pi.planetLabel', { id }))}
           />
 
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-dim">
-            <span>
-              <b className="text-text">{t('piColonies.cantSee.lead')}</b>{' '}
-              {t('piColonies.cantSee.body')}
-            </span>
-            <InfoTooltip label={t('pi.stalenessLabel')} content={t('pi.stalenessTooltip')} />
-          </p>
           {planetsResult?.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
@@ -574,6 +566,8 @@ export function ColoniesTab({
             }
             padded={false}
           >
+            {/* Header over the first real rows (own, else alts); never over the empty state. */}
+            {ownRows.length > 0 && <ColonyListHeader haulHours={haulHours} />}
             {ownRows.length === 0 ? (
               <EmptyState
                 title={t('pi.noOwnColoniesTitle')}
@@ -609,6 +603,7 @@ export function ColoniesTab({
               </>
             )}
 
+            {ownRows.length === 0 && includeAlts && <ColonyListHeader haulHours={haulHours} />}
             {showAltColonies &&
               altGroups.map((group) => {
                 const summaryParts: string[] = [];
@@ -692,6 +687,13 @@ export function ColoniesTab({
                   )}
                 </ul>
               )}
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+              <span>
+                <b className="font-semibold text-text">{t('piColonies.cantSee.lead')}</b>{' '}
+                {t('piColonies.cantSee.body')}
+              </span>
+              <InfoTooltip label={t('pi.stalenessLabel')} content={t('pi.stalenessTooltip')} />
+            </p>
           </Panel>
         </>
       )}

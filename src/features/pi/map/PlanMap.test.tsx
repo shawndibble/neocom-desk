@@ -9,7 +9,6 @@ import { buildPlanAdvice, hubBooks, type PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
 import { usePlanPreference } from '../planTicksPref';
 import { adviceInput, pi } from './mapFixtures.testutil';
-import { MAP_HINT_KEY } from './mapHintPref';
 import { buildMapGraph, DOCK_MIN_PANEL_WIDTH, productFigure } from './mapModel';
 import { PlanMap, type PlanMapProps } from './PlanMap';
 import { DEFAULT_PI_SETTINGS, usePiSettings } from '../piSettings';
@@ -776,24 +775,15 @@ describe('PlanMap: starting state follows the data until the pilot acts', () => 
   });
 });
 
-describe('PlanMap: first-visit hint', () => {
-  it('shows once, and a dismissal is remembered on this device', async () => {
-    const user = userEvent.setup();
-    const first = renderMap();
+describe('PlanMap: how-to line', () => {
+  it('says what a click does on the one line above the board, with no dismiss button', () => {
+    renderMap();
+    const line = screen.getByTestId('map-whatif');
     expect(
-      screen.getByText('Click a planet type to filter, or a product to trace it.')
+      within(line).getByText('Click a planet type to filter, or a product to trace it.')
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Got it' }));
-    expect(screen.queryByText(/Click a planet type to filter/)).toBeNull();
-    expect(localStorage.getItem(MAP_HINT_KEY)).toBe('1');
-    first.unmount();
-    renderMap();
-    expect(screen.queryByText(/Click a planet type to filter/)).toBeNull();
-  });
-
-  it('keeps "Got it" on one line', () => {
-    renderMap();
-    expect(screen.getByRole('button', { name: 'Got it' })).toHaveClass('whitespace-nowrap');
+    expect(within(line).getByText(/^Hover or focus a type you don't have \(/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
   });
 
   it('says Tap, not Click or Hover, on a coarse pointer', () => {
@@ -802,17 +792,17 @@ describe('PlanMap: first-visit hint', () => {
     expect(
       screen.getByText('Tap a planet type to filter, or a product to trace it.')
     ).toBeInTheDocument();
-    expect(screen.getByText(/^Tap a planet type you don't have \(/)).toBeInTheDocument();
+    expect(screen.getByText(/^Tap a type you don't have \(/)).toBeInTheDocument();
     expect(screen.queryByText(/Hover|Click/)).toBeNull();
   });
 
-  it('still shows when storage is blocked', () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
+  it('explains the tile marks in a legend beside the title, only the marks the board draws', () => {
     renderMap();
-    expect(screen.getByText(/Click a planet type to filter/)).toBeInTheDocument();
-    vi.restoreAllMocks();
+    const legend = screen.getByLabelText('Map legend');
+    expect(legend).toHaveTextContent('ISK a day from one planet');
+    expect(legend).toHaveTextContent("worse than that planet's simplest product");
+    // No multi-planet chain on this board, so no Est. entry.
+    expect(legend).not.toHaveTextContent('Est.');
   });
 });
 
@@ -920,6 +910,14 @@ describe('PlanMap with hub prices unreadable', () => {
     expect(screen.getByText(/Picks need hub prices/)).toBeInTheDocument();
     expect(screen.getByRole('group', { name: /^Planet map|^Planets$/ })).toBeInTheDocument();
   });
+
+  it('drops the figure legend: no tile has a figure or a mark to explain', () => {
+    const unpriced = buildPlanAdvice(
+      adviceInput('lean', { books: hubBooks({ prices: {}, buyPrices: {} }, 5) })
+    );
+    renderMap({ advice: unpriced, pricesFailed: true });
+    expect(screen.queryByLabelText('Map legend')).not.toBeInTheDocument();
+  });
 });
 
 describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets', () => {
@@ -970,6 +968,7 @@ describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets',
     expect(product('Camera Drones')).toHaveAccessibleName(
       /With a Lava planet added, a Bigger chain on your planets \(multi-planet estimate, needs hauling\): about 50,000 ISK a day across 2 planets/
     );
+    expect(screen.getByLabelText('Map legend')).toHaveTextContent('Est.');
     const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
     expect(within(dialog).getByText('Bigger chains with it')).toBeInTheDocument();
     const card = within(dialog).getByRole('link', { name: 'Camera Drones' }).closest('li')!;

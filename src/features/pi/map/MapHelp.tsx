@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useTouchContext } from '@/lib/useMediaQuery';
+import { VERDICT_TONE } from './mapText';
 
 function Heading({ children }: { children: React.ReactNode }) {
   return (
@@ -41,19 +42,19 @@ export function MapHelp() {
       <Heading>{t('piMap.help.legendHeading')}</Heading>
       <ul className="space-y-1.5">
         <li className="flex items-center gap-2.5">
-          <span aria-hidden="true" className="w-7 text-center font-bold text-success">
+          <span aria-hidden="true" className={`w-7 text-center font-bold ${VERDICT_TONE['▲']}`}>
             ▲
           </span>
           {t('piMap.help.legend.better')}
         </li>
         <li className="flex items-center gap-2.5">
-          <span aria-hidden="true" className="w-7 text-center font-bold text-text-dim">
+          <span aria-hidden="true" className={`w-7 text-center font-bold ${VERDICT_TONE['≈']}`}>
             ≈
           </span>
           {t('piMap.help.legend.same')}
         </li>
         <li className="flex items-center gap-2.5">
-          <span aria-hidden="true" className="w-7 text-center font-bold text-danger">
+          <span aria-hidden="true" className={`w-7 text-center font-bold ${VERDICT_TONE['▼']}`}>
             ▼
           </span>
           {t('piMap.help.legend.worse')}
@@ -73,7 +74,7 @@ export function MapHelp() {
           {t('piMap.help.legend.whatIf')}
         </li>
         <li className="flex items-center gap-2.5">
-          <Sample className="border-transparent bg-panel-2/60" />
+          <Sample className="border-dashed border-line" />
           {t('piMap.help.legend.ghost')}
         </li>
       </ul>

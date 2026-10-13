@@ -135,11 +135,7 @@ export interface ChecklistStep {
 
 export interface ChecklistColumn {
   planetId: number;
-  index: number;
   name: string;
-  planetType: PlanetType;
-  /** "Reactive Metals → Precious Metals". */
-  change: { from: NamedItem[]; to: NamedItem };
   minutes: number;
   steps: ChecklistStep[];
   fit: {
@@ -402,10 +398,7 @@ export function buildPlanView(
     const carries = pick.name;
     checklist.push({
       planetId: colony.planetId,
-      index: checklist.length + 1,
       name: nameOf(colony),
-      planetType: colony.planetType,
-      change: { from: colony.sells.map(named), to: { typeId: pick.typeId, name: pick.name } },
       minutes,
       steps: steps.map((step, i) =>
         stepView(step, `${colony.planetId}:${pick.typeId}:${i}:${step.verb}`, pi, carries)

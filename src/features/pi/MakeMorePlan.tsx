@@ -9,8 +9,8 @@ import { assumedCustomsNames } from './colonyCustoms';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import {
-  ChecklistPanel,
   HaulingPanel,
+  PlanSummaryPanel,
   QuickWinsPanel,
   RebuildPanel,
   YourPlanetsPanel,
@@ -170,14 +170,11 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
       />
       <IskFigureGroup>
-        <YourPlanetsPanel
+        <PlanSummaryPanel
           view={view}
           preference={preference}
           onPreference={(value) => void setPreference(value)}
-          onFindBest={onFindBest}
           priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
-          haulBetween={haulBetween}
-          onHaulBetween={(on) => void setPiSettings(withHaulBetweenPlanets(piSettings, on))}
         />
       </IskFigureGroup>
       {view.quickWins.length > 0 && (
@@ -186,7 +183,19 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         </IskFigureGroup>
       )}
       <IskFigureGroup>
-        <RebuildPanel view={view} />
+        <RebuildPanel
+          view={view}
+          ticks={ticks}
+          reveal={{ anchor: scrollTarget, navKey: location.key }}
+        />
+      </IskFigureGroup>
+      <IskFigureGroup>
+        <YourPlanetsPanel
+          view={view}
+          onFindBest={onFindBest}
+          haulBetween={haulBetween}
+          onHaulBetween={(on) => void setPiSettings(withHaulBetweenPlanets(piSettings, on))}
+        />
       </IskFigureGroup>
       {haulBetween && (
         <IskFigureGroup>
@@ -195,9 +204,6 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
       )}
       <IskFigureGroup>
         <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
-      </IskFigureGroup>
-      <IskFigureGroup>
-        <ChecklistPanel view={view} ticks={ticks} />
       </IskFigureGroup>
     </div>
   );

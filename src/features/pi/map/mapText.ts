@@ -18,6 +18,13 @@ export const tierName = (t: TFunction, tier: MapTier): string => t(`piMap.tier.$
 export const tierWithCode = (t: TFunction, tier: MapTier): string =>
   t('piMap.tierWithCode', { name: tierName(t, tier), tier });
 
+/** Each verdict glyph's colour: board, phone list, legend and help all draw it this way. */
+export const VERDICT_TONE = {
+  '▲': 'text-success',
+  '≈': 'text-text-dim',
+  '▼': 'text-danger',
+} as const;
+
 /** The ▲ ≈ ▼ glyph a figure carries, or null when it has no verdict to show. */
 export function verdictGlyph(figure: ProductFigure): '▲' | '≈' | '▼' | null {
   if (figure.kind !== 'ranked') return null;
