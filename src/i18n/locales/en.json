@@ -2755,6 +2755,8 @@
     "jobsColBlueprint": "Blueprint",
     "jobsColActivity": "Activity",
     "jobsColRuns": "Runs",
+    "jobsRunsUnit_one": "run",
+    "jobsRunsUnit_other": "runs",
     "jobsColProgress": "Progress",
     "jobsColEndsIn": "Ends in",
     "jobsColEnds": "Ends (EVE)",
