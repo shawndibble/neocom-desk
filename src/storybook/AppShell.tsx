@@ -21,6 +21,10 @@ export interface AppShellParameters {
   path: string;
   /** ESI answers for this page; defaults to the wallet routes. Keep the reference stable (module-level). */
   routes?: () => FixtureRoute[];
+  /** Scopes the sample Characters hold; defaults to the wallet's. Keep the reference stable (module-level). */
+  scopes?: readonly string[];
+  /** Writes the page's own Dexie rows (settings, saved lists) after the sample account is seeded. */
+  seed?: () => Promise<void>;
 }
 
 declare module 'storybook/internal/csf' {
@@ -35,7 +39,11 @@ function wireEsiToStoredTokens() {
   configureActiveCharacter(() => useActiveCharacter.getState().activeCharacterId);
 }
 
-async function seedSampleAccount(isCancelled: () => boolean) {
+async function seedSampleAccount(
+  isCancelled: () => boolean,
+  scopes: readonly string[],
+  seed?: () => Promise<void>
+) {
   await Promise.all([
     db.characters.clear(),
     db.tokens.clear(),
@@ -62,10 +70,11 @@ async function seedSampleAccount(isCancelled: () => boolean) {
       accessToken: 'sample-access-token',
       refreshToken: 'sample-refresh-token',
       expiresAt: Date.now() + 3_600_000,
-      scopes: SAMPLE_SCOPES,
+      scopes: [...scopes],
     }))
   );
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: SAMPLE_ACTIVE_CHARACTER.characterId });
+  await seed?.();
   if (isCancelled()) return;
   // `App`'s Root does this at boot; the shell stands in for it.
   await useActiveCharacter.getState().hydrate();
@@ -114,7 +123,7 @@ export function AppShell({ shell, children }: { shell: AppShellParameters; child
     wireEsiToStoredTokens();
     const uninstallFetch = installFixtureFetch(routes);
     const stopWatching = watchPortraits(document.body);
-    void seedSampleAccount(() => cancelled).then(() => {
+    void seedSampleAccount(() => cancelled, shell.scopes ?? SAMPLE_SCOPES, shell.seed).then(() => {
       if (!cancelled) setReady(true);
     });
     return () => {
@@ -123,7 +132,7 @@ export function AppShell({ shell, children }: { shell: AppShellParameters; child
       stopWatching();
       uninstallFetch();
     };
-  }, [shell.routes]);
+  }, [shell.routes, shell.scopes, shell.seed]);
 
   if (!ready) return null;
   return (

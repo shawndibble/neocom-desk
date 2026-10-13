@@ -24,7 +24,9 @@ import {
   EmptyState,
   FilterChip,
   IconButton,
+  IskAmount,
   LiveStatus,
+  NativeSelect,
   Panel,
   SegmentedControl,
   Spinner,
@@ -47,7 +49,6 @@ import {
 } from '@/engine/stockTargets/stockLists';
 import { STOCK_STATUSES, summarizeStock, type StockStatus } from '@/engine/stockTargets/stockRows';
 import { writeToClipboard } from '@/lib/clipboard';
-import { formatIskCompact } from '@/lib/isk';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import type { TradeHub } from '@/market/hubs';
 import { MarketDialog } from './MarketDialog';
@@ -262,8 +263,9 @@ export function StockMarketPage({
           ‹ {t('stockTargets.markets.back')}
         </Link>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
+      {/* One row at every width: a long name wraps in its own column, never under the actions. */}
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
           <h2
             data-stock-market-title
             tabIndex={-1}
@@ -279,6 +281,10 @@ export function StockMarketPage({
             </p>
           )}
         </div>
+        <Button variant="primary" onClick={() => setDialog('add')}>
+          {t('stockTargets.add.open')}
+        </Button>
+        {/* Rare actions share the one ⋮ (§6c header tier 3); it closes the cluster. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconButton
@@ -287,13 +293,27 @@ export function StockMarketPage({
             />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onCloseAutoFocus={menu.onCloseAutoFocus}>
+            <DropdownMenuItem onSelect={() => menu.run(() => setDialog('paste'))}>
+              {t('stockTargets.add.pasteOpen')}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void addListed()}>
               {t('stockTargets.list.addListed')}
             </DropdownMenuItem>
+            {list.items.length > 0 && (
+              <DropdownMenuItem
+                onSelect={() =>
+                  void writeToClipboard(shareUrl()).then(() =>
+                    setToast(t('stockTargets.share.copied'))
+                  )
+                }
+              >
+                {t('stockTargets.share.copy')}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => menu.run(onNew)}>
               {t('stockTargets.list.new')}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => menu.run(() => setDialog('rename'))}>
               {t('stockTargets.list.renameEllipsis')}
             </DropdownMenuItem>
@@ -305,43 +325,18 @@ export function StockMarketPage({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {list.items.length > 0 && (
-          <Button
-            onClick={() =>
-              void writeToClipboard(shareUrl()).then(() => setToast(t('stockTargets.share.copied')))
-            }
-          >
-            {t('stockTargets.share.copy')}
-          </Button>
-        )}
-        <Button variant="primary" onClick={() => setDialog('add')}>
-          {t('stockTargets.add.open')}
-        </Button>
       </div>
 
+      {/* Out, Low and Ready to list are counted once, on the filter chips below. */}
       {summary && (
         <StatChips>
           <StatChip
-            label={t('stockTargets.summary.out')}
-            value={t('stockTargets.summary.items', { count: summary.out })}
-            tone={summary.out > 0 ? 'danger' : 'default'}
-            emphasis
-          />
-          <StatChip
-            label={t('stockTargets.summary.low')}
-            value={t('stockTargets.summary.items', { count: summary.low })}
-            tone={summary.low > 0 ? 'warning' : 'default'}
-            emphasis
-          />
-          <StatChip
-            label={t('stockTargets.summary.ready')}
-            value={t('stockTargets.summary.items', { count: summary.readyToList })}
-            tooltip={t('stockTargets.summary.readyHint')}
-            emphasis
-          />
-          <StatChip
             label={t('stockTargets.summary.toSource')}
-            value={`${formatIskCompact(summary.costToFill)} ISK`}
+            value={
+              <>
+                <IskAmount value={summary.costToFill} /> ISK
+              </>
+            }
             tooltip={t('stockTargets.summary.toSourceHint', { hub: hub.name })}
             emphasis
           />
@@ -385,31 +380,27 @@ export function StockMarketPage({
             <FilterChip
               label={t('stockTargets.filterReady')}
               count={countOf('ready')}
+              tooltip={t('stockTargets.summary.readyHint')}
               selected={filter === 'ready'}
               onToggle={() => setFilter(filter === 'ready' ? null : 'ready')}
             />
           </div>
         )}
         {view === 'manager' && groupNames.length > 1 && (
-          // Desktop only: on a phone the status chips are the one filter row.
-          <div
-            role="group"
+          <NativeSelect
+            size="sm"
             aria-label={t('stockTargets.groupFilterLabel')}
-            className="hidden flex-wrap items-center gap-1.5 sm:flex"
+            className="ml-auto w-auto max-w-[50%] sm:max-w-64"
+            value={groupFilter ?? ''}
+            onChange={(e) => setGroupFilter(e.target.value || null)}
           >
+            <option value="">{t('stockTargets.groupAll')}</option>
             {groupNames.map((group) => (
-              <FilterChip
-                key={group}
-                label={group}
-                selected={groupFilter === group}
-                onToggle={() => setGroupFilter(groupFilter === group ? null : group)}
-              />
+              <option key={group} value={group}>
+                {group}
+              </option>
             ))}
-          </div>
-        )}
-        <span className="flex-1" />
-        {view === 'manager' && (
-          <Button onClick={() => setDialog('paste')}>{t('stockTargets.add.pasteOpen')}</Button>
+          </NativeSelect>
         )}
       </div>
 
