@@ -337,3 +337,110 @@ test('the widget settings trigger stays compact with a fine pointer at 1280px', 
   const trigger = page.locator('main section button[aria-label^="Settings for"]').first();
   await expect.poll(async () => (await trigger.boundingBox())?.height ?? 99).toBeLessThan(40);
 });
+
+/**
+ * L and F table widgets on a phone (#3683): column count follows the widget's size, not the
+ * screen, so a layout resized on a desktop reaches a phone with every column. The first
+ * column is the row's name; it must stay readable (>= 100px) and the table must stay inside
+ * its card. `hideNarrow` columns drop out until the table is 28rem wide.
+ */
+const DAY_MS = 24 * HOUR_MS;
+const ESI = 'https://esi.evetech.net';
+const MIN_NAME_PX = 100;
+
+function json(body: unknown) {
+  return { status: 200, contentType: 'application/json', body: JSON.stringify(body) };
+}
+
+function contract(id: number, fields: Record<string, unknown>) {
+  return {
+    contract_id: id,
+    issuer_id: CHARACTER_ID,
+    issuer_corporation_id: 2,
+    assignee_id: 0,
+    acceptor_id: 0,
+    type: 'item_exchange',
+    status: 'outstanding',
+    for_corporation: false,
+    availability: 'public',
+    date_issued: new Date(Date.now() - DAY_MS).toISOString(),
+    date_expired: new Date(Date.now() + 3 * DAY_MS).toISOString(),
+    title: `Listing number ${id}`,
+    price: 1_000_000,
+    ...fields,
+  };
+}
+
+async function seedTableFeeds(page: Page): Promise<void> {
+  await page.route(`${ESI}/incursions*`, (route) =>
+    route.fulfill(
+      json(
+        [1, 2, 3].map((n) => ({
+          constellation_id: 20000000 + n,
+          faction_id: 500019,
+          has_boss: n === 1,
+          infested_solar_systems: [30000140 + n],
+          influence: 0.4 + n / 10,
+          staging_solar_system_id: 30000140 + n,
+          state: 'established',
+          type: 'Incursion',
+        }))
+      )
+    )
+  );
+  await page.route(`${ESI}/characters/${CHARACTER_ID}/contracts*`, (route) =>
+    route.fulfill(
+      json([
+        contract(9001, { date_expired: new Date(Date.now() + 6 * HOUR_MS).toISOString() }),
+        contract(9002, { type: 'courier', title: '', reward: 5_000_000, collateral: 90_000_000 }),
+        contract(9003, {
+          type: 'courier',
+          status: 'in_progress',
+          acceptor_id: CHARACTER_ID,
+          reward: 2_000_000,
+          collateral: 40_000_000,
+          date_accepted: new Date(Date.now() - HOUR_MS).toISOString(),
+          days_to_complete: 3,
+        }),
+      ])
+    )
+  );
+}
+
+for (const kind of ['incursions', 'contracts'] as const) {
+  for (const size of ['L', 'F'] as const) {
+    test(`${kind} ${size} table keeps its name column readable at 390px`, async ({ page }) => {
+      await seedTableFeeds(page);
+      await page.setViewportSize(PHONE);
+      await signInAndGoto(page, './overview', SCOPES, [
+        overviewLayoutSetting([{ kind, size, view: 'list' }]),
+      ]);
+      const tableEl = page.locator('main table').first();
+      const card = tableEl.locator('xpath=ancestor::section[1]');
+      const rows = tableEl.locator('tbody tr');
+      await expect(rows.first()).toBeVisible({ timeout: FIRST_LOAD_MS });
+      const name = await rows.first().locator('td, th').first().boundingBox();
+      const table = await tableEl.boundingBox();
+      const box = await card.boundingBox();
+      expect(name!.width).toBeGreaterThanOrEqual(MIN_NAME_PX);
+      expect(table!.x + table!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
+      expect(await hasHorizontalOverflow(page)).toBe(false);
+      // Linked rows (incursions) keep the touch floor.
+      const rowBox = await rows.first().boundingBox();
+      if (kind === 'incursions') expect(rowBox!.height).toBeGreaterThanOrEqual(44);
+    });
+  }
+
+  test(`${kind} L table keeps every column on a 1440px desktop`, async ({ page }) => {
+    await seedTableFeeds(page);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await signInAndGoto(page, './overview', SCOPES, [
+      overviewLayoutSetting([{ kind, size: 'L', view: 'list' }]),
+    ]);
+    const tableEl = page.locator('main table').first();
+    await expect(tableEl.locator('tbody tr').first()).toBeVisible({ timeout: FIRST_LOAD_MS });
+    // The last column is the one `hideNarrow` hides first; a linked table adds a blank caret header after it.
+    const last = kind === 'incursions' ? 'Constellation' : 'Collateral';
+    await expect(tableEl.getByRole('columnheader', { name: last })).toBeVisible();
+  });
+}

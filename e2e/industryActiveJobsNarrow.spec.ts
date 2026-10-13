@@ -107,3 +107,68 @@ test.describe('Jobs panel header', () => {
     expect(deskSummary.y).toBeLessThan(deskTitle.y + deskTitle.height);
   });
 });
+
+test.describe('Active Jobs phone card (#3684)', () => {
+  test.beforeEach(async ({ page }) => {
+    await signInAndGoto(page);
+    await page.route(
+      (url) => url.pathname === `/characters/${CHARACTER_ID}/industry/jobs`,
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            job(1, 'active', 7_200_000),
+            job(2, 'ready', -60_000),
+            job(3, 'active', 1_800_000),
+          ]),
+        })
+    );
+  });
+
+  test('each job is a compact card with its countdown, bar and 44px Log production', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/jobs');
+    await page.getByRole('button', { name: 'Show job list' }).click();
+
+    const rows = page.getByRole('table').locator('tbody tr');
+    await expect(rows).toHaveCount(3);
+    for (let i = 0; i < 3; i++) {
+      const box = (await rows.nth(i).boundingBox())!;
+      // Today's labelled card is ~150px; the dense card is two or three lines.
+      expect(box.height).toBeLessThan(110);
+    }
+
+    // Sorted soonest-first, so locate rows by content rather than index.
+    const logButton = page.getByRole('button', { name: 'Log production…' });
+    const doneRow = rows.filter({ has: logButton });
+    const runningRow = rows.filter({ hasNot: logButton }).first();
+
+    const endsIn = runningRow.locator('td[data-label="Ends in"]');
+    await expect(endsIn).toBeVisible();
+    const title = (await runningRow.locator('td').first().boundingBox())!;
+    const corner = (await endsIn.boundingBox())!;
+    expect(corner.y).toBeLessThan(title.y + title.height);
+
+    await expect(runningRow.getByRole('progressbar')).toBeVisible();
+    await expect(runningRow.locator('td[data-label="Ends (EVE)"]')).toBeHidden();
+
+    const log = doneRow.getByRole('button', { name: 'Log production…' });
+    await expect(log).toBeVisible();
+    expect((await log.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test('desktop keeps the table columns', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await page.goto('./industry/jobs');
+    await page.getByRole('button', { name: 'Show job list' }).click();
+    await expect(page.getByRole('columnheader', { name: 'Ends (EVE)' })).toBeVisible();
+  });
+});

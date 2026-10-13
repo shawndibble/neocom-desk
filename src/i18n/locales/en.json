@@ -2755,6 +2755,8 @@
     "jobsColBlueprint": "Blueprint",
     "jobsColActivity": "Activity",
     "jobsColRuns": "Runs",
+    "jobsRunsUnit_one": "run",
+    "jobsRunsUnit_other": "runs",
     "jobsColProgress": "Progress",
     "jobsColEndsIn": "Ends in",
     "jobsColEnds": "Ends (EVE)",
@@ -4674,9 +4676,6 @@
     }
   },
   "common": {
-    "viewPicker": {
-      "label": "{{page}}, {{view}}. Change view"
-    },
     "opensInNewTab": "(opens in a new tab)",
     "iskAmountHint": "= {{amount}} ISK",
     "iskInvalid": "Not an ISK amount. Try 1.5b, 500m or 1,000,000.",

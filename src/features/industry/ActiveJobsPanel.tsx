@@ -815,20 +815,28 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         align: 'right',
         className: 'tabular-nums',
         sortValue: (job) => job.runs,
-        render: (job) => job.runs.toLocaleString(),
+        render: (job) => (
+          <>
+            {job.runs.toLocaleString()}
+            {/* The card has no Runs header to say what the bare number is. */}
+            <span className="sm:hidden"> {t('industry.jobsRunsUnit', { count: job.runs })}</span>
+          </>
+        ),
       },
       {
         id: 'progress',
         header: t('industry.jobsColProgress'),
         // Sorts on the raw fraction, not the rounded percent the cell prints.
         sortValue: (job) => jobProgress(job, now),
+        // A thin line of its own under the meta line, % at its right end.
+        stackEdge: 'below',
         render: (job) => {
           const progress = Math.round(jobProgress(job, now) * 100);
           return (
             // Fixed track: `flex-1` in a shrink-to-fit cell has no width to
             // fill and collapses. Nothing may right-align itself below `sm`
             // either (docs/DESIGN.md §4a) — hence `sm:text-right`.
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 max-sm:w-full">
               <span
                 role="progressbar"
                 aria-label={t('industry.jobsProgress', {
@@ -837,7 +845,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                 aria-valuenow={progress}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                className="block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-panel-2 sm:w-24"
+                className="block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-panel-2 max-sm:w-auto max-sm:flex-1 sm:w-24"
               >
                 <span
                   className={`block h-full ${
@@ -858,6 +866,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         id: 'endsIn',
         header: t('industry.jobsColEndsIn'),
         align: 'right',
+        cardCorner: true,
         className: 'tabular-nums whitespace-nowrap',
         cellClassName: (job) =>
           toneClass(jobTone(job), {
@@ -876,7 +885,12 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         sortValue: (job) => Date.parse(job.end_date),
         render: (job) => {
           const endDate = new Date(job.end_date);
-          return <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>;
+          // Off the phone card: the countdown in its corner already says when.
+          return (
+            <span data-dense-omit>
+              <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>
+            </span>
+          );
         },
       },
       {
@@ -885,8 +899,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         id: 'logProduction',
         header: '',
         align: 'right',
-        // A text button, not the corner icon `cardActions` pins: its own
-        // full-width row on the phone card, 44px tall.
+        // A text button, not the corner icon `cardActions` pins: closes the
+        // phone card's meta line at its right end, 44px tall.
+        stackEdge: 'end',
         cellClassName: () => 'dt-action-row',
         render: (job) =>
           canLog(job) ? (
@@ -1387,6 +1402,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                 label={t('industry.jobsTitle')}
                 {...sortProps}
                 density="compact"
+                stackLayout="dense"
                 mobileSort
                 rowClassName={(job) =>
                   toneClass(jobTone(job), { warning: 'bg-warning/10', success: 'bg-success/10' })

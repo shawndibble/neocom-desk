@@ -54,15 +54,12 @@ import {
   Tabs,
   TabPanel,
   useTabsId,
-  usesViewPicker,
   type DataTableColumn,
-  type PageViews,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import {
   LOYALTY_STORE_OFFERS_COLUMN_IDS,
@@ -434,24 +431,22 @@ function LpStoreActions() {
  * draws Wallet's tab bar itself. Every other tab is a path under `/wallet`;
  * `transactions` is no tab Wallet shows (it redirects to Market).
  */
-function useWalletViews(): PageViews {
+function WalletTabBar({ tabsId }: { tabsId: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  return {
-    value: 'lp-store',
-    onChange: (id) => navigate(tabPath(WALLET_TABS, id as (typeof WALLET_TABS.tabs)[number]['id'])),
-    tabs: WALLET_TABS.tabs
-      .filter((tab) => tab.id !== 'transactions')
-      .map((tab) => ({ id: tab.id, label: t(tab.labelKey) })),
-  };
-}
-
-/** The strip; a page with enough tabs gets the title-row picker (`PageHeader`'s `views`) on a phone instead. */
-function WalletTabBar({ tabsId, views }: { tabsId: string; views: PageViews }) {
-  const { t } = useTranslation();
-  const isPhone = useIsPhone();
-  if (usesViewPicker(views.tabs.length, isPhone)) return null;
-  return <Tabs tabsId={tabsId} label={t('wallet.title')} {...views} tabs={[...views.tabs]} />;
+  return (
+    <Tabs
+      tabsId={tabsId}
+      label={t('wallet.title')}
+      value="lp-store"
+      onChange={(id) =>
+        navigate(tabPath(WALLET_TABS, id as (typeof WALLET_TABS.tabs)[number]['id']))
+      }
+      tabs={WALLET_TABS.tabs
+        .filter((tab) => tab.id !== 'transactions')
+        .map((tab) => ({ id: tab.id, label: t(tab.labelKey) }))}
+    />
+  );
 }
 
 /** `/wallet/lp-store` with no corporation chosen yet: the item-first search. */
@@ -459,19 +454,10 @@ function LoyaltyStoreLanding() {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(LANDING_PARAMS);
   const tabsId = useTabsId();
-  const views = useWalletViews();
-  const isPhone = useIsPhone();
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3">
-      {/* A phone's picker reads "<page> <view>": "Wallet  LP Store", not "LP Store  LP Store". */}
-      <PageHeader
-        title={
-          usesViewPicker(views.tabs.length, isPhone) ? t('wallet.title') : t('loyaltyStore.title')
-        }
-        views={views}
-        actions={<LpStoreActions />}
-      />
-      <WalletTabBar tabsId={tabsId} views={views} />
+      <PageHeader title={t('loyaltyStore.title')} actions={<LpStoreActions />} />
+      <WalletTabBar tabsId={tabsId} />
       <TabPanel tabsId={tabsId} tabId="lp-store">
         <LpStoreSearch query={params.q} onQueryChange={(q) => setParams({ q })} />
       </TabPanel>
@@ -531,7 +517,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const tabsId = useTabsId();
-  const views = useWalletViews();
 
   const hydrateHub = useMarketHub((s) => s.hydrate);
   const hubId = useMarketHub((s) => s.value);
@@ -922,10 +907,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
               </StatChips>
             </div>
           }
-          views={views}
           actions={<LpStoreActions />}
         />
-        <WalletTabBar tabsId={tabsId} views={views} />
+        <WalletTabBar tabsId={tabsId} />
 
         <TabPanel tabsId={tabsId} tabId="lp-store" className="flex flex-col gap-3">
           <FilterBar

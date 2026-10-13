@@ -14,7 +14,7 @@ import type { TravelTabProps } from './travelTab';
  * hub control from the page; its reload and the scan's Data Age sit in the
  * title bar beside "Travel" (as on Route Safety and Thera), and its rows' item menus need this page's item actions.
  */
-export function HaulingTab({ tabBar, tabsId, views }: TravelTabProps) {
+export function HaulingTab({ tabBar, tabsId }: TravelTabProps) {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
@@ -25,7 +25,6 @@ export function HaulingTab({ tabBar, tabsId, views }: TravelTabProps) {
       <div className="space-y-4">
         <PageHeader
           title={t('travel.title')}
-          views={views}
           meta={
             refresh?.fetchedAt != null ? (
               <DataAgeBadge

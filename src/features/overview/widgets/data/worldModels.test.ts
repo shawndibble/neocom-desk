@@ -385,6 +385,14 @@ describe('incursions', () => {
     expect(cells[column(view, 'state')]).toContain('withBoss');
     expect(visibleColumns(view.table!.columns, 'S').map((c) => c.key)).toEqual(['system', 'jumps']);
   });
+
+  it('drops influence and constellation on a narrow box so the system name keeps its width', () => {
+    const view = buildView('incursions', feeds([row(1, 100, 1)]), ctx());
+    expect(view.table!.columns.filter((c) => c.hideNarrow).map((c) => c.key)).toEqual([
+      'influence',
+      'constellation',
+    ]);
+  });
 });
 
 describe('profit (world)', () => {

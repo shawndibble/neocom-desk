@@ -225,7 +225,7 @@ function RouteFacts({
   );
 }
 
-export function RouteSafetyTab({ tabBar, tabsId, views }: TravelTabProps) {
+export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(ROUTE_PARAMS);
   const current = useCurrentSystem();
@@ -370,7 +370,6 @@ export function RouteSafetyTab({ tabBar, tabsId, views }: TravelTabProps) {
     <div className="space-y-4">
       <PageHeader
         title={t('travel.title')}
-        views={views}
         meta={
           state.kind === 'route' && state.fetchedAt !== null ? (
             <DataAgeBadge date={state.fetchedAt} note={t('travel.dataAgeNote')} />
