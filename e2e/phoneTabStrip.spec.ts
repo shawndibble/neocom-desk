@@ -11,7 +11,7 @@ const PHONE = { width: 360, height: 800 };
 
 const PAGES = [
   { name: 'Skills', path: './skills/plans', view: 'Trained', url: /\/skills\/trained/ },
-  { name: 'Industry', path: './industry', view: 'Records', url: /\/industry\/records/ },
+  { name: 'Industry', path: './industry', view: 'BPC Sourcing', url: /\/industry\/sourcing/ },
   { name: 'Market', path: './market', view: 'Appraisal', url: /\/market\/appraisal/ },
   { name: 'Travel', path: './travel', view: 'Thera / Turnur', url: /\/travel\/thera/ },
 ];

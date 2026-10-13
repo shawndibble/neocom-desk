@@ -26,7 +26,7 @@ import { unmaskNumber } from '@/lib/numberMask';
  * chevron revealing Watch Open Order, Manual/Private Sale and Delete
  * Production Run — shared by `ProductionRunsPanel` and `ProductionLogPanel`'s
  * action columns. The delete item is the only way to drop a run from the
- * Records tab, whose rows click through to the Build Plan rather than into an
+ * Logs tab, whose rows click through to the Build Plan rather than into an
  * edit modal; it says "Delete production run" rather than inventing a second
  * verb for the danger button already in that modal. An
  * optional refresh icon sits beside it for a run with an open watch; only

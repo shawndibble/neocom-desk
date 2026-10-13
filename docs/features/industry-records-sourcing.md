@@ -1,6 +1,6 @@
-# Industry shell, Records, BPC Sourcing, Opportunities (feature inventory)
+# Industry shell, Logs, BPC Sourcing, Opportunities (feature inventory)
 
-Scope: `src/routes/Industry.tsx` shell + header, Jobs panel, Records tab, BPC Sourcing tab, Opportunities tab (+ All owned, Market-Wide), Blueprint Acquisition link-up. Build Plans tab, plan page, group page, materials, Auto Build, Fit Import, facility defaults, `computeBuildPlan` are covered elsewhere.
+Scope: `src/routes/Industry.tsx` shell + header, Jobs panel, Logs tab, BPC Sourcing tab, Opportunities tab (+ All owned, Market-Wide), Blueprint Acquisition link-up. Build Plans tab, plan page, group page, materials, Auto Build, Fit Import, facility defaults, `computeBuildPlan` are covered elsewhere.
 
 Terms per `GLOSSARY.md`: **Production Log**, **Production Run**, **BPC Sourcing** (tab label in UI: "BPC Sourcing", i18n `industry.bpcSearchTab`; code comments still say "BPC Search"), **Offer**, **Public Contract Offers snapshot**, **Build Opportunities**, **Market-Wide Build Opportunities**, **Liquidity Floor**, **Order Depth**, **Seeded Build Plan**, **Blueprint Acquisition**.
 
@@ -22,8 +22,8 @@ Where brief items actually live (code differs from the obvious guess):
 | Deep links `?product=` `?material=` + seed | `Industry.tsx`, `planSeed.ts`                                                                                         | Opens/creates plan, redirects to plan page                                                                    |
 | Jobs panel                                 | header, all tabs `ActiveJobsPanel.tsx`                                                                                | Personal + corp jobs, filters, CSV, slot readout, Log production                                              |
 | Log production from job                    | job row button, `LogProductionFromJobDialog.tsx`, `logProductionFromJob.ts`                                           | Finished mfg/reaction personal jobs only; 0/1/many plan resolve                                               |
-| Production Log (Records)                   | `/industry/logs` `ProductionLogPanel.tsx`                                                                             | Totals, profit chart, By item table, folded All runs table, date range, 2 CSVs                                |
-| Sold split button + modals                 | Records runs table `SaleLinkingControls.tsx`, `useSaleLinking.ts`                                                     | Link Past Sale, Watch Open Order, Manual Sale, Delete run                                                     |
+| Production Log (Logs)                      | `/industry/logs` `ProductionLogPanel.tsx`                                                                             | Totals, profit chart, By item table, folded All runs table, date range, 2 CSVs                                |
+| Sold split button + modals                 | Logs runs table `SaleLinkingControls.tsx`, `useSaleLinking.ts`                                                        | Link Past Sale, Watch Open Order, Manual Sale, Delete run                                                     |
 | Realized profit breakdown                  | `RealizedProfitCell` / `RealizedProfitBreakdown.tsx`                                                                  | Modal per run                                                                                                 |
 | BPC Sourcing search                        | `/industry/sourcing` `BpcSourcingPanel.tsx`                                                                           | 5 sources, filters, autocomplete, strip, 200-row table, CSV                                                   |
 | BPC contract detail modal                  | `BpcContractModal.tsx` -> `PublicContractDetailModal`                                                                 | Row click on contract rows                                                                                    |
@@ -36,14 +36,14 @@ Where brief items actually live (code differs from the obvious guess):
 
 ## Purpose and user goal
 
-"What is running, what did I make, and what should I build next?" This doc covers the Industry jobs around Build Plans (`industry-plans.md`): the **Jobs panel** answers "what is running and what is done" on every tab; **Records** answers "what did my builds actually earn" (Production Log, `20260905-181537`); **BPC Sourcing** answers "where can I buy a copy of this blueprint" (ADR 0013); **Opportunities** answers "what should I build next", from owned blueprints (Ranked, All owned) or the whole market (Market-Wide, `20260911-081120`).
+"What is running, what did I make, and what should I build next?" This doc covers the Industry jobs around Build Plans (`industry-plans.md`): the **Jobs panel** answers "what is running and what is done" on every tab; **Logs** answers "what did my builds actually earn" (Production Log, `20260905-181537`); **BPC Sourcing** answers "where can I buy a copy of this blueprint" (ADR 0013); **Opportunities** answers "what should I build next", from owned blueprints (Ranked, All owned) or the whole market (Market-Wide, `20260911-081120`).
 
-- **Top jobs (ranked):** 1. "What is done and what is still running, for this Character or across several?" (Jobs panel with its Character filter; `industryJobComplete` alert → `/industry`; #2866). Very important, and it must not get in the way of the rest of the page, which is why it is a summary bar that expands (owner, 2026-10-11). 2. "What is the most profitable thing I can build with what I own?" (Opportunities Ranked; #3071 calls the owned panel the one that answers the pilot's question and flags it as buried under the scan) 3. "Did my last builds make money?" (Records). BPC Sourcing is task-driven, often reached from a plan's Blueprint Acquisition.
+- **Top jobs (ranked):** 1. "What is done and what is still running, for this Character or across several?" (Jobs panel with its Character filter; `industryJobComplete` alert → `/industry`; #2866). Very important, and it must not get in the way of the rest of the page, which is why it is a summary bar that expands (owner, 2026-10-11). 2. "What is the most profitable thing I can build with what I own?" (Opportunities Ranked; #3071 calls the owned panel the one that answers the pilot's question and flags it as buried under the scan) 3. "Did my last builds make money?" (Logs). BPC Sourcing is task-driven, often reached from a plan's Blueprint Acquisition.
 - **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11). Phone parity: Industry is a default phone tab (`DEFAULT_MOBILE_TABS`); Opportunities and the Jobs panel have phone layouts (#3070, #2923). The `industryJobComplete` alert brings pilots to the Jobs panel.
-- **Above the fold:** the Jobs summary bar (running, done, next to finish, slots, Character filter; `20260906-091110`) above every tab, folded by default and expanding to the job list. Keep that pattern: the summary is always in view, the list never pushes the tab's own content down unasked (owner, 2026-10-11). Opportunities: owned Ranked builds by ISK/hour with a start-plan action (#3071). Records: realized-profit totals and chart. BPC Sourcing: blueprint search box.
+- **Above the fold:** the Jobs summary bar (running, done, next to finish, slots, Character filter; `20260906-091110`) above every tab, folded by default and expanding to the job list. Keep that pattern: the summary is always in view, the list never pushes the tab's own content down unasked (owner, 2026-10-11). Opportunities: owned Ranked builds by ISK/hour with a start-plan action (#3071). Logs: realized-profit totals and chart. BPC Sourcing: blueprint search box.
 - **Not for:** costing one build in detail (plan page, `industry-plans.md`); buying non-blueprint items on contract (Contracts › Item search); corp industry beyond listing jobs by installer (`20260929-102524`).
 - **Sources:** owner, 2026-10-11 (done/in-progress across Characters first, summary bar that expands, desktop use); `20260906-091110`, `20260905-181537`, `20260911-081120`, `20260926-222310`, `20261003-112230`, `20261007-164750`, `20260929-102524`, ADR 0013; #2866, #2923, #3070, #3071.
-- **Unconfirmed:** cadence (Jobs per session or on alert; Opportunities and Records occasional); the Opportunities vs Records order; how often pilots open Records; whether Market-Wide scanning is used by more than a few pilots.
+- **Unconfirmed:** cadence (Jobs per session or on alert; Opportunities and Logs occasional); the Opportunities vs Logs order; how often pilots open Logs; whether Market-Wide scanning is used by more than a few pilots.
 
 ### Mobbin brief
 
@@ -107,7 +107,7 @@ Observed gaps:
 - No row context menu or row click on a job; ItemInfoLink only.
 - UX-REVIEW §2 noted empty state with no reconnect action; code now renders `GrantBanner` with an action (historical).
 
-## 4. Records tab: Production Log (`/industry/logs`, `ProductionLogPanel.tsx`)
+## 4. Logs tab: Production Log (`/industry/logs`, `ProductionLogPanel.tsx`)
 
 What: account-wide (active Character) realized-profit rollup of every logged **Production Run**, grouped by product. Distinct from the per-plan `ProductionRunsPanel` on plan page (same sale-linking hook/columns, other doc).
 
@@ -310,7 +310,7 @@ Route `/industry` is UNGATED (`src/app/routeScopes.ts`); every panel gates itsel
 - Market-Wide: fixed hub, ME-0 approximation, no compare.
 - Ranked auto-recalc capped at 10 blueprints; manual Refresh above.
 - BPC Sourcing: 200-row cap, 10-type market BPO lookup, owned rows inert, active Character only for owned.
-- Records tab has no settings gear; date filter is the only filter.
+- Logs tab has no settings gear; date filter is the only filter.
 
 ## 13. Exact formulas, thresholds, edge cases
 

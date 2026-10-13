@@ -1,6 +1,6 @@
 /**
  * Reduces Production Log entries into a day-bucketed, cumulative
- * realized-profit series for the Records tab's profit-over-time chart
+ * realized-profit series for the Logs tab's profit-over-time chart
  * (issue #711). Cumulative running total, not a per-day figure: production
  * runs are lumpy and infrequent (unlike the wallet's near-continuous
  * balance), so a per-bucket value would mostly show gaps and spikes — the

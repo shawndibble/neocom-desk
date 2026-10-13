@@ -1,6 +1,6 @@
 # Industry: Build Plans, plan page, group page (feature inventory)
 
-Scope: Industry > Build Plans tab (`/industry/plans`), plan page (`/industry/plans/:planId`), group page (`/industry/groups/:groupId`), Build Plan + Build Group model, materials table, recipe modal, Blueprint Acquisition modal, Build Location pickers, Compare, Auto Build, Fit Import, Retarget, Production Runs panel on the plan page, assumed ME/TE + facility defaults, Calculation Breakdown, `computeBuildPlan` / `buildVsBuy` engine, ADR 0006. Records / BPC Sourcing / Opportunities / Active Jobs / tab shell: see `docs/features/industry-records-sourcing.md`. Settings form catalog: `docs/features/settings.md`.
+Scope: Industry > Build Plans tab (`/industry/plans`), plan page (`/industry/plans/:planId`), group page (`/industry/groups/:groupId`), Build Plan + Build Group model, materials table, recipe modal, Blueprint Acquisition modal, Build Location pickers, Compare, Auto Build, Fit Import, Retarget, Production Runs panel on the plan page, assumed ME/TE + facility defaults, Calculation Breakdown, `computeBuildPlan` / `buildVsBuy` engine, ADR 0006. Logs / BPC Sourcing / Opportunities / Active Jobs / tab shell: see `docs/features/industry-records-sourcing.md`. Settings form catalog: `docs/features/settings.md`.
 
 Terms per `GLOSSARY.md`: **Build Plan**, **Build Group**, **Group Rollup**, **Group Owned Overlay**, **Fit Import**, **Build Location**, **Build System**, **Reaction Location**, **Include Reactions**, **Remembered Location**, **Acquisition Verdict**, **Sale Profitability**, **Calculation Breakdown**, **Auto Build**, **Build Strategy**, **Craft Scope**, **Blueprint Acquisition**, **Seeded Build Plan**, **Production Run**, **Facility Preset**, **Industry Activity**, **Character Modifiers**. UI copy says "group" for Build Group (GLOSSARY.md **Build Group**).
 
@@ -54,12 +54,12 @@ Prior docs this expands: ADR 0006 (`docs/adr/0006-build-plan-dual-verdict-and-pr
 
 ## Purpose and user goal
 
-"Should I build this, what will I make, and what do I still need to get?" This doc covers the Build Plans tab plus the plan and group pages; the Jobs panel, Records, BPC Sourcing and Opportunities serve the other Industry jobs (`industry-records-sourcing.md`). A Build Plan "opens on its answer, not its inputs" (`20260906-091110`), and its materials are "a shopping list" filed by errand (`20261003-144713`). Groups turn a fit or a pasted blueprint list into many plans at once (#2982).
+"Should I build this, what will I make, and what do I still need to get?" This doc covers the Build Plans tab plus the plan and group pages; the Jobs panel, Logs, BPC Sourcing and Opportunities serve the other Industry jobs (`industry-records-sourcing.md`). A Build Plan "opens on its answer, not its inputs" (`20260906-091110`), and its materials are "a shopping list" filed by errand (`20261003-144713`). Groups turn a fit or a pasted blueprint list into many plans at once (#2982).
 
 - **Top jobs (ranked):** 1. "Is this build profitable, and should I build or buy it?" (verdict hero, Acquisition Verdict vs Sale Profitability, ADR 0006) 2. "What do I buy, what do I build, what do I already have?" (Materials errands, Copy shopping list) 3. "Which of my plans is best?" (plan list Profit / ISK/h / Margin, Compare).
 - **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11): Copy shopping list goes into the client's multibuy; fits and blueprint lists are pasted in to make a group. Phone parity: Industry is a default phone tab (`DEFAULT_MOBILE_TABS`); the Materials phone ledger and folded Costs exist so "a phone reaches the materials" (`20260906-091110`). Setup is "edited once and read many times" (same decision).
 - **Above the fold:** the Jobs summary bar (`industry-records-sourcing.md`) sits above the Plans tab too: folded to one line, expanding on demand, so it never pushes the plan list down (owner, 2026-10-11). Plan page: net profit with margin, ISK/h, duration and break-even, the verdict pills, then the To buy section. Plans tab: plan list with Profit and Verdict per row, and blueprint search to start one.
-- **Not for:** finding what to build (Opportunities); finished-job profit (Records); buying copies (BPC Sourcing); refining (reprocessing lives elsewhere, Q16).
+- **Not for:** finding what to build (Opportunities); finished-job profit (Logs); buying copies (BPC Sourcing); refining (reprocessing lives elsewhere, Q16).
 - **Sources:** owner, 2026-10-11 (desktop use; Jobs summary bar stays out of the way); `20260906-091110`, `20261003-144713`, `20260911-150427`, `20260905-000835`, `20261008-050524`, ADR 0006; #2843, #2920, #2982.
 - **Unconfirmed:** cadence (per build session, plans re-read while shopping); the order of jobs 2 and 3; that the plan list is used to compare plans rather than only to navigate; how often pilots edit Setup after creation.
 
@@ -93,7 +93,7 @@ Prior docs this expands: ADR 0006 (`docs/adr/0006-build-plan-dual-verdict-and-pr
   - Router state `fitImportText` (`lib/shortcuts.ts:30`): Fittings Export "Manufacture Plan" opens Fit Import dialog pre-filled and parsed (`Industry.tsx:136-153`).
   - Router state `logProductionFromJob` (Active Jobs "Log production..."): see sec 6.14.
   - Opportunities "Plan" (`StartPlanButton.tsx`, `handleStartPlan`, `Industry.tsx:526`): creates plan, opens plan page, busy until unmount. Opportunities "Add to compare" (`Industry.tsx:506`): creates plans, selects them, switches to Plans tab in comparing state.
-  - Records row click (`openRunFromRecords`, `Industry.tsx:552`): expands containing group then opens plan page.
+  - Logs row click (`openRunFromRecords`, `Industry.tsx:552`): expands containing group then opens plan page.
   - Global shortcut `go-to-industry` (`lib/shortcuts.ts:175`) is the only Industry keyboard shortcut; none inside plans/groups.
 - Outbound: BPC Sourcing from acquisition modal (`bpcSourcingHref(typeId)`, `IndustryPlanPage.tsx`), item context menus (Market, Show info, Build Plan) via `ItemActionsProvider`/`usePageItemActions`.
 
@@ -301,7 +301,7 @@ Panel "Production Runs", collapsible only once a run exists (folded by default t
 - Log Production modal (hero button, panel button, or Active Jobs seed): Quantity, Material cost, Job fee (`SourcingInput`s, no validation: blank = 0), live Total cost, Save. Defaults = plan's live quantity/material cost/job fee, or a job seed (job runs x yield, job fee; material cost stays the plan's estimate). Writes `productionRuns` (Dexie), `scheduleSync`.
 - Table columns: Logged, Quantity, Total cost, Qty sold ("sold / made"), Realized profit (with `RealizedProfitBreakdown`; no separate revenue column), Status (new / open / closed), actions (Sold split button: link past sale, watch open order, manual sale; Edit). Empty state `industry.productionRunsEmptyTitle/Hint`.
 - Edit run modal: same three fields, linked sales + watched orders lists with unlink / unwatch icons, "Delete run" danger button (no confirm in this modal; a confirm modal exists in `SaleLinkingControls.tsx:268` for the other path).
-- Realized profit (`engine/industry/realizedProfit.ts`): confirmed sales only; sales tax on all, broker only on watched-order revenue. Full Records view: other doc.
+- Realized profit (`engine/industry/realizedProfit.ts`): confirmed sales only; sales tax on all, broker only on watched-order revenue. Full Logs view: other doc.
 
 ### 6.11 Remaining plan-page notes
 

@@ -118,6 +118,19 @@ describe('listNavDestinations', () => {
   });
   const byPath = (path: string) => all.find((entry) => entry.path === path);
 
+  it('leaves out a tab whose path is in hiddenTabPaths', () => {
+    const without = listNavDestinations({
+      locked: NO_LOCKS,
+      corpVisible: true,
+      corpCapabilities: ALL_CORP_VIEWS,
+      t,
+      hiddenTabPaths: new Set(['/industry/logs']),
+    });
+    expect(without.some((entry) => entry.path === '/industry/logs')).toBe(false);
+    expect(without.some((entry) => entry.path === '/industry/plans')).toBe(true);
+    expect(byPath('/industry/logs')).toBeDefined();
+  });
+
   it('lists every page, in nav order, before or among its tabs', () => {
     const pages = all.filter((entry) => entry.kind === 'page').map((entry) => entry.path);
     expect(pages).toEqual(NAV_PAGES.map((page) => page.path));
