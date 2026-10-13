@@ -28,19 +28,21 @@ describe('SegmentedControl', () => {
     expect(onChange).toHaveBeenCalledWith('c');
   });
 
-  it('sizes every segment from the control scale', () => {
+  // The group's border sits inside the control height, so the whole control is
+  // exactly as tall as a Button of the same size beside it (a segment at full
+  // height inside a 1px border made it 2px taller).
+  it('sizes the group, border included, from the control scale', () => {
     const { rerender } = render(
       <SegmentedControl label="Pick" options={options} value="a" onChange={noop} />
     );
+    expect(screen.getByRole('group').className).toContain(controlHeightClassName.md);
     for (const button of screen.getAllByRole('button')) {
-      expect(button.className).toContain(controlHeightClassName.md);
+      expect(button.className).not.toContain(controlHeightClassName.md);
     }
     rerender(
       <SegmentedControl label="Pick" options={options} value="a" onChange={noop} size="sm" />
     );
-    for (const button of screen.getAllByRole('button')) {
-      expect(button.className).toContain(controlHeightClassName.sm);
-    }
+    expect(screen.getByRole('group').className).toContain(controlHeightClassName.sm);
   });
 
   it('stretches segments equally when filling', () => {

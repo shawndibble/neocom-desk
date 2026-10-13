@@ -226,14 +226,14 @@ export function ShipTreeMap({
         </span>
         <span className="flex-1" />
         <IconButton
-          size="sm"
+          size="md"
           icon={<Icon.ShowLabels />}
           label={t('ships.tree.showNames')}
           pressed={showNames}
           onClick={() => setShowNames((v) => !v)}
         />
         <IconButton
-          size="sm"
+          size="md"
           icon={<Icon.ZoomOut />}
           label={t('ships.tree.zoomOut')}
           disabled={cam.z <= MIN_ZOOM}
@@ -244,7 +244,7 @@ export function ShipTreeMap({
           {Math.round(cam.z * 100)}%
         </span>
         <IconButton
-          size="sm"
+          size="md"
           icon={<Icon.ZoomIn />}
           label={t('ships.tree.zoomIn')}
           disabled={cam.z >= MAX_ZOOM}
@@ -252,7 +252,7 @@ export function ShipTreeMap({
         />
         <Tooltip content={t('ships.tree.fitLabel')}>
           <Button
-            size="sm"
+            size="md"
             onClick={() => {
               setFocus(null);
               moveTo(fitCamera(world, viewport, fitInset));

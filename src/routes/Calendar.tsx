@@ -362,7 +362,7 @@ export function Calendar() {
       {/* Density is a property of the grid; the ticker is always a rolling fortnight. */}
       {!isNarrow && (
         <IconButton
-          size="sm"
+          size="md"
           icon={<Icon.CalendarEvent />}
           label={t('calendar.density.fortnightView')}
           // The name stays put and `pressed` carries the state; the bubble

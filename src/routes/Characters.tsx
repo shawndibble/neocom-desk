@@ -1820,7 +1820,7 @@ export function Characters() {
               {addingGroup ? (
                 <TextInput
                   autoFocus
-                  size="md"
+                  size="sm"
                   value={newGroupName}
                   aria-label={t('characters.newGroupName')}
                   onChange={(e) => setNewGroupName(e.target.value)}
@@ -1839,7 +1839,7 @@ export function Characters() {
                   className="w-40"
                 />
               ) : (
-                <Button ref={newGroupButton} size="md" onClick={() => setAddingGroup(true)}>
+                <Button ref={newGroupButton} size="sm" onClick={() => setAddingGroup(true)}>
                   {t('characters.newGroup')}
                 </Button>
               )}

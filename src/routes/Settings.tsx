@@ -517,7 +517,7 @@ function ImportPanel() {
               className="max-w-xs min-w-0 flex-1 basis-48"
             />
             <Button
-              size="sm"
+              size="md"
               aria-disabled={!file || password.length === 0 || status === 'importing'}
               onClick={() => void handleImport()}
             >

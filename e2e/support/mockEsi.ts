@@ -86,6 +86,8 @@ const PREFETCHED_EMPTY = new Set(
     'blueprints',
     'calendar',
     'contacts',
+    // Not warmed at boot: the Contacts and Mail pages read these on mount.
+    'contacts/labels',
     'contracts',
     'corporationhistory',
     // Not warmed at boot — the Fittings page's In-game Fittings panel fetches
@@ -94,6 +96,7 @@ const PREFETCHED_EMPTY = new Set(
     'fittings',
     'industry/jobs',
     'mail',
+    'mail/lists',
     // Trailing slash on purpose: `getCharacterMining` fetches
     // `/characters/{id}/mining/`, and the Overview board reads it on every
     // page now that the Mining Tax card is on the landing route.
