@@ -1636,6 +1636,11 @@ export function BpcSourcingPanel({
     );
   }
 
+  const showsTable =
+    !(loading && !data) &&
+    !error &&
+    syncConfigured &&
+    !(rows.length === 0 && originals.length === 0 && ownedBlueprints.length === 0);
   const capNote =
     sources.size > 0 && displayRows.length > shownRows.length
       ? t('bpcContracts.resultsCapped', {
@@ -1643,8 +1648,10 @@ export function BpcSourcingPanel({
           total: displayRows.length.toLocaleString(),
         })
       : null;
-  const marketNote =
-    marketLookup.typeIds.length === 0 || marketRegionId === null
+  const marketNoteApplies = marketLookup.typeIds.length > 0 || sources.has('market');
+  const marketNote = !marketNoteApplies
+    ? null
+    : marketLookup.typeIds.length === 0 || marketRegionId === null
       ? t('bpcContracts.marketScopeNeedsSearch')
       : [
           market.loading
@@ -1667,437 +1674,443 @@ export function BpcSourcingPanel({
     // data age sits beside the page title and Refresh beside the settings
     // gear (`onHeaderChange`). The table keeps its accessible name from
     // `bpcContracts.title`.
-    <Panel padded={false}>
-      {loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : !syncConfigured ? (
-        <EmptyState
-          title={t('bpcContracts.notConfiguredTitle')}
-          hint={t('bpcContracts.notConfiguredHint')}
-        />
-      ) : rows.length === 0 && originals.length === 0 && ownedBlueprints.length === 0 ? (
-        // Nothing to search from either source — distinct from
-        // `noFilterMatches` below, which is "some data exists, the filter
-        // just excludes it all."
-        <EmptyState title={t('bpcContracts.emptyTitle')} hint={t('bpcContracts.emptyHint')} />
-      ) : (
-        <>
-          {contractsResult?.fromCache && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.offlineTitle')}
-            </p>
-          )}
-          <BpcFilterBar
-            filter={uiFilter}
-            onChange={changeFilter}
-            hideDefaults={hideDefaults}
-            regionOptions={regionOptions}
-            sources={sources}
-            onSourcesChange={(next) => setParams({ 'sourcing.src': next })}
-            spaceKinds={spaceFilter}
-            onSpaceKindsChange={(next) => void setSpaceFilter(next)}
-            jumps={jumps}
-            onJumpsChange={(next) => setParams({ 'sourcing.jumps': next })}
-            currentSystem={currentSystem}
-            searchComboboxProps={searchComboboxProps}
-            actions={
-              <>
-                <ColumnPickerMenu
-                  available={BPC_SEARCH_COLUMN_IDS}
-                  visible={visibleColumns}
-                  columnsById={bpcColumnsById}
-                  onToggle={toggleColumn}
-                  buttonLabel={t('bpcContracts.columnsButton')}
-                  menuTitle={t('bpcContracts.columnsMenuTitle')}
-                />
-                {displayRows.length > 0 && (
-                  <TableActionsMenu
-                    name={t('bpcContracts.title')}
-                    tableExport={sourcingExport}
-                    size="md"
-                  />
-                )}
-              </>
-            }
+    <>
+      <Panel padded={false}>
+        {loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : !syncConfigured ? (
+          <EmptyState
+            title={t('bpcContracts.notConfiguredTitle')}
+            hint={t('bpcContracts.notConfiguredHint')}
           />
-          {activeChips.length > 0 && (
-            // Phone only: from `md` up every filter sits inline in the bar
-            // above, so it already shows what it is set to. Below it they
-            // hide in the funnel's sheet, where a count badge was the only
-            // sign any was on.
-            <div className="flex items-center gap-2 overflow-x-auto border-b border-line px-3 py-1.5 md:hidden">
-              {activeChips.map((chip) => (
-                <FilterChip
-                  key={chip.id}
-                  label={filterChipLabel(chip)}
-                  selected
-                  className="shrink-0"
-                  onToggle={() => applyFilterState(chip.clear(filterState))}
-                />
-              ))}
-              <button
-                type="button"
-                className={cx(textActionClassName(), 'shrink-0 whitespace-nowrap')}
-                onClick={() =>
-                  applyFilterState(
-                    activeChips.reduce((state, chip) => chip.clear(state), filterState)
-                  )
-                }
-              >
-                {t('bpcContracts.chips.clearAll')}
-              </button>
-            </div>
-          )}
-          {/* Outside the bar: collapsed, its controls unmount, and this is
+        ) : rows.length === 0 && originals.length === 0 && ownedBlueprints.length === 0 ? (
+          // Nothing to search from either source — distinct from
+          // `noFilterMatches` below, which is "some data exists, the filter
+          // just excludes it all."
+          <EmptyState title={t('bpcContracts.emptyTitle')} hint={t('bpcContracts.emptyHint')} />
+        ) : (
+          <>
+            {contractsResult?.fromCache && (
+              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                {t('common.offlineTitle')}
+              </p>
+            )}
+            <BpcFilterBar
+              filter={uiFilter}
+              onChange={changeFilter}
+              hideDefaults={hideDefaults}
+              regionOptions={regionOptions}
+              sources={sources}
+              onSourcesChange={(next) => setParams({ 'sourcing.src': next })}
+              spaceKinds={spaceFilter}
+              onSpaceKindsChange={(next) => void setSpaceFilter(next)}
+              jumps={jumps}
+              onJumpsChange={(next) => setParams({ 'sourcing.jumps': next })}
+              currentSystem={currentSystem}
+              searchComboboxProps={searchComboboxProps}
+              actions={
+                <>
+                  <ColumnPickerMenu
+                    available={BPC_SEARCH_COLUMN_IDS}
+                    visible={visibleColumns}
+                    columnsById={bpcColumnsById}
+                    onToggle={toggleColumn}
+                    buttonLabel={t('bpcContracts.columnsButton')}
+                    menuTitle={t('bpcContracts.columnsMenuTitle')}
+                  />
+                  {displayRows.length > 0 && (
+                    <TableActionsMenu
+                      name={t('bpcContracts.title')}
+                      tableExport={sourcingExport}
+                      size="md"
+                    />
+                  )}
+                </>
+              }
+            />
+            {activeChips.length > 0 && (
+              // Phone only: from `md` up every filter sits inline in the bar
+              // above, so it already shows what it is set to. Below it they
+              // hide in the funnel's sheet, where a count badge was the only
+              // sign any was on.
+              <div className="flex items-center gap-2 overflow-x-auto border-b border-line px-3 py-1.5 md:hidden">
+                {activeChips.map((chip) => (
+                  <FilterChip
+                    key={chip.id}
+                    label={filterChipLabel(chip)}
+                    selected
+                    className="shrink-0"
+                    onToggle={() => applyFilterState(chip.clear(filterState))}
+                  />
+                ))}
+                <button
+                  type="button"
+                  className={cx(textActionClassName(), 'shrink-0 whitespace-nowrap')}
+                  onClick={() =>
+                    applyFilterState(
+                      activeChips.reduce((state, chip) => chip.clear(state), filterState)
+                    )
+                  }
+                >
+                  {t('bpcContracts.chips.clearAll')}
+                </button>
+              </div>
+            )}
+            {/* Outside the bar: collapsed, its controls unmount, and this is
               exactly when the pilot needs telling the range is not applied. */}
-          {(jumpFilter.status === 'no-origin' || jumpFilter.status === 'unknown') && (
-            <div className="border-b border-line px-3 py-2">
-              <JumpRangeNote status={jumpFilter.status} />
-            </div>
-          )}
+            {(jumpFilter.status === 'no-origin' || jumpFilter.status === 'unknown') && (
+              <div className="border-b border-line px-3 py-2">
+                <JumpRangeNote status={jumpFilter.status} />
+              </div>
+            )}
 
-          {/* Inset on its own ground with an accent edge, because as a plain
+            {/* Inset on its own ground with an accent edge, because as a plain
               list flush against the filter bar it read as more page furniture
               and went unnoticed — the whole feature hangs on picking from it. */}
-          {/* Always mounted, so the count is announced when the list appears. */}
-          <span role="status" aria-live="polite" className="sr-only">
-            {openSuggestions !== null &&
-              (highlightedSuggestion
-                ? t('bpcContracts.suggestionsHighlighted', {
-                    count: openSuggestions.length,
-                    name: highlightedSuggestion.name,
-                  })
-                : t('bpcContracts.suggestionsCount', { count: openSuggestions.length }))}
-          </span>
-          {openSuggestions !== null && (
-            <div className="border-b border-line bg-panel-2 px-3 py-2">
-              <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('bpcContracts.suggestionsHeading')}
-              </p>
-              <ul
-                id={suggestionListboxId}
-                role="listbox"
-                aria-label={t('bpcContracts.suggestionsLabel')}
-                className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
-              >
-                {openSuggestions.map((suggestion) => (
-                  <li
-                    key={suggestion.typeId}
-                    id={suggestionOptionId(suggestion.typeId)}
-                    role="option"
-                    aria-selected={suggestion === highlightedSuggestion}
-                    // Keeps focus in the search box, so a click never blurs it first.
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => selectBlueprint(suggestion)}
-                    className={cx(
-                      'flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-line px-3 py-1.5 text-left text-sm last:border-b-0 md:min-h-9',
-                      suggestion === highlightedSuggestion
-                        ? `bg-panel-2 ${activeOptionClassName}`
-                        : 'hover:bg-panel-2'
-                    )}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>
-                    {/* Hidden on the narrowest screens rather than wrapped: three
+            {/* Always mounted, so the count is announced when the list appears. */}
+            <span role="status" aria-live="polite" className="sr-only">
+              {openSuggestions !== null &&
+                (highlightedSuggestion
+                  ? t('bpcContracts.suggestionsHighlighted', {
+                      count: openSuggestions.length,
+                      name: highlightedSuggestion.name,
+                    })
+                  : t('bpcContracts.suggestionsCount', { count: openSuggestions.length }))}
+            </span>
+            {openSuggestions !== null && (
+              <div className="border-b border-line bg-panel-2 px-3 py-2">
+                <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('bpcContracts.suggestionsHeading')}
+                </p>
+                <ul
+                  id={suggestionListboxId}
+                  role="listbox"
+                  aria-label={t('bpcContracts.suggestionsLabel')}
+                  className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
+                >
+                  {openSuggestions.map((suggestion) => (
+                    <li
+                      key={suggestion.typeId}
+                      id={suggestionOptionId(suggestion.typeId)}
+                      role="option"
+                      aria-selected={suggestion === highlightedSuggestion}
+                      // Keeps focus in the search box, so a click never blurs it first.
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectBlueprint(suggestion)}
+                      className={cx(
+                        'flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-line px-3 py-1.5 text-left text-sm last:border-b-0 md:min-h-9',
+                        suggestion === highlightedSuggestion
+                          ? `bg-panel-2 ${activeOptionClassName}`
+                          : 'hover:bg-panel-2'
+                      )}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>
+                      {/* Hidden on the narrowest screens rather than wrapped: three
                           columns in a 390px row squeezes the name, which is the
                           one part that has to stay readable. */}
-                    <span className="hidden shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:inline">
-                      {t('bpcContracts.suggestionBestMeTe', {
-                        me: suggestion.bestMe,
-                        te: suggestion.bestTe,
-                      })}
-                    </span>
-                    <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
-                      {t('bpcContracts.regionOffers', { count: suggestion.offerCount })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {selectedName !== null && summary !== null && (
-            // Name and close share the first line on a phone; the stats strip
-            // wraps beneath instead of the close button taking a line of its own.
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2">
-              <div className="min-w-0 max-sm:flex-1">
-                <p className="truncate text-base font-semibold">{selectedName}</p>
-                {/* The phone's sort bar counts the offers instead. */}
-                <p className="text-[0.6875rem] text-text-dim max-sm:hidden">
-                  {t('bpcContracts.offersOnContract', { count: summary.offerCount })}
-                </p>
+                      <span className="hidden shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:inline">
+                        {t('bpcContracts.suggestionBestMeTe', {
+                          me: suggestion.bestMe,
+                          te: suggestion.bestTe,
+                        })}
+                      </span>
+                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
+                        {t('bpcContracts.regionOffers', { count: suggestion.offerCount })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <IconButton
-                icon={<Icon.Close />}
-                label={t('bpcContracts.clearBlueprint', { name: selectedName })}
-                tooltip={t('bpcContracts.clearBlueprintShort')}
-                size="sm"
-                className="sm:order-3"
-                onClick={clearBlueprint}
-              />
-              <StatChips className="max-sm:order-3 max-sm:w-full md:ml-auto">
-                {summary.cheapest !== null && (
-                  <StatChip
-                    emphasis
-                    label={t('bpcContracts.cheapestLabel')}
-                    value={<IskAmount value={summary.cheapest} />}
-                  />
-                )}
-                {summary.cheapestPerRun !== null && (
-                  <StatChip
-                    label={t('bpcContracts.cheapestPerRunLabel')}
-                    value={<IskAmount value={summary.cheapestPerRun} />}
-                  />
-                )}
-                {summary.median !== null && (
-                  <StatChip
-                    label={t('bpcContracts.medianLabel')}
-                    value={<IskAmount value={summary.median} />}
-                  />
-                )}
-                {summary.bestMe !== null && summary.bestTe !== null && (
-                  <StatChip
-                    label={t('bpcContracts.bestMeTeLabel')}
-                    value={`${summary.bestMe} / ${summary.bestTe}`}
-                  />
-                )}
-              </StatChips>
-            </div>
-          )}
+            )}
 
-          {(regionCells.length > 0 || selectedBpoCards.length > 0) && (
-            // One wrapping row: [Cheapest by region] [Market BPOs] [Contract BPOs],
-            // every card the same width; on a phone the region cells take the
-            // first line (scrolling sideways) and the two BPO groups share the
-            // next in two columns. A group with no card is left out.
-            <div className="grid grid-cols-2 gap-x-2 gap-y-2 border-b border-line px-3 py-2 sm:flex sm:flex-row sm:flex-wrap sm:gap-x-4">
-              {regionCells.length > 0 && (
-                <div className="col-span-2 min-w-0 max-w-full">
-                  <p className={SOURCING_GROUP_HEADER}>{t('bpcContracts.cheapestByRegion')}</p>
-                  {/* A fixed order (The Forge first), so a cell stays where the pilot
+            {selectedName !== null && summary !== null && (
+              // Name and close share the first line on a phone; the stats strip
+              // wraps beneath instead of the close button taking a line of its own.
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2">
+                <div className="min-w-0 max-sm:flex-1">
+                  <p className="truncate text-base font-semibold">{selectedName}</p>
+                  {/* The phone's sort bar counts the offers instead. */}
+                  <p className="text-[0.6875rem] text-text-dim max-sm:hidden">
+                    {t('bpcContracts.offersOnContract', { count: summary.offerCount })}
+                  </p>
+                </div>
+                <IconButton
+                  icon={<Icon.Close />}
+                  label={t('bpcContracts.clearBlueprint', { name: selectedName })}
+                  tooltip={t('bpcContracts.clearBlueprintShort')}
+                  size="sm"
+                  className="sm:order-3"
+                  onClick={clearBlueprint}
+                />
+                <StatChips className="max-sm:order-3 max-sm:w-full md:ml-auto">
+                  {summary.cheapest !== null && (
+                    <StatChip
+                      emphasis
+                      label={t('bpcContracts.cheapestLabel')}
+                      value={<IskAmount value={summary.cheapest} />}
+                    />
+                  )}
+                  {summary.cheapestPerRun !== null && (
+                    <StatChip
+                      label={t('bpcContracts.cheapestPerRunLabel')}
+                      value={<IskAmount value={summary.cheapestPerRun} />}
+                    />
+                  )}
+                  {summary.median !== null && (
+                    <StatChip
+                      label={t('bpcContracts.medianLabel')}
+                      value={<IskAmount value={summary.median} />}
+                    />
+                  )}
+                  {summary.bestMe !== null && summary.bestTe !== null && (
+                    <StatChip
+                      label={t('bpcContracts.bestMeTeLabel')}
+                      value={`${summary.bestMe} / ${summary.bestTe}`}
+                    />
+                  )}
+                </StatChips>
+              </div>
+            )}
+
+            {(regionCells.length > 0 || selectedBpoCards.length > 0) && (
+              // One wrapping row: [Cheapest by region] [Market BPOs] [Contract BPOs],
+              // every card the same width; on a phone the region cells take the
+              // first line (scrolling sideways) and the two BPO groups share the
+              // next in two columns. A group with no card is left out.
+              <div className="grid grid-cols-2 gap-x-2 gap-y-2 border-b border-line px-3 py-2 sm:flex sm:flex-row sm:flex-wrap sm:gap-x-4">
+                {regionCells.length > 0 && (
+                  <div className="col-span-2 min-w-0 max-w-full">
+                    <p className={SOURCING_GROUP_HEADER}>{t('bpcContracts.cheapestByRegion')}</p>
+                    {/* A fixed order (The Forge first), so a cell stays where the pilot
                     looks for it; the accent marks the cheapest. Hovering a name says
                     why the region is here. */}
-                  {/* `relative` makes the row the containing block of each
+                    {/* `relative` makes the row the containing block of each
                     price's absolutely positioned screen-reader text
                     (`IskAmount`'s `sr-only`). Without it that text escaped
                     the row's scroll clip and the whole page scrolled
                     sideways on a phone, not just this row. */}
-                  <ul
-                    aria-label={t('bpcContracts.cheapestByRegion')}
-                    className="relative flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap"
-                  >
-                    {regionCells.map((cell) => {
-                      const accent =
-                        cheapestCard === 'region' && cell.regionId === cheapestRegionId?.regionId;
-                      return (
-                        <li
-                          key={cell.regionId}
-                          className={cx(
-                            'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-1.5',
-                            REGION_CELL_WIDTH,
-                            accent ? 'border-accent-dim' : 'border-line'
-                          )}
-                        >
-                          <HintText
-                            className="max-w-full self-start truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                            content={cell.reasons
-                              .map((reason) => t(`bpcContracts.regionReason.${reason}`))
-                              .join(' · ')}
+                    <ul
+                      aria-label={t('bpcContracts.cheapestByRegion')}
+                      className="relative flex gap-2 max-sm:-mx-3 max-sm:overflow-x-auto max-sm:px-3 sm:flex-wrap"
+                    >
+                      {regionCells.map((cell) => {
+                        const accent =
+                          cheapestCard === 'region' && cell.regionId === cheapestRegionId?.regionId;
+                        return (
+                          <li
+                            key={cell.regionId}
+                            className={cx(
+                              'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-1.5',
+                              REGION_CELL_WIDTH,
+                              accent ? 'border-accent-dim' : 'border-line'
+                            )}
                           >
-                            {baselineRegionName(cell.regionId)}
-                          </HintText>
-                          {/* Price and offer count share a line: two lines a cell, not three. */}
-                          {cell.listing === null ? (
-                            <span className="text-[0.6875rem] text-text-dim">
-                              {t('bpcContracts.regionNoOffers')}
-                            </span>
-                          ) : (
-                            <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-                              <span className={cx('text-sm tabular-nums', accent && 'text-accent')}>
-                                <IskAmount value={cell.listing.cheapest} />
+                            <HintText
+                              className="max-w-full self-start truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                              content={cell.reasons
+                                .map((reason) => t(`bpcContracts.regionReason.${reason}`))
+                                .join(' · ')}
+                            >
+                              {baselineRegionName(cell.regionId)}
+                            </HintText>
+                            {/* Price and offer count share a line: two lines a cell, not three. */}
+                            {cell.listing === null ? (
+                              <span className="text-[0.6875rem] text-text-dim">
+                                {t('bpcContracts.regionNoOffers')}
                               </span>
-                              <span className="truncate text-[0.6875rem] tabular-nums text-text-dim">
-                                {t('bpcContracts.regionOffers', { count: cell.listing.offerCount })}
+                            ) : (
+                              <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                                <span
+                                  className={cx('text-sm tabular-nums', accent && 'text-accent')}
+                                >
+                                  <IskAmount value={cell.listing.cheapest} />
+                                </span>
+                                <span className="truncate text-[0.6875rem] tabular-nums text-text-dim">
+                                  {t('bpcContracts.regionOffers', {
+                                    count: cell.listing.offerCount,
+                                  })}
+                                </span>
                               </span>
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-              {selectedBpoCards.map((bpo) => {
-                const header = t(
-                  bpo.kind === 'market'
-                    ? 'bpcContracts.sourceMarketBpos'
-                    : 'bpcContracts.sourceContractBpos'
-                );
-                return (
-                  <div key={bpo.kind} className="min-w-0 max-w-full">
-                    <p className={SOURCING_GROUP_HEADER}>{header}</p>
-                    <ul aria-label={header} className="flex flex-wrap gap-2">
-                      <BpoCard
-                        bpo={bpo}
-                        mayBeCheaper={cheapestCopy !== null && bpoMayBeCheaper(bpo, cheapestCopy)}
-                        cheapest={cheapestCard === bpo.kind}
-                        location={bpoCardLocations.get(bpo.locationId)}
-                        className={BPO_CARD_LAYOUT}
-                      />
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                )}
+                {selectedBpoCards.map((bpo) => {
+                  const header = t(
+                    bpo.kind === 'market'
+                      ? 'bpcContracts.sourceMarketBpos'
+                      : 'bpcContracts.sourceContractBpos'
+                  );
+                  return (
+                    <div key={bpo.kind} className="min-w-0 max-w-full">
+                      <p className={SOURCING_GROUP_HEADER}>{header}</p>
+                      <ul aria-label={header} className="flex flex-wrap gap-2">
+                        <BpoCard
+                          bpo={bpo}
+                          mayBeCheaper={cheapestCopy !== null && bpoMayBeCheaper(bpo, cheapestCopy)}
+                          cheapest={cheapestCard === bpo.kind}
+                          location={bpoCardLocations.get(bpo.locationId)}
+                          className={BPO_CARD_LAYOUT}
+                        />
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-          {sources.size === 0 ? (
-            <EmptyState title={t('bpcContracts.noSourceSelected')} className="py-8" />
-          ) : displayRows.length === 0 ? (
-            <EmptyState
-              title={t('bpcContracts.noFilterMatches')}
-              hint={t('bpcContracts.noFilterMatchesHint')}
-              className="py-8"
-              action={
-                <Button size="sm" onClick={resetSourcingFilters}>
-                  {t('common.resetFilters')}
-                </Button>
-              }
-            />
-          ) : (
-            <>
-              <DataTable
-                {...sourcingExport.tableProps}
-                label={t('bpcContracts.title')}
-                columns={columns}
-                rows={shownRows}
-                // Index included deliberately: a contract lists the same
-                // blueprint once per copy, so contractId+typeId is not
-                // unique — 70% of rows in a live pull shared one, and the
-                // duplicate React keys left the previous blueprint's rows
-                // in the table beside the chosen one. An owned row's
-                // item_id is already unique on its own.
-                rowKey={(row, index) =>
-                  row.source === 'contract'
-                    ? `${row.contract.contractId}:${row.typeId}:${index}`
-                    : row.source === 'market'
-                      ? `market:${row.orderId}`
-                      : row.source === 'lp'
-                        ? `lp:${row.corporationId}:${row.offerId}`
-                        : row.source === 'community'
-                          ? `community:${row.memberUid}:${row.typeId}:${row.me}:${row.te}:${row.runs}:${row.locationName}:${index}`
-                          : `owned:${row.itemId}`
+            {sources.size === 0 ? (
+              <EmptyState title={t('bpcContracts.noSourceSelected')} className="py-8" />
+            ) : displayRows.length === 0 ? (
+              <EmptyState
+                title={t('bpcContracts.noFilterMatches')}
+                hint={t('bpcContracts.noFilterMatchesHint')}
+                className="py-8"
+                action={
+                  <Button size="sm" onClick={resetSourcingFilters}>
+                    {t('common.resetFilters')}
+                  </Button>
                 }
-                {...sortProps}
-                // A two-line card per offer on a phone — price at the right of
-                // the title line, everything else on one dim line under it —
-                // and a sort picker, since the header row it would sort from
-                // is gone. The cap above follows that same sort.
-                stackLayout="dense"
-                // Name, price and the More actions button centred on one
-                // line, the button's 44px touch target no longer making that
-                // line button-tall (Hauling's opt-in, `index.css`).
-                className="dt-dense-tight"
-                mobileSort
-                stackSummary={
-                  displayRows.length > shownRows.length
-                    ? t('bpcContracts.mobile.offerCountCapped', {
-                        shown: shownRows.length.toLocaleString(),
-                        total: displayRows.length.toLocaleString(),
-                      })
-                    : t('bpcContracts.mobile.offerCount', { count: displayRows.length })
-                }
-                // A contract row opens its contract; a market row opens the
-                // item's Market entry. Owned and Community rows have no
-                // contract: nothing to open.
-                rowClickable={(row) => row.source !== 'community'}
-                onRowClick={(row) => {
-                  if (row.source === 'community') return;
-                  if (row.source === 'lp') {
-                    // The store, with this offer picked; `affordableOnly=0` so an
-                    // offer the pilot can't yet afford is not filtered out of view.
-                    navigate(
-                      `/wallet/lp-store/${row.corporationId}?${new URLSearchParams({ offer: String(row.offerId), affordableOnly: '0' })}`
-                    );
-                    return;
+              />
+            ) : (
+              <>
+                <DataTable
+                  {...sourcingExport.tableProps}
+                  label={t('bpcContracts.title')}
+                  columns={columns}
+                  rows={shownRows}
+                  // Index included deliberately: a contract lists the same
+                  // blueprint once per copy, so contractId+typeId is not
+                  // unique — 70% of rows in a live pull shared one, and the
+                  // duplicate React keys left the previous blueprint's rows
+                  // in the table beside the chosen one. An owned row's
+                  // item_id is already unique on its own.
+                  rowKey={(row, index) =>
+                    row.source === 'contract'
+                      ? `${row.contract.contractId}:${row.typeId}:${index}`
+                      : row.source === 'market'
+                        ? `market:${row.orderId}`
+                        : row.source === 'lp'
+                          ? `lp:${row.corporationId}:${row.offerId}`
+                          : row.source === 'community'
+                            ? `community:${row.memberUid}:${row.typeId}:${row.me}:${row.te}:${row.runs}:${row.locationName}:${index}`
+                            : `owned:${row.itemId}`
                   }
-                  if (row.source === 'market') {
-                    const params = marketLinkParams(row.typeId, location.search);
-                    navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-                    return;
+                  {...sortProps}
+                  // A two-line card per offer on a phone — price at the right of
+                  // the title line, everything else on one dim line under it —
+                  // and a sort picker, since the header row it would sort from
+                  // is gone. The cap above follows that same sort.
+                  stackLayout="dense"
+                  // Name, price and the More actions button centred on one
+                  // line, the button's 44px touch target no longer making that
+                  // line button-tall (Hauling's opt-in, `index.css`).
+                  className="dt-dense-tight"
+                  mobileSort
+                  stackSummary={
+                    displayRows.length > shownRows.length
+                      ? t('bpcContracts.mobile.offerCountCapped', {
+                          shown: shownRows.length.toLocaleString(),
+                          total: displayRows.length.toLocaleString(),
+                        })
+                      : t('bpcContracts.mobile.offerCount', { count: displayRows.length })
                   }
-                  if (row.source === 'owned') {
-                    // No contract to open: start a Build Plan from the owned
-                    // blueprint, seeded with its own ME/TE/runs.
-                    void loadPlannableIndex().then((index) => {
-                      const productTypeId = plannableProductTypeID(index, row.typeId);
-                      if (productTypeId === null) return;
-                      const params = new URLSearchParams({ product: String(productTypeId) });
-                      applyPlanSeed(
-                        params,
+                  // A contract row opens its contract; a market row opens the
+                  // item's Market entry. Owned and Community rows have no
+                  // contract: nothing to open.
+                  rowClickable={(row) => row.source !== 'community'}
+                  onRowClick={(row) => {
+                    if (row.source === 'community') return;
+                    if (row.source === 'lp') {
+                      // The store, with this offer picked; `affordableOnly=0` so an
+                      // offer the pilot can't yet afford is not filtered out of view.
+                      navigate(
+                        `/wallet/lp-store/${row.corporationId}?${new URLSearchParams({ offer: String(row.offerId), affordableOnly: '0' })}`
+                      );
+                      return;
+                    }
+                    if (row.source === 'market') {
+                      const params = marketLinkParams(row.typeId, location.search);
+                      navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+                      return;
+                    }
+                    if (row.source === 'owned') {
+                      // No contract to open: start a Build Plan from the owned
+                      // blueprint, seeded with its own ME/TE/runs.
+                      void loadPlannableIndex().then((index) => {
+                        const productTypeId = plannableProductTypeID(index, row.typeId);
+                        if (productTypeId === null) return;
+                        const params = new URLSearchParams({ product: String(productTypeId) });
+                        applyPlanSeed(
+                          params,
+                          row.runs === -1 || row.runs === null
+                            ? null
+                            : { me: row.me, te: row.te, runs: row.runs }
+                        );
+                        navigate(`${industryTabHref('plans')}?${params.toString()}`);
+                      });
+                      return;
+                    }
+                    setOpenRow(asContract(row));
+                  }}
+                  rowMoreActions
+                  rowContextMenu={(row, tr) => (
+                    // The Offer's own ME/TE/runs, not the defaults, so a pilot
+                    // shopping a specific copy sees what *that* copy builds. A
+                    // BPO's -1 runs falls back to the unseeded default instead
+                    // of a fabricated run count.
+                    <BuildPlanContextMenu
+                      typeId={row.typeId}
+                      itemName={blueprintNames.get(row.typeId)}
+                      seed={
                         row.runs === -1 || row.runs === null
                           ? null
                           : { me: row.me, te: row.te, runs: row.runs }
-                      );
-                      navigate(`${industryTabHref('plans')}?${params.toString()}`);
-                    });
-                    return;
-                  }
-                  setOpenRow(asContract(row));
-                }}
-                rowMoreActions
-                rowContextMenu={(row, tr) => (
-                  // The Offer's own ME/TE/runs, not the defaults, so a pilot
-                  // shopping a specific copy sees what *that* copy builds. A
-                  // BPO's -1 runs falls back to the unseeded default instead
-                  // of a fabricated run count.
-                  <BuildPlanContextMenu
-                    typeId={row.typeId}
-                    itemName={blueprintNames.get(row.typeId)}
-                    seed={
-                      row.runs === -1 || row.runs === null
-                        ? null
-                        : { me: row.me, te: row.te, runs: row.runs }
-                    }
-                    trigger={tr}
-                    omitViewInMarket
-                    extraItems={waypointItemFor(row, ownedPlaceIds)}
-                  />
-                )}
-                // At most RESULT_LIMIT rows, but a phone still mounts only a screenful.
-                virtualize
-              />
-            </>
-          )}
-        </>
-      )}
+                      }
+                      trigger={tr}
+                      omitViewInMarket
+                      extraItems={waypointItemFor(row, ownedPlaceIds)}
+                    />
+                  )}
+                  // At most RESULT_LIMIT rows, but a phone still mounts only a screenful.
+                  virtualize
+                />
+              </>
+            )}
+          </>
+        )}
 
-      {/* One quiet line under the table: what the list was capped to and
-          which market was checked. The cap follows the phone's sort bar
-          (`stackSummary`) there, so it is left off at that width. */}
-      {(marketLookup.typeIds.length > 0 || sources.has('market') || capNote !== null) && (
-        <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+        {openRow !== null && (
+          <BpcContractModal
+            row={openRow}
+            // Non-null past the `activeCharacterId === null` guard above; the
+            // modal needs one to resolve a player-structure location, whose ACL
+            // is per Character (#655 item F).
+            characterId={activeCharacterId}
+            blueprintName={blueprintNames.get(openRow.typeId) ?? `#${openRow.typeId}`}
+            regionName={regionNames.get(openRow.regionId) ?? `#${openRow.regionId}`}
+            onClose={() => setOpenRow(null)}
+          />
+        )}
+      </Panel>
+      {/* One quiet line just under the card: what the list was capped to and
+        which market was checked. The cap follows the phone's sort bar
+        (`stackSummary`) there, so it is left off at that width. Only where
+        the table itself shows, never under a spinner or an error. */}
+      {showsTable && (marketNote !== null || capNote !== null) && (
+        <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
           {capNote !== null && <span className="max-sm:hidden">{capNote} </span>}
           {marketNote}
         </p>
       )}
-
-      {openRow !== null && (
-        <BpcContractModal
-          row={openRow}
-          // Non-null past the `activeCharacterId === null` guard above; the
-          // modal needs one to resolve a player-structure location, whose ACL
-          // is per Character (#655 item F).
-          characterId={activeCharacterId}
-          blueprintName={blueprintNames.get(openRow.typeId) ?? `#${openRow.typeId}`}
-          regionName={regionNames.get(openRow.regionId) ?? `#${openRow.regionId}`}
-          onClose={() => setOpenRow(null)}
-        />
-      )}
-    </Panel>
+    </>
   );
 }
 
