@@ -13,6 +13,18 @@ export const useInstallPromptSeen = createLocalSetting<boolean>({
   parse: (raw) => (typeof raw === 'boolean' ? raw : null),
 });
 
+/** Device-local like `installPrompt.seen`; persists across sessions. */
+export const INSTALL_PROMPT_PAGE_VISITS_KEY = 'installPrompt.pageVisits';
+
+/** Pages or tabs opened before the Install Prompt asks: earlier is too early. */
+export const INSTALL_PROMPT_MIN_PAGE_VISITS = 5;
+
+export const useInstallPromptPageVisits = createLocalSetting<number>({
+  key: INSTALL_PROMPT_PAGE_VISITS_KEY,
+  defaultValue: 0,
+  parse: (raw) => (typeof raw === 'number' && raw >= 0 ? raw : null),
+});
+
 /** The native `beforeinstallprompt` event — not yet in lib.dom.d.ts. */
 export interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -53,8 +65,10 @@ export function selectInstallPromptVariant(state: {
   isStandalone: boolean;
   deferredPromptAvailable: boolean;
   platform: InstallPlatform | null;
+  pageVisits: number;
 }): InstallPromptVariant {
   if (state.seen || state.isStandalone || state.platform === null) return 'none';
+  if (state.pageVisits < INSTALL_PROMPT_MIN_PAGE_VISITS) return 'none';
   if (state.deferredPromptAvailable) return 'native';
   return state.platform === 'android' ? 'none' : state.platform;
 }

@@ -1,7 +1,7 @@
 /**
- * Market › History (ended orders) and Transactions at 390px: plain tables, not
- * cards or a bespoke list (DESIGN.md §6c Restraint). Each is a ledger read
- * across columns, so it keeps real columns, pins the item (`stickyStart`),
+ * Market › History (Transactions) at 390px: a plain table, not cards or a
+ * bespoke list (DESIGN.md §6c Restraint). It is a ledger read across
+ * columns, so it keeps real columns, pins the item (`stickyStart`),
  * sheds its low-value columns (`phoneHidden`) and scrolls sideways inside its
  * own wrapper, never the page. The default-sort column stays visible.
  *
@@ -15,23 +15,6 @@ import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
-
-const ORDER_HISTORY = [
-  {
-    order_id: 9001,
-    type_id: 34,
-    region_id: 10000002,
-    location_id: 60003760,
-    is_buy_order: false,
-    price: 5.68,
-    volume_remain: 0,
-    volume_total: 3_400_000,
-    issued: '2026-09-20T12:00:00Z',
-    duration: 90,
-    range: 'station',
-    state: 'expired',
-  },
-];
 
 const TRANSACTIONS = [
   {
@@ -47,24 +30,19 @@ const TRANSACTIONS = [
   },
 ];
 
-async function mockLedgers(page: Page) {
-  // Before signing in: boot prefetch reads these, and an empty answer from the
+async function mockTransactions(page: Page) {
+  // Before signing in: boot prefetch reads this, and an empty answer from the
   // shared mock would be cached as fresh.
-  for (const [suffix, body] of [
-    ['orders/history', ORDER_HISTORY],
-    ['wallet/transactions', TRANSACTIONS],
-  ] as const) {
-    await page.route(
-      (url) => url.pathname === `/characters/${CHARACTER_ID}/${suffix}`,
-      (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          headers: { 'X-Pages': '1' },
-          body: JSON.stringify(body),
-        })
-    );
-  }
+  await page.route(
+    (url) => url.pathname === `/characters/${CHARACTER_ID}/wallet/transactions`,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'X-Pages': '1' },
+        body: JSON.stringify(TRANSACTIONS),
+      })
+  );
 }
 
 async function expectPhoneTable(page: Page, label: string, shown: string[], hidden: string[]) {
@@ -82,29 +60,17 @@ async function expectPhoneTable(page: Page, label: string, shown: string[], hidd
   await expectNoPageOverflow(page);
 }
 
-test.describe('Market history ledgers at 390px', () => {
+test.describe('Market history ledger at 390px', () => {
   test.beforeEach(async ({ page }) => {
-    await mockLedgers(page);
+    await mockTransactions(page);
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
-  });
-
-  test('ended orders: item, price, remaining and issued stay; side and state go', async ({
-    page,
-  }) => {
-    await page.goto('./market/history');
-    await expectPhoneTable(
-      page,
-      'History',
-      ['Item', 'Price', 'Remaining', 'Issued'],
-      ['Side', 'State']
-    );
   });
 
   test('transactions: date, item, quantity, price and total stay; side and margin go', async ({
     page,
   }) => {
-    await page.goto('./market/history/transactions');
+    await page.goto('./market/history');
     await expectPhoneTable(
       page,
       'Transactions',

@@ -55,12 +55,6 @@ interface PanelProps {
    */
   metaOwnRow?: boolean;
   children: ReactNode;
-  /**
-   * Lets `actions` take the header's free width instead of hugging the right
-   * edge — for a header whose actions *are* the toolbar, like the History
-   * tab's phone view toggle, which needs the row to be tappable at all.
-   */
-  actionsFill?: boolean;
   /** @summary Set false for flush content like tables; the body then has no inner padding. */
   padded?: boolean;
   /**
@@ -102,7 +96,6 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
     title,
     headingRef,
     actions,
-    actionsFill = false,
     leading,
     meta,
     wrapMeta = false,
@@ -131,33 +124,30 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
         <header
           className={`flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 md:min-h-9 ${metaOwnRow ? 'max-md:flex-wrap' : ''} ${leading ? 'pl-1' : 'pl-3'}`}
         >
-          {/* An empty left group would still cost the header's gap before filling actions. */}
-          {(!actionsFill || leading || title || meta) && (
-            <div
-              className={`flex min-w-0 items-center gap-2 ${wrapMeta ? 'max-md:flex-wrap' : ''} ${metaOwnRow ? 'max-md:contents' : ''}`}
-            >
-              {leading}
-              {title && (
-                <h2
-                  ref={headingRef}
-                  tabIndex={headingRef ? -1 : undefined}
-                  className={`text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase ${
-                    headingRef
-                      ? 'max-md:min-w-0 max-md:break-words md:whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
-                      : wrapMeta
-                        ? 'max-md:shrink-0 max-md:whitespace-nowrap md:min-w-0 md:truncate'
-                        : 'min-w-0 truncate'
-                  }`}
-                >
-                  {title}
-                </h2>
-              )}
-              {meta}
-            </div>
-          )}
+          <div
+            className={`flex min-w-0 items-center gap-2 ${wrapMeta ? 'max-md:flex-wrap' : ''} ${metaOwnRow ? 'max-md:contents' : ''}`}
+          >
+            {leading}
+            {title && (
+              <h2
+                ref={headingRef}
+                tabIndex={headingRef ? -1 : undefined}
+                className={`text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase ${
+                  headingRef
+                    ? 'max-md:min-w-0 max-md:break-words md:whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+                    : wrapMeta
+                      ? 'max-md:shrink-0 max-md:whitespace-nowrap md:min-w-0 md:truncate'
+                      : 'min-w-0 truncate'
+                }`}
+              >
+                {title}
+              </h2>
+            )}
+            {meta}
+          </div>
           {actions && (
             <div
-              className={`flex items-center gap-1 ${actionsFill ? 'min-w-0 flex-1' : 'shrink-0'} ${metaOwnRow ? 'max-md:ml-auto' : ''}`}
+              className={`flex shrink-0 items-center gap-1 ${metaOwnRow ? 'max-md:ml-auto' : ''}`}
             >
               {actions}
             </div>

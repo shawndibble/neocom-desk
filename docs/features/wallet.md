@@ -8,7 +8,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 | ---------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Balance tab (`/wallet/balance`, default) | `Wallet.tsx`                          | Worth panel (net worth, EverMarks, chart), LP-per-corp table                                                    |
 | Journal tab (`/wallet/journal`)          | `Wallet.tsx:759-816`                  | filterable/sortable/virtualized ledger, column picker, export                                                   |
-| `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history/transactions`                                                          |
+| `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history`                                                                       |
 | Cross-character balance (`?char=`)       | `Wallet.tsx:570`                      | per-Character table + total, picker, CSV/XLSX/clipboard export                                                  |
 | Net worth chart                          | `features/netWorth/NetWorthPanel.tsx` | lazy Recharts stack (one Character) or lines (several), layer legend, drill                                     |
 | Loyalty Points table                     | `Wallet.tsx:707-756`                  | per-corp LP, row → LP Store, export, LP Store picker                                                            |
@@ -52,7 +52,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 - Redirects in `Wallet.tsx`:
   - no active Character → `/characters` (`Wallet.tsx:509`).
   - `?owner=corporation` (old bookmark) → `/corp/wallet` keeping query, and `tab === transactions` adds `view=transactions` (`Wallet.tsx:514-519`).
-  - `/wallet/transactions` → `/market/history/transactions` (`Wallet.tsx:522`).
+  - `/wallet/transactions` → `/market/history` (`Wallet.tsx:522`).
   - Unknown tab segment → default tab `balance` via `TabRoute`.
 - Tab state is a path segment (ADR 0015); `usePageTab(WALLET_TABS)`.
 - Palette: Command Palette matches `Wallet › LP Store` via search keys (`navDestinations.ts:101` comment). LP Store itself is a Wallet tab (`/wallet/lp-store`, `WALLET_TABS` in `src/app/pageTabs.ts`; `20261010-200446`, #3527); it was a Market sub-view until then.
@@ -148,7 +148,7 @@ Gaps: no share link or screenshot-friendly view of one journal row; journal lags
 
 ## Journal tab (`/wallet/journal`)
 
-Panel "Journal". Panel actions: link "Transactions" (to `/market/history/transactions`), `TableActionsMenu` (surface `wallet-journal`), `DataAgeBadge` of the journal fetch.
+Panel "Journal". Panel actions: link "Transactions" (to `/market/history`), `TableActionsMenu` (surface `wallet-journal`), `DataAgeBadge` of the journal fetch.
 
 Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
@@ -190,7 +190,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
 ## Pointers (not documented here)
 
-- Personal transactions live on Market › History › Transactions (`/market/history/transactions`).
+- Personal transactions live on Market › History (`/market/history`).
 - Corp wallet `/corp/wallet` (`routes/CorpWallet.tsx`, `features/corp/wallet.ts`): per-division balances/journal/transactions; reuses `JournalTable` and the same column setting. Gated by `canReadWallet` capability. Decision `20260929-131220-corp-wallet-moves-to-the-corp-section`.
 - LP Store pages `/wallet/lp-store[/:corporationId]` (`routes/LoyaltyStore.tsx`): offers ranked by ISK/LP. A Wallet tab since `20261010-200446` (#3527), which replaced the Market placement of `20261002-145653`.
 - Notification event `walletBalanceChanged` (feed-only default, scope `getCharacterWallet`, `features/notifications/events.ts:191`).

@@ -8,9 +8,9 @@
  * compete for: every eligible banner registers itself, and only the
  * highest-priority registrant is told to render.
  *
- * A module-level store rather than a context provider because the banners do
- * not share a subtree: `InstallPrompt` is mounted in `App` as a sibling of
- * `Layout`, while the other two are inside it. Nothing here changes any
+ * A module-level store rather than a context provider: the banners are
+ * independent siblings in `Layout`, no common provider needed. Nothing here
+ * changes any
  * banner's own eligibility, copy, or dismissal — each still decides entirely
  * for itself whether it *wants* the slot.
  */
