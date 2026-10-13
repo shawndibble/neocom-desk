@@ -166,7 +166,7 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       // My ships rows: Show info, Show fitting, Plan route, Open location assets; the row click holds only Show info.
       'src/features/character/MyShipsView.tsx',
       // Admin's Member rows: Make admin… and Remove…, reachable nowhere else.
-      'src/features/communities/CommunityDetail.tsx',
+      'src/features/communities/CommunityMemberList.tsx',
       'src/features/fittings/FittingAddPanel.tsx',
       'src/features/fittings/FittingRackList.tsx',
       'src/features/fittings/FittingStartScreen.tsx',

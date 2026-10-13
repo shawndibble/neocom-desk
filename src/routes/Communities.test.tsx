@@ -251,10 +251,61 @@ describe('Communities page', () => {
       store.deleteCommunity.mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderPage('/communities?community=c1');
+      await user.click(await screen.findByRole('tab', { name: en.communities.members }));
       await user.click(await screen.findByRole('button', { name: c.delete }));
       const dialog = await screen.findByRole('dialog');
       await user.click(within(dialog).getByRole('button', { name: c.deleteAction }));
       await waitFor(() => expect(store.deleteCommunity).toHaveBeenCalledWith(ME, 'c1'));
+    });
+  });
+
+  describe('switcher', () => {
+    it('folds the list into a switcher once a Community is open', async () => {
+      store.loadMyCommunities.mockResolvedValue([
+        community(),
+        community({ id: 'c2', name: 'Other' }),
+      ]);
+      renderPage('/communities?community=c1');
+      expect(await screen.findByRole('combobox', { name: c.switch })).toBeInTheDocument();
+      expect(screen.queryByText(c.yourCommunities)).not.toBeInTheDocument();
+    });
+
+    it('shows the list, not a switcher, while none is open', async () => {
+      store.loadMyCommunities.mockResolvedValue([
+        community(),
+        community({ id: 'c2', name: 'Other' }),
+      ]);
+      renderPage('/communities');
+      expect(await screen.findByText(c.yourCommunities)).toBeInTheDocument();
+      expect(screen.queryByRole('combobox', { name: c.switch })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('roster', () => {
+    it('offers a name filter only for a long roster', async () => {
+      const many = Array.from({ length: 9 }, (_, i) => ({
+        uid: `char:${200 + i}`,
+        characterName: `Pilot ${i}`,
+        joinedAt: i,
+      }));
+      store.loadMyCommunities.mockResolvedValue([community({ memberCount: 9 })]);
+      store.loadCommunityMembers.mockResolvedValue(many);
+      const user = userEvent.setup();
+      renderPage('/communities?community=c1&tab=members');
+      const filter = await screen.findByRole('searchbox', { name: c.memberSearch });
+      await user.type(filter, 'pilot 7');
+      expect(screen.getByText('Pilot 7')).toBeInTheDocument();
+      expect(screen.queryByText('Pilot 3')).not.toBeInTheDocument();
+      await user.clear(filter);
+      await user.type(filter, 'zzz');
+      expect(await screen.findByText(c.noMemberMatch)).toBeInTheDocument();
+    });
+
+    it('has no filter on a short roster', async () => {
+      store.loadMyCommunities.mockResolvedValue([community()]);
+      renderPage('/communities?community=c1&tab=members');
+      await screen.findByText('Friend');
+      expect(screen.queryByRole('searchbox', { name: c.memberSearch })).not.toBeInTheDocument();
     });
   });
 

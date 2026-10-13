@@ -2,11 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  MenuItem,
-  MenuSeparator,
   Panel,
-  RowActionsMenu,
-  RowMoreActions,
   Spinner,
   TabPanel,
   Tabs,
@@ -15,11 +11,11 @@ import {
   useTimedToast,
 } from '@/components/ui';
 import { NOTICE_MS } from '@/components/ui/useTimedToast';
-import { isLibraryStale } from '@/engine/communities/sharedLibrary';
-import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
 import { uidForCharacter } from '@/sync/uid';
 import { CommunityLibrary } from './CommunityLibrary';
+import type { CommunityTab } from './communityTabs';
+import { CommunityMemberList } from './CommunityMemberList';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CommunityInvites } from './CommunityInvites';
 import { JoinRequestsList } from './JoinRequestsList';
@@ -48,7 +44,7 @@ type Dialog =
 /**
  * One Community, as the open Character sees it. The admin gets the invite link
  * (copy, regenerate, revoke), a ⋮ on every other Member (make admin, remove)
- * and Delete; any other Member gets Leave. Every change refetches through
+ * and Delete; any other Member gets Leave. Both sit at the foot of the Members tab. Every change refetches through
  * `onChanged`, since Firestore here has no listeners.
  */
 export function CommunityDetail({
@@ -57,6 +53,7 @@ export function CommunityDetail({
   onChanged,
   onPatch,
   onGone,
+  initialTab = 'blueprints',
 }: {
   community: CommunitySummary;
   characterId: number;
@@ -66,6 +63,8 @@ export function CommunityDetail({
   onPatch: (patch: Partial<CommunitySummary>) => void;
   /** The Community no longer lists this Character (left, or deleted). */
   onGone: () => void;
+  /** The tab to open on (`?tab=`); Blueprints unless a link says otherwise. */
+  initialTab?: CommunityTab;
 }) {
   const { t } = useTranslation();
   const admin = isCommunityAdmin(community, characterId);
@@ -77,9 +76,7 @@ export function CommunityDetail({
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const tabsId = useTabsId();
-  const [tab, setTab] = useState<
-    'blueprints' | 'fittings' | 'plans' | 'members' | 'invites' | 'library'
-  >('blueprints');
+  const [tab, setTab] = useState<CommunityTab | 'library'>(initialTab);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   // Admin-only tabs fall back to Blueprints if the admin role moved to someone else.
   const shownTab = tab === 'invites' && !admin ? 'blueprints' : tab;
@@ -132,17 +129,6 @@ export function CommunityDetail({
     <Panel
       title={community.name}
       meta={t('communities.memberCount', { count: community.memberCount })}
-      actions={
-        admin ? (
-          <Button variant="danger" size="sm" onClick={() => setDialog({ kind: 'delete' })}>
-            {t('communities.delete')}
-          </Button>
-        ) : (
-          <Button variant="danger" size="sm" onClick={() => setDialog({ kind: 'leave' })}>
-            {t('communities.leave')}
-          </Button>
-        )
-      }
     >
       {tab === 'library' ? (
         <>
@@ -175,9 +161,7 @@ export function CommunityDetail({
               ...(admin ? [{ id: 'invites', label: t('communities.tabs.invites') }] : []),
             ]}
             value={shownTab}
-            onChange={(id) =>
-              setTab(id as 'blueprints' | 'fittings' | 'plans' | 'members' | 'invites')
-            }
+            onChange={(id) => setTab(id as CommunityTab)}
             label={t('communities.tabs.label')}
             className="mb-2"
           />
@@ -226,70 +210,16 @@ export function CommunityDetail({
                 ) : members === null ? (
                   <Spinner size="sm" label={t('communities.loading')} />
                 ) : (
-                  <ul className="divide-y divide-line">
-                    {members.map((member) => {
-                      const isSelf = member.uid === myUid;
-                      const isAdminRow = member.uid === community.adminUid;
-                      const stale = isLibraryStale(member.libraryAsOf, now);
-                      const row = (
-                        <li
-                          key={member.uid}
-                          className={`flex items-center gap-2 py-1.5 text-xs ${stale ? 'opacity-60' : ''}`}
-                        >
-                          <span className="min-w-0 flex-1 truncate">
-                            {member.characterName}
-                            {isSelf && (
-                              <span className="ml-1 text-text-dim">({t('communities.you')})</span>
-                            )}
-                            {member.libraryAsOf !== null && (
-                              <span className="ml-1 text-text-dim">
-                                {t('communities.asOf', {
-                                  age: formatAge(now - member.libraryAsOf, t),
-                                })}
-                              </span>
-                            )}
-                          </span>
-                          {stale && (
-                            <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                              {t('communities.staleBadge')}
-                            </span>
-                          )}
-                          {isAdminRow && (
-                            <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
-                              {t('communities.adminBadge')}
-                            </span>
-                          )}
-                          {admin && !isAdminRow && <RowMoreActions />}
-                        </li>
-                      );
-                      // Only the admin has actions, and only on another Member: a row
-                      // with nothing to offer gets no ⋮ and no menu.
-                      return admin && !isAdminRow ? (
-                        <RowActionsMenu
-                          key={member.uid}
-                          name={member.characterName}
-                          items={
-                            <>
-                              <MenuItem onSelect={() => setDialog({ kind: 'makeAdmin', member })}>
-                                {t('communities.makeAdminMenu', { name: member.characterName })}
-                              </MenuItem>
-                              <MenuSeparator />
-                              <MenuItem
-                                className="text-danger"
-                                onSelect={() => setDialog({ kind: 'remove', member })}
-                              >
-                                {t('communities.removeMenu', { name: member.characterName })}
-                              </MenuItem>
-                            </>
-                          }
-                        >
-                          {row}
-                        </RowActionsMenu>
-                      ) : (
-                        row
-                      );
-                    })}
-                  </ul>
+                  <CommunityMemberList
+                    members={members}
+                    adminUid={community.adminUid}
+                    myUid={myUid}
+                    isAdmin={admin}
+                    now={now}
+                    onMakeAdmin={(member) => setDialog({ kind: 'makeAdmin', member })}
+                    onRemove={(member) => setDialog({ kind: 'remove', member })}
+                    onLeaveOrDelete={() => setDialog({ kind: admin ? 'delete' : 'leave' })}
+                  />
                 )}
               </>
             )}

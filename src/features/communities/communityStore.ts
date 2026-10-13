@@ -40,6 +40,25 @@ export interface CommunityMember {
   libraryAsOf: number | null;
 }
 
+/**
+ * A stand-in for the backend, for Storybook and its smoke test: set, the three
+ * reads and every callable answer from memory, so a page story shows sample
+ * Communities without a network or a sign-in. Never set by the app itself.
+ */
+export interface CommunityBackendOverride {
+  loadMine: () => CommunitySummary[];
+  loadMembers: (communityId: string) => CommunityMember[];
+  loadRequests: (communityId: string) => JoinRequest[];
+  /** A callable by name; its result is what the real one would return. */
+  call: (name: string, data: unknown) => unknown;
+}
+
+let override: CommunityBackendOverride | null = null;
+
+export function setCommunityBackendOverride(next: CommunityBackendOverride | null): void {
+  override = next;
+}
+
 /** Where an invite link lands. The join page is its own ticket; this is its one address. */
 export function communityInviteUrl(inviteCode: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -58,6 +77,7 @@ export async function listCommunityIds(characterId: number): Promise<string[]> {
 }
 
 export async function loadMyCommunities(characterId: number): Promise<CommunitySummary[]> {
+  if (override) return override.loadMine();
   const uid = await ensureSignedIn(characterId);
   const db = getSyncFirestore();
   const index = await getDocs(collection(db, 'characters', uid, 'communities'));
@@ -85,6 +105,7 @@ export async function loadCommunityMembers(
   characterId: number,
   communityId: string
 ): Promise<CommunityMember[]> {
+  if (override) return override.loadMembers(communityId);
   await ensureSignedIn(characterId);
   const snap = await getDocs(collection(getSyncFirestore(), 'communities', communityId, 'members'));
   return snap.docs
@@ -102,6 +123,7 @@ export async function loadJoinRequests(
   characterId: number,
   communityId: string
 ): Promise<JoinRequest[]> {
+  if (override) return override.loadRequests(communityId);
   await ensureSignedIn(characterId);
   const snap = await getDocs(
     collection(getSyncFirestore(), 'communities', communityId, 'requests')
@@ -150,6 +172,7 @@ function libraryAsOf(data: Record<string, unknown>): number | null {
 }
 
 async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
+  if (override) return override.call(name, data) as Out;
   await ensureSignedIn(characterId);
   const result = await httpsCallable<In, Out>(getSyncFunctions(), name)(data);
   return result.data;
@@ -263,6 +286,7 @@ export async function loadMailInviteStatus(
   communityId: string,
   now = Date.now()
 ): Promise<{ remaining: number; sent: SentMailInvite[] }> {
+  if (override) return { remaining: MAX_MAIL_INVITES_PER_DAY, sent: [] };
   const uid = await ensureSignedIn(characterId);
   const db = getSyncFirestore();
   const day = new Date(now).toISOString().slice(0, 10);
