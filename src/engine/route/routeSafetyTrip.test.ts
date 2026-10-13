@@ -8,6 +8,7 @@ import { waypointSequence } from './waypoints';
 import type { RouteSafetySystemEntry } from './routeSafety';
 import {
   assembleRouteSafety,
+  gatesOverLongerHoles,
   planLegAlternatives,
   routeSafetyNetwork,
   type LegAlternatives,
@@ -213,6 +214,30 @@ describe('routeSafetyNetwork', () => {
   });
 });
 
+describe('gatesOverLongerHoles', () => {
+  it('flies a leg by gates when the planner’s hole route is more jumps', () => {
+    const tripPlan: TripPlan = {
+      legs: [
+        { from: START, to: END, route: { kind: 'route', systems: THROUGH_FAR } },
+        { from: END, to: START, route: { kind: 'route', systems: [...THROUGH_THERA].reverse() } },
+      ],
+      reordered: null,
+      unreachable: false,
+    };
+    const trip = { plan: tripPlan, graph: GRAPH, options: {} };
+    expect(gatesOverLongerHoles(trip).plan.legs.map((leg) => leg.route)).toEqual([
+      { kind: 'route', systems: BY_GATE },
+      { kind: 'route', systems: [...THROUGH_THERA].reverse() },
+    ]);
+  });
+
+  it('leaves a trip with no longer hole route as it was', () => {
+    const { tripPlan } = plan({ holes: THERA_HOLES });
+    const trip = { plan: tripPlan, graph: GRAPH, options: {} };
+    expect(gatesOverLongerHoles(trip)).toBe(trip);
+  });
+});
+
 describe('planLegAlternatives', () => {
   it('lists each leg’s ways, with nothing pinned', () => {
     const { alternatives } = plan({ holes: [...THERA_HOLES, VIA_TURNUR] });
@@ -267,6 +292,16 @@ describe('planLegAlternatives', () => {
 });
 
 describe('assembleRouteSafety', () => {
+  it('lists a pinned hub as the way in use, even one longer than the gates', () => {
+    // Through FAR is six jumps to the gates' five: Thera is no way of its own.
+    const state = route(plan({ holes: [VIA_FAR, VIA_EXIT], pins: ['thera'] }).state);
+    expect(systemsOf(state.legs[0].rows)).toEqual(THROUGH_FAR);
+    expect(state.legs[0].ways.map((way) => [way.kind, way.pin, way.inUse])).toEqual([
+      ['thera', 'thera', true],
+      ['gates', 'gates', false],
+    ]);
+  });
+
   it('flies the planner’s pick, listing it first among the ways', () => {
     const state = route(plan({ holes: [...THERA_HOLES, VIA_TURNUR] }).state);
     const [leg] = state.legs;

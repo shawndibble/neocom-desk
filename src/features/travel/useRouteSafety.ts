@@ -35,6 +35,7 @@ import { candidateAvoid } from '@/engine/route/avoidRules';
 import type { RouteSafetySystemEntry } from '@/engine/route/routeSafety';
 import {
   assembleRouteSafety,
+  gatesOverLongerHoles,
   planLegAlternatives,
   routeSafetyNetwork,
   type LegAlternatives,
@@ -133,7 +134,7 @@ async function planRouteSafetyTrip(request: {
   systemIds: number[];
   systems: ReadonlyMap<number, RouteSafetySystemEntry>;
 }> {
-  const [result, systems] = await Promise.all([
+  const [planned, systems] = await Promise.all([
     planLocalTrip(
       request.fromId,
       request.stops,
@@ -143,6 +144,7 @@ async function planRouteSafetyTrip(request: {
     ),
     loadSolarSystemsById().catch(() => null),
   ]);
+  const result = planned.kind === 'trip' ? gatesOverLongerHoles(planned) : planned;
   if (result.kind !== 'trip') {
     return { result, alternatives: [], systemIds: [], systems: systems ?? NO_SYSTEMS };
   }

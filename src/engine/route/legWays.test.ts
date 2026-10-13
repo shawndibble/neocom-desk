@@ -209,6 +209,27 @@ describe('legWays', () => {
     ]);
   });
 
+  it('leaves out a hub whose way through is more jumps than the gates', () => {
+    // Gates: START ─ W1 ─ W2 ─ W3, three jumps. Through either hub is longer.
+    expect(legWays(GRAPH, START, W3, NETWORK, ALL_HOLES)).toEqual([
+      { way: 'gates', route: { kind: 'route', systems: [START, W1, W2, W3] } },
+    ]);
+  });
+
+  it('keeps a hub whose way through is as many jumps as the gates', () => {
+    const ways = legWays(GRAPH, START, END, NETWORK, [VIA_TURNUR]);
+    expect(ways.map((way) => way.way)).toEqual(['gates', 'turnur']);
+  });
+
+  it('keeps a hub way when no gate route flies the leg', () => {
+    const graph: JumpGraph = new Map([...GRAPH, [ISLAND, [THERA]], [THERA, [ISLAND]]]);
+    const ways = legWays(graph, START, ISLAND, NETWORK, THERA_HOLES);
+    expect(ways.map((way) => [way.way, way.route.kind])).toEqual([
+      ['gates', 'no-route'],
+      ['thera', 'route'],
+    ]);
+  });
+
   it('always lists gates only, even when no gate route flies the leg', () => {
     expect(legWays(GRAPH, START, ISLAND, NETWORK, ALL_HOLES)).toEqual([
       { way: 'gates', route: { kind: 'no-route' } },
