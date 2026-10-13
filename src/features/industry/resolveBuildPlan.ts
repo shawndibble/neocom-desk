@@ -267,8 +267,7 @@ export interface MakeOrBuyResolution {
  * The make-or-buy half of `resolveBuildPlan`, without computing a result:
  * the verdict context (facility, fees, Reaction Location, blueprint cost),
  * the recipe lookup and the plan's resolved top-level tier, all derived
- * exactly as `resolveBuildPlan` derives them, so Auto Build on a Build Group
- * walks each member as its own page does. Null when the blueprint is missing
+ * exactly as `resolveBuildPlan` derives them. Null when the blueprint is missing
  * or live fees have not landed (no context). Resolves the top-level tier
  * against a fresh pool, same as the primary pass.
  */
