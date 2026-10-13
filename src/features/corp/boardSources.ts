@@ -4,7 +4,7 @@
  * `engine/corp/board.ts` ranks clocks; it does not know what an ESI structure
  * looks like, parse a date, or resolve a name. This module does all three, so
  * the engine stays pure numbers-in/objects-out and CCP renaming a field touches
- * one file. Same split `engine/pi/colonyPins.ts` makes for colonies.
+ * one file.
  *
  * Pure itself — no fetch, no Dexie. The loaders are `boardData.ts`.
  */

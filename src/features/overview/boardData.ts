@@ -39,7 +39,7 @@ import type { CalendarEventSummary } from '@/esi/endpoints';
  * route is code-split, `app/routeChunks.ts`), so anything this module names
  * statically is in the first paint's graph. Two rules follow:
  *
- * - The PI fetch layer (`pi/data`, `pi/names`, `engine/pi/colonyPins`) and
+ * - The PI fetch layer (`pi/data`, `pi/names`) and
  *   `character/typeNames` are imported statically. The boot graph already
  *   holds them — `app/prefetch.ts`, the notification poller and the Calendar
  *   route warmer all name them — so an `import()` here cannot move them out
