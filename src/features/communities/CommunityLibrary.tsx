@@ -33,9 +33,10 @@ import {
 import { formatAge } from '@/lib/age';
 import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadBlueprints } from '@/sde/loadSde';
+import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { uidForCharacter } from '@/sync/uid';
 import { loadMemberLibraries, type CommunityMember } from './communityStore';
-import { sharedBlueprintRows } from './sharedBlueprintCopies';
+import { sharedBlueprintRows, systemIdsByName } from './sharedBlueprintCopies';
 import { SharedBlueprintTable } from './SharedBlueprintTable';
 
 const FILTERS: LibraryFilter[] = ['missingCommunity', 'ownedByMe', 'missingFromMe'];
@@ -181,8 +182,8 @@ function LibraryGroup({
 /**
  * The Community Library (issue #3601), the Blueprints tab's Everyone view:
  * what the Members share. It opens on "Shared in the Community": each shared
- * blueprint with its Member, station or structure and system, ME / TE and
- * runs. The other chips turn to every blueprint in the SDE against the
+ * blueprint with its Member, station or structure, jumps from here, ME / TE
+ * and runs, and a ⋮ to Show info, plan a build, source it or route there. The other chips turn to every blueprint in the SDE against the
  * Members who share it: "missing from the Community", "owned by me" or
  * "missing from me", in a market-group tree that counts each category. A
  * stale Member is greyed and badged, never hidden. BPC Sourcing is one link
@@ -208,6 +209,18 @@ export function CommunityLibrary({
   const [query, setQuery] = useState('');
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
+  // Apart from the Library's own load: only the Jumps column waits on it, and
+  // an unreadable list leaves that column at its placeholder, nothing else.
+  const [systemIds, setSystemIds] = useState<ReadonlyMap<string, number> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadSolarSystemsById().then((systems) => {
+      if (!cancelled && systems) setSystemIds(systemIdsByName(systems.values()));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const memberKey = members
     ? members
@@ -359,7 +372,7 @@ export function CommunityLibrary({
         ))}
       </ul>
       {view === 'shared' ? (
-        <SharedBlueprintTable rows={copies} />
+        <SharedBlueprintTable rows={copies} systemIds={systemIds} />
       ) : tree.length === 0 ? (
         <EmptyState title={t('communities.library.none')} />
       ) : (

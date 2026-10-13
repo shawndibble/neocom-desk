@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sharedBlueprintRows } from './sharedBlueprintCopies';
+import { placeNamesSystem, sharedBlueprintRows, systemIdsByName } from './sharedBlueprintCopies';
 
 const item = (typeId: number, locationName: string, systemName: string, runs = -1) => ({
   typeId,
@@ -57,5 +57,30 @@ describe('sharedBlueprintRows', () => {
       ''
     );
     expect(rows[0].name).toBe('#99');
+  });
+});
+
+describe('placeNamesSystem', () => {
+  it('is true when the station or structure name starts with its system', () => {
+    expect(placeNamesSystem('Jita IV - Moon 4 - Caldari Navy Assembly Plant', 'Jita')).toBe(true);
+    expect(placeNamesSystem('efa - Home Fortizar', 'Efa')).toBe(true);
+  });
+
+  it('is false when the name does not start with its system', () => {
+    expect(placeNamesSystem('Home Fortizar', 'Efa')).toBe(false);
+    // Naming another system somewhere inside is not naming its own.
+    expect(placeNamesSystem('Perimeter - Jita overflow', 'Jita')).toBe(false);
+  });
+});
+
+describe('systemIdsByName', () => {
+  it('finds a system id by its name, ignoring case', () => {
+    const ids = systemIdsByName([
+      { id: 30000142, name: 'Jita' },
+      { id: 30003070, name: 'Efa' },
+    ]);
+    expect(ids.get('jita')).toBe(30000142);
+    expect(ids.get('efa')).toBe(30003070);
+    expect(ids.get('amarr')).toBeUndefined();
   });
 });
