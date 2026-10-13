@@ -18,7 +18,7 @@ import {
   prepareBpcOffers,
   rankBpcOffers,
   searchBpcOffers,
-  type BpcQuery,
+  type BpcFullQuery,
   type BpcSourceData,
 } from './searchBpcOffers';
 
@@ -145,8 +145,8 @@ const NO_FILTER: BpcSourcingFilter = {
 };
 
 function query(
-  overrides: Partial<Omit<BpcQuery, 'filter'>> & { filter?: Partial<BpcSourcingFilter> } = {}
-): BpcQuery {
+  overrides: Partial<Omit<BpcFullQuery, 'filter'>> & { filter?: Partial<BpcSourcingFilter> } = {}
+): BpcFullQuery {
   const { filter, ...rest } = overrides;
   return {
     filter: { ...NO_FILTER, ...filter },

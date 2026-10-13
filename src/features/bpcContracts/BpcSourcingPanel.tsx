@@ -48,6 +48,8 @@ import {
   BPC_SOURCING_SORT_KEY,
   DEFAULT_SOURCE_TOGGLES,
   SOURCE_TOGGLES,
+  sourceToggleKey,
+  sourceToggleSet,
   type SourceToggle,
 } from './bpcSourcingUrl';
 import {
@@ -69,6 +71,7 @@ import {
   prepareBpcOffers,
   rankBpcOffers,
   type BlueprintSuggestion,
+  type BpcPrepareInput,
   type BpcQuery,
   type BpcSourceData,
 } from '@/features/bpcContracts/searchBpcOffers';
@@ -765,14 +768,11 @@ export function BpcSourcingPanel() {
       filter: uiFilter,
       selectedTypeId,
       sources,
-      spaceKinds: activeSpaceKinds,
-      allowedSystems: jumpFilter.allowed,
     }),
-    [uiFilter, selectedTypeId, sources, activeSpaceKinds, jumpFilter.allowed]
+    [uiFilter, selectedTypeId, sources]
   );
-  // Stage 1 never reads the type query (or what the lookup derives from it),
-  // so a keystroke reruns only stage 2.
-  const stableFilter = useMemo(
+  // Stage 1 never reads the type query, so a keystroke reruns only stage 2.
+  const stableFilter = useMemo<BpcPrepareInput['filter']>(
     () => ({
       regionId: uiFilter.regionId,
       minMe: uiFilter.minMe,
@@ -792,13 +792,17 @@ export function BpcSourcingPanel() {
       uiFilter.hidePlex,
     ]
   );
+  // The URL parse returns a new Set on every write; key on content so a
+  // keystroke's `sourcing.q` write doesn't rerun stage 1.
+  const sourcesKey = sourceToggleKey(sources);
+  const stableSources = useMemo(() => sourceToggleSet(sourcesKey), [sourcesKey]);
   const prepared = useMemo(
     () =>
       prepareBpcOffers(
         { contractRows: rows, originals, contractLocations, blueprintNames, ownedBlueprints },
         {
           filter: stableFilter,
-          sources,
+          sources: stableSources,
           spaceKinds: activeSpaceKinds,
           allowedSystems: jumpFilter.allowed,
         }
@@ -810,7 +814,7 @@ export function BpcSourcingPanel() {
       blueprintNames,
       ownedBlueprints,
       stableFilter,
-      sources,
+      stableSources,
       activeSpaceKinds,
       jumpFilter.allowed,
     ]

@@ -1,9 +1,7 @@
 /**
  * The Public Contract Offers snapshot's blueprint rows as one list: copies,
- * then originals (`runs: -1`, issue #1240). Every consumer that wants "all the
- * contract offers for a blueprint" reads through here instead of re-deriving
- * the concat and its failure handling. ADR 0013's cache seam is untouched:
- * this sits on top of `loadPublicBpcContracts`.
+ * then originals (`runs: -1`). Single place for the copies+originals concat
+ * and snapshot-failure handling; sits on `loadPublicBpcContracts`.
  */
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import { loadPublicBpcContracts, type PublicBpcContractsSnapshot } from './syncedContracts';

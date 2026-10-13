@@ -21,11 +21,6 @@ import type { UndercutScope } from '@/engine/market/undercut';
 import { undercutPrice, outbidPrice } from '@/engine/market/priceTick';
 import type { OpenOrderRow } from './openOrdersModel';
 
-/**
- * The fields order advice (badge, summary, verdict, next step) reads — a
- * structural slice of `OpenOrderRow`, so advice never depends on the whole
- * row shape.
- */
 export type OrderAdviceInput = Pick<
   OpenOrderRow,
   | 'problem'

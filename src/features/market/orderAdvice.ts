@@ -1,13 +1,6 @@
 /**
- * Everything an Open Orders row says about what to do: the badge, the one
- * fact beside it, the verdict and the next step. One call derives all four
- * from a single `orderRowSummary`, so the detail modal's header, verdict and
- * next-step lines can never disagree (the verdict's price is the same
- * legal tick the next step quotes — see `orderNextAction`).
- *
- * Lives in features/market, not the engine: the badge kind type comes from
- * the `OrderProblemBadge` component and `OrderAdviceInput` slices the feature's
- * `OpenOrderRow`.
+ * One `orderRowSummary` feeds badge, verdict and next step so the modal's lines can't disagree.
+ * In features/market, not engine: the badge kind type comes from the `OrderProblemBadge` component.
  */
 import { orderBadgeFor, type OrderBadgeChoice } from './orderBadgeKind';
 import { orderNextAction, type NextAction } from './orderNextAction';

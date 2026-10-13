@@ -52,7 +52,7 @@ export type BlueprintSuggestion = BlueprintTypeOption & BlueprintOfferStats;
 export interface BpcSourceData {
   /** Public contract copies. */
   contractRows: readonly BpcContractRow[];
-  /** Public contract originals (issue #1241). */
+  /** Public contract originals. */
   originals: readonly BpcContractRow[];
   /** Keyed by `BpcContractRow.locationId`. */
   contractLocations: ReadonlyMap<number, ContractLocationInfo>;
@@ -78,11 +78,10 @@ export interface BpcQuery {
   /** The one blueprint picked from the autocomplete, or null while free text. */
   selectedTypeId: number | null;
   sources: ReadonlySet<SourceToggle>;
-  /** Null when every kind is checked. */
-  spaceKinds: ReadonlySet<SpaceKind> | null;
-  /** Null when no Jump Range is active. */
-  allowedSystems: ReadonlySet<number> | null;
 }
+
+/** `BpcQuery` plus the Space / Jump narrowing that only stage 1 reads. */
+export type BpcFullQuery = BpcQuery & Pick<BpcPrepareInput, 'spaceKinds' | 'allowedSystems'>;
 
 export interface BpcOfferSearch {
   suggestions: BlueprintSuggestion[];
@@ -119,7 +118,7 @@ function narrowByLocation(
 }
 
 /**
- * The blueprint types the market is checked for BPOs (issue #1241): the
+ * The blueprint types the market is checked for BPOs: the
  * chosen blueprint, else the closest typed matches across the whole SDE,
  * else none — never every type in the results. `capped` when more matched.
  */
@@ -150,7 +149,9 @@ export type BpcPrepareData = Pick<
 export interface BpcPrepareInput {
   filter: Omit<BpcSourcingFilter, 'typeQuery'>;
   sources: ReadonlySet<SourceToggle>;
+  /** Null when every kind is checked. */
   spaceKinds: ReadonlySet<SpaceKind> | null;
+  /** Null when no Jump Range is active. */
   allowedSystems: ReadonlySet<number> | null;
 }
 
@@ -239,12 +240,9 @@ export function rankBpcOffers(
     }
   }
 
-  const typeIds =
-    selectedTypeId !== null
-      ? new Set([selectedTypeId])
-      : !hasTypeQuery
-        ? null
-        : new Set(typeMatches(TYPE_SEARCH_LIMIT).map((o) => o.typeId));
+  let typeIds: Set<number> | null = null;
+  if (selectedTypeId !== null) typeIds = new Set([selectedTypeId]);
+  else if (hasTypeQuery) typeIds = new Set(typeMatches(TYPE_SEARCH_LIMIT).map((o) => o.typeId));
   const engineFilter: BpcSearchFilter = { ...nonTypeFilter, typeIds };
 
   const filteredRows = filterBpcContracts(spaceFilteredRows, engineFilter);
@@ -345,13 +343,11 @@ export function rankBpcOffers(
     bpoSourcesByType,
     bpoByType,
     displayRows,
-    // Of `filteredRows`, not every row of the chosen blueprint: it describes
-    // what is on screen.
     summary: selectedTypeId === null ? null : bpcPriceSummary(filteredRows),
   };
 }
 
 /** Both stages composed; the panel memoises them separately. */
-export function searchBpcOffers(data: BpcSourceData, query: BpcQuery): BpcOfferSearch {
+export function searchBpcOffers(data: BpcSourceData, query: BpcFullQuery): BpcOfferSearch {
   return rankBpcOffers(prepareBpcOffers(data, query), data, query);
 }

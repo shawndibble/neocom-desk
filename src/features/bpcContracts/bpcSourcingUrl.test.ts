@@ -1,5 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { BPC_SOURCING_PARAMS, bpcSourcingCommunityHref, bpcSourcingHref } from './bpcSourcingUrl';
+import {
+  BPC_SOURCING_PARAMS,
+  bpcSourcingCommunityHref,
+  bpcSourcingHref,
+  sourceToggleKey,
+  sourceToggleSet,
+} from './bpcSourcingUrl';
+
+describe('sourceToggleKey', () => {
+  it('is equal for equal sets built in any order', () => {
+    expect(sourceToggleKey(new Set(['owned', 'contract']))).toBe(
+      sourceToggleKey(new Set(['contract', 'owned']))
+    );
+  });
+
+  it('differs when the sets differ', () => {
+    expect(sourceToggleKey(new Set(['owned']))).not.toBe(sourceToggleKey(new Set(['contract'])));
+  });
+
+  it('round-trips through sourceToggleSet, including the empty set', () => {
+    for (const sources of [new Set<'owned' | 'lp'>(), new Set<'owned' | 'lp'>(['owned', 'lp'])]) {
+      expect(sourceToggleSet(sourceToggleKey(sources))).toEqual(sources);
+    }
+  });
+});
 
 describe('bpcSourcingHref', () => {
   it('opens the Sourcing tab pinned to the blueprint', () => {
