@@ -31,6 +31,9 @@ Look for:
 - Two adjacent tap targets with no gap between them, where a thumb hits both.
 - A row where one control sits at a different height than its neighbours — a
   sign one of them skipped the shared scale.
+- A bare header sort button is the recurring touch-tier miss (#3670, #3680):
+  check `DataTable`-less sort headers (`SortableLabel`/`SortHeader`) in the grep
+  sweeps.
 
 ```
 grep -rn 'h-6\|h-8' src --include='*.tsx' | grep -iv 'md:h-\|icon\|svg'
