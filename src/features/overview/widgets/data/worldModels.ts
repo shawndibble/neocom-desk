@@ -752,11 +752,13 @@ export const incursions: Builder = (feeds, { t }) => {
         label: t('overview.widgets.incursions.col.influence'),
         align: 'end',
         priority: 3,
+        hideNarrow: true,
       },
       {
         key: 'constellation',
         label: t('overview.widgets.incursions.col.constellation'),
         priority: 4,
+        hideNarrow: true,
       },
     ],
     rows: data.rows.map((row) => {
