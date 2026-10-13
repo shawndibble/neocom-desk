@@ -92,6 +92,19 @@ describe('NetWorthPanel, several Characters', () => {
     expect(within(table).getByText(/hasn't granted wallet access/)).toBeInTheDocument();
   });
 
+  it('keys each covered Character with a swatch, and an unshared one with none', async () => {
+    await seed({ covered: [1, 2] });
+    renderPanel();
+    const table = await screen.findByRole('table', { name: 'Balance by character' });
+    const swatchIn = (name: string) =>
+      (within(table).getAllByText(name)[0].closest('td') as HTMLElement).querySelector(
+        '[data-testid="character-swatch"]'
+      );
+    await vi.waitFor(() => expect(swatchIn('Ava')).not.toBeNull());
+    expect(swatchIn('Bo')).not.toBeNull();
+    expect(swatchIn('Cy')).toBeNull();
+  });
+
   it('pins the character column on the panel surface, not the page background', async () => {
     await seed({ covered: [1, 2] });
     renderPanel();
