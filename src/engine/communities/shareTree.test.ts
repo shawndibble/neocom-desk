@@ -111,6 +111,13 @@ describe('buildShareTree with the Blueprints & Reactions root', () => {
     expect(byName(roots[0].children, 'Frigates').types.map((t) => t.typeId)).toEqual([4]);
   });
 
+  it('never loses a blueprint filed in the removed root itself', () => {
+    const roots = build([
+      { typeId: 8, name: 'Rootless Blueprint', marketGroupId: 2, productMarketGroupId: 5 },
+    ]);
+    expect(roots.map((g) => g.name)).toEqual(['Ships']);
+  });
+
   it('keeps Other for a blueprint whose product has no market group', () => {
     const roots = build([{ typeId: 5, name: 'Odd Blueprint', marketGroupId: null }]);
     expect(roots.map((g) => g.name)).toEqual(['Other']);

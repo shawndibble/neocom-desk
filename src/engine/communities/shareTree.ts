@@ -64,6 +64,19 @@ function finish(group: Omit<ShareGroup, 'total'>): ShareGroup {
   };
 }
 
+/** A market group and its ancestors, root first. */
+function groupPath(byId: ReadonlyMap<number, ShareMarketGroup>, id: number): ShareMarketGroup[] {
+  const path: ShareMarketGroup[] = [];
+  for (let at = byId.get(id); at; at = at.parentId === null ? undefined : byId.get(at.parentId)) {
+    path.unshift(at);
+  }
+  return path;
+}
+
+/** Strictly below the Blueprints & Reactions group: the group itself is not a place. */
+const isBlueprintGroup = (byId: ReadonlyMap<number, ShareMarketGroup>, id: number) =>
+  id !== BLUEPRINT_ROOT_GROUP_ID && groupPath(byId, id)[0]?.id === BLUEPRINT_ROOT_GROUP_ID;
+
 /**
  * For each market group of products, the blueprint market group most of its
  * listed blueprints sit in: the blueprint tree and the product tree are named
@@ -74,15 +87,13 @@ export function blueprintGroupOfProductGroup(
   groups: readonly ShareMarketGroup[]
 ): Map<number, number> {
   const byId = new Map(groups.map((group) => [group.id, group]));
-  const underRoot = (id: number) => {
-    for (let at = byId.get(id); at; at = at.parentId === null ? undefined : byId.get(at.parentId)) {
-      if (at.id === BLUEPRINT_ROOT_GROUP_ID) return true;
-    }
-    return false;
-  };
   const counts = new Map<number, Map<number, number>>();
   for (const { marketGroupId, productMarketGroupId } of blueprints) {
-    if (marketGroupId === null || productMarketGroupId == null || !underRoot(marketGroupId))
+    if (
+      marketGroupId === null ||
+      productMarketGroupId == null ||
+      !isBlueprintGroup(byId, marketGroupId)
+    )
       continue;
     const forProduct = counts.get(productMarketGroupId) ?? new Map<number, number>();
     forProduct.set(marketGroupId, (forProduct.get(marketGroupId) ?? 0) + 1);
@@ -108,23 +119,11 @@ export function buildShareTree(
 ): ShareGroup[] {
   const hasBlueprintRoot = groups.some((group) => group.id === BLUEPRINT_ROOT_GROUP_ID);
   const rawById = new Map(groups.map((group) => [group.id, group]));
-  const pathOf = (id: number): ShareMarketGroup[] => {
-    const path: ShareMarketGroup[] = [];
-    for (
-      let at = rawById.get(id);
-      at;
-      at = at.parentId === null ? undefined : rawById.get(at.parentId)
-    ) {
-      path.unshift(at);
-    }
-    return path;
-  };
-  const underBlueprintRoot = (id: number) => pathOf(id)[0]?.id === BLUEPRINT_ROOT_GROUP_ID;
   // The root itself disappears: its children become roots, and no other
   // market tree is shown (a blueprint filed in one is placed by its product).
   const allGroups: ShareMarketGroup[] = hasBlueprintRoot
     ? groups
-        .filter((group) => group.id !== BLUEPRINT_ROOT_GROUP_ID && underBlueprintRoot(group.id))
+        .filter((group) => isBlueprintGroup(rawById, group.id))
         .map((group) =>
           group.parentId === BLUEPRINT_ROOT_GROUP_ID ? { ...group, parentId: null } : group
         )
@@ -136,7 +135,7 @@ export function buildShareTree(
     if (productGroup == null || !rawById.has(productGroup)) return null;
     const known = learned.get(productGroup);
     if (known !== undefined) return known;
-    const path = pathOf(productGroup);
+    const path = groupPath(rawById, productGroup);
     let parent: number | null = null;
     let index = 0;
     for (; index < path.length; index++) {
@@ -162,7 +161,7 @@ export function buildShareTree(
   for (const type of unique.values()) {
     const own = type.marketGroupId;
     const listed =
-      own !== null && rawById.has(own) && (!hasBlueprintRoot || underBlueprintRoot(own));
+      own !== null && rawById.has(own) && (!hasBlueprintRoot || isBlueprintGroup(rawById, own));
     placeOf.set(type.typeId, listed ? own : placeByProduct(type.productMarketGroupId));
   }
 
