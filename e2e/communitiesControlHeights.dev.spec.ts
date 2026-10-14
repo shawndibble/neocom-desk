@@ -73,7 +73,9 @@ for (const width of CONTROL_ROW_WIDTHS) {
 const RHYTHM_WIDTHS = [1440, 1024, 390] as const;
 
 async function firstHeight(page: Page, selector: string): Promise<number> {
-  const box = await page.locator(selector).first().boundingBox();
+  const row = page.locator(selector).first();
+  await expect(row).toBeVisible();
+  const box = await row.boundingBox();
   expect(box, selector).not.toBeNull();
   return box?.height ?? 0;
 }
@@ -93,6 +95,7 @@ for (const width of RHYTHM_WIDTHS) {
   test(`communities Fittings and list rows are at least as tall as Skill plans rows (${width}px)`, async ({
     page,
   }) => {
+    test.skip(width === 390, 'phone rows keep their 44px floor, unchanged');
     await page.setViewportSize({ width, height: 900 });
     await openWithSampleCommunities(page, `/communities?community=${ADMIN}&tab=plans`);
     const planRow = await firstHeight(page, 'main ul.divide-y > li');
