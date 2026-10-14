@@ -66,3 +66,26 @@ export function evaluateSkillGate(
   if (best === null) return { gated: false };
   return { gated: true, shortfall: best.shortfall, bestCharacterId: best.characterId };
 }
+
+/**
+ * One verdict for several builds that run together: every distinct missing
+ * skill once (at the highest level any of them needs), for the first gated
+ * verdict's closest character. Callers pass only the builds the plan actually
+ * runs — a bought material's gate has no bearing on the plan.
+ */
+export function mergeSkillGates(
+  verdicts: readonly (SkillGateVerdict | undefined)[]
+): SkillGateVerdict {
+  const byType = new Map<number, SkillShortfall>();
+  let bestCharacterId: number | null = null;
+  for (const verdict of verdicts) {
+    if (!verdict?.gated) continue;
+    bestCharacterId ??= verdict.bestCharacterId;
+    for (const s of verdict.shortfall) {
+      const existing = byType.get(s.typeID);
+      if (!existing || s.needLevel > existing.needLevel) byType.set(s.typeID, s);
+    }
+  }
+  if (bestCharacterId === null) return { gated: false };
+  return { gated: true, shortfall: [...byType.values()], bestCharacterId };
+}

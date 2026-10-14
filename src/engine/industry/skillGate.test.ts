@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateSkillGate, type BlueprintSkillRequirement } from './skillGate';
+import {
+  evaluateSkillGate,
+  type BlueprintSkillRequirement,
+  mergeSkillGates,
+  type SkillGateVerdict,
+} from './skillGate';
 import type { SkillLevels } from './types';
 
 const CAPITAL_SHIP_CONSTRUCTION = 20334;
@@ -106,5 +111,33 @@ describe('evaluateSkillGate', () => {
     const result = evaluateSkillGate(requirements, skills);
     expect(result.gated).toBe(true);
     if (result.gated) expect(result.bestCharacterId).toBe(3);
+  });
+});
+
+describe('mergeSkillGates', () => {
+  const gated = (typeID: number, needLevel: number, bestCharacterId = 1): SkillGateVerdict => ({
+    gated: true,
+    shortfall: [{ typeID, haveLevel: 0, needLevel }],
+    bestCharacterId,
+  });
+
+  it('is not gated when no verdict is gated', () => {
+    expect(mergeSkillGates([{ gated: false }, undefined])).toEqual({ gated: false });
+    expect(mergeSkillGates([])).toEqual({ gated: false });
+  });
+
+  it('counts each distinct missing skill once across verdicts', () => {
+    const merged = mergeSkillGates([gated(10, 3), { gated: false }, gated(20, 4), gated(30, 1)]);
+    expect(merged.gated && merged.shortfall.map((s) => s.typeID)).toEqual([10, 20, 30]);
+  });
+
+  it('keeps the highest level needed when two builds share a skill', () => {
+    const merged = mergeSkillGates([gated(10, 3), gated(10, 5)]);
+    expect(merged.gated && merged.shortfall).toEqual([{ typeID: 10, haveLevel: 0, needLevel: 5 }]);
+  });
+
+  it("names the first gated verdict's character", () => {
+    const merged = mergeSkillGates([gated(10, 3, 7), gated(20, 1, 9)]);
+    expect(merged.gated && merged.bestCharacterId).toBe(7);
   });
 });
