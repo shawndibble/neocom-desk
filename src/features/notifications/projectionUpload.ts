@@ -26,9 +26,11 @@ import type { ProjectionRow } from '@/engine/projection';
 import { webPushSupport } from '@/sync/webPushSupport';
 import { readNotificationPermission } from './permission';
 import { recordPushFailure, settlePushRegistration } from './pushFailure';
+import { recordSeenEveTypes } from './seenEveTypes';
 
 export async function uploadProjectionRows(
-  rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>
+  rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>,
+  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>
 ): Promise<void> {
   if (webPushSupport() !== 'supported') return;
   if (readNotificationPermission() !== 'granted') return;
@@ -37,11 +39,12 @@ export async function uploadProjectionRows(
     const { registerDeviceForWebPush } = await import('@/sync/deviceRegistration');
     const registration = await navigator.serviceWorker.ready;
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
-    settlePushRegistration(
-      await registerDeviceForWebPush(vapidKey, registration, rowsByCharacter, {
-        skipIfUnchanged: true,
-      })
-    );
+    const result = await registerDeviceForWebPush(vapidKey, registration, rowsByCharacter, {
+      skipIfUnchanged: true,
+      eveTypesByCharacter,
+    });
+    settlePushRegistration(result);
+    await recordSeenEveTypes(result?.seenTypes);
   } catch (err) {
     // Same fire-and-forget contract as sendBrowserNotification/
     // recordFeedNotification in foregroundPoller.ts: the poll itself must

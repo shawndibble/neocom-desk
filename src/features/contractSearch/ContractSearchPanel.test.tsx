@@ -44,7 +44,8 @@ vi.mock('@/features/contractSearch/publicContractOffers', () => ({
 // suite below publishes one.
 const loadOfferIndex = vi.fn();
 const loadOffersForTypes = vi.fn();
-vi.mock('@/features/contractSearch/publicContractOfferIndex', () => ({
+vi.mock('@/features/contractSearch/publicContractOfferIndex', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/contractSearch/publicContractOfferIndex')>()),
   loadOfferIndex: (...args: unknown[]) => loadOfferIndex(...args),
   loadOffersForTypes: (...args: unknown[]) => loadOffersForTypes(...args),
 }));

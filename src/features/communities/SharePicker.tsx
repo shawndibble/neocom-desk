@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { Button, Caret, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
@@ -204,7 +206,11 @@ export function CharacterSharePicker({
   if (state.status === 'loading')
     return <Spinner size="sm" label={t('communities.share.loading')} />;
   if (state.status === 'needsReauth') {
-    return <p className="text-xs text-text-dim">{t('communities.share.needsReauth')}</p>;
+    return (
+      <p className="text-xs text-text-dim">
+        <GrantMissingLink groups={permissionsForEndpoints(['getCharacterBlueprints'])} />
+      </p>
+    );
   }
   if (state.status === 'failed') {
     return (

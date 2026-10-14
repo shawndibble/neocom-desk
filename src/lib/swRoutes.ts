@@ -4,6 +4,8 @@
  */
 
 const EVE_IMAGE_ORIGIN = 'https://images.evetech.net';
+/** Same host as `R2_SNAPSHOT_ORIGIN` (`contractSearch/r2OfferSnapshot.ts`), restated because that module pulls Dexie into the worker. */
+const SNAPSHOT_ORIGIN = 'https://data.neocomdesk.com';
 
 /**
  * A same-origin SDE file under `<base>data/`, requested with its `?v=<content
@@ -33,5 +35,19 @@ export function isEveTypeImage(url: URL): boolean {
 export function isEvePortraitImage(url: URL): boolean {
   return (
     url.origin === EVE_IMAGE_ORIGIN && /^\/(characters|corporations|alliances)\//.test(url.pathname)
+  );
+}
+
+/**
+ * An object of an R2 contract snapshot (ADR 0019): a per-type offers object or
+ * the courier rows object. Its name carries its
+ * content hash, so the bytes behind a URL never change. The sibling `index.json`
+ * is deliberately not matched: it changes every publish.
+ */
+export function isContractSnapshotObject(url: URL): boolean {
+  return (
+    url.origin === SNAPSHOT_ORIGIN &&
+    (url.pathname.startsWith('/contract-offers/types/') ||
+      url.pathname.startsWith('/courier-contracts/rows.'))
   );
 }

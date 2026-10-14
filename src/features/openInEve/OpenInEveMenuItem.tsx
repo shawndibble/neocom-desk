@@ -8,17 +8,25 @@
  * inert with the reason on tap.
  */
 import { useTranslation } from 'react-i18next';
+import { GrantMissingMenuItem } from '@/app/GrantMissingLink';
 import { DisabledMenuItem, MenuItem } from '@/components/ui';
 import type { OpenInEveTarget } from './sendOpenInEve';
 import { useOpenInEve } from './useOpenInEve';
 
 export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
   const { t } = useTranslation();
-  const { blockedReason, sending, outcome, send } = useOpenInEve({ kind, id });
+  const { blockedReason, missingGroups, sending, outcome, send } = useOpenInEve({ kind, id });
   const label = t(`openInEve.${kind}`);
 
   if (blockedReason !== null) {
-    return <DisabledMenuItem reason={blockedReason}>{label}</DisabledMenuItem>;
+    return missingGroups.length > 0 ? (
+      <>
+        <DisabledMenuItem reason={t('permissions.grantMissing')}>{label}</DisabledMenuItem>
+        <GrantMissingMenuItem groups={missingGroups} />
+      </>
+    ) : (
+      <DisabledMenuItem reason={t('openInEve.needCharacter')}>{label}</DisabledMenuItem>
+    );
   }
   return (
     <MenuItem

@@ -21,6 +21,7 @@ import {
   type ChunkedSnapshotSource,
 } from '@/features/contractSearch/chunkedSnapshot';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
+import { loadR2OfferIndex } from '@/features/contractSearch/r2OfferSnapshot';
 
 const SOURCE: ChunkedSnapshotSource = {
   collectionName: 'publicContractOffers',
@@ -35,8 +36,27 @@ const SOURCE: ChunkedSnapshotSource = {
   staleAfterMs: 30 * 60_000,
 };
 
-export function loadPublicContractOffers(
+/** The whole snapshot from the Firestore chunks: the fallback when R2 is unreachable. */
+export function loadFirestoreContractOffers(
   characterId: number
 ): Promise<ChunkedSnapshotRead<PublicContractOfferRow>> {
   return loadChunkedSnapshot<PublicContractOfferRow>(SOURCE, characterId);
+}
+
+/**
+ * The snapshot's freshness, and its rows only when R2 is unreachable (ADR 0019,
+ * issue #3746). While R2's index is readable the rows are not downloaded here at
+ * all: the Items board reads the types a search names through the index
+ * (`publicContractOfferIndex.ts`), so this answers with no rows and the index's
+ * own `lastSyncedAt`, which the header reports.
+ */
+export async function loadPublicContractOffers(
+  characterId: number
+): Promise<ChunkedSnapshotRead<PublicContractOfferRow>> {
+  const r2 = await loadR2OfferIndex();
+  if (!r2) return loadFirestoreContractOffers(characterId);
+  return {
+    cached: { ...r2, data: { rows: [], lastSyncedAt: r2.data.lastSyncedAt } },
+    revalidating: false,
+  };
 }

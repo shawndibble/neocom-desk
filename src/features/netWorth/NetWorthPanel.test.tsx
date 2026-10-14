@@ -89,7 +89,9 @@ describe('NetWorthPanel, several Characters', () => {
     expect(screen.getByLabelText(/All characters · 2 of 3/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Not included: Cy/)).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Balance by character' });
-    expect(within(table).getByText(/hasn't granted wallet access/)).toBeInTheDocument();
+    expect(
+      within(table).getByRole('link', { name: 'Grant missing Permissions' })
+    ).toBeInTheDocument();
   });
 
   it('keys each covered Character with a swatch, and an unshared one with none', async () => {
@@ -141,7 +143,7 @@ describe('NetWorthPanel, several Characters', () => {
     await seed({ covered: [1, 2] });
     renderPanel();
     const table = await screen.findByRole('table', { name: 'Balance by character' });
-    await within(table).findAllByText("This character hasn't granted wallet access");
+    await within(table).findAllByRole('link', { name: 'Grant missing Permissions' });
     await openSeries(user);
     await user.click(await screen.findByRole('option', { name: 'Order escrow' }));
     await screen.findByText('Excludes Order escrow');

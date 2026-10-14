@@ -1,6 +1,8 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
 import {
   copiesByPlace,
@@ -169,7 +171,11 @@ export function ShareBlueprintsTab({
     return <Spinner size="sm" label={t('communities.share.loading')} />;
   }
   if (owned.status === 'needsReauth') {
-    return <p className="text-xs text-text-dim">{t('communities.share.needsReauth')}</p>;
+    return (
+      <p className="text-xs text-text-dim">
+        <GrantMissingLink groups={permissionsForEndpoints(['getCharacterBlueprints'])} />
+      </p>
+    );
   }
   if (owned.status === 'failed') {
     return (

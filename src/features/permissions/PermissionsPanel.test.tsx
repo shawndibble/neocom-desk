@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import i18n from '@/i18n';
 import type { StatusResult } from '@/esi/cache';
 import type { CharacterCorporationRoles } from '@/esi/endpoints';
@@ -40,6 +41,14 @@ function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorpo
   };
 }
 
+function renderPanel(url = '/settings/permissions') {
+  return render(
+    <MemoryRouter initialEntries={[url]}>
+      <PermissionsPanel />
+    </MemoryRouter>
+  );
+}
+
 /** The list item for one Permission, found by its label. */
 function row(label: string): HTMLElement {
   return screen.getByText(label, { selector: 'div' }).closest('li')!;
@@ -54,16 +63,36 @@ beforeEach(() => {
 
 describe('PermissionsPanel — revoking', () => {
   it("links the revoke hint to CCP's authorized-apps page", () => {
-    render(<PermissionsPanel />);
+    renderPanel();
     const link = screen.getByRole('link', { name: /^EVE's own site/ });
     expect(link).toHaveAttribute('href', AUTHORIZED_APPS_URL);
     expect(link).toHaveAttribute('target', '_blank');
   });
 });
 
+describe('PermissionsPanel — arriving from Grant missing Permissions', () => {
+  it('flashes the Grant button of each flagged Permission and no other', () => {
+    mockedGrantedScopes.mockReturnValue([...CORE_GRANT]);
+    renderPanel('/settings/permissions?grant=openWindow');
+    expect(within(row('Open in EVE')).getByRole('button', { name: /^Grant/ })).toHaveClass(
+      'grant-flash'
+    );
+    expect(
+      within(row('Structure markets')).getByRole('button', { name: /^Grant/ })
+    ).not.toHaveClass('grant-flash');
+  });
+
+  it('flashes nothing without the parameter, or for a Permission already granted', () => {
+    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedLoadRoles.mockReturnValue(new Promise(() => {}));
+    renderPanel('/settings/permissions?grant=wallet,nonsense');
+    expect(document.querySelector('.grant-flash')).toBeNull();
+  });
+});
+
 describe('PermissionsPanel — every Permission', () => {
   it('lists each Permission with its label and caption', () => {
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(screen.getAllByRole('listitem')).toHaveLength(SCOPE_GROUPS.length);
     expect(within(row('Mail')).getByText(/reading, organizing and sending/i)).toBeInTheDocument();
     expect(within(row('Structure markets')).getByText(/player structure/i)).toBeInTheDocument();
@@ -72,7 +101,7 @@ describe('PermissionsPanel — every Permission', () => {
   it('marks what the Base Grant holds as granted and the opt-ins as missing', () => {
     mockedGrantedScopes.mockReturnValue([...SCOPES]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(within(row('Wallet')).getByText('Granted')).toBeInTheDocument();
     expect(within(row('Wallet')).queryByRole('button')).not.toBeInTheDocument();
     expect(within(row('Structure markets')).getByText('Not granted')).toBeInTheDocument();
@@ -84,7 +113,7 @@ describe('PermissionsPanel — every Permission', () => {
   it('lists Not granted rows before Granted ones, each half in catalogue order', () => {
     mockedGrantedScopes.mockReturnValue([...SCOPES]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
-    render(<PermissionsPanel />);
+    renderPanel();
     const items = screen.getAllByRole('listitem');
     const states = items.map((li) => (within(li).queryByText('Not granted') ? 'missing' : 'other'));
     const firstOther = states.indexOf('other');
@@ -96,7 +125,7 @@ describe('PermissionsPanel — every Permission', () => {
 
   it('keeps catalogue order when nothing is missing', () => {
     mockedGrantedScopes.mockReturnValue(undefined);
-    render(<PermissionsPanel />);
+    renderPanel();
     const shown = screen
       .getAllByRole('listitem')
       .map((li) => li.querySelector('div > div')?.textContent);
@@ -108,20 +137,20 @@ describe('PermissionsPanel — every Permission', () => {
 
   it('offers Grant on every Permission a Core-only Character is missing', () => {
     mockedGrantedScopes.mockReturnValue([...CORE_GRANT]);
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(screen.getAllByRole('button', { name: /^grant /i })).toHaveLength(SCOPE_GROUPS.length);
   });
 
   it('shows checking, not missing, while the grant is still unknown', () => {
     mockedGrantedScopes.mockReturnValue(undefined);
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(within(row('Wallet')).getByText('Checking…')).toBeInTheDocument();
   });
 
   it('Grant asks for just that Permission, as this Character', async () => {
     mockedGrantedScopes.mockReturnValue([...CORE_GRANT]);
-    render(<PermissionsPanel />);
+    renderPanel();
 
     await userEvent.click(screen.getByRole('button', { name: 'Grant Mail' }));
 
@@ -130,7 +159,7 @@ describe('PermissionsPanel — every Permission', () => {
 
   it('has no Remove action anywhere', () => {
     mockedGrantedScopes.mockReturnValue([...SCOPES, ...ALL_CORP_SCOPES]);
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(screen.queryByRole('button', { name: /remove|revoke/i })).not.toBeInTheDocument();
   });
 });
@@ -141,7 +170,7 @@ describe('PermissionsPanel — granting several at once', () => {
   it('offers a checkbox only on rows that are missing', () => {
     mockedGrantedScopes.mockReturnValue([...SCOPES]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(within(row('Wallet')).queryByRole('checkbox')).not.toBeInTheDocument();
     expect(
       within(row('Structure markets')).getByRole('checkbox', { name: 'Select Structure markets' })
@@ -149,12 +178,12 @@ describe('PermissionsPanel — granting several at once', () => {
   });
 
   it('hides the bulk button until something is ticked', () => {
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(screen.queryByRole('button', { name: /^grant selected/i })).not.toBeInTheDocument();
   });
 
   it('sends every ticked Permission in one login', async () => {
-    render(<PermissionsPanel />);
+    renderPanel();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Select Mail' }));
     await userEvent.click(screen.getByRole('checkbox', { name: 'Select Wallet' }));
 
@@ -167,7 +196,7 @@ describe('PermissionsPanel — granting several at once', () => {
   });
 
   it('unticking removes it from the request', async () => {
-    render(<PermissionsPanel />);
+    renderPanel();
     const mail = screen.getByRole('checkbox', { name: 'Select Mail' });
     await userEvent.click(mail);
     await userEvent.click(mail);
@@ -175,18 +204,22 @@ describe('PermissionsPanel — granting several at once', () => {
   });
 
   it('drops the ticks when the active Character changes', async () => {
-    const { rerender } = render(<PermissionsPanel />);
+    const { rerender } = renderPanel();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Select Mail' }));
     expect(screen.getByRole('button', { name: 'Grant selected (1)' })).toBeInTheDocument();
 
     act(() => useActiveCharacter.setState({ activeCharacterId: 43 }));
-    rerender(<PermissionsPanel />);
+    rerender(
+      <MemoryRouter initialEntries={['/settings/permissions']}>
+        <PermissionsPanel />
+      </MemoryRouter>
+    );
 
     expect(screen.queryByRole('button', { name: /^grant selected/i })).not.toBeInTheDocument();
   });
 
   it('Select all ticks every missing row; Select none clears them', async () => {
-    render(<PermissionsPanel />);
+    renderPanel();
     await userEvent.click(screen.getByRole('button', { name: 'Select all' }));
     expect(
       screen.getByRole('button', { name: `Grant selected (${SCOPE_GROUPS.length})` })
@@ -204,7 +237,7 @@ describe('PermissionsPanel — granting several at once', () => {
       SCOPE_GROUPS.flatMap((group) => [...scopesForGroup(group)])
     );
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Director']));
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(screen.queryByRole('button', { name: 'Select all' })).not.toBeInTheDocument();
   });
 });
@@ -217,7 +250,7 @@ describe('PermissionsPanel — the Corporation row', () => {
   it('none: hidden, because granting would unlock nothing', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Hangar_Take_1']));
-    render(<PermissionsPanel />);
+    renderPanel();
     await waitFor(() =>
       expect(screen.getAllByRole('listitem')).toHaveLength(SCOPE_GROUPS.length - 1)
     );
@@ -227,7 +260,7 @@ describe('PermissionsPanel — the Corporation row', () => {
   it('roles-without-grant: names the roles held and offers Grant', async () => {
     mockedGrantedScopes.mockReturnValue([ROLES_SCOPE]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Junior_Accountant']));
-    render(<PermissionsPanel />);
+    renderPanel();
     await waitFor(() =>
       expect(within(row('Corporation')).getByText(/Junior Accountant/)).toBeInTheDocument()
     );
@@ -239,7 +272,7 @@ describe('PermissionsPanel — the Corporation row', () => {
 
   it('not-granted: offers Grant, since roles are unknowable until then', () => {
     mockedGrantedScopes.mockReturnValue([...SCOPES]);
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(within(row('Corporation')).getByText(/roles show once granted/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Grant Corporation' })).toBeInTheDocument();
     expect(mockedLoadRoles).not.toHaveBeenCalled();
@@ -248,7 +281,7 @@ describe('PermissionsPanel — the Corporation row', () => {
   it('unknown: checking, with no Grant button', () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(within(row('Corporation')).getByText('Checking…')).toBeInTheDocument();
     expect(within(row('Corporation')).queryByRole('button')).not.toBeInTheDocument();
   });
@@ -256,7 +289,7 @@ describe('PermissionsPanel — the Corporation row', () => {
   it('ready: granted, nothing left to ask for', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Director']));
-    render(<PermissionsPanel />);
+    renderPanel();
     await waitFor(() =>
       expect(within(row('Corporation')).getByText('Granted')).toBeInTheDocument()
     );
@@ -267,7 +300,7 @@ describe('PermissionsPanel — the Corporation row', () => {
 describe('PermissionsPanel — no active Character', () => {
   it('says so instead of an empty list, and asks ESI for nothing', () => {
     useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
-    render(<PermissionsPanel />);
+    renderPanel();
     expect(screen.getByText(/select a character/i)).toBeInTheDocument();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
     expect(mockedLoadRoles).not.toHaveBeenCalled();

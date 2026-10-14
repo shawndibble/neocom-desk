@@ -34,6 +34,8 @@ export interface CharacterSectionHeightInput {
   missingPermissionFor: (eventId: NotificationEventId) => boolean;
   /** Whether this Character holds `eveNotification`'s own scope (family/type rows gate on this alone, never capability). */
   hasEveNotificationScope: boolean;
+  /** Seen ESI types beyond the allow-list, offered as one extra group (issue #3755). */
+  extraEveTypeCount?: number;
   /**
    * True below `md`, where the header button takes the 44px touch tier
    * (`min-h-11 md:min-h-0`, issue #1118) instead of its content height. Only
@@ -148,6 +150,8 @@ export function estimateCharacterSectionHeight(input: CharacterSectionHeightInpu
         if (types.length === 0) continue;
         height += ROW_HEIGHT['eve-family-header'] + types.length * ROW_HEIGHT['eve-type'];
       }
+      const extra = input.extraEveTypeCount ?? 0;
+      if (extra > 0) height += ROW_HEIGHT['eve-family-header'] + extra * ROW_HEIGHT['eve-type'];
     }
   }
 

@@ -116,6 +116,7 @@ describe('firestore.indexes.json field overrides', () => {
       'surveyTax',
       'surveyIgnores',
       'surveyInfo',
+      'publicContractOffersIndex',
     ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
   });
@@ -199,6 +200,17 @@ describe('firestore.indexes.json composite indexes', () => {
           { fieldPath: 'fired', order: 'ASCENDING' },
         ],
       },
+    ]);
+  });
+});
+
+describe('firestore.indexes.json large-map docs', () => {
+  // One map key per item type (~11.9k) blows Firestore's 40,000 index-entries-
+  // per-document limit under automatic indexing (#3779), so the write failed
+  // and clients never got the index. It is only ever read by id.
+  it('exempts every field of publicContractOffersIndex from auto-indexing', () => {
+    expect(overridesFor('publicContractOffersIndex')).toEqual([
+      { collectionGroup: 'publicContractOffersIndex', fieldPath: '*', ttl: false, indexes: [] },
     ]);
   });
 });

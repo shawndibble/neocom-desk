@@ -181,6 +181,7 @@ export function SharedBlueprintTable({
       id: 'meTe',
       header: t('communities.library.columns.meTe'),
       align: 'right',
+      headerClassName: 'whitespace-nowrap',
       render: (row) => `${row.me} / ${row.te}`,
       sortValue: (row) => row.me * 100 + row.te,
     },

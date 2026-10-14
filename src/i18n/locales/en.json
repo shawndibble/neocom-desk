@@ -291,7 +291,6 @@
     "saveToEve": {
       "action": "Save to EVE…",
       "needCharacter": "Log in with a Character to save Fittings to EVE.",
-      "needPermission": "Log in again to allow saving Fittings to EVE.",
       "title": "Save to EVE",
       "nameLabel": "Name",
       "targetLabel": "Save as",
@@ -2785,7 +2784,6 @@
     "jobsReauthTitle": "Log in again to see jobs",
     "jobsReauthHint": "This character logged in before industry job tracking was added. Log this character in again to grant the new permission.",
     "jobsReauthAction": "Log in again with EVE Online",
-    "jobsCharacterNotShared": "This character hasn't granted industry-jobs access",
     "jobsCorpBadge": "Corp",
     "jobsDone": "Done",
     "jobsCompletingSoon": "Completing soon",
@@ -4851,7 +4849,6 @@
     "balanceByCharacter": "Balance by character",
     "totalBalance": "Total",
     "balanceCharacterColumn": "Character",
-    "balanceCharacterNotShared": "This character hasn't granted wallet access",
     "everMarks": "EverMarks",
     "everMarksTooltipLabel": "About EverMarks",
     "everMarksTooltip": "EverMarks are loyalty points for the Paragon corporation, spent in its own LP Store — separate from the per-corporation LP under Loyalty Points.",
@@ -8087,7 +8084,6 @@
       "noBlueprints": "This Character owns no blueprints.",
       "noMatch": "No blueprint matches that search.",
       "loading": "Loading blueprints…",
-      "needsReauth": "Grant permission to read blueprints to choose what to share.",
       "failed": "Could not load this Character's blueprints.",
       "chooseCount": "Choose what to share ({{count}})…",
       "saveFailed": "Could not save your choice."
@@ -8447,6 +8443,12 @@
       "enable": "Enable",
       "dismiss": "Not now"
     },
+    "alertsOffer": {
+      "title": "Get alerts when Neocom is closed?",
+      "body": "Turn on alerts for {{name}}. EVE asks you to authorize notifications only. You can change this per character in Settings.",
+      "enable": "Turn on",
+      "dismiss": "Not now"
+    },
     "groupedTitle": "{{title}} x{{count}}",
     "eveTypeName": {
       "StructureUnderAttack": "Structure Under Attack",
@@ -8479,7 +8481,15 @@
     "fired": {
       "pushFallback": {
         "title": "Neocom Desk",
-        "body": "Something happened — open the app for details."
+        "body": "Something happened — open the app for details.",
+        "character": "Your character"
+      },
+      "eveNotificationSummary": {
+        "title": "New EVE notifications",
+        "body_one": "{{count}} new EVE notification.",
+        "body_other": "{{count}} new EVE notifications.",
+        "bodyWithCharacter_one": "{{count}} new EVE notification for {{character}}.",
+        "bodyWithCharacter_other": "{{count}} new EVE notifications for {{character}}."
       },
       "newMail": {
         "title": "New mail",
@@ -9675,6 +9685,7 @@
     "discordHint": "Think this is a bug? Ask on Discord"
   },
   "permissions": {
+    "grantMissing": "Grant missing Permissions",
     "wallet": {
       "label": "Wallet",
       "caption": "Your wallet balance, transactions and journal."
@@ -10177,7 +10188,8 @@
         "corpGovernance": "Corp Governance",
         "bills": "Bills",
         "moonMining": "Moon Mining",
-        "pi": "PI"
+        "pi": "PI",
+        "other": "Other"
       },
       "selectAllFamily": {
         "browser": "Toggle all device notifications for {{family}}",
@@ -10872,8 +10884,6 @@
     "sending": "Opening in EVE…",
     "opened": "Opened in your EVE client.",
     "needCharacter": "Log in a character to open this in its EVE client.",
-    "permissionReason": "This character hasn't granted the Open in EVE permission.",
-    "needPermission": "This character hasn't granted the Open in EVE permission. Log in again to allow it.",
     "failed": "Couldn't open it in EVE: {{message}}",
     "unknownError": "Is your character logged in to the game?"
   },
@@ -11673,7 +11683,6 @@
       "sending": "Setting waypoints…",
       "character": "Character to set waypoints for",
       "needCharacter": "Log in a character to set waypoints in its EVE client.",
-      "needPermission": "This character hasn't granted the Autopilot waypoints permission.",
       "grantTitle": "Setting waypoints needs a permission this character hasn't granted",
       "grantHint": "Characters that logged in before this button existed must log in again to let Neocom Desk set autopilot waypoints in the EVE client.",
       "grantAction": "Log in again",
@@ -11691,7 +11700,6 @@
       "nothingToSet": "No waypoints to set: the trip has no jumps.",
       "failed": "Waypoints not set: {{message}}",
       "failedPartway": "{{set}} of {{total}} waypoints set, then ESI refused the rest: {{message}}",
-      "permissionReason": "this character hasn't granted the Autopilot waypoints permission",
       "unknownError": "ESI gave no reason. Is the character logged in to the game?"
     },
     "activityLoading": "Loading the last hour of jumps and kills…",
