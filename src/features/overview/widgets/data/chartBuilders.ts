@@ -17,6 +17,7 @@ import type {
   StackChartModel,
 } from '../charts/types';
 import { sharesOfMax } from '../charts/geometry';
+import { dayTitle } from './chartTips';
 import type { Translate } from './types';
 
 const K = 'overview.widgets.chart';
@@ -78,6 +79,10 @@ export function walletArea(
     low: t(`${K}.low`, { value: format(low) }),
     high: t(`${K}.high`, { value: format(high) }),
     rangeLabel: t(`${K}.span`, { count: values.length }),
+    tips: values.map((value, i) => ({
+      title: dayTitle(series.days[i] ?? ''),
+      rows: [{ label: t(`${K}.tip.balance`), value: format(value) }],
+    })),
     summary: t(`${K}.wallet.summary`, {
       from: format(values[0]!),
       to: format(values[values.length - 1]!),

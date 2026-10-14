@@ -168,10 +168,16 @@ hauling, incursions, location.
 
 ### Charts
 Honest and accessible: Orders chart is Not-undercut vs Undercut (expiring is a
-separate count); Wallet flow is Income vs Spending bars; Net worth stack has no
+separate count); Wallet flow is one net bar per day or week (green up for a net
+gain, red down for a net loss) with its figure printed beside it, and hovering a
+bar reads Income, Spending and Net apart; Profit is drawn the same way; Net worth stack has no
 red and a legend in bar order; bars carry a max and a time range; every chart
 has a visually hidden text summary and its Table view is the table; colour is
-never the only signal.
+never the only signal. Bar and line charts (wallet, net worth, profit, mining,
+kills, route safety) read a point out on hover, or on a tap and drag on touch,
+through the shared `ChartHover` bubble (`ChartTip` titles and rows on the model).
+The drawing is aria-hidden and takes no focus, so the summary and Table view
+stay the keyboard and screen-reader route.
 
 ### Alerts (global)
 - **Bell** in every page header (replaces the Alerts link): badge = unread

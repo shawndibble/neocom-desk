@@ -11,7 +11,6 @@ import type { WidgetSize } from '../kinds';
 import { chartHeight } from '../sizes';
 import { AreaChart } from './AreaChart';
 import { Bars } from './Bars';
-import { DivergingBars } from './DivergingBars';
 import { Donut } from './Donut';
 import { Gantt } from './Gantt';
 import { HBars } from './HBars';
@@ -30,8 +29,6 @@ function Drawing({ model, size }: { model: ChartModel; size: WidgetSize }) {
       return <AreaChart model={model} height={height} />;
     case 'bars':
       return <Bars model={model} height={height} />;
-    case 'diverging':
-      return <DivergingBars model={model} height={height} />;
     case 'hbars':
       return <HBars model={model} maxRows={hbarRows(size)} />;
     case 'gantt':

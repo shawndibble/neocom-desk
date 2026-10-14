@@ -3875,6 +3875,32 @@
           "xEnd": "today",
           "summary_one": "{{count}} kill or loss in the last {{range}} days: {{kills}} kills and {{losses}} losses. Busiest day: {{peak}}. Per day, oldest first: {{days}}.",
           "summary_other": "{{count}} kills and losses in the last {{range}} days: {{kills}} kills and {{losses}} losses. Busiest day: {{peak}}. Per day, oldest first: {{days}}."
+        },
+        "tip": {
+          "day": {
+            "now": "Today",
+            "ago_one": "{{count}} day ago",
+            "ago_other": "{{count}} days ago"
+          },
+          "week": {
+            "now": "This week",
+            "ago_one": "{{count}} week ago",
+            "ago_other": "{{count}} weeks ago"
+          },
+          "hour": {
+            "now": "This hour",
+            "ago_one": "{{count}} hour ago",
+            "ago_other": "{{count}} hours ago"
+          },
+          "balance": "Balance",
+          "income": "Income",
+          "spending": "Spending",
+          "net": "Net",
+          "kills": "Kills",
+          "losses": "Losses",
+          "profit": "Profit",
+          "mined": "Mined",
+          "total": "Total"
         }
       },
       "data": {

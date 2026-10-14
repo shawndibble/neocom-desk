@@ -14,17 +14,22 @@ export interface AreaGeometry {
   polygon: string;
 }
 
-/** Points for an area/line chart in a `100 x height` viewBox. Fewer than two values draw nothing. */
-export function areaPoints(values: readonly number[], height: number): AreaGeometry {
-  if (values.length < 2) return { line: [], polygon: '' };
+/** Where each value of an area/line chart sits: `x` in 0..100 and `y` in 0..height, oldest first. Fewer than two values give none. */
+export function areaCoords(values: readonly number[], height: number): { x: number; y: number }[] {
+  if (values.length < 2) return [];
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
-  const line = values.map((value, i) => {
-    const x = (i / (values.length - 1)) * 100;
-    const y = height - 4 - ((value - min) / span) * (height - 10);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
+  return values.map((value, i) => ({
+    x: (i / (values.length - 1)) * 100,
+    y: height - 4 - ((value - min) / span) * (height - 10),
+  }));
+}
+
+/** Points for an area/line chart in a `100 x height` viewBox. Fewer than two values draw nothing. */
+export function areaPoints(values: readonly number[], height: number): AreaGeometry {
+  const line = areaCoords(values, height).map(({ x, y }) => `${x.toFixed(1)},${y.toFixed(1)}`);
+  if (line.length === 0) return { line: [], polygon: '' };
   return { line, polygon: `0,${height} ${line.join(' ')} 100,${height}` };
 }
 
@@ -83,37 +88,6 @@ export function donutSegments(values: readonly number[]): DonutSegment[] {
     used += dash;
     return segment;
   });
-}
-
-export interface DivergingGeometry {
-  /** Each bar above the axis, as a percentage of the region above it. */
-  up: number[];
-  /** Each bar below the axis, as a percentage of the region below it. */
-  down: number[];
-  /** The share of the chart's height above the axis, 0.2 to 0.8. */
-  split: number;
-}
-
-const MIN_SPLIT = 0.2;
-
-/**
- * Heights for paired bars either side of an axis. The axis sits where it
- * gives both sides the same pixels-per-ISK (income that is four times
- * spending gets four times the room), but never closer than a fifth of the
- * height to an edge, so a small side still reads. A zero draws nothing; any
- * other value is never thinner than a visible sliver.
- */
-export function divergingHeights(
-  up: readonly number[],
-  down: readonly number[]
-): DivergingGeometry {
-  const maxUp = up.reduce((m, v) => Math.max(m, v), 0);
-  const maxDown = down.reduce((m, v) => Math.max(m, v), 0);
-  const total = maxUp + maxDown;
-  const split = total <= 0 ? 0.5 : Math.min(1 - MIN_SPLIT, Math.max(MIN_SPLIT, maxUp / total));
-  const scale = (max: number) => (v: number) =>
-    max <= 0 || v <= 0 ? 0 : Math.max(MIN_BAR_PERCENT, (v / max) * 100);
-  return { up: up.map(scale(maxUp)), down: down.map(scale(maxDown)), split };
 }
 
 /**

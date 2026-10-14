@@ -21,12 +21,13 @@ import type { RefTypeBreakdownRow } from '@/features/character/walletJournalFilt
 import type { StockBoardMarket } from '@/features/stockTargets/stockBoard';
 import type { PayeeOwed } from '../../miningTaxPayees';
 import type {
-  DivergingChartModel,
+  BarsChartModel,
   StackChartModel,
   StackPart,
   StackRowsChartModel,
 } from '../charts/types';
 import { backwardBucketSums } from './chartSeries';
+import { rollingTitles, signTone } from './chartTips';
 import type { NetWorthCharacter } from './kindLoaders';
 import { STOCK_PATH, UNKNOWN } from './builderKit';
 import { fractionBar, signedCell } from './cellKit';
@@ -320,27 +321,42 @@ export function flowBuckets(
   return { daily, income, spending };
 }
 
-/** Paired bars of income above the axis and spending below it; null when ISK never moved. */
-export function flowDiverging(
+/**
+ * One bar per period: what the wallet gained net, green above the axis, red
+ * below it, each with its figure. Hover reads income, spending and net apart.
+ * Null when ISK never moved.
+ */
+export function flowBars(
   t: Translate,
   entries: readonly WalletJournalEntry[],
   now: number,
   range: number,
   note: string,
   summary: string
-): DivergingChartModel | null {
+): BarsChartModel | null {
   if (entries.length === 0) return null;
   const { daily, income, spending } = flowBuckets(entries, now, range);
   const tallest = Math.max(...income, ...spending);
   if (tallest <= 0) return null;
   const C = `${W}.chart`;
+  const nets = income.map((v, i) => v - spending[i]!);
+  const titles = rollingTitles(t, daily ? 'day' : 'week', nets.length);
   return {
-    kind: 'diverging',
-    up: income,
-    down: spending,
-    max: t(`${C}.max`, { value: formatIskCompact(tallest) }),
+    kind: 'bars',
+    values: nets,
+    gains: true,
+    barLabels: nets.map((v) => (v === 0 ? '' : formatIskCompactSigned(v))),
+    max: t(`${C}.max`, { value: formatIskCompact(Math.max(0, ...nets)) }),
     xStart: t(daily ? `${C}.daysAgo` : `${C}.weeksAgo`, { count: income.length }),
     xEnd: t(daily ? `${C}.today` : `${C}.thisWeek`),
+    tips: nets.map((net, i) => ({
+      title: titles[i]!,
+      rows: [
+        { label: t(`${C}.tip.income`), value: formatIskCompact(income[i]!), tone: 'good' },
+        { label: t(`${C}.tip.spending`), value: formatIskCompact(spending[i]!), tone: 'bad' },
+        { label: t(`${C}.tip.net`), value: formatIskCompactSigned(net), tone: signTone(net) },
+      ],
+    })),
     note,
     summary,
   };
