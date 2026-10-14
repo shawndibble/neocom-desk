@@ -1,9 +1,7 @@
 /**
  * Jump clone names in the Clones list (issues #2087, #3002): the name shows
  * beside the place, and a long one wraps inside its card instead of widening
- * the list past its Panel, down to a phone. A blank one is headed by its place,
- * not "Unnamed": ESI no longer sends names (esi/esi-issues#1305), so "Unnamed"
- * labelled every clone a pilot had named in game.
+ * the list past its Panel, down to a phone. A blank one is headed by its place.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';

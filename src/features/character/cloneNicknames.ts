@@ -1,9 +1,9 @@
 /**
  * The pilot's own name for each jump clone.
  *
- * ESI stopped returning jump clone names in 2021 (esi/esi-issues#1305, still
- * open): `name` is in the schema but never in the payload, so every clone read
- * as unnamed however the pilot named it in game. The pilot names it here
+ * ESI stopped returning jump clone names in 2021 (esi/esi-issues#1305):
+ * `name` is in the schema but never in the payload, so every clone read as
+ * unnamed however the pilot named it in game. The pilot names it here
  * instead. ESI's `name` still wins over nothing, in case CCP fixes it.
  *
  * Synced, one blob keyed by `jump_clone_id` (globally unique, so no Character

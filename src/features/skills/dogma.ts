@@ -46,7 +46,7 @@ export function extractImplantSlot(
   dogmaAttributes: readonly DogmaAttribute[] | undefined
 ): number | undefined {
   const value = dogmaAttributes?.find((a) => a.attribute_id === IMPLANT_SLOT_ATTRIBUTE_ID)?.value;
-  return value ? value : undefined;
+  return value || undefined;
 }
 
 /** Sum non-zero per-attribute bonuses across multiple implants into one Implants map. */

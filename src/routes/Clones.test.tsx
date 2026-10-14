@@ -286,7 +286,7 @@ describe('Clones', () => {
     expect(alpha.closest('li')).toHaveTextContent(/^Alpha\s*Jita IV - Moon 4 - Caldari Navy/);
     expect(screen.getByText('Beta')).toBeInTheDocument();
     expect(screen.queryByText('Unnamed')).not.toBeInTheDocument();
-    // ESI sends no name (esi/esi-issues#1305): the place is the heading, said once.
+    // An unnamed clone: the place is the heading, not repeated under it.
     const unnamed = screen.getAllByRole('heading', {
       name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
       level: 3,

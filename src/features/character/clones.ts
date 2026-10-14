@@ -31,10 +31,9 @@ export interface ImplantDetail {
 }
 
 /**
- * Description, slot and attribute bonus for implant types, keyed by typeID. A
- * failed lookup leaves the id absent, so the caller renders the bare name.
- * `loadUniverseType` already retries once; a still-failing id never rejects
- * the whole snapshot.
+ * Keyed by typeID. A failed lookup leaves the id absent, so the caller renders
+ * the bare name. `loadUniverseType` already retries once; a still-failing id
+ * never rejects the whole snapshot.
  */
 export async function loadImplantDetails(
   typeIds: readonly number[]

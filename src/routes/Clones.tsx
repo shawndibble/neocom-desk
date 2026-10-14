@@ -106,7 +106,7 @@ interface Snapshot {
   infomorphLevel: number;
   /** Implants of the clone the Character is wearing; the Skills > Trained read, now loaded here too. */
   wornImplants: CachedResult<number[]> | null;
-  /** The read-implants grant is missing (401/403): a banner above the table, never in place of it. */
+  /** The read-implants grant is missing (401/403): a banner above the list, never in place of it. */
   implantsNeedsReauth: boolean;
   /** The active training queue. */
   queueResult: CachedResult<SkillQueueEntry[]> | null;
@@ -121,7 +121,7 @@ interface Snapshot {
   /** Security status of every system above, keyed by solar system id; absent when unresolved. */
   securities: Map<number, number>;
   implantNames: Map<number, string>;
-  /** Description (name tooltip), slot and attribute bonus per implant; absent ids get none. */
+  /** Absent ids render the bare name. */
   implantDetails: Map<number, ImplantDetail>;
   /** Jump-clone and home-clone location names, keyed by `location_id`. */
   locationNames: Map<number, string>;
@@ -281,11 +281,9 @@ type PriceMap = ReadonlyMap<number, number | null>;
 
 /** Slot order, the way the game lists them; a type with no slot goes last, in ESI's order. */
 function bySlot(ids: readonly number[], details: ReadonlyMap<number, ImplantDetail>): number[] {
+  // A stable sort; Infinity − Infinity is NaN, which sorts as a tie.
   const slot = (id: number) => details.get(id)?.slot ?? Number.POSITIVE_INFINITY;
-  return ids
-    .map((id, index) => ({ id, index }))
-    .sort((a, b) => slot(a.id) - slot(b.id) || a.index - b.index)
-    .map((x) => x.id);
+  return [...ids].sort((a, b) => slot(a) - slot(b));
 }
 
 /** One implant: slot, name (Show info), then what it adds and what it is worth. */
@@ -301,7 +299,7 @@ function ImplantRow({
   detail: ImplantDetail | undefined;
   /** False when no implant in the list has a known slot: no empty column. */
   showSlot: boolean;
-  /** Undefined until priced or when unpriced: the card's footer counts those. */
+  /** Nullish until priced or when unpriced: the card's footer counts those. */
   price: number | null | undefined;
 }) {
   const { t } = useTranslation();
@@ -376,7 +374,7 @@ function CloneCard({
   prices: PriceMap | undefined;
   /** Queue time in this clone; absent when there is no verdict. */
   training?: { row: CloneRow | undefined; best: boolean };
-  /** Absent for the worn clone: only a jump clone has a name of its own. */
+  /** Absent for the worn clone (no jump_clone_id) and until nicknames hydrate. */
   rename?: CloneRename;
   /** The clone the Character is wearing now: set apart from the jump clones. */
   current?: boolean;
@@ -491,33 +489,31 @@ function CloneCard({
       {implantIds.length === 0 ? (
         <p className="text-text-dim">{t('clones.noImplants')}</p>
       ) : (
-        <>
-          {/* One row per implant, divided: on a phone each row is a 44px tap target,
-              and a wrapped run of 44px links read as gaps, not as a list. */}
-          <IskFigureGroup className="space-y-1.5">
-            <ul className="divide-y divide-line border-y border-line">
-              {bySlot(implantIds, implantDetails).map((id) => (
-                <ImplantRow
-                  key={id}
-                  typeId={id}
-                  name={implantNames.get(id) ?? `Type #${id}`}
-                  detail={implantDetails.get(id)}
-                  price={prices?.get(id)}
-                  showSlot={showSlot}
-                />
-              ))}
-            </ul>
-            <p className="flex flex-wrap items-center gap-x-2 text-xs text-text-dim">
-              <span>{t('clones.implantCount', { count: implantIds.length })}</span>
-              {value && (
-                <span>
-                  {value.unpriced < implantIds.length && <IskAmount value={value.total} />}
-                  {value.unpriced > 0 && ` ${t('clones.unpriced', { count: value.unpriced })}`}
-                </span>
-              )}
-            </p>
-          </IskFigureGroup>
-        </>
+        // One row per implant, divided: on a phone each row is a 44px tap target,
+        // and a wrapped run of 44px links read as gaps, not as a list.
+        <IskFigureGroup className="space-y-1.5">
+          <ul className="divide-y divide-line border-y border-line">
+            {bySlot(implantIds, implantDetails).map((id) => (
+              <ImplantRow
+                key={id}
+                typeId={id}
+                name={implantNames.get(id) ?? `Type #${id}`}
+                detail={implantDetails.get(id)}
+                price={prices?.get(id)}
+                showSlot={showSlot}
+              />
+            ))}
+          </ul>
+          <p className="flex flex-wrap items-center gap-x-2 text-xs text-text-dim">
+            <span>{t('clones.implantCount', { count: implantIds.length })}</span>
+            {value && (
+              <span>
+                {value.unpriced < implantIds.length && <IskAmount value={value.total} />}
+                {value.unpriced > 0 && ` ${t('clones.unpriced', { count: value.unpriced })}`}
+              </span>
+            )}
+          </p>
+        </IskFigureGroup>
       )}
     </li>
   );
@@ -775,7 +771,7 @@ export function Clones() {
   );
   const clonesExport = useTableExport({
     surface: 'clones',
-    // Nothing behind the re-login banner, same as the table.
+    // Nothing behind the re-login banner, same as the list.
     rows: clonesNeedsReauth ? NO_CLONES : clones,
     columns: csvColumns,
   });
@@ -975,9 +971,11 @@ export function Clones() {
                 />
               </div>
             )}
-            {clones.length > 0 && clones.every((c) => cloneOwnName(c, nicknames) === undefined) && (
-              <p className="px-3 pt-3 text-xs text-text-dim">{t('clones.namesNote')}</p>
-            )}
+            {nicknamesHydrated &&
+              clones.length > 0 &&
+              clones.every((c) => cloneOwnName(c, nicknames) === undefined) && (
+                <p className="px-3 pt-3 text-xs text-text-dim">{t('clones.namesNote')}</p>
+              )}
             {(clones.length > 0 || hasWorn) && (
               <ul aria-label={t('clones.title')} className="grid gap-3 p-3 md:grid-cols-2">
                 {hasWorn && (
@@ -1006,7 +1004,7 @@ export function Clones() {
                   return (
                     <CloneCard
                       key={clone.jump_clone_id}
-                      title={cloneLabel(clone)}
+                      title={name ?? place}
                       place={name === undefined ? null : place}
                       rename={
                         nicknamesHydrated
