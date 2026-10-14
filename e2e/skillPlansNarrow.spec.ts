@@ -1,5 +1,6 @@
 /**
- * Skill Plans list pane on a phone (issue #1096): `useViewportBoundedHeight`
+ * Skill Plans on a phone (issue #1096; the list now lives in the Plans page's
+ * "All plans…" dialog, so the check is that every row stays reachable there): `useViewportBoundedHeight`
  * sizes the list's scroller off the raw viewport height, with no knowledge of
  * `Layout.tsx`'s fixed mobile tab bar below `md` — the same bug class already
  * shipped as #1054 for Mail. `PlanListPane` applied that height unconditionally
@@ -54,7 +55,7 @@ async function seedManyPlans(page: Page): Promise<void> {
   );
 }
 
-test('plan list: the last plan row is reachable above the fixed tab bar at 390px', async ({
+test('plans page: the current plan opens from the page, and every other plan is reachable from the All plans dialog at 390px', async ({
   page,
 }) => {
   await signInAndGoto(page);
@@ -62,23 +63,19 @@ test('plan list: the last plan row is reachable above the fixed tab bar at 390px
   await page.setViewportSize(PHONE);
   await page.goto('./skills/plans');
 
-  // The row's accessible name grows a stats line ("Nothing to train") once
-  // the character's skills load, so match the name by its start (a word
-  // boundary keeps "Plan 4" from matching "Plan 40"), and wait for that line
-  // before measuring — it makes the row taller.
-  const lastRow = page.getByRole('link', { name: new RegExp(`^${LAST_PLAN_NAME}\\b`) });
-  await expect(lastRow).toContainText('Nothing to train');
+  // The page leads with the plan edited last (the seed's highest `updatedAt`),
+  // not a 40-row list: one tap to its editor.
+  await expect(page.getByRole('link', { name: new RegExp(`^${LAST_PLAN_NAME}\\b`) })).toBeVisible();
 
-  // Scrolls the page itself, not the list pane, to its end: the fix's whole
-  // point is that the list no longer scrolls internally on phone.
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.getByRole('button', { name: 'Plan options' }).click();
+  await page.getByRole('menuitem', { name: 'All plans…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'All plans' });
 
-  const tabBar = page.getByRole('navigation', { name: 'Mobile navigation' });
-  const [rowBox, tabBarBox] = await Promise.all([lastRow.boundingBox(), tabBar.boundingBox()]);
-
-  expect(rowBox).not.toBeNull();
-  expect(tabBarBox).not.toBeNull();
-  expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(tabBarBox!.y);
+  // The first plan sits 39 rows down the dialog's own scroller; it must scroll
+  // into view rather than sit clipped (the #1096 bug class, in its new home).
+  const firstRow = dialog.getByRole('link', { name: /^Plan 1\b/ });
+  await firstRow.scrollIntoViewIfNeeded();
+  await expect(firstRow).toBeVisible();
 });
 
 test('plan editor: the open plan name is visible in the header at 390px (#1709)', async ({

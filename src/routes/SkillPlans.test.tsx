@@ -261,12 +261,20 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/skills/plans');
 });
 
+/** Opens the "All plans…" dialog from the phone card's menu (jsdom is narrow by default). */
+async function openAllPlans(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Plan options' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'All plans…' }));
+  return screen.findByRole('dialog', { name: 'All plans' });
+}
+
 describe('SkillPlans CRUD', () => {
   it('creates a plan and navigates straight to its editor, scheduling a sync', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'New plan' }));
+    await user.click(await screen.findByRole('button', { name: 'Plan options' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'New plan' }));
 
     const stored = await waitFor(async () => {
       const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
@@ -276,6 +284,22 @@ describe('SkillPlans CRUD', () => {
     await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`));
     expect(await screen.findByText('Your entries')).toBeInTheDocument();
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  it('offers the plan edited last, and All plans… even before any plan exists', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Plan options' }));
+    expect(await screen.findByRole('menuitem', { name: 'All plans…' })).toBeInTheDocument();
+  });
+
+  it('shows the plan edited last on the page, not the oldest', async () => {
+    await db.skillPlans.add(seedPlan({ id: 'old', name: 'Old plan', updatedAt: 1 }));
+    await db.skillPlans.add(seedPlan({ id: 'new', name: 'Newest plan', updatedAt: 2 }));
+    render(<App />);
+    const link = await screen.findByRole('link', { name: /Newest plan/ });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/skills/plans/new'));
+    expect(screen.queryByRole('link', { name: /Old plan/ })).not.toBeInTheDocument();
   });
 
   it('makes a plan for a pasted skill plan and opens its Import dialog already parsed', async () => {
@@ -303,13 +327,16 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
+    );
     await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename' });
     await user.clear(input);
     await user.type(input, 'PvP Fit{Enter}');
 
-    expect(await screen.findByText('PvP Fit')).toBeInTheDocument();
+    expect(await within(plans).findByText('PvP Fit')).toBeInTheDocument();
     expect((await db.skillPlans.get('plan-1'))?.name).toBe('PvP Fit');
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
@@ -319,7 +346,10 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
+    );
     await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
 
     const copy = await waitFor(async () => {
@@ -338,7 +368,10 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
+    );
     await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
@@ -356,12 +389,15 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
+    );
     await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Delete' })).not.toBeInTheDocument();
     expect(markPlanDeletedMock).not.toHaveBeenCalled();
   });
 
@@ -375,7 +411,7 @@ describe('SkillPlans CRUD', () => {
     expect(window.location.pathname).toBe('/skills/plans/plan-1');
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
-    expect(await screen.findByText('Skill Plans')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/skills/plans');
 
     await user.click(await screen.findByText('Test plan'));
@@ -383,7 +419,7 @@ describe('SkillPlans CRUD', () => {
 
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
-    expect(await screen.findByText('Skill Plans')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
   });
 });
 
@@ -410,13 +446,9 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    const listPanel = (await screen.findByText('New plan')).closest('section');
-    // The detail pane shows the character's current attributes until a plan
-    // is opened (#158 follow-up: the old "select a plan" placeholder said
-    // nothing the list beside it didn't already say).
-    const detailPanel = (await screen.findByText('Attributes')).closest('section');
-    expect(listPanel).not.toHaveClass('hidden');
-    expect(detailPanel).toHaveClass('hidden');
+    // The rail leads on a phone: the plan row and the attributes line, then the queue.
+    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Attributes' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
 
     await user.click(await screen.findByText('Test plan'));
@@ -432,14 +464,8 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
 
-    expect(await screen.findByText('Attributes')).toBeInTheDocument();
-    // `find`, not `get`: crossing back to the list route remounts
-    // `PlanListPane`, whose own `useLiveQuery` starts at `undefined` and
-    // renders a spinner in place of the list. Its plans resolve independently
-    // of the pane beside it, so 'Attributes' being on screen says nothing
-    // about whether 'New plan' is yet.
-    const listPanelBack = (await screen.findByText('New plan')).closest('section');
-    expect(listPanelBack).not.toHaveClass('hidden');
+    expect(await screen.findByRole('region', { name: 'Attributes' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
   });
 
   it('keeps both panes visible on desktop, with no back control', async () => {
@@ -461,7 +487,7 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
       await db.skillPlans.add(seedPlan());
       render(<App />);
 
-      await user.click(await screen.findByRole('link', { name: 'Test plan' }));
+      await user.click(await screen.findByRole('link', { name: /^Test plan/ }));
       await screen.findByText('Your entries');
 
       // `find`, not `get`: 'Your entries' first renders on the very tick the
@@ -485,7 +511,7 @@ describe('Skills opens on Plans', () => {
     render(<App />);
 
     await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
-    expect(await screen.findByText('Skill Plans')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
   });
 
   it('still reaches the trained-skills view from the sub-nav', async () => {
@@ -500,7 +526,26 @@ describe('Skills opens on Plans', () => {
 });
 
 describe('SkillPlans: current attributes beside the plan list', () => {
-  const attributesPanel = async () => (await screen.findByText('Attributes')).closest('section')!;
+  // Full labels and the remap note are the desktop rail; a phone gets one short line.
+  const original = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+  });
+  afterEach(() => {
+    window.matchMedia = original;
+  });
+  const attributesPanel = async () =>
+    (await screen.findByRole('heading', { name: 'Attributes' })).closest('section')!;
 
   it("shows the character's attributes from ESI, not the planner's placeholder defaults", async () => {
     // Distinct from usePlanEditorData's DEFAULT_ATTRIBUTES (20/20/20/20/19),
@@ -520,7 +565,7 @@ describe('SkillPlans: current attributes beside the plan list', () => {
 
     const panel = await attributesPanel();
     expect(await within(panel).findByText('24')).toBeInTheDocument();
-    expect(within(panel).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(panel).getByText('INT')).toBeInTheDocument();
     expect(within(panel).getByText('25')).toBeInTheDocument();
     expect(within(panel).getByText('21')).toBeInTheDocument();
   });
@@ -565,7 +610,7 @@ describe('SkillPlans: current attributes beside the plan list', () => {
 
     const panel = await attributesPanel();
     expect(await within(panel).findByText('—')).toBeInTheDocument();
-    expect(within(panel).queryByText('Intelligence')).not.toBeInTheDocument();
+    expect(within(panel).queryByText('INT')).not.toBeInTheDocument();
   });
 });
 
@@ -856,8 +901,9 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
     render(<App />);
 
     const panel = await queuePanel();
-    expect(await within(panel).findByText('Training')).toBeInTheDocument();
-    expect(within(panel).getByText(/2h.*left/i)).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Training now' })).toBeInTheDocument();
+    expect(within(panel).getByText(/^2h/)).toBeInTheDocument();
+    expect(within(panel).getByText(/^left · done /)).toBeInTheDocument();
   });
 
   it('calls a queue with no dates paused, rather than pretending it starts now', async () => {
@@ -866,8 +912,9 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
     render(<App />);
 
     const panel = await queuePanel();
-    // Both fixture rows are paused — the badge is per row.
-    expect(await within(panel).findAllByText('Paused')).toHaveLength(2);
+    // Both fixture rows are paused: the group heading, then a badge per row.
+    expect(await within(panel).findByRole('heading', { name: 'Paused' })).toBeInTheDocument();
+    expect(within(panel).getAllByText('Paused')).toHaveLength(3);
     expect(
       within(panel).getByText(/Training is paused, so EVE reports no completion times\./i)
     ).toBeInTheDocument();
@@ -1428,7 +1475,8 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
-    await user.click(await screen.findByRole('button', { name: 'New plan' }));
+    await user.click(await screen.findByRole('button', { name: 'Plan options' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'New plan' }));
     await openPlanTools();
     // Not user-editable anymore, but still seeded once at creation
     // (offline-fallback `remapCount`) from live ESI: the yearly remap is on
@@ -1461,7 +1509,8 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     expect(await screen.findByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
-    await user.click(await screen.findByRole('button', { name: 'New plan' }));
+    await user.click(await screen.findByRole('button', { name: 'Plan options' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'New plan' }));
     await openPlanTools();
     // The cooldown date is already past, so the new plan's derived display
     // counts the yearly remap as ready too (1 bonus + yearly = 2 available).
@@ -1850,14 +1899,14 @@ describe('SkillPlans: current skill queue panel', () => {
   // #218: the plan list/editor is what a visitor came to this page to work
   // with; the current queue is secondary reference info and must follow it,
   // not precede it.
-  it('renders after the plan list/editor grid, not before it', async () => {
+  it('renders after the plan row and attributes on a phone, not before them', async () => {
     render(<App />);
 
-    const listPanel = (await screen.findByText('New plan')).closest('section')!;
+    const plan = await screen.findByRole('button', { name: 'Plan options' });
     const queuePanel = (await screen.findByText('Current skill queue')).closest('section')!;
 
     expect(
-      listPanel.compareDocumentPosition(queuePanel) & Node.DOCUMENT_POSITION_FOLLOWING
+      plan.compareDocumentPosition(queuePanel) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
   });
 });

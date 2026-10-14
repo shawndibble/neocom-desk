@@ -27,6 +27,11 @@ interface AttributeChipsProps {
    * it.
    */
   dense?: boolean;
+  /**
+   * Three-letter labels (INT, MEM, ...) so all five fit one line on a phone,
+   * where the Plans page keeps them in a single row above the queue.
+   */
+  short?: boolean;
 }
 
 /**
@@ -51,6 +56,7 @@ export function AttributeChips({
   implantBonuses,
   boosterBonus = 0,
   dense = false,
+  short = false,
 }: AttributeChipsProps) {
   const { t } = useTranslation();
   return (
@@ -72,7 +78,7 @@ export function AttributeChips({
           return (
             <StatChip
               key={name}
-              label={t(`skills.attr.${name}`)}
+              label={t(short ? `skills.attrShort.${name}` : `skills.attr.${name}`)}
               // No bonus means base and effective are the same number, so a
               // bubble reading "20 base = 20" would be a hover that says
               // nothing. The bare total stays bare.
