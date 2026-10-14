@@ -71,7 +71,7 @@ export function CharacterChipGrid({
                 </span>
               )}
               {NOTIFICATION_CHANNELS.map((channel) => (
-                <span key={channel} className="flex items-center gap-0.5 last:ml-1">
+                <span key={channel} className="last:ml-1">
                   <ChannelCheckbox
                     channel={channel}
                     eventLabel={`${label}, ${character.name}`}
@@ -80,10 +80,8 @@ export function CharacterChipGrid({
                     missingPermissionLabel={state.permissionLabel}
                     checked={readValue(character.characterId, channel)}
                     onToggle={() => onToggle(character.characterId, channel)}
+                    caption={t(`settings.notifications.chipLetter.${channel}`)}
                   />
-                  <span aria-hidden="true" className="font-mono text-[0.625rem] text-text-dim">
-                    {t(`settings.notifications.chipLetter.${channel}`)}
-                  </span>
                 </span>
               ))}
             </li>

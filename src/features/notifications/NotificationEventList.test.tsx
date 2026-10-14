@@ -306,4 +306,27 @@ describe('NotificationEventList on desktop', () => {
     );
     expect(screen.getAllByRole('combobox')).toHaveLength(1);
   });
+
+  it('toggles when the D or A beside a checkbox is clicked, not only the 16px box', async () => {
+    // The letters look like the box's label; a click on one that did nothing read as a click that did not register.
+    const user = userEvent.setup();
+    render(<Harness ids={['skillLevelComplete']} />);
+    await user.click(screen.getByRole('button', { name: 'Skill Level Complete' }));
+    const chip = screen.getByText('Beta Pilot').closest('li')!;
+    const alerts = within(chip).getByRole('checkbox', {
+      name: 'Skill Level Complete, Beta Pilot, Alerts list',
+    });
+    const device = within(chip).getByRole('checkbox', {
+      name: 'Skill Level Complete, Beta Pilot, device notifications',
+    });
+    expect(alerts).toBeChecked();
+    expect(device).toBeChecked();
+
+    await user.click(within(chip).getByText('A'));
+    await waitFor(() => expect(alerts).not.toBeChecked());
+    expect(device).toBeChecked();
+
+    await user.click(within(chip).getByText('D'));
+    await waitFor(() => expect(device).not.toBeChecked());
+  });
 });

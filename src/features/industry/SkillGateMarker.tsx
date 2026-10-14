@@ -42,6 +42,11 @@ export interface SkillGateMarkerProps {
    * popover, so a quiet row is no less actionable than a loud one.
    */
   quiet?: boolean;
+  /**
+   * Icon only, but in the warning colour: the lock on a Build instead button
+   * is the whole cue, so it cannot sit dim the way a quiet row's does.
+   */
+  lockOnly?: boolean;
 }
 
 export function SkillGateMarker({
@@ -50,6 +55,7 @@ export function SkillGateMarker({
   nameForCharacter,
   newPlanName,
   quiet = false,
+  lockOnly = false,
 }: SkillGateMarkerProps) {
   const { t } = useTranslation();
   const { shortfall } = verdict;
@@ -71,15 +77,19 @@ export function SkillGateMarker({
           onClick={(event) => event.stopPropagation()}
           className={cx(
             'inline-flex max-w-full shrink-0 items-center gap-1 rounded-xs text-left',
-            quiet
-              ? 'p-0.5 text-text-dim enabled:hover:text-warning'
-              : 'border border-warning/60 px-1.5 py-0.5 text-warning enabled:hover:border-warning enabled:hover:bg-warning/10 enabled:active:bg-warning/20',
+            lockOnly
+              ? 'p-0.5 text-warning enabled:hover:bg-warning/10 enabled:active:bg-warning/20'
+              : quiet
+                ? 'p-0.5 text-text-dim enabled:hover:text-warning'
+                : 'border border-warning/60 px-1.5 py-0.5 text-warning enabled:hover:border-warning enabled:hover:bg-warning/10 enabled:active:bg-warning/20',
             interactiveClassName,
             focusRingClassName
           )}
         >
           <Icon.SkillLocked size={Icon.ICON_SIZE.sm} />
-          {!quiet && <span className="min-w-0 text-[0.6875rem] leading-tight">{label}</span>}
+          {!quiet && !lockOnly && (
+            <span className="min-w-0 text-[0.6875rem] leading-tight">{label}</span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent

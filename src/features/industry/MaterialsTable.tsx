@@ -543,6 +543,9 @@ function SwapButton({
   name,
   kind,
   advice,
+  skillGate,
+  nameForCharacter,
+  nameForSkill,
   onClick,
 }: {
   material: MaterialTableRow;
@@ -550,6 +553,10 @@ function SwapButton({
   /** What a click does: start building it, or go back to buying it. */
   kind: 'build' | 'buy';
   advice: MakeOrBuy | undefined;
+  /** When gated, a lock-only marker follows a Build instead button: no skill text. */
+  skillGate?: SkillGateVerdict;
+  nameForCharacter?: (characterId: number) => string;
+  nameForSkill?: (typeID: number) => string;
   onClick: () => void;
 }) {
   const { t } = useTranslation();
@@ -586,6 +593,14 @@ function SwapButton({
         <span className="text-[0.6875rem] text-success tabular-nums">
           {t('industry.errands.saves', { amount: formatIsk(savings) })}
         </span>
+      )}
+      {kind === 'build' && skillGate?.gated && nameForCharacter && nameForSkill && (
+        <SkillGateMarker
+          lockOnly
+          verdict={skillGate}
+          nameForSkill={nameForSkill}
+          nameForCharacter={nameForCharacter}
+        />
       )}
     </span>
   );
@@ -791,11 +806,9 @@ export function MaterialsTable({
   function renderName(material: MaterialTableRow, withAction: boolean, badge = false) {
     const name = nameFor(material.typeID);
     const { advice, toggleable } = buildChoice(material);
-    // A built row always says what blocks it. A bought row says so only when
-    // the cost call is to build it: that is the row a pilot expects Auto Build
-    // to have taken, and the gate is why it did not.
-    const gateVerdict = skillGates?.get(material.typeID);
-    const skillGate = isBuilt(material) || advice?.verdict === 'build' ? gateVerdict : undefined;
+    // Only a built row names what blocks it. A bought row carries no gate
+    // text: its lock sits on the Build instead button (see `SwapButton`).
+    const skillGate = isBuilt(material) ? skillGates?.get(material.typeID) : undefined;
     return (
       <span className="flex min-w-0 flex-col items-start gap-0.5">
         <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -874,6 +887,9 @@ export function MaterialsTable({
         name={name}
         kind="build"
         advice={advice}
+        skillGate={skillGates?.get(material.typeID)}
+        nameForCharacter={characterNameFor}
+        nameForSkill={nameFor}
         onClick={() => toggleBuild(material)}
       />
     ) : null;
