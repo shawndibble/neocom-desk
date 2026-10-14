@@ -25,7 +25,7 @@ Usage profile (owner, 2026-10-11): the app is used mainly on the desktop, with t
 
 Each file's "Purpose and user goal" section ranks the pilot's top jobs, names what belongs above the fold, and ends with a Mobbin brief: analog apps, screen queries and what Mobbin can't cover. Start a redesign there. Claims without a source sit under each section's **Unconfirmed** line for the owner to correct. Phone evidence is `DEFAULT_MOBILE_TABS` (`src/lib/mobileTabs.ts`) plus phone decisions and issues; `mobileTab: true` alone proves little, since nearly every page has it.
 
-Mobbin fit: **high** = mostly generic patterns; **low** = mostly EVE-specific views, take reference from EVE tools and the client instead. planetary-industry has no section: its overhaul has its own spec in `docs/design/pi-tabs/`.
+Mobbin fit: **high** = mostly generic patterns; **low** = mostly EVE-specific views, take reference from EVE tools and the client instead. planetary-industry has no section: its Plan, Map and Colonies tabs have their own spec in `docs/design/pi-tabs/`.
 
 | File                      | Top job                                                       | Device, cadence                                                  | Mobbin fit                   |
 | ------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------- |

@@ -18,7 +18,11 @@ import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { HintText } from '@/components/ui/HintText';
 import { SystemLink } from '@/features/entities';
 import { PiProductLink } from '../PiProductLink';
-import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
+import {
+  OpenInEveItemMenuItems,
+  ShowInfoMenuItem,
+  ViewInMarketMenuItem,
+} from '@/features/market/ItemContextMenu';
 import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
@@ -443,6 +447,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
         <>
           <ViewInMarketMenuItem typeId={shownProductId} />
           <ShowInfoMenuItem typeId={shownProductId} itemName={productName} />
+          <OpenInEveItemMenuItems typeId={shownProductId} />
         </>
       )}
     </>
