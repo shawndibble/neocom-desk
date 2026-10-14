@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import { focusRingClassName } from './controlStyles';
 import { Tooltip } from './Tooltip';
@@ -17,28 +17,45 @@ interface HintTextProps {
    */
   desktopOnly?: boolean;
   /**
-   * For a name inside a truncating parent (`truncate`, `line-clamp`): the cue
+   * For a name inside a truncating parent (`truncate`): the cue
    * and the tooltip appear only while the parent actually clips the text. A
    * name that fits in full has nothing left to reveal.
    */
   onlyWhenTruncated?: boolean;
 }
 
-/** Whether the element's parent clips its content, kept current as either resizes. */
+/**
+ * Whether the element's parent clips it. The text is cut at the parent's
+ * content box, not its padding box, so compare the text's right edge to that
+ * (`scrollWidth` would miss an overflow smaller than the padding). Measured
+ * before paint after every render (a name or label change moves it) and on
+ * parent resize; an unchanged answer bails out of the state update.
+ */
 function useParentClips(enabled: boolean) {
   const ref = useRef<HTMLSpanElement>(null);
   const [clips, setClips] = useState(false);
+  const measure = () => {
+    const el = ref.current;
+    const parent = el?.parentElement;
+    if (!el || !parent) return;
+    const style = getComputedStyle(parent);
+    const limit =
+      parent.getBoundingClientRect().right -
+      (parseFloat(style.paddingRight) || 0) -
+      (parseFloat(style.borderRightWidth) || 0);
+    setClips(el.getBoundingClientRect().right > limit + 0.5);
+  };
+  useLayoutEffect(() => {
+    if (enabled) measure();
+  });
   useEffect(() => {
     const parent = ref.current?.parentElement;
     if (!enabled || !parent) return;
-    const measure = () => setClips(parent.scrollWidth > parent.clientWidth);
-    measure();
     const observer = new ResizeObserver(measure);
     observer.observe(parent);
-    if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, [enabled]);
-  return { ref, clips };
+  return { ref, clips: enabled && clips };
 }
 
 /**

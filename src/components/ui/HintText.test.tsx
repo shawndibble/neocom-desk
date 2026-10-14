@@ -2,9 +2,12 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HintText } from './HintText';
 
-function mockClip(scrollWidth: number, clientWidth: number) {
-  vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(scrollWidth);
-  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(clientWidth);
+/** The parent's content box ends at 100; the text's right edge is `textRight`. */
+function mockClip(textRight: number) {
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    const right = this.tagName === 'SPAN' ? textRight : 100;
+    return { right } as DOMRect;
+  });
 }
 
 describe('HintText onlyWhenTruncated', () => {
@@ -23,9 +26,9 @@ describe('HintText onlyWhenTruncated', () => {
   });
 
   it('drops the cue when the parent shows the whole text', () => {
-    mockClip(100, 100);
+    mockClip(100);
     render(
-      <div>
+      <div style={{ padding: 0, border: 0 }}>
         <HintText content="Full name" onlyWhenTruncated>
           Full name
         </HintText>
@@ -37,9 +40,9 @@ describe('HintText onlyWhenTruncated', () => {
   });
 
   it('keeps the cue when the parent clips the text', () => {
-    mockClip(200, 100);
+    mockClip(104);
     render(
-      <div>
+      <div style={{ padding: 0, border: 0 }}>
         <HintText content="Full name" onlyWhenTruncated>
           Full na…
         </HintText>

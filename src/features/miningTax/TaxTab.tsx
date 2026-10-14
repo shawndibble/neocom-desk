@@ -1412,7 +1412,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       render: (dr) => {
         const name = payeeDisplayName(dr);
         return (
-          <HintText content={name} desktopOnly onlyWhenTruncated>
+          <HintText
+            content={dr.assignment?.label ? `${name} · ${dr.assignment.label}` : name}
+            desktopOnly
+            onlyWhenTruncated
+          >
             {name}
             {dr.assignment?.label && (
               <span className="text-text-dim"> · {dr.assignment.label}</span>
