@@ -63,6 +63,7 @@ import {
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { layoutNotificationEvents } from './notificationLayout';
 import { AllCharactersNotificationSection } from './AllCharactersNotificationSection';
+import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
 import { CHANNEL_COLUMNS, ChannelColumnHeadings } from './ChannelColumns';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
 import { db } from '@/db';
@@ -127,6 +128,7 @@ import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
 import { usePushFailure } from './pushFailure';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { beginEveLogin } from '@/app/loginFlow';
 import { PERMISSIONS, type ScopeGroup } from '@/esi/registry';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
@@ -654,6 +656,7 @@ export function NotificationsPanel() {
           <EmptyState title={t('settings.notifications.emptyTitle')} />
         ) : (
           <>
+            {isSyncConfigured() && <AlertsWhenClosedSection characters={characterList} />}
             <AllCharactersNotificationSection
               characterIds={allCharacterIds}
               prefsValue={prefsValue}

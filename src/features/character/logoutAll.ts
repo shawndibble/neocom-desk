@@ -11,6 +11,7 @@ import { db } from '@/db';
 import { signOutOfSync } from '@/sync';
 import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
 import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
+import { deleteAlertGrantsBestEffort } from '@/features/notifications/alertsGrant';
 import { flushSync, removeCharacter, removeSharedBlueprints } from './removeCharacter';
 
 /**
@@ -29,6 +30,8 @@ export async function logoutAllCharacters(
   const characters = await db.characters.toArray();
   const ids = characters.map((character) => character.characterId);
   if (removeShared) await removeSharedBlueprints(ids);
+  // Before the sign-out below: deleting a grant needs each Character's sign-in.
+  if (syncConfigured) await deleteAlertGrantsBestEffort(ids);
   if (syncConfigured) await flushSync(ids);
   for (const id of ids) {
     await removeCharacter(id, false);

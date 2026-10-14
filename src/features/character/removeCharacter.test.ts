@@ -18,6 +18,11 @@ const pushMock = vi.hoisted(() => ({
 vi.mock('@/features/notifications/projectionRebuildScheduler', () => ({
   scheduleProjectionRebuild: pushMock.scheduleProjectionRebuild,
 }));
+const alertsApi = vi.hoisted(() => ({
+  saveAlertGrantRemote: vi.fn(async () => {}),
+  deleteAlertGrantRemote: vi.fn<(characterId: number) => Promise<void>>(async () => {}),
+}));
+vi.mock('@/sync/alertsGrantApi', () => alertsApi);
 vi.mock('@/features/notifications/projectionUpload', () => ({
   unregisterProjectionRegistration: pushMock.unregisterProjectionRegistration,
 }));
@@ -319,6 +324,28 @@ describe('removeCharacter', () => {
 });
 
 describe('removeCharacterAfterSync', () => {
+  it("deletes the Character's Alerts Grant before removing it, and removes even if that fails", async () => {
+    await seedCharacter(1);
+    alertsApi.deleteAlertGrantRemote.mockImplementationOnce(async () => {
+      expect(await db.characters.get(1)).toBeDefined();
+      throw new Error('offline');
+    });
+
+    await removeCharacterAfterSync(1, true);
+
+    expect(alertsApi.deleteAlertGrantRemote).toHaveBeenCalledExactlyOnceWith(1);
+    expect(await db.characters.get(1)).toBeUndefined();
+  });
+
+  it('asks the server for no grant deletion when sync is not configured', async () => {
+    await seedCharacter(1);
+    alertsApi.deleteAlertGrantRemote.mockClear();
+
+    await removeCharacterAfterSync(1, false);
+
+    expect(alertsApi.deleteAlertGrantRemote).not.toHaveBeenCalled();
+  });
+
   it('pushes the Character once before removing it when sync is configured', async () => {
     await seedCharacter(1);
     syncMock.triggerSync.mockImplementation(async () => {

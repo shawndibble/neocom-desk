@@ -4,12 +4,18 @@ import { useTranslation } from 'react-i18next';
 import { addCharacter } from '@/features/character/addCharacter';
 import {
   LoginError,
+  loginIntentFor,
   clearLoginIntent,
   clearLoginRecovery,
   clearRetryBudget,
   type LoginFailureReason,
 } from '@/auth/session';
 import { takeLoginReturnTo } from '@/auth/loginReturnTo';
+import {
+  clearAlertsQueue,
+  completeAlertsGrant,
+  type AlertsGrantOutcome,
+} from '@/features/notifications/alertsGrant';
 import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
 import { Button, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -25,6 +31,14 @@ class SsoRejection extends Error {
     this.name = 'SsoRejection';
   }
 }
+
+/**
+ * What an Alerts Grant round trip hands back to the page it was pressed on, as
+ * router state: the Settings row reads it once to say what happened.
+ */
+export type AlertsCallbackState = {
+  alertsGrant: AlertsGrantOutcome | { status: 'cancelled' };
+};
 
 /** Which wording the panel shows; `null` while the callback is still working. */
 type ErrorKind = LoginFailureReason | 'denied' | 'generic' | null;
@@ -66,6 +80,33 @@ export function Callback() {
     const code = params.get('code');
     const state = params.get('state');
     const ssoError = params.get('error');
+
+    // An Alerts Grant round trip (ADR 0020) is not a login: no Character is
+    // added, no token is stored on this device, and every outcome — including
+    // a cancel or a failure — goes back to the Settings row that was pressed
+    // rather than to an error panel that would offer to restart it as one.
+    const alertsIntent = state ? loginIntentFor(state) : undefined;
+    if (alertsIntent?.kind === 'alerts') {
+      const land = (alertsGrant: AlertsCallbackState['alertsGrant']) => {
+        if (alertsGrant.status !== 'on') clearAlertsQueue();
+        navigate(takeLoginReturnTo() ?? '/settings/notifications', {
+          replace: true,
+          state: { alertsGrant } satisfies AlertsCallbackState,
+        });
+      };
+      if (ssoError || !code || !state) {
+        land({ status: 'cancelled' });
+        return;
+      }
+      void completeAlertsGrant({ code, state })
+        .catch((): AlertsGrantOutcome => ({
+          status: 'failed',
+          characterId: alertsIntent.characterId,
+        }))
+        .then(land);
+      return;
+    }
+
     Promise.resolve()
       .then(() => {
         if (ssoError) throw new SsoRejection(ssoError);
