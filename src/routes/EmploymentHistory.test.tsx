@@ -193,16 +193,19 @@ describe('EmploymentHistory', () => {
     expect(await screen.findByRole('link', { name: 'Current Corp' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Employment' })).toBeNull();
 
-    // Data age and Refresh belong to this tab's panel, below the tabs.
-    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    // Data age sits beside the name; Refresh and export sit in the header with
+    // the bell. The panel below has no title bar of its own: the tab says it.
     const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
-    expect(header?.contains(refresh)).toBe(false);
+    expect(within(header!).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(
+      within(header!).getByRole('button', { name: /table actions|export/i })
+    ).toBeInTheDocument();
+    expect(await within(header!).findByText('Updated')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Employment' })).toBeNull();
 
-    // The SP chips hold their place with "—" rather than the header changing
-    // shape — and nothing asked ESI for skills this character never granted.
-    for (const label of ['Total SP', 'Unallocated SP']) {
-      expect(screen.getByText(label).parentElement).toHaveTextContent('—');
-    }
+    // No SP at all, and nothing asked ESI for skills this character never granted.
+    expect(screen.queryByText('Total SP')).toBeNull();
+    expect(screen.queryByText('Unallocated SP')).toBeNull();
     expect(skillCalls).toBe(0);
   });
 

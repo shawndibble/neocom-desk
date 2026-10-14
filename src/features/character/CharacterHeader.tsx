@@ -9,9 +9,13 @@ import { usePublicInfo } from '@/stores/publicInfo';
 
 interface CharacterHeaderProps {
   characterId: number;
-  /** Corrected total SP; null while loading, or when /skills is unavailable. Omitted on the Overview. */
+  /**
+   * Corrected total SP; null while loading, or when /skills is unavailable.
+   * The SP chips draw only when this or `unallocatedSp` is passed: the
+   * Overview and Employment History omit both.
+   */
   totalSp?: number | null;
-  /** ESI's unallocated_sp; null while loading, or when unavailable. Omitted on the Overview. */
+  /** ESI's unallocated_sp; null while loading, or when unavailable. */
   unallocatedSp?: number | null;
   /**
    * The Overview's layout: no SP chips (a Skill points widget carries them),
@@ -20,9 +24,9 @@ interface CharacterHeaderProps {
    * Employment History leave it off.
    */
   overview?: boolean;
-  /** Overview only: beside the name (the data age); wraps under it when the name is long. */
+  /** Beside the name (the data age); wraps under it when the name is long. */
   aside?: ReactNode;
-  /** Overview only: the controls row under the identity (the Next deadline and Customize). */
+  /** In the header's own flex row, ahead of the bell (the Overview's Next deadline and Customize; Employment History's Refresh and export). */
   actions?: ReactNode;
 }
 
@@ -36,15 +40,14 @@ interface CharacterHeaderProps {
  * block jumping in and out as you moved between tabs was the actual complaint.
  * The character's name is the `<h1>` — one per route, as before.
  *
- * It has no controls of its own on Clones and Employment History: everything
- * above the tab strip is the same on every tab, and a view's `DataAgeBadge`
- * and Refresh belong to the data they describe, so they sit in that view's
- * `Panel` toolbar below the tabs. The exception is the Overview (`overview`),
- * whose widgets are the page: its header carries the data age
- * beside the name (`aside`), the bell at the top right, and a controls row
- * (`actions`: Next deadline, Customize). No SP is drawn there; a Skill points
- * widget carries it. Switching Character is the
- * rail footer's and the command palette's job.
+ * Clones carries no controls of its own here: its `DataAgeBadge` and Refresh
+ * belong to the data they describe, so they sit in its `Panel` toolbar below
+ * the tabs. The Overview (`overview`) and Employment History instead put the
+ * data age beside the name (`aside`) and their controls ahead of the bell
+ * (`actions`): the Overview's widgets, and Employment's timeline, are the
+ * page, with no panel title bar to hold them. No SP is drawn on either
+ * (`totalSp` and `unallocatedSp` omitted). Switching Character is the rail
+ * footer's and the command palette's job.
  *
  *
  * Identity is read here rather than passed in: it is the same on every tab and
@@ -55,8 +58,8 @@ interface CharacterHeaderProps {
  */
 export function CharacterHeader({
   characterId,
-  totalSp = null,
-  unallocatedSp = null,
+  totalSp,
+  unallocatedSp,
   overview = false,
   aside,
   actions,
@@ -73,8 +76,9 @@ export function CharacterHeader({
     void loadPublicInfo(characterId);
   }, [characterId, loadPublicInfo]);
 
-  const sp = (value: number | null): string =>
-    value === null ? t('common.unknown') : value.toLocaleString();
+  const sp = (value: number | null | undefined): string =>
+    value == null ? t('common.unknown') : value.toLocaleString();
+  const showSp = totalSp !== undefined || unallocatedSp !== undefined;
 
   return (
     <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -90,7 +94,7 @@ export function CharacterHeader({
         to a single letter instead. Given a real basis, the chips wrap to
         their own line and the name gets the full width.
       */}
-      <div className={cx('min-w-0 flex-1', overview ? 'basis-36' : 'basis-48')}>
+      <div className={cx('min-w-0 flex-1', overview || actions ? 'basis-36' : 'basis-48')}>
         {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
         <div className="flex flex-wrap items-center gap-x-3">
           <h1
@@ -99,7 +103,7 @@ export function CharacterHeader({
           >
             {character?.name ?? t('common.unknown')}
           </h1>
-          {overview && aside}
+          {aside}
         </div>
         <p className="truncate text-xs text-text-dim">
           {publicInfo?.corporationName && publicInfo.corporationId !== undefined ? (
@@ -121,10 +125,9 @@ export function CharacterHeader({
           )}
         </p>
       </div>
-      {overview ? (
-        // The Overview's controls sit in this flex row: Next, Customize, then the bell.
-        actions
-      ) : (
+      {/* Controls sit in this flex row, then the bell: the Overview's Next and Customize, Employment History's Refresh and export. */}
+      {actions}
+      {showSp && (
         <StatChips>
           <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />
           <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />

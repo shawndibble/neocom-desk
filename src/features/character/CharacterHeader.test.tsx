@@ -85,8 +85,6 @@ describe('CharacterHeader', () => {
     render(
       <CharacterHeader
         characterId={CHARACTER_ID}
-        totalSp={82_865_296}
-        unallocatedSp={719_732}
         overview
         aside={<span>aside-slot</span>}
         actions={<button type="button">actions-slot</button>}
@@ -101,17 +99,18 @@ describe('CharacterHeader', () => {
     expect(screen.getByRole('button', { name: /^Alerts/ })).toBeInTheDocument();
   });
 
-  it('off the Overview ignores aside and actions: the tabs share one fixed header', async () => {
+  it('draws aside and actions wherever they are passed, and no SP chips when no SP is passed', async () => {
     render(
       <CharacterHeader
         characterId={CHARACTER_ID}
-        totalSp={1}
-        unallocatedSp={2}
         aside={<span>aside-slot</span>}
+        actions={<button type="button">actions-slot</button>}
       />
     );
-    await screen.findByRole('heading', { level: 1, name: 'Mero Otichoda' });
-    expect(screen.queryByText('aside-slot')).not.toBeInTheDocument();
-    expect(screen.getByText('Total SP')).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Mero Otichoda' });
+
+    expect(heading.parentElement).toContainElement(screen.getByText('aside-slot'));
+    expect(screen.getByRole('button', { name: 'actions-slot' })).toBeInTheDocument();
+    expect(screen.queryByText('Total SP')).not.toBeInTheDocument();
   });
 });
