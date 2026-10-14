@@ -28,7 +28,9 @@ import {
   type AlertGrantDeps,
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
-import { firestoreAlertGrantStore } from './alertGrantStore.js';
+import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
+import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
+import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
 import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
 import {
@@ -291,6 +293,42 @@ export const deleteAlertGrant = onCall<unknown>(
 export const dispatchProjections = onSchedule('every 15 minutes', async () => {
   await dispatchDueProjections(getFirestore(), getMessaging(), Date.now(), logError);
 });
+
+/**
+ * pollEveNotifications (issue #3756, ADR 0020): every 15 minutes, reads each
+ * active Alerts Grant's `/notifications/` feed and pushes the types a
+ * registered device enabled. The only function that holds an EVE token, and
+ * only the notifications-only one. Deploy is manual:
+ * `firebase deploy --only functions:pollEveNotifications`.
+ */
+export const pollEveNotifications = onSchedule(
+  {
+    schedule: 'every 15 minutes',
+    secrets: [ALERTS_TOKEN_KEY],
+    timeoutSeconds: 540,
+    maxInstances: 1,
+  },
+  async () => {
+    const messaging = getMessaging();
+    const summary = await pollEveNotificationsRun({
+      store: firestorePollerStore(getFirestore(), {
+        key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
+        refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
+      }),
+      fetchNotifications: (characterId, accessToken, etag) =>
+        fetchEsiNotifications(characterId, accessToken, etag),
+      send: async (token, message) => {
+        await messaging.send({
+          token,
+          data: message.data,
+          ...(message.collapseKey ? { webpush: { headers: { Topic: message.collapseKey } } } : {}),
+        });
+      },
+      log: (message, data) => logWarn(message, data),
+    });
+    logInfo('pollEveNotifications finished', { ...summary });
+  }
+);
 
 /**
  * purgeNotificationFeed: server-side expiry for the remote Notification Feed
