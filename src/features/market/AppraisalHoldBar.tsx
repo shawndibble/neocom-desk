@@ -4,6 +4,7 @@
  * guessed.
  */
 import { useTranslation } from 'react-i18next';
+import { ProgressBar } from '@/components/ui';
 import type { AppraisalTotals } from '@/engine/market/appraisal';
 import { formatCubicMetres } from '@/lib/volume';
 import { totalCargoM3, type HaulingCargo } from './haulingCargo';
@@ -32,19 +33,11 @@ export function AppraisalHoldBar({
           })}
         </span>
       </div>
-      <div
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(pct)}
-        aria-label={t('market.appraisal.holdTitle', { ship: cargo.label })}
-        className="h-1.5 overflow-hidden rounded-xs bg-panel-2"
-      >
-        <div
-          className={fits ? 'h-full bg-accent' : 'h-full bg-warning'}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      <ProgressBar
+        label={t('market.appraisal.holdTitle', { ship: cargo.label })}
+        value={Math.round(pct)}
+        tone={fits ? 'accent' : 'warning'}
+      />
       <p className="text-[0.6875rem] text-text-dim">
         {fits ? t('market.appraisal.holdFits') : t('market.appraisal.holdOver')}
         {totals.volumeUnknownRows > 0 &&
