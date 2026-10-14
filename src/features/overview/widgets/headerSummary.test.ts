@@ -34,20 +34,17 @@ describe('stalestFetch', () => {
 });
 
 describe('fetchBreakdown', () => {
-  const view = (at: number | null, fromCache = false) => ({
-    fetchedAt: at === null ? null : new Date(at),
-    fromCache,
-  });
+  const view = (at: number | null) => ({ fetchedAt: at === null ? null : new Date(at) });
 
   it('lists each kind once, stalest first, with unread kinds last', () => {
     const rows = fetchBreakdown([
       { kind: 'wallet', view: view(5000) },
-      { kind: 'assets', view: view(1000, true) },
+      { kind: 'assets', view: view(1000) },
       { kind: 'orders', view: view(null) },
       { kind: 'wallet', view: view(5000) },
     ]);
     expect(rows.map((r) => r.kind)).toEqual(['assets', 'wallet', 'orders']);
-    expect(rows[0]).toEqual({ kind: 'assets', fetchedAt: new Date(1000), fromCache: true });
+    expect(rows[0]).toEqual({ kind: 'assets', fetchedAt: new Date(1000) });
     expect(rows[2].fetchedAt).toBeNull();
   });
 

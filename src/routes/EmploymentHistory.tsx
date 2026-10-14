@@ -95,8 +95,8 @@ export function EmploymentHistory() {
     <div className="mx-auto max-w-6xl space-y-4">
       {/*
         The header carries this tab's Refresh and export (level with the bell, at
-        the bell's size), as the Overview's does; its data age sits on the tab row. They stay here in the empty and failed states too: those are the
-        ones a Refresh is for. No SP: this tab has no use for it.
+        the bell's size), as the Overview's does; its data age sits on the tab row. They stay here in
+        the empty and failed states too: those are the ones a Refresh is for. No SP: this tab has no use for it.
       */}
       <CharacterHeader
         characterId={activeCharacterId}

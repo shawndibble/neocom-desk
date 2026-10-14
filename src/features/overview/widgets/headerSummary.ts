@@ -27,7 +27,6 @@ export function stalestFetch(views: readonly Pick<KindView, 'fetchedAt' | 'fromC
 export interface FetchRow {
   kind: string;
   fetchedAt: Date | null;
-  fromCache: boolean;
 }
 
 /**
@@ -35,12 +34,12 @@ export interface FetchRow {
  * first so the row that sets the header's age leads; kinds never read sit last.
  */
 export function fetchBreakdown(
-  entries: readonly { kind: string; view: Pick<KindView, 'fetchedAt' | 'fromCache'> }[]
+  entries: readonly { kind: string; view: Pick<KindView, 'fetchedAt'> }[]
 ): FetchRow[] {
   const byKind = new Map<string, FetchRow>();
   for (const { kind, view } of entries) {
     if (!byKind.has(kind)) {
-      byKind.set(kind, { kind, fetchedAt: view.fetchedAt, fromCache: view.fromCache });
+      byKind.set(kind, { kind, fetchedAt: view.fetchedAt });
     }
   }
   const time = (row: FetchRow) => row.fetchedAt?.getTime() ?? Infinity;

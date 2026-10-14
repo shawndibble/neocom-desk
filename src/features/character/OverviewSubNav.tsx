@@ -63,25 +63,28 @@ export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
   const locked = useLockedRoutes(TAB_PATHS);
 
   return (
-    <div className={tabScrollerClassName}>
-      <nav aria-label={t('nav.overview')} className={tabListClassName}>
-        <NavLink to="/overview" className={subNavClass}>
-          {t('nav.overview')}
-        </NavLink>
-        {/*
+    <div className="flex items-stretch">
+      <div className={cx(tabScrollerClassName, 'min-w-0 flex-1')}>
+        <nav aria-label={t('nav.overview')} className={tabListClassName}>
+          <NavLink to="/overview" className={subNavClass}>
+            {t('nav.overview')}
+          </NavLink>
+          {/*
           The rail used to carry this marker for /clones; the tab has to keep it
           now that the rail no longer lists the route. Informational only, and it
           is a dot inside the link with a tooltip on a wrapper, so the link stays
           named "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
         */}
-        <ClonesTab locked={locked.has('/clones')} />
-        <NavLink to="/employment-history" className={subNavClass}>
-          {t('nav.employmentHistory')}
-        </NavLink>
-        {trailing && (
-          <div className="ml-auto flex items-center self-center pr-1 pb-1">{trailing}</div>
-        )}
-      </nav>
+          <ClonesTab locked={locked.has('/clones')} />
+          <NavLink to="/employment-history" className={subNavClass}>
+            {t('nav.employmentHistory')}
+          </NavLink>
+        </nav>
+      </div>
+      {/* Outside the scroller, so a narrow phone scrolls the tabs and never hides this. */}
+      {trailing && (
+        <div className="flex shrink-0 items-center border-b border-line pr-1 pl-2">{trailing}</div>
+      )}
     </div>
   );
 }

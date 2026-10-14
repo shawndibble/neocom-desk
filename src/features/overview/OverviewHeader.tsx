@@ -1,6 +1,6 @@
 /**
  * The Overview's header controls, handed to `CharacterHeader`'s slots: the
- * data age (`OverviewDataAge`, beside the Character's name) and the
+ * data age (`OverviewDataAge`, on the tab row) and the
  * controls (`OverviewNext` and `OverviewCustomize`, level with the bell).
  *
  * It reads what is on screen, not what is stored: the button and the age count
@@ -25,7 +25,11 @@ import {
   buttonClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import {
+  controlHeightClassName,
+  focusRingClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { formatAge } from '@/lib/age';
@@ -37,11 +41,13 @@ import { useOverviewEdit } from './widgets/editContext';
 import { collectDeadlines, fetchBreakdown, stalestFetch } from './widgets/headerSummary';
 import { getKind } from './widgets/kinds';
 import type { Widget } from './widgets/layout';
-import type { KindView } from './widgets/data/types';
 import { chipTone, nextDeadline, type ChipTone } from './widgets/nextDeadline';
 import { distinctKinds, visibleWidgets } from './widgets/visibility';
 
 const CLOCK_TICK_MS = 30_000;
+
+/** A kind whose view has not been built yet: no read to date. */
+const EMPTY_READ = { fetchedAt: null, fromCache: false };
 
 /** The button's own ladder: amber under 3 h, red under 30 min (not the per-card severities). */
 const CHIP_TEXT: Record<ChipTone, string> = {
@@ -65,7 +71,7 @@ function useOverviewSummary(widgets: readonly Widget[]) {
   const breakdown = fetchBreakdown(
     shown.map((widget) => ({
       kind: widget.kind,
-      view: views.get(viewKey({ kind: widget.kind, scopeAll: false })) as KindView,
+      view: views.get(viewKey({ kind: widget.kind, scopeAll: false })) ?? EMPTY_READ,
     }))
   );
   const remaining = next ? next.at - now : 0;
@@ -80,7 +86,7 @@ function useOverviewSummary(widgets: readonly Widget[]) {
 }
 
 /**
- * "Updated N ago" beside the Character's name: the stalest read of any drawn
+ * "Data updated N ago" on the tab row: the stalest read of any drawn
  * widget. Its tooltip names that widget; a click opens the per-widget table, so
  * "14h ago" is never a mystery (no Refresh: widgets retry themselves).
  */
@@ -107,12 +113,13 @@ export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
           <button
             type="button"
             className={cx(
-              'inline-flex cursor-pointer items-center gap-1 rounded-xs border border-line px-1.5 py-0.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:bg-panel-2 hover:text-text',
+              'inline-flex cursor-pointer items-center gap-1 rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:bg-panel-2 hover:text-text',
+              controlHeightClassName.sm,
               interactiveClassName,
               focusRingClassName
             )}
           >
-            {t('overview.header.updated')}
+            <span className="max-sm:sr-only">{t('overview.header.updated')}</span>
             <DataAgeBadge date={fetchedAt} alwaysVisible tooltip={false} />
             <Icon.Expanded className="size-3" aria-hidden="true" />
           </button>
@@ -122,7 +129,7 @@ export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
         <table className="w-full text-xs">
           <caption className="sr-only">{t('overview.header.breakdownCaption')}</caption>
           <thead>
-            <tr className="border-b border-line bg-panel-2 text-left text-text-dim uppercase">
+            <tr className="border-b border-line text-left text-text-dim uppercase">
               <th scope="col" className="px-3 py-2 font-semibold tracking-widest">
                 {t('overview.header.breakdownWidget')}
               </th>
