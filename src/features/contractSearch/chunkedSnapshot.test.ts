@@ -201,6 +201,12 @@ describe('loadChunkedSnapshot', () => {
     // But the board must be able to say a newer read is on its way.
     expect(result.revalidating).toBe(true);
     released();
+    // Let the background read land before the next test clears the cache.
+    await vi.waitFor(async () =>
+      expect(
+        (await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, SOURCE.cacheKey]))?.value
+      ).toMatchObject({ rows: [{ id: 'this-cycle' }] })
+    );
   });
 
   it('still blocks when there is no stored snapshot to show', async () => {
@@ -210,5 +216,62 @@ describe('loadChunkedSnapshot', () => {
 
     expect(result.cached?.data.rows).toEqual([{ id: 'cold' }]);
     expect(result.revalidating).toBe(false);
+  });
+
+  describe('a lapsed snapshot whose meta.lastSyncedAt is unchanged', () => {
+    const chunkReads = () =>
+      getDoc.mock.calls.filter(([ref]) => !(ref as { path: string }).path.endsWith('/meta'));
+
+    async function storedFetchedAt(): Promise<number | undefined> {
+      return (await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, SOURCE.cacheKey]))?.fetchedAt;
+    }
+
+    it('costs one meta read, zero chunk reads, and restarts the stale clock', async () => {
+      await seedLapsedRow({ rows: [{ id: 'kept' }], lastSyncedAt: 7 });
+      const before = await storedFetchedAt();
+      serveDocs(7, [[{ id: 'new' }]]);
+
+      const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+      await vi.waitFor(async () => expect(await storedFetchedAt()).toBeGreaterThan(before ?? 0));
+
+      expect(result.cached?.data.rows).toEqual([{ id: 'kept' }]);
+      expect(getDoc).toHaveBeenCalledTimes(1);
+      expect(chunkReads()).toHaveLength(0);
+    });
+
+    it('does the full read when lastSyncedAt changed', async () => {
+      await seedLapsedRow({ rows: [{ id: 'old' }], lastSyncedAt: 7 });
+      serveDocs(8, [[{ id: 'new' }]]);
+
+      await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+      await vi.waitFor(() => expect(chunkReads()).toHaveLength(1));
+    });
+
+    it('does the full read when nothing is cached', async () => {
+      serveDocs(7, [[{ id: 'new' }]]);
+
+      await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+
+      expect(chunkReads()).toHaveLength(1);
+    });
+
+    it('falls back to the full read when the meta check fails', async () => {
+      await seedLapsedRow({ rows: [{ id: 'old' }], lastSyncedAt: 7 });
+      const data = new Map<string, unknown>([
+        ['publicCourierContracts/meta', { lastSyncedAt: 7, chunkCount: 1 }],
+        [`publicCourierContracts/${chunkDocId(0)}`, { rows: [{ id: 'new' }], publishedAt: 7 }],
+      ]);
+      let metaCalls = 0;
+      getDoc.mockImplementation(async (ref: { path: string }) => {
+        if (ref.path.endsWith('/meta')) {
+          metaCalls += 1;
+          if (metaCalls === 1) throw new Error('offline');
+        }
+        return { data: () => data.get(ref.path) };
+      });
+
+      await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+      await vi.waitFor(() => expect(chunkReads()).toHaveLength(1));
+    });
   });
 });

@@ -25,7 +25,12 @@ import { create } from 'zustand';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureAnySession } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/esi/cache';
+import {
+  loadWithCache,
+  readCached,
+  GLOBAL_CACHE_CHARACTER_ID,
+  type CachedResult,
+} from '@/esi/cache';
 
 const META_DOC_ID = 'meta';
 
@@ -127,6 +132,40 @@ async function readMeta(collectionName: string): Promise<MetaDocData & { chunkCo
   );
 }
 
+/**
+ * `meta` read for the unchanged-snapshot check, or `null` when the read fails:
+ * the check is an optimisation, so a failure falls back to the full read
+ * (which reads `meta` again and surfaces a real outage) rather than failing the
+ * load here.
+ */
+async function tryReadMeta(
+  collectionName: string
+): Promise<(MetaDocData & { chunkCount?: number }) | null> {
+  try {
+    return await readMeta(collectionName);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The cached snapshot when `meta.lastSyncedAt` still matches it, so a lapsed
+ * window costs one `meta` doc instead of every chunk. Returning it makes
+ * `loadWithCache` re-stamp the entry, restarting the stale clock. Null on no
+ * cached copy, a changed `lastSyncedAt`, or a failed `meta` read. A snapshot
+ * that never synced (`lastSyncedAt` null/0) never matches.
+ */
+export async function readUnchangedSnapshot<TSnapshot extends { lastSyncedAt: number | null }>(
+  cacheKey: string,
+  collectionName: string,
+  meta?: MetaDocData | null
+): Promise<TSnapshot | null> {
+  const cached = await readCached<TSnapshot>(GLOBAL_CACHE_CHARACTER_ID, cacheKey);
+  if (!cached?.lastSyncedAt) return null;
+  const current = meta === undefined ? await tryReadMeta(collectionName) : meta;
+  return current?.lastSyncedAt === cached.lastSyncedAt ? cached : null;
+}
+
 /** The whole collection in one query: no progress to report, so only the fallback when `meta` carries no chunk count. */
 async function readWholeCollection<TRow>(
   source: ChunkedSnapshotSource
@@ -203,8 +242,15 @@ async function fetchSnapshot<TRow>(
   await ensureAnySession(characterId);
 
   try {
+    const firstMeta = await tryReadMeta(source.collectionName);
+    const unchanged = await readUnchangedSnapshot<ChunkedSnapshot<TRow>>(
+      source.cacheKey,
+      source.collectionName,
+      firstMeta
+    );
+    if (unchanged) return unchanged;
     for (let attempt = 0; ; attempt += 1) {
-      const meta = await readMeta(source.collectionName);
+      const meta = (attempt === 0 ? firstMeta : null) ?? (await readMeta(source.collectionName));
       if (meta.chunkCount === undefined) return await readWholeCollection<TRow>(source);
       const { chunks, mixed } = await readChunks<TRow>(source, meta.chunkCount, meta.lastSyncedAt);
       if (!mixed || attempt >= 1) {

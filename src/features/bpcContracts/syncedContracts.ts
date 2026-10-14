@@ -19,6 +19,7 @@ import { collection, getDocs } from 'firebase/firestore/lite';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureAnySession } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { readUnchangedSnapshot } from '@/features/contractSearch/chunkedSnapshot';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/esi/cache';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import {
@@ -85,6 +86,10 @@ interface MetaDocData {
 async function fetchSnapshot(characterId: number): Promise<PublicBpcContractsSnapshot | null> {
   if (!isSyncConfigured()) return null;
   await ensureAnySession(characterId);
+
+  // Stale but unchanged: one `meta` read instead of the whole collection.
+  const unchanged = await readUnchangedSnapshot<PublicBpcContractsSnapshot>(CACHE_KEY, COLLECTION);
+  if (unchanged) return unchanged;
 
   const snapshot = await getDocs(collection(getSyncFirestore(), COLLECTION));
   const offers: PublicContractOfferRow[] = [];
