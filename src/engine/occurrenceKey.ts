@@ -53,6 +53,10 @@ import type {
   StructureReinforcementExitFire,
   PriceAlertTriggeredFire,
 } from './notificationDiffs';
+import type {
+  CommunityJoinRequestFire,
+  CommunityMemberJoinedFire,
+} from './communities/communityAlert';
 import type { StockBelowTargetFire } from './stockTargets/stockAlert';
 import type { IncursionNearbyFire } from './incursions/incursionAlert';
 
@@ -86,6 +90,8 @@ export type OccurrenceFire =
   | StructureReinforcementExitFire
   | PriceAlertTriggeredFire
   | StockBelowTargetFire
+  | CommunityJoinRequestFire
+  | CommunityMemberJoinedFire
   | IncursionNearbyFire;
 
 const DAY_MS = 86_400_000;
@@ -187,6 +193,12 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // The diff only fires on a drop into Low or Out, so the drop itself —
     // per list, item, Stock Target and status, bucketed by day — is the
     // identity: the same drop seen twice in a day is one occurrence.
+    // The Character at the Community is the identity: someone who asks again
+    // after being turned away is a new occurrence only once they left the list,
+    // which the diff already counts as a fresh arrival.
+    case 'communityJoinRequest':
+    case 'communityMemberJoined':
+      return [characterId, fire.eventId, fire.communityId, fire.uid].join(':');
     case 'stockBelowTarget':
       return [
         characterId,
@@ -291,6 +303,10 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     // The feed carries no spawn time; the poll that saw it in range is it.
     // falls through
     case 'incursionNearby':
+    // Neither the waiting list nor the roster is read with a time the poll could use.
+    // falls through
+    case 'communityJoinRequest':
+    case 'communityMemberJoined':
       return nowMs;
     default: {
       const exhaustive: never = fire;

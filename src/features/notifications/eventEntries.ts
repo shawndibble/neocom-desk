@@ -41,6 +41,13 @@ import {
   type IncursionNearbyFire,
 } from '@/engine/incursions/incursionAlert';
 import {
+  diffCommunityJoinRequest,
+  diffCommunityMemberJoined,
+  type CommunityAlertSnapshot,
+  type CommunityJoinRequestFire,
+  type CommunityMemberJoinedFire,
+} from '@/engine/communities/communityAlert';
+import {
   SKILL_QUEUE_NOTIFICATION_DIFFS,
   diffSpExtractionReady,
   diffCloneJumpReady,
@@ -124,6 +131,8 @@ import {
   priceAlertCopy,
   stockBelowTargetCopy,
   incursionNearbyCopy,
+  communityJoinRequestCopy,
+  communityMemberJoinedCopy,
   type IncursionNames,
   type DomainCopy,
   type NoNames,
@@ -160,7 +169,9 @@ export type AnyNotificationFire =
   | CorpWalletThresholdFire
   | PriceAlertTriggeredFire
   | StockBelowTargetFire
-  | IncursionNearbyFire;
+  | IncursionNearbyFire
+  | CommunityJoinRequestFire
+  | CommunityMemberJoinedFire;
 
 /* -------------------------------------------------------------------------- */
 /* Snapshot sources                                                            */
@@ -202,6 +213,7 @@ export const SNAPSHOT_SOURCES = {
   priceAlert: source<PriceAlertSnapshot>('priceAlert'),
   stockTargets: source<StockAlertSnapshot>('stockTargets'),
   incursions: source<IncursionAlertSnapshot, IncursionNames>('incursions'),
+  communities: source<CommunityAlertSnapshot>('communities'),
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -544,6 +556,22 @@ export const NOTIFICATION_EVENT_ENTRIES = {
       fields: [THRESHOLD_FIELDS.incursionNearbyJumps],
       hintKey: 'settings.notifications.incursionNearbyRouteRulesHint',
     },
+    rowHintKey: null,
+  }),
+  communityJoinRequest: defineEvent({
+    source: SNAPSHOT_SOURCES.communities,
+    diff: diffCommunityJoinRequest,
+    copy: communityJoinRequestCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  communityMemberJoined: defineEvent({
+    source: SNAPSHOT_SOURCES.communities,
+    diff: diffCommunityMemberJoined,
+    copy: communityMemberJoinedCopy,
+    projection: null,
+    thresholds: null,
     rowHintKey: null,
   }),
 } satisfies { readonly [K in NotificationEventId]: ErasedEntryFor<K> };

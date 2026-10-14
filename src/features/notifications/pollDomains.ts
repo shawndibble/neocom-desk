@@ -145,6 +145,12 @@ import type {
   IncursionAlertSnapshot,
   IncursionNearbyFire,
 } from '@/engine/incursions/incursionAlert';
+import type {
+  CommunityAlertEntry,
+  CommunityJoinRequestFire,
+  CommunityMemberJoinedFire,
+  CommunityAlertSnapshot,
+} from '@/engine/communities/communityAlert';
 import { INCURSION_STATES } from '@/engine/incursions/incursionRows';
 import { loadCurrentSystemId } from '@/features/route/currentSystem';
 import { loadJumpBasis } from '@/features/route/jumpBasis';
@@ -1809,6 +1815,49 @@ export const incursionDomain = defineDomain<
   },
 });
 
+/* Communities: join requests and new Members ------------------------------ */
+
+function isCommunityAlertEntry(raw: unknown): raw is CommunityAlertEntry {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.communityId === 'string' &&
+    typeof r.communityName === 'string' &&
+    (r.kind === 'request' || r.kind === 'member') &&
+    typeof r.uid === 'string' &&
+    typeof r.characterName === 'string'
+  );
+}
+
+/**
+ * The waiting list and roster of each Community this Character administers.
+ * Read from the sync backend rather than ESI, and only for a Character the
+ * Communities page has seen administer one (`communityAlertEntries.ts` holds
+ * the cost reasoning). A read that fails skips the poll (`null`) rather than
+ * writing a baseline that would make the next good poll look like a burst of
+ * new arrivals.
+ */
+export const communitiesDomain = defineDomain<
+  CommunityAlertEntry,
+  CommunityAlertSnapshot,
+  CommunityJoinRequestFire | CommunityMemberJoinedFire
+>({
+  source: SNAPSHOT_SOURCES.communities,
+  stateKey: 'notifications.pollerState.communities',
+  entriesKey: 'entries',
+  isEntry: isCommunityAlertEntry,
+  load: async (characterId) => {
+    try {
+      const { loadCommunityAlertEntries } =
+        await import('@/features/communities/communityAlertEntries');
+      return await loadCommunityAlertEntries(characterId);
+    } catch {
+      return null;
+    }
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+});
+
 /**
  * Every polled domain, in fetch order. One entry here is the whole cost of
  * adding a domain: `foregroundPoller.ts` names none of them.
@@ -1833,6 +1882,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   priceAlertDomain,
   stockTargetDomain,
   incursionDomain,
+  communitiesDomain,
 ];
 
 const DOMAIN_BY_EVENT: ReadonlyMap<NotificationEventId, PollDomain> = new Map(

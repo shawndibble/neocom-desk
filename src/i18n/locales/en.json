@@ -8491,6 +8491,14 @@
         "body_one": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jump from your current system.",
         "body_other": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jumps from your current system."
       },
+      "communityJoinRequest": {
+        "title": "Join request for {{community}}",
+        "body": "{{name}} asked to join {{community}} and is waiting for you to let them in."
+      },
+      "communityMemberJoined": {
+        "title": "New member in {{community}}",
+        "body": "{{name}} joined {{community}}."
+      },
       "stockBelowTarget": {
         "lowTitle": "{{item}} is running low",
         "outTitle": "{{item}} sold out",
@@ -10024,6 +10032,8 @@
         "corpWalletThreshold": "Corp Wallet Threshold",
         "stockBelowTarget": "Stock target running low",
         "incursionNearby": "Incursion nearby",
+        "communityJoinRequest": "Community join request",
+        "communityMemberJoined": "Community member joined",
         "priceAlertTriggered": "Quickbar Price Alert"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",

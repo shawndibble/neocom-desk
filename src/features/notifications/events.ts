@@ -265,6 +265,21 @@ const CATALOG = [
     defaultChannels: 'both',
     scope: requiredScope('getCharacterLocation'),
   },
+  // A Character asking to join a Community the pilot administers. Read from the
+  // sync backend, so it needs no ESI scope. In the bell and as a notification:
+  // someone is waiting on the admin.
+  {
+    id: 'communityJoinRequest',
+    labelKey: 'settings.notifications.event.communityJoinRequest',
+    defaultChannels: 'both',
+  },
+  // A new Member in a Community the pilot administers. Worth a Feed row, not an
+  // interruption: it needs nothing from the admin.
+  {
+    id: 'communityMemberJoined',
+    labelKey: 'settings.notifications.event.communityMemberJoined',
+    defaultChannels: 'feedOnly',
+  },
 ] as const satisfies readonly CatalogRow[];
 
 export type NotificationEventId = (typeof CATALOG)[number]['id'];

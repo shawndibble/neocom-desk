@@ -39,6 +39,8 @@ describe('NOTIFICATION_EVENTS', () => {
       'priceAlertTriggered',
       'stockBelowTarget',
       'incursionNearby',
+      'communityJoinRequest',
+      'communityMemberJoined',
     ]);
   });
 
@@ -150,10 +152,16 @@ describe('NOTIFICATION_EVENTS', () => {
     expect(event?.corpCapability).toBeUndefined();
   });
 
-  it('defaults exactly the four worth-a-row events to feed-only (round 45, issue #1091)', () => {
+  it('defaults exactly the worth-a-row events to feed-only (round 45, issue #1091; community members)', () => {
     expect(
       NOTIFICATION_EVENTS.filter((e) => e.defaultChannels === 'feedOnly').map((e) => e.id)
-    ).toEqual(['marketOrderFilled', 'contractCompleted', 'contractFailed', 'walletBalanceChanged']);
+    ).toEqual([
+      'marketOrderFilled',
+      'contractCompleted',
+      'contractFailed',
+      'walletBalanceChanged',
+      'communityMemberJoined',
+    ]);
   });
 });
 
