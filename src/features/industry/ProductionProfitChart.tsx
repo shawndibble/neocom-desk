@@ -5,6 +5,7 @@
  * this must only ever be reached through a dynamic `import()`, never
  * imported eagerly.
  */
+import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
@@ -94,12 +95,12 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
               dataKey="date"
               tickFormatter={formatDateTick}
               stroke="var(--color-text-dim)"
-              tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
             />
             <YAxis
               stroke="var(--color-text-dim)"
-              tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-              width={COMPACT_ISK_Y_AXIS_WIDTH}
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
+              width={scalePx(COMPACT_ISK_Y_AXIS_WIDTH)}
               // SVG axis tick: IskAmount can't render here (documented exception).
               tickFormatter={(value: number) => formatIskCompact(value)}
             />

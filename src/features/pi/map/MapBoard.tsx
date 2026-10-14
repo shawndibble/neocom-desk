@@ -353,7 +353,7 @@ export function MapBoard(props: MapBoardProps) {
           if (!event.currentTarget.contains(event.relatedTarget)) props.onPreview(null);
         }}
         aria-labelledby={headingId}
-        className="relative mx-auto grid w-max grid-cols-[96px_132px_146px_196px_184px_194px] gap-x-4 py-3 pr-3"
+        className="relative mx-auto grid w-max grid-cols-[6rem_8.25rem_9.125rem_12.25rem_11.5rem_12.125rem] gap-x-4 py-3 pr-3"
       >
         <h3 id={headingId} className="sr-only">
           {t('piMap.boardLabel')}
@@ -444,14 +444,14 @@ export function MapBoard(props: MapBoardProps) {
                 total: graph.tiers[tier].length,
               })}
             />
-            <ul className="flex flex-1 flex-col justify-center gap-[3px]">
+            <ul className="flex flex-1 flex-col justify-center gap-[0.1875rem]">
               {graph.tiers[tier].map((product) => {
                 if (!visible(product.typeId)) {
                   return (
                     <li
                       key={product.typeId}
                       aria-hidden="true"
-                      className="h-11 flex-none md:h-[34px] touch:h-11"
+                      className="h-11 flex-none md:h-[2.125rem] touch:h-11"
                     />
                   );
                 }
@@ -503,7 +503,7 @@ export function MapBoard(props: MapBoardProps) {
                         onKeyDown={(e) => clickOnSpace(e) || move(key, e)}
                         onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                         className={cx(
-                          'grid h-11 w-full md:h-[34px] touch:h-11 grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0 pr-[5px] pl-[3px] text-left text-xs',
+                          'grid h-11 w-full md:h-[2.125rem] touch:h-11 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0 pr-[0.3125rem] pl-[0.1875rem] text-left text-xs',
                           interactiveClassName,
                           focusRingClassName,
                           goal
@@ -519,7 +519,7 @@ export function MapBoard(props: MapBoardProps) {
                         <TypeIcon typeId={product.typeId} size={64} width={24} height={24} />
                         <span
                           className={cx(
-                            'min-w-0 text-xs leading-[13px] whitespace-normal',
+                            'min-w-0 text-xs leading-[0.8125rem] whitespace-normal',
                             goal || onPath ? 'font-semibold text-text' : 'text-text',
                             goal && 'text-accent'
                           )}
@@ -529,11 +529,11 @@ export function MapBoard(props: MapBoardProps) {
                         {glyph && figure.kind === 'ranked' ? (
                           <span
                             aria-hidden="true"
-                            className="flex items-center gap-1 text-[11px] tabular-nums"
+                            className="flex items-center gap-1 text-[0.6875rem] tabular-nums"
                           >
                             <span
                               className={cx(
-                                'text-[11px] leading-[11px] font-bold',
+                                'text-[0.6875rem] leading-[0.6875rem] font-bold',
                                 VERDICT_TONE[glyph]
                               )}
                             >
@@ -543,7 +543,7 @@ export function MapBoard(props: MapBoardProps) {
                               {formatIskCompact(figure.iskPerDay)}
                             </span>
                             {figure.needsCcLevel && (
-                              <span className="rounded-xs border border-warning/60 px-1 text-[10px] leading-[14px] font-semibold text-warning">
+                              <span className="rounded-xs border border-warning/60 px-1 text-[0.625rem] leading-[0.875rem] font-semibold text-warning">
                                 {t('piMap.needsCcShort', { level: figure.needsCcLevel })}
                               </span>
                             )}
@@ -559,7 +559,7 @@ export function MapBoard(props: MapBoardProps) {
                       <span
                         aria-hidden="true"
                         className={cx(
-                          'pointer-events-none absolute top-1/2 -left-[15px] z-[1] grid h-[18px] min-w-[22px] -translate-y-1/2 place-items-center rounded-xs border border-warning px-[3px] text-[11px] font-bold',
+                          'pointer-events-none absolute top-1/2 -left-[0.9375rem] z-[1] grid h-[1.125rem] min-w-[1.375rem] -translate-y-1/2 place-items-center rounded-xs border border-warning px-[0.1875rem] text-[0.6875rem] font-bold',
                           goal ? 'bg-warning text-bg' : 'bg-bg text-warning'
                         )}
                       >
@@ -569,7 +569,7 @@ export function MapBoard(props: MapBoardProps) {
                     {isNew && (
                       <span
                         aria-hidden="true"
-                        className="pointer-events-none absolute top-0 right-0 z-[1] grid size-[14px] -translate-y-1/3 translate-x-1/3 place-items-center rounded-xs bg-map-whatif p-px text-bg"
+                        className="pointer-events-none absolute top-0 right-0 z-[1] grid size-[0.875rem] -translate-y-1/3 translate-x-1/3 place-items-center rounded-xs bg-map-whatif p-px text-bg"
                       >
                         <Icon.Increase size="100%" aria-hidden="true" />
                       </span>
@@ -600,14 +600,17 @@ function ColumnHead(props: {
   count?: string;
 }) {
   return (
-    <div className="h-[52px]">
+    <div className="h-[3.25rem]">
       <div className="flex items-center gap-1.5">
-        <h4 id={props.id} className="text-[11px] font-semibold tracking-widest text-text uppercase">
+        <h4
+          id={props.id}
+          className="text-[0.6875rem] font-semibold tracking-widest text-text uppercase"
+        >
           {props.title}
         </h4>
         <InfoTooltip label={props.infoLabel} content={props.info} />
       </div>
-      <p className="mt-[3px] text-[11px] leading-[1.25] text-text-dim">{props.sub}</p>
+      <p className="mt-[0.1875rem] text-[0.6875rem] leading-[1.25] text-text-dim">{props.sub}</p>
       {props.count && <span className="sr-only">{props.count}</span>}
     </div>
   );
@@ -678,7 +681,7 @@ function PlanetToggle({
         onKeyDown={props.onKeyDown}
         onClick={props.onClick}
         className={cx(
-          'relative flex w-[72px] flex-col items-center gap-[3px] rounded-xs border border-transparent px-0 py-[3px] text-text',
+          'relative flex w-[4.5rem] flex-col items-center gap-[0.1875rem] rounded-xs border border-transparent px-0 py-[0.1875rem] text-text',
           interactiveClassName,
           focusRingInsetClassName,
           '[@media(hover:hover)]:hover:border-line-bright [@media(hover:hover)]:hover:bg-panel-2',
@@ -688,7 +691,7 @@ function PlanetToggle({
         <span
           aria-hidden="true"
           className={cx(
-            'absolute top-0.5 right-1.5 z-[1] grid size-3.5 place-items-center rounded-xs border text-[11px] leading-none',
+            'absolute top-0.5 right-1.5 z-[1] grid size-3.5 place-items-center rounded-xs border text-[0.6875rem] leading-none',
             pressed
               ? 'border-accent bg-accent text-accent-contrast'
               : 'border-line-bright bg-panel-2'
@@ -707,31 +710,34 @@ function PlanetToggle({
           )}
         />
         <span
-          className={cx('text-[11px] leading-[13px] font-semibold', !pressed && 'text-text-dim')}
+          className={cx(
+            'text-[0.6875rem] leading-[0.8125rem] font-semibold',
+            !pressed && 'text-text-dim'
+          )}
         >
           {name}
         </span>
-        <span aria-hidden="true" className="flex min-h-[14px] flex-wrap justify-center gap-0.5">
+        <span aria-hidden="true" className="flex min-h-[0.875rem] flex-wrap justify-center gap-0.5">
           {have && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-success/50 px-[3px] text-[11px] font-semibold tracking-wider text-success uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-success/50 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-wider text-success uppercase">
               {t('piMap.tagHave')}
             </span>
           )}
           {props.ranks.map((rank) => (
             <span
               key={rank}
-              className="inline-flex h-3.5 items-center rounded-xs border border-warning/60 px-[3px] text-[11px] font-semibold text-warning"
+              className="inline-flex h-3.5 items-center rounded-xs border border-warning/60 px-[0.1875rem] text-[0.6875rem] font-semibold text-warning"
             >
               #{rank}
             </span>
           ))}
           {props.tracedNeed && !props.tracedNeed.have && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-danger/50 px-[3px] text-[11px] font-semibold tracking-wider text-danger uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-danger/50 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-wider text-danger uppercase">
               {t('piMap.tagNeed')}
             </span>
           )}
           {props.whatIf && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-map-whatif/60 px-[3px] text-[11px] font-semibold tracking-wider text-map-whatif uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-map-whatif/60 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-wider text-map-whatif uppercase">
               {t('piMap.tagWhatIf')}
             </span>
           )}

@@ -63,8 +63,8 @@ type InternalRowKind =
  * Same fixed per-kind estimates `Assets.tsx`'s `estimateRowHeight` uses,
  * sized to this panel's rows instead. The three hint rows carry a full
  * sentence of prose (e.g. `extractorExpiringHint`), not a compact caption —
- * sized to wrap two lines rather than one, since there's no `measureElement`
- * here to correct an under-estimate later.
+ * sized to wrap two lines rather than one. The panel's `measureElement`
+ * corrects any estimate (including a changed text-size setting) once mounted.
  */
 const ROW_HEIGHT: Record<InternalRowKind, number> = {
   'character-header': 32,

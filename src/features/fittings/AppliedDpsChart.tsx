@@ -8,6 +8,7 @@
  * against solid before reaching for a second hue): both lines are `accent`,
  * the overlay dashed, and the key draws the dash too.
  */
+import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
@@ -134,12 +135,12 @@ function Graph({
               domain={[0, 'dataMax']}
               tickFormatter={formatX}
               stroke="var(--color-text-dim)"
-              tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
             />
             <YAxis
               stroke="var(--color-text-dim)"
-              tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-              width={40}
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
+              width={scalePx(40)}
               tickFormatter={(value: number) => value.toFixed(0)}
             />
             <Tooltip content={(props) => <DpsTooltip {...props} formatX={formatX} />} />

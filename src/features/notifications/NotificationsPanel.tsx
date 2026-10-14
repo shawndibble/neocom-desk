@@ -33,7 +33,8 @@
  * Characters actually on screen mount, and `CharacterNotificationSection` is
  * memoized so an edit to one Character's preferences doesn't force React to
  * re-diff every other Character's rows.
- */ import {
+ */ import { rootFontScale } from '@/lib/fontScale';
+import {
   focusRingInsetClassName,
   interactiveClassName,
   touchCheckboxLabelClassName,
@@ -43,7 +44,7 @@ import { cx } from '@/lib/cx';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { measureElement, useWindowVirtualizer } from '@tanstack/react-virtual';
 import {
   Button,
   Panel,
@@ -148,9 +149,9 @@ const DESKTOP_QUERY = '(min-width: 48rem)';
 
 /**
  * True at or above `md`, where the section header drops back off the touch
- * tier (issue #1118). The virtualizer sizes every section from a fixed
- * estimate with no `measureElement` behind it, so the estimate has to know
- * which tier the header is actually rendering at. Local rather than shared,
+ * tier (issue #1118). The virtualizer's first-paint estimate has to know
+ * which tier the header is actually rendering at; `measureElement` then
+ * corrects it to the real height. Local rather than shared,
  * matching `EntryList.tsx`'s own copy of this hook.
  */
 function useIsDesktop(): boolean {
@@ -475,27 +476,35 @@ export function NotificationsPanel() {
         : NOTIFICATION_EVENT_IDS;
       const grantedScopes = scopesByCharacterId.get(character.characterId) ?? EMPTY_SCOPES;
       const characterCapabilities = capabilitiesByCharacterId.get(character.characterId);
-      return estimateCharacterSectionHeight({
-        expanded,
-        touchViewport: !isDesktop,
-        visibleEventIds,
-        rowEnabledFor: (eventId) =>
-          characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
-        missingPermissionFor: (eventId) =>
-          characterEventRowState(eventId, grantedScopes, characterCapabilities)
-            .missingPermission !== null,
-        hasEveNotificationScope: characterEventRowState(
-          'eveNotification',
-          grantedScopes,
-          characterCapabilities
-        ).hasScope,
-      });
+      return (
+        rootFontScale() *
+        estimateCharacterSectionHeight({
+          expanded,
+          touchViewport: !isDesktop,
+          visibleEventIds,
+          rowEnabledFor: (eventId) =>
+            characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
+          missingPermissionFor: (eventId) =>
+            characterEventRowState(eventId, grantedScopes, characterCapabilities)
+              .missingPermission !== null,
+          hasEveNotificationScope: characterEventRowState(
+            'eveNotification',
+            grantedScopes,
+            characterCapabilities
+          ).hasScope,
+        })
+      );
     },
     getItemKey: (index) => visibleCharacters[index].characterId,
     // `virtualRow.start` is otherwise measured from the top of the
     // *document*, not this list — it has to know how far down the page the
     // list itself starts (master switch, channel toggles, the All
     // Characters section, and the search box all sit above it).
+    // Where nothing is laid out (jsdom) a measure reads 0; keep the estimate
+    // then, as `DataTable` does, rather than collapsing every section to 0.
+    measureElement: (element, entry, instance) =>
+      measureElement(element, entry, instance) ||
+      instance.options.estimateSize(Number((element as HTMLElement).dataset.index)),
     scrollMargin,
     overscan: 5,
   });
@@ -684,6 +693,7 @@ export function NotificationsPanel() {
                       <div
                         key={virtualRow.key}
                         data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
                         style={{
                           position: 'absolute',
                           top: 0,

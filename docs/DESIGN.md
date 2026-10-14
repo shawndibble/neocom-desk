@@ -289,6 +289,10 @@ Rules:
   `src/lib/fontScale.ts`) sets `<html>`'s font-size as a percentage, so this
   whole scale — and the rem-based spacing scale alongside it — grows or
   shrinks together rather than just the text.
+  Two corollaries: chart text passed to recharts is a rem string
+  (`fontSize: '0.6875rem'`), never a number; and a px size that sits beside
+  rem text (a virtualizer row estimate, a chart axis gutter) goes through
+  `rootFontScale()` / `scalePx()` from the same file.
 
 ## 2b. Brand assets
 

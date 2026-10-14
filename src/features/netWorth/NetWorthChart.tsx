@@ -7,6 +7,7 @@
  * clickable to drill in. Days without a snapshot are a hatched band (never an
  * interpolated value); the wallet line carries on through them.
  */
+import { scalePx } from '@/lib/fontScale';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -174,14 +175,14 @@ export default function NetWorthChart(props: NetWorthChartProps) {
       ticks={axis.ticks}
       tickFormatter={dayLabel}
       stroke="var(--color-text-dim)"
-      tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+      tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
     />
   );
   const yAxis = (
     <YAxis
       stroke="var(--color-text-dim)"
-      tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-      width={COMPACT_ISK_Y_AXIS_WIDTH}
+      tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
+      width={scalePx(COMPACT_ISK_Y_AXIS_WIDTH)}
       tickFormatter={(value: number) => formatIskCompact(value)}
     />
   );
@@ -218,7 +219,7 @@ export default function NetWorthChart(props: NetWorthChartProps) {
                   label={{
                     value: props.walletOnlyLabel,
                     position: 'insideTopLeft',
-                    fontSize: 11,
+                    fontSize: '0.6875rem',
                     fill: 'var(--color-text-dim)',
                   }}
                 />

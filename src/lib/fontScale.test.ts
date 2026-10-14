@@ -6,6 +6,8 @@ import {
   FONT_SCALE_MIRROR_KEY,
   FONT_SCALE_STEPS,
   DEFAULT_FONT_SCALE,
+  rootFontScale,
+  scalePx,
 } from './fontScale';
 
 beforeEach(async () => {
@@ -72,6 +74,43 @@ describe('useFontScale', () => {
       expect(document.documentElement.style.fontSize).toBe('112.5%');
     } finally {
       setItem.mockRestore();
+    }
+  });
+});
+
+describe('rootFontScale', () => {
+  it('reads the inline percentage without touching computed style', () => {
+    document.documentElement.style.fontSize = '112.5%';
+    const spy = vi.spyOn(window, 'getComputedStyle');
+    try {
+      expect(rootFontScale()).toBe(1.125);
+      expect(scalePx(40)).toBe(45);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      document.documentElement.style.fontSize = '';
+    }
+  });
+
+  it('reads the live <html> font-size as a multiple of 16px', () => {
+    const spy = vi
+      .spyOn(window, 'getComputedStyle')
+      .mockReturnValue({ fontSize: '20px' } as CSSStyleDeclaration);
+    try {
+      expect(rootFontScale()).toBe(1.25);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('falls back to 1 when the size is unreadable', () => {
+    const spy = vi
+      .spyOn(window, 'getComputedStyle')
+      .mockReturnValue({ fontSize: '' } as CSSStyleDeclaration);
+    try {
+      expect(rootFontScale()).toBe(1);
+    } finally {
+      spy.mockRestore();
     }
   });
 });
