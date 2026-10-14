@@ -63,3 +63,39 @@ for (const width of CONTROL_ROW_WIDTHS) {
     });
   }
 }
+
+/** Row/header rhythm: same two-line row padding as Skill plans; one-line Library headers. */
+const RHYTHM_WIDTHS = [1440, 1024, 390] as const;
+
+async function firstHeight(page: Page, selector: string): Promise<number> {
+  const box = await page.locator(selector).first().boundingBox();
+  expect(box, selector).not.toBeNull();
+  return box?.height ?? 0;
+}
+
+for (const width of RHYTHM_WIDTHS) {
+  test(`communities Library headers share one height (${width}px)`, async ({ page }) => {
+    test.skip(width === 390, 'phone layout stacks the table');
+    await page.setViewportSize({ width, height: 768 });
+    await openWithSampleCommunities(page, `/communities?community=${ADMIN}`);
+    const heights = await page
+      .locator('main table thead th')
+      .evaluateAll((ths) => ths.map((th) => Math.round(th.getBoundingClientRect().height)));
+    expect(heights.length).toBeGreaterThan(1);
+    expect(new Set(heights).size, `header heights ${heights.join(',')}`).toBe(1);
+  });
+
+  test(`communities Fittings and list rows are at least as tall as Skill plans rows (${width}px)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await openWithSampleCommunities(page, `/communities?community=${ADMIN}&tab=plans`);
+    const planRow = await firstHeight(page, 'main ul.divide-y > li');
+    await openWithSampleCommunities(page, `/communities?community=${ADMIN}&tab=fittings`);
+    const fittingRow = await firstHeight(page, 'main ul.divide-y > li');
+    await openWithSampleCommunities(page, '/communities');
+    const listRow = await firstHeight(page, 'main ul.divide-y > li');
+    expect(fittingRow).toBeGreaterThanOrEqual(planRow);
+    expect(listRow).toBeGreaterThanOrEqual(planRow);
+  });
+}
