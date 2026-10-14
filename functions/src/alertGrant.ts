@@ -201,6 +201,17 @@ export async function revokeAtSso(
   if (!res.ok) throw new Error(`SSO revoke failed (${res.status})`);
 }
 
+/** An SSO refresh refusal. Carries the status and error code only — never a token. */
+export class SsoRefreshError extends Error {
+  constructor(
+    readonly status: number,
+    /** True when SSO answered `invalid_grant`: the token is dead (revoked, expired, wrong client). */
+    readonly invalidGrant: boolean
+  ) {
+    super(`SSO refresh failed (${status})`);
+  }
+}
+
 /** Refresh-token grant for a public (PKCE) client. Errors carry the status only. */
 export async function refreshAtSso(
   clientId: string,
@@ -217,7 +228,10 @@ export async function refreshAtSso(
     }).toString(),
     signal: AbortSignal.timeout(SSO_TIMEOUT_MS),
   });
-  if (!res.ok) throw new Error(`SSO refresh failed (${res.status})`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+    throw new SsoRefreshError(res.status, body?.error === 'invalid_grant');
+  }
   const json = (await res.json()) as { access_token?: unknown; refresh_token?: unknown };
   if (typeof json.access_token !== 'string' || typeof json.refresh_token !== 'string') {
     throw new Error('SSO refresh response malformed');
