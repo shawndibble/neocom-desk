@@ -11,6 +11,8 @@ import { PointTooltip } from '@/components/ui/PointTooltip';
 import { cx } from '@/lib/cx';
 import type { ChartTip } from './types';
 
+const TONE_CLASS = { good: 'text-isk-pos', bad: 'text-isk-neg', plain: 'text-text' } as const;
+
 /**
  * The hover layer every Overview chart with per-point readouts shares: one
  * bubble that follows the pointer along the plot, a mark on the point it reads,
@@ -74,11 +76,10 @@ export function ChartHover({
     };
   }, [live]);
 
-  const drawing = children;
   if (!tips || count === 0) {
     return (
       <div className={cx('relative', className)} style={style}>
-        {drawing}
+        {children}
       </div>
     );
   }
@@ -91,12 +92,12 @@ export function ChartHover({
       ref={ref}
       className={cx('relative touch-pan-y', className)}
       style={style}
-      onPointerEnter={(e) => e.pointerType !== 'touch' && pick(e)}
-      onPointerMove={(e) => e.pointerType !== 'touch' && pick(e)}
+      onPointerEnter={pick}
+      onPointerMove={pick}
       onPointerDown={(e) => e.pointerType === 'touch' && pick(e)}
       onPointerLeave={(e) => e.pointerType !== 'touch' && setActive(null)}
     >
-      {drawing}
+      {children}
       {tip && (
         <>
           {layout === 'columns' ? (
@@ -138,17 +139,7 @@ export function ChartHover({
             {tip.rows.map((row) => (
               <div key={row.label} className="flex justify-between gap-4">
                 <span>{row.label}</span>
-                <span
-                  className={
-                    row.tone === 'good'
-                      ? 'text-isk-pos'
-                      : row.tone === 'bad'
-                        ? 'text-isk-neg'
-                        : 'text-text'
-                  }
-                >
-                  {row.value}
-                </span>
+                <span className={TONE_CLASS[row.tone ?? 'plain']}>{row.value}</span>
               </div>
             ))}
           </ChartTooltipShell>

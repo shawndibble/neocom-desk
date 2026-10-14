@@ -177,7 +177,7 @@ never the only signal. Bar and line charts (wallet, net worth, profit, mining,
 kills, route safety) read a point out on hover, or on a tap and drag on touch,
 through the shared `ChartHover` bubble (`ChartTip` titles and rows on the model).
 The drawing is aria-hidden and takes no focus, so the summary and Table view
-stay the keyboard and screen-reader route.
+stay the keyboard and screen-reader route. Small Net worth is a single stacked bar with its legend, so it has no hover.
 
 ### Alerts (global)
 - **Bell** in every page header (replaces the Alerts link): badge = unread

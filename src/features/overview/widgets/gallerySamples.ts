@@ -134,10 +134,12 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       chart: {
         kind: 'bars',
         summary: '',
-        values: series(14, 12, 24, 0.35),
-        max: '38M',
-        xStart: t('overview.widgets.chart.daysAgo', { count: 14 }),
-        xEnd: t('overview.widgets.chart.today'),
+        values: [40, -18, 62, 25, -30, 88],
+        gains: true,
+        barLabels: ['+40M', '-18M', '+62M', '+25M', '-30M', '+88M'],
+        max: '88M',
+        xStart: t('overview.widgets.chart.weeksAgo', { count: 6 }),
+        xEnd: t('overview.widgets.chart.thisWeek'),
       },
     },
     netWorth: {
@@ -340,7 +342,9 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       chart: {
         kind: 'bars',
         summary: '',
-        values: [180, 260, 210, 330, 140],
+        values: [180, 260, -90, 330, 140],
+        gains: true,
+        barLabels: ['+180M', '+260M', '-90M', '+330M', '+140M'],
         max: '330M',
         xStart: t('overview.widgets.chart.weeksAgo', { count: 5 }),
         xEnd: t('overview.widgets.chart.thisWeek'),

@@ -18,7 +18,7 @@ import type { SurveySummary } from '@/engine/survey/series';
 export type ChartColor =
   'accent' | 'neutral' | 'warning' | 'iskPos' | 'iskNeg' | 's1' | 's2' | 's3' | 's4' | 's5';
 
-/** What a hover (or a focused bar, or a tap) reads out for one point: a title and labelled figures. */
+/** What a hover (or a tap) reads out for one point: a title and labelled figures. */
 export interface ChartTip {
   title: string;
   rows: { label: string; value: string; tone?: 'good' | 'bad' }[];
@@ -57,7 +57,7 @@ export interface BarsChartModel extends ChartBase {
   ref?: { value: number; label: string };
   /** Gains and losses: green above the axis, red below it, instead of the accent. */
   gains?: boolean;
-  /** A figure printed beside each bar (above a gain, below a loss), same length as `values`; dropped bars a Small tile has no room for. */
+  /** A figure printed beside each bar (above a gain, below a loss), same length as `values`. A narrow chart prints only every few, newest first. */
   barLabels?: string[];
   /** One readout per value, same length as `values`. */
   tips?: ChartTip[];

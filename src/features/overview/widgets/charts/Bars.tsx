@@ -45,8 +45,8 @@ export function Bars({ model, height }: { model: BarsChartModel; height: number 
     <div aria-hidden="true" ref={ref} className="grid gap-1">
       {(!labelled || model.ref) && (
         <div className="flex justify-between gap-2 text-[0.6875rem] text-text-dim tabular-nums">
-          <span>{labelled ? '' : model.max}</span>
-          {model.ref && <span>{model.ref.label}</span>}
+          {!labelled && <span>{model.max}</span>}
+          {model.ref && <span className="ml-auto">{model.ref.label}</span>}
         </div>
       )}
       {signed ? (

@@ -52,10 +52,7 @@ export function StackedArea({
           </svg>
         </ChartHover>
         {(model.xStart || model.xEnd) && (
-          <div
-            aria-hidden="true"
-            className="flex justify-between gap-2 text-[0.6875rem] text-text-dim tabular-nums"
-          >
+          <div className="flex justify-between gap-2 text-[0.6875rem] text-text-dim tabular-nums">
             <span>{model.xStart}</span>
             <span>{model.xEnd}</span>
           </div>
