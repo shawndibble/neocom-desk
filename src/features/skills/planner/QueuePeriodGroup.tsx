@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import { romanLevel } from '@/engine/projection';
 import { SkillLink } from '@/features/entities';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
@@ -7,8 +8,6 @@ import { skillGroupIcon } from '../skillGroupIcon';
 import type { SkillCatalog } from '../skillMap';
 import type { SkillQueueStatus } from '../queueStatus';
 import type { QueuePeriodGroup as Group, QueueRowView } from './queueView';
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 const BADGE_STYLE: Partial<Record<SkillQueueStatus, string>> = {
   completed: 'bg-success/15 text-success',
@@ -42,7 +41,7 @@ function QueueRow({ row, catalog, nowMs }: RowProps) {
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm">
           <SkillLink typeId={entry.skill_id}>{skill?.name ?? `#${entry.skill_id}`}</SkillLink>{' '}
-          {ROMAN[entry.finished_level - 1]}
+          {romanLevel(entry.finished_level)}
         </div>
         {skill?.groupName && (
           <div className="truncate text-xs text-text-dim">{skill.groupName}</div>

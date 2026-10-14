@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -55,9 +55,18 @@ export function SkillPlanCard({
   );
   const stats = usePlanStats(plans, scheduleInputs, activeCharacterId);
   // `?browse=community` (the Community page's link) opens the list, where its dialog lives.
-  const [listOpen, setListOpen] = useState(
-    () => new URLSearchParams(location.search).get('browse') === 'community'
-  );
+  const browseLink = new URLSearchParams(location.search).get('browse') === 'community';
+  const [listOpen, setListOpen] = useState(browseLink);
+  // The list opened only to host the community browse: once the browse closes
+  // (its pane drops the param) the pilot goes back to the page, not to a list
+  // they never asked for.
+  const openedByBrowse = useRef(browseLink);
+  useEffect(() => {
+    if (openedByBrowse.current && !browseLink) {
+      openedByBrowse.current = false;
+      setListOpen(false);
+    }
+  }, [browseLink]);
   const menu = useOpenAfterMenu();
 
   const current = plans?.reduce<(typeof plans)[number] | undefined>(
@@ -161,11 +170,9 @@ export function SkillPlanCard({
                 <IconButton icon={<Icon.More />} label={t('plans.planCardMenu')} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onCloseAutoFocus={menu.onCloseAutoFocus}>
-                {plans.length > 0 && (
-                  <DropdownMenuItem onSelect={() => menu.run(() => setListOpen(true))}>
-                    {t('plans.allPlansButton')}
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem onSelect={() => menu.run(() => setListOpen(true))}>
+                  {t('plans.allPlansButton')}
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => void handleCreate()}>
                   {t('plans.create')}
                 </DropdownMenuItem>

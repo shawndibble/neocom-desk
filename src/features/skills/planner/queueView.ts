@@ -40,9 +40,10 @@ function bucketOf(days: number): { id: string; firstMonth?: number } {
   if (days <= 7) return { id: 'week' };
   if (days <= 28) return { id: 'weeks' };
   if (days <= 2 * MONTH_DAYS) return { id: 'month2' };
-  // Two-month windows from month 3: 60-120d, 120-180d, ...
-  const window = Math.floor((days - 2 * MONTH_DAYS) / (2 * MONTH_DAYS));
-  const firstMonth = 3 + 2 * window;
+  // Two-month windows from month 3, each closed on its late edge like the
+  // fixed buckets above: (60-120d], (120-180d], ...
+  const windowIndex = Math.ceil((days - 2 * MONTH_DAYS) / (2 * MONTH_DAYS)) - 1;
+  const firstMonth = 3 + 2 * windowIndex;
   return { id: `months-${firstMonth}`, firstMonth };
 }
 
@@ -88,7 +89,7 @@ export function buildQueueView(rows: readonly ClassifiedQueueEntry[]): QueueView
   };
 }
 
-function window(entry: SkillQueueEntry): { start: number; end: number } | null {
+function trainingWindow(entry: SkillQueueEntry): { start: number; end: number } | null {
   if (!entry.start_date || !entry.finish_date) return null;
   const start = Date.parse(entry.start_date);
   const end = Date.parse(entry.finish_date);
@@ -97,7 +98,7 @@ function window(entry: SkillQueueEntry): { start: number; end: number } | null {
 
 /** Share (0..1) of the level's own training window already elapsed; null when paused. */
 export function heroProgress(entry: SkillQueueEntry, nowMs: number): number | null {
-  const w = window(entry);
+  const w = trainingWindow(entry);
   if (!w) return null;
   return Math.min(1, Math.max(0, (nowMs - w.start) / (w.end - w.start)));
 }
@@ -107,7 +108,7 @@ export function heroProgress(entry: SkillQueueEntry, nowMs: number): number | nu
  * span, so it already reflects attributes, implants and clone state.
  */
 export function heroSpPerHour(entry: SkillQueueEntry): number | null {
-  const w = window(entry);
+  const w = trainingWindow(entry);
   if (!w || entry.training_start_sp === undefined || entry.level_end_sp === undefined) return null;
   const hours = (w.end - w.start) / 3_600_000;
   return (entry.level_end_sp - entry.training_start_sp) / hours;

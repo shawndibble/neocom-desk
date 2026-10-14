@@ -286,6 +286,22 @@ describe('SkillPlans CRUD', () => {
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 
+  it('offers the plan edited last, and All plans… even before any plan exists', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Plan options' }));
+    expect(await screen.findByRole('menuitem', { name: 'All plans…' })).toBeInTheDocument();
+  });
+
+  it('shows the plan edited last on the page, not the oldest', async () => {
+    await db.skillPlans.add(seedPlan({ id: 'old', name: 'Old plan', updatedAt: 1 }));
+    await db.skillPlans.add(seedPlan({ id: 'new', name: 'Newest plan', updatedAt: 2 }));
+    render(<App />);
+    const link = await screen.findByRole('link', { name: /Newest plan/ });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/skills/plans/new'));
+    expect(screen.queryByRole('link', { name: /Old plan/ })).not.toBeInTheDocument();
+  });
+
   it('makes a plan for a pasted skill plan and opens its Import dialog already parsed', async () => {
     // What GlobalPasteRouter navigates with: react-router keeps location state under `usr`.
     window.history.replaceState(

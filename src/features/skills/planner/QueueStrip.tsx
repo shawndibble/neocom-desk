@@ -19,19 +19,24 @@ export function QueueStrip({
   fetchedAt?: Date;
 }) {
   const { t } = useTranslation();
-  if (view.totalSeconds <= 0) return null;
+  if (view.skillCount === 0) return null;
+  const dated = view.totalSeconds > 0;
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
       <StatChips>
-        <StatChip
-          label={t('plans.queueStripLength')}
-          value={formatCountdown(view.totalSeconds)}
-          emphasis
-        />
-        <StatChip
-          label={t('plans.queueStripEnds')}
-          value={formatLocalDate(new Date(nowMs + view.totalSeconds * 1000))}
-        />
+        {dated && (
+          <>
+            <StatChip
+              label={t('plans.queueStripLength')}
+              value={formatCountdown(view.totalSeconds)}
+              emphasis
+            />
+            <StatChip
+              label={t('plans.queueStripEnds')}
+              value={formatLocalDate(new Date(nowMs + view.totalSeconds * 1000))}
+            />
+          </>
+        )}
         <StatChip label={t('plans.queueStripSkills')} value={view.skillCount} />
       </StatChips>
       {fetchedAt && <DataAgeBadge date={fetchedAt} />}

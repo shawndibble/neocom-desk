@@ -1,11 +1,10 @@
 import { useTranslation } from 'react-i18next';
+import { romanLevel } from '@/engine/projection';
 import { SkillLink } from '@/features/entities';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import type { SkillCatalog } from '../skillMap';
 import { heroProgress, heroSpPerHour, type QueueRowView } from './queueView';
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 interface NowTrainingCardProps {
   row: QueueRowView;
@@ -24,7 +23,7 @@ export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardPr
   const { entry, secondsRemaining } = row;
   const skill = catalog.bySkillTypeID.get(entry.skill_id);
   const name = skill?.name ?? `#${entry.skill_id}`;
-  const level = ROMAN[entry.finished_level - 1] ?? String(entry.finished_level);
+  const level = romanLevel(entry.finished_level);
   const progress = heroProgress(entry, nowMs);
   const percent = progress === null ? null : Math.floor(progress * 100);
   const spPerHour = heroSpPerHour(entry);
@@ -49,7 +48,7 @@ export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardPr
           {spPerHour !== null && (
             <div className="mt-1 text-sm text-text-dim">
               {skill &&
-                `${t(`skills.attr.${skill.primaryAttr}`)} + ${t(`skills.attr.${skill.secondaryAttr}`)} · `}
+                `${t('plans.heroAttributes', { primary: t(`skills.attr.${skill.primaryAttr}`), secondary: t(`skills.attr.${skill.secondaryAttr}`) })} · `}
               {t('plans.heroSpPerHour', { sp: Math.round(spPerHour).toLocaleString('en-US') })}
             </div>
           )}
@@ -64,30 +63,28 @@ export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardPr
         )}
       </div>
       {percent !== null && (
-        <>
-          <div
-            role="progressbar"
-            aria-label={t('plans.heroProgress', { percent, level })}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-            className="mt-4 h-2 overflow-hidden rounded-full bg-panel-2"
-          >
-            <div className="h-full bg-accent" style={{ width: `${percent}%` }} />
-          </div>
-          <div className="mt-1 flex justify-between gap-3 text-xs text-text-dim">
-            <span>{t('plans.heroProgress', { percent, level })}</span>
-            {next && (
-              <span className="truncate">
-                {t('plans.heroNext', {
-                  name: nextSkill?.name ?? `#${next.entry.skill_id}`,
-                  level: ROMAN[next.entry.finished_level - 1] ?? next.entry.finished_level,
-                })}
-              </span>
-            )}
-          </div>
-        </>
+        <div
+          role="progressbar"
+          aria-label={t('plans.heroProgress', { percent, level })}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          className="mt-4 h-2 overflow-hidden rounded-full bg-panel-2"
+        >
+          <div className="h-full bg-accent" style={{ width: `${percent}%` }} />
+        </div>
       )}
+      <div className="mt-1 flex justify-between gap-3 text-xs text-text-dim">
+        <span>{percent !== null && t('plans.heroProgress', { percent, level })}</span>
+        {next && (
+          <span className="truncate">
+            {t('plans.heroNext', {
+              name: nextSkill?.name ?? `#${next.entry.skill_id}`,
+              level: romanLevel(next.entry.finished_level),
+            })}
+          </span>
+        )}
+      </div>
     </section>
   );
 }

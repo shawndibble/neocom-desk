@@ -47,6 +47,18 @@ describe('buildQueueView', () => {
     expect(v.groups.map((g) => g.rows.length)).toEqual([1, 1, 1, 1, 1, 1]);
   });
 
+  it('puts a level finishing exactly on a boundary in the earlier bucket', () => {
+    const v = view([entry(0, 1), entry(1, 7), entry(2, 28), entry(3, 60), entry(4, 120)]);
+    expect(v.groups.map((g) => g.id)).toEqual(['week', 'weeks', 'month2', 'months-3']);
+    expect(v.groups.map((g) => g.rows.length)).toEqual([1, 1, 1, 1]);
+  });
+
+  it('is not inflated by finished rows listed ahead of the active ones', () => {
+    const v = view([entry(0, -3), entry(1, 2), entry(2, 5)]);
+    expect(v.hero?.entry.queue_position).toBe(1);
+    expect(v.totalSeconds).toBeCloseTo(5 * 86_400, 0);
+  });
+
   it('skips empty buckets', () => {
     const v = view([entry(0, 1), entry(1, 100)]);
     expect(v.groups.map((g) => g.id)).toEqual(['months-3']);
