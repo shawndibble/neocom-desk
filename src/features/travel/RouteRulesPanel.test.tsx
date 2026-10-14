@@ -37,7 +37,11 @@ beforeEach(async () => {
   }
 });
 
-function renderPanel({ holes = false, bridges = false } = {}) {
+function renderPanel({
+  holes = false,
+  bridges = false,
+  onBrowseWormholes = () => undefined,
+}: { holes?: boolean; bridges?: boolean; onBrowseWormholes?: () => void } = {}) {
   const holeQuery: RouteHoleQuery = {
     enabled: holes,
     settings: { shipSize: 'medium', minLifeHours: 1, hubs: 'all' },
@@ -61,6 +65,7 @@ function renderPanel({ holes = false, bridges = false } = {}) {
         range: 'max',
         onRangeChange: () => undefined,
       }}
+      onBrowseWormholes={onBrowseWormholes}
     />
   );
 }
@@ -139,5 +144,20 @@ describe('RouteHoleFields › My ship', () => {
 
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.queryByText(/Set from/)).toBeNull();
+  });
+});
+
+describe('RouteRulesPanel › Thera / Turnur modal openers', () => {
+  it('opens the modal from the switch label and from Browse open wormholes, the switch still toggling', async () => {
+    const user = userEvent.setup();
+    const onBrowseWormholes = vi.fn();
+    renderPanel({ onBrowseWormholes });
+    await user.click(await screen.findByRole('button', { name: /More route options/ }));
+
+    await user.click(screen.getByRole('button', { name: 'Route through Thera / Turnur' }));
+    expect(onBrowseWormholes).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Browse open wormholes' }));
+    expect(onBrowseWormholes).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('checkbox', { name: /Route through Thera/ })).toBeInTheDocument();
   });
 });

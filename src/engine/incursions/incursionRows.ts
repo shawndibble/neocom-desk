@@ -65,3 +65,12 @@ export function buildIncursionRows(
       return b.influence - a.influence || a.constellationId - b.constellationId;
     });
 }
+
+/**
+ * The closest incursion, but only when its distance is actually known: rows
+ * sort unknown distances last, and "nearest" must never be one of those.
+ */
+export function nearestIncursion(rows: readonly IncursionRow[]): IncursionRow | null {
+  const first = rows[0];
+  return first !== undefined && first.jumps !== null ? first : null;
+}

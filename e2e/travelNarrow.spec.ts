@@ -5,9 +5,10 @@
  *   state with nothing to press: the panel now stays open on a phone until
  *   there is a stop worth folding.
  * - A long Current System name ("TASH-MURKON PRIME (CURRENT SYSTEM)") pushed
- *   the shared solar-system picker past the screen on both tabs: its trigger
+ *   the shared solar-system picker past the screen: its trigger
  *   now shrinks and ends in an ellipsis instead, at the same height.
- * - Thera / Turnur's filtered-to-zero state gained Reset filters.
+ * - Thera / Turnur's filtered-to-zero state gained Reset filters (now in its
+ *   modal on Route Safety, where it keeps the page's From).
  *
  * The shared ESI mock answers the Current System with Jita; tests that need
  * a long name override `/location` (a later `page.route` wins). It doesn't
@@ -23,6 +24,7 @@ import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
+import { openTheraModal } from './support/theraModal';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -102,9 +104,10 @@ test.describe('Travel at 390px', () => {
     await page.setViewportSize(PHONE);
   });
 
-  test('Route Safety with no stops shows Add a stop without a tap', async ({ page }) => {
+  test('Route Safety with no stops shows the destination field without a tap', async ({ page }) => {
     await signInAndGoto(page, './travel/route');
-    await expect(page.getByRole('button', { name: /^add stop/i })).toBeVisible(COLD_LOAD);
+    await expect(page.getByRole('combobox', { name: /^destination/i })).toBeVisible(COLD_LOAD);
+    await expect(page.getByRole('button', { name: /^add stop/i })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Edit stops' })).toHaveCount(0);
   });
 
@@ -118,34 +121,29 @@ test.describe('Travel at 390px', () => {
     ['Tash-Murkon Prime', TASH_MURKON_PRIME],
     ['Kor-Azor Prime', KOR_AZOR_PRIME],
   ] as const) {
-    test(`a ${name} Current System doesn't widen either tab`, async ({ page }) => {
+    test(`a ${name} Current System doesn't widen the picker`, async ({ page }) => {
       await mockCurrentSystem(page, systemId);
       await signInAndGoto(page, './travel/route');
       await expectPickerFits(page, new RegExp(`^Change starting system — ${name}`));
-
-      await page.goto('./travel/thera');
-      await expectPickerFits(
-        page,
-        new RegExp(`^Change the system jumps are counted from — ${name}`)
-      );
     });
   }
 
-  test('Thera filtered to zero offers Reset filters, which keeps the origin', async ({ page }) => {
+  test('Thera filtered to zero offers Reset filters, which keeps the From', async ({ page }) => {
     await mockOneTheraHole(page);
-    await signInAndGoto(page, `./travel/thera?origin=${AMARR}&size=capital`);
-    await expect(page.getByText('No connections match these filters')).toBeVisible(COLD_LOAD);
+    await signInAndGoto(page, `./travel/route?from=${AMARR}`);
+    const dialog = await openTheraModal(page, { phone: true });
+    await dialog.getByRole('combobox', { name: 'Fits' }).click();
+    await page.getByRole('option', { name: 'Cap' }).click();
+    await expect(dialog.getByText('No connections match these filters')).toBeVisible(COLD_LOAD);
 
-    await page.getByRole('button', { name: 'Reset filters' }).click();
+    await dialog.getByRole('button', { name: 'Reset filters' }).click();
 
     await expect(
-      page.getByRole('table', { name: 'Open holes out of Thera and Turnur' })
+      dialog.getByRole('table', { name: 'Open holes out of Thera and Turnur' })
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reset filters' })).toHaveCount(0);
-    await expect(
-      page.getByRole('button', { name: /^Change the system jumps are counted from — Amarr$/ })
-    ).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`origin=${AMARR}`));
+    await expect(dialog.getByRole('button', { name: 'Reset filters' })).toHaveCount(0);
+    await expect(dialog.getByText('Open holes from EVE-Scout, counted from Amarr')).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`from=${AMARR}`));
   });
 
   test('the hub badge stays one line beside a long exit name (#2609)', async ({ page }) => {
@@ -176,16 +174,17 @@ test.describe('Travel at 390px', () => {
         ]),
       })
     );
-    await signInAndGoto(page, './travel/thera');
+    await signInAndGoto(page, './travel/route');
+    const dialog = await openTheraModal(page, { phone: true });
 
-    const badges = page.getByRole('main').getByText(/^(thera|turnur)$/i);
+    const badges = dialog.getByText(/^(thera|turnur)$/i);
     await expect(badges).toHaveCount(3, COLD_LOAD);
     const heights = await badges.evaluateAll((els) =>
       els.map((el) => Math.round(el.getBoundingClientRect().height))
     );
     expect(new Set(heights).size).toBe(1);
 
-    const name = page.getByRole('main').locator('span.truncate', { hasText: longName }).first();
+    const name = dialog.locator('span.truncate', { hasText: longName }).first();
     expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
     await expectNoPageOverflow(page);
   });
@@ -209,13 +208,14 @@ test.describe('Travel at 390px', () => {
     await expectFontSize(note, 14);
   });
 
-  test('Thera with no origin sets its distance note at 14px', async ({ page }) => {
+  test('the Thera modal with no From sets its note at 14px', async ({ page }) => {
     // No Current System to fall back on: ESI has no location for the character.
     await page.route(`https://esi.evetech.net/**/characters/${CHARACTER_ID}/location*`, (route) =>
       route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"none"}' })
     );
-    await signInAndGoto(page, './travel/thera');
-    const note = page.getByRole('status').filter({ hasText: 'Pick a system to count jumps from' });
+    await signInAndGoto(page, './travel/route');
+    const dialog = await openTheraModal(page, { phone: true });
+    const note = dialog.getByText('Pick a From system on Route Safety to count jumps');
     await expect(note).toBeVisible(COLD_LOAD);
     await expectFontSize(note, 14);
   });

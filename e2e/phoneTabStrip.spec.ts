@@ -13,7 +13,7 @@ const PAGES = [
   { name: 'Skills', path: './skills/plans', view: 'Trained', url: /\/skills\/trained/ },
   { name: 'Industry', path: './industry', view: 'BPC Sourcing', url: /\/industry\/sourcing/ },
   { name: 'Market', path: './market', view: 'Appraisal', url: /\/market\/appraisal/ },
-  { name: 'Travel', path: './travel', view: 'Thera / Turnur', url: /\/travel\/thera/ },
+  { name: 'Travel', path: './travel', view: 'Pilot Lookup', url: /\/travel\/pilot/ },
 ];
 
 for (const { name, path, view, url } of PAGES) {

@@ -45,11 +45,17 @@
  *
  * Ways to fly each leg (issue #2477): beside each leg's rows, gates only and
  * the way through each hub with a qualifying hole, with facts side by side
- * (`LegWays`). Clicking a way pins it in the link (`pin`), and a Thera /
- * Turnur row's Route via opens this page with its hole pinned for the first
- * leg (`routeSafetyLink.ts`). Editing the stops or their order drops the
- * pins, which belong to legs by position — except the first stop added to a
- * Route via link, which is the leg its pin was made for.
+ * (`LegWays`). Clicking a way pins it in the link (`pin`), and Use in route on
+ * a hole in the Thera / Turnur modal pins that hole for the first leg
+ * (`pinFirstLeg`). Editing the stops or their order drops the pins, which
+ * belong to legs by position — except the first stop added while a pin
+ * waits, which is the leg its pin was made for.
+ *
+ * Layout (the Briefing redesign): the Stops panel and the three preference
+ * cards (`PreferenceCards`, the trip planned under each Route Preference) run
+ * full width; the route sits beside a right column of Route rules and
+ * Incursions near you from `xl`. With no stops the destination is a search
+ * field on the page, with quick picks, and the route area is `RouteSkeleton`.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -93,10 +99,14 @@ import { useAnsiblexGates } from '@/features/route/ansiblexGates';
 import { AvoidSystemDialog, type AvoidTarget } from './AvoidSystemDialog';
 import { LegBody, type LegWaysProps } from './LegWays';
 import { IncursionsPanel, type RouteAction } from './IncursionsPanel';
+import { PreferenceCards } from './PreferenceCards';
+import { QuickPicks } from './QuickPicks';
 import { RouteRulesPanel } from './RouteRulesPanel';
+import { RouteSkeleton } from './RouteSkeleton';
+import { TheraModal } from './TheraModal';
 import { RouteStrip } from './RouteStrip';
 import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
-import { ROUTE_PARAMS } from '@/features/route/routeSafetyLink';
+import { pinFirstLeg, ROUTE_PARAMS } from '@/features/route/routeSafetyLink';
 import { routeSystemName } from './routeSystemName';
 import { SetWaypoints } from './SetWaypoints';
 import { StopsPanel, type StopOrderSettings } from './StopsPanel';
@@ -104,6 +114,7 @@ import { TripLegs } from './TripLegs';
 import { useRouteHoles, type RouteHolesState } from '@/features/route/useRouteHoles';
 import { sameSavedRoute, useSavedRoute } from './savedRoute';
 import { useRouteKills, type RouteKillsCell } from './useRouteKills';
+import { usePreferenceRoutes } from './usePreferenceRoutes';
 import { useRouteSafety, type RouteSafetyLeg } from './useRouteSafety';
 import type { TravelTabProps } from './travelTab';
 
@@ -258,6 +269,7 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
   const bridges =
     bridgeQuery.enabled && bridgeQuery.hydrated && gateRecords !== undefined ? gateRecords : null;
   const [bridgeDialog, setBridgeDialog] = useState<AnsiblexDialogMode | null>(null);
+  const [theraOpen, setTheraOpen] = useState(false);
   const jumpDrive = useRouteJump();
   const jumpEnabled = useRouteJumpsEnabled((s) => s.value);
   const jumpRange = useRouteJumpRange((s) => s.value);
@@ -281,6 +293,11 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
     bridges,
     jump: jumpDrive.setup,
   });
+  const preferenceCardList = usePreferenceRoutes(state, routeQuery.rules.preference);
+  const takenSystems = useMemo(
+    () => new Set(fromId === null ? stops : [fromId, ...stops]),
+    [fromId, stops]
+  );
   const pinLeg = (index: number, pin: string | null) => {
     const next = [...params.pin];
     while (next.length <= index) next.push('');
@@ -378,82 +395,59 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
       />
       {tabBar}
       <TabPanel tabsId={tabsId} tabId="route" className="space-y-4">
-        {/* The route table needs ~612px but only gets ~427px beside the rail at 1024, so the
-          rail and route sit side by side only from `xl` (#2591). Below it the rail
-          dissolves (`contents`) so Stops, the route, then Route rules stack in order. */}
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <div className="contents xl:block xl:space-y-4">
-            <div className="order-1 focus:outline-none xl:order-none" data-stops-panel>
-              <StopsPanel
-                fromId={fromId}
-                fromName={fromId === null ? fromTrigger : nameOf(fromId)}
-                fromTrigger={fromTrigger}
-                // A new start is a new first leg: its pin no longer applies.
-                onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
-                stops={stops}
-                onStopsChange={(next) =>
-                  setParams(
-                    // Pins belong to legs by position: a new stop list drops them,
-                    // but the first stop keeps the pin a Route via link made for it.
-                    { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
-                    { push: true }
-                  )
-                }
-                settings={settings}
-                onSettingsChange={(patch) =>
-                  setParams({
-                    pin: [],
-                    ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
-                    ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
-                    ...(patch.keepLastStopLast === undefined
-                      ? {}
-                      : { keep: patch.keepLastStopLast }),
-                  })
-                }
-                optimizeBlocked={state.kind === 'route' && state.unreachable}
-                orderNote={orderNote}
-                nameOf={nameOf}
-              />
-            </div>
-            <div className="order-3 xl:order-none">
-              <RouteRulesPanel
-                preference={routeQuery.rules.preference}
-                onPreferenceChange={(pref) => {
-                  void useDefaultRoutePreference.getState().setValue(pref);
-                  setParams({ pref: null });
-                }}
-                holeQuery={holeQuery}
-                onHoleChange={(change) => {
-                  saveRouteHoleDefault(change);
-                  setParams({ [HOLE_PARAM[change.field]]: null });
-                }}
-                bridges={{
-                  bridgeQuery,
-                  onBridgesChange: (enabled) => {
-                    void useRouteBridgesEnabled.getState().setValue(enabled);
-                    setParams({ jb: null });
-                  },
-                  bridgeCount: gateRecords?.length ?? 0,
-                  onManageBridges: () => setBridgeDialog('search'),
-                }}
-                jump={{
-                  enabled: jumpEnabled,
-                  onEnabledChange: (enabled) =>
-                    void useRouteJumpsEnabled.getState().setValue(enabled),
-                  range: jumpRange,
-                  onRangeChange: (range) => void useRouteJumpRange.getState().setValue(range),
-                }}
-              />
-            </div>
-            <div className="order-4 xl:order-none">
-              <IncursionsPanel
+        <div className="focus:outline-none" data-stops-panel>
+          <StopsPanel
+            fromId={fromId}
+            fromName={fromId === null ? fromTrigger : nameOf(fromId)}
+            fromTrigger={fromTrigger}
+            // A new start is a new first leg: its pin no longer applies.
+            onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
+            stops={stops}
+            onStopsChange={(next) => {
+              setParams(
+                // Pins belong to legs by position: a new stop list drops them,
+                // but the first stop keeps the pin a hole's Use in route made for it.
+                { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
+                { push: true }
+              );
+              // The destination field this stop came from unmounts with it: focus follows to the list (§7).
+              if (stops.length === 0 && next.length > 0) focusStopsOnChange.current = true;
+            }}
+            settings={settings}
+            onSettingsChange={(patch) =>
+              setParams({
+                pin: [],
+                ...(patch.optimize === undefined ? {} : { opt: patch.optimize }),
+                ...(patch.returnToStart === undefined ? {} : { ret: patch.returnToStart }),
+                ...(patch.keepLastStopLast === undefined ? {} : { keep: patch.keepLastStopLast }),
+              })
+            }
+            optimizeBlocked={state.kind === 'route' && state.unreachable}
+            orderNote={orderNote}
+            nameOf={nameOf}
+            quickPicks={
+              <QuickPicks
                 current={current}
-                routeAction={incursionRouteAction}
-                onRoute={routeToIncursion}
+                taken={takenSystems}
+                onPick={(systemId) => {
+                  setParams({ stops: [systemId], to: null }, { push: true });
+                  focusStopsOnChange.current = true;
+                }}
               />
-            </div>
-          </div>
-          <div className="order-2 min-w-0 space-y-4 xl:order-none">
+            }
+          />
+        </div>
+        <PreferenceCards
+          cards={preferenceCardList}
+          onSelect={(pref) => {
+            void useDefaultRoutePreference.getState().setValue(pref);
+            setParams({ pref: null });
+          }}
+        />
+        {/* The route needs ~612px, so the rules rail sits beside it only from `xl` (#2591);
+          below it the rail stacks under the route. */}
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0 space-y-4">
             <RouteBody
               state={state}
               multiStop={stops.length > 1}
@@ -467,11 +461,58 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
               onSetUpBridges={setBridgeDialog}
             />
           </div>
+          <div className="min-w-0 space-y-4">
+            <RouteRulesPanel
+              preference={routeQuery.rules.preference}
+              onPreferenceChange={(pref) => {
+                void useDefaultRoutePreference.getState().setValue(pref);
+                setParams({ pref: null });
+              }}
+              holeQuery={holeQuery}
+              onBrowseWormholes={() => setTheraOpen(true)}
+              onHoleChange={(change) => {
+                saveRouteHoleDefault(change);
+                setParams({ [HOLE_PARAM[change.field]]: null });
+              }}
+              bridges={{
+                bridgeQuery,
+                onBridgesChange: (enabled) => {
+                  void useRouteBridgesEnabled.getState().setValue(enabled);
+                  setParams({ jb: null });
+                },
+                bridgeCount: gateRecords?.length ?? 0,
+                onManageBridges: () => setBridgeDialog('search'),
+              }}
+              jump={{
+                enabled: jumpEnabled,
+                onEnabledChange: (enabled) =>
+                  void useRouteJumpsEnabled.getState().setValue(enabled),
+                range: jumpRange,
+                onRangeChange: (range) => void useRouteJumpRange.getState().setValue(range),
+              }}
+            />
+            <IncursionsPanel
+              current={current}
+              routeAction={incursionRouteAction}
+              onRoute={routeToIncursion}
+            />
+          </div>
         </div>
         <AvoidSystemDialog
           target={avoidTarget}
           route={state.kind === 'route' ? state : null}
           onClose={() => setAvoidTarget(null)}
+        />
+        <TheraModal
+          open={theraOpen}
+          onClose={() => setTheraOpen(false)}
+          originId={fromId}
+          routeQuery={routeQuery}
+          onUse={(holeId) => {
+            // Hole jumps are switched on in the link alone (never saved): a hole is only known while they are on.
+            setParams({ wh: true, pin: pinFirstLeg(params.pin, holeId) }, { push: true });
+            setTheraOpen(false);
+          }}
         />
         {bridgeDialog !== null && (
           <AnsiblexGatesDialog
@@ -503,7 +544,7 @@ function RouteBody({
   killsOf: (systemId: number) => RouteKillsCell;
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
   holesState: RouteHolesState;
-  /** A leg is pinned: an incomplete route asks for the stop a Route via link left open. */
+  /** A leg is pinned: an incomplete route asks for the stop a Use in route pin left open. */
   pinned: boolean;
   onUse: (index: number, pin: string | null) => void;
 } & Pick<LegWaysProps, 'bridges' | 'onSetUpBridges'>) {
@@ -512,10 +553,7 @@ function RouteBody({
   switch (state.kind) {
     case 'incomplete':
       return (
-        <EmptyState
-          title={t('travel.pickTitle')}
-          hint={pinned ? t('travel.ways.pickDestination') : t('travel.pickHint')}
-        />
+        <RouteSkeleton hint={pinned ? t('travel.ways.pickDestination') : t('travel.pickHint')} />
       );
     case 'same-system':
       return <EmptyState title={t('travel.sameSystemTitle')} hint={t('travel.sameSystemHint')} />;

@@ -275,6 +275,102 @@ function visit(search: string) {
 }
 
 describe('Travel › Route Safety', () => {
+  describe('before a route exists', () => {
+    it('asks for the destination in a field already on the page, not behind Add stop', async () => {
+      visit(`?from=${JITA}`);
+
+      expect(await screen.findByRole('combobox', { name: /^destination/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^add stop/i })).toBeNull();
+      expect(
+        screen.getByRole('heading', { name: 'Pick where the route starts and ends' })
+      ).toBeInTheDocument();
+    });
+
+    it('shows the three preference cards with dashes, the saved one selected', async () => {
+      visit(`?from=${JITA}`);
+
+      const group = await screen.findByRole('radiogroup', { name: 'Route preference' });
+      const cards = within(group).getAllByRole('radio');
+      expect(cards).toHaveLength(3);
+      for (const name of [/^Safer/, /^Shorter/, /^Less secure/]) {
+        expect(within(group).getByRole('radio', { name })).toBeInTheDocument();
+      }
+      expect(within(group).getByRole('radio', { name: /^Safer/ })).toHaveAttribute(
+        'aria-checked',
+        'true'
+      );
+      expect(within(cards[0]).getAllByText('—')).toHaveLength(4);
+    });
+
+    it('offers the trade hubs as quick picks and starts a route from one', async () => {
+      const user = userEvent.setup();
+      visit(`?from=${PERIMETER}`);
+
+      const picks = await screen.findByRole('group', { name: 'Go to' });
+      expect(within(picks).getByRole('button', { name: 'Jita' })).toBeInTheDocument();
+      await user.click(within(picks).getByRole('button', { name: 'Jita' }));
+
+      expect(
+        await screen.findByRole('table', { name: 'Systems on the route' })
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Go to' })).toBeNull();
+    });
+  });
+
+  describe('preference cards', () => {
+    it("plans the same trip once per preference and states each one's facts", async () => {
+      visit(`?from=${JITA}&to=${UEDAMA}`);
+
+      const group = await screen.findByRole('radiogroup', { name: 'Route preference' });
+      await waitFor(() => {
+        for (const card of within(group).getAllByRole('radio')) {
+          expect(within(card).queryByText('—')).toBeNull();
+        }
+      });
+      // One gate chain: all three preferences fly the same route, and say so.
+      expect(within(group).getAllByText(/^Same route as/)).toHaveLength(2);
+      expect(
+        within(group)
+          .getAllByRole('radio')
+          .every((card) => /2/.test(card.textContent ?? ''))
+      ).toBe(true);
+    });
+
+    it('is one tab stop, and the arrow keys move the choice between the cards', async () => {
+      const user = userEvent.setup();
+      visit(`?from=${JITA}&to=${UEDAMA}`);
+
+      const group = await screen.findByRole('radiogroup', { name: 'Route preference' });
+      const safer = within(group).getByRole('radio', { name: /^Safer/ });
+      const shorter = within(group).getByRole('radio', { name: /^Shorter/ });
+      expect(safer).toHaveAttribute('tabindex', '0');
+      expect(shorter).toHaveAttribute('tabindex', '-1');
+
+      safer.focus();
+      await user.keyboard('{ArrowRight}');
+      await waitFor(() => expect(shorter).toHaveAttribute('aria-checked', 'true'));
+      expect(shorter).toHaveFocus();
+      expect(shorter).toHaveAttribute('tabindex', '0');
+      expect(safer).toHaveAttribute('tabindex', '-1');
+    });
+
+    it("saves the chosen card as the pilot's Route Preference, as the rules control does", async () => {
+      const user = userEvent.setup();
+      visit(`?from=${JITA}&to=${UEDAMA}`);
+
+      const group = await screen.findByRole('radiogroup', { name: 'Route preference' });
+      await user.click(within(group).getByRole('radio', { name: /^Shorter/ }));
+
+      await waitFor(() =>
+        expect(within(group).getByRole('radio', { name: /^Shorter/ })).toHaveAttribute(
+          'aria-checked',
+          'true'
+        )
+      );
+      expect(useDefaultRoutePreference.getState().value).toBe('shortest');
+    });
+  });
+
   it('lists every system on the route in order with its last hour of activity', async () => {
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
@@ -1107,7 +1203,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       expect(
         await screen.findByText('Add a stop to fly there through the pinned wormhole.')
       ).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: /^add stop/i }));
+      // With no stops the destination is a field already on the page, not an Add stop button.
       await user.type(await systemPickerInput(), 'Ueda');
       await user.click(await screen.findByRole('option', { name: /Uedama/ }));
 
@@ -1145,15 +1241,10 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
   });
 });
 
-describe('Travel › Thera / Turnur', () => {
+describe('Travel › Route Safety › Thera / Turnur modal', () => {
   const MAIN_TABLE = 'Open holes out of Thera and Turnur';
   const JSPACE_TABLE = 'Open holes into J-space';
   const JSPACE_GROUP = /exits? into J-space · no gate route from you/;
-
-  function visitThera(search: string) {
-    window.history.pushState({}, '', '/travel/thera' + search);
-    render(<App />);
-  }
 
   /** The connection ids a table lists, top to bottom. */
   function holesIn(table: HTMLElement) {
@@ -1167,17 +1258,16 @@ describe('Travel › Thera / Turnur', () => {
     return document.querySelector<HTMLElement>(`tr[data-row-key="${id}"]`)!;
   }
 
-  it('links each K-space row a gate route reaches to Route Safety through its hole', async () => {
-    visitThera('');
-
-    const links = await screen.findAllByRole('link', {
-      name: 'Plan a route through the Thera hole at Uedama',
-    });
-    expect(links[0]).toHaveAttribute('href', `/travel/route?from=${JITA}&wh=1&pin=uedama`);
-    expect(
-      screen.queryByRole('link', { name: /Plan a route through the Thera hole at J120704/ })
-    ).not.toBeInTheDocument();
-  });
+  /** Opens More route options, then the modal from the Browse open wormholes button. */
+  async function openFromBrowse(search = `?from=${JITA}`, { phone = false } = {}) {
+    visit(search);
+    // A phone folds the rules panel until asked.
+    if (phone)
+      await userEvent.click(await screen.findByRole('button', { name: 'Show route rules' }));
+    await userEvent.click(await screen.findByRole('button', { name: /More route options/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Browse open wormholes' }));
+    return screen.findByRole('dialog', { name: 'Thera / Turnur' });
+  }
 
   function stubPhone() {
     return vi.spyOn(window, 'matchMedia').mockImplementation(
@@ -1191,46 +1281,66 @@ describe('Travel › Thera / Turnur', () => {
     );
   }
 
-  it('lists live K-space holes nearest first, folding J-space exits into a group under them', async () => {
-    visitThera('');
+  it('has no Thera / Turnur tab, and an old /travel/thera link lands on Route Safety', async () => {
+    window.history.pushState({}, '', `/travel/thera?origin=${JITA}`);
+    render(<App />);
+    expect(await screen.findByRole('tab', { name: 'Route Safety' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.queryByRole('tab', { name: 'Thera / Turnur' })).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe('/travel/route');
+    expect(window.location.search).toContain(`from=${JITA}`);
+  });
 
-    expect(await screen.findByText('Jita (current system)')).toBeInTheDocument();
-    const table = await screen.findByRole('table', { name: MAIN_TABLE });
+  it('opens from Browse open wormholes, naming where jumps are counted from', async () => {
+    const dialog = await openFromBrowse();
+    expect(
+      within(dialog).getByText('Open holes from EVE-Scout, counted from Jita')
+    ).toBeInTheDocument();
+    expect(await within(dialog).findByRole('table', { name: MAIN_TABLE })).toBeInTheDocument();
+  });
+
+  it('opens from the Route through Thera / Turnur label, which is a button beside the switch', async () => {
+    visit(`?from=${JITA}`);
+    await userEvent.click(await screen.findByRole('button', { name: /More route options/ }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Route through Thera / Turnur' })
+    );
+    expect(await screen.findByRole('dialog', { name: 'Thera / Turnur' })).toBeInTheDocument();
+    // The switch itself still only toggles.
+    expect(
+      screen.getByRole('checkbox', { name: 'Route through Thera / Turnur' })
+    ).not.toBeChecked();
+  });
+
+  it('lists live K-space holes nearest first, folding J-space exits into a group under them', async () => {
+    const dialog = await openFromBrowse();
+
+    const table = await within(dialog).findByRole('table', { name: MAIN_TABLE });
     // Perimeter is one jump from Jita, Uedama two; the expired Jita hole is gone.
     await waitFor(() => expect(holesIn(table)).toEqual(['perimeter', 'uedama']));
     const perimeter = within(holeRow('perimeter'));
     expect(perimeter.getByText('Perimeter')).toHaveClass('font-semibold');
-    expect(perimeter.getByText('Turnur')).toBeInTheDocument();
     expect(perimeter.getByText('Capital')).toBeInTheDocument();
     expect(perimeter.getByText('AAA-111')).toBeInTheDocument();
-    // The type code waits for the expanded row.
     expect(perimeter.queryByText(/Q063/)).not.toBeInTheDocument();
 
-    const group = screen.getByRole('button', {
+    const group = within(dialog).getByRole('button', {
       name: '1 exit into J-space · no gate route from you',
     });
     expect(group).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('table', { name: JSPACE_TABLE })).not.toBeInTheDocument();
     fireEvent.click(group);
-    const jspace = await screen.findByRole('table', { name: JSPACE_TABLE });
+    const jspace = await within(dialog).findByRole('table', { name: JSPACE_TABLE });
     expect(holesIn(jspace)).toEqual(['jspace']);
     expect(within(holeRow('jspace')).getByText('No gate route')).toBeInTheDocument();
-    expect(within(holeRow('jspace')).getByText('C2')).toBeInTheDocument();
-  });
-
-  it('shows a connection with two hours or less left in the warning color', async () => {
-    visitThera('');
-
-    await screen.findByRole('table', { name: MAIN_TABLE });
-    const life = (id: string) => within(holeRow(id)).getAllByRole('cell')[4]!.firstElementChild;
-    expect(life('perimeter')).toHaveClass('text-warning');
-    expect(life('uedama')).not.toHaveClass('text-warning');
+    // J-space exits are not offered Use in route.
+    expect(within(holeRow('jspace')).queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('opens a row onto its type, both signatures and the exit on zKillboard', async () => {
-    visitThera('');
-
-    await screen.findByRole('table', { name: MAIN_TABLE });
+    const dialog = await openFromBrowse();
+    await within(dialog).findByRole('table', { name: MAIN_TABLE });
     fireEvent.click(holeRow('uedama'));
     expect(await screen.findByText('Type Q063')).toBeInTheDocument();
     expect(screen.getByText('enter at AAA-111 in Thera, leave at UED-001')).toBeInTheDocument();
@@ -1239,30 +1349,46 @@ describe('Travel › Thera / Turnur', () => {
     ).toHaveAttribute('href', `https://zkillboard.com/system/${UEDAMA}/`);
   });
 
-  it('filters by hub from the URL, counting each hub under the other filters', async () => {
-    visitThera('?hub=thera');
+  it('Use in route pins the hole on the first leg, switches hole jumps on in the link and closes', async () => {
+    const dialog = await openFromBrowse(`?from=${JITA}&pin=,gates`);
+    await within(dialog).findByRole('table', { name: MAIN_TABLE });
+    await userEvent.click(
+      within(holeRow('uedama')).getByRole('button', {
+        name: 'Use the Thera hole at Uedama in the route',
+      })
+    );
 
-    const table = await screen.findByRole('table', { name: MAIN_TABLE });
-    expect(holesIn(table)).toEqual(['uedama']);
-    const user = userEvent.setup();
-    const hub = screen.getByRole('combobox', { name: 'Hub' });
-    expect(hub).toHaveTextContent('Thera 1');
-    await user.click(hub);
-    expect(await screen.findByRole('option', { name: 'Both 2' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Turnur 1' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Thera / Turnur' })).toBeNull()
+    );
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get('wh')).toBe('1');
+    // The first leg is the hole; the second leg keeps its pin.
+    expect(params.get('pin')).toBe('uedama,gates');
+    expect(params.get('from')).toBe(String(JITA));
   });
 
-  it.each(['all', 'bogus'])('reads an unknown exit param (space=%s) as K-space', async (space) => {
-    visitThera(`?space=${space}`);
-
-    const table = await screen.findByRole('table', { name: MAIN_TABLE });
+  it('filters by hub, counting each hub under the other filters', async () => {
+    const dialog = await openFromBrowse();
+    const table = await within(dialog).findByRole('table', { name: MAIN_TABLE });
     await waitFor(() => expect(holesIn(table)).toEqual(['perimeter', 'uedama']));
-    expect(screen.getByRole('combobox', { name: 'Exit' })).toHaveTextContent('K-space');
-    expect(screen.getByRole('button', { name: JSPACE_GROUP })).toBeInTheDocument();
+    const hub = within(dialog).getByRole('group', { name: 'Hub' });
+    expect(within(hub).getByRole('button', { name: 'Both 2' })).toBeInTheDocument();
+    expect(within(hub).getByRole('button', { name: 'Turnur 1' })).toBeInTheDocument();
+
+    await userEvent.click(within(hub).getByRole('button', { name: 'Thera 1' }));
+    await waitFor(() =>
+      expect(holesIn(screen.getByRole('table', { name: MAIN_TABLE }))).toEqual(['uedama'])
+    );
+    // Local to the modal: not in the page's URL.
+    expect(window.location.search).not.toContain('hub=');
   });
 
   it('shows only the J-space exits under the J-space filter, with no group', async () => {
-    visitThera('?space=wormhole');
+    const dialog = await openFromBrowse();
+    await within(dialog).findByRole('table', { name: MAIN_TABLE });
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Exit' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'J-space' }));
 
     const table = await screen.findByRole('table', { name: JSPACE_TABLE });
     expect(holesIn(table)).toEqual(['jspace']);
@@ -1270,32 +1396,28 @@ describe('Travel › Thera / Turnur', () => {
     expect(screen.queryByRole('button', { name: JSPACE_GROUP })).not.toBeInTheDocument();
   });
 
-  it('narrows to one band from the URL', async () => {
-    visitThera('?space=lowsec');
+  it('keeps only connections that pass at least the chosen ship size, and resets', async () => {
+    const dialog = await openFromBrowse();
+    await within(dialog).findByRole('table', { name: MAIN_TABLE });
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Fits' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Cap' }));
+    await waitFor(() =>
+      expect(holesIn(screen.getByRole('table', { name: MAIN_TABLE }))).toEqual(['perimeter'])
+    );
+
+    await userEvent.click(
+      within(dialog).getByRole('group', { name: 'Hub' }).querySelectorAll('button')[1]!
+    );
     expect(await screen.findByText('No connections match these filters')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: JSPACE_GROUP })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(await screen.findByRole('table', { name: MAIN_TABLE })).toBeInTheDocument();
   });
 
   it('says an origin with no stargates reaches no exit by gate', async () => {
-    visitThera(`?origin=${THERA}`);
+    await openFromBrowse(`?from=${THERA}`);
     expect(
       await screen.findByText('Thera has no stargates, so no exit can be reached by gate from it.')
     ).toBeInTheDocument();
-  });
-
-  it('keeps only connections that pass at least the chosen ship size', async () => {
-    visitThera('?size=capital');
-    const table = await screen.findByRole('table', { name: MAIN_TABLE });
-    expect(holesIn(table)).toEqual(['perimeter']);
-    // The J-space hole stops at medium hulls.
-    expect(screen.queryByRole('button', { name: JSPACE_GROUP })).not.toBeInTheDocument();
-  });
-
-  it('says so when the filters leave no hole', async () => {
-    // Thera's two holes both stop at medium hulls.
-    visitThera('?hub=thera&size=capital');
-    expect(await screen.findByText('No connections match these filters')).toBeInTheDocument();
-    expect(screen.queryByRole('table', { name: MAIN_TABLE })).not.toBeInTheDocument();
   });
 
   it('says no K-space hole matches when only J-space exits are open', async () => {
@@ -1304,7 +1426,7 @@ describe('Travel › Thera / Turnur', () => {
         HttpResponse.json(SIGNATURES.filter((entry) => entry.id === 'jspace'))
       )
     );
-    visitThera('');
+    await openFromBrowse();
     expect(
       await screen.findByText('No holes into K-space match these filters')
     ).toBeInTheDocument();
@@ -1313,21 +1435,15 @@ describe('Travel › Thera / Turnur', () => {
 
   it('says so when EVE-Scout lists nothing', async () => {
     server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json([])));
-    visitThera('');
+    await openFromBrowse();
     expect(
       await screen.findByText('EVE-Scout lists no open connections right now')
     ).toBeInTheDocument();
   });
 
-  it('says so when EVE-Scout cannot be reached', async () => {
-    server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => new HttpResponse(null, { status: 500 })));
-    visitThera('');
-    expect(await screen.findByText(/Connections can.t be loaded right now/)).toBeInTheDocument();
-  });
-
   it('asks EVE-Scout again from the unavailable state without a reload', async () => {
     server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => new HttpResponse(null, { status: 503 })));
-    visitThera('');
+    await openFromBrowse();
     await screen.findByText(/Connections can.t be loaded right now/);
 
     server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(SIGNATURES)));
@@ -1337,38 +1453,13 @@ describe('Travel › Thera / Turnur', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
-  it('offers no Try again once the connections are listed', async () => {
-    visitThera('');
-    await screen.findByRole('table', { name: MAIN_TABLE });
-    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
-  });
-
-  it('lets the hub-side signature be selected without opening the row', async () => {
-    visitThera('');
-
-    await screen.findByRole('table', { name: MAIN_TABLE });
-    const signature = within(holeRow('uedama')).getByText('AAA-111');
-    expect(signature).toHaveClass('select-all');
-    fireEvent.click(signature);
-    expect(holeRow('uedama')).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('shows dense cards and filter chips on a phone', async () => {
+  it('shows dense cards on a phone', async () => {
     const matchMedia = stubPhone();
     try {
-      const user = userEvent.setup();
-      visitThera('');
-
-      const table = await screen.findByRole('table', { name: MAIN_TABLE });
+      const dialog = await openFromBrowse(`?from=${JITA}`, { phone: true });
+      const table = await within(dialog).findByRole('table', { name: MAIN_TABLE });
       expect(table).toHaveClass('dt-stacked', 'dt-stack-dense');
       expect(within(holeRow('perimeter')).getByText(/→ PER-002/)).toBeInTheDocument();
-      expect(screen.queryByRole('group', { name: 'Exit' })).not.toBeInTheDocument();
-
-      await user.click(screen.getByRole('button', { name: 'Exit K-space' }));
-      await user.click(await screen.findByRole('menuitemradio', { name: 'J-space' }));
-      const jspace = await screen.findByRole('table', { name: JSPACE_TABLE });
-      expect(holesIn(jspace)).toEqual(['jspace']);
-      expect(window.location.search).toContain('space=wormhole');
     } finally {
       matchMedia.mockRestore();
     }
@@ -1390,14 +1481,14 @@ describe('Travel › Hauling (moved from Market, #3526)', () => {
     );
   }
 
-  it('is Travel’s last tab, after Route Safety, Thera / Turnur and Pilot Lookup', async () => {
+  it('is Travel’s last tab, after Route Safety and Pilot Lookup', async () => {
     visit(`?from=${JITA}&to=${UEDAMA}`);
     const strip = await screen.findByRole('tablist', { name: 'Travel' });
     expect(
       within(strip)
         .getAllByRole('tab')
         .map((tab) => tab.textContent)
-    ).toEqual([en.travel.routeTab, en.travel.thera.tab, en.nav.pilotLookup, en.travel.haulingTab]);
+    ).toEqual([en.travel.routeTab, en.nav.pilotLookup, en.travel.haulingTab]);
   });
 
   it('opens straight from its own URL', async () => {

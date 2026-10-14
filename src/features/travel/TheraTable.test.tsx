@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import type { TheraConnectionRow } from '@/engine/route/theraConnections';
+import { canUseInRoute } from '@/engine/route/theraConnections';
 import { TheraTable } from './TheraTable';
 
 const ROWS: TheraConnectionRow[] = [1, 2, 3].map((n) => ({
@@ -55,5 +56,40 @@ describe('TheraTable render count', () => {
     fireEvent.click(screen.getByText('bump 0'));
     expect(screen.getByText('bump 1')).toBeTruthy();
     expect(cellRenders.count).toBe(afterMount);
+  });
+});
+
+describe('canUseInRoute', () => {
+  it('offers K-space exits a gate route reaches', () => {
+    expect(canUseInRoute(ROWS[0]!)).toBe(true);
+  });
+
+  it('is not offered into J-space, or where the jumps are unknown', () => {
+    expect(canUseInRoute({ ...ROWS[0]!, exitSpace: 'wormhole' })).toBe(false);
+    expect(canUseInRoute({ ...ROWS[0]!, jumps: { kind: 'no-route' } })).toBe(false);
+    expect(canUseInRoute({ ...ROWS[0]!, jumps: { kind: 'unknown' } })).toBe(false);
+    expect(canUseInRoute({ ...ROWS[0]!, jumps: { kind: 'no-origin' } })).toBe(false);
+  });
+});
+
+describe('TheraTable Use in route', () => {
+  it('shows a Use in route button naming the exit, and hands the row on', () => {
+    const onUse = vi.fn();
+    render(
+      <MemoryRouter>
+        <TheraTable rows={ROWS} label="Holes" onUse={onUse} />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getAllByRole('button', { name: /System 2/ })[0]!);
+    expect(onUse).toHaveBeenCalledWith(expect.objectContaining({ id: 'hole-2' }));
+  });
+
+  it('shows no button without onUse', () => {
+    render(
+      <MemoryRouter>
+        <TheraTable rows={ROWS} label="Holes" />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText('Use in route')).toBeNull();
   });
 });

@@ -11297,7 +11297,6 @@
         }
       }
     },
-    "preferenceLabel": "Route",
     "pickSystem": "Pick a system",
     "currentSystem": "{{system}} (current system)",
     "changeFrom": "Change starting system — {{current}}",
@@ -11309,6 +11308,7 @@
       "unnamed": "System {{id}}",
       "add": "+ Add stop",
       "addLabel": "Add stop, search solar systems",
+      "destinationLabel": "Destination, search solar systems",
       "full_one": "Up to {{count}} stop.",
       "full_other": "Up to {{count}} stops.",
       "remove": "Remove {{name}}",
@@ -11383,6 +11383,14 @@
     },
     "pickTitle": "Pick where the route starts and ends",
     "pickHint": "Every system on the route is listed with its security, region, and the last hour of jumps and kills ESI reports.",
+    "options": {
+      "label": "Route preference",
+      "sameRoute": "Same route as {{preference}}"
+    },
+    "quick": {
+      "label": "Go to",
+      "incursion": "Nearest incursion: {{system}}"
+    },
     "sameSystemTitle": "Start and destination are the same system",
     "sameSystemHint": "There are no jumps to list. Pick a different destination.",
     "noRouteTitle": "No stargate route connects these systems",
@@ -11614,6 +11622,7 @@
     "holes": {
       "group": "Route Safety only · your default on this page, can be overridden in the link",
       "enabled": "Route through Thera / Turnur",
+      "browse": "Browse open wormholes",
       "shipSize": "My ship fits",
       "sizeFromHull": "Set from {{hull}}",
       "ship": "Ship I am moving",
@@ -11643,9 +11652,10 @@
       "stripLabel_other": "{{count}} jumps through wormholes."
     },
     "thera": {
-      "tab": "Thera / Turnur",
-      "originLabel": "Jumps from",
-      "changeOrigin": "Change the system jumps are counted from — {{current}}",
+      "modalTitle": "Thera / Turnur",
+      "originNote": "Open holes from EVE-Scout, counted from {{system}}",
+      "useInRoute": "Use in route",
+      "useInRouteLabel": "Use the {{hub}} hole at {{system}} in the route",
       "hubLabel": "Hub",
       "fitsLabel": "Fits",
       "exitLabel": "Exit",
@@ -11693,8 +11703,6 @@
       "fitsAffix": "Fits ",
       "lifeAffix": " left",
       "lifeLeft": "{{time}} left",
-      "routeVia": "Route via",
-      "routeViaLabel": "Plan a route through the {{hub}} hole at {{system}}",
       "jumpsUnit_one": "jump",
       "jumpsUnit_other": "jumps",
       "detail": {
@@ -11704,7 +11712,7 @@
         "zkillboardLabel": "{{system}} on zKillboard (opens in a new tab)"
       },
       "noGateRoute": "No gate route",
-      "noOrigin": "Pick a system to count jumps from, or set your current system.",
+      "noOrigin": "Open holes from EVE-Scout. Pick a From system on Route Safety to count jumps.",
       "originUngated": "{{system}} has no stargates, so no exit can be reached by gate from it.",
       "jumpsLoading": "Counting jumps from the stargate map…",
       "jumpsUnknown": "The local stargate map couldn't be read, so jumps show as —.",

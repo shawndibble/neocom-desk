@@ -1,8 +1,9 @@
 /**
  * Travel › Route Safety at the narrow end of the pointer-width range (#2591):
- * beside the 300px rail at `lg` the route table got ~427px for ~612px of
- * content, so the page scrolled sideways and Avoid sat off-screen. The two now
- * sit side by side only from `xl`; below that they stack, route table full width.
+ * beside a side column at `lg` the route table got too little width, so the
+ * page scrolled sideways and Avoid sat off-screen. The route and the Route
+ * rules column (right of the route) sit side by side only from `xl`; below
+ * that they stack, route table full width.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -40,11 +41,11 @@ for (const width of [1024, 1280, 1440]) {
       .toBe(true);
 
     const main = page.getByRole('main');
-    const rail = main.getByText('Stops', { exact: true }).first();
+    const rules = main.getByText('Route rules', { exact: true }).first();
     const table = main.getByRole('table').first();
-    const railBox = (await rail.boundingBox())!;
+    const rulesBox = (await rules.boundingBox())!;
     const tableBox = (await table.boundingBox())!;
-    if (width >= 1280) expect(railBox.x + railBox.width).toBeLessThanOrEqual(tableBox.x);
-    else expect(tableBox.y).toBeGreaterThan(railBox.y);
+    if (width >= 1280) expect(tableBox.x + tableBox.width).toBeLessThanOrEqual(rulesBox.x);
+    else expect(rulesBox.y).toBeGreaterThan(tableBox.y);
   });
 }

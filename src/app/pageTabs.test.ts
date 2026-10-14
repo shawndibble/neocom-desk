@@ -196,7 +196,7 @@ describe('LP Store, a Wallet tab (issue #3527)', () => {
 
 describe('Hauling, a Travel tab (issue #3526)', () => {
   it('sits last on Travel and is gone from Market', () => {
-    expect(TRAVEL_TABS.tabs.map((tab) => tab.id)).toEqual(['route', 'thera', 'pilot', 'hauling']);
+    expect(TRAVEL_TABS.tabs.map((tab) => tab.id)).toEqual(['route', 'pilot', 'hauling']);
     expect(MARKET_TABS.tabs.map((tab) => tab.id)).not.toContain('hauling');
   });
 
@@ -240,5 +240,23 @@ describe('History is Transactions only (issue #3692)', () => {
     });
     expect(moved?.('/market/history/transactionsx', '')).toBeNull();
     expect(isTabRedirectPath('/market/history/transactions')).toBe(true);
+  });
+});
+
+describe('Thera / Turnur is a modal on Route Safety, not a Travel tab', () => {
+  it('has no Thera tab', () => {
+    expect(TRAVEL_TABS.tabs.map((tab) => tab.id)).not.toContain('thera');
+  });
+
+  it('moves an old /travel/thera link to Route Safety, origin becoming From', () => {
+    const moved = PAGE_LEGACY_LOCATIONS['/travel'];
+    expect(moved?.('/travel/thera', '?origin=30000142&pref=shortest&hub=turnur')).toEqual({
+      pathname: '/travel/route',
+      search: '?from=30000142&pref=shortest',
+    });
+    expect(moved?.('/travel/thera/', '')).toEqual({ pathname: '/travel/route', search: '' });
+    expect(moved?.('/travel/therax', '')).toBeNull();
+    expect(moved?.('/travel/hauling', '')).toBeNull();
+    expect(isTabRedirectPath('/travel/thera')).toBe(true);
   });
 });

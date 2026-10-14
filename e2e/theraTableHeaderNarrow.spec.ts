@@ -1,10 +1,11 @@
 /**
- * Travel › Thera / Turnur at 1024px: every column header stays on one line
+ * Route Safety › Thera / Turnur modal at 1024px: every column header stays on one line
  * (issue #2605), so the header row is one height and the table still fits its
  * panel with nowrap on.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { openTheraModal } from './support/theraModal';
 
 const LAPTOP = { width: 1024, height: 768 };
 const HOUR = 3_600_000;
@@ -47,9 +48,10 @@ test('Thera table headers share one line and the table fits its panel at 1024px 
     })
   );
   await page.setViewportSize(LAPTOP);
-  await signInAndGoto(page, './travel/thera');
+  await signInAndGoto(page, './travel/route');
+  const dialog = await openTheraModal(page);
 
-  const table = page.getByRole('table', { name: 'Open holes out of Thera and Turnur' });
+  const table = dialog.getByRole('table', { name: 'Open holes out of Thera and Turnur' });
   await expect(table.getByRole('row')).toHaveCount(HOLES.length + 1);
 
   const headers = table.getByRole('columnheader');
@@ -71,7 +73,7 @@ test('Thera table headers share one line and the table fits its panel at 1024px 
   expect(wraps).toEqual([]);
 
   const fit = await table.evaluate((el) => {
-    const panel = el.parentElement!.getBoundingClientRect();
+    const panel = el.closest('dialog')!.getBoundingClientRect();
     return {
       tableRight: el.getBoundingClientRect().right,
       panelRight: panel.right,
