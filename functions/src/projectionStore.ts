@@ -58,6 +58,12 @@ export interface DeviceRegistrationWrite {
   characterIds: number[];
   /** Verified Characters' Projections (registerDevice.ts drops rejected ones). */
   projections: CharacterProjection[];
+  /**
+   * Verified Characters' browser-enabled ESI types from this device (issue
+   * #3755, ADR 0020). Stored on this device's own registration doc, so a
+   * `set` replaces only this device's lists.
+   */
+  eveTypesByCharacter: Record<number, string[]>;
 }
 
 type Doc = QueryDocumentSnapshot;
@@ -95,6 +101,11 @@ export async function writeDeviceRegistration(
   const previousIds = Array.isArray(previous?.characterIds)
     ? (previous.characterIds as number[])
     : [];
+  // An upload without a list (an older client) keeps what this device stored.
+  const previousEveTypes: Record<string, string[]> =
+    typeof previous?.eveTypesByCharacter === 'object' && previous.eveTypesByCharacter !== null
+      ? (previous.eveTypesByCharacter as Record<string, string[]>)
+      : {};
   const droppedIds = previousIds.filter((id) => !write.characterIds.includes(id));
   // Once per Character per device: on the device's first per-device upload,
   // and again for any Character it adds later, which may still carry another
@@ -128,6 +139,14 @@ export async function writeDeviceRegistration(
   await registrationRef.set({
     fcmToken: write.fcmToken,
     characterIds: write.characterIds,
+    // Firestore map keys are strings; a Character dropped from the roster
+    // falls out because the whole map is rebuilt on every upload.
+    eveTypesByCharacter: Object.fromEntries(
+      write.characterIds.map((id) => [
+        String(id),
+        write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
+      ])
+    ),
     updatedAt: FieldValue.serverTimestamp(),
   });
 

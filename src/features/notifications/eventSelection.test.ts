@@ -7,6 +7,8 @@ import {
   toggleAllEventsOnChannel,
   isEveTypeAllowed,
   isEveTypeEnabledFor,
+  enabledEveTypesForBrowser,
+  extraEveTypes,
   toggleEveTypeChannel,
   EVE_ALLOWED_TYPES,
   NOTIFICATION_FAMILIES,
@@ -473,5 +475,44 @@ describe('broadcastAllEveTypesChannelFlags (issue #745)', () => {
     const next = broadcastAllEveTypesChannelFlags([1, 2], [TYPE_A, TYPE_B], perCharacter, 'feed');
     expect(isEveTypeEnabledFor(next[1], TYPE_A, 'feed')).toBe(false);
     expect(isEveTypeEnabledFor(next[2], TYPE_B, 'feed')).toBe(false);
+  });
+});
+
+describe('enabledEveTypesForBrowser', () => {
+  it('applies the per-type browser default to types the map does not mention', () => {
+    expect(enabledEveTypesForBrowser({}, ['StructureDestroyed', 'CorpAppNewMsg'])).toEqual([
+      'StructureDestroyed',
+    ]);
+  });
+
+  it('lets an explicit flag win over the default in either direction', () => {
+    const map: EveTypeEnabledMap = {
+      StructureDestroyed: { browser: false },
+      CorpAppNewMsg: { browser: true },
+    };
+    expect(enabledEveTypesForBrowser(map, ['StructureDestroyed', 'CorpAppNewMsg'])).toEqual([
+      'CorpAppNewMsg',
+    ]);
+  });
+
+  it('ignores the feed flag', () => {
+    expect(
+      enabledEveTypesForBrowser({ StructureDestroyed: { feed: false } }, ['StructureDestroyed'])
+    ).toEqual(['StructureDestroyed']);
+  });
+
+  it('returns a sorted, de-duplicated list', () => {
+    const map: EveTypeEnabledMap = { B: { browser: true }, A: { browser: true } };
+    expect(enabledEveTypesForBrowser(map, ['B', 'A', 'B'])).toEqual(['A', 'B']);
+  });
+
+  it('does not offer a type outside the known list even when the map enables it', () => {
+    expect(enabledEveTypesForBrowser({ Mystery: { browser: true } }, ['A'])).toEqual([]);
+  });
+});
+
+describe('extraEveTypes', () => {
+  it('keeps only seen types that are not on the allow-list, sorted and de-duplicated', () => {
+    expect(extraEveTypes([EVE_ALLOWED_TYPES[0], 'ZNew', 'ANew', 'ZNew'])).toEqual(['ANew', 'ZNew']);
   });
 });
