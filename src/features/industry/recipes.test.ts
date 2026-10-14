@@ -323,7 +323,7 @@ describe('acquisitionForLookup', () => {
       blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
     });
     const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       me: 0,
       te: 0,
       blueprintTypeID: 9841,
@@ -366,7 +366,7 @@ describe('acquisitionForLookup', () => {
       },
     });
     const result = acquisitionFor(16667, 5, ctx, { 16650: 10 });
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       me: 0,
       te: 0,
       blueprintTypeID: 46156,
@@ -410,7 +410,7 @@ describe('acquisitionForLookup', () => {
     // but the pilot pinned the ME8 BPC instead — that copy's own runs cover
     // the 5 needed, so the line reports owned/free at the pinned tier.
     const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       me: 8,
       te: 16,
       blueprintTypeID: 9841,
@@ -461,7 +461,7 @@ describe('acquisitionForLookup', () => {
     // Branch A calls first — 25 parts at 5 a run is 5 runs, which the owned
     // copy fully covers. `needed` is units, never runs.
     const branchA = acquisitionFor(9840, 25, ctx, { 34: 10 });
-    expect(branchA).toEqual({
+    expect(branchA).toMatchObject({
       me: 6,
       te: 12,
       blueprintTypeID: 9841,
@@ -472,7 +472,7 @@ describe('acquisitionForLookup', () => {
     // copy is already claimed by Branch A, so Branch B must fall back to the
     // BPO sell-price cascade instead of also reporting itself as free.
     const branchB = acquisitionFor(9840, 25, ctx, { 34: 10 });
-    expect(branchB).toEqual({
+    expect(branchB).toMatchObject({
       me: 0,
       te: 0,
       blueprintTypeID: 9841,
@@ -502,7 +502,7 @@ describe('acquisitionForLookup', () => {
       ],
       blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
     });
-    expect(acquisitionFor(9840, 10, ctx, { 34: 10 })?.line).toEqual({
+    expect(acquisitionFor(9840, 10, ctx, { 34: 10 })?.line).toMatchObject({
       unitPrice: 0,
       owned: true,
     });
@@ -530,13 +530,13 @@ describe('acquisitionForLookup', () => {
 
     // Two independent plan resolutions (e.g. two separate build plans) each
     // get their own closure and must each see the full owned stock.
-    expect(acquisitionForLookup(sources)(9840, 5, ctx, { 34: 10 })).toEqual({
+    expect(acquisitionForLookup(sources)(9840, 5, ctx, { 34: 10 })).toMatchObject({
       me: 6,
       te: 12,
       blueprintTypeID: 9841,
       line: { unitPrice: 0, owned: true },
     });
-    expect(acquisitionForLookup(sources)(9840, 5, ctx, { 34: 10 })).toEqual({
+    expect(acquisitionForLookup(sources)(9840, 5, ctx, { 34: 10 })).toMatchObject({
       me: 6,
       te: 12,
       blueprintTypeID: 9841,
@@ -570,7 +570,7 @@ describe('acquisitionForLookup', () => {
     // The top-level product's own claim — resolved once, shared by both a
     // real pass and a Group Owned Overlay pass.
     const topLevel = forTopLevel(9840, 3, ctx, { 34: 10 });
-    expect(topLevel).toEqual({
+    expect(topLevel).toMatchObject({
       me: 6,
       te: 12,
       blueprintTypeID: 9841,
@@ -586,7 +586,7 @@ describe('acquisitionForLookup', () => {
     const forPassB = acquisitionForLookup(sources, poolsForPassB);
 
     // Pass A's own nested node claims all 7 remaining runs.
-    expect(forPassA(9840, 7, ctx, { 34: 10 })).toEqual({
+    expect(forPassA(9840, 7, ctx, { 34: 10 })).toMatchObject({
       me: 6,
       te: 12,
       blueprintTypeID: 9841,
@@ -597,7 +597,7 @@ describe('acquisitionForLookup', () => {
     // shared, Pass A's claim above would have already drained them and Pass
     // B would wrongly see a shortfall. Isolated pools mean Pass B still sees
     // its own full 7 remaining.
-    expect(forPassB(9840, 7, ctx, { 34: 10 })).toEqual({
+    expect(forPassB(9840, 7, ctx, { 34: 10 })).toMatchObject({
       me: 6,
       te: 12,
       blueprintTypeID: 9841,

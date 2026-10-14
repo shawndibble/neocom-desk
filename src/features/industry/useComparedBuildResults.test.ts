@@ -381,40 +381,11 @@ describe('useComparedBuildResults', () => {
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
 
     const call = mockedCompute.mock.calls[0]?.[0];
-    expect(call?.blueprintAcquisition).toEqual({
+    expect(call?.blueprintAcquisition).toMatchObject({
       blueprintTypeID: 100,
       line: { unitPrice: 500, owned: false },
     });
     expect(typeof call?.acquisitionFor).toBe('function');
-  });
-
-  it('reports no blueprint cost, while still resolving the tier, when the includeBlueprintCost setting is off', async () => {
-    const pricingInputs = { ...PRICING_INPUTS, includeBlueprintCost: false };
-    const producedEntry = entry({ blueprintTypeID: 100, productTypeID: 1, productName: 'Widget' });
-    const catalog: BlueprintCatalog = {
-      ...catalogWith([producedEntry]),
-      byProductTypeID: new Map([[1, producedEntry]]),
-    };
-    mockedSnapshots.mockImplementation((requests) =>
-      requests.map(() =>
-        Promise.resolve({
-          hubPrices: { 100: 500 },
-          hubBuyPrices: {},
-          hubSellVolumes: {},
-          adjustedPrices: {},
-          systemCostIndex: 0.01,
-        })
-      )
-    );
-    const plans = [plan({ id: 'a' })];
-
-    const { result } = renderHook(() =>
-      useComparedBuildResults({ plans, catalog, ...baseArgs, pricingInputs })
-    );
-    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
-
-    const call = mockedCompute.mock.calls[0]?.[0];
-    expect(call?.blueprintAcquisition).toEqual({ blueprintTypeID: 100, line: null });
   });
 
   it('leaves groupResult null and never calls computeBuildPlan a second time when computeGroupResult is not requested', async () => {

@@ -91,7 +91,6 @@ function sources(catalog: BlueprintCatalog, overrides: Partial<BuildPlanSources>
     assumedMe: 0,
     modifiers: NO_CHARACTER_MODIFIERS,
     bpcOffersFor: () => [],
-    includeBlueprintCost: true,
     ...overrides,
   } satisfies BuildPlanSources;
 }
@@ -250,10 +249,10 @@ describe('resolveBuildPlan', () => {
     const prices = snapshot({ 1: 1_000_000, 500: 5000, 34: 10_000 }, 0.01);
 
     function resolveAt(reactionSystemCostIndex: number | null) {
-      // No blueprint cost: an unpriced acquisition row would blank the totals.
+      // Both blueprints owned: an unpriced acquisition row would blank the totals.
       return resolveBuildPlan(
         reactionPlan,
-        sources(catalog, { includeBlueprintCost: false }),
+        sources(catalog, { ownedBlueprints: [owned(100, -1), owned(600, -1)] }),
         { snapshot: prices, reactionSystemCostIndex },
         { withGroupResult: true }
       );
@@ -361,15 +360,6 @@ describe('make-or-buy advice agrees with the plan it advises (blueprint cost)', 
     expect(verdict?.verdict).toBe('build');
     expect(verdict?.blueprintCost).toBe(0);
     expect(verdict?.me).toBe(10);
-  });
-
-  it('leaves the blueprint out when Include Blueprint Cost is off, same as the plan total', () => {
-    const { verdict, boughtCost, builtCost } = adviceFor(
-      sources(catalog, { includeBlueprintCost: false })
-    );
-    expect(builtCost).toBeLessThan(boughtCost);
-    expect(verdict?.verdict).toBe('build');
-    expect(verdict?.blueprintCost).toBe(0);
   });
 });
 

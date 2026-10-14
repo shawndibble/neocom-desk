@@ -11,7 +11,6 @@ import {
 } from '@/features/market/useTradeHubStandings';
 import type { CachedResult } from '@/esi/cache';
 import { useAssumedMe } from './assumedMe';
-import { useIncludeBlueprintCost } from './includeBlueprintCost';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import {
   communityOffersForRows,
@@ -34,14 +33,10 @@ vi.mock('@/features/market/useTradeHubStandings', async (importOriginal) => ({
 vi.mock('./assumedMe', () => ({
   useAssumedMe: create(() => ({ value: 0, hydrated: false, hydrate: vi.fn() })),
 }));
-vi.mock('./includeBlueprintCost', () => ({
-  useIncludeBlueprintCost: create(() => ({ value: true, hydrated: false, hydrate: vi.fn() })),
-}));
 const CORP: CorpOwnedBlueprintsState = { blueprints: [], available: true, incomplete: false };
 vi.mock('./corpOwnedBlueprints', () => ({ useCorpOwnedBlueprints: () => CORP }));
 
 const mockedAssumedMe = vi.mocked(useAssumedMe);
-const mockedIncludeBlueprintCost = vi.mocked(useIncludeBlueprintCost);
 const mockedBpcContracts = vi.mocked(loadPublicBpcContracts);
 const mockedStandings = vi.mocked(useTradeHubStandings);
 
@@ -81,7 +76,6 @@ function inputs(overrides: Partial<BuildPlanPricingInputs> = {}): BuildPlanPrici
   return {
     hydrated: true,
     assumedMe: 0,
-    includeBlueprintCost: true,
     corpBlueprints: CORP,
     standings: new Map(),
     bpcRows: [],
@@ -92,7 +86,6 @@ function inputs(overrides: Partial<BuildPlanPricingInputs> = {}): BuildPlanPrici
 
 beforeEach(() => {
   mockedAssumedMe.setState({ value: 0, hydrated: false, hydrate: vi.fn() });
-  mockedIncludeBlueprintCost.setState({ value: true, hydrated: false, hydrate: vi.fn() });
   mockedBpcContracts.mockReset();
   mockedBpcContracts.mockResolvedValue(null);
   mockedStandings.mockReset();
@@ -102,26 +95,20 @@ beforeEach(() => {
 });
 
 describe('useBuildPlanPricingInputs', () => {
-  it('hydrates both pricing settings itself', () => {
+  it('hydrates the pricing settings itself', () => {
     const hydrateMe = vi.fn();
-    const hydrateCost = vi.fn();
     mockedAssumedMe.setState({ hydrate: hydrateMe });
-    mockedIncludeBlueprintCost.setState({ hydrate: hydrateCost });
     renderHook(() => useBuildPlanPricingInputs(1));
     expect(hydrateMe).toHaveBeenCalled();
-    expect(hydrateCost).toHaveBeenCalled();
   });
 
-  it('is not ready to price until both settings hydrate, then carries their values', () => {
+  it('is not ready to price until the settings hydrate, then carries their values', () => {
     const { result } = renderHook(() => useBuildPlanPricingInputs(1));
     expect(isPricingReady(result.current)).toBe(false);
 
     act(() => mockedAssumedMe.setState({ value: 4, hydrated: true }));
-    expect(isPricingReady(result.current)).toBe(false);
-
-    act(() => mockedIncludeBlueprintCost.setState({ value: false, hydrated: true }));
     expect(isPricingReady(result.current)).toBe(true);
-    expect(result.current).toMatchObject({ assumedMe: 4, includeBlueprintCost: false });
+    expect(result.current).toMatchObject({ assumedMe: 4 });
   });
 
   it('still reports the current (default) values before hydration, for readers that do not wait', () => {
@@ -129,7 +116,6 @@ describe('useBuildPlanPricingInputs', () => {
     expect(result.current).toMatchObject({
       hydrated: false,
       assumedMe: 0,
-      includeBlueprintCost: true,
     });
   });
 
@@ -236,15 +222,8 @@ describe('pricingSourcesForHub', () => {
   });
 
   it('passes the settings and corp blueprints through unchanged', () => {
-    const sources = pricingSourcesForHub(
-      inputs({ assumedMe: 7, includeBlueprintCost: false }),
-      JITA
-    );
-    expect(sources).toMatchObject({
-      assumedMe: 7,
-      includeBlueprintCost: false,
-      corpBlueprints: CORP,
-    });
+    const sources = pricingSourcesForHub(inputs({ assumedMe: 7 }), JITA);
+    expect(sources).toMatchObject({ assumedMe: 7, corpBlueprints: CORP });
   });
 });
 

@@ -677,19 +677,39 @@ export interface AcquisitionCommunitySource {
   stale: boolean;
 }
 
+/**
+ * The runs behind one Blueprint Acquisition row — what a Build Group needs to
+ * pool the same blueprint across its members instead of buying a copy per plan.
+ */
+export interface BlueprintRunPool {
+  /** Runs the row's plan(s) need from this blueprint at this tier. */
+  neededRuns: number;
+  /** Runs the Character already owns at this tier (counted once per group, not once per plan). */
+  ownedRuns: number;
+  /** Runs one bought copy brings (`Infinity` for an original); null when nothing can be bought to top the tier up. */
+  copyRuns: number | null;
+  /** ISK for one bought copy (a pilot's override price included); null when unpriced or nothing can be bought. */
+  copyPrice: number | null;
+}
+
 /** The ME/TE tier a Blueprint Acquisition row resolved to, and the Member it comes from when a Community Offer. */
 export type AcquisitionTier = {
   me: number;
   te: number;
   community?: AcquisitionCommunitySource;
+  pool?: BlueprintRunPool;
 };
 
 /** What a Blueprint Acquisition row (issue #838) reports, at whatever node resolved it. */
 export interface AcquisitionLine {
-  /** ISK to cover the shortfall at the resolved tier; ignored when `owned`. */
+  /** ISK for one bought copy at the resolved tier; ignored when `owned`. */
   unitPrice: number | null;
   /** True when the resolved tier's owned runs already cover the need — nothing bought. */
   owned: boolean;
+  /** Whole copies bought to cover the shortfall (`ceil(shortfall / runs per copy)`); `unitPrice` is one copy's price. Absent = 1. */
+  quantity?: number;
+  /** Runs behind this line, for pooling across a Build Group. Absent when nothing can be bought or owned. */
+  pool?: BlueprintRunPool;
   /** Set when the tier is a Community Offer: free, from this Member. */
   community?: AcquisitionCommunitySource;
 }

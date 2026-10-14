@@ -9945,7 +9945,7 @@
           "settingsDetail": {
             "notifications": "Notifications: your notification preferences.",
             "defaults": "Defaults: trade hub, industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
-            "industry": "Industry: build groups, whether blueprint cost counts toward profit, and BPC Sourcing's hide auctions / hide PLEX.",
+            "industry": "Industry: build groups and BPC Sourcing's hide auctions / hide PLEX.",
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
@@ -10258,8 +10258,6 @@
     "assumedMeHint": "New plans and sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
     "assumedTeLabel": "Assumed TE for blueprints you don’t own",
     "assumedTeHint": "New plans start at this TE — an invented copy comes out at TE 4. A blueprint you do own always uses its real TE instead. Sub-builds are still timed at TE 0.",
-    "includeBlueprintCostLabel": "Count blueprint cost toward Industry profit",
-    "includeBlueprintCostHint": "When a plan needs a blueprint copy, what covering it costs is added to totalCost and subtracted from profit — on the plan's own page, the Industry index's Profit column, and every Build Group's rollup. Turn this off to price plans as if every blueprint were already owned.",
     "piSellAtHint": "Where Planetary Industry prices and sells its output. A corp buyback pays a percentage of the chosen hub's price.",
     "piBuyTiersLabel": "Buy at the hub when short",
     "piBuyTiersHint": "Off by default, because buying assumes a hub within reach. With a tier on, the Goal Planner buys it to finish a chain your colonies cannot, at the lowest tier that closes the gap. Priced at the ask, with import customs at the colony.",

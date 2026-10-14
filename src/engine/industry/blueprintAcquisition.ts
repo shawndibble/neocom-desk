@@ -326,22 +326,23 @@ export function resolveTierOption(option: TierOption, neededRuns: number): Bluep
   if (shortfall === 0) {
     return { me: option.me, te: option.te, line: { unitPrice: 0, owned: true } };
   }
-  const price = option.extend ? shortfallCost(shortfall, option.extend) : null;
+  const copies = option.extend ? copiesToCover(shortfall, option.extend) : null;
+  const price = option.extend ? option.extend.price : null;
   // An owned copy that nothing can top up: the job cannot be started past the
   // copy's own runs, so report the real limit (issue #1775).
   const coverage =
     price === null && option.ownedRuns > 0
       ? { coveredRuns: option.ownedRuns, neededRuns }
       : undefined;
-  const purchasedRuns = option.extend
-    ? copiesToCover(shortfall, option.extend) * option.extend.capacityRuns
-    : undefined;
+  const purchasedRuns =
+    option.extend && copies !== null ? copies * option.extend.capacityRuns : undefined;
   return {
     me: option.me,
     te: option.te,
     line: {
       unitPrice: price,
       owned: false,
+      ...(copies !== null && copies > 1 ? { quantity: copies } : {}),
       ...(option.extend?.community ? { community: option.extend.community } : {}),
     },
     coverage,

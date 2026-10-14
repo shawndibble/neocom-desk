@@ -39,17 +39,14 @@ import {
 } from '@/features/market/useTradeHubStandings';
 import { useWarmLoad } from '@/lib/useWarmLoad';
 import { useAssumedMe } from './assumedMe';
-import { useIncludeBlueprintCost } from './includeBlueprintCost';
 import { useCorpOwnedBlueprints, type CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import type { BuildPlanSources, CorpBlueprintSource } from './resolveBuildPlan';
 
 export interface BuildPlanPricingInputs {
-  /** Both settings below have hydrated. Until then they read their defaults. */
+  /** The settings below have hydrated. Until then they read their defaults. */
   hydrated: boolean;
   /** ME to quote an unowned sub-build at (`assumedMe.ts`). */
   assumedMe: number;
-  /** Whether Blueprint Acquisition's cost counts toward profit (`includeBlueprintCost.ts`). */
-  includeBlueprintCost: boolean;
   /** The active Character's corp blueprints, folded into a plan on its own `includeCorpAssets`. */
   corpBlueprints: CorpOwnedBlueprintsState;
   /** The Character's standing toward each Trade Hub's NPC owner, keyed by hub id. */
@@ -64,7 +61,6 @@ export interface BuildPlanPricingInputs {
 export type HubPricingSources = Pick<
   BuildPlanSources,
   | 'assumedMe'
-  | 'includeBlueprintCost'
   | 'corpBlueprints'
   | 'standing'
   | 'bpcOffersFor'
@@ -75,7 +71,7 @@ export type HubPricingSources = Pick<
 /** What `pricingSourcesForHub` reads. Corp blueprints may be withheld, which reads as unavailable. */
 export type HubPricingSourceArgs = Pick<
   BuildPlanPricingInputs,
-  'assumedMe' | 'includeBlueprintCost' | 'standings' | 'bpcRows' | 'communityRows'
+  'assumedMe' | 'standings' | 'bpcRows' | 'communityRows'
 > & { corpBlueprints?: CorpBlueprintSource };
 
 const NO_BPC_ROWS: readonly BpcContractRow[] = [];
@@ -141,13 +137,9 @@ export function useBuildPlanPricingInputs(characterId: number | null): BuildPlan
   const assumedMe = useAssumedMe((state) => state.value);
   const assumedMeHydrated = useAssumedMe((state) => state.hydrated);
   const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
-  const includeBlueprintCost = useIncludeBlueprintCost((state) => state.value);
-  const includeBlueprintCostHydrated = useIncludeBlueprintCost((state) => state.hydrated);
-  const hydrateIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.hydrate);
   useEffect(() => {
     void hydrateAssumedMe();
-    void hydrateIncludeBlueprintCost();
-  }, [hydrateAssumedMe, hydrateIncludeBlueprintCost]);
+  }, [hydrateAssumedMe]);
 
   const corpBlueprints = useCorpOwnedBlueprints();
   const standings = useTradeHubStandings(characterId);
@@ -156,24 +148,23 @@ export function useBuildPlanPricingInputs(characterId: number | null): BuildPlan
     characterId,
     enabled: isSyncConfigured(),
   });
-  const hydrated = assumedMeHydrated && includeBlueprintCostHydrated;
+  const hydrated = assumedMeHydrated;
 
   // One object per distinct state: every surface's pricing memo keys on it.
   return useMemo(
     () => ({
       hydrated,
       assumedMe,
-      includeBlueprintCost,
       corpBlueprints,
       standings,
       bpcRows,
       communityRows,
     }),
-    [hydrated, assumedMe, includeBlueprintCost, corpBlueprints, standings, bpcRows, communityRows]
+    [hydrated, assumedMe, corpBlueprints, standings, bpcRows, communityRows]
   );
 }
 
-/** The hydration gate: true once both settings have hydrated. */
+/** The hydration gate: true once the settings have hydrated. */
 export function isPricingReady(inputs: Pick<BuildPlanPricingInputs, 'hydrated'>): boolean {
   return inputs.hydrated;
 }
@@ -245,7 +236,6 @@ export function pricingSourcesForHub(
 ): HubPricingSources {
   return {
     assumedMe: inputs.assumedMe,
-    includeBlueprintCost: inputs.includeBlueprintCost,
     corpBlueprints: inputs.corpBlueprints,
     standing: tradeHubStanding(inputs.standings, hub.id),
     bpcOffersFor: offersFor(inputs.bpcRows, hub.regionId),

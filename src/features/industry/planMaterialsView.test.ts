@@ -98,7 +98,6 @@ function tableFor(p: BuildPlanRecord) {
       assumedMe: 0,
       modifiers: NO_CHARACTER_MODIFIERS,
       bpcOffersFor: () => [],
-      includeBlueprintCost: false,
     },
     {
       snapshot: {
@@ -138,8 +137,8 @@ describe('materialTypeIdKey', () => {
     expect(materialTypeIdKey(rows)).toBe(key);
   });
 
-  it('walks the whole resolved tree, not just the blueprint top level', () => {
-    expect(materialTypeIdKey(tableFor(plan({ buildHere: [300] })))).toBe('34,35,300');
+  it('walks the whole resolved tree, including its blueprint acquisition rows', () => {
+    expect(materialTypeIdKey(tableFor(plan({ buildHere: [300] })))).toBe('34,35,100,200,300');
   });
 
   it('round-trips through typeIdsFromKey', () => {

@@ -178,8 +178,6 @@ export async function applyGroupAutoBuild(
   corpOwnedBlueprints?: CorpOwnedBlueprintsState,
   /** BPC Sourcing rows (all regions) — narrowed to each member's own Trade Hub region. */
   bpcRows: readonly BpcContractRow[] = [],
-  /** `useIncludeBlueprintCost` — whether a cost-effective verdict counts the blueprint purchase, as the member's own total does. */
-  includeBlueprintCost = true,
   /** Community Offers (issue #3603): free Shared Blueprints, region-agnostic. */
   communityRows: readonly BpcSearchRow[] = []
 ): Promise<Map<string, Set<number>>> {
@@ -211,7 +209,6 @@ export async function applyGroupAutoBuild(
           bpcLastResortOffersFor: offersForRegion(bpcRows, hub.regionId, true),
           blueprintPurchaseOffersFor,
           communityOffersFor: communityOffersForRows(communityRows),
-          includeBlueprintCost,
         },
         { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
       );

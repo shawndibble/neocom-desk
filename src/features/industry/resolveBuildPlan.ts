@@ -53,7 +53,6 @@ import {
   cloneBlueprintPools,
   recipeForLookup,
   verdictAcquisitionFor,
-  withoutAcquisitionCost,
   type BlueprintTierPools,
   type RecipeSources,
 } from './recipes';
@@ -88,8 +87,6 @@ export interface BuildPlanSources {
   blueprintPurchaseOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
   /** Community Offers (issue #3603): free Shared Blueprints, named for the Member. */
   communityOffersFor?: (blueprintTypeID: number) => readonly BpcOffer[];
-  /** `useIncludeBlueprintCost`: off still resolves each tier, but prices no acquisition line. */
-  includeBlueprintCost: boolean;
 }
 
 /** The plan's prices, as fetched for its own hub/build system. */
@@ -231,7 +228,7 @@ function prepareResolution(
           materialPrices,
           modifiers: sources.modifiers,
           reactionFacility,
-          acquisitionFor: verdictAcquisitionFor(recipeSources, sources.includeBlueprintCost),
+          acquisitionFor: verdictAcquisitionFor(recipeSources),
         }
       : null;
   return {
@@ -242,15 +239,6 @@ function prepareResolution(
     reactionFacility,
     makeOrBuyContext,
   };
-}
-
-function acquisitionForPool(
-  recipeSources: RecipeSources,
-  includeBlueprintCost: boolean,
-  pools: BlueprintTierPools
-) {
-  const raw = acquisitionForLookup(recipeSources, pools);
-  return includeBlueprintCost ? raw : withoutAcquisitionCost(raw);
 }
 
 /** What a make-or-buy verdict (or an Auto Build walk) needs for one plan. */
@@ -287,7 +275,7 @@ export function resolveMakeOrBuy(
   const { me, te } = resolveTopLevelTier(
     plan,
     blueprint,
-    acquisitionForPool(recipeSources, sources.includeBlueprintCost, new Map()),
+    acquisitionForLookup(recipeSources, new Map()),
     makeOrBuyContext,
     materialPrices
   );
@@ -326,7 +314,7 @@ export function resolveBuildPlan(
   // One pool for this whole resolution — see the module doc comment.
   const blueprintPools: BlueprintTierPools = new Map();
   const acquisitionForPass = (pools: BlueprintTierPools) =>
-    acquisitionForPool(recipeSources, sources.includeBlueprintCost, pools);
+    acquisitionForLookup(recipeSources, pools);
   const acquisitionFor = acquisitionForPass(blueprintPools);
 
   const {

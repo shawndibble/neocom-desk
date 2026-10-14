@@ -116,7 +116,6 @@ export function IndustryGroupPage() {
       options,
       pricingInputs.corpBlueprints,
       bpcRows,
-      pricingInputs.includeBlueprintCost,
       pricingInputs.communityRows
     );
     if (picks.size === 0) return;

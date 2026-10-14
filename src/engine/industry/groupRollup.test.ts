@@ -547,3 +547,106 @@ describe('rollUpBuildGroup — buy list per hub', () => {
     expect(rollup.shoppingByHub[1].materials[0].remainingQuantity).toBe(0);
   });
 });
+
+describe('rollUpBuildGroup — blueprints pooled across members', () => {
+  /** One member's blueprint row: `copies` bought at 100 ISK, `needed` runs from a `copyRuns`-run copy. */
+  function bpRow(
+    needed: number,
+    copyRuns: number | null,
+    copies: number,
+    ownedRuns = 0
+  ): MaterialCostLine {
+    return {
+      ...line(7, copies || 1, {
+        ownedQuantity: copies ? 0 : 1,
+        remainingQuantity: copies,
+        // An owned-covered member's own line is free, as `resolveTierOption` reports it.
+        unitPrice: copies ? 100 : 0,
+        lineCost: copies * 100,
+      }),
+      acquisitionTier: {
+        me: 0,
+        te: 0,
+        pool: { neededRuns: needed, ownedRuns, copyRuns, copyPrice: 100 },
+      },
+    };
+  }
+
+  function groupOf(rows: MaterialCostLine[]) {
+    return rollUpBuildGroup(
+      rows.map((row, i) =>
+        member({
+          planId: `p${i}`,
+          result: result({ materialCost: row.lineCost, profit: 1000 }),
+          tableMaterials: [row],
+        })
+      )
+    );
+  }
+
+  it('shares one blueprint copy across plans instead of buying one each', () => {
+    // Three plans of 100 runs from 500-run copies: 3 copies alone, 1 together.
+    const rollup = groupOf([bpRow(100, 500, 1), bpRow(100, 500, 1), bpRow(100, 500, 1)]);
+    const row = rollup.tableMaterials.find((m) => m.typeID === 7);
+    expect(row).toMatchObject({ quantity: 1, remainingQuantity: 1, lineCost: 100 });
+    expect(rollup.materialCost).toBe(100);
+    expect(rollup.profit).toBe(3000 + 200);
+  });
+
+  it('scales the pooled count with the runs the group needs', () => {
+    // Eight plans of 100 runs from 300-run copies: 800 runs is 3 copies, not 8.
+    const rollup = groupOf(Array.from({ length: 8 }, () => bpRow(100, 300, 1)));
+    expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
+      quantity: 3,
+      lineCost: 300,
+    });
+  });
+
+  it('spends an owned copy once for the whole group', () => {
+    // 500 owned runs; each plan wanting 400 thinks it is covered, together they are not.
+    const rollup = groupOf([bpRow(400, 500, 0, 500), bpRow(400, 500, 0, 500)]);
+    expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
+      quantity: 1,
+      remainingQuantity: 1,
+      lineCost: 100,
+    });
+    expect(rollup.materialCost).toBe(100);
+  });
+
+  it('prices a copy from the tier, not from an owned-covered member that paid nothing', () => {
+    // A owns 10 runs and needs 5; B needs 15 — the group is 10 runs short.
+    const rollup = groupOf([bpRow(5, 5, 0, 10), bpRow(15, 5, 2, 10)]);
+    expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
+      quantity: 2,
+      lineCost: 200,
+      unpriced: false,
+    });
+  });
+
+  it('buys an original once for the whole group', () => {
+    const rollup = groupOf([bpRow(5, Infinity, 1), bpRow(5, Infinity, 1)]);
+    expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
+      quantity: 1,
+      lineCost: 100,
+    });
+    expect(rollup.materialCost).toBe(100);
+  });
+
+  it('keeps the members’ own figures for a tier nothing can top up', () => {
+    const rollup = groupOf([bpRow(8, null, 0, 10), bpRow(8, null, 0, 10)]);
+    expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
+      quantity: 1,
+      lineCost: 0,
+    });
+    expect(rollup.materialCost).toBe(0);
+  });
+
+  it('leaves a lone member as it priced itself', () => {
+    const rollup = groupOf([bpRow(1000, 500, 2)]);
+    expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
+      quantity: 2,
+      lineCost: 200,
+    });
+    expect(rollup.materialCost).toBe(200);
+  });
+});

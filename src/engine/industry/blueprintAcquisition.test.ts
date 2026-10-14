@@ -77,7 +77,7 @@ describe('selectBlueprintTier', () => {
   it('buys whole copies to cover a shortfall at an owned BPC tier, never a fractional price', () => {
     // Owns 2 runs at ME6, needs 5 — a 3-run shortfall. Only a matching-tier
     // offer (ME6/TE12) can extend that tier; the cheapest one has 2 runs at 10
-    // ISK, so covering a 3-run shortfall needs 2 copies (ceil(3/2)) = 20 ISK.
+    // ISK, so covering a 3-run shortfall needs 2 copies (ceil(3/2)) at 10 ISK each.
     const owned: OwnedBlueprintCopy[] = [{ me: 6, te: 12, runs: 2 }];
     const result = selectBlueprintTier({
       ownedCopies: owned,
@@ -90,7 +90,7 @@ describe('selectBlueprintTier', () => {
     expect(result).toEqual({
       me: 6,
       te: 12,
-      line: { unitPrice: 20, owned: false },
+      line: { unitPrice: 10, quantity: 2, owned: false },
       purchasedRuns: 4,
     });
   });
@@ -139,11 +139,11 @@ describe('selectBlueprintTier', () => {
       bpoSellPrice: null,
       assumedMeForUnowned: 0,
     });
-    // 5 runs needed, this offer covers 1 run per copy at 5 ISK: 5 copies = 25.
+    // 5 runs needed, this offer covers 1 run per copy at 5 ISK: 5 copies at 5 ISK each.
     expect(result).toEqual({
       me: 0,
       te: 0,
-      line: { unitPrice: 25, owned: false },
+      line: { unitPrice: 5, quantity: 5, owned: false },
       purchasedRuns: 5,
     });
   });
@@ -643,13 +643,31 @@ describe('selectBlueprintTier — every purchasable source competes on total cos
     expect(result.line).toEqual({ unitPrice: null, owned: false });
   });
 
+  it.each([
+    { runsPerCopy: 500, needed: 1000, copies: 2 },
+    { runsPerCopy: 500, needed: 1001, copies: 3 },
+    { runsPerCopy: 1, needed: 20, copies: 20 },
+    { runsPerCopy: 500, needed: 20, copies: 1 },
+  ])(
+    'needs $copies copies of a $runsPerCopy-run blueprint for $needed runs',
+    ({ runsPerCopy, needed, copies }) => {
+      const result = selectBlueprintTier({
+        ...base,
+        neededRuns: needed,
+        bpcOffers: [{ me: 0, te: 0, runs: runsPerCopy, quantity: 1, price: 100 }],
+      });
+      expect(result.line?.unitPrice).toBe(100);
+      expect(result.line?.quantity ?? 1).toBe(copies);
+    }
+  );
+
   it('prices a genuinely free extra offer at 0 — an LP redemption with no ISK side at LP Value 0', () => {
     // Unlike a zero-ISK contract (a barter), an LP offer's 0 is its real price.
     const result = selectBlueprintTier({
       ...base,
       extraOffers: [{ me: 0, te: 0, runs: 1, quantity: 1, price: 0 }],
     });
-    expect(result.line).toEqual({ unitPrice: 0, owned: false });
+    expect(result.line).toMatchObject({ unitPrice: 0, owned: false });
   });
 
   it('still never prices a zero-ISK contract listing', () => {

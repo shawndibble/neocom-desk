@@ -8,13 +8,11 @@
  * pricing memo keyed on it doesn't re-run.
  */
 import { DEFAULT_ASSUMED_ME } from './assumedMe';
-import { DEFAULT_INCLUDE_BLUEPRINT_COST } from './includeBlueprintCost';
 import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
 
 export const PRICING_INPUTS_FIXTURE: BuildPlanPricingInputs = {
   hydrated: true,
   assumedMe: DEFAULT_ASSUMED_ME,
-  includeBlueprintCost: DEFAULT_INCLUDE_BLUEPRINT_COST,
   corpBlueprints: { blueprints: [], available: false, incomplete: false },
   standings: new Map(),
   bpcRows: [],

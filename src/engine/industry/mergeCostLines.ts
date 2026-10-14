@@ -24,7 +24,7 @@
  *   offer, so a merged blueprint row must still carry it.
  */
 
-import type { MaterialCostLine } from './types';
+import type { AcquisitionTier, MaterialCostLine } from './types';
 
 /**
  * Written out field by field rather than spread, so a new member of
@@ -45,7 +45,34 @@ export function mergeCostLines(
     lineCost: existing.lineCost + line.lineCost,
     unpriced: existing.unpriced || line.unpriced,
     ...((existing.acquisitionTier ?? line.acquisitionTier)
-      ? { acquisitionTier: existing.acquisitionTier ?? line.acquisitionTier }
+      ? { acquisitionTier: mergedTier(existing.acquisitionTier, line.acquisitionTier) }
       : {}),
+  };
+}
+
+/**
+ * Two rows of one blueprint at the same ME/TE tier need their runs added: the
+ * first row already carries the Character's real owned runs (later nodes only
+ * see what is left over), so owned and per-copy runs stay the first's and only
+ * the needed runs sum. Tiers that differ drop the pooling.
+ */
+function mergedTier(
+  existing: AcquisitionTier | undefined,
+  line: AcquisitionTier | undefined
+): AcquisitionTier | undefined {
+  if (!existing || !line) return existing ?? line;
+  if (existing.me !== line.me || existing.te !== line.te) {
+    // Two tiers behind one summed row: no single set of runs describes it, so
+    // it keeps what its nodes reported and a group leaves it unpooled.
+    return {
+      me: existing.me,
+      te: existing.te,
+      ...(existing.community ? { community: existing.community } : {}),
+    };
+  }
+  if (!existing.pool || !line.pool) return existing;
+  return {
+    ...existing,
+    pool: { ...existing.pool, neededRuns: existing.pool.neededRuns + line.pool.neededRuns },
   };
 }

@@ -1,9 +1,7 @@
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Field, Fields, Spinner, TextInput } from '@/components/ui';
+import { Field, Fields, Spinner, TextInput } from '@/components/ui';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
-import { useIncludeBlueprintCost } from '@/features/industry/includeBlueprintCost';
 import { DefaultsSyncHint } from './settingsFields';
 import { useHydratedStore } from './useHydratedStore';
 
@@ -27,15 +25,12 @@ export function IndustrySettingsForm({
   const setAssumedMe = useAssumedMe((state) => state.setValue);
   const assumedTe = useAssumedTe((state) => state.value);
   const setAssumedTe = useAssumedTe((state) => state.setValue);
-  const includeBlueprintCost = useIncludeBlueprintCost((state) => state.value);
-  const setIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.setValue);
 
   // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
   // make every hook after the first false one a conditional call.
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
-  const includeBlueprintCostHydrated = useHydratedStore(useIncludeBlueprintCost);
-  const ready = assumedMeHydrated && assumedTeHydrated && includeBlueprintCostHydrated;
+  const ready = assumedMeHydrated && assumedTeHydrated;
 
   if (!ready) return <Spinner />;
 
@@ -90,21 +85,6 @@ export function IndustrySettingsForm({
                 }}
                 className="w-24"
               />
-            </Field>
-
-            <Field
-              label={t('settings.includeBlueprintCostLabel')}
-              htmlFor="settings-include-blueprint-cost"
-              inline
-              note={t('settings.includeBlueprintCostHint')}
-            >
-              <label className={touchCheckboxLabelClassName}>
-                <Checkbox
-                  id="settings-include-blueprint-cost"
-                  checked={includeBlueprintCost}
-                  onChange={() => void setIncludeBlueprintCost(!includeBlueprintCost)}
-                />
-              </label>
             </Field>
           </>
         )}
