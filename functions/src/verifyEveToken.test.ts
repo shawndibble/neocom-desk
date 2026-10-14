@@ -14,6 +14,7 @@ import {
   DEFAULT_AUDIENCE,
   DEFAULT_ISSUERS,
   uidForCharacter,
+  characterIdForUid,
   verifyEveAccessToken,
   verifyOptionsFromEnv,
   type VerifyOptions,
@@ -233,5 +234,13 @@ describe('verifyOptionsFromEnv', () => {
 describe('uidForCharacter', () => {
   it('formats the shared cross-device uid', () => {
     expect(uidForCharacter(94832766)).toBe('char:94832766');
+  });
+});
+
+describe('characterIdForUid', () => {
+  it('inverts uidForCharacter and rejects other shapes', () => {
+    expect(characterIdForUid(uidForCharacter(42))).toBe(42);
+    expect(characterIdForUid('char:abc')).toBeUndefined();
+    expect(characterIdForUid('other:1')).toBeUndefined();
   });
 });

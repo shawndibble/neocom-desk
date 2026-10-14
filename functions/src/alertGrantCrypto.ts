@@ -28,9 +28,8 @@ export function encryptRefreshToken(token: string, characterId: number, key: Buf
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   cipher.setAAD(aad(characterId));
   const ct = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
-  return [VERSION, iv, cipher.getAuthTag(), ct]
-    .map((p) => (typeof p === 'string' ? p : p.toString('base64')))
-    .join('.');
+  const b64 = (b: Buffer) => b.toString('base64');
+  return [VERSION, b64(iv), b64(cipher.getAuthTag()), b64(ct)].join('.');
 }
 
 export function decryptRefreshToken(blob: string, characterId: number, key: Buffer): string {

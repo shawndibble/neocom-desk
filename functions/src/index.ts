@@ -15,12 +15,14 @@ import {
   verifyEveAccessToken,
   verifyOptionsFromEnv,
   uidForCharacter,
+  characterIdForUid,
   type EveTokenClaims,
 } from './verifyEveToken.js';
 import {
   AlertGrantError,
   deleteAlertGrant as deleteAlertGrantFor,
   parseSaveAlertGrantInput,
+  refreshAtSso,
   revokeAtSso,
   saveAlertGrant as saveAlertGrantFor,
   type AlertGrantDeps,
@@ -217,8 +219,9 @@ const ALERTS_TOKEN_KEY = defineSecret('ALERTS_TOKEN_KEY');
 function alertGrantDeps(): AlertGrantDeps {
   return {
     store: firestoreAlertGrantStore(getFirestore()),
-    key: parseAlertsKey(ALERTS_TOKEN_KEY.value()),
+    key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
     verify: (accessToken) => verifyEveAccessToken(accessToken, verifyOptions),
+    refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
     revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
     now: () => Date.now(),
     log: (message, data) => logWarn(message, data),
@@ -252,7 +255,7 @@ export const deleteAlertGrant = onCall<unknown>(
   async (request) => {
     const { uid } = callerOf(request);
     try {
-      return await deleteAlertGrantFor(alertGrantDeps(), Number(uid.slice('char:'.length)));
+      return await deleteAlertGrantFor(alertGrantDeps(), characterIdForUid(uid)!);
     } catch (err) {
       return alertGrantHttpsError(err);
     }
@@ -373,7 +376,8 @@ export const purgeStaleAccounts = onSchedule(
 
       // The server-held Alerts Grant token goes with the account (ADR 0020).
       try {
-        await deleteAlertGrantFor(alertGrantDeps(), Number(ref.id.slice('char:'.length)));
+        const characterId = characterIdForUid(ref.id);
+        if (characterId !== undefined) await deleteAlertGrantFor(alertGrantDeps(), characterId);
       } catch (err) {
         logWarn('Stale account purge: Alerts Grant cleanup failed, will retry', {
           uid: ref.id,

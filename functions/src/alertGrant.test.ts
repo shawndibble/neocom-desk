@@ -5,6 +5,7 @@ import {
   AlertGrantError,
   deleteAlertGrant,
   parseSaveAlertGrantInput,
+  refreshAtSso,
   revokeAtSso,
   saveAlertGrant,
   type AlertGrantDeps,
@@ -36,8 +37,13 @@ function makeDeps(over: Partial<AlertGrantDeps> = {}) {
       set: async (id, doc) => void docs.set(id, doc),
       delete: async (id) => void docs.delete(id),
     },
-    key: KEY,
+    key: () => KEY,
     verify: async () => claims(),
+    // SSO rotates: the refreshed token differs from the one supplied.
+    refresh: vi.fn(async (_c: string, t: string) => ({
+      accessToken: 'fresh-access',
+      refreshToken: `${t}-rotated`,
+    })),
     revoke: vi.fn(async () => undefined),
     now: () => 1_000,
     log: (...a) => void logged.push(a),
@@ -67,7 +73,7 @@ describe('saveAlertGrant', () => {
     expect(res).toEqual({ characterId: 42, enabledAt: 1_000 });
     const doc = docs.get(42)!;
     expect(JSON.stringify(doc)).not.toContain(REFRESH);
-    expect(decryptRefreshToken(doc.encryptedRefreshToken, 42, KEY)).toBe(REFRESH);
+    expect(decryptRefreshToken(doc.encryptedRefreshToken, 42, KEY)).toBe(`${REFRESH}-rotated`);
     expect(doc).toMatchObject({
       enabledAt: 1_000,
       highWaterId: null,
@@ -124,9 +130,42 @@ describe('saveAlertGrant', () => {
       { accessToken: 'a', refreshToken: 'second-token' }
     );
     const doc = docs.get(42)!;
-    expect(decryptRefreshToken(doc.encryptedRefreshToken, 42, KEY)).toBe('second-token');
+    expect(decryptRefreshToken(doc.encryptedRefreshToken, 42, KEY)).toBe('second-token-rotated');
     expect(doc).toMatchObject({ enabledAt: 1_000, highWaterId: 99, etag: 'e', seenTypes: ['T'] });
-    expect(deps.revoke).toHaveBeenCalledWith('client-1', REFRESH);
+    expect(deps.revoke).toHaveBeenCalledWith('client-1', `${REFRESH}-rotated`);
+  });
+
+  it('re-saving the token already stored does not revoke the live token', async () => {
+    const { deps } = makeDeps({
+      refresh: vi.fn(async (_c: string, t: string) => ({ accessToken: 'fresh', refreshToken: t })),
+    });
+    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    expect(deps.revoke).not.toHaveBeenCalled();
+  });
+
+  it('rejects a refresh token SSO will not redeem, storing nothing', async () => {
+    const { deps, docs } = makeDeps({
+      refresh: vi.fn(async () => {
+        throw new Error('SSO refresh failed (400)');
+      }),
+    });
+    await expect(
+      saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH })
+    ).rejects.toMatchObject({ code: 'unauthenticated' });
+    expect(docs.size).toBe(0);
+  });
+
+  it('rejects a refresh token that belongs to another Character', async () => {
+    const verify = vi
+      .fn()
+      .mockResolvedValueOnce(claims())
+      .mockResolvedValueOnce(claims({ characterId: 77 }));
+    const { deps, docs } = makeDeps({ verify });
+    await expect(
+      saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH })
+    ).rejects.toMatchObject({ code: 'permission-denied' });
+    expect(docs.size).toBe(0);
   });
 
   it('re-saving a revoked grant starts fresh', async () => {
@@ -145,7 +184,7 @@ describe('deleteAlertGrant', () => {
     const res = await deleteAlertGrant(deps, 42);
     expect(res).toEqual({ deleted: true, revoked: true });
     expect(docs.size).toBe(0);
-    expect(deps.revoke).toHaveBeenCalledWith('client-1', REFRESH);
+    expect(deps.revoke).toHaveBeenCalledWith('client-1', `${REFRESH}-rotated`);
   });
 
   it('is a no-op when no grant exists', async () => {
@@ -195,6 +234,30 @@ describe('revokeAtSso', () => {
     ).rejects.toThrow(/400/);
     await revokeAtSso('c', REFRESH, fetchMock as unknown as typeof fetch).catch((e) =>
       expect(String(e)).not.toContain(REFRESH)
+    );
+  });
+});
+
+describe('refreshAtSso', () => {
+  it('posts a refresh_token grant and returns both tokens', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ access_token: 'acc', refresh_token: 'ref2' }, { status: 200 })
+    );
+    const out = await refreshAtSso('client-1', REFRESH, fetchMock as unknown as typeof fetch);
+    expect(out).toEqual({ accessToken: 'acc', refreshToken: 'ref2' });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://login.eveonline.com/v2/oauth/token');
+    const body = new URLSearchParams(init.body as string);
+    expect(body.get('grant_type')).toBe('refresh_token');
+    expect(body.get('client_id')).toBe('client-1');
+  });
+
+  it('throws a token-free error on failure or a malformed body', async () => {
+    const bad = vi.fn(async () => new Response('x', { status: 400 }));
+    await expect(refreshAtSso('c', REFRESH, bad as unknown as typeof fetch)).rejects.toThrow(/400/);
+    const odd = vi.fn(async () => Response.json({}, { status: 200 }));
+    await expect(refreshAtSso('c', REFRESH, odd as unknown as typeof fetch)).rejects.toThrow(
+      /malformed/
     );
   });
 });

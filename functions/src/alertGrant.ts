@@ -10,6 +10,8 @@ import type { EveTokenClaims } from './verifyEveToken.js';
 /** The only scope an Alerts Grant may carry. */
 export const ALERTS_SCOPE = 'esi-characters.read_notifications.v1';
 
+const SSO_TIMEOUT_MS = 10_000;
+const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
 const REVOKE_URL = 'https://login.eveonline.com/v2/oauth/revoke';
 
 /** `alertGrants/{characterId}` — function-only (firestore.rules denies clients). */
@@ -34,10 +36,18 @@ export interface AlertGrantStore {
   delete(characterId: number): Promise<void>;
 }
 
+export interface RefreshedTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
 export interface AlertGrantDeps {
   store: AlertGrantStore;
-  key: Buffer;
+  /** Lazy: a missing secret must only fail calls that actually need the key. */
+  key: () => Buffer;
   verify: (accessToken: string) => Promise<EveTokenClaims>;
+  /** Exchange a refresh token at SSO; returns the new access token and the rotated refresh token. */
+  refresh: (clientId: string, refreshToken: string) => Promise<RefreshedTokens>;
   revoke: (clientId: string, refreshToken: string) => Promise<void>;
   now: () => number;
   /** Receives only messages and ids — never a token. */
@@ -75,9 +85,56 @@ export async function saveAlertGrant(
   deps: AlertGrantDeps,
   input: SaveAlertGrantInput
 ): Promise<{ characterId: number; enabledAt: number }> {
+  const supplied = await verifyAlertsToken(deps, input.accessToken);
+
+  // The access token alone proves nothing about the refresh token beside it:
+  // anyone holding a stolen access token could otherwise swap in their own.
+  // Redeeming the refresh token at SSO proves it is a live token for this same
+  // Character, and hands back the rotated one, which is the one to store.
+  let refreshed: RefreshedTokens;
+  try {
+    refreshed = await deps.refresh(supplied.clientId, input.refreshToken);
+  } catch (err) {
+    deps.log('Alerts Grant refresh token rejected', {
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+    throw new AlertGrantError('unauthenticated', 'EVE refresh token rejected');
+  }
+  const claims = await verifyAlertsToken(deps, refreshed.accessToken);
+  if (claims.characterId !== supplied.characterId) {
+    throw new AlertGrantError('permission-denied', 'Refresh token belongs to another Character');
+  }
+
+  const { characterId, clientId } = claims;
+  const key = deps.key();
+  const existing = await deps.store.get(characterId);
+  const previousActive = existing?.status === 'active' ? existing : null;
+  const doc: AlertGrantDoc = {
+    encryptedRefreshToken: encryptRefreshToken(refreshed.refreshToken, characterId, key),
+    clientId,
+    enabledAt: previousActive?.enabledAt ?? deps.now(),
+    highWaterId: previousActive?.highWaterId ?? null,
+    etag: previousActive?.etag ?? null,
+    seenTypes: previousActive?.seenTypes ?? [],
+    status: 'active',
+  };
+  await deps.store.set(characterId, doc);
+
+  // The replaced token is now orphaned; revoke it, best effort. The refresh
+  // above usually rotated it already, so skip if it is the one just stored.
+  if (existing) {
+    await revokeStored(deps, characterId, existing, refreshed.refreshToken);
+  }
+  return { characterId, enabledAt: doc.enabledAt };
+}
+
+async function verifyAlertsToken(
+  deps: AlertGrantDeps,
+  accessToken: string
+): Promise<EveTokenClaims> {
   let claims: EveTokenClaims;
   try {
-    claims = await deps.verify(input.accessToken);
+    claims = await deps.verify(accessToken);
   } catch (err) {
     deps.log('Alerts Grant access token rejected', {
       error: err instanceof Error ? err.message : 'unknown',
@@ -87,34 +144,19 @@ export async function saveAlertGrant(
   if (claims.scopes.length !== 1 || claims.scopes[0] !== ALERTS_SCOPE) {
     throw new AlertGrantError('permission-denied', `Token must carry only ${ALERTS_SCOPE}`);
   }
-
-  const { characterId, clientId } = claims;
-  const existing = await deps.store.get(characterId);
-  const keep = existing?.status === 'active' ? existing : null;
-  const doc: AlertGrantDoc = {
-    encryptedRefreshToken: encryptRefreshToken(input.refreshToken, characterId, deps.key),
-    clientId,
-    enabledAt: keep?.enabledAt ?? deps.now(),
-    highWaterId: keep?.highWaterId ?? null,
-    etag: keep?.etag ?? null,
-    seenTypes: keep?.seenTypes ?? [],
-    status: 'active',
-  };
-  await deps.store.set(characterId, doc);
-
-  // The replaced token is now orphaned; revoke it, best effort.
-  if (existing) await revokeStored(deps, characterId, existing);
-  return { characterId, enabledAt: doc.enabledAt };
+  return claims;
 }
 
-/** Decrypt and revoke a stored token at SSO. False if it could not be done. */
+/** Decrypt and revoke a stored token at SSO (unless it equals `keepToken`). False if it could not be done. */
 async function revokeStored(
   deps: AlertGrantDeps,
   characterId: number,
-  doc: AlertGrantDoc
+  doc: AlertGrantDoc,
+  keepToken?: string
 ): Promise<boolean> {
   try {
-    const token = decryptRefreshToken(doc.encryptedRefreshToken, characterId, deps.key);
+    const token = decryptRefreshToken(doc.encryptedRefreshToken, characterId, deps.key());
+    if (token === keepToken) return true;
     await deps.revoke(doc.clientId, token);
     return true;
   } catch (err) {
@@ -154,7 +196,31 @@ export async function revokeAtSso(
       token_type_hint: 'refresh_token',
       client_id: clientId,
     }).toString(),
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(SSO_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`SSO revoke failed (${res.status})`);
+}
+
+/** Refresh-token grant for a public (PKCE) client. Errors carry the status only. */
+export async function refreshAtSso(
+  clientId: string,
+  refreshToken: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<RefreshedTokens> {
+  const res = await fetchImpl(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: clientId,
+    }).toString(),
+    signal: AbortSignal.timeout(SSO_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`SSO refresh failed (${res.status})`);
+  const json = (await res.json()) as { access_token?: unknown; refresh_token?: unknown };
+  if (typeof json.access_token !== 'string' || typeof json.refresh_token !== 'string') {
+    throw new Error('SSO refresh response malformed');
+  }
+  return { accessToken: json.access_token, refreshToken: json.refresh_token };
 }

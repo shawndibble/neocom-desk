@@ -58,6 +58,12 @@ function scopesOf(scp: unknown): string[] {
   return Array.isArray(scp) ? scp.filter((s): s is string => typeof s === 'string') : [];
 }
 
+/** Inverse of `uidForCharacter`; undefined for any other uid shape. */
+export function characterIdForUid(uid: string): number | undefined {
+  const match = /^char:(\d+)$/.exec(uid);
+  return match ? Number(match[1]) : undefined;
+}
+
 /**
  * Verify signature (via JWKS), issuer, audience, and expiry; return identity.
  * Throws on any validation failure.
