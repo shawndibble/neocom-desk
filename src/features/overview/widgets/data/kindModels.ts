@@ -570,6 +570,7 @@ const location: Builder = (feeds, { t }) => {
         isEmpty: !data.needsReauth && system === null,
       })
     ),
+    fetchedAt: data.fetchedAt,
     table: system
       ? locationTable(t, { system: systemName, security: system.security, ship: data.shipName })
       : undefined,

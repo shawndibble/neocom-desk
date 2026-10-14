@@ -474,6 +474,8 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
   const severity = ordersSeverity(rows, needsReauth);
   return {
     ...blank(to, statusOf(feed, { needsPermission: needsReauth, isEmpty: rows.length === 0 })),
+    // The snapshot's own clock: when its orders were read, not when this view was built.
+    fetchedAt: new Date(snapshot.now),
     number: {
       value: count(undercut),
       unit: t('overview.board.undercut'),

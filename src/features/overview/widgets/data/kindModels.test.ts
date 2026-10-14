@@ -490,10 +490,12 @@ describe('location', () => {
           system: { id: 30000142, name: 'Jita', security: 0.9459 },
           shipTypeId: 1,
           shipName: 'Muninn',
+          fetchedAt: new Date(1_700_000_000_000),
         }),
       },
       ctx()
     );
+    expect(view.fetchedAt).toEqual(new Date(1_700_000_000_000));
     expect(view.number.value).toBe('Jita');
     expect(view.number.secondary?.text).toBe('Muninn');
     expect(view.number.unit).toContain('"value":"0.9"');
@@ -501,7 +503,13 @@ describe('location', () => {
   });
 
   it('is empty when the location cannot be read and needs the grant when it lapsed', () => {
-    const none = { needsReauth: false, system: null, shipTypeId: null, shipName: null };
+    const none = {
+      needsReauth: false,
+      system: null,
+      shipTypeId: null,
+      shipName: null,
+      fetchedAt: null,
+    };
     expect(stateOf(buildView('location', { location: ok(none) }, ctx()))).toBe('empty');
     expect(
       stateOf(buildView('location', { location: ok({ ...none, needsReauth: true }) }, ctx()))
@@ -669,6 +677,7 @@ describe('location table', () => {
           system: { id: 1, name: 'Sys', security },
           shipTypeId: 1,
           shipName: 'Muninn',
+          fetchedAt: new Date(1_700_000_000_000),
         }),
       },
       ctx()
