@@ -596,7 +596,7 @@ function SwapButton({
       )}
       {kind === 'build' && skillGate?.gated && nameForCharacter && nameForSkill && (
         <SkillGateMarker
-          quiet
+          lockOnly
           verdict={skillGate}
           nameForSkill={nameForSkill}
           nameForCharacter={nameForCharacter}
