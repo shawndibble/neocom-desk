@@ -18,10 +18,10 @@ interface CharacterHeaderProps {
   /** ESI's unallocated_sp; null while loading, or when unavailable. */
   unallocatedSp?: number | null;
   /**
-   * The Overview's layout: no SP chips (a Skill points widget carries them),
-   * `aside` beside the name and `actions` (Next deadline, Customize) in the
-   * header's own flex row, level with and ahead of the bell. Clones and
-   * Employment History leave it off.
+   * The Overview's layout: a narrower name column (`basis-36`) and the bell
+   * always shown. SP chips come from `totalSp`/`unallocatedSp` and the slots
+   * from `aside`/`actions`, none of which this flag changes; the Overview just
+   * passes no SP (a Skill points widget carries it).
    */
   overview?: boolean;
   /** Beside the name (the data age); wraps under it when the name is long. */

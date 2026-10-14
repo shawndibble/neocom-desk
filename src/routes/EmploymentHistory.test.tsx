@@ -197,9 +197,7 @@ describe('EmploymentHistory', () => {
     // the bell. The panel below has no title bar of its own: the tab says it.
     const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
     expect(within(header!).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
-    expect(
-      within(header!).getByRole('button', { name: /table actions|export/i })
-    ).toBeInTheDocument();
+    expect(within(header!).getByRole('button', { name: 'Export Employment' })).toBeInTheDocument();
     expect(await within(header!).findByText('Updated')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 2, name: 'Employment' })).toBeNull();
 
