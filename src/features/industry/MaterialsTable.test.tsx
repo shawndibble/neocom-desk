@@ -1551,52 +1551,36 @@ describe('MaterialsTable skill-gate marker (issue #1015)', () => {
     expect(within(row('Mechanical Parts')).getByText('Industry V')).toBeInTheDocument();
   });
 
-  it('marks a bought row whose cost call is build — the gate is why it was not built', () => {
+  it('puts a text-free lock on the Build instead line of a gated bought row, not beside its name', () => {
     renderTable({
       materials: MENU_LINES,
       skillGates: new Map([[9840, GATED]]),
-      makeOrBuy: new Map([
-        [
-          9840,
-          {
-            method: 'manufacturing',
-            verdict: 'build',
-            makeUnitPrice: 40,
-            buyUnitPrice: 50,
-            savings: 100,
-            me: 0,
-            blueprintCost: 0,
-          },
-        ],
-      ]),
+      canBuildHere: () => true,
+      onToggleBuildHere: vi.fn(),
       characterNameFor,
     });
 
-    expect(within(row('Mechanical Parts')).getByText('Industry V')).toBeInTheDocument();
+    const parts = within(row('Mechanical Parts'));
+    expect(parts.queryByText('Industry V')).toBeNull();
+    const lock = parts.getByRole('button', { name: /Industry V/ });
+    expect(lock).toHaveTextContent('');
+    expect(lock.compareDocumentPosition(parts.getByText('Build instead'))).toBe(
+      Node.DOCUMENT_POSITION_PRECEDING
+    );
   });
 
-  it('leaves a bought row unmarked when buying is cheaper anyway', () => {
+  it('leaves a bought row with no lock when its blueprint is not gated', () => {
     renderTable({
       materials: MENU_LINES,
-      skillGates: new Map([[9840, GATED]]),
-      makeOrBuy: new Map([
-        [
-          9840,
-          {
-            method: 'manufacturing',
-            verdict: 'buy',
-            makeUnitPrice: 60,
-            buyUnitPrice: 50,
-            savings: 0,
-            me: 0,
-            blueprintCost: 0,
-          },
-        ],
-      ]),
+      skillGates: new Map([[9840, { gated: false }]]),
+      canBuildHere: () => true,
+      onToggleBuildHere: vi.fn(),
       characterNameFor,
     });
 
-    expect(within(row('Mechanical Parts')).queryByText('Industry V')).toBeNull();
+    expect(
+      within(row('Mechanical Parts')).queryByRole('button', { name: /Industry V/ })
+    ).toBeNull();
   });
 
   it('shows no marker at all when the caller passed no skill-gate data', () => {
