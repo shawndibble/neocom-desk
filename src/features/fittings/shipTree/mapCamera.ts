@@ -2,6 +2,11 @@
  * The map's pan/zoom camera: world → screen is `translate(x, y) scale(z)`.
  * Pure, so Fit, centring on a hull and zooming around the pointer are
  * testable without a DOM.
+ *
+ * `z` is the rendered scale: the reader's zoom times `scale`, the root font
+ * scale (`useFontScale`). The map is px geometry on a canvas, so it grows with
+ * the text-size setting by scaling the camera, not by rem. Every function takes
+ * `scale` (default 1) and keeps its bounds in the reader's zoom terms.
  */
 import type { ShipTreeNode } from '@/engine/shipTree/types';
 
@@ -24,7 +29,8 @@ export const FIT_FLOOR = 0.25;
 const FOCUS_ZOOM = 0.8;
 const FIT_PADDING = 40;
 
-const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+const clampZoom = (z: number, scale: number) =>
+  Math.min(MAX_ZOOM * scale, Math.max(MIN_ZOOM * scale, z));
 
 /** The tree centred at zoom `z`. `leftInset`: px an overlay panel covers on the left. */
 function centreAt(world: Size, viewport: Size, z: number, leftInset: number): Camera {
@@ -37,11 +43,15 @@ function centreAt(world: Size, viewport: Size, z: number, leftInset: number): Ca
 }
 
 /** The whole tree, centred, at most 100%. */
-export function fitCamera(world: Size, viewport: Size, leftInset = 0): Camera {
+export function fitCamera(world: Size, viewport: Size, leftInset = 0, scale = 1): Camera {
   const width = viewport.width - leftInset;
   const z = Math.max(
-    FIT_FLOOR,
-    Math.min(1, (width - FIT_PADDING) / world.width, (viewport.height - FIT_PADDING) / world.height)
+    FIT_FLOOR * scale,
+    Math.min(
+      scale,
+      (width - FIT_PADDING) / world.width,
+      (viewport.height - FIT_PADDING) / world.height
+    )
   );
   return centreAt(world, viewport, z, leftInset);
 }
@@ -51,13 +61,18 @@ export function fitCamera(world: Size, viewport: Size, leftInset = 0): Camera {
  * resets to on a faction switch) at — unlike `fitCamera`, this never shrinks
  * a large tree to make it fit; the reader pans to see the rest.
  */
-export function initialCamera(world: Size, viewport: Size, leftInset = 0): Camera {
-  return centreAt(world, viewport, 1, leftInset);
+export function initialCamera(world: Size, viewport: Size, leftInset = 0, scale = 1): Camera {
+  return centreAt(world, viewport, scale, leftInset);
 }
 
 /** One class centred in the viewport. */
-export function focusCamera(node: ShipTreeNode, viewport: Size, currentZoom: number): Camera {
-  const z = Math.max(currentZoom, FOCUS_ZOOM);
+export function focusCamera(
+  node: ShipTreeNode,
+  viewport: Size,
+  currentZoom: number,
+  scale = 1
+): Camera {
+  const z = Math.max(currentZoom, FOCUS_ZOOM * scale);
   return {
     z,
     x: viewport.width / 2 - (node.x + node.w / 2) * z,
@@ -66,8 +81,8 @@ export function focusCamera(node: ShipTreeNode, viewport: Size, currentZoom: num
 }
 
 /** Zoom by `factor`, keeping the world point under (px, py) — viewport coordinates — still. */
-export function zoomAround(cam: Camera, factor: number, px: number, py: number): Camera {
-  const z = clampZoom(cam.z * factor);
+export function zoomAround(cam: Camera, factor: number, px: number, py: number, scale = 1): Camera {
+  const z = clampZoom(cam.z * factor, scale);
   return { z, x: px - ((px - cam.x) * z) / cam.z, y: py - ((py - cam.y) * z) / cam.z };
 }
 

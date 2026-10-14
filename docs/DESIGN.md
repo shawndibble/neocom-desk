@@ -293,6 +293,10 @@ Rules:
   (`fontSize: '0.6875rem'`), never a number; and a px size that sits beside
   rem text (a virtualizer row estimate, a chart axis gutter) goes through
   `rootFontScale()` / `scalePx()` from the same file.
+  Exception: the Ship Tree map (`shipTree.css`) stays px. Its tiles, edge
+  paths and Ωs share one px coordinate space (`SHIP_TREE_GEOMETRY`), so rem
+  would pull the lines off the tiles. It scales as a unit instead: the text
+  scale multiplies the camera zoom in `mapCamera.ts`.
 
 ## 2b. Brand assets
 
