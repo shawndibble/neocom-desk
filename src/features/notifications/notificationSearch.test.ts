@@ -1,52 +1,52 @@
 import { describe, it, expect } from 'vitest';
 import {
-  filterNotificationSections,
+  filterNotificationEvents,
   NOTIFICATION_SEARCH_MIN_QUERY_LENGTH,
 } from './notificationSearch';
-import type { NotificationEventId } from './events';
 
-const EVENTS = [
-  { id: 'skillLevelComplete' as NotificationEventId, label: 'Skill Level Complete' },
-  { id: 'newMail' as NotificationEventId, label: 'New Mail' },
-];
+it('starts filtering at three characters', () => {
+  expect(NOTIFICATION_SEARCH_MIN_QUERY_LENGTH).toBe(3);
+});
 
-const SECTIONS = [
-  { characterId: 1, characterName: 'Alice Pilot' },
-  { characterId: 2, characterName: 'Bob Trader' },
-];
+describe('filterNotificationEvents', () => {
+  const characters = [
+    { characterId: 1, characterName: 'Pilot One' },
+    { characterId: 2, characterName: 'Pilot Two' },
+    { characterId: 3, characterName: 'Mero Otichoda' },
+  ];
+  const events = [
+    { id: 'newMail' as const, label: 'New Mail' },
+    { id: 'skillQueueEnding' as const, label: 'Skill Queue Ending' },
+  ];
 
-describe('filterNotificationSections', () => {
-  it('returns null (no filter) under the minimum query length', () => {
-    expect(NOTIFICATION_SEARCH_MIN_QUERY_LENGTH).toBeGreaterThan(0);
-    const shortQuery = 'a'.repeat(NOTIFICATION_SEARCH_MIN_QUERY_LENGTH - 1);
-    expect(filterNotificationSections(SECTIONS, EVENTS, shortQuery)).toBeNull();
+  it('is null (no filter) under the minimum query length', () => {
+    expect(filterNotificationEvents(characters, events, 'ne')).toBeNull();
   });
 
-  it('matches a section by event-type name, showing only the matching events', () => {
-    const result = filterNotificationSections(SECTIONS, EVENTS, 'mail');
-    expect(result).not.toBeNull();
-    expect([...result!.visibleCharacterIds].sort()).toEqual([1, 2]);
-    expect(result!.visibleEventIdsByCharacter.get(1)).toEqual(new Set(['newMail']));
-    expect(result!.visibleEventIdsByCharacter.get(2)).toEqual(new Set(['newMail']));
+  it('an event-name match shows only those events, with every character', () => {
+    const result = filterNotificationEvents(characters, events, 'mail')!;
+    expect([...result.visibleEventIds]).toEqual(['newMail']);
+    expect(result.characterIds).toBeNull();
   });
 
-  it('matches a section by character name, showing every event for that character', () => {
-    const result = filterNotificationSections(SECTIONS, EVENTS, 'alice');
-    expect(result).not.toBeNull();
-    expect([...result!.visibleCharacterIds]).toEqual([1]);
-    expect(result!.visibleEventIdsByCharacter.get(1)).toEqual(
-      new Set(['skillLevelComplete', 'newMail'])
-    );
+  it('a character-name match shows every event, narrowed to the matching characters', () => {
+    const result = filterNotificationEvents(characters, events, 'pilot')!;
+    expect([...result.visibleEventIds]).toEqual(['newMail', 'skillQueueEnding']);
+    expect([...result.characterIds!]).toEqual([1, 2]);
   });
 
-  it('hides a section with no matching event and no matching character name', () => {
-    const result = filterNotificationSections(SECTIONS, EVENTS, 'zzz-no-match');
-    expect(result).not.toBeNull();
-    expect(result!.visibleCharacterIds.size).toBe(0);
+  it('shows nothing when neither matches', () => {
+    const result = filterNotificationEvents(characters, events, 'zzzz')!;
+    expect(result.visibleEventIds.size).toBe(0);
   });
 
-  it('is case-insensitive', () => {
-    const result = filterNotificationSections(SECTIONS, EVENTS, 'MAIL');
-    expect([...result!.visibleCharacterIds].sort()).toEqual([1, 2]);
+  it('when both match, events win so the rows stay the ones the query names', () => {
+    const result = filterNotificationEvents(
+      [{ characterId: 9, characterName: 'Mailer Dan' }],
+      events,
+      'mail'
+    )!;
+    expect([...result.visibleEventIds]).toEqual(['newMail']);
+    expect(result.characterIds).toBeNull();
   });
 });

@@ -1,120 +1,52 @@
 /**
  * Settings' Notifications section. Persistence + UI shell landed with issue
- * #170; issue #171 added the browser grant on top, so this section now renders
+ * #170; issue #171 added the browser grant on top, so this section renders
  * three ways off the *live* `Notification.permission` (never off the stored
- * outcome — the user can flip it in site settings without telling the page):
+ * outcome, since the user can flip it in site settings without telling the
+ * page):
  *
- * - **denied** — the blocked notice stands in for the whole toggle UI. JS
- *   cannot re-request a denied grant, so offering toggles here would be a
- *   button that does nothing.
- * - **default** — the toggles stay, with an Enable button above them: the
+ * - **denied**: the blocked notice and a disabled Device column. JS cannot
+ *   re-request a denied grant, so a toggle here would do nothing.
+ * - **default**: the toggles stay, with an Enable button above them: the
  *   second chance for someone who dismissed the one-time explainer
  *   (`NotificationPermissionPrompt`). That tap is the only thing in this file
  *   that reaches the browser prompt; nothing requests permission on mount.
- * - **granted** (and browsers with no Notification API at all) — unchanged.
+ * - **granted** (and browsers with no Notification API at all): unchanged.
  *
- * Below that: each Character gets a collapsible section listing every
- * Notification Event, on by default, with a select-all/none checkbox; a row
- * the Character lacks the ESI scope for renders disabled with a reauth tooltip
- * instead of a working toggle (the same "compare the grant, don't wait for a
- * 403" reasoning as `ScopeGate.tsx`, applied per row instead of per route).
- * Search filters rows by event-type or Character name (Trained Skills
- * precedent, issue #108). The Foreground Poller
- * (`features/notifications/ForegroundNotificationPoller.tsx`, issue #172)
- * reads these same toggles to decide what to fire; further Notification
- * Events land here as later tickets add their pollers (GLOSSARY.md round 20).
- *
- * Issue #740: a ~50-Character roster with several sections expanded used to
- * mount every one of their ~90 checkboxes at once, and any state change
- * (including a keystroke in the search box) re-rendered every expanded
- * Character's full row set. Below, one virtualized row per Character
- * (`@tanstack/react-virtual`, the same library `Assets.tsx` uses for a
- * comparable large-list case) windows the section list so only the
- * Characters actually on screen mount, and `CharacterNotificationSection` is
- * memoized so an edit to one Character's preferences doesn't force React to
- * re-diff every other Character's rows.
- */ import { rootFontScale } from '@/lib/fontScale';
-import {
-  focusRingInsetClassName,
-  interactiveClassName,
-  touchCheckboxLabelClassName,
-  tappableRowClassName,
-} from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+ * Below that the page is event-first: every Notification Event once, each row
+ * speaking for all Characters, with a "K differ" chip and an expander that
+ * lists the Characters so the odd ones out can be fixed (`NotificationEventList`).
+ * A row a Character lacks the ESI scope for does not count that Character and
+ * shows it dimmed with a reauth tooltip, the "compare the grant, don't wait for
+ * a 403" reasoning of `ScopeGate.tsx` applied per Character. The Foreground
+ * Poller (`ForegroundNotificationPoller.tsx`, issue #172) reads these same
+ * toggles to decide what to fire.
+ */
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { measureElement, useWindowVirtualizer } from '@tanstack/react-virtual';
-import {
-  Button,
-  Panel,
-  EmptyState,
-  SearchInput,
-  Tooltip,
-  TextInput,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Caret,
-  Checkbox,
-} from '@/components/ui';
-import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
-import { layoutNotificationEvents } from './notificationLayout';
-import { AllCharactersNotificationSection } from './AllCharactersNotificationSection';
+import { Link } from 'react-router-dom';
+import { Button, Panel, EmptyState, SearchInput, Checkbox } from '@/components/ui';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
-import { CHANNEL_COLUMNS, ChannelColumnHeadings } from './ChannelColumns';
-import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
+import { NotificationEventList } from './NotificationEventList';
+import type { EventRowContext } from './eventRowSupport';
+import { useIsDesktop } from './useIsDesktop';
 import { db } from '@/db';
-import {
-  NOTIFICATION_EVENTS,
-  NOTIFICATION_EVENT_IDS,
-  eventLabelKey,
-  missingEventPermission,
-  type NotificationEventDef,
-  type NotificationEventId,
-} from './events';
+import { NOTIFICATION_EVENT_IDS, eventLabelKey } from './events';
 import {
   useNotificationPreferences,
   hydrateNotificationPreferences,
-  updateNotificationPrefs as updatePrefs,
   setDeviceNotificationPrefs,
-  characterEventPrefs,
-  characterEveTypePrefs,
   withMasterEnabled,
   withBrowserEnabled,
   withFeedEnabled,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
-  toggleEventChannelPref,
-  toggleAllEventsChannelPref,
-  toggleEveTypeChannelPref,
-  toggleAllEveTypesChannelPref,
-  characterEventThresholds,
-  withCharacterEventThreshold,
-  type CharacterEventThresholds,
 } from './preferences';
-import { eventEntry, type EventThresholds } from './eventEntries';
-import type { ThresholdField, ThresholdKey } from './eventThresholds';
-import {
-  isEventEnabledFor,
-  isEveTypeEnabledFor,
-  selectionStateForEvents,
-  selectionStateForEveTypes,
-  NOTIFICATION_CHANNELS,
-  NOTIFICATION_FAMILIES,
-  eveTypesByFamily,
-  extraEveTypes,
-  type NotificationChannel,
-  type EventEnabledMap,
-  type EveTypeEnabledMap,
-} from './eventSelection';
-import { eveTypeLabel } from './eveTypeLabel';
-import { filterNotificationSections } from './notificationSearch';
-import { estimateCharacterSectionHeight } from './notificationRows';
+import { extraEveTypes } from './eventSelection';
+import { filterNotificationEvents } from './notificationSearch';
 import { useSeenEveTypesStore } from './seenEveTypes';
-import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
 import {
   useNotificationPermission,
@@ -122,8 +54,6 @@ import {
   promptStateAfterAsk,
   notificationsBlocked,
 } from './permission';
-import { Link } from 'react-router-dom';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { tabPath } from '@/lib/pageTabs';
 import { SETTINGS_TABS } from '@/app/pageTabs';
 import { webPushSupport } from '@/sync/webPushSupport';
@@ -131,8 +61,6 @@ import { enableWebPush } from './webPush';
 import { usePushFailure } from './pushFailure';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { beginEveLogin } from '@/app/loginFlow';
-import { PERMISSIONS, type ScopeGroup } from '@/esi/registry';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 import { useUrlParam } from '@/lib/useUrlState';
@@ -140,97 +68,8 @@ import { textParam } from '@/lib/urlState';
 import { androidNotificationSettingsUrl, isPlayStoreApp } from '@/lib/playStoreApp';
 import { assignLocation } from '@/app/navigation';
 
-const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
-
 /** Module scope so `useUrlParam` sees a stable codec identity across renders. */
 const SEARCH_PARAM = textParam();
-
-/** Stable identity for a Character with no seen types, so it doesn't break `CharacterNotificationSection`'s memo. */
-const NO_EXTRA_TYPES: readonly string[] = [];
-
-/** Stable identity for a Character with no token row yet, so it doesn't itself break `CharacterNotificationSection`'s memo. */
-const EMPTY_SCOPES: ReadonlySet<string> = new Set();
-
-/** Matches Layout.tsx's phone/desktop line (#114). */
-const DESKTOP_QUERY = '(min-width: 48rem)';
-
-/**
- * True at or above `md`, where the section header drops back off the touch
- * tier (issue #1118). The virtualizer's first-paint estimate has to know
- * which tier the header is actually rendering at; `measureElement` then
- * corrects it to the real height. Local rather than shared,
- * matching `EntryList.tsx`'s own copy of this hook.
- */
-function useIsDesktop(): boolean {
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_QUERY).matches
-  );
-  useEffect(() => {
-    const desktop = window.matchMedia(DESKTOP_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    desktop.addEventListener('change', onChange);
-    return () => desktop.removeEventListener('change', onChange);
-  }, []);
-  return isDesktop;
-}
-
-/**
- * Events whose whole row is delivered by Scheduled Push — the ones that carry
- * the badge saying so.
- *
- * Read from each Event Entry's `projection.everyOccurrence`, not merely
- * "projects at all": `eveNotification` projects one sub-case only — a
- * structure's reinforcement *exit* has a knowable future instant, and the
- * other 25 types on that row do not. A badge there would tell someone who
- * enabled `WarDeclared` that it reaches them with the app closed, which is
- * false. So its entry says `everyOccurrence: false`, and the
- * reinforcement-timer fact stays where it already lives — in prose, not on an
- * icon that means something else everywhere it appears.
- */
-const PUSH_BADGED_EVENT_IDS: ReadonlySet<NotificationEventId> = new Set(
-  NOTIFICATION_EVENT_IDS.filter((id) => eventEntry(id).projection?.everyOccurrence === true)
-);
-
-function eventDef(eventId: NotificationEventId): NotificationEventDef {
-  const def = EVENT_BY_ID.get(eventId);
-  if (!def) throw new Error(`Unknown Notification Event id: ${eventId}`);
-  return def;
-}
-
-/**
- * One Character's scope/capability read for one event (issue #740) — the
- * single place both the virtualizer's `estimateSize` and
- * `CharacterNotificationSection`'s render read this from, so the two can't
- * drift into disagreeing about which rows a Character's section actually
- * has (they used to each reimplement this independently).
- */
-function characterEventRowState(
-  eventId: NotificationEventId,
-  grantedScopes: ReadonlySet<string>,
-  characterCapabilities: CorpCapabilities | undefined
-): {
-  hasScope: boolean;
-  capabilityMissing: boolean;
-  rowEnabled: boolean;
-  /** The ungranted Permission behind a missing scope (issue #1525); `null` for a Core Grant scope. */
-  missingPermission: ScopeGroup | null;
-} {
-  const def = eventDef(eventId);
-  const hasScope = def.scope === undefined || grantedScopes.has(def.scope);
-  // A capability not yet resolved reads as held (see the capability
-  // effect's own doc comment below) — never a false lock while the roles
-  // read is still in flight.
-  const capabilityMissing = !(
-    def.corpCapability === undefined ||
-    (characterCapabilities?.[def.corpCapability] ?? true)
-  );
-  return {
-    hasScope,
-    capabilityMissing,
-    rowEnabled: hasScope && !capabilityMissing,
-    missingPermission: missingEventPermission(eventId, grantedScopes),
-  };
-}
 
 export function NotificationsPanel() {
   const { t } = useTranslation();
@@ -311,41 +150,8 @@ export function NotificationsPanel() {
   const [inPlayStoreApp] = useState(isPlayStoreApp);
 
   const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
-  const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
-  // Collapsed to start, like every Character but the active one: the header's
-  // select-all column keeps the broadcast one click away.
-  const [allCharactersExpanded, setAllCharactersExpanded] = useState(false);
-
-  /**
-   * The active Character's section starts open: with several Characters
-   * signed in, every section collapsed meant the one people came here to
-   * change was the one thing the page did not show.
-   *
-   * An effect rather than a `useState` initializer because
-   * `useActiveCharacter` hydrates from Dexie — `activeCharacterId` is `null`
-   * on the first render, so seeding at mount would seed nothing. It runs once
-   * per id: the ref is what keeps a re-render (or a hydration that resolves
-   * to the id already seeded) from re-opening a section the user has since
-   * collapsed by hand.
-   */
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const seededCharacterId = useRef<number | null>(null);
-  useEffect(() => {
-    if (activeCharacterId === null || seededCharacterId.current === activeCharacterId) return;
-    seededCharacterId.current = activeCharacterId;
-    setExpandedCharacterIds((prev) => new Set(prev).add(activeCharacterId));
-  }, [activeCharacterId]);
-
-  // useCallback (issue #740): a stable reference, not a fresh function every
-  // render, so it doesn't itself break `CharacterNotificationSection`'s memo.
-  const toggleExpanded = useCallback((characterId: number) => {
-    setExpandedCharacterIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(characterId)) next.delete(characterId);
-      else next.add(characterId);
-      return next;
-    });
-  }, []);
+  const isDesktop = useIsDesktop();
 
   const scopesByCharacterId = useMemo(() => {
     const map = new Map<number, ReadonlySet<string>>();
@@ -398,152 +204,67 @@ export function NotificationsPanel() {
     [t]
   );
 
-  const sections = useMemo(
-    () => (characters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
-    [characters]
-  );
-
-  const filterResult = useMemo(
-    () => filterNotificationSections(sections, eventLabels, search),
-    [sections, eventLabels, search]
-  );
-  const searching = filterResult !== null;
-  // useLiveQuery resolves asynchronously — render the panel and master switch
-  // immediately (like ActivityLogPanel does), and treat "still loading" the
-  // same as "no characters yet" rather than blanking the whole section.
+  // useLiveQuery resolves asynchronously: render the panel and master switch
+  // immediately, and treat "still loading" the same as "no characters yet".
   // "Still loading" covers `tokens` too: the two live queries resolve on
-  // separate ticks, and rendering Characters before their tokens arrive
-  // drew every row scope-less — disabled, "re-authorize" tooltip — for a
-  // frame, then remounted each checkbox out of its Tooltip wrapper once
-  // the scopes landed (a click in that window was swallowed).
+  // separate ticks, and rendering Characters before their tokens arrive drew
+  // every row scope-less for a frame.
   const characterList = useMemo(
     () => (characters !== undefined && tokens !== undefined ? characters : []),
     [characters, tokens]
   );
 
   /**
-   * Every known Character id, active one first (issue #738): the "All
-   * Characters" broadcast writes into every id here in one call, then drives
-   * `updateNotificationPrefs`'s sync scheduling off `characterIds[0]` — the
-   * active Character is the one this session already knows is signed in with
-   * a usable token, so leading with it (rather than Dexie's insertion order)
-   * is what makes that assumption actually hold.
+   * Every known Character, active one first: a row's broadcast writes into
+   * every Character it applies to in one call and schedules its sync off the
+   * first, and the active Character is the one this session already knows is
+   * signed in with a usable token.
    */
-  const allCharacterIds = useMemo(() => {
-    const ids = characterList.map((c) => c.characterId);
-    if (activeCharacterId === null) return ids;
-    return [activeCharacterId, ...ids.filter((id) => id !== activeCharacterId)];
-  }, [characterList, activeCharacterId]);
+  const characterRefs = useMemo(
+    () => characterList.map((c) => ({ characterId: c.characterId, name: c.name })),
+    [characterList]
+  );
+  const orderedCharacters = useMemo(() => {
+    if (activeCharacterId === null) return characterRefs;
+    return [
+      ...characterRefs.filter((c) => c.characterId === activeCharacterId),
+      ...characterRefs.filter((c) => c.characterId !== activeCharacterId),
+    ];
+  }, [characterRefs, activeCharacterId]);
 
-  // A denied grant disables the *browser* column and its Enable button — JS
-  // cannot re-request one, so those controls could never take effect. It no
-  // longer stands in for the whole panel: the Overview feed is designed to
-  // work with no grant at all (`foregroundPoller` keeps filing it when
-  // permission is 'denied'), so blanking this section left exactly the user
-  // whose only channel is the feed with no way to configure it — and the
-  // Overview's own "Settings" link landing on a dead end.
-  const browserBlocked = notificationsBlocked(permission);
-
-  const visibleCharacters = useMemo(
+  const filterResult = useMemo(
     () =>
-      searching
-        ? characterList.filter((c) => filterResult!.visibleCharacterIds.has(c.characterId))
-        : characterList,
-    [characterList, searching, filterResult]
+      filterNotificationEvents(
+        orderedCharacters.map((c) => ({ characterId: c.characterId, characterName: c.name })),
+        eventLabels,
+        search
+      ),
+    [orderedCharacters, eventLabels, search]
+  );
+  const visibleEventIds = useMemo(
+    () =>
+      filterResult === null
+        ? NOTIFICATION_EVENT_IDS
+        : NOTIFICATION_EVENT_IDS.filter((id) => filterResult.visibleEventIds.has(id)),
+    [filterResult]
   );
 
-  /**
-   * One virtualized row per Character (issue #740): only the sections
-   * actually on screen mount, regardless of roster size. `estimateSize`
-   * reuses the exact same conditional-row walk the section below renders
-   * (`estimateCharacterSectionHeight`), so the estimate tracks what's really
-   * about to render rather than guessing a flat height.
-   *
-   * Windows against the page itself rather than an inner scroll box
-   * (`useWindowVirtualizer`, not `useVirtualizer`): a fixed-height,
-   * internally-scrolling panel here read as a cramped box with its own
-   * scrollbar buried inside the page. The load-bearing case #740 was filed
-   * for is still covered — a search matching the whole roster expands every
-   * section at once (`expanded = searching || ...` below), which is the
-   * same worst case whichever element does the scrolling.
-   */
-  const [listElement, setListElement] = useState<HTMLDivElement | null>(null);
-  const [scrollMargin, setScrollMargin] = useState(0);
-  const isDesktop = useIsDesktop();
-  // A callback ref, not a plain `useRef` read at render time (the eslint
-  // `react-hooks/refs` rule this project enables forbids that): the list sits
-  // below content whose height can change after mount (a permission banner
-  // appearing, search narrowing the roster), so this re-measures on resize
-  // too, the same pattern `useViewportBoundedHeight` uses for its own
-  // layout-position read.
-  const listRef = useCallback((node: HTMLDivElement | null) => setListElement(node), []);
-  useEffect(() => {
-    if (!listElement) return;
-    const measure = () => setScrollMargin(listElement.offsetTop);
-    measure();
-    window.addEventListener('resize', measure);
-    const observer = new ResizeObserver(measure);
-    observer.observe(document.body);
-    return () => {
-      window.removeEventListener('resize', measure);
-      observer.disconnect();
-    };
-  }, [listElement]);
-  const rowVirtualizer = useWindowVirtualizer({
-    count: visibleCharacters.length,
-    estimateSize: (index) => {
-      const character = visibleCharacters[index];
-      const expanded = searching || expandedCharacterIds.has(character.characterId);
-      const visibleEventIds: readonly NotificationEventId[] = searching
-        ? [...(filterResult!.visibleEventIdsByCharacter.get(character.characterId) ?? [])]
-        : NOTIFICATION_EVENT_IDS;
-      const grantedScopes = scopesByCharacterId.get(character.characterId) ?? EMPTY_SCOPES;
-      const characterCapabilities = capabilitiesByCharacterId.get(character.characterId);
-      return (
-        rootFontScale() *
-        estimateCharacterSectionHeight({
-          expanded,
-          touchViewport: !isDesktop,
-          visibleEventIds,
-          rowEnabledFor: (eventId) =>
-            characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
-          missingPermissionFor: (eventId) =>
-            characterEventRowState(eventId, grantedScopes, characterCapabilities)
-              .missingPermission !== null,
-          extraEveTypeCount: extraTypesByCharacter.get(character.characterId)?.length ?? 0,
-          hasEveNotificationScope: characterEventRowState(
-            'eveNotification',
-            grantedScopes,
-            characterCapabilities
-          ).hasScope,
-        })
-      );
-    },
-    getItemKey: (index) => visibleCharacters[index].characterId,
-    // `virtualRow.start` is otherwise measured from the top of the
-    // *document*, not this list — it has to know how far down the page the
-    // list itself starts (master switch, channel toggles, the All
-    // Characters section, and the search box all sit above it).
-    // Where nothing is laid out (jsdom) a measure reads 0; keep the estimate
-    // then, as `DataTable` does, rather than collapsing every section to 0.
-    measureElement: (element, entry, instance) =>
-      measureElement(element, entry, instance) ||
-      instance.options.estimateSize(Number((element as HTMLElement).dataset.index)),
-    scrollMargin,
-    overscan: 5,
-  });
+  // A denied grant disables the *browser* column and its Enable button: JS
+  // cannot re-request one. It does not blank the panel, because the Overview
+  // feed works with no grant at all.
+  const browserBlocked = notificationsBlocked(permission);
 
-  // Crossing the `md` breakpoint changes the header tier, and so every
-  // section's estimated height — `measure()` drops the sizes cached under
-  // the old tier so the new estimates are the ones laid out (TanStack
-  // Virtual's documented reset for exactly this). Without it, rotating a
-  // phone past `md` keeps positioning sections at the old heights.
-  // (`rowVirtualizer` is in the deps but never retriggers this on its own:
-  // `useWindowVirtualizer` builds the instance once in a `useState` and
-  // mutates its options, so its identity is stable across renders.)
-  useEffect(() => {
-    rowVirtualizer.measure();
-  }, [isDesktop, rowVirtualizer]);
+  const rowContext: EventRowContext = {
+    characters: orderedCharacters,
+    scopesByCharacterId,
+    capabilitiesByCharacterId,
+    prefsValue,
+    browserBlocked,
+    visibleCharacterIds: filterResult?.characterIds ?? null,
+    // A search that names Characters opens every row to show just those chips.
+    forceExpanded: filterResult?.characterIds != null,
+    isDesktop,
+  };
 
   return (
     <Panel title={t('settings.notificationsTitle')}>
@@ -678,732 +399,25 @@ export function NotificationsPanel() {
           <EmptyState title={t('settings.notifications.emptyTitle')} />
         ) : (
           <>
-            {isSyncConfigured() && <AlertsWhenClosedSection characters={characterList} />}
-            <AllCharactersNotificationSection
-              characterIds={allCharacterIds}
-              prefsValue={prefsValue}
-              browserBlocked={browserBlocked}
-              expanded={allCharactersExpanded}
-              onToggleExpanded={() => setAllCharactersExpanded((open) => !open)}
-            />
+            {isSyncConfigured() && <AlertsWhenClosedSection characters={characterRefs} />}
             <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('settings.notifications.searchPlaceholder')}
               aria-label={t('settings.notifications.searchPlaceholder')}
             />
-
-            {searching && filterResult.visibleCharacterIds.size === 0 ? (
+            {filterResult !== null && visibleEventIds.length === 0 ? (
               <EmptyState title={t('settings.notifications.noResults')} className="py-8" />
             ) : (
-              <div
-                ref={listRef}
-                data-virtual-scroll-root
-                aria-label={t('settings.notificationsTitle')}
-              >
-                <div
-                  role="presentation"
-                  style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
-                >
-                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const character = visibleCharacters[virtualRow.index];
-                    const expanded = searching || expandedCharacterIds.has(character.characterId);
-                    const visibleEventIds: readonly NotificationEventId[] = searching
-                      ? [
-                          ...(filterResult.visibleEventIdsByCharacter.get(character.characterId) ??
-                            []),
-                        ]
-                      : NOTIFICATION_EVENT_IDS;
-                    return (
-                      <div
-                        key={virtualRow.key}
-                        data-index={virtualRow.index}
-                        ref={rowVirtualizer.measureElement}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
-                        }}
-                      >
-                        <CharacterNotificationSection
-                          character={character}
-                          expanded={expanded}
-                          visibleEventIds={visibleEventIds}
-                          grantedScopes={
-                            scopesByCharacterId.get(character.characterId) ?? EMPTY_SCOPES
-                          }
-                          characterCapabilities={capabilitiesByCharacterId.get(
-                            character.characterId
-                          )}
-                          prefs={characterEventPrefs(prefsValue, character.characterId)}
-                          eveTypePrefs={characterEveTypePrefs(prefsValue, character.characterId)}
-                          seenExtraTypes={
-                            extraTypesByCharacter.get(character.characterId) ?? NO_EXTRA_TYPES
-                          }
-                          thresholds={characterEventThresholds(prefsValue, character.characterId)}
-                          browserBlocked={browserBlocked}
-                          onToggleExpanded={toggleExpanded}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <NotificationEventList
+                eventIds={visibleEventIds}
+                context={rowContext}
+                extraTypesByCharacter={extraTypesByCharacter}
+              />
             )}
           </>
         )}
       </div>
     </Panel>
-  );
-}
-
-interface CharacterNotificationSectionProps {
-  character: { characterId: number; name: string };
-  expanded: boolean;
-  visibleEventIds: readonly NotificationEventId[];
-  grantedScopes: ReadonlySet<string>;
-  characterCapabilities: CorpCapabilities | undefined;
-  /**
-   * This Character's own slice of the store (issue #740) — not the whole
-   * `NotificationPreferencesValue`. `preferences.ts`'s writes replace
-   * `perCharacter` with a shallow copy, so an edit to a *different*
-   * Character leaves this Character's own `perCharacter[id]` entry at the
-   * exact same object reference; passing the whole store value here instead
-   * would give every mounted section a new prop on every edit, defeating
-   * this component's `memo` for the very "one Character's edit shouldn't
-   * re-diff the others" case it exists for. The write handlers below still
-   * need the *current* full value at click time — they read
-   * `useNotificationPreferences.getState().value` directly rather than
-   * closing over a prop, so accepting one doesn't leak back in here.
-   */
-  prefs: EventEnabledMap;
-  eveTypePrefs: EveTypeEnabledMap;
-  /** Seen ESI types outside the allow-list, shown as an "Other" group (issue #3755). */
-  seenExtraTypes: readonly string[];
-  thresholds: Required<CharacterEventThresholds>;
-  browserBlocked: boolean;
-  onToggleExpanded: (characterId: number) => void;
-}
-
-/**
- * One Character's collapsible Notifications section — exactly the markup
- * the panel's old inline `.map` rendered, just extracted so it can be
- * `memo`-wrapped (issue #740, the brief's "independently memoizable" row
- * unit) and windowed by `NotificationsPanel`'s virtualizer instead of every
- * Character mounting its full ~90-checkbox content unconditionally.
- */
-const CharacterNotificationSection = memo(function CharacterNotificationSection({
-  character,
-  expanded,
-  visibleEventIds,
-  grantedScopes,
-  characterCapabilities,
-  prefs,
-  eveTypePrefs,
-  seenExtraTypes,
-  thresholds,
-  browserBlocked,
-  onToggleExpanded,
-}: CharacterNotificationSectionProps) {
-  const { t } = useTranslation();
-
-  const togglableEventIds = visibleEventIds.filter(
-    (eventId) => characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled
-  );
-  // Every write reads the store fresh at click time rather than closing
-  // over a `prefsValue` prop — see this component's props doc for why.
-  const currentValue = () => useNotificationPreferences.getState().value;
-
-  const layout = layoutNotificationEvents(visibleEventIds);
-  const corpGroupLabel = t('settings.notifications.corpGroup');
-  const togglableCorpEventIds = layout.corp.filter(
-    (eventId) => characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled
-  );
-  // Every corp event rides the one opt-in Corporation Permission, so any
-  // missing one names the group's.
-  const corpMissingPermission =
-    layout.corp
-      .map(
-        (eventId) =>
-          characterEventRowState(eventId, grantedScopes, characterCapabilities).missingPermission
-      )
-      .find((permission) => permission !== null) ?? null;
-
-  /** One event's row and everything hanging off it. `grouped`: a corp event, whose Permission line and honesty note belong to its group header. */
-  const renderEvent = (eventId: NotificationEventId, grouped: boolean) => {
-    const def = eventDef(eventId);
-    const { hasScope, capabilityMissing, rowEnabled, missingPermission } = characterEventRowState(
-      eventId,
-      grantedScopes,
-      characterCapabilities
-    );
-    const eventLabel = t(def.labelKey);
-    const permissionLabel =
-      missingPermission === null ? undefined : t(PERMISSIONS[missingPermission].labelKey);
-    const entry = eventEntry(eventId);
-    return (
-      <li key={eventId}>
-        <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-panel-2">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className={rowEnabled ? 'text-text' : 'text-text-dim'}>{eventLabel}</span>
-            {PUSH_BADGED_EVENT_IDS.has(eventId) && <ScheduledPushBadge />}
-          </span>
-          <div className={CHANNEL_COLUMNS}>
-            {NOTIFICATION_CHANNELS.map((channel) => (
-              <ChannelCheckbox
-                key={channel}
-                channel={channel}
-                eventLabel={eventLabel}
-                enabled={rowEnabled && !(channel === 'browser' && browserBlocked)}
-                disabledReason={!hasScope ? 'scope' : capabilityMissing ? 'capability' : null}
-                missingPermissionLabel={permissionLabel}
-                checked={isEventEnabledFor(prefs, eventId, channel)}
-                onToggle={() =>
-                  void toggleEventChannelPref(
-                    character.characterId,
-                    currentValue(),
-                    eventId,
-                    channel
-                  )
-                }
-              />
-            ))}
-          </div>
-        </div>
-        {/*
-                    A declined Permission (issue #1525): the row stays
-                    listed but disabled, says which Permission it needs,
-                    and Grant asks for that one Permission for this
-                    Character — rather than hiding the alert (hides the
-                    reason) or leaving it on but never firing (looks like
-                    a bug). Granting updates the stored token, which
-                    re-enables the row through `grantedScopes`.
-                  */}
-        {!grouped && missingPermission !== null && (
-          <p className="flex items-center gap-2 border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-            <span>
-              {t('settings.notifications.needsPermission', {
-                permission: permissionLabel,
-              })}
-            </span>
-            <Button
-              size="sm"
-              aria-label={t('settings.notifications.grantPermissionLabel', {
-                permission: permissionLabel,
-                event: eventLabel,
-              })}
-              onClick={() =>
-                void beginEveLogin({
-                  characterId: character.characterId,
-                  groups: [missingPermission],
-                })
-              }
-            >
-              {t('settings.notifications.grantPermission')}
-            </Button>
-          </p>
-        )}
-        {/*
-                    The event's own delivery caveat, shown whatever the
-                    Character's grants (extractor lead time, issues
-                    #310/#358: bounded by the 72-hour Projection Horizon,
-                    not by scopes, so it is true before authorization too).
-                  */}
-        {entry.rowHintKey !== null && (
-          <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-            {t(entry.rowHintKey)}
-          </p>
-        )}
-        {/*
-                    The event's inline threshold controls (issue #299 and
-                    after), derived from its Event Entry. Persisted per
-                    Character (`preferences.ts`); the poller re-reads them
-                    each tick and a change rebuilds the Projection at once
-                    (issue #1259).
-                  */}
-        {entry.thresholds !== null && rowEnabled && (
-          <ThresholdControls
-            characterId={character.characterId}
-            thresholds={entry.thresholds}
-            values={thresholds}
-            onChange={(key, amount) =>
-              void updatePrefs(
-                character.characterId,
-                withCharacterEventThreshold(currentValue(), character.characterId, key, amount)
-              )
-            }
-          />
-        )}
-        {/*
-                    Per-type opt-out underneath the single
-                    eveNotification event (issue #274, AC3).
-                    Enumerated from the closed allow-list,
-                    grouped by Notification Family (issue #352),
-                    so every type is toggle-able immediately
-                    rather than only after it has fired once.
-                    Types the server has seen beyond the list
-                    (issue #3755) follow in an Other group.
-                  */}
-        {eventId === 'eveNotification' && hasScope && (
-          <div className="border-t border-line bg-panel/60 pl-3">
-            <p className="px-3 py-1.5 text-[0.6875rem] text-text-dim">
-              {t('settings.notifications.eveTypesHint')}
-            </p>
-            {[
-              ...NOTIFICATION_FAMILIES.map((family) => ({
-                key: family,
-                types: eveTypesByFamily(family),
-              })),
-              { key: 'other', types: seenExtraTypes },
-            ].map(({ key: family, types: familyTypes }) => {
-              if (familyTypes.length === 0) return null;
-              const familyLabel = t(`settings.notifications.family.${family}`);
-              return (
-                <div key={family}>
-                  <div className="flex items-center justify-between gap-3 border-t border-line/60 bg-panel/40 px-3 py-1">
-                    <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {familyLabel}
-                    </span>
-                    <div className={CHANNEL_COLUMNS}>
-                      {NOTIFICATION_CHANNELS.map((channel) => (
-                        <SelectionCheckbox
-                          key={channel}
-                          state={selectionStateForEveTypes(familyTypes, eveTypePrefs, channel)}
-                          onToggle={() =>
-                            void toggleAllEveTypesChannelPref(
-                              character.characterId,
-                              currentValue(),
-                              familyTypes,
-                              channel
-                            )
-                          }
-                          label={t(`settings.notifications.selectAllFamily.${channel}`, {
-                            family: familyLabel,
-                          })}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <ul className="divide-y divide-line/60">
-                    {familyTypes.map((type) => {
-                      // ESI's own `CamelCase` identifier is what
-                      // used to label these rows. It named the
-                      // type without saying what it was.
-                      const typeLabel = eveTypeLabel(t, type);
-                      return (
-                        <li
-                          key={type}
-                          className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs hover:bg-panel-2"
-                        >
-                          {/* `title` for the same reason
-                                        `DataAgePanel` uses one: the
-                                        label truncates on a narrow
-                                        screen, and now that it says
-                                        something, the cut-off half
-                                        is worth recovering. */}
-                          <Tooltip content={typeLabel}>
-                            <span className="truncate text-text-dim">{typeLabel}</span>
-                          </Tooltip>
-                          <div className={CHANNEL_COLUMNS}>
-                            {NOTIFICATION_CHANNELS.map((channel) => (
-                              <ChannelCheckbox
-                                key={channel}
-                                channel={channel}
-                                eventLabel={typeLabel}
-                                enabled={!(channel === 'browser' && browserBlocked)}
-                                disabledReason={null}
-                                checked={isEveTypeEnabledFor(eveTypePrefs, type, channel)}
-                                onToggle={() =>
-                                  void toggleEveTypeChannelPref(
-                                    character.characterId,
-                                    currentValue(),
-                                    type,
-                                    channel
-                                  )
-                                }
-                              />
-                            ))}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </li>
-    );
-  };
-
-  return (
-    <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
-      {/* Select-all is a sibling of the expand toggle, not nested inside its
-          <button> — an interactive control inside a <button> is invalid HTML
-          and would fold both accessible names together for screen readers. */}
-      <div
-        className={`flex min-h-8 items-center gap-2 pr-2.5 ${expanded ? 'border-b border-line' : ''}`}
-      >
-        {/*
-          `min-h-11 md:min-h-0` (issue #1118): this toggle is the only way to
-          reveal a Character's ~90 event rows, and as a plain flex child it
-          collapsed to its own ~16.5px caret-plus-text height inside the 32px
-          row it appears to fill — a thumb aimed at the row's padding hit
-          nothing. The row's `px-2.5 py-1.5` moves onto the button, so that
-          padding sits inside the hit area instead of being dead space around
-          it; the row keeps `pr-2.5` for the select-all columns beside it.
-          Growing the button rather than overlaying the row is what keeps
-          those columns independently tappable. `md:min-h-0` leaves the
-          desktop button at 28.5px inside the unchanged 32px row.
-        */}
-        <button
-          type="button"
-          aria-expanded={expanded}
-          onClick={() => onToggleExpanded(character.characterId)}
-          className={cx(
-            'flex min-h-11 min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-2.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text md:min-h-0',
-            interactiveClassName,
-            focusRingInsetClassName
-          )}
-        >
-          <Caret expanded={expanded} />
-          <span className="min-w-0 truncate normal-case">{character.name}</span>
-        </button>
-        {/* One select-all per column, in the same grid track as
-            the checkboxes below so each sits over its own column. */}
-        <div className={CHANNEL_COLUMNS}>
-          {NOTIFICATION_CHANNELS.map((channel) => (
-            <SelectionCheckbox
-              key={channel}
-              state={selectionStateForEvents(togglableEventIds, prefs, channel)}
-              onToggle={() =>
-                void toggleAllEventsChannelPref(
-                  character.characterId,
-                  currentValue(),
-                  togglableEventIds,
-                  channel
-                )
-              }
-              label={t(`settings.notifications.selectAll.${channel}`, {
-                character: character.name,
-              })}
-            />
-          ))}
-        </div>
-      </div>
-      {expanded && (
-        <div className="bg-panel-2">
-          <ChannelColumnHeadings pinned />
-          <ul className="divide-y divide-line">
-            {layout.ordinary.map((eventId) => renderEvent(eventId, false))}
-            {layout.corp.length > 0 && (
-              <li>
-                {/*
-                  One group for the corp events, headed like an EVE family:
-                  a label, then a select-all per channel. They share one
-                  Needs-permission line (all five ride the same opt-in
-                  Corporation Permission) and the one honesty note (issue
-                  #299): best-effort, no server push. Both used to repeat on
-                  every row.
-                */}
-                <div className="flex items-center justify-between gap-3 bg-panel/40 px-3 py-1">
-                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {corpGroupLabel}
-                  </span>
-                  <div className={CHANNEL_COLUMNS}>
-                    {NOTIFICATION_CHANNELS.map((channel) => (
-                      <SelectionCheckbox
-                        key={channel}
-                        state={selectionStateForEvents(togglableCorpEventIds, prefs, channel)}
-                        disabled={togglableCorpEventIds.length === 0}
-                        onToggle={() =>
-                          void toggleAllEventsChannelPref(
-                            character.characterId,
-                            currentValue(),
-                            togglableCorpEventIds,
-                            channel
-                          )
-                        }
-                        label={t(`settings.notifications.selectAllFamily.${channel}`, {
-                          family: corpGroupLabel,
-                        })}
-                      />
-                    ))}
-                  </div>
-                </div>
-                {corpMissingPermission !== null && (
-                  <p className="flex items-center gap-2 border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-                    <span>
-                      {t('settings.notifications.needsPermission', {
-                        permission: t(PERMISSIONS[corpMissingPermission].labelKey),
-                      })}
-                    </span>
-                    <Button
-                      size="sm"
-                      aria-label={t('settings.notifications.grantPermissionLabel', {
-                        permission: t(PERMISSIONS[corpMissingPermission].labelKey),
-                        event: corpGroupLabel,
-                      })}
-                      onClick={() =>
-                        void beginEveLogin({
-                          characterId: character.characterId,
-                          groups: [corpMissingPermission],
-                        })
-                      }
-                    >
-                      {t('settings.notifications.grantPermission')}
-                    </Button>
-                  </p>
-                )}
-                <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-                  {t('settings.notifications.corpEventBestEffortHint')}
-                </p>
-                <ul className="divide-y divide-line border-t border-line pl-3">
-                  {layout.corp.map((eventId) => renderEvent(eventId, true))}
-                </ul>
-              </li>
-            )}
-            {layout.eve !== null && renderEvent(layout.eve, false)}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-});
-
-/**
- * The "arrives with the app closed" mark on a Scheduled Push event's row.
- *
- * `role="img"` plus `aria-label` rather than a focusable trigger (the
- * `MaterialsTable` pattern, not the column captions' one): the meaning has to
- * reach a screen reader, but there are seventeen rows per Character here and
- * a tab stop on each would make the panel worse to keyboard through than the
- * badge is worth.
- */
-function ScheduledPushBadge() {
-  const { t } = useTranslation();
-  const label = t('settings.notifications.scheduledPushBadge');
-  return (
-    <Tooltip content={label} openOnTap>
-      <span role="img" aria-label={label} className="shrink-0 text-accent">
-        <ScheduledPush size={ICON_SIZE.sm} />
-      </span>
-    </Tooltip>
-  );
-}
-
-/**
- * One event's checkbox for one delivery channel. Its accessible name names
- * both — "New Mail, browser notifications" — because two visually adjacent
- * checkboxes on a row are indistinguishable to a screen reader otherwise, and
- * the column caption above is not associated with them.
- *
- * `disabledReason` picks the tooltip when `enabled` is false: a missing
- * scope reads "re-authorize", but a corp event a Character lacks the
- * in-game role for cannot be fixed by re-authing at all (issue #299) — that
- * needs its own copy, the same distinction `corpAuthFailure.ts` draws for
- * the poller's own 403 handling. `null` (the eve-type sub-rows, which are
- * never capability- or scope-gated of their own) falls back to the scope
- * copy for parity with this component's pre-#299 behaviour.
- */
-function ChannelCheckbox({
-  channel,
-  eventLabel,
-  enabled,
-  disabledReason,
-  missingPermissionLabel,
-  checked,
-  onToggle,
-}: {
-  channel: NotificationChannel;
-  eventLabel: string;
-  enabled: boolean;
-  disabledReason: 'scope' | 'capability' | null;
-  /** Names the declined Permission in the scope tooltip (issue #1525); absent for a Core Grant scope. */
-  missingPermissionLabel?: string;
-  checked: boolean;
-  onToggle: () => void;
-}) {
-  const { t } = useTranslation();
-  const label = t(`settings.notifications.toggleLabel.${channel}`, { event: eventLabel });
-  const checkbox = (
-    <label className={touchCheckboxLabelClassName}>
-      <Checkbox
-        checked={enabled && checked}
-        onChange={onToggle}
-        // Not `disabled` — same reasoning as MobileOpportunityList (keeps the
-        // Tooltip trigger in the hover/touch path). `preventDefault` on click
-        // blocks the toggle instead, before `onChange` fires.
-        onClick={(event) => {
-          if (!enabled) event.preventDefault();
-        }}
-        aria-disabled={enabled ? undefined : true}
-        aria-label={label}
-        className={enabled ? undefined : 'cursor-not-allowed! opacity-40'}
-      />
-    </label>
-  );
-  if (enabled) return checkbox;
-  const hint =
-    disabledReason === 'capability'
-      ? t('settings.notifications.corpCapabilityHint')
-      : missingPermissionLabel !== undefined
-        ? t('settings.notifications.needsPermission', { permission: missingPermissionLabel })
-        : t('settings.notifications.reauthHint');
-  return (
-    <Tooltip content={hint} openOnTap>
-      {checkbox}
-    </Tooltip>
-  );
-}
-
-/**
- * One event's threshold controls, rendered from its Event Entry's
- * `thresholds` (issue #1285) rather than hand-written per event: a select per
- * `choice` field, an ISK field per `iskAmount` field, then the group's hint.
- * A single field sits in a plain block; several wrap side by side (corp
- * wallet's floor and ceiling).
- */
-function ThresholdControls({
-  characterId,
-  thresholds,
-  values,
-  onChange,
-}: {
-  characterId: number;
-  thresholds: EventThresholds;
-  values: Required<CharacterEventThresholds>;
-  onChange: (key: ThresholdKey, amount: number) => void;
-}) {
-  const { t } = useTranslation();
-  const wraps = thresholds.fields.length > 1;
-  return (
-    <div
-      className={
-        wraps
-          ? 'flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line bg-panel/60 px-6 py-1.5'
-          : 'border-t border-line bg-panel/60 px-6 py-1.5'
-      }
-    >
-      {thresholds.fields.map((field) => (
-        <ThresholdFieldControl
-          key={field.key}
-          characterId={characterId}
-          field={field}
-          value={values[field.key]}
-          onChange={(amount) => onChange(field.key, amount)}
-        />
-      ))}
-      {thresholds.hintKey !== null && (
-        <p className="mt-1 text-[0.6875rem] text-text-dim">{t(thresholds.hintKey)}</p>
-      )}
-    </div>
-  );
-}
-
-function ThresholdFieldControl({
-  characterId,
-  field,
-  value,
-  onChange,
-}: {
-  characterId: number;
-  field: ThresholdField;
-  value: number;
-  onChange: (amount: number) => void;
-}) {
-  const { t } = useTranslation();
-  const { control } = field;
-  if (control.kind === 'iskAmount') {
-    return (
-      <ThresholdAmountInput
-        id={`${control.inputIdPrefix}-${characterId}`}
-        label={t(control.labelKey)}
-        value={value}
-        onCommit={onChange}
-      />
-    );
-  }
-  return (
-    <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
-      {t(control.labelKey)}
-      <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}>
-        <SelectTrigger size="sm" aria-label={t(control.labelKey)}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {control.options.map((option) => (
-            <SelectItem key={option} value={String(option)}>
-              {t(control.optionKey, { count: option })}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </label>
-  );
-}
-
-/**
- * An ISK-amount threshold field (issue #299, extended for the wallet-balance
- * threshold): local text state so a mid-typing value like "50," or an empty
- * field never round-trips through `withCharacterEventThreshold` as `NaN`.
- * Commits on blur, matching the pattern used elsewhere for numeric fields
- * (`piPlan.tsx`); reverts to the last committed value on an invalid blur.
- *
- * Parsed with `parseIskAmount` (`lib/isk.ts`) rather than a bare `Number()`,
- * so "10.5m", "10,500,000" and "10500000" all commit to the same 10,500,000 —
- * a plain `<input type="number">` can't hold the shorthand-suffix forms, so
- * this is `type="text"` with a numeric-friendly `inputMode`.
- */
-function ThresholdAmountInput({
-  id,
-  label,
-  value,
-  onCommit,
-}: {
-  id: string;
-  label: string;
-  value: number;
-  onCommit: (value: number) => void;
-}) {
-  const [text, setText] = useState(formatIsk(value));
-  // Adjusted during render, not an effect (react-hooks/set-state-in-effect):
-  // this is React's own "store info from previous renders" pattern for
-  // resetting local state when a prop changes, not a DOM/external-system
-  // sync — an actual effect would run one render late here.
-  const [prevValue, setPrevValue] = useState(value);
-  if (value !== prevValue) {
-    setPrevValue(value);
-    setText(formatIsk(value));
-  }
-
-  function commit() {
-    const amount = parseIskAmount(text);
-    if (amount !== null && amount >= 0) {
-      const rounded = Math.round(amount);
-      onCommit(rounded);
-      setText(formatIsk(rounded));
-    } else {
-      setText(formatIsk(value));
-    }
-  }
-
-  return (
-    <label htmlFor={id} className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
-      {label}
-      <TextInput
-        id={id}
-        size="sm"
-        type="text"
-        inputMode="decimal"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        className="w-32"
-      />
-    </label>
   );
 }

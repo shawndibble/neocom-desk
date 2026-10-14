@@ -1,20 +1,16 @@
 /**
- * Settings › Notifications: the per-Character disclosure header's touch
- * target (issue #1118).
+ * Settings › Notifications: the event-first page's touch targets and sheet at
+ * 390px (originally issue #1118, for the per-Character disclosure header).
  *
- * The header row visually fills 32px, but its `<button>` was an
- * `items-center` flex child that collapsed to its own ~16.5px caret-plus-text
- * height — so a thumb aimed at the row's padding, which is most of the row,
- * missed the only control that reveals that Character's ~90 event rows.
- * Fixed with `min-h-11 ... md:min-h-0` plus the row's padding moved onto the
- * button, the same shape as `Disclosure.tsx`/#1071 and Open Orders/#1064.
+ * Every event row is one button that opens that event's Characters, and the
+ * row's own two checkboxes sit beside it. A phone thumb needs the button at
+ * the 44px floor, the checkboxes must stay independently tappable, and the
+ * phone opens a bottom sheet rather than growing the page.
  *
  * Asserted on the rendered bounding box rather than the class string; see
  * `loyaltyStoreNarrow.spec.ts` for why.
  *
- * Uses the default seeded character with no Dexie overrides: the active
- * Character's section is seeded open by `NotificationsPanel`, so the run
- * starts from `aria-expanded="true"` and collapses first.
+ * Uses the default seeded character with no Dexie overrides.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -29,106 +25,80 @@ async function gotoNotificationSettings(page: Page) {
   await page.waitForURL(/\/settings\/notifications$/);
 }
 
-/** The Character's own disclosure toggle, not the "All Characters" sibling row. */
-function characterToggle(page: Page) {
-  return page.getByRole('button', { name: CHARACTER_NAME, exact: true });
+function eventToggle(page: Page, event: string) {
+  return page.getByRole('button', { name: event, exact: true });
 }
 
-/**
- * The Character's own section, not the "All Characters" master row: that row
- * (`AllCharactersNotificationSection.tsx`) lists every event too once it is
- * opened, so an unscoped `getByText`/`getByRole` lookup for an event's own
- * label or control matches twice on this page.
- */
-function characterSection(page: Page) {
-  return characterToggle(page).locator('xpath=ancestor::div[contains(@class, "rounded-xs")][1]');
-}
-
-test('per-Character disclosure header meets the 44px touch floor at 390px, and still expands/collapses', async ({
+test('an event row meets the 44px touch floor at 390px and opens a sheet with its characters', async ({
   page,
 }) => {
   await gotoNotificationSettings(page);
   await page.setViewportSize(PHONE);
 
-  const toggle = characterToggle(page);
+  const toggle = eventToggle(page, 'Skill Queue Ending');
   await expect(toggle).toBeVisible();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const height = await toggle.evaluate((el) => el.getBoundingClientRect().height);
+  expect(height).toBeGreaterThanOrEqual(44);
 
-  const expandedHeight = await toggle.evaluate((el) => el.getBoundingClientRect().height);
-  expect(expandedHeight).toBeGreaterThanOrEqual(44);
-
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-
-  const collapsedHeight = await toggle.evaluate((el) => el.getBoundingClientRect().height);
-  expect(collapsedHeight).toBeGreaterThanOrEqual(44);
-
-  // The padding the old button left as dead space is now inside the hit
-  // area: a click 3px below the row's top edge — well clear of the name text
-  // that used to be the only target — must still toggle.
+  // A click 3px below the row's top edge, clear of the label text, must still open it.
   const box = await toggle.boundingBox();
   if (!box) throw new Error('toggle has no bounding box');
-  await page.mouse.click(box.x + box.width / 2, box.y + 3);
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await page.mouse.click(box.x + 40, box.y + 3);
+
+  const sheet = page.getByRole('dialog', { name: 'Skill Queue Ending' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText(CHARACTER_NAME)).toBeVisible();
 });
 
-test('select-all checkboxes stay independently clickable beside the enlarged toggle at 390px', async ({
+test('the row-level checkboxes stay independently clickable beside the enlarged toggle at 390px', async ({
   page,
 }) => {
   await gotoNotificationSettings(page);
   await page.setViewportSize(PHONE);
 
-  const toggle = characterToggle(page);
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-
-  // The toggle grew as a flex sibling rather than as an overlay, so the
-  // select-all columns keep their own hit areas: toggling one must change
-  // the checkbox, not the section's expanded state.
-  const selectAll = page.getByRole('checkbox', {
-    name: `Toggle all Alerts notifications for ${CHARACTER_NAME}`,
+  const alerts = page.getByRole('checkbox', {
+    name: 'Skill Queue Ending for every character, Alerts list',
   });
-  await expect(selectAll).toBeVisible();
-  const before = await selectAll.isChecked();
+  await expect(alerts).toBeVisible();
+  const before = await alerts.isChecked();
 
-  await selectAll.click();
-  await expect(selectAll).toBeChecked({ checked: !before });
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await alerts.click();
+  await expect(alerts).toBeChecked({ checked: !before });
+  // The toggle grew as a flex sibling, not an overlay: the click changed the
+  // checkbox and did not open the row.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('per-Character disclosure header drops the touch-tier floor at and above md (1280px), staying content-driven', async ({
+test('an event row stays content-driven at and above md (1280px), and opens inline', async ({
   page,
 }) => {
   await gotoNotificationSettings(page);
   await page.setViewportSize(DESKTOP);
 
-  const toggle = characterToggle(page);
+  const toggle = eventToggle(page, 'Skill Queue Ending');
   await expect(toggle).toBeVisible();
-
   const height = await toggle.evaluate((el) => el.getBoundingClientRect().height);
-  // `md:min-h-0` removes the floor rather than pinning a fixed height —
-  // bounded to the real content-driven height (~28.5px: 16.5px of content
-  // plus `py-1.5`), so a partial regression toward the touch tier can't
-  // slip through a loose upper bound.
-  expect(height).toBeGreaterThanOrEqual(24);
-  expect(height).toBeLessThanOrEqual(36);
+  // `md:min-h-9` drops the touch floor: 36px, bounded so a regression toward the touch tier shows.
+  expect(height).toBeGreaterThanOrEqual(30);
+  expect(height).toBeLessThanOrEqual(40);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText(CHARACTER_NAME).first()).toBeVisible();
 });
 
-test('skillQueueEnding row and its lead-time select stay visible at 390px (issue #1410)', async ({
-  page,
-}) => {
-  // The threshold row (`ThresholdControls`) sits in the same wrapping flex
-  // layout as every other inline control here, so a narrow viewport is where
-  // a control silently sliding off-row would first show up — the same class
-  // of regression `extractorExpiringLeadHours`'s neighbouring row risks.
+test('skillQueueEnding warn-ahead select is reachable at 390px (issue #1410)', async ({ page }) => {
+  // The threshold controls sit in the same wrapping layout as every other
+  // inline control, so a narrow viewport is where one sliding off-row would
+  // first show up.
   await gotoNotificationSettings(page);
   await page.setViewportSize(PHONE);
 
-  const toggle = characterToggle(page);
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-
-  const section = characterSection(page);
-  await expect(section.getByText('Skill Queue Ending', { exact: true })).toBeVisible();
+  await eventToggle(page, 'Skill Queue Ending').click();
+  const sheet = page.getByRole('dialog', { name: 'Skill Queue Ending' });
+  await sheet.getByRole('button', { name: /^Warn-ahead time/ }).click();
   await expect(
-    section.getByRole('combobox', { name: 'Warn this far before the skill queue runs dry:' })
+    sheet.getByRole('combobox', { name: 'Warn this far before the skill queue runs dry:' })
   ).toBeVisible();
 });
