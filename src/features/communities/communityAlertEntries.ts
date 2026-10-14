@@ -16,6 +16,7 @@
  */
 import { db } from '@/db';
 import type { CommunityAlertEntry } from '@/engine/communities/communityAlert';
+import { communityBackendOverride } from './backendOverride';
 import { isCommunityAdmin, type CommunitySummary } from './communityStore';
 
 const adminKey = (characterId: number) => `communityAdmin:${characterId}`;
@@ -25,6 +26,8 @@ export async function rememberCommunityAdmin(
   characterId: number,
   communities: readonly CommunitySummary[]
 ): Promise<void> {
+  // A stand-in backend (Storybook) is not this Character's real Communities.
+  if (communityBackendOverride()) return;
   const admin = communities.some((community) => isCommunityAdmin(community, characterId));
   if (admin) await db.settings.put({ key: adminKey(characterId), value: true });
   else await db.settings.delete(adminKey(characterId));
