@@ -34,7 +34,7 @@ import { beginAlertsLogin } from '@/app/loginFlow';
  *
  * Step two (ADR 0020, issue #3758): when Enable ends in a grant, the same
  * banner offers Alerts when closed for the Character just signed in. It is
- * never requested inside the permission step itself, and shown once per device.
+ * never requested inside the permission step itself, and
  */
 export function NotificationPermissionPrompt() {
   const { t } = useTranslation();
@@ -100,43 +100,42 @@ export function NotificationPermissionPrompt() {
   const dismiss = () => void setValue({ seen: true, outcome: value.outcome });
   const enable = async () => {
     const { permission: outcome } = await enableWebPush();
-    await setValue(promptStateAfterAsk(outcome));
+    // Before the prompt state is saved: that save ends the explainer, and the
+    // offer must already be eligible so the slot never frees up in between.
     if (outcome === 'granted') {
       refresh();
       setGrantedHere(true);
     }
+    await setValue(promptStateAfterAsk(outcome));
   };
   const declineAlerts = () => void setAlertsOfferSeen(true);
   const acceptAlerts = async () => {
     const characterId = newestCharacter?.characterId;
-    await setAlertsOfferSeen(true);
     if (characterId === undefined) return;
-    void beginAlertsLogin(characterId).catch(() => undefined);
+    await setAlertsOfferSeen(true);
+    // A start that fails (offline) puts the offer back rather than losing it.
+    void beginAlertsLogin(characterId).catch(() => setAlertsOfferSeen(false));
   };
 
-  if (offering) {
-    return (
-      <div
-        ref={bannerRef}
-        role="alert"
-        data-testid="onboarding-banner"
-        className="fixed inset-x-4 bottom-16 z-50 space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-16 md:left-auto md:max-w-sm"
-      >
-        <p className="font-medium text-text">{t('notifications.alertsOffer.title')}</p>
-        <p className="text-xs text-text-dim">
-          {t('notifications.alertsOffer.body', { name: newestCharacter?.name })}
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button size="sm" onClick={declineAlerts}>
-            {t('notifications.alertsOffer.dismiss')}
-          </Button>
-          <Button size="sm" variant="primary" onClick={() => void acceptAlerts()}>
-            {t('notifications.alertsOffer.enable')}
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const copy = offering
+    ? {
+        title: t('notifications.alertsOffer.title'),
+        body: t('notifications.alertsOffer.body', { name: newestCharacter?.name }),
+        dismiss: t('notifications.alertsOffer.dismiss'),
+        enable: t('notifications.alertsOffer.enable'),
+        onDismiss: declineAlerts,
+        onEnable: acceptAlerts,
+      }
+    : {
+        title: t('notifications.prompt.title'),
+        body: t(
+          installRequired ? 'notifications.prompt.installRequiredBody' : 'notifications.prompt.body'
+        ),
+        dismiss: t('notifications.prompt.dismiss'),
+        enable: installRequired ? null : t('notifications.prompt.enable'),
+        onDismiss: dismiss,
+        onEnable: enable,
+      };
 
   return (
     <div
@@ -148,19 +147,15 @@ export function NotificationPermissionPrompt() {
       // them (issue #1124) — only one of the three is ever mounted at once.
       className="fixed inset-x-4 bottom-16 z-50 space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-16 md:left-auto md:max-w-sm"
     >
-      <p className="font-medium text-text">{t('notifications.prompt.title')}</p>
-      <p className="text-xs text-text-dim">
-        {t(
-          installRequired ? 'notifications.prompt.installRequiredBody' : 'notifications.prompt.body'
-        )}
-      </p>
+      <p className="font-medium text-text">{copy.title}</p>
+      <p className="text-xs text-text-dim">{copy.body}</p>
       <div className="flex justify-end gap-2">
-        <Button size="sm" onClick={dismiss}>
-          {t('notifications.prompt.dismiss')}
+        <Button size="sm" onClick={copy.onDismiss}>
+          {copy.dismiss}
         </Button>
-        {!installRequired && (
-          <Button size="sm" variant="primary" onClick={() => void enable()}>
-            {t('notifications.prompt.enable')}
+        {copy.enable && (
+          <Button size="sm" variant="primary" onClick={() => void copy.onEnable()}>
+            {copy.enable}
           </Button>
         )}
       </div>

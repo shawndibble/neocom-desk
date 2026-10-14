@@ -189,6 +189,20 @@ describe('NotificationPermissionPrompt', () => {
       expect((await db.settings.get(ALERTS_OFFER_SEEN_KEY))?.value).toBe(true);
     });
 
+    it('puts the offer back when the Alerts flow fails to start', async () => {
+      vi.mocked(beginAlertsLogin).mockRejectedValueOnce(new Error('offline'));
+      stubNotification('default', 'granted');
+      const user = userEvent.setup();
+      renderPastFirstScreen();
+
+      await user.click(await screen.findByRole('button', { name: /^enable$/i }));
+      await user.click(await screen.findByRole('button', { name: /^turn on$/i }));
+      await waitFor(async () =>
+        expect((await db.settings.get(ALERTS_OFFER_SEEN_KEY))?.value).toBe(false)
+      );
+      expect(await screen.findByText(/alerts when neocom is closed/i)).toBeInTheDocument();
+    });
+
     it('Not now suppresses it for good without starting the flow', async () => {
       stubNotification('default', 'granted');
       const user = userEvent.setup();
