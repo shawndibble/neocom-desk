@@ -16,6 +16,8 @@ const MOVES: readonly (readonly [from: string, to: string, dropParams?: readonly
   // The PI Advisor tab retired; old links land on Colonies. Its `?system` is gone, not
   // inert (scope decision `20261005-183720-retire-the-pi-advisor-accepted-feature-drops`).
   ['/planetary-industry/advisor', '/planetary-industry/colonies', ['system']],
+  // Skills Compare became a drawer over Trained; its selection (`ids`, `baseline`, `comparisonId`) rides along and opens it. The old column toggle is gone.
+  ['/skills/compare', '/skills/trained', ['groupColumn']],
 ];
 
 export interface LegacyTarget {

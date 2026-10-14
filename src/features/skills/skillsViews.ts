@@ -2,6 +2,5 @@
 export const SKILLS_VIEWS = [
   { id: 'plans', labelKey: 'skills.plansTab' },
   { id: 'trained', labelKey: 'skills.trainedTab' },
-  { id: 'compare', labelKey: 'skills.compareTab' },
   { id: 'certificates', labelKey: 'skills.certificatesTab' },
 ] as const;

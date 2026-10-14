@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { buildComparisonRows, hasDifferingLevels, idsNeedingFetch } from './compareSkills';
+import {
+  buildComparisonRows,
+  groupBands,
+  hasDifferingLevels,
+  idsNeedingFetch,
+  levelDelta,
+  resolveBaseline,
+  splitDiffering,
+} from './compareSkills';
 import type { ComparisonRow } from './compareSkills';
 import type { TrainedSkill } from '@/engine/types';
 
@@ -147,5 +155,119 @@ describe('idsNeedingFetch', () => {
 
   it('returns everything when the cache is empty', () => {
     expect(idsNeedingFetch([1, 2], new Set(), false)).toEqual([1, 2]);
+  });
+});
+
+function skillRow(
+  skillTypeID: number,
+  groupName: string,
+  levels: [number, number][]
+): ComparisonRow {
+  const map = new Map(levels);
+  return {
+    skillTypeID,
+    name: `Skill ${skillTypeID}`,
+    groupName,
+    levels: map,
+    maxLevel: Math.max(...map.values()),
+  };
+}
+
+describe('levelDelta', () => {
+  it('is same when the levels match', () => {
+    expect(levelDelta(3, 3)).toEqual({ kind: 'same' });
+  });
+
+  it('is ahead by the gap when above the baseline', () => {
+    expect(levelDelta(5, 3)).toEqual({ kind: 'ahead', by: 2 });
+  });
+
+  it('is behind by the gap when below the baseline but trained', () => {
+    expect(levelDelta(1, 4)).toEqual({ kind: 'behind', by: 3 });
+  });
+
+  it('is missing, not behind, when the character has no level of a skill the baseline has', () => {
+    expect(levelDelta(0, 4)).toEqual({ kind: 'missing' });
+  });
+
+  it('is ahead when the baseline has none and the character does', () => {
+    expect(levelDelta(2, 0)).toEqual({ kind: 'ahead', by: 2 });
+  });
+});
+
+describe('splitDiffering', () => {
+  it('separates differing rows from identical ones and counts the identical', () => {
+    const differing = skillRow(1, 'A', [
+      [1, 3],
+      [2, 1],
+    ]);
+    const identical = skillRow(2, 'A', [
+      [1, 5],
+      [2, 5],
+    ]);
+    const result = splitDiffering([differing, identical]);
+    expect(result.differing).toEqual([differing]);
+    expect(result.identical).toEqual([identical]);
+    expect(result.identicalCount).toBe(1);
+  });
+
+  it('treats every row as identical for a single character', () => {
+    const only = skillRow(1, 'A', [[1, 3]]);
+    expect(splitDiffering([only]).identicalCount).toBe(1);
+  });
+});
+
+describe('groupBands', () => {
+  it('groups consecutive rows by group name in order', () => {
+    const rows = [
+      skillRow(1, 'Gunnery', [
+        [1, 4],
+        [2, 2],
+      ]),
+      skillRow(2, 'Gunnery', [
+        [1, 3],
+        [2, 5],
+      ]),
+      skillRow(3, 'Navigation', [
+        [1, 1],
+        [2, 1],
+      ]),
+    ];
+    const bands = groupBands(rows, [1, 2], 1);
+    expect(bands.map((b) => b.groupName)).toEqual(['Gunnery', 'Navigation']);
+    expect(bands[0]?.rows.map((r) => r.skillTypeID)).toEqual([1, 2]);
+  });
+
+  it("sums each character's level difference from the baseline across the band", () => {
+    const rows = [
+      skillRow(1, 'Gunnery', [
+        [1, 4],
+        [2, 2],
+      ]),
+      skillRow(2, 'Gunnery', [
+        [1, 3],
+        [2, 5],
+      ]),
+    ];
+    const [band] = groupBands(rows, [1, 2], 1);
+    expect(band?.netDelta.get(2)).toBe(0);
+    const [skewed] = groupBands([rows[0]!], [1, 2], 1);
+    expect(skewed?.netDelta.get(2)).toBe(-2);
+    expect(skewed?.netDelta.get(1)).toBe(0);
+  });
+});
+
+describe('resolveBaseline', () => {
+  it('keeps the requested baseline while it is still selected', () => {
+    expect(resolveBaseline([1, 2, 3], 2)).toBe(2);
+  });
+
+  it('falls back to the first selected character when the request is gone or absent', () => {
+    expect(resolveBaseline([4, 5], 9)).toBe(4);
+    expect(resolveBaseline([4, 5], null)).toBe(4);
+  });
+
+  it('is null with nothing selected', () => {
+    expect(resolveBaseline([], 1)).toBeNull();
   });
 });

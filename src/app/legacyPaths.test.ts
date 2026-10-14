@@ -25,6 +25,14 @@ describe('legacyLocation', () => {
     expect(legacyLocation('/settings/help', '', '').pathname).toBe('/help/support');
   });
 
+  it('sends the retired Skills Compare page to Trained with its selection, dropping the old column toggle', () => {
+    expect(legacyLocation('/skills/compare', '?ids=1,2&baseline=2&groupColumn=false', '')).toEqual({
+      pathname: '/skills/trained',
+      search: '?ids=1%2C2&baseline=2',
+      hash: '',
+    });
+  });
+
   it('sends the retired PI Advisor tab to Colonies, dropping its retired ?system', () => {
     expect(legacyLocation('/planetary-industry/advisor', '?system=30000142', '')).toEqual({
       pathname: '/planetary-industry/colonies',

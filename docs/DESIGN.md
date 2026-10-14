@@ -523,13 +523,12 @@ original case: an icon + name and a quantity fit as they are, so stacking
 would only spend a 6.5rem gutter on "QUANTITY: 744" and turn a scannable list
 into one card per item.
 
-`SkillCompare`'s character-by-skill matrix used to opt out for the
-columns-are-the-content reason above, but #406 moved it back to the default
-stack: a mobile card per skill, with one level line per compared character,
-is a fine trade once the page's own "differing only" toggle keeps the row
-count down to what's actually worth scanning — and a sideways-scrolling
-matrix couldn't show more than about two characters on a 390px screen
-anyway, so the opt-out was buying less than it looked like.
+The Skills comparison drawer (`SkillCompareView`) is not a `DataTable`: it
+draws its own banded table on desktop and, on a phone, a card per skill with one
+level line per compared character. It follows the stack-by-default rule for the
+reason `SkillCompare` did before it (#406): a sideways-scrolling matrix couldn't
+show more than about two characters on a 390px screen anyway, and "differing
+only" keeps the card count down to what is worth scanning.
 
 ### Dense cards, phone sort and phone grouping (opt-in)
 
@@ -1137,6 +1136,10 @@ Three tiers decide how a page-header or toolbar control is labelled:
 1. **Scope and mode controls** (a series/layer picker, a view toggle) carry a visible text label at every width; truncate it rather than drop it. The Character scope trigger is the exception: icon-only below `md` (portrait or `AllCharacters` glyph), text from `md` up, and its menu names the options.
 2. **Frequent actions** (Columns, filter, export) show icon + text from `md` up (`IconButton visibleLabel`, or the `showLabel` / `triggerLabel` opt-ins on `ColumnPickerMenu`, `TableActionsMenu`, `FilterBar`) and stay the conventional icon below `md`.
 3. **Rare actions** share one ⋮ "More actions" menu with text items (only with two or more real actions). Refresh stays a standalone icon beside the `DataAgeBadge`.
+
+A header action that opens a drawer for more input takes the "…" label (`Compare with…` on Skills › Trained, a tier-2 `IconButton visibleLabel`): it opens a right `SlideOver` on desktop and a full-height sheet on a phone, and is the page's only compare entry, so it needs no ⋮.
+
+**A figure measured against a baseline** (the Skills comparison drawer) reads as a signed number or a word, never colour alone: `+2` / `−3` beside the level, `missing` when the character has none of a skill the baseline has, `same` when equal. `isk-pos` / `isk-neg` tint the sign (§1) and the baseline column is labelled "Baseline", so a colour-blind reader loses nothing.
 
 The Fittings editor header applies tier 3: Compare and Copy stats sit in its ⋮ menu on desktop, and on a phone that menu also holds Rename, the Fittings menu's items, Export and the Alpha/Omega and Mastery badges as text (the icon badges stay in the header from `md` up). Its Save is the one primary control, and says where it saves.
 

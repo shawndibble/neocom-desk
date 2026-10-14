@@ -81,3 +81,76 @@ export function idsNeedingFetch(
   if (forceAll) return [...selectedIds];
   return selectedIds.filter((id) => !cachedIds.has(id));
 }
+
+/** How one character's level of a skill stands against the baseline character's. */
+export type LevelDelta =
+  | { kind: 'same' }
+  | { kind: 'ahead'; by: number }
+  | { kind: 'behind'; by: number }
+  | { kind: 'missing' };
+
+/**
+ * `missing` rather than `behind` when the character has no level at all of a
+ * skill the baseline has: "doesn't have it" is a different fact from "is two
+ * levels short", and a bare `-4` would hide it.
+ */
+export function levelDelta(level: number, baselineLevel: number): LevelDelta {
+  if (level === baselineLevel) return { kind: 'same' };
+  if (level === 0) return { kind: 'missing' };
+  if (level > baselineLevel) return { kind: 'ahead', by: level - baselineLevel };
+  return { kind: 'behind', by: baselineLevel - level };
+}
+
+/** Rows whose levels differ across the compared characters, and the rest — kept so they can be shown on demand. */
+export function splitDiffering(rows: readonly ComparisonRow[]): {
+  differing: ComparisonRow[];
+  identical: ComparisonRow[];
+  identicalCount: number;
+} {
+  const differing: ComparisonRow[] = [];
+  const identical: ComparisonRow[] = [];
+  for (const row of rows) (hasDifferingLevels(row) ? differing : identical).push(row);
+  return { differing, identical, identicalCount: identical.length };
+}
+
+export interface GroupBand {
+  groupName: string;
+  rows: ComparisonRow[];
+  /** Per character: total levels across the band's rows minus the baseline's (0 for the baseline). */
+  netDelta: ReadonlyMap<number, number>;
+}
+
+/** Consecutive rows with the same group name, each with its net lead or deficit against the baseline. */
+export function groupBands(
+  rows: readonly ComparisonRow[],
+  characterIds: readonly number[],
+  baselineId: number | null
+): GroupBand[] {
+  const bands: GroupBand[] = [];
+  for (const row of rows) {
+    const last = bands.at(-1);
+    if (last && last.groupName === row.groupName) last.rows.push(row);
+    else bands.push({ groupName: row.groupName, rows: [row], netDelta: new Map() });
+  }
+  return bands.map((band) => {
+    const netDelta = new Map<number, number>();
+    for (const characterId of characterIds) {
+      let net = 0;
+      for (const row of band.rows) {
+        const baseline = baselineId === null ? 0 : (row.levels.get(baselineId) ?? 0);
+        net += (row.levels.get(characterId) ?? 0) - baseline;
+      }
+      netDelta.set(characterId, characterId === baselineId ? 0 : net);
+    }
+    return { ...band, netDelta };
+  });
+}
+
+/** The requested baseline while it is still selected, else the first selected character. */
+export function resolveBaseline(
+  selectedIds: readonly number[],
+  requested: number | null
+): number | null {
+  if (requested !== null && selectedIds.includes(requested)) return requested;
+  return selectedIds[0] ?? null;
+}

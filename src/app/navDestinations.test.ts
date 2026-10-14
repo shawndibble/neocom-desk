@@ -91,7 +91,6 @@ describe('NAV_LOCK_PATHS', () => {
         '/employment-history',
         '/skills/plans',
         '/skills/trained',
-        '/skills/compare',
         '/skills/certificates',
       ].toSorted()
     );

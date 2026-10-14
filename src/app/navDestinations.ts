@@ -153,7 +153,6 @@ export const NAV_PAGES = [
     subViews: [
       { path: '/skills/plans', labelKey: 'skills.plansTab' },
       { path: '/skills/trained', labelKey: 'skills.trainedTab' },
-      { path: '/skills/compare', labelKey: 'skills.compareTab' },
       { path: '/skills/certificates', labelKey: 'skills.certificatesTab' },
     ],
   },
