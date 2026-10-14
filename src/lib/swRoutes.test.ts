@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isEvePortraitImage, isEveTypeImage, isVersionedSdeData } from './swRoutes';
+import {
+  isContractSnapshotObject,
+  isEvePortraitImage,
+  isEveTypeImage,
+  isVersionedSdeData,
+} from './swRoutes';
 
 const ORIGIN = 'https://neocomdesk.app';
 const at = (href: string) => new URL(href, ORIGIN);
@@ -56,5 +61,22 @@ describe('isEvePortraitImage', () => {
   it('ignores type art and ESI character endpoints', () => {
     expect(isEvePortraitImage(at('https://images.evetech.net/types/587/icon'))).toBe(false);
     expect(isEvePortraitImage(at('https://esi.evetech.net/characters/9/portrait/'))).toBe(false);
+  });
+});
+
+describe('isContractSnapshotObject', () => {
+  it('matches a per-type object on the snapshot host', () => {
+    expect(
+      isContractSnapshotObject(
+        at('https://data.neocomdesk.com/contract-offers/types/34.0123abcd.json')
+      )
+    ).toBe(true);
+  });
+
+  it('ignores the index, which changes every publish, and other hosts', () => {
+    expect(
+      isContractSnapshotObject(at('https://data.neocomdesk.com/contract-offers/index.json'))
+    ).toBe(false);
+    expect(isContractSnapshotObject(at('/contract-offers/types/34.0123abcd.json'))).toBe(false);
   });
 });

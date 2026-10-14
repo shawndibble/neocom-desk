@@ -39,7 +39,18 @@ export interface DeviceCharacterInput {
    * another device's (issue #2240).
    */
   projectionRows: ProjectionRowInput[];
+  /**
+   * The raw ESI notification types this device has enabled for the browser
+   * channel for this Character (issue #3755, ADR 0020). Replaces this
+   * device's own previous list; never another device's. Absent (an older
+   * client) leaves the stored list untouched.
+   */
+  eveTypes?: string[];
 }
+
+/** Bounds a hostile or buggy client's `eveTypes` upload; the real list is a few dozen. */
+export const MAX_EVE_TYPES = 200;
+const MAX_EVE_TYPE_LENGTH = 100;
 
 export interface RegisterDeviceInput {
   deviceId: string;
@@ -69,6 +80,8 @@ export interface RegisterDeviceResult {
    * under an id its token did not verify to.
    */
   projections: CharacterProjection[];
+  /** Each verified character's enabled browser types, keyed by characterId; absent when the client sent none. */
+  eveTypesByCharacter: Record<number, string[]>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -106,6 +119,19 @@ function parseProjectionRow(raw: unknown, path: string): ProjectionRowInput {
   };
 }
 
+/** `eveTypes` is optional so an older client's upload still parses (leaving the stored list alone). */
+function parseEveTypes(raw: unknown, path: string): string[] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) throw new Error(`${path}, if present, must be an array`);
+  if (raw.length > MAX_EVE_TYPES) throw new Error(`${path} has more than ${MAX_EVE_TYPES} entries`);
+  for (const type of raw) {
+    if (typeof type !== 'string' || type.length === 0 || type.length > MAX_EVE_TYPE_LENGTH) {
+      throw new Error(`${path} must contain only non-empty strings`);
+    }
+  }
+  return [...new Set(raw as string[])].sort();
+}
+
 /**
  * A deviceId becomes a `deviceRegistrations` doc id and the prefix of every
  * projection row id (issue #2240), so it must be a safe Firestore id: no `/`,
@@ -134,7 +160,7 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
 
   const parsedCharacters = characters.map((entry, i) => {
     if (!isRecord(entry)) throw new Error(`characters[${i}] must be an object`);
-    const { characterId, accessToken, projectionRows } = entry;
+    const { characterId, accessToken, projectionRows, eveTypes } = entry;
     if (typeof characterId !== 'number' || !Number.isFinite(characterId)) {
       throw new Error(`characters[${i}].characterId must be a number`);
     }
@@ -147,7 +173,12 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
     const rows = projectionRows.map((row, j) =>
       parseProjectionRow(row, `characters[${i}].projectionRows[${j}]`)
     );
-    return { characterId, accessToken, projectionRows: rows };
+    return {
+      characterId,
+      accessToken,
+      projectionRows: rows,
+      eveTypes: parseEveTypes(eveTypes, `characters[${i}].eveTypes`),
+    };
   });
 
   return { deviceId, fcmToken, characters: parsedCharacters };
@@ -167,6 +198,7 @@ export async function buildDeviceRegistration(
   const characterIds: number[] = [];
   const rejected: number[] = [];
   const projections: CharacterProjection[] = [];
+  const eveTypesByCharacter: Record<number, string[]> = {};
 
   for (const character of input.characters) {
     try {
@@ -176,6 +208,9 @@ export async function buildDeviceRegistration(
       }
       characterIds.push(character.characterId);
       projections.push({ characterId: character.characterId, rows: character.projectionRows });
+      if (character.eveTypes !== undefined) {
+        eveTypesByCharacter[character.characterId] = character.eveTypes;
+      }
     } catch (err) {
       logError('Device registration: character access token rejected', {
         characterId: character.characterId,
@@ -189,5 +224,6 @@ export async function buildDeviceRegistration(
     registration: { fcmToken: input.fcmToken, characterIds },
     rejected,
     projections,
+    eveTypesByCharacter,
   };
 }

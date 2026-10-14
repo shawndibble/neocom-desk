@@ -158,7 +158,10 @@ export interface PollDependencies {
    * `ForegroundNotificationPoller` polls on mount), and directly from
    * Settings (issue #1248).
    */
-  uploadProjection: (rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>) => Promise<void>;
+  uploadProjection: (
+    rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>,
+    eveTypesByCharacter: ReadonlyMap<number, readonly string[]>
+  ) => Promise<void>;
 }
 
 /** Which delivery channels are live for this poll, before per-event opinions. */
