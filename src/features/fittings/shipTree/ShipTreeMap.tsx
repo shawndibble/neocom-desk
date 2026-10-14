@@ -10,6 +10,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { useFontScale } from '@/lib/fontScale';
 import type { ShipTreeEdge, ShipTreeHullStatus, ShipTreeLayout } from '@/engine/shipTree/types';
 import type { ShipTreeFaction, ShipTreeShip } from '@/sde/types';
 import { ClassNode } from './ClassNode';
@@ -73,7 +74,12 @@ export function ShipTreeMap({
       : 0;
   // A camera the reader moved, for the faction they moved it on; any other
   // faction starts at 100% (or centred on the hull search picked there).
-  const [moved, setMoved] = useState<{ factionID: number; cam: Camera } | null>(null);
+  // The text-size setting scales the whole map; a change re-centres it, like a
+  // faction switch, rather than rescaling a pan made at the old scale.
+  const scale = useFontScale((state) => state.value);
+  const [moved, setMoved] = useState<{ factionID: number; scale: number; cam: Camera } | null>(
+    null
+  );
   const [focus, setFocus] = useState<{ factionID: number; typeID: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -88,12 +94,12 @@ export function ShipTreeMap({
     return ship ? (nodeById.get(ship.treeGroupID) ?? null) : null;
   }, [focusShip, data, nodeById]);
 
-  const initial = initialCamera(world, viewport, fitInset);
+  const initial = initialCamera(world, viewport, fitInset, scale);
   const cam =
-    moved?.factionID === factionID
+    moved?.factionID === factionID && moved.scale === scale
       ? moved.cam
       : focusNode
-        ? focusCamera(focusNode, viewport, initial.z)
+        ? focusCamera(focusNode, viewport, initial.z, scale)
         : initial;
 
   useEffect(() => {
@@ -106,9 +112,9 @@ export function ShipTreeMap({
     return () => observer.disconnect();
   }, []);
 
-  const moveTo = (next: Camera) => setMoved({ factionID, cam: next });
+  const moveTo = (next: Camera) => setMoved({ factionID, scale, cam: next });
   const zoomBy = (factor: number) =>
-    moveTo(zoomAround(cam, factor, viewport.width / 2, viewport.height / 2));
+    moveTo(zoomAround(cam, factor, viewport.width / 2, viewport.height / 2, scale));
 
   // Drag pans, wheel and pinch zoom around the pointer/fingers — one gesture
   // layer for mouse, trackpad and touch (incl. two-finger pinch on a
@@ -135,7 +141,8 @@ export function ShipTreeMap({
             cam,
             wheelZoomFactor(dy),
             wheelEvent.clientX - rect.left,
-            wheelEvent.clientY - rect.top
+            wheelEvent.clientY - rect.top,
+            scale
           )
         );
       },
@@ -144,13 +151,16 @@ export function ShipTreeMap({
         event.preventDefault();
         const rect = viewportRef.current!.getBoundingClientRect();
         const factor = z / cam.z;
-        if (factor !== 1) moveTo(zoomAround(cam, factor, ox - rect.left, oy - rect.top));
+        if (factor !== 1) moveTo(zoomAround(cam, factor, ox - rect.left, oy - rect.top, scale));
       },
     },
     {
       target: viewportRef,
       eventOptions: { passive: false },
-      pinch: { scaleBounds: { min: MIN_ZOOM, max: MAX_ZOOM }, from: () => [cam.z, 0] },
+      pinch: {
+        scaleBounds: { min: MIN_ZOOM * scale, max: MAX_ZOOM * scale },
+        from: () => [cam.z, 0],
+      },
     }
   );
 
@@ -191,7 +201,7 @@ export function ShipTreeMap({
       onFaction(ship.factionID);
     } else {
       const node = nodeById.get(ship.treeGroupID);
-      if (node) moveTo(focusCamera(node, viewport, cam.z));
+      if (node) moveTo(focusCamera(node, viewport, cam.z, scale));
     }
     onOpenShip(ship);
   }
@@ -236,18 +246,18 @@ export function ShipTreeMap({
           size="md"
           icon={<Icon.ZoomOut />}
           label={t('ships.tree.zoomOut')}
-          disabled={cam.z <= MIN_ZOOM}
+          disabled={cam.z <= MIN_ZOOM * scale}
           onClick={() => zoomBy(1 / BUTTON_STEP)}
         />
         <span className="w-10 text-center text-xs text-text-dim tabular-nums">
           <span className="sr-only">{t('ships.tree.zoomLevel')}: </span>
-          {Math.round(cam.z * 100)}%
+          {Math.round((cam.z / scale) * 100)}%
         </span>
         <IconButton
           size="md"
           icon={<Icon.ZoomIn />}
           label={t('ships.tree.zoomIn')}
-          disabled={cam.z >= MAX_ZOOM}
+          disabled={cam.z >= MAX_ZOOM * scale}
           onClick={() => zoomBy(BUTTON_STEP)}
         />
         <Tooltip content={t('ships.tree.fitLabel')}>
@@ -255,7 +265,7 @@ export function ShipTreeMap({
             size="md"
             onClick={() => {
               setFocus(null);
-              moveTo(fitCamera(world, viewport, fitInset));
+              moveTo(fitCamera(world, viewport, fitInset, scale));
             }}
           >
             {t('ships.tree.fit')}
