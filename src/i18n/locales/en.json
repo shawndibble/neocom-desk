@@ -4382,6 +4382,11 @@
       "next": "Next",
       "nextGoTo": "Opens the page for {{note}}",
       "updated": "Updated",
+      "stalest": "Oldest: {{name}}, {{age}}",
+      "breakdownCaption": "When each widget on the Overview last read its data",
+      "breakdownWidget": "Widget",
+      "breakdownUpdated": "Updated",
+      "breakdownNever": "Not read yet",
       "customize": "Customize"
     },
     "customize": {

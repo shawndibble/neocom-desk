@@ -16,6 +16,9 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataAgeBadge,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   SEVERITY_TEXT,
   SeverityIcon,
   Tooltip,
@@ -24,12 +27,15 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
+import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { useKindViews } from './widgets/data/useWidgetView';
+import { useKindViews, viewKey } from './widgets/data/useWidgetView';
 import { useOverviewEdit } from './widgets/editContext';
-import { collectDeadlines, stalestFetch } from './widgets/headerSummary';
+import { collectDeadlines, fetchBreakdown, stalestFetch } from './widgets/headerSummary';
+import { getKind } from './widgets/kinds';
 import type { Widget } from './widgets/layout';
+import type { KindView } from './widgets/data/types';
 import { chipTone, nextDeadline, type ChipTone } from './widgets/nextDeadline';
 import { distinctKinds, visibleWidgets } from './widgets/visibility';
 
@@ -54,25 +60,89 @@ function useOverviewSummary(widgets: readonly Widget[]) {
   const views = useKindViews(requests);
   const all = [...views.values()];
   const next = nextDeadline(collectDeadlines(all), now);
+  const breakdown = fetchBreakdown(
+    shown.map((widget) => ({
+      kind: widget.kind,
+      view: views.get(viewKey({ kind: widget.kind, scopeAll: false })) as KindView,
+    }))
+  );
   const remaining = next ? next.at - now : 0;
   return {
     next,
     remaining,
     tone: chipTone(remaining),
     fetchedAt: stalestFetch(all).date,
+    breakdown,
+    now,
   };
 }
 
-/** "Updated N ago", a read-only indicator beside the Character's name (no Refresh: widgets retry themselves). */
+/**
+ * "Updated N ago" beside the Character's name: the stalest read of any drawn
+ * widget. Its tooltip names that widget; a click opens the per-widget table, so
+ * "14h ago" is never a mystery (no Refresh: widgets retry themselves).
+ */
 export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
   const { t } = useTranslation();
-  const { fetchedAt } = useOverviewSummary(widgets);
+  const { fetchedAt, breakdown, now } = useOverviewSummary(widgets);
   if (!fetchedAt) return null;
+  const title = (kind: string) => {
+    const def = getKind(kind);
+    return def ? t(def.titleKey) : kind;
+  };
+  const age = (date: Date) => formatAge(Math.max(0, now - date.getTime()), t);
+  const stalest = breakdown[0];
   return (
-    <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
-      {t('overview.header.updated')}
-      <DataAgeBadge date={fetchedAt} alwaysVisible />
-    </span>
+    <Popover>
+      <Tooltip
+        content={t('overview.header.stalest', {
+          name: title(stalest.kind),
+          age: age(fetchedAt),
+        })}
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-xs text-[0.6875rem] text-text-dim hover:text-text"
+          >
+            {t('overview.header.updated')}
+            <DataAgeBadge date={fetchedAt} alwaysVisible tooltip={false} />
+            <Icon.Expanded className="size-3" aria-hidden="true" />
+          </button>
+        </PopoverTrigger>
+      </Tooltip>
+      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0">
+        <table className="w-full text-xs">
+          <caption className="sr-only">{t('overview.header.breakdownCaption')}</caption>
+          <thead>
+            <tr className="border-b border-line bg-panel-2 text-left text-text-dim uppercase">
+              <th scope="col" className="px-3 py-2 font-semibold tracking-widest">
+                {t('overview.header.breakdownWidget')}
+              </th>
+              <th scope="col" className="px-3 py-2 text-right font-semibold tracking-widest">
+                {t('overview.header.breakdownUpdated')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {breakdown.map((row) => (
+              <tr key={row.kind} className="border-b border-line last:border-b-0">
+                <th scope="row" className="px-3 py-2 text-left font-normal">
+                  {title(row.kind)}
+                </th>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {row.fetchedAt ? (
+                    <DataAgeBadge date={row.fetchedAt} alwaysVisible className="justify-end" />
+                  ) : (
+                    <span className="text-text-dim">{t('overview.header.breakdownNever')}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </PopoverContent>
+    </Popover>
   );
 }
 

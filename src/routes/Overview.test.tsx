@@ -416,6 +416,17 @@ describe('Overview widget grid', () => {
     const heading = main.getByRole('heading', { level: 1 });
     await waitFor(() => expect(heading.parentElement).toHaveTextContent(/Updated/));
   });
+
+  it('opens a per-widget table of when each read landed from the data age', async () => {
+    await seedLayout(widget('w', 'wallet', { size: 'S' }));
+    render(<App />);
+
+    await widgetCard('Wallet');
+    const trigger = await screen.findByRole('button', { name: /Updated/ });
+    await userEvent.click(trigger);
+    const table = await screen.findByRole('table', { name: /last read its data/i });
+    expect(within(table).getByRole('rowheader', { name: 'Wallet' })).toBeInTheDocument();
+  });
 });
 
 /*
