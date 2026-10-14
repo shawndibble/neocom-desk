@@ -72,15 +72,18 @@ describe('OpenInEveMenuItem', () => {
   it('clears the result by itself after 10 seconds', async () => {
     await seed([SCOPE]);
     const timeout = vi.spyOn(globalThis, 'setTimeout');
-    openMenu('information', 587);
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Opened in your EVE client.');
-    const call = timeout.mock.calls.find(([, ms]) => ms === OUTCOME_VISIBLE_MS);
-    expect(OUTCOME_VISIBLE_MS).toBe(10_000);
-    expect(call).toBeDefined();
-    act(() => (call![0] as () => void)());
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    timeout.mockRestore();
+    try {
+      openMenu('information', 587);
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
+      expect(await screen.findByRole('status')).toHaveTextContent('Opened in your EVE client.');
+      const call = timeout.mock.calls.find(([, ms]) => ms === OUTCOME_VISIBLE_MS);
+      expect(OUTCOME_VISIBLE_MS).toBe(10_000);
+      expect(call).toBeDefined();
+      act(() => (call![0] as () => void)());
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   it.each([
