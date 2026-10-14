@@ -97,7 +97,7 @@ describe('loadImplantDetails', () => {
     expect(result.has(3)).toBe(false);
   });
 
-  it('reads the slot and the attribute bonus', async () => {
+  it('reads the slot', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/types/10209`, () =>
         HttpResponse.json(
@@ -113,7 +113,6 @@ describe('loadImplantDetails', () => {
     expect(result.get(10209)).toEqual({
       description: '+5 Memory',
       slot: 2,
-      bonuses: { memory: 5 },
     });
   });
 });

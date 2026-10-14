@@ -2,8 +2,7 @@
 import { getCharacterClones, type CharacterClones } from '@/esi/endpoints';
 import { loadUniverseType } from '@/features/skills/data';
 import { typeDescription } from '@/features/skills/typeDisplay';
-import { extractAttributeBonuses, extractImplantSlot } from '@/features/skills/dogma';
-import type { Attributes } from '@/engine/types';
+import { extractImplantSlot } from '@/features/skills/dogma';
 import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
 const KEY = 'clones';
@@ -26,8 +25,6 @@ export interface ImplantDetail {
   description?: string;
   /** Implant slot 1–10; absent when the type has none. */
   slot?: number;
-  /** Non-zero attribute bonuses (the learning implants). */
-  bonuses: Partial<Attributes>;
 }
 
 /**
@@ -49,7 +46,6 @@ export async function loadImplantDetails(
     map.set(id, {
       ...(description ? { description } : {}),
       ...(slot !== undefined ? { slot } : {}),
-      bonuses: extractAttributeBonuses(data.dogma_attributes),
     });
   });
   return map;

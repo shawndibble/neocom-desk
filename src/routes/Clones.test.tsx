@@ -346,12 +346,11 @@ describe('Clones', () => {
     ).toBeInTheDocument();
   });
 
-  it('lists each implant with its slot and attribute bonus', async () => {
+  it('lists each implant as its slot and name; Show info carries the rest', async () => {
     render(<App />);
     const link = await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' });
     const row = link.closest('li');
-    await waitFor(() => expect(row).toHaveTextContent(/^Slot 4\s*High-grade Ascendancy Alpha/));
-    expect(row).toHaveTextContent('+4 Willpower');
+    await waitFor(() => expect(row).toHaveTextContent(/^Slot 4\s*High-grade Ascendancy Alpha$/));
   });
 
   it('shows the empty state when there are no clones', async () => {

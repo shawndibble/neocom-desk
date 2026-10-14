@@ -6,7 +6,6 @@ import {
   CachedEmptyState,
   EmptyState,
   IconButton,
-  IskFigureGroup,
   Panel,
   SegmentedControl,
   Spinner,
@@ -86,7 +85,6 @@ import {
 } from '@/features/character/cloneVerdictGate';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import type { AttributeName } from '@/engine/types';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -286,12 +284,14 @@ function bySlot(ids: readonly number[], details: ReadonlyMap<number, ImplantDeta
   return [...ids].sort((a, b) => slot(a) - slot(b));
 }
 
-/** One implant: slot, name (Show info), then what it adds and what it is worth. */
+/**
+ * One implant: slot, then the name. Show info carries its bonus and price;
+ * the card's footer carries the total.
+ */
 function ImplantRow({
   typeId,
   name,
   detail,
-  price,
   showSlot,
 }: {
   typeId: number;
@@ -299,11 +299,8 @@ function ImplantRow({
   detail: ImplantDetail | undefined;
   /** False when no implant in the list has a known slot: no empty column. */
   showSlot: boolean;
-  /** Nullish until priced or when unpriced: the card's footer counts those. */
-  price: number | null | undefined;
 }) {
   const { t } = useTranslation();
-  const bonuses = Object.entries(detail?.bonuses ?? {}) as [AttributeName, number][];
   return (
     <li className="flex items-center gap-2 md:py-0.5">
       {showSlot && (
@@ -322,17 +319,6 @@ function ImplantRow({
         description={detail?.description}
         className={`${TOUCH_LINK} min-w-0 flex-1 [overflow-wrap:anywhere]`}
       />
-      <span className="flex shrink-0 items-center gap-x-2 text-xs whitespace-nowrap text-text-dim tabular-nums">
-        {bonuses.map(([attribute, value]) => (
-          <span key={attribute}>
-            {t('clones.implantBonus', {
-              value,
-              attribute: t(`clones.verdict.attribute.${attribute}`),
-            })}
-          </span>
-        ))}
-        {price != null && price > 0 && <IskAmount value={price} />}
-      </span>
     </li>
   );
 }
@@ -492,7 +478,7 @@ function CloneCard({
       ) : (
         // One row per implant, divided: on a phone each row is a 44px tap target,
         // and a wrapped run of 44px links read as gaps, not as a list.
-        <IskFigureGroup className="space-y-1.5">
+        <div className="space-y-1.5">
           <ul className="divide-y divide-line border-y border-line">
             {bySlot(implantIds, implantDetails).map((id) => (
               <ImplantRow
@@ -500,7 +486,6 @@ function CloneCard({
                 typeId={id}
                 name={implantNames.get(id) ?? `Type #${id}`}
                 detail={implantDetails.get(id)}
-                price={prices?.get(id)}
                 showSlot={showSlot}
               />
             ))}
@@ -514,7 +499,7 @@ function CloneCard({
               </span>
             )}
           </p>
-        </IskFigureGroup>
+        </div>
       )}
     </li>
   );
