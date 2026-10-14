@@ -386,6 +386,7 @@ function SnapshotProgress({
         label={label}
         value={determinate ? done : null}
         max={determinate ? total : undefined}
+        size="xs"
         className="w-full"
       />
       <p className="text-[0.6875rem] text-text-dim">{label}</p>
