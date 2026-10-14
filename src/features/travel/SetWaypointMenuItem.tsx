@@ -48,8 +48,8 @@ export function SetWaypointMenuItem({
         >
           {label}
         </DisabledMenuItem>
-        {missingGroups.length > 0 && <GrantMissingMenuItem groups={missingGroups} />}
         <ViewRouteMenuItem locationId={locationId} />
+        {missingGroups.length > 0 && <GrantMissingMenuItem groups={missingGroups} />}
       </>
     );
   }
