@@ -6,6 +6,7 @@ import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBa
 import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 import { formatLocalDate } from '@/lib/localDate';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { RemapAvailability } from './remapAvailability';
 
 interface AttributesPaneProps {
@@ -39,30 +40,46 @@ export function AttributesPane({
   className,
 }: AttributesPaneProps) {
   const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
+  const chips = () => (
+    <AttributeChips
+      attributes={result?.data ?? null}
+      implantBonuses={implantBonuses}
+      boosterBonus={acceleratorBonusOf(attributeBaseline)}
+      dense
+      short
+    />
+  );
+  if (!isDesktop) {
+    // One line, no card. The remap note and data age are desktop reference.
+    return (
+      <section aria-label={t('skills.attributes')} className="px-1">
+        {chips()}
+      </section>
+    );
+  }
   return (
-    <Panel
-      title={t('skills.attributes')}
-      className={className}
-      actions={result?.fetchedAt && <DataAgeBadge date={result.fetchedAt} />}
-    >
-      <AttributeChips
-        attributes={result?.data ?? null}
-        implantBonuses={implantBonuses}
-        boosterBonus={acceleratorBonusOf(attributeBaseline)}
-      />
-      {/* Same live remap read the plan editor costs against (#1726) — a
-          pilot checking Attributes shouldn't have to open a plan to see it. */}
-      {remapInfo && (
-        <p className="mt-2 text-[0.6875rem] text-text-dim">
-          {`${t('plans.remapBudget', { bonus: remapInfo.bonus })} ${
-            remapInfo.yearlyReady
-              ? t('plans.remapBudgetYearlyReady')
-              : t('plans.remapBudgetYearlyFrom', {
-                  date: remapInfo.cooldownUntil ? formatLocalDate(remapInfo.cooldownUntil) : '',
-                })
-          }`}
-        </p>
-      )}
-    </Panel>
+    <>
+      <Panel
+        title={t('skills.attributes')}
+        className={className}
+        actions={result?.fetchedAt && <DataAgeBadge date={result.fetchedAt} />}
+      >
+        {chips()}
+        {/* Same live remap read the plan editor costs against (#1726) — a
+            pilot checking Attributes shouldn't have to open a plan to see it. */}
+        {remapInfo && (
+          <p className="mt-2 text-[0.6875rem] text-text-dim">
+            {`${t('plans.remapBudget', { bonus: remapInfo.bonus })} ${
+              remapInfo.yearlyReady
+                ? t('plans.remapBudgetYearlyReady')
+                : t('plans.remapBudgetYearlyFrom', {
+                    date: remapInfo.cooldownUntil ? formatLocalDate(remapInfo.cooldownUntil) : '',
+                  })
+            }`}
+          </p>
+        )}
+      </Panel>
+    </>
   );
 }
