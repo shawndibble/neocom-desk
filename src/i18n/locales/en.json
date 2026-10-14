@@ -6187,7 +6187,8 @@
     "renameNamed": "Rename clone {{name}}",
     "renamePlace": "Rename clone in {{place}}",
     "nameField": "Clone name",
-    "nameHint": "EVE no longer shares clone names with apps, so name it here. Leave it empty to show its station.",
+    "nameHint": "EVE no longer shares clone names with apps, so name it here. Leave it empty to show where it is.",
+    "namesNote": "EVE no longer shares the names you gave your clones in game. Name one here with its pencil.",
     "slot": "Slot",
     "implantBonus": "+{{value}} {{attribute}}"
   },

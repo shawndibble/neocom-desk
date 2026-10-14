@@ -143,6 +143,8 @@ describe('CurrentQueuePanel as a link target', () => {
 
   afterEach(() => {
     window.history.replaceState({}, '', '/');
+    // jsdom has no scrollIntoView of its own; drop the stub so it cannot leak.
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
   });
 
   it('scrolls itself into view and takes focus when the URL names it (#current-queue)', async () => {

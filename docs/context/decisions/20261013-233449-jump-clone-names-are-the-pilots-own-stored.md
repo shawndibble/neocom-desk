@@ -20,3 +20,6 @@ _Recorded 2026-10-13._
   same after a pilot jumps into a clone and back out. If it changes, that
   clone's name drops back to its place and the pilot names it again. The
   stale entry costs a few bytes in the synced blob and is not pruned.
+- **Accepted limitation:** the blob is last-write-wins as a whole, like
+  `sync.skillCloneStates`. Two devices renaming different clones before a
+  sync keep only one of the two names.

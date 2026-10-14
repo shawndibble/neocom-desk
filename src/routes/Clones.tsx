@@ -26,8 +26,8 @@ import {
 import {
   CLONE_NICKNAME_MAX,
   cloneOwnName,
+  saveCloneNickname,
   useCloneNicknames,
-  withCloneNickname,
 } from '@/features/character/cloneNicknames';
 import { ItemInfoLink } from '@/features/entities';
 import { loadCharacterSpSummary } from '@/features/character/characterSp';
@@ -309,7 +309,7 @@ function ImplantRow({
   return (
     <li className="flex items-center gap-2 md:py-0.5">
       {showSlot && (
-        <span className="w-4 shrink-0 text-right text-xs text-text-faint tabular-nums">
+        <span className="w-4 shrink-0 text-right text-xs text-text-dim tabular-nums">
           {detail?.slot !== undefined && (
             <>
               <span className="sr-only">{t('clones.slot')} </span>
@@ -385,6 +385,8 @@ function CloneCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const pencilRef = useRef<HTMLButtonElement>(null);
+  // Set once Enter or Esc has settled the field, so the blur that follows does not save again.
+  const settled = useRef(false);
   const hintId = useId();
   const focusAfterCommit = useFocusAfterCommit();
   const value = prices ? sumImplantValue(implantIds, prices) : null;
@@ -392,19 +394,17 @@ function CloneCard({
   const showSlot = implantIds.some((id) => implantDetails.get(id)?.slot !== undefined);
 
   function startRename() {
+    settled.current = false;
     setDraft(rename?.value ?? '');
     setEditing(true);
   }
-  function commit() {
+  // Enter and Escape hand focus back to the pencil; blur does not, the pilot is already moving on.
+  function close(save: boolean, refocus: boolean) {
+    if (settled.current) return;
+    settled.current = true;
     setEditing(false);
-    if (rename && draft.trim() !== rename.value) rename.onSave(draft);
-  }
-  // Enter and Escape unmount the focused field; hand focus back to the pencil.
-  // Blur does not: the pilot is already moving on.
-  function end(save: boolean) {
-    if (save) commit();
-    else setEditing(false);
-    focusAfterCommit(pencilRef);
+    if (save && rename && draft.trim() !== rename.value) rename.onSave(draft);
+    if (refocus) focusAfterCommit(pencilRef);
   }
 
   return (
@@ -424,14 +424,18 @@ function CloneCard({
             aria-label={t('clones.nameField')}
             aria-describedby={hintId}
             onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
+            onBlur={() => close(true, false)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 // Focus moves to a button mid-keystroke: its keypress must not click it.
                 e.preventDefault();
-                end(true);
+                close(true, true);
               }
-              if (e.key === 'Escape') end(false);
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                close(false, true);
+              }
             }}
             className="min-w-0 flex-1"
           />
@@ -490,7 +494,7 @@ function CloneCard({
         <>
           {/* One row per implant, divided: on a phone each row is a 44px tap target,
               and a wrapped run of 44px links read as gaps, not as a list. */}
-          <IskFigureGroup>
+          <IskFigureGroup className="space-y-1.5">
             <ul className="divide-y divide-line border-y border-line">
               {bySlot(implantIds, implantDetails).map((id) => (
                 <ImplantRow
@@ -503,16 +507,16 @@ function CloneCard({
                 />
               ))}
             </ul>
+            <p className="flex flex-wrap items-center gap-x-2 text-xs text-text-dim">
+              <span>{t('clones.implantCount', { count: implantIds.length })}</span>
+              {value && (
+                <span>
+                  {value.unpriced < implantIds.length && <IskAmount value={value.total} />}
+                  {value.unpriced > 0 && ` ${t('clones.unpriced', { count: value.unpriced })}`}
+                </span>
+              )}
+            </p>
           </IskFigureGroup>
-          <p className="flex flex-wrap items-center gap-x-2 text-xs text-text-dim">
-            <span>{t('clones.implantCount', { count: implantIds.length })}</span>
-            {value && (
-              <span>
-                {value.unpriced < implantIds.length && <IskAmount value={value.total} />}
-                {value.unpriced > 0 && ` ${t('clones.unpriced', { count: value.unpriced })}`}
-              </span>
-            )}
-          </p>
         </>
       )}
     </li>
@@ -674,7 +678,7 @@ export function Clones() {
   const setSort = useClonesSort((state) => state.setValue);
   const hydrateSort = useClonesSort((state) => state.hydrate);
   const nicknames = useCloneNicknames((state) => state.value);
-  const setNicknames = useCloneNicknames((state) => state.setValue);
+  const nicknamesHydrated = useCloneNicknames((state) => state.hydrated);
   const hydrateNicknames = useCloneNicknames((state) => state.hydrate);
   const cloneStates = useCloneStates((state) => state.value);
   const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
@@ -971,6 +975,9 @@ export function Clones() {
                 />
               </div>
             )}
+            {clones.length > 0 && clones.every((c) => cloneOwnName(c, nicknames) === undefined) && (
+              <p className="px-3 pt-3 text-xs text-text-dim">{t('clones.namesNote')}</p>
+            )}
             {(clones.length > 0 || hasWorn) && (
               <ul aria-label={t('clones.title')} className="grid gap-3 p-3 md:grid-cols-2">
                 {hasWorn && (
@@ -999,24 +1006,22 @@ export function Clones() {
                   return (
                     <CloneCard
                       key={clone.jump_clone_id}
-                      title={name ?? place}
+                      title={cloneLabel(clone)}
                       place={name === undefined ? null : place}
-                      rename={{
-                        label:
-                          name === undefined
-                            ? t('clones.renamePlace', { place })
-                            : t('clones.renameNamed', { name }),
-                        value: nicknames[clone.jump_clone_id] ?? '',
-                        placeholder: clone.name?.trim() || place,
-                        onSave: (next) =>
-                          void setNicknames(
-                            withCloneNickname(
-                              useCloneNicknames.getState().value,
-                              clone.jump_clone_id,
-                              next
-                            )
-                          ),
-                      }}
+                      rename={
+                        nicknamesHydrated
+                          ? {
+                              label:
+                                name === undefined
+                                  ? t('clones.renamePlace', { place })
+                                  : t('clones.renameNamed', { name }),
+                              value: nicknames[clone.jump_clone_id] ?? '',
+                              // What an empty field falls back to: ESI's name, else the place.
+                              placeholder: cloneOwnName(clone, {}) ?? place,
+                              onSave: (next) => void saveCloneNickname(clone.jump_clone_id, next),
+                            }
+                          : undefined
+                      }
                       security={securityOf(clone.location_id)}
                       jumps={
                         <JumpsAwayText

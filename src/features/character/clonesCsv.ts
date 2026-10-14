@@ -4,7 +4,8 @@ import { cloneOwnName, type CloneNicknamesValue } from './cloneNicknames';
 
 /**
  * Export columns for the jump-clone list. A card heads a named clone with its
- * name over its location; the file splits them so each sorts on its own. Implants are the names joined into one cell, as the table lists them.
+ * name over its location; the file splits them so each sorts on its own.
+ * Implants are the names joined into one cell.
  */
 export function clonesCsvColumns(
   t: CsvTranslate,

@@ -321,6 +321,31 @@ describe('Clones', () => {
     );
   });
 
+  it('drops an edit on Escape', async () => {
+    render(<App />);
+    await screen.findByText('High-grade Ascendancy Alpha');
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Rename clone in Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+      })
+    );
+    const field = screen.getByRole('textbox', { name: 'Clone name' });
+    fireEvent.change(field, { target: { value: 'Not this' } });
+    fireEvent.keyDown(field, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Clone name' })).not.toBeInTheDocument()
+    );
+    expect(screen.queryByText('Not this')).not.toBeInTheDocument();
+    expect(await db.settings.get('sync.cloneNicknames')).toBeUndefined();
+  });
+
+  it('says why no clone has a name until one is named', async () => {
+    render(<App />);
+    expect(
+      await screen.findByText(/EVE no longer shares the names you gave your clones/)
+    ).toBeInTheDocument();
+  });
+
   it('lists each implant with its slot and attribute bonus', async () => {
     render(<App />);
     const link = await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' });

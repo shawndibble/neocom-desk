@@ -1,5 +1,5 @@
 /**
- * Clone Nicknames: the pilot's own name for each jump clone.
+ * The pilot's own name for each jump clone.
  *
  * ESI stopped returning jump clone names in 2021 (esi/esi-issues#1305, still
  * open): `name` is in the schema but never in the payload, so every clone read
@@ -7,10 +7,12 @@
  * instead. ESI's `name` still wins over nothing, in case CCP fixes it.
  *
  * Synced, one blob keyed by `jump_clone_id` (globally unique, so no Character
- * key is needed), for the same exact-match allow-list reason as
- * `sync.skillCloneStates`. Clearing a name drops the entry; the key itself is
- * never deleted, so the tombstone-expiry edge in syncedSettings.ts does not
- * bite it.
+ * key is needed; `parseCharacterKeyedRecord` reads any integer-keyed record),
+ * for the same exact-match allow-list reason as `sync.skillCloneStates`.
+ * Clearing a name drops the entry; the key itself is never deleted, so the
+ * tombstone-expiry edge in syncedSettings.ts does not bite it. The blob is
+ * last-write-wins as a whole: two devices renaming different clones before
+ * a sync keep only one of the two names.
  */
 import type { JumpClone } from '@/esi/endpoints';
 import { parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
@@ -62,6 +64,17 @@ export const useCloneNicknames = createSyncedSetting<CloneNicknamesValue>({
   defaultValue: {},
   parse: parseCloneNicknames,
 });
+
+/**
+ * Sets one clone's nickname. Hydrates first: merged into the empty default
+ * before the stored blob is read, a save would push a one-entry blob that
+ * wipes every other name on every device.
+ */
+export async function saveCloneNickname(jumpCloneId: number, name: string): Promise<void> {
+  await useCloneNicknames.getState().hydrate();
+  const { value, setValue } = useCloneNicknames.getState();
+  await setValue(withCloneNickname(value, jumpCloneId, name));
+}
 
 /** The stored nicknames, for a loader outside React. */
 export async function readCloneNicknames(): Promise<CloneNicknamesValue> {
