@@ -2,10 +2,10 @@ import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { ComparisonRow } from './compareSkills';
 
 /**
- * Export columns for Skill Compare: skill, group, then one level column per
- * compared character, headed by the character's name. Group is always
- * included — the on-screen Group toggle is a display choice, and a
- * spreadsheet can hide a column itself.
+ * Export columns for the skill comparison: skill, group, then one level column
+ * per compared character, headed by the character's name. Group is always
+ * included — the on-screen view shows it as a band, and a spreadsheet can hide
+ * a column itself.
  */
 export function skillCompareCsvColumns(
   t: CsvTranslate,

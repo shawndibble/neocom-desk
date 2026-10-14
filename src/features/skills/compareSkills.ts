@@ -16,8 +16,6 @@ export interface ComparisonRow {
   groupName: string;
   /** Trained level per character id; 0 for a character that has not trained this skill. */
   levels: ReadonlyMap<number, number>;
-  /** Highest level among the compared characters, for "who's ahead" styling. */
-  maxLevel: number;
 }
 
 /**
@@ -41,18 +39,15 @@ export function buildComparisonRows(
   for (const skillTypeID of skillTypeIDs) {
     const info = bySkillTypeID.get(skillTypeID);
     const levels = new Map<number, number>();
-    let maxLevel = 0;
     for (const characterId of characterIds) {
       const level = skillsByCharacter.get(characterId)?.get(skillTypeID)?.level ?? 0;
       levels.set(characterId, level);
-      if (level > maxLevel) maxLevel = level;
     }
     rows.push({
       skillTypeID,
       name: info?.name ?? `#${skillTypeID}`,
       groupName: info?.groupName ?? '',
       levels,
-      maxLevel,
     });
   }
 
@@ -80,4 +75,83 @@ export function idsNeedingFetch(
 ): number[] {
   if (forceAll) return [...selectedIds];
   return selectedIds.filter((id) => !cachedIds.has(id));
+}
+
+/** How one character's level of a skill stands against the baseline character's. */
+export type LevelDelta =
+  | { kind: 'same' }
+  | { kind: 'ahead'; by: number }
+  | { kind: 'behind'; by: number }
+  | { kind: 'missing' };
+
+/**
+ * `missing` rather than `behind` when the character has no level at all of a
+ * skill the baseline has: "doesn't have it" is a different fact from "is two
+ * levels short", and a bare `-4` would hide it.
+ */
+export function levelDelta(level: number, baselineLevel: number): LevelDelta {
+  if (level === baselineLevel) return { kind: 'same' };
+  if (level === 0) return { kind: 'missing' };
+  if (level > baselineLevel) return { kind: 'ahead', by: level - baselineLevel };
+  return { kind: 'behind', by: baselineLevel - level };
+}
+
+/** A character's level of a row's skill: 0 for one with none, or for no character at all. */
+export function levelOf(row: ComparisonRow, characterId: number | null): number {
+  return characterId === null ? 0 : (row.levels.get(characterId) ?? 0);
+}
+
+/** Rows whose levels differ across the compared characters, and the rest — kept so they can be shown on demand. */
+export function splitDiffering(rows: readonly ComparisonRow[]): {
+  differing: ComparisonRow[];
+  identical: ComparisonRow[];
+} {
+  const differing: ComparisonRow[] = [];
+  const identical: ComparisonRow[] = [];
+  for (const row of rows) (hasDifferingLevels(row) ? differing : identical).push(row);
+  return { differing, identical };
+}
+
+export interface GroupBand {
+  groupName: string;
+  rows: ComparisonRow[];
+  /** Per character: total levels across the band's rows minus the baseline's (0 for the baseline). */
+  netDelta: ReadonlyMap<number, number>;
+}
+
+/** Consecutive rows with the same group name, each with its net lead or deficit against the baseline. */
+export function groupBands(
+  rows: readonly ComparisonRow[],
+  characterIds: readonly number[],
+  baselineId: number | null
+): GroupBand[] {
+  const bands: GroupBand[] = [];
+  for (const row of rows) {
+    const last = bands.at(-1);
+    if (last && last.groupName === row.groupName) last.rows.push(row);
+    else bands.push({ groupName: row.groupName, rows: [row], netDelta: new Map() });
+  }
+  return bands.map((band) => {
+    const netDelta = new Map<number, number>();
+    for (const characterId of characterIds) {
+      let net = 0;
+      for (const row of band.rows) net += levelOf(row, characterId) - levelOf(row, baselineId);
+      netDelta.set(characterId, characterId === baselineId ? 0 : net);
+    }
+    return { ...band, netDelta };
+  });
+}
+
+/**
+ * The requested baseline while it is still selected, else the preferred
+ * character (the active one) if selected, else the first selected.
+ */
+export function resolveBaseline(
+  selectedIds: readonly number[],
+  requested: number | null,
+  preferred: number | null = null
+): number | null {
+  if (requested !== null && selectedIds.includes(requested)) return requested;
+  if (preferred !== null && selectedIds.includes(preferred)) return preferred;
+  return selectedIds[0] ?? null;
 }

@@ -165,6 +165,26 @@ describe('Skills', () => {
     expect(screen.queryByText('Ocular Filter - Basic')).not.toBeInTheDocument();
   });
 
+  it('opens the skill comparison drawer from the header, seeded with the active character', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Compare with…' }));
+
+    const drawer = await screen.findByRole('dialog', { name: 'Compare skills' });
+    expect(
+      await within(drawer).findByRole('button', { name: /Pilot One/, pressed: true })
+    ).toBeInTheDocument();
+  });
+
+  it('opens the drawer on the selection a retired Compare link carried', async () => {
+    window.history.pushState({}, '', `/skills/compare?ids=${CHAR_ID}`);
+    render(<App />);
+
+    expect(await screen.findByRole('dialog', { name: 'Compare skills' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/skills/trained');
+  });
+
   it('marks a skill already in a Skill Plan on its level bar, regardless of which plan it is in', async () => {
     // Frigate (typeID 2) is trained to III; a plan targets V. The row's
     // context menu can add to *any* of the character's plans (no single

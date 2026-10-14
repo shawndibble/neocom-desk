@@ -77,6 +77,7 @@ describe('documentTitleFor', () => {
     '/settings/faq',
     '/settings/help',
     '/planetary-industry/advisor',
+    '/skills/compare',
   ]);
 
   it('gives every feature route a distinct title', () => {

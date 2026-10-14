@@ -65,7 +65,7 @@ export function useCompareAttributes(
         const [, dictionary] = await Promise.all([
           // A large variation group (up to `VARIATIONS_LIMIT`) fanning out
           // unbounded risks ESI's rate limit, same reasoning as
-          // `SkillCompare.tsx`'s own per-item fetch for the same "N items in
+          // `useCompareSkills`'s own per-item fetch for the same "N items in
           // a compare table" shape.
           mapWithConcurrencyLimit(
             currentItems.map((item, index) => ({ item, index })),

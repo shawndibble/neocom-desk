@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -18,6 +18,7 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
+import { SkillCompareDrawer } from '@/features/skills/compare/SkillCompareDrawer';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import {
   loadSkillCatalog,
@@ -139,6 +140,13 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 /** Every SDE skill for the active character, grouped by SDE group, with SP + attributes. */
 export function Skills() {
   const { t } = useTranslation();
+  // A retired Compare link (`/skills/compare?ids=…`, see `legacyPaths.ts`) lands here with its
+  // selection in the URL: open on it. The drawer clears that selection when it closes.
+  const { search } = useLocation();
+  const [compareOpen, setCompareOpen] = useState(() => {
+    const params = new URLSearchParams(search);
+    return params.has('ids') || params.has('comparisonId');
+  });
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadSkillsSnapshot,
     undefined,
@@ -302,6 +310,12 @@ export function Skills() {
         meta={fetchedAt && <DataAgeBadge date={fetchedAt} />}
         actions={
           <>
+            <IconButton
+              icon={<Icon.Compare />}
+              label={t('skillCompare.open')}
+              visibleLabel={t('skillCompare.open')}
+              onClick={() => setCompareOpen(true)}
+            />
             <TableActionsMenu name={t('nav.skills')} tableExport={skillsExport} size="md" />
             <IconButton icon={<Icon.Refresh />} label={t('skills.refresh')} onClick={refresh} />
           </>
@@ -448,6 +462,11 @@ export function Skills() {
           )}
         </>
       )}
+      <SkillCompareDrawer
+        open={compareOpen}
+        onClose={() => setCompareOpen(false)}
+        activeCharacterId={activeCharacterId}
+      />
     </div>
   );
 }

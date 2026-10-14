@@ -19,7 +19,6 @@ import type { AppRoutePath } from './routeScopes';
 const SUB_NAV_PAGES: Partial<Record<AppRoutePath, AppRoutePath>> = {
   '/skills/trained': '/skills',
   '/skills/plans': '/skills',
-  '/skills/compare': '/skills',
   '/skills/certificates': '/skills',
   '/corp/members': '/corp',
   '/corp/wallet': '/corp',

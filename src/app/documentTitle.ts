@@ -26,7 +26,7 @@ const ROUTE_TITLE_KEYS = {
   '/skills/trained': ['nav.skills', 'skills.trainedTab'],
   '/skills/plans': ['nav.skills', 'skills.plansTab'],
   '/skills/plans/:planId': ['nav.skills', 'skills.plansTab'],
-  '/skills/compare': ['nav.skills', 'skills.compareTab'],
+  '/skills/compare': ['nav.skills', 'skills.trainedTab'],
   '/skills/certificates': ['nav.skills', 'skills.certificatesTab'],
   '/industry': ['nav.industry'],
   '/ships': ['nav.ships'],

@@ -96,7 +96,6 @@ export const loadSkillPlanEditor = named(
   () => import('@/routes/SkillPlanEditor'),
   'SkillPlanEditor'
 );
-export const loadSkillCompare = named(() => import('@/routes/SkillCompare'), 'SkillCompare');
 export const loadSkillCertificates = named(
   () => import('@/routes/SkillCertificates'),
   'SkillCertificates'
@@ -156,9 +155,9 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/alerts': loadOverview,
   '/skills': loadSkillPlans,
   '/skills/trained': loadSkills,
+  '/skills/compare': loadSkills,
   '/skills/plans': loadSkillPlans,
   '/skills/plans/:planId': loadSkillPlanEditor,
-  '/skills/compare': loadSkillCompare,
   '/skills/certificates': loadSkillCertificates,
   '/industry': loadIndustry,
   '/industry/plans/:planId': loadIndustryPlanPage,

@@ -1777,7 +1777,6 @@
   "skills": {
     "trainedTab": "Trained",
     "plansTab": "Plans",
-    "compareTab": "Compare",
     "certificatesTab": "Certificates",
     "targetPlan": {
       "label": "Adding to"
@@ -2304,19 +2303,35 @@
     }
   },
   "skillCompare": {
+    "title": "Compare skills",
+    "open": "Compare with…",
     "pickCharacters": "Characters to compare",
+    "baseline": "Baseline",
     "noneSelectedTitle": "No characters selected",
     "noneSelectedHint": "Select characters to compare their trained skills.",
+    "onlyBaselineTitle": "Pick someone to compare",
+    "onlyBaselineHint": "Select another character to see how they stand against {{name}}.",
     "loading": "Loading skills…",
+    "loadFailed": "Couldn't load skills for {{names}}.",
     "characterLoading": "Loading {{name}}'s skills…",
     "noDataTitle": "No skill data cached",
     "noDataHint": "Couldn't load trained skills for these characters yet. Try again shortly.",
     "refresh": "Refresh",
     "skillColumn": "Skill",
     "groupColumn": "Group",
+    "ungrouped": "Other",
     "tableLabel": "Skill comparison",
+    "same": "same",
+    "missing": "missing",
+    "levelsAhead_one": "{{count}} level ahead of the baseline",
+    "levelsAhead_other": "{{count}} levels ahead of the baseline",
+    "levelsBehind_one": "{{count}} level behind the baseline",
+    "levelsBehind_other": "{{count}} levels behind the baseline",
+    "identicalCount_one": "{{count}} skill identical",
+    "identicalCount_other": "{{count}} skills identical",
     "saveComparison": "Save comparison",
     "untitledName": "Untitled comparison",
+    "saved": "Saved",
     "savedTitle": "Saved comparisons",
     "savedEmpty": "No saved comparisons yet.",
     "savedEmptyHint": "Pick characters, then use Save comparison to reopen that set later.",
@@ -2326,8 +2341,7 @@
     "cancel": "Cancel",
     "someRemoved": "Some characters in this comparison have been removed and are no longer shown.",
     "differingOnly": "Differing only",
-    "differingOnlyEmptyHint": "No differing skills — the compared characters match on everything trained.",
-    "groupColumnToggle": "Group column"
+    "differingOnlyEmptyHint": "No differing skills — the compared characters match on everything trained."
   },
   "industry": {
     "csvCharacter": "Character",

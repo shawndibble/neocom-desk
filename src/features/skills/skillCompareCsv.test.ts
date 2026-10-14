@@ -12,7 +12,6 @@ const row: ComparisonRow = {
     [1, 5],
     [2, 3],
   ]),
-  maxLevel: 5,
 };
 
 describe('skillCompareCsvColumns', () => {
