@@ -280,6 +280,16 @@ export async function installEsiMock(page: Page): Promise<void> {
     });
   });
 
+  // R2 contract-offer snapshot (ADR 0019): none published here, so every reader
+  // takes its Firestore fallback, as it did before the R2 read existed.
+  await page.route('https://data.neocomdesk.com/**', async (route) => {
+    await route.fulfill({
+      status: 404,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: '',
+    });
+  });
+
   await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
     await route.fulfill({
       status: 200,
