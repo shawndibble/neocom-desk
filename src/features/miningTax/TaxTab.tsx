@@ -1558,6 +1558,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     surface: 'mining-tax',
     rows: visibleRows,
     columns: csvColumns,
+    // Open and History are two tables; the default reads only the mounted
+    // Open one, so the file would drop every settled record.
+    source: 'sorted-rows',
   });
 
   const payeeManagerDefaultCharacterId =
