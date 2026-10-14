@@ -261,10 +261,9 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/skills/plans');
 });
 
-/** Opens the "All plans…" dialog from the phone card's menu (jsdom is narrow by default). */
+/** Opens the "All plans…" popover from the plan card. */
 async function openAllPlans(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: 'Plan options' }));
-  await user.click(await screen.findByRole('menuitem', { name: 'All plans…' }));
+  await user.click(await screen.findByRole('button', { name: 'All plans…' }));
   return screen.findByRole('dialog', { name: 'All plans' });
 }
 
@@ -273,8 +272,7 @@ describe('SkillPlans CRUD', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Plan options' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'New plan' }));
+    await user.click(await screen.findByRole('button', { name: 'New plan' }));
 
     const stored = await waitFor(async () => {
       const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
@@ -286,11 +284,11 @@ describe('SkillPlans CRUD', () => {
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 
-  it('offers the plan edited last, and All plans… even before any plan exists', async () => {
-    const user = userEvent.setup();
+  it('offers New plan and its other starts before any plan exists, and no All plans… to open', async () => {
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'Plan options' }));
-    expect(await screen.findByRole('menuitem', { name: 'All plans…' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More ways to start a plan' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'All plans…' })).not.toBeInTheDocument();
   });
 
   it('shows the plan edited last on the page, not the oldest', async () => {
@@ -411,7 +409,7 @@ describe('SkillPlans CRUD', () => {
     expect(window.location.pathname).toBe('/skills/plans/plan-1');
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
-    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/skills/plans');
 
     await user.click(await screen.findByText('Test plan'));
@@ -419,7 +417,7 @@ describe('SkillPlans CRUD', () => {
 
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
-    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
   });
 });
 
@@ -447,7 +445,7 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     render(<App />);
 
     // The rail leads on a phone: the plan row and the attributes line, then the queue.
-    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
     expect(await screen.findByRole('region', { name: 'Attributes' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
 
@@ -465,7 +463,7 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
 
     expect(await screen.findByRole('region', { name: 'Attributes' })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
   });
 
   it('keeps both panes visible on desktop, with no back control', async () => {
@@ -511,7 +509,7 @@ describe('Skills opens on Plans', () => {
     render(<App />);
 
     await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
-    expect(await screen.findByRole('button', { name: 'Plan options' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
   });
 
   it('still reaches the trained-skills view from the sub-nav', async () => {
@@ -1475,8 +1473,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
-    await user.click(await screen.findByRole('button', { name: 'Plan options' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'New plan' }));
+    await user.click(await screen.findByRole('button', { name: 'New plan' }));
     await openPlanTools();
     // Not user-editable anymore, but still seeded once at creation
     // (offline-fallback `remapCount`) from live ESI: the yearly remap is on
@@ -1509,8 +1506,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     expect(await screen.findByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
-    await user.click(await screen.findByRole('button', { name: 'Plan options' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'New plan' }));
+    await user.click(await screen.findByRole('button', { name: 'New plan' }));
     await openPlanTools();
     // The cooldown date is already past, so the new plan's derived display
     // counts the yearly remap as ready too (1 bonus + yearly = 2 available).
@@ -1902,7 +1898,7 @@ describe('SkillPlans: current skill queue panel', () => {
   it('renders after the plan row and attributes on a phone, not before them', async () => {
     render(<App />);
 
-    const plan = await screen.findByRole('button', { name: 'Plan options' });
+    const plan = await screen.findByRole('button', { name: 'New plan' });
     const queuePanel = (await screen.findByText('Current skill queue')).closest('section')!;
 
     expect(

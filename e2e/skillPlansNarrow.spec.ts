@@ -55,7 +55,7 @@ async function seedManyPlans(page: Page): Promise<void> {
   );
 }
 
-test('plans page: the current plan opens from the page, and every other plan is reachable from the All plans dialog at 390px', async ({
+test('plans page: the current plan opens from the page, and every other plan is reachable from the All plans popover at 390px', async ({
   page,
 }) => {
   await signInAndGoto(page);
@@ -67,11 +67,10 @@ test('plans page: the current plan opens from the page, and every other plan is 
   // not a 40-row list: one tap to its editor.
   await expect(page.getByRole('link', { name: new RegExp(`^${LAST_PLAN_NAME}\\b`) })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Plan options' }).click();
-  await page.getByRole('menuitem', { name: 'All plans…' }).click();
+  await page.getByRole('button', { name: 'All plans…' }).click();
   const dialog = page.getByRole('dialog', { name: 'All plans' });
 
-  // The first plan sits 39 rows down the dialog's own scroller; it must scroll
+  // The first plan sits 39 rows down the popover's own scroller; it must scroll
   // into view rather than sit clipped (the #1096 bug class, in its new home).
   const firstRow = dialog.getByRole('link', { name: /^Plan 1\b/ });
   await firstRow.scrollIntoViewIfNeeded();
