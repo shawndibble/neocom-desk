@@ -44,7 +44,7 @@ import { cx } from '@/lib/cx';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { measureElement, useWindowVirtualizer } from '@tanstack/react-virtual';
 import {
   Button,
   Panel,
@@ -500,6 +500,11 @@ export function NotificationsPanel() {
     // *document*, not this list — it has to know how far down the page the
     // list itself starts (master switch, channel toggles, the All
     // Characters section, and the search box all sit above it).
+    // Where nothing is laid out (jsdom) a measure reads 0; keep the estimate
+    // then, as `DataTable` does, rather than collapsing every section to 0.
+    measureElement: (element, entry, instance) =>
+      measureElement(element, entry, instance) ||
+      instance.options.estimateSize(Number((element as HTMLElement).dataset.index)),
     scrollMargin,
     overscan: 5,
   });
