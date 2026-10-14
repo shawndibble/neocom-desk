@@ -82,6 +82,7 @@ import {
   fetchLpStoreRows,
 } from './lpOffersSnapshot.js';
 import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicContractsArchive.js';
+import { createR2Put, publishContractOffersToR2, type R2PublishState } from './r2Publisher.js';
 import { measureContractTypeChanges, type ContractTypeHashes } from './contractTypeChanges.js';
 import {
   INSURGENCY_URL,
@@ -682,7 +683,7 @@ const PUBLIC_COURIER_CONTRACTS_SNAPSHOT: ChunkedSnapshot = {
 async function writePublicContractOffersSnapshot(
   db: Firestore,
   rows: readonly PublicContractOfferRow[]
-): Promise<void> {
+): Promise<number> {
   const lastSyncedAt = await writeChunkedSnapshot(db, PUBLIC_CONTRACT_OFFERS_SNAPSHOT, rows);
   // The index is an optimisation a client can do without (it falls back to
   // reading every chunk), so a failure to write it is logged, never allowed to
@@ -698,6 +699,7 @@ async function writePublicContractOffersSnapshot(
   } catch (error) {
     logError('public contract offers index write failed', { error: String(error) });
   }
+  return lastSyncedAt;
 }
 
 async function writePublicCourierContractsSnapshot(
@@ -997,8 +999,63 @@ const PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC = 'publicContractsArchiveFingerpr
 /** Doc under `systemConditions` holding the last publish's per-type content hashes (issue #3744). */
 const PUBLIC_CONTRACTS_TYPE_HASHES_DOC = 'publicContractTypeHashes';
 
+/** Doc under `systemConditions` holding what the R2 writer last published (issue #3745). */
+const PUBLIC_CONTRACTS_R2_STATE_DOC = 'publicContractR2State';
+
+const R2_ACCESS_KEY_ID = defineSecret('R2_ACCESS_KEY_ID');
+const R2_SECRET_ACCESS_KEY = defineSecret('R2_SECRET_ACCESS_KEY');
+
+/**
+ * Additive to the Firestore snapshot (ADR 0019): never throws, so an R2 outage
+ * cannot fail the Firestore publish.
+ */
+async function publishOffersToR2(
+  db: Firestore,
+  rows: readonly PublicContractOfferRow[],
+  lastSyncedAt: number
+): Promise<void> {
+  try {
+    const endpoint = process.env.R2_ENDPOINT;
+    const bucket = process.env.R2_BUCKET;
+    if (!endpoint?.startsWith('https://') || !bucket) {
+      logWarn('R2 offers publish skipped: R2_ENDPOINT (https) / R2_BUCKET not set');
+      return;
+    }
+    const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_CONTRACTS_R2_STATE_DOC);
+    const previous = await stateRef
+      .get()
+      .then((snap) => (snap.exists ? (snap.data() as R2PublishState) : null))
+      .catch(() => null);
+    const result = await publishContractOffersToR2({
+      rows,
+      lastSyncedAt,
+      previous,
+      now: Date.now(),
+      put: createR2Put({
+        endpoint,
+        bucket,
+        accessKeyId: R2_ACCESS_KEY_ID.value(),
+        secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
+      }),
+    });
+    await stateRef.set(result.state);
+    const { uploaded, skipped, failed, indexWritten, firstError } = result;
+    (result.failed > 0 || !result.indexWritten ? logWarn : logInfo)(
+      'public contract offers R2 publish',
+      { uploaded, skipped, failed, indexWritten, firstError }
+    );
+  } catch (error) {
+    logError('public contract offers R2 publish failed', { error: String(error) });
+  }
+}
+
 export const syncPublicContractOffers = onSchedule(
-  { schedule: 'every 30 minutes', memory: '2GiB', timeoutSeconds: 540 },
+  {
+    schedule: 'every 30 minutes',
+    memory: '2GiB',
+    timeoutSeconds: 540,
+    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
+  },
   async () => {
     // Skip the whole run when EVE Ref has not published a new archive since
     // the last publish. The fingerprint is read before the download and stored
@@ -1100,7 +1157,7 @@ export const syncPublicContractOffers = onSchedule(
     } catch (err) {
       logWarn('public contract type change measurement failed', { error: String(err) });
     }
-    await writePublicContractOffersSnapshot(db, sortContractOfferRows(rows));
+    const lastSyncedAt = await writePublicContractOffersSnapshot(db, sortContractOfferRows(rows));
     await writePublicCourierContractsSnapshot(db, sortCourierContractRows(courierRows));
     if (typeHashes !== null) {
       await typeHashesRef
@@ -1110,6 +1167,8 @@ export const syncPublicContractOffers = onSchedule(
         );
     }
     if (fingerprint !== null) await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
+    // Last, so a slow or failing R2 can never delay or skip the Firestore publish.
+    await publishOffersToR2(db, rows, lastSyncedAt);
   }
 );
 

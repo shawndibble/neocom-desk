@@ -1,5 +1,5 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
-import { startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
+import { startAlertsLogin, startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
 import { clearLoginReturnTo, setLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
@@ -88,6 +88,17 @@ export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void
   const characterId = options.characterId ?? useActiveCharacter.getState().activeCharacterId;
   rememberThisPage();
   assignLocation(await startLogin(await requestedScopes(characterId, options.groups ?? [])));
+}
+
+/**
+ * Turn on Alerts when closed for one Character (ADR 0020): a separate SSO
+ * round trip for the notifications scope alone, returning to the page it was
+ * pressed on. The callback never stores its token on this device; see
+ * `features/notifications/alertsGrant.ts`.
+ */
+export async function beginAlertsLogin(characterId: number): Promise<void> {
+  rememberThisPage();
+  assignLocation(await startAlertsLogin(characterId));
 }
 
 /**

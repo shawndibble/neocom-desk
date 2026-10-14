@@ -122,6 +122,8 @@ const DOM_TS_TESTS = [
   'src/lib/useLazyRowCache.test.ts',
   // sessionStorage / localStorage
   'src/app/loginFlow.test.ts',
+  'src/auth/alertsLogin.test.ts',
+  'src/features/notifications/alertsGrant.test.ts',
   'src/auth/session.test.ts',
   'src/auth/loginReturnTo.test.ts',
   'src/sync/deviceId.test.ts',

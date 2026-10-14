@@ -72,8 +72,19 @@
       <h2>Where your data lives</h2>
       <p>
         Most of what the app reads is cached locally on your own device. Your EVE login session
-        (refresh token) never leaves your device — it is not sent to any server the app operator
+        (refresh token) stays on your device — it is not sent to any server the app operator
         controls, and never appears in logs.
+      </p>
+      <p>
+        There is one opt-in exception. If you turn on <strong>Alerts when closed</strong> for a
+        character in Settings &rarr; Notifications, you authorize that character a second time on
+        EVE's login page, for one permission only: reading its notifications. An encrypted copy of
+        that separate notifications-only token is stored on the app operator's server (Google
+        Firebase), so the server can check for new notifications while the app is closed. It cannot
+        read assets, wallet, mail, skills or anything else, and it is never written to your device
+        or to logs. Turn the setting off, remove the character, log out or use
+        <strong>Delete all data</strong> and the token is deleted and revoked with EVE. Each
+        character is separate: nothing is stored for a character you did not turn it on for.
       </p>
       <p>
         If you turn on cross-device sync, a copy of your plans, settings and similar data is stored
