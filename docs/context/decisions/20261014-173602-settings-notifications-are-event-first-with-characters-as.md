@@ -1,0 +1,16 @@
+# Scope decisions — Settings notifications are event-first, with characters as exceptions
+
+_Recorded 2026-10-14. Supersedes the per-Character sections, the All Characters section and the order rules in `20260925-094242`._
+
+With 20 Characters the page was 20 accordions of about 28 events each, with Alerts when closed listing all 20 above them.
+
+- **The page is one list of Notification Events, each shown once.** Its two checkboxes (Device, Alerts) speak for every Character the event applies to, and are indeterminate when they disagree. This is the cross-Character aggregate the All Characters row already computed, made the main view. There are no per-Character sections.
+- **A row says how many Characters differ ("All 20 alike", "4 differ").** The odd ones out are the minority on any channel; on an even split, the ones that are off. With one Character the chip is not shown.
+- **Opening a row lists the Characters as chips, each with its own Device and Alerts checkbox.** Inline from `md` up. On a phone it is a bottom sheet (`Modal placement="sheet-full"`), and a search never opens a sheet by itself. EVE type rows inside the EVE notifications row always open inline, so a sheet is never stacked on a sheet.
+- **A row's checkboxes write only to Characters the event applies to.** A Character without the ESI scope, or without the in-game corp role, stays listed in the chips, dimmed with the same tooltip as before, and is not counted as differing. This replaces the old All Characters rule that wrote into every Character regardless. If no Character can use an event, its row is disabled and says so.
+- **Events sit under named groups: Skills, Industry and PI, Market and contracts (Quickbar price alert last), Mail and calendar, Space and community, then Corp notifications, then EVE notifications last.** Display only; the catalog order is untouched. These are not Notification Families, which only arrange EVE types. `eventGroups.ts` must file every catalog event, and does not compile until a new one is filed.
+- **Granting a missing Permission moved off the row.** A row where some Characters have not granted the Permission says so once ("1 character hasn't granted Mail") with a link to Settings > Permissions, which already requests one Permission per Character. The per-Character Grant button on each row is gone.
+- **Warn-ahead times are listed per Character under the chips,** in a disclosure closed by default, only for Characters the event applies to and has on. Thresholds are saved per Character, so there is no "set for all" yet.
+- **Alerts when closed is one line by default:** "K of N characters", the names of those that are on, and a count needing re-authorization. Opening it shows the existing per-Character list unchanged, including Turn on for all. It stays mounted when closed, because the router-state outcome from the EVE round trip is handled inside it.
+- **Search keeps its URL param and three-character minimum.** An event name narrows the rows. A Character name keeps every row and narrows opened rows to that Character. When both match, events win.
+- **Dropped with no replacement:** the per-Character select-all per channel, the All Characters top select-all, and window virtualization (about 30 rows need none; chips mount only for an opened row).

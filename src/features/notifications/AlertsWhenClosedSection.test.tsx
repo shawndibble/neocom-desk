@@ -22,12 +22,17 @@ const characters = [
   { characterId: 2, name: 'Beta' },
 ];
 
-function renderSection(state?: unknown) {
-  return render(
+/** The list starts closed (the page used to open on N rows); most tests need the rows, so they open it. */
+async function renderSection(state?: unknown, { open = true } = {}) {
+  const result = render(
     <MemoryRouter initialEntries={[{ pathname: '/settings/notifications', state }]}>
       <AlertsWhenClosedSection characters={characters} />
     </MemoryRouter>
   );
+  if (open) {
+    await userEvent.click(await screen.findByRole('button', { name: /Alerts when closed/ }));
+  }
+  return result;
 }
 
 async function turnOn(characterId: number) {
@@ -46,15 +51,39 @@ beforeEach(async () => {
 });
 
 describe('AlertsWhenClosedSection', () => {
+  it('starts closed with a one-line summary and no rows', async () => {
+    await renderSection(undefined, { open: false });
+    expect(await screen.findByText('0 of 2 characters')).toBeInTheDocument();
+    expect(screen.queryByTestId('alerts-state-1')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Alerts when closed/ })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  it('closed, it names the Characters that are on and counts the ones needing re-auth', async () => {
+    await db.settings.put({
+      key: 'alertsGrants',
+      value: {
+        1: { status: 'active', enabledAt: 1 },
+        2: { status: 'needs-reauth', enabledAt: 1 },
+      },
+    });
+    await renderSection(undefined, { open: false });
+    expect(await screen.findByText(/1 of 2 characters/)).toBeInTheDocument();
+    expect(screen.getByText(/1 needs re-authorizing/)).toBeInTheDocument();
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+  });
+
   it('starts every Character off, saying what is stored', async () => {
-    renderSection();
+    await renderSection();
     expect(await screen.findByTestId('alerts-state-1')).toHaveTextContent('Off');
     expect(screen.getByTestId('alerts-state-2')).toHaveTextContent('Off');
     expect(screen.getAllByText(/encrypted, notifications-only token/i).length).toBeGreaterThan(1);
   });
 
   it('Turn on starts the Alerts login for that row', async () => {
-    renderSection();
+    await renderSection();
     await userEvent.click(
       await screen.findByRole('button', { name: /Turn on alerts when closed for Beta/ })
     );
@@ -63,7 +92,7 @@ describe('AlertsWhenClosedSection', () => {
 
   it('renders On with Turn off, and Turn off deletes the grant', async () => {
     await turnOn(1);
-    renderSection();
+    await renderSection();
     await waitFor(() => expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('On'));
     await userEvent.click(
       screen.getByRole('button', { name: /Turn off alerts when closed for Alpha/ })
@@ -76,7 +105,7 @@ describe('AlertsWhenClosedSection', () => {
   it('keeps On and says so when the delete fails', async () => {
     await turnOn(1);
     remote.del.mockRejectedValue(new Error('offline'));
-    renderSection();
+    await renderSection();
     await userEvent.click(
       await screen.findByRole('button', { name: /Turn off alerts when closed for Alpha/ })
     );
@@ -86,7 +115,7 @@ describe('AlertsWhenClosedSection', () => {
 
   it('renders Needs re-authorizing with a Re-authorize action', async () => {
     await markAlertsNeedReauth(1);
-    renderSection();
+    await renderSection();
     await waitFor(() =>
       expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('Needs re-authorizing')
     );
@@ -98,14 +127,14 @@ describe('AlertsWhenClosedSection', () => {
 
   it('Turn on for all starts with the first Character that is not on', async () => {
     await turnOn(1);
-    renderSection();
+    await renderSection();
     // One Character left to authorize: the all-action is not offered.
     await waitFor(() => expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('On'));
     expect(screen.queryByRole('button', { name: 'Turn on for all' })).toBeNull();
   });
 
   it('Turn on for all steps through Characters one at a time', async () => {
-    renderSection();
+    await renderSection();
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for all' }));
     expect(login.begin).toHaveBeenCalledTimes(1);
     expect(login.begin).toHaveBeenCalledWith(1);
@@ -113,7 +142,7 @@ describe('AlertsWhenClosedSection', () => {
 
   it('after a success it carries on with the next queued Character', async () => {
     queueAlertsForAll([2]);
-    renderSection({ alertsGrant: { status: 'on', characterId: 1, name: 'Alpha' } });
+    await renderSection({ alertsGrant: { status: 'on', characterId: 1, name: 'Alpha' } });
     await waitFor(() => expect(login.begin).toHaveBeenCalledWith(2));
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Alerts when closed is on for Alpha'
@@ -122,7 +151,7 @@ describe('AlertsWhenClosedSection', () => {
 
   it('a mismatch names who was authorized and stops the walk', async () => {
     queueAlertsForAll([2]);
-    renderSection({
+    await renderSection({
       alertsGrant: {
         status: 'mismatch',
         expectedCharacterId: 1,
@@ -136,10 +165,10 @@ describe('AlertsWhenClosedSection', () => {
   });
 
   it('says so on a cancel and on a failure', async () => {
-    const { unmount } = renderSection({ alertsGrant: { status: 'cancelled' } });
+    const { unmount } = await renderSection({ alertsGrant: { status: 'cancelled' } });
     expect(await screen.findByRole('status')).toHaveTextContent(/cancelled/);
     unmount();
-    renderSection({ alertsGrant: { status: 'failed', characterId: 2 } });
+    await renderSection({ alertsGrant: { status: 'failed', characterId: 2 } });
     expect(await screen.findByRole('status')).toHaveTextContent(/Could not turn on .* Beta/);
   });
 });
