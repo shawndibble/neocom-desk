@@ -8447,6 +8447,12 @@
       "enable": "Enable",
       "dismiss": "Not now"
     },
+    "alertsOffer": {
+      "title": "Get alerts when Neocom is closed?",
+      "body": "Turn on alerts for {{name}}. EVE asks you to authorize notifications only. You can change this per character in Settings.",
+      "enable": "Turn on",
+      "dismiss": "Not now"
+    },
     "groupedTitle": "{{title}} x{{count}}",
     "eveTypeName": {
       "StructureUnderAttack": "Structure Under Attack",

@@ -1,19 +1,22 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button } from '@/components/ui';
-import { db } from '@/db';
+import { db, type CharacterRecord } from '@/db';
 import {
   useNotificationPromptState,
   useNotificationPermission,
   promptStateAfterAsk,
   shouldShowPermissionExplainer,
+  shouldShowAlertsOffer,
+  useAlertsOfferSeen,
 } from './permission';
 import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
 import { useOnboardingBannerSlot } from '@/app/onboardingBannerSlot';
 import { useHasLeftFirstScreen } from './firstScreen';
 import { useStickyClearance } from '@/lib/useStickyClearance';
+import { beginAlertsLogin } from '@/app/loginFlow';
 
 /**
  * The one-time notification explainer (issue #171). Mounted in `Layout`, so it
@@ -28,16 +31,36 @@ import { useStickyClearance } from '@/lib/useStickyClearance';
  * now" makes none at all, and either answer suppresses it permanently — a
  * denied grant can never be re-requested from JS anyway, and Settings owns the
  * second chance for the "Not now" case.
+ *
+ * Step two (ADR 0020, issue #3758): when Enable ends in a grant, the same
+ * banner offers Alerts when closed for the Character just signed in. It is
+ * never requested inside the permission step itself, and shown once per device.
  */
 export function NotificationPermissionPrompt() {
   const { t } = useTranslation();
   const { value, hydrated, hydrate, setValue } = useNotificationPromptState();
-  const { permission } = useNotificationPermission();
+  const { permission, refresh } = useNotificationPermission();
   const characterCount = useLiveQuery(() => db.characters.count());
+  const newestCharacter = useLiveQuery(async () =>
+    (await db.characters.toArray()).reduce<CharacterRecord | undefined>(
+      (newest, c) => (newest === undefined || c.addedAt > newest.addedAt ? c : newest),
+      undefined
+    )
+  );
+  const {
+    value: alertsOfferSeen,
+    hydrated: offerHydrated,
+    hydrate: hydrateOffer,
+    setValue: setAlertsOfferSeen,
+  } = useAlertsOfferSeen();
+  // True only after this banner's own Enable ended in a grant, so the offer
+  // never reaches someone who saw the explainer on an earlier visit.
+  const [grantedHere, setGrantedHere] = useState(false);
 
   useEffect(() => {
     void hydrate();
-  }, [hydrate]);
+    void hydrateOffer();
+  }, [hydrate, hydrateOffer]);
 
   // iOS delivers Web Push only to an installed PWA — requesting permission
   // here would either do nothing or grant a permission that can never
@@ -58,11 +81,19 @@ export function NotificationPermissionPrompt() {
   });
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).
-  const hasSlot = useOnboardingBannerSlot('notifications', visible);
+  const offering = shouldShowAlertsOffer({
+    hydrated: offerHydrated,
+    alertsOfferSeen,
+    grantedHere,
+    permission,
+    installRequired,
+    characterId: newestCharacter?.characterId ?? null,
+  });
+  const hasSlot = useOnboardingBannerSlot('notifications', visible || offering);
   const bannerRef = useRef<HTMLDivElement>(null);
   // Both, not just the slot: registration happens in an effect, so the store
   // still says "eligible" for the one commit after `visible` goes false.
-  const shown = visible && hasSlot;
+  const shown = (visible || offering) && hasSlot;
   useStickyClearance(bannerRef, 'onboarding-banner', { enabled: shown });
   if (!shown) return null;
 
@@ -70,7 +101,42 @@ export function NotificationPermissionPrompt() {
   const enable = async () => {
     const { permission: outcome } = await enableWebPush();
     await setValue(promptStateAfterAsk(outcome));
+    if (outcome === 'granted') {
+      refresh();
+      setGrantedHere(true);
+    }
   };
+  const declineAlerts = () => void setAlertsOfferSeen(true);
+  const acceptAlerts = async () => {
+    const characterId = newestCharacter?.characterId;
+    await setAlertsOfferSeen(true);
+    if (characterId === undefined) return;
+    void beginAlertsLogin(characterId).catch(() => undefined);
+  };
+
+  if (offering) {
+    return (
+      <div
+        ref={bannerRef}
+        role="alert"
+        data-testid="onboarding-banner"
+        className="fixed inset-x-4 bottom-16 z-50 space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-16 md:left-auto md:max-w-sm"
+      >
+        <p className="font-medium text-text">{t('notifications.alertsOffer.title')}</p>
+        <p className="text-xs text-text-dim">
+          {t('notifications.alertsOffer.body', { name: newestCharacter?.name })}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" onClick={declineAlerts}>
+            {t('notifications.alertsOffer.dismiss')}
+          </Button>
+          <Button size="sm" variant="primary" onClick={() => void acceptAlerts()}>
+            {t('notifications.alertsOffer.enable')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
