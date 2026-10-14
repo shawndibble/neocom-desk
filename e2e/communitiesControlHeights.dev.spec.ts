@@ -34,6 +34,11 @@ const SURFACES: { name: string; path: string }[] = [
 async function openWithSampleCommunities(page: Page, path: string): Promise<void> {
   await signInAndGoto(page, './settings');
   await expect(page.locator('main')).toBeVisible();
+  await routeInApp(page, path);
+}
+
+/** Routes in-app (no re-seed), so one test can visit several surfaces. */
+async function routeInApp(page: Page, path: string): Promise<void> {
   await page.evaluate(async (target) => {
     // Indirected through variables so `tsc` leaves them alone: dev-server URLs,
     // not paths this spec's module graph resolves. The casts are checked
@@ -91,9 +96,9 @@ for (const width of RHYTHM_WIDTHS) {
     await page.setViewportSize({ width, height: 900 });
     await openWithSampleCommunities(page, `/communities?community=${ADMIN}&tab=plans`);
     const planRow = await firstHeight(page, 'main ul.divide-y > li');
-    await openWithSampleCommunities(page, `/communities?community=${ADMIN}&tab=fittings`);
+    await routeInApp(page, `/communities?community=${ADMIN}&tab=fittings`);
     const fittingRow = await firstHeight(page, 'main ul.divide-y > li');
-    await openWithSampleCommunities(page, '/communities');
+    await routeInApp(page, '/communities');
     const listRow = await firstHeight(page, 'main ul.divide-y > li');
     expect(fittingRow).toBeGreaterThanOrEqual(planRow);
     expect(listRow).toBeGreaterThanOrEqual(planRow);
