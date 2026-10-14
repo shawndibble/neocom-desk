@@ -7,9 +7,11 @@ Proposed (2026-10-14)
 ## Context
 
 ADR 0013 put the Public Contract Offers snapshot in Firestore as ~124 chunk
-docs of up to 3,000 rows each, republished by `syncPublicContractOffers`, and
-every browser reads the whole collection. The Public Courier Contracts snapshot
-(a sibling) does the same.
+docs of up to 3,000 rows each, republished by `syncPublicContractOffers`. Item
+search can already answer one type's query from only the chunks the #2921 index
+names while the rest is still downloading, but the full download still runs, and
+every other consumer reads the whole collection. The Public Courier Contracts
+snapshot (a sibling) does the same.
 
 The October 2026 GCP bill shows what that costs. Oct 1–14 was $2.42, all of it
 Firestore (Google files the SKUs under the "App Engine" service name): 22 GiB
@@ -31,8 +33,9 @@ Why the egress is that large, from reading `origin/main`:
   which makes such repeats more likely.
 
 Cost therefore scales with users × downloads, not with what anyone searches
-for. At ~$0.065/GB and two 60 MB reads a day, 100 daily users is ≈$12/month and
-1,000 is on the order of $120–230/month (an estimate, not a measurement).
+for. At ~$0.065/GB and two full reads a day per user (40–75 MB each, ≈3.6 GB a
+user a month at 60 MB), 100 daily users is ≈$23/month and 1,000 is ≈$160–290/month
+(an estimate, not a measurement; the read frequency is assumed).
 
 Alternatives considered for _where_ to serve it are under Considered Options.
 
