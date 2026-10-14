@@ -62,6 +62,32 @@ describe('parseRegisterDeviceInput', () => {
     }
   );
 
+  it('parses eveTypes sorted and de-duplicated', () => {
+    const input = parseRegisterDeviceInput({
+      deviceId: 'device-1',
+      fcmToken: 'fcm-token',
+      characters: [
+        { characterId: 1, accessToken: 'a', projectionRows: [], eveTypes: ['B', 'A', 'B'] },
+      ],
+    });
+    expect(input.characters[0].eveTypes).toEqual(['A', 'B']);
+  });
+
+  it.each([
+    ['a non-array', 'StructureDestroyed'],
+    ['an empty string entry', ['']],
+    ['a non-string entry', [7]],
+    ['too many entries', Array.from({ length: 201 }, (_, i) => `T${i}`)],
+  ])('rejects eveTypes that is %s', (_, eveTypes) => {
+    expect(() =>
+      parseRegisterDeviceInput({
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        characters: [{ characterId: 1, accessToken: 'a', projectionRows: [], eveTypes }],
+      })
+    ).toThrow(/eveTypes/);
+  });
+
   it('accepts the client fallback deviceId shape (base36 time + random)', () => {
     expect(
       parseRegisterDeviceInput({
@@ -227,8 +253,13 @@ describe('buildDeviceRegistration', () => {
     deviceId: 'device-1',
     fcmToken: 'fcm-token',
     characters: [
-      { characterId: 1, accessToken: 'token-1', projectionRows: [PROJECTION_ROW] },
-      { characterId: 2, accessToken: 'token-2', projectionRows: [] },
+      {
+        characterId: 1,
+        accessToken: 'token-1',
+        projectionRows: [PROJECTION_ROW],
+        eveTypes: ['StructureDestroyed'],
+      },
+      { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
     ],
   };
 
@@ -266,6 +297,17 @@ describe('buildDeviceRegistration', () => {
       { characterId: 1, rows: [PROJECTION_ROW] },
       { characterId: 2, rows: [] },
     ]);
+  });
+
+  it('keys each verified character’s eveTypes by characterId, omitting rejected ones', async () => {
+    verifyMock.mockImplementation(async (token) => {
+      if (token === 'token-2') throw new Error('expired');
+      return { characterId: 1, ownerHash: 'hash', name: 'Pilot', scopes: [], clientId: 'c' };
+    });
+
+    const result = await buildDeviceRegistration(input, opts);
+
+    expect(result.eveTypesByCharacter).toEqual({ 1: ['StructureDestroyed'] });
   });
 
   it('drops a character whose access token fails verification, keeping the rest', async () => {

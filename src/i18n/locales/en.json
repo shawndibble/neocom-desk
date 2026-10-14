@@ -10177,7 +10177,8 @@
         "corpGovernance": "Corp Governance",
         "bills": "Bills",
         "moonMining": "Moon Mining",
-        "pi": "PI"
+        "pi": "PI",
+        "other": "Other"
       },
       "selectAllFamily": {
         "browser": "Toggle all device notifications for {{family}}",

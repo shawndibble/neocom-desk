@@ -148,13 +148,15 @@ async function upload(
   db: FakeFirestore,
   deviceId: string,
   projections: { characterId: number; rows: ProjectionRowInput[] }[],
-  characterIds = projections.map((p) => p.characterId)
+  characterIds = projections.map((p) => p.characterId),
+  eveTypesByCharacter: Record<number, string[]> = {}
 ): Promise<void> {
   await writeDeviceRegistration(asFirestore(db), {
     deviceId,
     fcmToken: `token-${deviceId}`,
     characterIds,
     projections,
+    eveTypesByCharacter,
   });
 }
 
@@ -166,6 +168,25 @@ function unfiredRowsOf(db: FakeFirestore, deviceId: string): string[] {
 }
 
 describe('writeDeviceRegistration', () => {
+  it('stores each device’s own eveTypes, so two devices keep independent lists', async () => {
+    const db = new FakeFirestore();
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }], [CHAR], { [CHAR]: ['X', 'Y'] });
+    await upload(db, 'B', [{ characterId: CHAR, rows: [] }], [CHAR], { [CHAR]: ['Z'] });
+    await upload(db, 'B', [{ characterId: CHAR, rows: [] }], [CHAR], { [CHAR]: [] });
+
+    // An upload that omits the list (older client) keeps this device's stored one.
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    expect(db.get('deviceRegistrations', 'A')?.eveTypesByCharacter).toEqual({
+      [String(CHAR)]: ['X', 'Y'],
+    });
+    expect(db.get('deviceRegistrations', 'A')?.eveTypesByCharacter).toEqual({
+      [String(CHAR)]: ['X', 'Y'],
+    });
+    expect(db.get('deviceRegistrations', 'B')?.eveTypesByCharacter).toEqual({
+      [String(CHAR)]: [],
+    });
+  });
+
   it("keeps device A's unfired rows when device B uploads for the same Character", async () => {
     const db = new FakeFirestore();
     const jobA = row('industryJobComplete');

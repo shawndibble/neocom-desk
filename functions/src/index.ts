@@ -192,11 +192,8 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
     );
   }
 
-  const { registration, rejected, projections } = await buildDeviceRegistration(
-    input,
-    verifyOptions,
-    logError
-  );
+  const { registration, rejected, projections, eveTypesByCharacter } =
+    await buildDeviceRegistration(input, verifyOptions, logError);
 
   if (registration.characterIds.length === 0) {
     throw new HttpsError('unauthenticated', 'No character access token could be verified');
@@ -207,9 +204,25 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
     fcmToken: registration.fcmToken,
     characterIds: registration.characterIds,
     projections,
+    eveTypesByCharacter,
   });
 
-  return { deviceId: input.deviceId, registered: registration.characterIds, rejected };
+  // The types the server has seen for each Character (alertGrants, ADR 0020),
+  // so the client can offer a toggle for them. Only `seenTypes` is read out.
+  const { store } = alertGrantDeps();
+  const seenTypes: Record<string, string[]> = {};
+  await Promise.all(
+    registration.characterIds.map(async (characterId) => {
+      try {
+        seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
+      } catch (err) {
+        // The registration already landed; a failed read only delays new toggles.
+        logError('Device registration: seenTypes read failed', { characterId, error: String(err) });
+      }
+    })
+  );
+
+  return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
 });
 
 // Alerts Grant custody (issue #3753, ADR 0020). `ALERTS_TOKEN_KEY` is a Firebase

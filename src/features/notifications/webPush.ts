@@ -13,6 +13,7 @@
  */
 import { requestNotificationPermission, type NotificationPermissionState } from './permission';
 import { recordPushFailure, settlePushRegistration } from './pushFailure';
+import { recordSeenEveTypes } from './seenEveTypes';
 import { webPushSupport, type WebPushSupport } from '@/sync/webPushSupport';
 
 export interface EnableWebPushResult {
@@ -41,7 +42,17 @@ export async function enableWebPush(): Promise<EnableWebPushResult> {
       const { registerDeviceForWebPush } = await deviceRegistration;
       const registration = await navigator.serviceWorker.ready;
       const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
-      settlePushRegistration(await registerDeviceForWebPush(vapidKey, registration));
+      // The Enable tap uploads the same type lists a rebuild would: an empty
+      // default here would wipe this device's list on the server.
+      const [{ enabledEveTypesByCharacter }, { liveDependencies }] = await Promise.all([
+        import('./projectionRebuild'),
+        import('./foregroundPoller'),
+      ]);
+      const result = await registerDeviceForWebPush(vapidKey, registration, new Map(), {
+        eveTypesByCharacter: await enabledEveTypesByCharacter(liveDependencies()),
+      });
+      settlePushRegistration(result);
+      await recordSeenEveTypes(result?.seenTypes);
     } catch (err) {
       // Registration failing must not undo a permission grant the browser
       // already gave — the user is still enrolled for the feed/foreground

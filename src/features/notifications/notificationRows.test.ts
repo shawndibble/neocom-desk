@@ -158,6 +158,17 @@ describe('estimateCharacterSectionHeight', () => {
     expect(corpOnly - ordinaryOnly).toBe(30 + 42);
   });
 
+  it('adds a group header and one row per extra seen type', () => {
+    const base: Partial<CharacterSectionHeightInput> = {
+      expanded: true,
+      visibleEventIds: [EVE_NOTIFICATION],
+      hasEveNotificationScope: true,
+    };
+    const without = estimateCharacterSectionHeight(input(base));
+    const withTwo = estimateCharacterSectionHeight(input({ ...base, extraEveTypeCount: 2 }));
+    expect(withTwo - without).toBe(30 + 2 * 33);
+  });
+
   it('adds a large block for eve-type family/type rows only when hasEveNotificationScope', () => {
     const withScope = estimateCharacterSectionHeight(
       input({ expanded: true, visibleEventIds: [EVE_NOTIFICATION], hasEveNotificationScope: true })

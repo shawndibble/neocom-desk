@@ -4,6 +4,7 @@ import { registerDeviceForWebPush, unregisterDeviceForWebPush } from '@/sync/dev
 import { webPushSupport } from '@/sync/webPushSupport';
 import { usePushFailure } from './pushFailure';
 import { uploadProjectionRows, unregisterProjectionRegistration } from './projectionUpload';
+import { useSeenEveTypesStore } from './seenEveTypes';
 import type { ProjectionRow } from '@/engine/projection';
 
 vi.mock('./permission', () => ({
@@ -16,6 +17,8 @@ vi.mock('@/sync/deviceRegistration', () => ({
   registerDeviceForWebPush: vi.fn(),
   unregisterDeviceForWebPush: vi.fn(),
 }));
+
+const TYPES = new Map([[1, ['StructureDestroyed']]]);
 
 const readyRegistration = {} as ServiceWorkerRegistration;
 
@@ -31,6 +34,7 @@ const ROW: ProjectionRow = {
 beforeEach(() => {
   vi.clearAllMocks();
   usePushFailure.setState({ value: null, hydrated: true });
+  useSeenEveTypesStore.setState({ value: {}, hydrated: true });
   vi.mocked(webPushSupport).mockReturnValue('supported');
   vi.mocked(readNotificationPermission).mockReturnValue('granted');
   vi.mocked(registerDeviceForWebPush).mockResolvedValue({
@@ -47,52 +51,63 @@ beforeEach(() => {
 describe('uploadProjectionRows', () => {
   it('registers the device with the given rows when push is supported and granted', async () => {
     const rows = new Map([[1, [ROW]]]);
-    await uploadProjectionRows(rows);
+    await uploadProjectionRows(rows, TYPES);
     expect(registerDeviceForWebPush).toHaveBeenCalledWith(
       expect.any(String),
       readyRegistration,
       rows,
-      { skipIfUnchanged: true }
+      { skipIfUnchanged: true, eveTypesByCharacter: TYPES }
     );
+  });
+
+  it('keeps the types the server reports as seen, for the next Settings open', async () => {
+    vi.mocked(registerDeviceForWebPush).mockResolvedValue({
+      deviceId: 'd',
+      registered: [1],
+      rejected: [],
+      seenTypes: { '1': ['NewKind'] },
+    });
+    await uploadProjectionRows(new Map([[1, [ROW]]]), TYPES);
+    expect(useSeenEveTypesStore.getState().value).toEqual({ '1': ['NewKind'] });
   });
 
   it('does nothing when push is not supported', async () => {
     vi.mocked(webPushSupport).mockReturnValue('unsupported');
-    await uploadProjectionRows(new Map([[1, [ROW]]]));
+    await uploadProjectionRows(new Map([[1, [ROW]]]), TYPES);
     expect(registerDeviceForWebPush).not.toHaveBeenCalled();
   });
 
   it('does nothing when the platform requires install', async () => {
     vi.mocked(webPushSupport).mockReturnValue('requires-install');
-    await uploadProjectionRows(new Map([[1, [ROW]]]));
+    await uploadProjectionRows(new Map([[1, [ROW]]]), TYPES);
     expect(registerDeviceForWebPush).not.toHaveBeenCalled();
   });
 
   it('does nothing when permission is not granted', async () => {
     vi.mocked(readNotificationPermission).mockReturnValue('default');
-    await uploadProjectionRows(new Map([[1, [ROW]]]));
+    await uploadProjectionRows(new Map([[1, [ROW]]]), TYPES);
     expect(registerDeviceForWebPush).not.toHaveBeenCalled();
   });
 
   it('resolves rather than rejecting when registration fails', async () => {
     vi.mocked(registerDeviceForWebPush).mockRejectedValue(new Error('network error'));
-    await expect(uploadProjectionRows(new Map([[1, [ROW]]]))).resolves.toBeUndefined();
+    await expect(uploadProjectionRows(new Map([[1, [ROW]]]), TYPES)).resolves.toBeUndefined();
   });
 });
 
 describe('push failure record', () => {
   it('records a failed upload and clears it on the next success', async () => {
     vi.mocked(registerDeviceForWebPush).mockRejectedValueOnce(new Error('network error'));
-    await uploadProjectionRows(new Map([[1, [ROW]]]));
+    await uploadProjectionRows(new Map([[1, [ROW]]]), TYPES);
     expect(usePushFailure.getState().value).not.toBeNull();
-    await uploadProjectionRows(new Map([[1, [ROW]]]));
+    await uploadProjectionRows(new Map([[1, [ROW]]]), TYPES);
     expect(usePushFailure.getState().value).toBeNull();
   });
 
   it('leaves a standing failure alone when the upload was skipped as unchanged', async () => {
     usePushFailure.setState({ value: { reason: 'network', at: 1 } });
     vi.mocked(registerDeviceForWebPush).mockResolvedValue(null);
-    await uploadProjectionRows(new Map([[1, [ROW]]]));
+    await uploadProjectionRows(new Map([[1, [ROW]]]), TYPES);
     expect(usePushFailure.getState().value).toEqual({ reason: 'network', at: 1 });
   });
 });

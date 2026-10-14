@@ -392,6 +392,26 @@ export function isEveTypeEnabledFor(
   return state[channel] ?? eveTypeDefaultFor(type, channel);
 }
 
+/**
+ * The types, out of `knownTypes`, this device has enabled for the browser
+ * channel (issue #3755, ADR 0020) — what `registerDevice` uploads so the
+ * server's Alerts push honours the same per-type opt-outs. Sorted and
+ * de-duplicated so the upload (and its fingerprint) is order-stable.
+ */
+export function enabledEveTypesForBrowser(
+  map: EveTypeEnabledMap,
+  knownTypes: readonly string[]
+): string[] {
+  return [...new Set(knownTypes)]
+    .filter((type) => isEveTypeEnabledFor(map, type, 'browser'))
+    .sort();
+}
+
+/** Seen types the closed allow-list does not already cover, sorted and de-duplicated. */
+export function extraEveTypes(seenTypes: readonly string[]): string[] {
+  return [...new Set(seenTypes.filter((type) => !isEveTypeAllowed(type)))].sort();
+}
+
 /** Flips one type on one channel, preserving whatever the other channel said. */
 export function toggleEveTypeChannel(
   map: EveTypeEnabledMap,
