@@ -10,7 +10,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, IskAmount } from '@/components/ui';
+import { Button, IskAmount, ProgressBar } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import {
   orderExpiry,
@@ -77,7 +77,6 @@ export function OrderRowDetail({
   const location = resolveOrderLocation(order, npcStations, solarSystems);
   const placeName = location.stationName ?? t('market.unknownStructure');
   const filled = order.volume_total - order.volume_remain;
-  const remainShare = order.volume_total > 0 ? order.volume_remain / order.volume_total : 0;
   const versusBest = priceComparison(best, order.price);
   const expiry = orderExpiry(order);
   const daysLeft = Math.max(0, Math.ceil((expiry.getTime() - now) / 86_400_000));
@@ -101,16 +100,13 @@ export function OrderRowDetail({
             })}
           </span>
         </div>
-        <div
-          role="progressbar"
-          aria-label={t('market.orderDetail.remainingLabel')}
-          aria-valuemin={0}
-          aria-valuemax={order.volume_total}
-          aria-valuenow={order.volume_remain}
-          className="h-1 bg-line"
-        >
-          <div className="h-1 bg-accent" style={{ width: `${Math.round(remainShare * 100)}%` }} />
-        </div>
+        <ProgressBar
+          label={t('market.orderDetail.remainingLabel')}
+          value={order.volume_remain}
+          max={order.volume_total}
+          size="xs"
+          surface="panel-2"
+        />
       </div>
 
       <p className="text-text">

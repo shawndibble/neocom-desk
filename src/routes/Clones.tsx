@@ -39,7 +39,7 @@ import { loadStructureName, loadStructureSystemId } from '@/features/character/s
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadSystemNameAndSecurity, loadSystemSecurity } from '@/features/character/systemSecurity';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { IskAmount } from '@/components/ui';
+import { IskAmount, ProgressBar } from '@/components/ui';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices, getRegionSellPrices } from '@/market/prices';
@@ -814,19 +814,11 @@ export function Clones() {
                       })
                     : t('clones.cooldownReadyValue')}
                 </p>
-                <div
-                  role="progressbar"
-                  aria-label={t('clones.cooldown')}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(cooldownFraction * 100)}
-                  className="h-1.5 overflow-hidden rounded-full bg-line"
-                >
-                  <div
-                    className={cooldown.onCooldown ? 'h-full bg-warning' : 'h-full bg-success'}
-                    style={{ width: `${cooldownFraction * 100}%` }}
-                  />
-                </div>
+                <ProgressBar
+                  label={t('clones.cooldown')}
+                  value={Math.round(cooldownFraction * 100)}
+                  tone={cooldown.onCooldown ? 'warning' : 'success'}
+                />
                 {cooldownNote && <p className="text-xs text-text-dim">{cooldownNote}</p>}
               </section>
             </Panel>

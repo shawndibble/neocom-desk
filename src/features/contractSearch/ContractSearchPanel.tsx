@@ -34,6 +34,7 @@ import {
   FilterField,
   IskInput,
   Panel,
+  ProgressBar,
   RegionSelect,
   SearchInput,
   Spinner,
@@ -381,19 +382,12 @@ function SnapshotProgress({
   const determinate = total !== null && total > 0;
   return (
     <div className="flex w-full max-w-xs flex-col items-center gap-1">
-      <div
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={determinate ? total : undefined}
-        aria-valuenow={determinate ? done : undefined}
-        className="h-1 w-full overflow-hidden rounded-full bg-line"
-      >
-        <div
-          className={cx('h-full bg-accent', determinate ? 'transition-[width]' : 'animate-pulse')}
-          style={{ width: determinate ? `${Math.round((done / total) * 100)}%` : '30%' }}
-        />
-      </div>
+      <ProgressBar
+        label={label}
+        value={determinate ? done : null}
+        max={determinate ? total : undefined}
+        className="w-full"
+      />
       <p className="text-[0.6875rem] text-text-dim">{label}</p>
     </div>
   );

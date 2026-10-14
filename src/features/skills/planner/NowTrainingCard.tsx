@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { romanLevel } from '@/engine/projection';
+import { ProgressBar } from '@/components/ui';
 import { SkillLink } from '@/features/entities';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
@@ -63,16 +64,12 @@ export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardPr
         )}
       </div>
       {percent !== null && (
-        <div
-          role="progressbar"
-          aria-label={t('plans.heroProgress', { percent, level })}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          className="mt-4 h-2 overflow-hidden rounded-full bg-panel-2"
-        >
-          <div className="h-full bg-accent" style={{ width: `${percent}%` }} />
-        </div>
+        <ProgressBar
+          label={t('plans.heroProgress', { percent, level })}
+          value={percent}
+          size="md"
+          className="mt-4"
+        />
       )}
       <div className="mt-1 flex justify-between gap-3 text-xs text-text-dim">
         <span>{percent !== null && t('plans.heroProgress', { percent, level })}</span>

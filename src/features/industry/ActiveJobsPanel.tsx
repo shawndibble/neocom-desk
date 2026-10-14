@@ -19,6 +19,7 @@ import {
   EmptyState,
   IconButton,
   Panel,
+  ProgressBar,
   SegmentedControl,
   Spinner,
   Toast,
@@ -837,24 +838,14 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             // fill and collapses. Nothing may right-align itself below `sm`
             // either (docs/DESIGN.md §4a) — hence `sm:text-right`.
             <span className="flex items-center gap-2 max-sm:w-full">
-              <span
-                role="progressbar"
-                aria-label={t('industry.jobsProgress', {
+              <ProgressBar
+                label={t('industry.jobsProgress', {
                   name: nameForBlueprint(job.blueprint_type_id),
                 })}
-                aria-valuenow={progress}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                className="block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-panel-2 max-sm:w-auto max-sm:flex-1 sm:w-24"
-              >
-                <span
-                  className={`block h-full ${
-                    toneClass(jobTone(job), { warning: 'bg-warning', success: 'bg-success' }) ??
-                    'bg-accent'
-                  }`}
-                  style={{ width: `${progress}%` }}
-                />
-              </span>
+                value={progress}
+                tone={jobTone(job) ?? 'accent'}
+                className="w-16 shrink-0 max-sm:w-auto max-sm:flex-1 sm:w-24"
+              />
               <span className="w-8 shrink-0 tabular-nums text-text-dim sm:text-right">
                 {progress}%
               </span>

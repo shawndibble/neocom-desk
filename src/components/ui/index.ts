@@ -29,6 +29,8 @@ export { entityLinkClassName } from './entityLinkClassName';
 export { iconButtonClassName } from './iconButtonClassName';
 export { ReauthBanner } from './ReauthBanner';
 export { SkillBar } from './SkillBar';
+export { ProgressBar } from './ProgressBar';
+export type { ProgressBarTone } from './ProgressBar';
 export { StandingIcon } from './StandingIcon';
 export { standingTier, type StandingTier } from './standingTier';
 export { Modal } from './Modal';

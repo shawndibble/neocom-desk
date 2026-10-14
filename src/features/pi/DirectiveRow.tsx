@@ -32,6 +32,7 @@
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ProgressBar } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 
 /** What an instruction does. The set is closed; the colour carries the meaning. */
@@ -193,19 +194,12 @@ export function LoadMeter({
       <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
       </span>
-      <div
-        role="progressbar"
-        aria-label={t('piShared.budgetBarLabel', { axis: label })}
-        aria-valuenow={percent}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel-2"
-      >
-        <div
-          className={`h-full ${tight ? 'bg-warning' : 'bg-accent'}`}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+      <ProgressBar
+        label={t('piShared.budgetBarLabel', { axis: label })}
+        value={percent}
+        tone={tight ? 'warning' : 'accent'}
+        className="flex-1"
+      />
       <span className="min-w-[1.75rem] text-right text-[0.6875rem] text-text-dim tabular-nums">
         {percent}%
       </span>
