@@ -70,11 +70,13 @@ export function stepFinish(cumulativeSeconds: number, startDate: Date): Date {
  * glance label for how long a pilot stayed, not an exact interval.
  */
 export function formatTenure(totalSeconds: number): string {
+  const DAYS_PER_MONTH = 30.4;
+  const DAYS_PER_YEAR = 365;
   const days = Math.floor(Math.max(0, totalSeconds) / 86_400);
   if (days < 60) return `${days}d`;
-  const months = Math.floor(days / 30.4);
-  if (days < 365) return `${months}mo`;
-  const years = Math.floor(days / 365);
-  const leftover = Math.floor((days - years * 365) / 30.4);
+  const months = Math.floor(days / DAYS_PER_MONTH);
+  if (days < DAYS_PER_YEAR) return `${months}mo`;
+  const years = Math.floor(days / DAYS_PER_YEAR);
+  const leftover = Math.floor((days - years * DAYS_PER_YEAR) / DAYS_PER_MONTH);
   return leftover > 0 ? `${years}y ${leftover}mo` : `${years}y`;
 }

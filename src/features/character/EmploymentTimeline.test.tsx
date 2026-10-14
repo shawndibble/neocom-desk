@@ -45,11 +45,18 @@ describe('EmploymentTimeline', () => {
     expect(screen.queryByText('employmentHistory.current')).toBeNull();
   });
 
+  it('keeps the ongoing row plain on the page when the character has no corporation id yet', () => {
+    render(<EmploymentTimeline rows={rows} names={names} label="History" />);
+
+    expect(screen.queryByText('employmentHistory.current')).toBeNull();
+  });
+
   it('modal variant draws no date gutter, so the range under the name is never hidden', () => {
     const { container } = render(
       <EmploymentTimeline variant="modal" rows={rows} names={names} label="History" />
     );
 
+    expect(screen.getByText('employmentHistory.current')).toBeInTheDocument();
     expect(container.querySelector('.md\\:block')).toBeNull();
     expect(container.querySelector('.md\\:hidden')).toBeNull();
     expect(screen.getAllByText(/ – /)).toHaveLength(rows.length);

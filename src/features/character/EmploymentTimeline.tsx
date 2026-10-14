@@ -15,6 +15,10 @@ import { cx } from '@/lib/cx';
 import { formatTenure } from '@/lib/duration';
 import { corporationLogoUrl } from '@/lib/eveImages';
 import type { EmploymentHistoryRow, EmploymentSummary } from './employmentHistory';
+import { monthYear } from './publicInfoStyles';
+
+/** A bar never shrinks below this, so a two-day stint still shows a sliver. */
+const MIN_BAR_PERCENT = 2;
 
 const PILL =
   'inline-flex shrink-0 items-center rounded-xs border px-1.5 py-px text-[0.6875rem] leading-4 font-semibold tracking-widest whitespace-nowrap uppercase';
@@ -23,10 +27,6 @@ const PILL_TONE = {
   warning: 'border-warning/40 bg-warning/10 text-warning',
   neutral: 'border-line text-text-dim',
 } as const;
-
-function monthYear(iso: string | number): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-}
 
 export function EmploymentSummaryChips({
   summary,
@@ -74,9 +74,10 @@ interface EmploymentTimelineProps {
   names: ReadonlyMap<number, string>;
   label: string;
   /**
-   * The corporation the CURRENT chip needs to match. The page passes the
-   * character's own, so an ongoing row the character record hasn't caught up
-   * to stays plain; the modal has no character record and passes nothing.
+   * The corporation the page's CURRENT chip must match: the character's own,
+   * so an ongoing row the character record hasn't caught up to (or has no
+   * corporation yet) stays plain. The modal has no character record and
+   * ignores it, so its ongoing row is always CURRENT.
    */
   currentCorporationId?: number;
   /** `modal` never draws the date gutter. */
@@ -96,9 +97,7 @@ export function EmploymentTimeline({
     <ol aria-label={label}>
       {rows.map((row, i) => {
         const name = names.get(row.corporationId) ?? `#${row.corporationId}`;
-        const current =
-          row.ongoing &&
-          (currentCorporationId === undefined || currentCorporationId === row.corporationId);
+        const current = row.ongoing && (!page || currentCorporationId === row.corporationId);
         const end = row.ongoing ? t('employmentHistory.present') : monthYear(rows[i - 1].startDate);
         const range = `${monthYear(row.startDate)} – ${end}`;
         const isFirst = i === 0;
@@ -177,7 +176,9 @@ export function EmploymentTimeline({
               <div aria-hidden className="mt-2 h-1 overflow-hidden rounded-xs bg-line">
                 <div
                   className="h-full rounded-xs bg-line-bright"
-                  style={{ width: `${Math.max(2, Math.round(row.tenureRatio * 100))}%` }}
+                  style={{
+                    width: `${Math.max(MIN_BAR_PERCENT, Math.round(row.tenureRatio * 100))}%`,
+                  }}
                 />
               </div>
             </div>

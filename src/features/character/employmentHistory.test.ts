@@ -59,6 +59,15 @@ describe('employment row flags', () => {
     expect(tight.map((r) => r.shortStay)).toEqual([false, true, false]);
   });
 
+  it('never calls the ongoing stint a short stay, however recently it began', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(400)), ENTRY(2, 200, daysAgo(3))],
+      NOW
+    );
+
+    expect(rows.map((r) => r.shortStay)).toEqual([false, false]);
+  });
+
   it('gives each stint its tenure as a fraction of the longest', () => {
     const rows = deriveEmploymentHistoryRows(
       [ENTRY(1, 100, daysAgo(400)), ENTRY(2, 200, daysAgo(100))],

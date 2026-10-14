@@ -28,7 +28,7 @@ export interface EmploymentHistoryRow {
   ongoing: boolean;
   /** The pilot was in this corporation in an earlier record too. */
   returned: boolean;
-  /** Stayed under `SHORT_STAY_SECONDS`. */
+  /** Stayed under `SHORT_STAY_SECONDS`; never the ongoing stint, which isn't over yet. */
   shortStay: boolean;
   /** `tenureSeconds` over the longest stint's, 0..1; sizes the card's bar. */
   tenureRatio: number;
@@ -57,7 +57,7 @@ export function deriveEmploymentHistoryRows(
     tenureSeconds: tenures[i],
     ongoing: i === 0,
     returned: sorted.slice(i + 1).some((older) => older.corporation_id === entry.corporation_id),
-    shortStay: tenures[i] < SHORT_STAY_SECONDS,
+    shortStay: i > 0 && tenures[i] < SHORT_STAY_SECONDS,
     tenureRatio: longest > 0 ? tenures[i] / longest : 0,
   }));
 }

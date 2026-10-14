@@ -54,10 +54,10 @@ test('coming back to a page shows its rows again, not a spinner', async ({ page 
   // the summary's Longest stay can read the same text as a past employer's
   // card (all legitimately "Past Corp" here), which makes an unscoped
   // page-wide locator ambiguous.
-  const historyTable = page.getByRole('list', { name: 'Employment' });
+  const historyList = page.getByRole('list', { name: 'Employment' });
 
   await subNav.getByRole('link', { name: 'Employment' }).click();
-  await expect(historyTable.getByRole('link', { name: 'Past Corp' })).toBeVisible();
+  await expect(historyList.getByRole('link', { name: 'Past Corp' })).toBeVisible();
 
   await subNav.getByRole('link', { name: 'Overview' }).click();
   await page.waitForURL(/\/overview$/);
@@ -74,7 +74,7 @@ test('coming back to a page shows its rows again, not a spinner', async ({ page 
 
   await subNav.getByRole('link', { name: 'Employment' }).click();
 
-  await expect(historyTable.getByRole('link', { name: 'Past Corp' })).toBeVisible();
+  await expect(historyList.getByRole('link', { name: 'Past Corp' })).toBeVisible();
   await expect(page.getByRole('status', { name: 'Loading' })).toHaveCount(0);
 
   // Released before the test ends so the held request cannot outlive it.

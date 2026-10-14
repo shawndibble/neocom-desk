@@ -90,6 +90,7 @@ export function EmploymentHistory() {
   const csvColumns = useMemo(() => employmentHistoryCsvColumns(t, corpNames), [t, corpNames]);
   const historyExport = useTableExport({
     surface: 'employment-history',
+    source: 'rows',
     rows,
     columns: csvColumns,
   });
