@@ -424,7 +424,8 @@ function CloneCard({
             onChange={(e) => setDraft(e.target.value)}
             onBlur={() => close(true, false)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              // An Enter that confirms an IME candidate is not a save.
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                 // Focus moves to a button mid-keystroke: its keypress must not click it.
                 e.preventDefault();
                 close(true, true);
