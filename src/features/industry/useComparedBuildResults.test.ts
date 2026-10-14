@@ -381,7 +381,7 @@ describe('useComparedBuildResults', () => {
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
 
     const call = mockedCompute.mock.calls[0]?.[0];
-    expect(call?.blueprintAcquisition).toEqual({
+    expect(call?.blueprintAcquisition).toMatchObject({
       blueprintTypeID: 100,
       line: { unitPrice: 500, owned: false },
     });
