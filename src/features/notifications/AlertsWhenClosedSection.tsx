@@ -14,9 +14,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { beginAlertsLogin } from '@/app/loginFlow';
-import type { AlertsCallbackState } from '@/routes/Callback';
 import {
   alertsRowState,
+  type AlertsCallbackState,
   clearAlertsQueue,
   queueAlertsForAll,
   readAlertsGrants,
@@ -79,7 +79,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
       return;
     }
     const next = takeNextQueuedAlerts();
-    if (next !== null) void beginAlertsLogin(next);
+    if (next !== null) void beginAlertsLogin(next).catch(() => undefined);
   }, [returned, navigate, location.pathname, location.search]);
 
   if (characters.length === 0) return null;

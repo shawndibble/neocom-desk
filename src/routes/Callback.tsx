@@ -14,6 +14,7 @@ import { takeLoginReturnTo } from '@/auth/loginReturnTo';
 import {
   clearAlertsQueue,
   completeAlertsGrant,
+  type AlertsCallbackState,
   type AlertsGrantOutcome,
 } from '@/features/notifications/alertsGrant';
 import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
@@ -31,14 +32,6 @@ class SsoRejection extends Error {
     this.name = 'SsoRejection';
   }
 }
-
-/**
- * What an Alerts Grant round trip hands back to the page it was pressed on, as
- * router state: the Settings row reads it once to say what happened.
- */
-export type AlertsCallbackState = {
-  alertsGrant: AlertsGrantOutcome | { status: 'cancelled' };
-};
 
 /** Which wording the panel shows; `null` while the callback is still working. */
 type ErrorKind = LoginFailureReason | 'denied' | 'generic' | null;

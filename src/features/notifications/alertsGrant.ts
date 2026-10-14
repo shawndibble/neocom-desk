@@ -19,6 +19,11 @@ const QUEUE_TTL_MS = 15 * 60_000;
 /** A hung delete must not hold removal, Log out or delete-data. */
 const DELETE_TIMEOUT_MS = 8_000;
 
+/** What an Alerts round trip hands back, as router state, to the page it was pressed on. */
+export interface AlertsCallbackState {
+  alertsGrant: AlertsGrantOutcome | { status: 'cancelled' };
+}
+
 export interface AlertsGrantRecord {
   status: 'active' | 'needs-reauth';
   /** Epoch ms this device recorded the grant turning on. */
@@ -135,14 +140,22 @@ export async function deleteAlertGrantsBestEffort(characterIds: readonly number[
   const timeout = new Promise<void>((resolve) => {
     timer = setTimeout(resolve, DELETE_TIMEOUT_MS);
   });
+  // Set once the timeout wins: the loop then stops signing in as further
+  // Characters, which would fight the caller's own sync and sign-out for the
+  // one Firebase session slot.
+  let abandoned = false;
   const deletions = (async () => {
     const { deleteAlertGrantRemote } = await import('@/sync/alertsGrantApi');
     // One at a time: Firebase has a single session slot.
-    for (const id of characterIds) await deleteAlertGrantRemote(id).catch(() => undefined);
+    for (const id of characterIds) {
+      if (abandoned) return;
+      await deleteAlertGrantRemote(id).catch(() => undefined);
+    }
   })().catch(() => undefined);
   try {
     await Promise.race([deletions, timeout]);
   } finally {
+    abandoned = true;
     clearTimeout(timer);
   }
 }
