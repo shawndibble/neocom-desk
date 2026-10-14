@@ -18,6 +18,13 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { CHUNK_READ_CONCURRENCY, chunkDocId } from './chunkedSnapshot';
+import { loadFirestoreContractOffers } from './publicContractOffers';
+import {
+  loadR2OfferIndex,
+  loadR2TypeRows,
+  r2ObjectsForTypes,
+  type R2OfferIndex,
+} from './r2OfferSnapshot';
 
 const INDEX_COLLECTION = 'publicContractOffersIndex';
 const INDEX_DOC = 'types';
@@ -40,6 +47,7 @@ export interface OfferIndexType {
   typeId: number;
   count: number;
   cheapest: number | null;
+  /** Firestore chunk range; empty (`lastChunk < firstChunk`) for an index read from R2. */
   firstChunk: number;
   lastChunk: number;
 }
@@ -48,6 +56,8 @@ export interface OfferIndex {
   lastSyncedAt: number;
   types: ReadonlyMap<number, OfferIndexType>;
   regionIds: readonly number[];
+  /** Set when the index came from R2 (ADR 0019): a type's offers are then read from the objects it names, not from chunk docs. */
+  r2?: R2OfferIndex;
 }
 
 export function parseOfferIndex(raw: RawOfferIndex): OfferIndex {
@@ -59,6 +69,15 @@ export function parseOfferIndex(raw: RawOfferIndex): OfferIndex {
   return { lastSyncedAt: raw.lastSyncedAt, types, regionIds: raw.regionIds };
 }
 
+export function offerIndexFromR2(raw: R2OfferIndex): OfferIndex {
+  const types = new Map<number, OfferIndexType>();
+  for (const [key, { count, cheapest }] of Object.entries(raw.types)) {
+    const typeId = Number(key);
+    types.set(typeId, { typeId, count, cheapest, firstChunk: 0, lastChunk: -1 });
+  }
+  return { lastSyncedAt: raw.lastSyncedAt, types, regionIds: raw.regionIds, r2: raw };
+}
+
 async function fetchIndex(characterId: number): Promise<RawOfferIndex | null> {
   if (!isSyncConfigured()) return null;
   await ensureAnySession(characterId);
@@ -68,8 +87,14 @@ async function fetchIndex(characterId: number): Promise<RawOfferIndex | null> {
   return { lastSyncedAt: data.lastSyncedAt, types: data.types, regionIds: data.regionIds ?? [] };
 }
 
-/** `null` when there is no usable index; never throws. */
+/**
+ * `null` when there is no usable index; never throws. R2's index is preferred;
+ * the Firestore one answers when R2 is unreachable or its index is missing or
+ * invalid.
+ */
 export async function loadOfferIndex(characterId: number): Promise<OfferIndex | null> {
+  const r2 = await loadR2OfferIndex();
+  if (r2) return offerIndexFromR2(r2.data);
   try {
     const cached = await loadWithCache(
       GLOBAL_CACHE_CHARACTER_ID,
@@ -128,6 +153,14 @@ export async function loadOffersForTypes(
   typeIds: ReadonlySet<number>,
   characterId: number
 ): Promise<PublicContractOfferRow[] | null> {
+  if (index.r2) {
+    const rows = await loadR2TypeRows(index.r2, typeIds);
+    if (rows) return rows;
+    // R2 stopped answering after its index was read: the whole snapshot from
+    // Firestore, narrowed, rather than a board stuck waiting for rows.
+    const full = await loadFirestoreContractOffers(characterId).catch(() => null);
+    return full?.cached?.data.rows.filter((row) => typeIds.has(row.typeId)) ?? null;
+  }
   try {
     await ensureAnySession(characterId);
     const chunks = new Set<number>();
@@ -156,4 +189,16 @@ export async function loadOffersForTypes(
   } catch {
     return null;
   }
+}
+
+/** How many objects (R2) or chunk docs (Firestore) reading these types takes. */
+export function readSpan(index: OfferIndex, typeIds: ReadonlySet<number>): number {
+  if (index.r2) return r2ObjectsForTypes(index.r2, typeIds).length;
+  const chunks = new Set<number>();
+  for (const typeId of typeIds) {
+    const entry = index.types.get(typeId);
+    if (!entry) continue;
+    for (let chunk = entry.firstChunk; chunk <= entry.lastChunk; chunk += 1) chunks.add(chunk);
+  }
+  return chunks.size;
 }

@@ -551,7 +551,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   // or names still resolving, an empty set means "not known", not "no match".
   const typesKnown = offerIndex !== null && !namingTypes;
   const awaitingRows =
-    !haveFull && early.rows === null && !(typesKnown && typeIds !== null && typeIds.size === 0);
+    !haveFull &&
+    early.rows === null &&
+    !early.failed &&
+    !(typesKnown && typeIds !== null && typeIds.size === 0);
 
   const { value: endpoints } = useCourierEndpoints(courierRows);
   // Synchronous, so the haul list never empties while its ends are being
@@ -702,15 +705,23 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     // stand in. They ignore the other filters, which only matters until the
     // snapshot arrives and the stats are computed as before.
     if (!haveFull && offerIndex) {
-      return new Map<number, ContractOfferStats>(
+      const stats = new Map<number, ContractOfferStats>(
         [...offerIndex.types.values()].map((entry) => [
           entry.typeId,
           { offerCount: entry.count, cheapest: entry.cheapest },
         ])
       );
+      // Read through R2 the full rows never arrive, so the types whose rows
+      // were read get their real, filter-aware stats; the rest keep the index's.
+      if (early.rows !== null) {
+        for (const [typeId, typeStats] of contractOfferStats(nonTypeRows, plexPrice)) {
+          stats.set(typeId, typeStats);
+        }
+      }
+      return stats;
     }
     return contractOfferStats(nonTypeRows, plexPrice);
-  }, [haveFull, offerIndex, nonTypeRows, plexPrice]);
+  }, [haveFull, offerIndex, early.rows, nonTypeRows, plexPrice]);
 
   /**
    * Cheapest first, so the rows arrive in the order the table's default
