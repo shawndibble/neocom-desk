@@ -1219,8 +1219,9 @@ export const syncPublicContractOffers = onSchedule(
     }
     if (fingerprint !== null) await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
     // Last, so a slow or failing R2 can never delay or skip the Firestore publish.
-    await publishOffersToR2(db, rows, lastSyncedAt);
+    // Courier first: one small object, so a slow offers upload cannot starve it of the time budget.
     await publishCourierToR2(db, courierRows, lastSyncedAt);
+    await publishOffersToR2(db, rows, lastSyncedAt);
   }
 );
 

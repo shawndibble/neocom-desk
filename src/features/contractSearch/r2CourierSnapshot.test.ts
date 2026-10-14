@@ -68,6 +68,14 @@ describe('readR2CourierSnapshot', () => {
     expect(await readR2CourierSnapshot()).toBeNull();
   });
 
+  it('is null when the object holds fewer rows than the index counts', async () => {
+    serve({
+      [`${ORIGIN}/courier-contracts/index.json`]: INDEX,
+      [`${ORIGIN}/${OBJECT}`]: [{ contractId: 1 }],
+    });
+    expect(await readR2CourierSnapshot()).toBeNull();
+  });
+
   it('is null when the object holds bad rows', async () => {
     serve({
       [`${ORIGIN}/courier-contracts/index.json`]: INDEX,

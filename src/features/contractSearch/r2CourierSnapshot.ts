@@ -47,7 +47,10 @@ export async function readR2CourierSnapshot(): Promise<ChunkedSnapshot<PublicCou
     const index = parseR2CourierIndex(await fetchJson(INDEX_URL));
     if (!index) return null;
     const body = await fetchJson(`${R2_SNAPSHOT_ORIGIN}/${index.object}`);
-    if (!Array.isArray(body) || !body.every(isCourierRow)) return null;
+    // A length that disagrees with the index is a truncated or mismatched object.
+    if (!Array.isArray(body) || body.length !== index.count || !body.every(isCourierRow)) {
+      return null;
+    }
     return { rows: body, lastSyncedAt: index.lastSyncedAt };
   } catch {
     return null;
