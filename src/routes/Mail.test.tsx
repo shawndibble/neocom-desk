@@ -221,7 +221,7 @@ describe('Mail', () => {
 
     await user.click(rowButton as HTMLButtonElement);
     const readerHeading = await screen.findByRole('heading', { name: 'Fleet up!' });
-    expect(readerHeading).toHaveFocus();
+    await waitFor(() => expect(readerHeading).toHaveFocus());
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await waitFor(() => expect(rowButton).toHaveFocus());
