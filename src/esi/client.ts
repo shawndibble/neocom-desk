@@ -17,6 +17,7 @@ import { passEsiGate, observeEsiResponse } from './budget';
 import { EsiError, EsiBudgetError, EsiTimeoutError } from './errors';
 import { currentEsiLane, gateLane, type EsiLane } from './lane';
 import type { EsiEndpointId } from './registry';
+import { COMPATIBILITY_DATE } from './compatibilityDate';
 import { USER_AGENT } from './userAgent';
 
 // `EsiError` lives in `./errors` so the budget can throw one without importing
@@ -24,7 +25,7 @@ import { USER_AGENT } from './userAgent';
 export { EsiError, EsiBudgetError, EsiTimeoutError, attachEndpointId } from './errors';
 
 export const ESI_BASE_URL = 'https://esi.evetech.net';
-export const COMPATIBILITY_DATE = '2026-08-01';
+export { COMPATIBILITY_DATE };
 export { USER_AGENT };
 
 /**

@@ -33,6 +33,8 @@ import {
 } from '@/features/notifications/notificationClick';
 import { handlePush, type PushEnv } from '@/features/notifications/pushHandler';
 import { recordFeedEntry } from '@/features/notifications/feed';
+import { resolvePushNames } from '@/features/notifications/pushNames';
+import { db } from '@/db';
 import {
   isContractSnapshotObject,
   isEvePortraitImage,
@@ -174,6 +176,8 @@ function pushEnv(): PushEnv {
   return {
     showNotification: (title, options) => self.registration.showNotification(title, options),
     recordFeedEntry,
+    characterName: async (characterId) => (await db.characters.get(characterId))?.name,
+    resolveNames: (fire) => resolvePushNames(fire),
   };
 }
 
