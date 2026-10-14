@@ -277,13 +277,15 @@ export interface LocationWidgetData {
   system: { id: number; name: string | null; security: number | null } | null;
   shipTypeId: number | null;
   shipName: string | null;
+  /** When the read landed; null when none was made (the grant is missing). */
+  fetchedAt: Date | null;
 }
 
 export async function loadLocationWidget(characterId: number): Promise<LocationWidgetData> {
   const token = await db.tokens.get(characterId);
   const scopes = token?.scopes ?? [];
   if (!scopes.includes(ESI_REGISTRY.getCharacterLocation.scope)) {
-    return { needsReauth: true, system: null, shipTypeId: null, shipName: null };
+    return { needsReauth: true, system: null, shipTypeId: null, shipName: null, fetchedAt: null };
   }
   const [
     { loadCharacterSolarSystemId },
@@ -317,6 +319,7 @@ export async function loadLocationWidget(characterId: number): Promise<LocationW
         : { id: systemId, name: system?.name ?? null, security: system?.security ?? null },
     shipTypeId,
     shipName,
+    fetchedAt: new Date(),
   };
 }
 
