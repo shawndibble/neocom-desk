@@ -19,6 +19,7 @@ import { fitTypeIds } from './lib/fitTypeIds.mjs';
 import { bakeCertificates } from './lib/certificates.mjs';
 import { bakeTypeNames, namesMissingFrom } from './lib/typeNames.mjs';
 import { WORMHOLE_GROUP_ID, bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
+import { bakeOreAndIceTypeIds } from './lib/oreTypeIds.mjs';
 import { bakeSystemPositions } from './lib/systemPositions.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
@@ -1743,10 +1744,13 @@ async function main() {
     const root = findMarketGroupRoot(marketGroups, name);
     if (root) collectMarketGroupIds(root.id, oreAndIceMarketGroupIds);
   }
-  const oreAndIceTypeIds = marketTypes
-    .filter((t) => oreAndIceMarketGroupIds.has(t.marketGroupId))
-    .map((t) => t.typeId)
-    .sort((a, b) => a - b);
+  const oreAndIceTypeIds = bakeOreAndIceTypeIds({
+    types,
+    groups,
+    marketOreTypeIds: marketTypes
+      .filter((t) => oreAndIceMarketGroupIds.has(t.marketGroupId))
+      .map((t) => t.typeId),
+  });
 
   // --- gasCloudTypeIds.json: every harvestable gas cloud type — Fullerites,
   // Mykoserocin and Cytoserocin, plus the compressed forms the tree nests
