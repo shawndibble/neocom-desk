@@ -62,3 +62,19 @@ export function formatCountdown(totalSeconds: number): string {
 export function stepFinish(cumulativeSeconds: number, startDate: Date): Date {
   return new Date(startDate.getTime() + cumulativeSeconds * 1000);
 }
+
+/**
+ * Format a long span (seconds) as calendar-ish "2y 3mo": days under two
+ * months (so a short stay never reads "0mo"), whole months under a year,
+ * then years with any leftover months. Months are 30.4 days; this is a
+ * glance label for how long a pilot stayed, not an exact interval.
+ */
+export function formatTenure(totalSeconds: number): string {
+  const days = Math.floor(Math.max(0, totalSeconds) / 86_400);
+  if (days < 60) return `${days}d`;
+  const months = Math.floor(days / 30.4);
+  if (days < 365) return `${months}mo`;
+  const years = Math.floor(days / 365);
+  const leftover = Math.floor((days - years * 365) / 30.4);
+  return leftover > 0 ? `${years}y ${leftover}mo` : `${years}y`;
+}

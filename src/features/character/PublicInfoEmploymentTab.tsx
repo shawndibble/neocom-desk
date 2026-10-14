@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
-import { formatDuration } from '@/lib/duration';
+import { EmploymentSummaryChips, EmploymentTimeline } from './EmploymentTimeline';
 import { loadPublicEmploymentHistory, type PublicEmploymentHistory } from './publicInfoData';
 
 type State =
@@ -42,7 +42,7 @@ export default function PublicInfoEmploymentTab({ characterId }: { characterId: 
       />
     );
   }
-  const { rows, names } = state.data;
+  const { rows, summary, names } = state.data;
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -53,20 +53,14 @@ export default function PublicInfoEmploymentTab({ characterId }: { characterId: 
     );
   }
   return (
-    <ul className="divide-y divide-line text-xs">
-      {rows.map((row) => (
-        <li key={row.recordId} className="flex items-baseline justify-between gap-3 py-1.5">
-          <span className="min-w-0 truncate">
-            {names.get(row.corporationId) ?? `#${row.corporationId}`}
-            {row.ongoing && (
-              <span className="ml-2 text-accent uppercase">{t('employmentHistory.current')}</span>
-            )}
-          </span>
-          <span className="shrink-0 text-text-dim">
-            {new Date(row.startDate).toLocaleDateString()} · {formatDuration(row.tenureSeconds)}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-3">
+      <EmploymentSummaryChips summary={summary} names={names} />
+      <EmploymentTimeline
+        variant="modal"
+        rows={rows}
+        names={names}
+        label={t('publicInfo.employmentTab')}
+      />
+    </div>
   );
 }

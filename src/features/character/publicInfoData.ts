@@ -28,7 +28,12 @@ import {
   STALE_AFTER,
 } from '@/esi/cache';
 import { resolveNames } from './names';
-import { deriveEmploymentHistoryRows, type EmploymentHistoryRow } from './employmentHistory';
+import {
+  deriveEmploymentHistoryRows,
+  deriveEmploymentSummary,
+  type EmploymentHistoryRow,
+  type EmploymentSummary,
+} from './employmentHistory';
 import { deriveAllianceHistoryRows, type AllianceHistoryRow } from './corporationInfo';
 
 export interface PublicCharacterInfo extends CharacterPublicInfo {
@@ -101,6 +106,7 @@ export async function loadPublicAllianceInfo(
 
 export interface PublicEmploymentHistory {
   rows: EmploymentHistoryRow[];
+  summary: EmploymentSummary;
   /** Corporation id -> name; `resolveNames` falls back to `#id`. */
   names: Map<number, string>;
 }
@@ -124,9 +130,10 @@ export async function loadPublicEmploymentHistory(
     { staleAfterMs: STALE_AFTER.static, conditional }
   );
   if (!result) return null;
-  const rows = deriveEmploymentHistoryRows(result.data, Date.now());
+  const now = Date.now();
+  const rows = deriveEmploymentHistoryRows(result.data, now);
   const names = await resolveNames([...new Set(rows.map((r) => r.corporationId))]);
-  return { rows, names };
+  return { rows, summary: deriveEmploymentSummary(rows, now), names };
 }
 
 export interface PublicAllianceHistory {
