@@ -12,7 +12,7 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
-import { ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
+import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
 import { shipItemsEditLocation } from '@/features/fittings/assetShipLocation';
 import { routeToHref } from '@/features/route/routeSafetyLink';
@@ -309,6 +309,7 @@ function ShipRowView({
       items={
         <>
           <ShowInfoMenuItem typeId={row.typeId} itemName={shipName} />
+          <OpenInEveItemMenuItems typeId={row.typeId} />
           <MenuItem onSelect={openFitting}>{t('assets.myShips.menu.showFitting')}</MenuItem>
           {systemId !== null && (
             <MenuItem onSelect={() => void navigate(routeToHref(systemId, null, preference))}>

@@ -118,3 +118,68 @@ describe('removePayeeRecord', () => {
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 });
+
+describe('Payee entity kind', () => {
+  it('createPayee stores entityId and entityKind when given', async () => {
+    const payee = await createPayee(CHAR_A, {
+      name: 'Moon Corp',
+      defaultTaxPct: 10,
+      entityId: 98_000_001,
+      entityKind: 'corporation',
+    });
+    expect(await db.payees.get(payee.id)).toMatchObject({
+      entityId: 98_000_001,
+      entityKind: 'corporation',
+    });
+  });
+
+  it('updatePayee keeps the entity when the input omits it, and deletes both keys on null', async () => {
+    const payee = await createPayee(CHAR_A, {
+      name: 'Moon Corp',
+      defaultTaxPct: 10,
+      entityId: 98_000_001,
+      entityKind: 'corporation',
+    });
+    const kept = await updatePayee(payee, { name: 'Moon Corp 2', defaultTaxPct: 10 });
+    expect(kept).toMatchObject({ entityId: 98_000_001, entityKind: 'corporation' });
+
+    const cleared = await updatePayee(kept, {
+      name: 'Moon 1 Planet 2',
+      defaultTaxPct: 10,
+      entityId: null,
+      entityKind: null,
+    });
+    const stored = await db.payees.get(payee.id);
+    expect('entityId' in cleared || 'entityKind' in cleared).toBe(false);
+    expect(stored && ('entityId' in stored || 'entityKind' in stored)).toBe(false);
+  });
+
+  it('rememberPayeeEntity records a known kind but never overwrites a verified one', async () => {
+    const payee = await createPayee(CHAR_A, {
+      name: 'Landlord',
+      defaultTaxPct: 10,
+      entityId: 90_000_001,
+      entityKind: 'corporation',
+    });
+    expect(await rememberPayeeEntity(payee, 90_000_001, 'character')).toBe(payee);
+
+    const bare = await createPayee(CHAR_A, {
+      name: 'Other',
+      defaultTaxPct: 10,
+      entityId: 90_000_002,
+    });
+    expect((await rememberPayeeEntity(bare, 90_000_002, 'character')).entityKind).toBe('character');
+  });
+
+  it('rememberPayeeEntity drops a stale kind when the recipient changes without one', async () => {
+    const payee = await createPayee(CHAR_A, {
+      name: 'Landlord',
+      defaultTaxPct: 10,
+      entityId: 90_000_001,
+      entityKind: 'corporation',
+    });
+    const moved = await rememberPayeeEntity(payee, 90_000_005);
+    expect(moved.entityId).toBe(90_000_005);
+    expect('entityKind' in moved).toBe(false);
+  });
+});

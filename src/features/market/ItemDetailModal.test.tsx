@@ -376,7 +376,7 @@ describe('ItemDetailModal', () => {
 
     // No plan yet -> "Create Skill Plan and add" (FitCheck/Mastery's shared label
     // contract, issue #1378).
-    await user.click(screen.getByRole('button', { name: 'Create Skill Plan and add' }));
+    await user.click(await screen.findByRole('button', { name: 'Create Skill Plan and add' }));
 
     expect(await screen.findByRole('button', { name: 'Added' })).toBeInTheDocument();
     const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();

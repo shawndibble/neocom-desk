@@ -31,6 +31,7 @@ import { loadTypeNames } from './typeNames';
 import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
 import { ContractMarketValueRow } from '@/features/contracts/ContractMarketValueRow';
 import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
+import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import {
   CONTRACT_AVAILABILITY_KEY,
   CONTRACT_STATUS_KEY,
@@ -287,6 +288,7 @@ export function ContractDetailModal({
             <dd className="flex items-center gap-1 tabular-nums">
               {contract.contract_id}
               <CopyContractIdButton contractId={contract.contract_id} />
+              <OpenInEveButton kind="contract" id={contract.contract_id} />
             </dd>
 
             {contract.start_location_id && (

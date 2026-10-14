@@ -635,6 +635,14 @@ export interface PayeeRecord {
    * settling this Payee's entries.
    */
   entityId?: number;
+  /**
+   * What `entityId` is. Set when the pilot picks the Payee from the name
+   * search (or an exact-name lookup matches it), so Settle up never looks it
+   * up again. Absent on an older Payee that only has an `entityId` (it still
+   * opens in EVE, which needs just the id) or that is an unverified free-text
+   * label. Not indexed, so no Dexie version bump.
+   */
+  entityKind?: 'character' | 'corporation' | 'alliance';
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

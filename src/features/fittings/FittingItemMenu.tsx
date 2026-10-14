@@ -28,6 +28,7 @@ import { reachableModuleStates } from '@/engine/fittings/fittingEdit';
 import type { FittingItemState, FittingModule, FittingSlotKind } from '@/engine/fittings/types';
 import {
   BuildPlanMenuItems,
+  OpenInEveItemMenuItems,
   ShowInfoMenuItem,
   ViewInMarketMenuItem,
 } from '@/features/market/ItemContextMenu';
@@ -265,6 +266,7 @@ export function ModuleMenuItems({
       )}
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
+      <OpenInEveItemMenuItems typeId={typeId} />
       <ViewInMarketMenuItem typeId={typeId} />
       <MenuSeparator />
       <MenuItem onSelect={() => actions.removeAllOfType(typeId)}>
@@ -381,6 +383,7 @@ export function WeaponMenuItems({
       )}
       <MenuSeparator />
       <ShowInfoMenuItem typeId={first.typeId} itemName={name} />
+      <OpenInEveItemMenuItems typeId={first.typeId} />
       <ViewInMarketMenuItem typeId={first.typeId} />
     </>
   );
@@ -455,6 +458,7 @@ export function DroneMenuItems({
       <MenuItem onSelect={() => actions.recallAllDrones()}>{t('fittings.item.recallAll')}</MenuItem>
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
+      <OpenInEveItemMenuItems typeId={typeId} />
       <ViewInMarketMenuItem typeId={typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={() => actions.removeDrones(typeId)}>
@@ -528,6 +532,7 @@ export function CargoMenuItems({ typeId }: { typeId: number }) {
       </MenuItem>
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
+      <OpenInEveItemMenuItems typeId={typeId} />
       <ViewInMarketMenuItem typeId={typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={() => actions.removeCargo(typeId)}>
@@ -594,6 +599,7 @@ export function AddItemMenuItems({
       )}
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
+      <OpenInEveItemMenuItems typeId={typeId} />
       <ViewInMarketMenuItem typeId={typeId} />
       <BuildPlanMenuItems typeId={typeId} />
     </>

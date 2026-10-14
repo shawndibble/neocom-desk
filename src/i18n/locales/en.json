@@ -5515,7 +5515,21 @@
       "moveAndDelete": "Move and delete",
       "deleteAnyway": "Delete anyway",
       "deleteAnywayHint": "Deleting anyway keeps those entries, but they will show as \"Unknown Payee\" until you assign them again.",
-      "deleteFailed": "Couldn’t delete {{name}} — nothing was changed. Try again."
+      "deleteFailed": "Couldn’t delete {{name}} — nothing was changed. Try again.",
+      "verify": {
+        "openUnresolved": "Couldn't find one character, corporation or alliance named {{name}}, so there is nothing to open.",
+        "suggestionsLabel": "Matching characters, corporations and alliances",
+        "kind": {
+          "character": "Character",
+          "corporation": "Corporation",
+          "alliance": "Alliance"
+        },
+        "verifiedNote": "{{kind}} — verified, so Settle up can open it in EVE.",
+        "linkedNote": "Linked to an EVE character or corporation from a payment.",
+        "unverifiedNote": "Unverified — not a character, corporation or alliance we could find. It stays a free-text label.",
+        "unverifiedShort": "Unverified",
+        "linkedShort": "Linked"
+      }
     },
     "settleUp": {
       "arrival": {
@@ -9678,7 +9692,7 @@
     },
     "openWindow": {
       "label": "Open in EVE",
-      "caption": "Open an item, pilot, corporation, contract or market in your EVE client from a Show info window or a row menu."
+      "caption": "Open an item, pilot, corporation, contract or market in your EVE client from a Show info window, a row menu or a contract."
     },
     "autopilot": {
       "label": "Autopilot waypoints",

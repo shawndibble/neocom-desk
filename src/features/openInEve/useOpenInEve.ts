@@ -21,7 +21,17 @@ export interface OpenInEve {
   send: () => void;
 }
 
-export function useOpenInEve({ kind, id }: OpenInEveTarget): OpenInEve {
+export interface OpenInEveLookup {
+  /**
+   * For a target whose id isn't known yet (a Payee never verified): finds it
+   * when pressed, `null` when there is nothing to open. `id` is then ignored.
+   */
+  resolveId: () => Promise<number | null>;
+  /** Shown when `resolveId` finds nothing. */
+  unresolvedText: string;
+}
+
+export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLookup): OpenInEve {
   const { t } = useTranslation();
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const lacksScope = useCharacterLacksEndpoints(characterId, OPEN_IN_EVE_ENDPOINTS);
@@ -42,7 +52,12 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget): OpenInEve {
     setSending(true);
     setOutcome(null);
     try {
-      const result = await openInEve(forCharacter, { kind, id });
+      const targetId = lookup ? await lookup.resolveId() : id;
+      if (targetId === null) {
+        setOutcome({ tone: 'alert', text: lookup?.unresolvedText ?? '' });
+        return;
+      }
+      const result = await openInEve(forCharacter, { kind, id: targetId });
       if (result.ok) {
         setOutcome({ tone: 'status', text: t('openInEve.opened') });
       } else {

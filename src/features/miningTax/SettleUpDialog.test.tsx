@@ -11,6 +11,12 @@ vi.mock('./ledgerActions', () => ({
   settle: (...args: unknown[]) => settle(...args),
 }));
 
+vi.mock('@/features/openInEve/OpenInEveButton', () => ({
+  OpenInEveButton: ({ id, kind, lookup }: { id: number; kind: string; lookup?: unknown }) => (
+    <button type="button">{`Open ${kind} ${lookup ? 'by name' : String(id)}`}</button>
+  ),
+}));
+
 function assignment(
   id: string,
   date: string,
@@ -73,6 +79,15 @@ function recordedPayment(): Record<string, unknown> | undefined {
 const RECORD = 'I sent it · record payment';
 
 describe('SettleUpDialog', () => {
+  it('offers Open in EVE beside To: by id for a verified Payee, by name lookup otherwise', () => {
+    const { unmount } = renderDialog([{ ...ONE_ROW[0], payeeEntityId: 98_000_001 }]);
+    expect(screen.getByRole('button', { name: 'Open information 98000001' })).toBeInTheDocument();
+    unmount();
+
+    renderDialog(ONE_ROW);
+    expect(screen.getByRole('button', { name: 'Open information by name' })).toBeInTheDocument();
+  });
+
   beforeEach(() => {
     settle.mockReset();
     settle.mockResolvedValue({ ok: true, value: undefined });

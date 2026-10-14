@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
+import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { SkillPlanAdd } from '@/features/skills/SkillPlanAdd';
 import { SkillPriceSection } from '@/features/skills/SkillPriceSection';
 import { SkillRequirementsList } from '@/features/skills/SkillRequirementsList';
@@ -117,7 +118,19 @@ export function SkillDetailModal() {
   const title = state.status === 'ready' ? state.data.name : t('skills.detail.title');
 
   return (
-    <Modal open onClose={close} title={title} closeOnBack={false}>
+    <Modal
+      open
+      onClose={close}
+      title={title}
+      closeOnBack={false}
+      titleActions={
+        <OpenInEveButton
+          kind="information"
+          id={request.typeID}
+          name={state.status === 'ready' ? state.data.name : undefined}
+        />
+      }
+    >
       <div ref={resultRef} tabIndex={-1} className="focus:outline-none">
         {state.status === 'loading' || state.status === 'idle' ? (
           <div className="flex justify-center py-8">

@@ -1,4 +1,5 @@
 import { useCallback, type ReactElement } from 'react';
+import { OpenInEveItemMenuItems } from '@/features/market/ItemContextMenu';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -55,6 +56,7 @@ function SharedBlueprintMenu({
           <MenuItem onSelect={() => openItemInfo(row.typeId, row.name)}>
             {t('market.contextMenu.showInfo')}
           </MenuItem>
+          <OpenInEveItemMenuItems typeId={row.typeId} />
           <BuildPlanMenuItem
             typeId={row.typeId}
             index={index}

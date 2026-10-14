@@ -7,18 +7,21 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { OpenInEveTarget } from './sendOpenInEve';
-import { useOpenInEve } from './useOpenInEve';
+import { useOpenInEve, type OpenInEveLookup } from './useOpenInEve';
 
 export function OpenInEveButton({
   kind,
   id,
   name,
+  lookup,
 }: OpenInEveTarget & {
   /** What is being opened, for the button's accessible name. */
   name?: string;
+  /** The id isn't known yet: find it when pressed (`id` is then ignored). */
+  lookup?: OpenInEveLookup;
 }) {
   const { t } = useTranslation();
-  const { blockedReason, sending, outcome, send } = useOpenInEve({ kind, id });
+  const { blockedReason, sending, outcome, send } = useOpenInEve({ kind, id }, lookup);
   const label = t(`openInEve.${kind}`);
 
   return (

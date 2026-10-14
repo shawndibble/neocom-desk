@@ -22,6 +22,7 @@ import { formatLocalDate } from '@/lib/localDate';
 import { unmaskNumber } from '@/lib/numberMask';
 import { buildSettleUpReason, formatDateRange } from './groupRows';
 import { settle, type PaymentInput } from './ledgerActions';
+import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
@@ -32,6 +33,9 @@ export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
   characterName: string;
   payeeName: string;
+  payeeId?: string;
+  /** The Payee's EVE entity id, when it has one — Settle up opens it in EVE from here. */
+  payeeEntityId?: number;
 }
 
 interface SettleUpDialogProps {
@@ -115,6 +119,8 @@ export function SettleUpDialog({
   // One Amount + To pair per Payee: each is a separate in-game transfer.
   const perPayee = [...new Set(included.map((r) => r.payeeName))].map((name) => ({
     name,
+    payeeId: included.find((r) => r.payeeName === name)?.payeeId,
+    entityId: included.find((r) => r.payeeName === name)?.payeeEntityId,
     subtotal: Math.round(
       included.filter((r) => r.payeeName === name).reduce((s, r) => s + r.assignment.taxOwed, 0)
     ),
@@ -213,7 +219,14 @@ export function SettleUpDialog({
     );
   }
 
-  const copyRow = (key: string, label: string, value: string, copyText: string, dim = false) => (
+  const copyRow = (
+    key: string,
+    label: string,
+    value: string,
+    copyText: string,
+    dim = false,
+    openInEve?: { name: string; entityId?: number; payeeId?: string }
+  ) => (
     <div key={key} className="flex min-w-0 items-center gap-2 px-2 py-1.5">
       <span className={cx(FIELD_LABEL, 'w-14 shrink-0')}>{label}</span>
       <Tooltip content={value}>
@@ -239,6 +252,7 @@ export function SettleUpDialog({
         )}
         {copied === key ? t('miningTax.settleUpCopied') : t('miningTax.settleUpCopy')}
       </Button>
+      {openInEve && <PayeeOpenInEveButton {...openInEve} />}
     </div>
   );
 
@@ -332,7 +346,14 @@ export function SettleUpDialog({
                 String(amountToSend)
               )}
               {perPayee.length === 1 &&
-                copyRow('to', t('miningTax.settleUp.toLabel'), perPayee[0].name, perPayee[0].name)}
+                copyRow(
+                  'to',
+                  t('miningTax.settleUp.toLabel'),
+                  perPayee[0].name,
+                  perPayee[0].name,
+                  false,
+                  perPayee[0]
+                )}
             </>
           ) : (
             perPayee.map((p) => (
@@ -343,7 +364,7 @@ export function SettleUpDialog({
                   `${formatIsk(p.subtotal, 0)} ISK`,
                   String(p.subtotal)
                 )}
-                {copyRow(`to:${p.name}`, t('miningTax.settleUp.toLabel'), p.name, p.name)}
+                {copyRow(`to:${p.name}`, t('miningTax.settleUp.toLabel'), p.name, p.name, false, p)}
               </div>
             ))
           )}

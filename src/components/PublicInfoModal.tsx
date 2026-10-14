@@ -25,6 +25,7 @@
  */
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { tabDomId } from '@/components/ui/tabPanel';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { guarded } from '@/app/routeChunks';
@@ -181,9 +182,33 @@ export function PublicInfoModal() {
   const activeData =
     activeTab === 'corporation' ? corporation : activeTab === 'alliance' ? alliance : character;
   const title = activeData.status === 'ready' ? activeData.data.name : t('publicInfo.title');
+  // The id the active tab shows (Employment is the character's): the one "Open in EVE" opens.
+  const characterProfile = character.status === 'ready' ? character.data : undefined;
+  const activeEntityId =
+    activeTab === 'corporation'
+      ? request.kind === 'corporation'
+        ? request.id
+        : characterProfile?.corporationId
+      : activeTab === 'alliance'
+        ? request.kind === 'alliance'
+          ? request.id
+          : (characterProfile?.allianceId ??
+            (corporation.status === 'ready' ? corporation.data.alliance_id : undefined))
+        : request.id;
 
   return (
-    <Modal open onClose={close} title={title} placement="wide" closeOnBack={false}>
+    <Modal
+      open
+      onClose={close}
+      title={title}
+      placement="wide"
+      closeOnBack={false}
+      titleActions={
+        activeEntityId === undefined || activeEntityId === null ? undefined : (
+          <OpenInEveButton kind="information" id={activeEntityId} name={title} />
+        )
+      }
+    >
       <div className="space-y-3">
         {tabs.length > 0 && (
           <Tabs

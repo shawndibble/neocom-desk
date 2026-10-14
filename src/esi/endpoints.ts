@@ -1149,9 +1149,12 @@ export interface CharacterSearchResult {
   structure?: number[];
   solar_system?: number[];
   character?: number[];
+  corporation?: number[];
+  alliance?: number[];
 }
 
-export type SearchCategory = 'station' | 'structure' | 'solar_system' | 'character';
+export type SearchCategory =
+  'station' | 'structure' | 'solar_system' | 'character' | 'corporation' | 'alliance';
 
 /**
  * Name search across the categories asked for, returning ids only.
@@ -1185,6 +1188,8 @@ export function getCharacterSearch(
 export interface UniverseIds {
   systems?: { id: number; name: string }[];
   characters?: { id: number; name: string }[];
+  corporations?: { id: number; name: string }[];
+  alliances?: { id: number; name: string }[];
 }
 
 /** Exact-name (case-insensitive) lookup. Empty input never calls ESI. */
