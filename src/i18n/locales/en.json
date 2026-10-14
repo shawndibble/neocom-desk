@@ -1989,7 +1989,6 @@
     "planCardTitle": "Skill plan",
     "planCardMeta": "{{duration}} · finishes {{date}}",
     "planCardEmpty": "No skill plans yet.",
-    "planCardMenu": "Plan options",
     "allPlansButton": "All plans…",
     "allPlansTitle": "All plans",
     "computeError": "Couldn't compute this plan: {{message}}",
