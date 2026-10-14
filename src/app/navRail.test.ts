@@ -89,23 +89,23 @@ describe('recent views', () => {
   it('puts the newest view first and never lists one twice', () => {
     let recent: string[] = [];
     recent = pushRecentNav(recent, '/market/orders');
-    recent = pushRecentNav(recent, '/travel/thera');
+    recent = pushRecentNav(recent, '/travel/pilot');
     recent = pushRecentNav(recent, '/market/orders');
-    expect(recent).toEqual(['/market/orders', '/travel/thera']);
+    expect(recent).toEqual(['/market/orders', '/travel/pilot']);
   });
 
   it('keeps a short list', () => {
     let recent: string[] = [];
-    for (const path of ['/alerts', '/mail', '/assets', '/wallet/journal', '/travel/thera']) {
+    for (const path of ['/alerts', '/mail', '/assets', '/wallet/journal', '/travel/pilot']) {
       recent = pushRecentNav(recent, path);
     }
-    expect(recent).toEqual(['/travel/thera', '/wallet/journal', '/assets', '/mail']);
+    expect(recent).toEqual(['/travel/pilot', '/wallet/journal', '/assets', '/mail']);
   });
 
   it('shows the three newest other than the one you are on', () => {
-    const recent = ['/market/orders', '/travel/thera', '/assets', '/mail'];
-    expect(recentNavFor(recent, '/market/orders')).toEqual(['/travel/thera', '/assets', '/mail']);
-    expect(recentNavFor(recent, '/alerts')).toEqual(['/market/orders', '/travel/thera', '/assets']);
+    const recent = ['/market/orders', '/travel/pilot', '/assets', '/mail'];
+    expect(recentNavFor(recent, '/market/orders')).toEqual(['/travel/pilot', '/assets', '/mail']);
+    expect(recentNavFor(recent, '/alerts')).toEqual(['/market/orders', '/travel/pilot', '/assets']);
   });
 
   it('parses only known view paths from storage', () => {

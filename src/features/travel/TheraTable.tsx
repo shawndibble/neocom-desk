@@ -6,22 +6,21 @@
  *
  * Below `sm` each hole is one dense card (`DataTable`'s dense stack): exit and
  * hub badge with jumps on the right, then security, region, fits and life
- * left, then the signature pair with Route via at its right end.
+ * left, then the signature pair with Use in route at its right end.
  *
- * Route via (issue #2477): a K-space row with a gate route from the page's
- * origin links to Route Safety from that origin with the hole pinned for the
- * first leg — after the signature (and so on the phone card's signature
- * line), and on the expanded row.
+ * Use in route (issues #2477, then the modal): a K-space row with a gate route
+ * from the page's origin offers a `Button` that hands the row to `onUse`, which
+ * pins the hole for the route's first leg — after the signature (and so on the
+ * phone card's signature line), and on the expanded row.
  *
  * Conditions, never verdicts (decision `20260912-172628`).
  */
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { DataTable, entityLinkClassName, type DataTableColumn } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { Button, DataTable, type DataTableColumn } from '@/components/ui';
 import {
+  canUseInRoute,
   jumpsSortValue,
   shipSizeRank,
   type TheraConnectionRow,
@@ -36,52 +35,36 @@ const DEFAULT_SORT = { columnId: 'jumps', direction: 'asc' } as const;
 const hubBadgeClassName =
   'shrink-0 rounded-xs bg-panel-2 px-1 text-[0.625rem] font-normal tracking-widest whitespace-nowrap text-text-dim uppercase';
 
-/** Route Safety through a row's hole, or `null` for a row it is not offered on. */
-type RouteViaHref = (row: TheraConnectionRow) => string | null;
-
-/** Where Route via goes: only from a K-space exit a gate route reaches from the origin. */
-function routeViaTarget(row: TheraConnectionRow, href?: RouteViaHref): string | null {
-  return row.exitSpace !== 'wormhole' && row.jumps.kind === 'known' ? (href?.(row) ?? null) : null;
-}
-
-function RouteVia({
+function UseInRoute({
   row,
-  href,
+  onUse,
   className,
 }: {
   row: TheraConnectionRow;
-  href?: RouteViaHref;
+  onUse?: (row: TheraConnectionRow) => void;
   className?: string;
 }) {
   const { t } = useTranslation();
-  const to = routeViaTarget(row, href);
-  if (to === null) return null;
+  if (onUse === undefined || !canUseInRoute(row)) return null;
   return (
-    <Link
-      to={to}
+    <Button
+      size="sm"
       data-row-control
-      className={entityLinkClassName(
-        cx(
-          'group inline-flex min-h-11 items-center gap-0.5 whitespace-nowrap md:min-h-0',
-          className
-        )
-      )}
-      aria-label={t('travel.thera.routeViaLabel', {
+      className={className}
+      onClick={() => onUse(row)}
+      aria-label={t('travel.thera.useInRouteLabel', {
         hub: t(`travel.thera.hub.${row.hub}`),
         system: row.exitSystemName ?? DASH,
       })}
     >
-      {t('travel.thera.routeVia')}
-      <Icon.Descend
-        aria-hidden="true"
-        size={Icon.ICON_SIZE.sm}
-        className="text-text-faint group-hover:text-accent"
-      />
-    </Link>
+      {t('travel.thera.useInRoute')}
+    </Button>
   );
 }
 
-function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow>[] {
+function useColumns(
+  onUse?: (row: TheraConnectionRow) => void
+): DataTableColumn<TheraConnectionRow>[] {
   'use memo';
   const { t } = useTranslation();
   return [
@@ -176,9 +159,7 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
       render: (row) => (
         <span className="inline-flex items-center gap-3 max-sm:flex max-sm:w-full">
           <Signature row={row} />
-          {/* Its 44px tap target overhangs the phone card's line rather than
-              heightening it, which left a gap over the signature. */}
-          <RouteVia row={row} href={routeVia} className="max-sm:-my-2.5" />
+          <UseInRoute row={row} onUse={onUse} />
         </span>
       ),
     },
@@ -226,7 +207,13 @@ function Signature({ row }: { row: TheraConnectionRow }) {
 }
 
 /** The expanded row: wormhole type, where to enter and leave, the exit's zKillboard page. */
-function HoleDetail({ row, routeVia }: { row: TheraConnectionRow; routeVia?: RouteViaHref }) {
+function HoleDetail({
+  row,
+  onUse,
+}: {
+  row: TheraConnectionRow;
+  onUse?: (row: TheraConnectionRow) => void;
+}) {
   const { t } = useTranslation();
   const parts = [
     row.wormholeType === null ? null : (
@@ -246,8 +233,8 @@ function HoleDetail({ row, routeVia }: { row: TheraConnectionRow; routeVia?: Rou
     >
       {t('travel.thera.detail.zkillboard')}
     </ExternalLink>,
-    routeViaTarget(row, routeVia) === null ? null : (
-      <RouteVia key="route-via" row={row} href={routeVia} />
+    onUse === undefined || !canUseInRoute(row) ? null : (
+      <UseInRoute key="use-in-route" row={row} onUse={onUse} />
     ),
   ].filter((part) => part !== null);
   return (
@@ -269,16 +256,16 @@ function HoleDetail({ row, routeVia }: { row: TheraConnectionRow; routeVia?: Rou
 export function TheraTable({
   rows,
   label,
-  routeVia,
+  onUse,
 }: {
   /** Longest life first (`longestLifeFirst`): the stable jumps sort keeps it for ties. */
   rows: readonly TheraConnectionRow[];
   label: string;
-  /** Route Safety through a row's hole; absent where there is no origin to route from. */
-  routeVia?: RouteViaHref;
+  /** Pins a row's hole on the route; absent where there is no route to pin it on. */
+  onUse?: (row: TheraConnectionRow) => void;
 }) {
   'use memo';
-  const columns = useColumns(routeVia);
+  const columns = useColumns(onUse);
   return (
     <DataTable
       columns={columns}
@@ -289,7 +276,7 @@ export function TheraTable({
       density="compact"
       stackLayout="dense"
       mobileSort
-      expandableRow={{ renderDetail: (row) => <HoleDetail row={row} routeVia={routeVia} /> }}
+      expandableRow={{ renderDetail: (row) => <HoleDetail row={row} onUse={onUse} /> }}
     />
   );
 }

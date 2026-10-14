@@ -1,6 +1,6 @@
 /**
- * Route Safety's link: the URL parameters the page reads, and the Route via
- * link a Thera / Turnur row builds into it (issue #2477).
+ * Route Safety's link: the URL parameters the page reads, and the Use in route
+ * pin a Thera / Turnur row writes into it (issue #2477).
  *
  * Leg pins (`pin`): one token per Leg in flying order, comma-separated, an
  * empty token for a leg flown as the planner picks — `gates`, `thera`,
@@ -75,26 +75,13 @@ export const ROUTE_PARAMS = {
 };
 
 /**
- * Route Safety from `originId` with one hole pinned for the first leg: what
- * Route via on a Thera / Turnur row opens. Hole jumps are switched on in the
- * link alone (never saved), since a hole is only known while they are on. No
- * stop is set: the page asks for one. A page's own `preference` rides along,
- * so the route is drawn as the page counted it.
+ * The leg pins with the first leg pinned to one hole: what Use in route on a
+ * Thera / Turnur modal row writes. Later legs keep their pins.
  */
-export function routeViaHref(
-  originId: number,
-  holeId: string,
-  preference?: RoutePreferenceKind | null
-): string {
-  const params = new URLSearchParams();
-  const values = {
-    from: ROUTE_PARAMS.from.serialize(originId),
-    wh: ROUTE_PARAMS.wh.serialize(true),
-    pin: ROUTE_PARAMS.pin.serialize([holeId]),
-    pref: preference == null ? null : ROUTE_PARAMS.pref.serialize(preference),
-  };
-  for (const [key, value] of Object.entries(values)) if (value !== null) params.set(key, value);
-  return `${tabPath(TRAVEL_TABS, 'route')}?${params.toString()}`;
+export function pinFirstLeg(pins: LegPinTokens, holeId: string): string[] {
+  const next = [...pins];
+  next[0] = holeId;
+  return next;
 }
 
 /**

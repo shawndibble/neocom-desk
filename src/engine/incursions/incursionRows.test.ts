@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildIncursionRows, type IncursionEntry } from './incursionRows';
+import { buildIncursionRows, nearestIncursion, type IncursionEntry } from './incursionRows';
 
 const entry = (over: Partial<IncursionEntry> & { constellation_id: number }): IncursionEntry => ({
   staging_solar_system_id: over.constellation_id + 1000,
@@ -72,5 +72,27 @@ describe('buildIncursionRows', () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].influence).toBe(1);
+  });
+});
+
+describe('nearestIncursion', () => {
+  it('is the first row, when its distance is known', () => {
+    const rows = buildIncursionRows(
+      [entry({ constellation_id: 1 }), entry({ constellation_id: 2 })],
+      new Map([
+        [1001, 9],
+        [1002, 4],
+      ])
+    );
+    expect(nearestIncursion(rows)?.constellationId).toBe(2);
+  });
+
+  it('is none when no distance is known, so an unreachable staging system is never "nearest"', () => {
+    const rows = buildIncursionRows([entry({ constellation_id: 1 })], null);
+    expect(nearestIncursion(rows)).toBeNull();
+  });
+
+  it('is none for an empty list', () => {
+    expect(nearestIncursion([])).toBeNull();
   });
 });

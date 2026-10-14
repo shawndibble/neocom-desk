@@ -187,6 +187,7 @@ export function RouteHoleFields({
   bare = false,
   nested = false,
   jump,
+  onBrowseWormholes,
 }: {
   query: RouteHoleQuery;
   onChange: (change: RouteHoleChange) => void;
@@ -196,6 +197,8 @@ export function RouteHoleFields({
   nested?: boolean;
   /** Route Safety only: Settings → Travel has no jump drive legs to switch. */
   jump?: RouteJumpFieldsProps;
+  /** Route Safety only: opens the Thera / Turnur modal (Settings → Travel has none). */
+  onBrowseWormholes?: () => void;
 }) {
   const { t } = useTranslation();
   const lifeId = useId();
@@ -211,13 +214,32 @@ export function RouteHoleFields({
       }
     >
       {!bare && <GroupLabel>{t('travel.holes.group')}</GroupLabel>}
-      <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
-        <Checkbox
-          checked={enabled}
-          onChange={() => onChange({ field: 'enabled', value: !enabled })}
-        />
-        {t('travel.holes.enabled')}
-      </label>
+      {onBrowseWormholes ? (
+        <>
+          {/* The switch toggles; the label beside it is a button that opens the modal (a window that only shows a list: no "…"). */}
+          <div className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
+            <Checkbox
+              checked={enabled}
+              aria-label={t('travel.holes.enabled')}
+              onChange={() => onChange({ field: 'enabled', value: !enabled })}
+            />
+            <Button size="sm" variant="ghost" aria-haspopup="dialog" onClick={onBrowseWormholes}>
+              {t('travel.holes.enabled')}
+            </Button>
+          </div>
+          <Button size="sm" onClick={onBrowseWormholes}>
+            {t('travel.holes.browse')}
+          </Button>
+        </>
+      ) : (
+        <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
+          <Checkbox
+            checked={enabled}
+            onChange={() => onChange({ field: 'enabled', value: !enabled })}
+          />
+          {t('travel.holes.enabled')}
+        </label>
+      )}
       <div className="space-y-1.5">
         <p className="font-semibold">
           {t('travel.holes.shipSize')}
@@ -386,6 +408,7 @@ export function RouteRulesPanel({
   onHoleChange,
   bridges,
   jump,
+  onBrowseWormholes,
 }: {
   /** The preference this route is drawn with: the link's, else the pilot's default. */
   preference: RoutePreferenceKind;
@@ -397,6 +420,8 @@ export function RouteRulesPanel({
   onHoleChange: (change: RouteHoleChange) => void;
   bridges: RouteBridgeFieldsProps;
   jump: RouteJumpFieldsProps;
+  /** Opens the Thera / Turnur modal. */
+  onBrowseWormholes: () => void;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -475,6 +500,7 @@ export function RouteRulesPanel({
                 onChange={onHoleChange}
                 bridges={bridges}
                 jump={jump}
+                onBrowseWormholes={onBrowseWormholes}
                 nested
               />
             </div>

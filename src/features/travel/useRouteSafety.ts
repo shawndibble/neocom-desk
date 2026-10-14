@@ -32,6 +32,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { candidateAvoid } from '@/engine/route/avoidRules';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import type { PreferenceRoute } from '@/engine/route/routePreferenceCards';
 import type { RouteSafetySystemEntry } from '@/engine/route/routeSafety';
 import {
   assembleRouteSafety,
@@ -90,6 +92,12 @@ export type RouteSafetyState =
        * drawn. Saves nothing.
        */
       planWithAvoid: (addition: AvoidAddition) => Promise<AvoidTripResult>;
+      /**
+       * This trip re-planned under another Route Preference, with the same
+       * activity the page shows, for the preference cards. `null` when the
+       * stargate map cannot be read or a leg has no route. Saves nothing.
+       */
+      planWithPreference: (preference: RoutePreferenceKind) => Promise<PreferenceRoute | null>;
     });
 
 export interface RouteSafetyRequest {
@@ -301,6 +309,63 @@ export function useRouteSafety({
     ]
   );
 
+  const planWithPreference = useCallback(
+    async (preference: RoutePreferenceKind): Promise<PreferenceRoute | null> => {
+      if (fromId === null || resolved === null) return null;
+      const stopIds = stopsKey.split(',').map(Number);
+      const planned = await planRouteSafetyTrip({
+        fromId,
+        stops: stopIds,
+        rules: { ...rules, preference },
+        tripOptions: { optimize, returnToStart, keepLastStopLast },
+        network,
+        networkEnds,
+        pins: pinsFromKey(pinRequestKey),
+        jump,
+      });
+      if (planned.result.kind === 'unknown') return null;
+      const assembled = assembleRouteSafety({
+        planned: planned.result,
+        alternatives: planned.alternatives,
+        singleStop: stopIds.length === 1,
+        pins,
+        holes,
+        listed,
+        bridges,
+        systems: planned.systems,
+        regionNames: resolved.regionNames,
+        activity,
+        lawless,
+        jump,
+      });
+      if (assembled.kind !== 'route' || assembled.trip === null) return null;
+      return {
+        systemIds: assembled.trip.rows.map((row) => row.systemId),
+        securities: assembled.trip.rows.map((row) => row.security),
+        summary: assembled.trip.summary,
+      };
+    },
+    [
+      fromId,
+      resolved,
+      stopsKey,
+      rules,
+      optimize,
+      returnToStart,
+      keepLastStopLast,
+      network,
+      networkEnds,
+      pinRequestKey,
+      pins,
+      holes,
+      listed,
+      bridges,
+      activity,
+      lawless,
+      jump,
+    ]
+  );
+
   return useMemo((): RouteSafetyState => {
     if (fromId === null || stops.length === 0) return { kind: 'incomplete' };
     if (stops.length === 1 && stops[0] === fromId) return { kind: 'same-system' };
@@ -321,7 +386,9 @@ export function useRouteSafety({
       lawless,
       jump,
     });
-    return assembled.kind === 'route' ? { ...assembled, requestKey, planWithAvoid } : assembled;
+    return assembled.kind === 'route'
+      ? { ...assembled, requestKey, planWithAvoid, planWithPreference }
+      : assembled;
   }, [
     bridges,
     fromId,
@@ -332,6 +399,7 @@ export function useRouteSafety({
     lawless,
     holes,
     planWithAvoid,
+    planWithPreference,
     pins,
     listed,
     jump,

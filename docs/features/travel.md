@@ -1,6 +1,6 @@
 # Travel (Route Safety, Thera / Turnur, Travel Settings)
 
-Progression group page `/travel` (last in the group). Four tabs (`TRAVEL_TABS`, `src/app/pageTabs.ts`): Route Safety (`/travel/route`, default for bare `/travel`), Thera / Turnur (`/travel/thera`), Pilot Lookup (`/travel/pilot`, see `docs/features/pilot-lookup.md`) and Hauling (`/travel/hauling`, spec in `docs/features/market.md` §4). Settings > Travel edits the same stores as the Route rules panel.
+Progression group page `/travel` (last in the group). Three tabs (`TRAVEL_TABS`, `src/app/pageTabs.ts`): Route Safety (`/travel/route`, default for bare `/travel`), Pilot Lookup (`/travel/pilot`, see `docs/features/pilot-lookup.md`) and Hauling (`/travel/hauling`, spec in `docs/features/market.md` §4). Thera / Turnur is a modal on Route Safety (below), not a tab; an old `/travel/thera` link redirects to `/travel/route` (`legacyTravelLocation`, origin becomes `from`, `pref` kept). Settings > Travel edits the same stores as the Route rules panel.
 
 Glossary terms (GLOSSARY.md): Route Safety, Route strip, Quiet stretch, Stop, Leg, Hole jump, Ansiblex, Way to fly, Pinned way, Avoided Systems, Route Preference, Travel Settings, Jump Basis, Gank Chokepoint, Current System.
 
@@ -26,9 +26,9 @@ Principle in every Route Safety scope decision: conditions, never verdicts (`202
 | Ansiblex bridges                     | rules panel + dialog                                   | Device-local list; find via character structure search or paste. One-jump connections.                                                                           |
 | Set waypoints in game                | facts line                                             | Sends Stops to EVE client autopilot. Needs `esi-ui.write_waypoint.v1`.                                                                                           |
 | Share link                           | URL                                                    | Every setting in query params (see Link parameters).                                                                                                             |
-| Thera / Turnur table                 | `/travel/thera`                                        | EVE-Scout open holes: exit, sec, region, fits, life left, jumps, signature, Route via.                                                                           |
-| Thera filters                        | Thera tab                                              | From, Hub (with counts), Exit, Fits, Route Preference; Reset filters.                                                                                            |
-| Route via                            | Thera row                                              | Opens Route Safety from the origin with that hole pinned for leg 1.                                                                                              |
+| Thera / Turnur modal                 | Route rules: switch label, Browse open wormholes       | EVE-Scout open holes: exit, sec, region, fits, life left, jumps, signature, Use in route.                                                                        |
+| Thera filters                        | Thera modal                                            | Hub (with counts), Exit, Fits (local state, not in the URL); Reset filters. From and Route Preference are the page's.                                            |
+| Use in route                         | Thera modal row                                        | Pins that hole on leg 1 (`pinFirstLeg`), turns hole jumps on in the link only, closes the modal.                                                                 |
 | Jumps links elsewhere                | Assets, Market, Courier, BPC, PI Hauling, entity links | Jump count opens Route Safety to that system.                                                                                                                    |
 | Set waypoint / View route menu items | Market + BPC row menus, order detail                   | One-place autopilot destination via `postAutopilotWaypoint`.                                                                                                     |
 | Travel Settings                      | Settings > Travel                                      | Preference, penalty, avoid rules, wormhole/bridge defaults, Avoided Systems.                                                                                     |
@@ -88,7 +88,7 @@ Hauling is also a Travel tab (`/travel/hauling`, moved from Market by `20261010-
 
 ## Route Safety (`/travel/route`)
 
-Component `src/features/travel/RouteSafetyTab.tsx`. Layout: grid, rail (Stops, Route rules) + route from `xl` (1280); below that rail dissolves so order is Stops, route, Route rules (#2591). `PageHeader` shows `DataAgeBadge` of the ESI activity fetch when a route is drawn.
+Component `src/features/travel/RouteSafetyTab.tsx`. Layout: Stops panel and the three preference cards run full width on top; beneath them the route sits beside a right column (Route rules, Incursions near you) from `xl` (1280), and below that the column stacks under the route so the order is Stops, cards, route, Route rules, Incursions (#2591). `PageHeader` shows `DataAgeBadge` of the ESI activity fetch when a route is drawn.
 
 ### Link parameters (`src/features/route/routeSafetyLink.ts:56`, `ROUTE_PARAMS`)
 
@@ -104,21 +104,29 @@ Component `src/features/travel/RouteSafetyTab.tsx`. Layout: grid, rail (Stops, R
 
 Parameter edits `push` history (Back works). Unreadable pin tokens degrade to "not pinned".
 
-Link builders: `routeToHref(systemId, fromId?, preference?)` (View route / jump links; `stops=[systemId]`); `routeViaHref(originId, holeId, preference?)` (Thera Route via; sets `wh=true` in link only, never saved, `pin=[holeId]`, no stop).
+Link builders: `routeToHref(systemId, fromId?, preference?)` (View route / jump links; `stops=[systemId]`); `pinFirstLeg(pins, holeId)` (Thera modal Use in route: sets `pin[0]` to the hole id, later legs keep theirs; the page also sets `wh=true` in the link only, never saved). A pinned hole is looked up in the unfiltered `listed` holes, so the page's ship-size, min-life and hub filters never hide it.
 
 ### Page states (`RouteBody`, `RouteSafetyTab.tsx:373`)
 
-| State                        | Shown                                                                                                        |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `incomplete`                 | EmptyState pickTitle / pickHint (or `ways.pickDestination` when a pin awaits a stop)                         |
-| `same-system`                | EmptyState (one stop = start)                                                                                |
-| `no-route`                   | EmptyState (no stargate route; single stop)                                                                  |
-| `unknown`                    | EmptyState (stargate snapshot unreadable)                                                                    |
-| `loading`                    | Spinner                                                                                                      |
-| `route`                      | Panel with facts, strip, status lines, leg(s)                                                                |
-| status lines (`role=status`) | holes loading; holes unavailable (route gates-only, said so); ESI activity loading; ESI activity unavailable |
+| State                        | Shown                                                                                                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `incomplete`                 | `RouteSkeleton`: pickTitle, pickHint (or `ways.pickDestination` when a pin awaits a stop) and `aria-hidden` ghost rows; the preference cards show dashes |
+| `same-system`                | EmptyState (one stop = start)                                                                                                                            |
+| `no-route`                   | EmptyState (no stargate route; single stop)                                                                                                              |
+| `unknown`                    | EmptyState (stargate snapshot unreadable)                                                                                                                |
+| `loading`                    | Spinner                                                                                                                                                  |
+| `route`                      | Panel with facts, strip, status lines, leg(s)                                                                                                            |
+| status lines (`role=status`) | holes loading; holes unavailable (route gates-only, said so); ESI activity loading; ESI activity unavailable                                             |
 
 Multi-stop: an unreachable stop shows its leg's no-route message while other legs draw; facts line/strip wait for every leg; Optimize disabled (`optimizeBlocked`).
+
+### Preference cards (`PreferenceCards.tsx`, `usePreferenceRoutes.ts`)
+
+Three cards, Safer / Shorter / Less secure (`ROUTE_PREFERENCES`), each the same trip planned under that Route Preference by `useRouteSafety`'s `planWithPreference` (local graph routing, never an ESI call, with the activity the page shows). A card states jumps, lowest security, last hour's kills (ships + pods; a dash when unknown, never 0) and Gank Chokepoints, with a strip of the route's security bands, and says "Same route as X" when its route is exactly an earlier card's (`engine/route/routePreferenceCards.ts`). The cards are a `radiogroup` and a second face of the Route Preference picker: choosing one saves the pilot's default and drops `pref`, as the Route rules control does. No card is marked best or recommended. On a phone they scroll sideways.
+
+### Empty route
+
+With no stops the Stops panel shows From, an arrow and a `SolarSystemSearchField` (the destination, focused, results listed under it) instead of Add stop, and `QuickPicks.tsx` under it: the five trade hubs and the nearest Incursion's staging system (`engine/route/quickPicks.ts`, `nearestIncursion`; only when its distance is known; a system already on the trip is left out). One tap sets the first stop. Optimize stop order appears once there is a stop.
 
 ### Stops panel (`StopsPanel.tsx`)
 
@@ -144,7 +152,7 @@ Phone: panel folds with `ActiveRuleChips` summarising rules on (preference, pena
 
 ### Incursions near you (`IncursionsPanel.tsx`, issue #3540)
 
-In the rail after Route rules (last on narrow screens). A `CollapsiblePanel`, folded by default (device-local `routeIncursionsOpen`); folded, it still names the nearest Incursion and its distance. Rows (`engine/incursions/incursionRows.ts`): staging system + security, state as a tinted word (Mobilizing, Established, Withdrawing), constellation, influence %, system count, "Mothership up", and jumps from the Current System via `useJumpRangeFilter` (the full jump basis: Route Preference, avoid list, holes and bridges). Nearest first; an unreachable staging system sorts last and says "No route with your route rules", never 0. "Route" adds the staging system as the next stop and focuses the stops list; "On route" when it already is the start or a stop; disabled with a reason when the stops are full. No Current System: rows show without distances and the panel says why. Feed failure: says so with Try again, never "none active".
+In the right column under Route rules (last on narrow screens). A `CollapsiblePanel`, folded by default (device-local `routeIncursionsOpen`); folded, it still names the nearest Incursion and its distance. Rows (`engine/incursions/incursionRows.ts`): staging system + security, state as a tinted word (Mobilizing, Established, Withdrawing), constellation, influence %, system count, "Mothership up", and jumps from the Current System via `useJumpRangeFilter` (the full jump basis: Route Preference, avoid list, holes and bridges). Nearest first; an unreachable staging system sorts last and says "No route with your route rules", never 0. "Route" adds the staging system as the next stop and focuses the stops list; "On route" when it already is the start or a stop; disabled with a reason when the stops are full. No Current System: rows show without distances and the panel says why. Feed failure: says so with Try again, never "none active".
 
 ### Facts chips (`RouteFacts`)
 
@@ -214,13 +222,13 @@ Opened from rules panel "Manage" (mode `search`), Via Ansiblex box ("find" `sear
 - `avoidRules.ts`: `effectiveAvoid` merges Avoided Systems (if enabled), EDENCOM (`invasionSystems.ts`), Triglavian, pod-kill >= threshold; `avoidPreviewOutcome`, `listOnlyOutcome`.
 - `killHeat.ts`: ship-kill colour ramp.
 
-## Thera / Turnur (`/travel/thera`)
+## Thera / Turnur (modal on Route Safety)
 
-Components `TheraTab.tsx`, `TheraFilters.tsx`, `TheraTable.tsx`, `useTheraConnections.ts`. `PageHeader` shows `DataAgeBadge` (EVE-Scout list age).
+Components `TheraModal.tsx`, `TheraTable.tsx`, `useTheraConnections.ts`. Opened from the Route rules panel: the "Route through Thera / Turnur" label is a ghost `Button` beside its switch (the switch still only toggles), and "Browse open wormholes" sits under it in More route options. `Modal` `placement="wide"` on desktop, `sheet-full` on a phone. Mounted only while open, so the filters and the EVE-Scout read start fresh. Header: "Open holes from EVE-Scout, counted from <From>" and the `DataAgeBadge` (EVE-Scout list age).
 
-Link params (`TheraTab.tsx:52`): `origin` (absent = Current System), `pref`, `hub` (all/thera/turnur), `space` (kspace default, highsec, lowsec, nullsec, wormhole; unknown value e.g. old `all` falls back to kspace), `size` (any/small/medium/large/xlarge/capital). Origin changes `push` history.
+No URL params of its own. Origin is the page's From, jump counts use the page's `useRouteQuery` rules, and Hub (all/thera/turnur, with per-hub counts that follow the other filters), Exit (kspace default, highsec, lowsec, nullsec, wormhole) and Fits (any..capital) are local state in one row at one control size (`md`). Reset filters appears in the empty state when any is off default.
 
-Filters (content-sized selects in one row, desktop): From (SolarSystemPicker), Hub (with per-hub counts that follow other filters), Exit, Fits, Route Preference (`PreferenceField`). Phone: From on own labelled line; other four become chips opening radio menus, accent when off default. "Reset filters" in empty state when any filter off default (origin and preference stay).
+Use in route (below) calls `onUse(holeId)`; `RouteSafetyTab` then writes `wh=1` and `pin = pinFirstLeg(params.pin, holeId)` in one pushed history entry and closes the modal. Origin unknown: the header says to pick a From, and no row offers Use in route.
 
 Table (`DataTable`, compact, default sort Jumps asc, `mobileSort`, expandable rows):
 
@@ -232,10 +240,10 @@ Table (`DataTable`, compact, default sort Jumps asc, `mobileSort`, expandable ro
 | Fits      | Max ship size                                                                                                                                           |
 | Life left | Countdown; warning style at <= 2 h (`LIFE_WARNING_MS`); ticks per minute                                                                                |
 | Jumps     | From origin to exit by gate (before taking the hole): number, "no gate route", or "—"; stable sort so ties (every J-space hole) stay longest-life-first |
-| Signature | Hub-side signature, select-all; phone shows "hub sig -> exit sig"; Route via link                                                                       |
+| Signature | Hub-side signature, select-all; phone shows "hub sig -> exit sig"; Use in route `Button`                                                                |
 
-- Row expand: wormhole type, both signatures, exit's zKillboard page link, Route via.
-- Route via (K-space exits with a known gate route only): link to Route Safety from the origin with the hole pinned for leg 1.
+- Row expand: wormhole type, both signatures, exit's zKillboard page link, Use in route.
+- Use in route (`routeViaTarget`: K-space exits with a known gate route only): a visible `Button`, its label naming the hub and exit system.
 - Under K-space, J-space exits fold into a collapsed Disclosure under the table ("N exits into J-space"); J-space filter shows them as the table.
 - Notes (single live `role=status`): no origin; jumps loading; origin ungated (e.g. Thera, J-space, no stargates); some jumps unknown.
 - States: loading spinner; EVE-Scout unavailable EmptyState with Retry; EVE-Scout lists none; filters match none (with reset).
@@ -268,7 +276,7 @@ Jump Basis (`src/features/route/jumpBasis.ts`): the one set of rules every jump 
 | `SetDestinationButton` (`features/market/`)                                 | Order detail + order book                                                                                                      | "Set destination" (one waypoint, clears others) + `ViewRouteButton`                                                           |
 | `SetWaypointMenuItem`                                                       | Order row context menu, Open orders panel, BPC Sourcing row menu                                                               | "Set waypoint in game" (menu stays open, shows outcome; disabled with reason without Character/scope) + `ViewRouteMenuItem`   |
 | `useSetDestination` (`features/travel/useSetDestination.ts`)                | Shared hook                                                                                                                    | `locationId` must be a place (station/structure/system), never an item id; scope `esi-ui.write_waypoint.v1`                   |
-| Thera table Route via                                                       | `routeViaHref`                                                                                                                 | See above                                                                                                                     |
+| Thera modal Use in route                                                    | `pinFirstLeg`                                                                                                                  | See above                                                                                                                     |
 
 `useViewRoute` (`useViewRoute.ts`): resolve place's system, `navigate(routeToHref(systemId, null, preference))`; failed state "unavailable".
 
@@ -411,7 +419,7 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 | ESI feeds loading                                                            | route shows; status line; kill figures "—"                                             |
 | One feed null                                                                | facts that need it withheld; figures unknown never zero; "activity unavailable" status |
 | EVE-Scout loading (holes on)                                                 | gate route shown, status line says so; hole/hub pins show `no-list`                    |
-| EVE-Scout unreachable                                                        | gates only, said so; Thera tab shows Retry EmptyState                                  |
+| EVE-Scout unreachable                                                        | gates only, said so; Thera modal shows Retry EmptyState                                |
 | zKillboard row fails / 429                                                   | that row "unavailable"; walk continues; retry only on next walk                        |
 | Stop unreachable (multi)                                                     | that leg no-route, other legs draw, facts/strip wait, Optimize off                     |
 | Pod-kill feed unreadable with rule on                                        | rule drops; warning in rules panel                                                     |
@@ -419,16 +427,16 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 
 ## Mobile vs desktop
 
-| Area            | Desktop                                          | Phone / narrow                                                          |
-| --------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
-| Layout          | rail (Stops, Route rules) + route from `xl` 1280 | rail dissolves; order Stops, route, Route rules (#2591)                 |
-| Stops           | full list                                        | one line "Start -> N stops" with Edit/Done (open while no stops, #2519) |
-| Route rules     | full                                             | folded with `ActiveRuleChips`                                           |
-| Route table     | DataTable columns                                | dense cards, sec in corner, zero kill counts omitted                    |
-| Ways            | beside rows at container >= `@5xl`               | above rows 2-3 across; phone folded with Compare/Hide                   |
-| Set waypoints   | right end of facts line                          | full width                                                              |
-| Thera filters   | selects in one row                               | From own line; four chips opening radio menus; sort via `mobileSort`    |
-| Thera signature | sig                                              | "hub sig -> exit sig"                                                   |
+| Area            | Desktop                                                                               | Phone / narrow                                                                            |
+| --------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Layout          | Stops and cards on top; route + right column (Route rules, Incursions) from `xl` 1280 | column stacks under the route; order Stops, cards, route, Route rules, Incursions (#2591) |
+| Stops           | full list                                                                             | one line "Start -> N stops" with Edit/Done (open while no stops, #2519)                   |
+| Route rules     | full                                                                                  | folded with `ActiveRuleChips`                                                             |
+| Route table     | DataTable columns                                                                     | dense cards, sec in corner, zero kill counts omitted                                      |
+| Ways            | beside rows at container >= `@5xl`                                                    | above rows 2-3 across; phone folded with Compare/Hide                                     |
+| Set waypoints   | right end of facts line                                                               | full width                                                                                |
+| Thera modal     | `wide` dialog; filters Hub segmented + Exit, Fits selects                             | `sheet-full` sheet; filters wrap, same control size; sort via `mobileSort`                |
+| Thera signature | sig                                                                                   | "hub sig -> exit sig"                                                                     |
 
 ## Permissions
 
@@ -441,43 +449,43 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 
 ## Test coverage map
 
-| Behavior                                                                      | Test                                                                                                                                                            |
-| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Penalty costs, avoid > penalty, gate tie, unknown id, sweep == pair           | `src/engine/route/jumpRoute.test.ts` (penalty 0/50 and 0.45 raw cases)                                                                                          |
-| Held-Karp exact vs brute force, ties, return/keep, 10 stops fast, unreachable | `tripPlan.test.ts`                                                                                                                                              |
-| Hole filters, free hub, holeBetween                                           | `routeHoles.test.ts`                                                                                                                                            |
-| Ways, pins (`closed`, `no-hole`, `no-bridge`), never back out hole            | `legWays.test.ts`                                                                                                                                               |
-| Unknown vs zero, J-space, fold rules, strip keys, trip dedup                  | `routeSafety.test.ts`                                                                                                                                           |
-| Trip assembly, step tagging                                                   | `routeSafetyTrip.test.ts`                                                                                                                                       |
-| Avoid list, preview outcome, list-only                                        | `avoidRules.test.ts`                                                                                                                                            |
-| Ansiblex parse/errors/found rules                                             | `ansiblex.test.ts`, `ansiblexGates.test.ts`, `AnsiblexGatesDialog.test.tsx`                                                                                     |
-| Waypoint cut-offs                                                             | `waypoints.test.ts`, `sendWaypoints.test.ts`, `SetWaypoints.test.tsx`                                                                                           |
-| Thera bands, jumps states, filter, hub counts, ordering                       | `theraConnections.test.ts`                                                                                                                                      |
-| Bubble/smartbomb tags, grouping, on-path                                      | `recentKills.test.ts`, `routeKillsData.test.ts`                                                                                                                 |
-| Link codec                                                                    | `routeSafetyLink.test.ts`; keys `routeSafetyKeys.test.ts`                                                                                                       |
-| Strip                                                                         | `RouteStrip.test.tsx`; jump links `jumpsCell.test.tsx`                                                                                                          |
-| Heat ramp, chokepoint list                                                    | `killHeat.test.ts`, `chokepoints.test.ts`                                                                                                                       |
-| Not covered by a dedicated test (from file list)                              | `RouteSafetyTab.tsx`, `StopsPanel.tsx`, `TheraTab.tsx`, `AvoidSystemDialog.tsx`, `TripLegs.tsx`, `LegWays.tsx` have no sibling `.test.tsx`; e2e specs may cover |
+| Behavior                                                                      | Test                                                                                                                                            |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Penalty costs, avoid > penalty, gate tie, unknown id, sweep == pair           | `src/engine/route/jumpRoute.test.ts` (penalty 0/50 and 0.45 raw cases)                                                                          |
+| Held-Karp exact vs brute force, ties, return/keep, 10 stops fast, unreachable | `tripPlan.test.ts`                                                                                                                              |
+| Hole filters, free hub, holeBetween                                           | `routeHoles.test.ts`                                                                                                                            |
+| Ways, pins (`closed`, `no-hole`, `no-bridge`), never back out hole            | `legWays.test.ts`                                                                                                                               |
+| Unknown vs zero, J-space, fold rules, strip keys, trip dedup                  | `routeSafety.test.ts`                                                                                                                           |
+| Trip assembly, step tagging                                                   | `routeSafetyTrip.test.ts`                                                                                                                       |
+| Avoid list, preview outcome, list-only                                        | `avoidRules.test.ts`                                                                                                                            |
+| Ansiblex parse/errors/found rules                                             | `ansiblex.test.ts`, `ansiblexGates.test.ts`, `AnsiblexGatesDialog.test.tsx`                                                                     |
+| Waypoint cut-offs                                                             | `waypoints.test.ts`, `sendWaypoints.test.ts`, `SetWaypoints.test.tsx`                                                                           |
+| Thera bands, jumps states, filter, hub counts, ordering                       | `theraConnections.test.ts`                                                                                                                      |
+| Bubble/smartbomb tags, grouping, on-path                                      | `recentKills.test.ts`, `routeKillsData.test.ts`                                                                                                 |
+| Link codec                                                                    | `routeSafetyLink.test.ts`; keys `routeSafetyKeys.test.ts`                                                                                       |
+| Strip                                                                         | `RouteStrip.test.tsx`; jump links `jumpsCell.test.tsx`                                                                                          |
+| Heat ramp, chokepoint list                                                    | `killHeat.test.ts`, `chokepoints.test.ts`                                                                                                       |
+| Not covered by a dedicated test (from file list)                              | `RouteSafetyTab.tsx`, `StopsPanel.tsx`, `AvoidSystemDialog.tsx`, `TripLegs.tsx`, `LegWays.tsx` have no sibling `.test.tsx`; e2e specs may cover |
 
 ## Decision links (why)
 
-| Decision                                                     | Gist                                                                                         |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `20260929-234357`                                            | Travel/Intel in scope; ungated but signed-in; two ESI requests per visit                     |
-| `20260912-172628`                                            | conditions, never verdicts; unknown never zero                                               |
-| `20260912-130200`                                            | local stargate graph; key per system incl. gateless                                          |
-| `20260930-165116`                                            | one route vocabulary; CCP route costs                                                        |
-| `20260930-153212`                                            | Avoided Systems hand-entered (ESI cannot read in-game list), synced, cost not wall           |
-| `20260930-002219` / `20261005-125019`                        | zKillboard per region (supersedes per system); stargate names via `/universe/stargates/{id}` |
-| `20261003-161302` / `20261006-143832`                        | rules panel edits Travel Settings in place; preference saves the default                     |
-| `20261003-173108`                                            | up to 10 stops, exact optimizer, cost not jumps, typed order wins ties                       |
-| `20261003-175151`                                            | waypoint scope as its own default-on Permission; stops in flying order; cut at hole/bridge   |
-| `20261003-181618`                                            | hub entry free of security cost; Route Safety-only at the time                               |
-| `20261004-161245`                                            | every jump count uses the local graph + saved hole/bridge settings (Jump Basis)              |
-| `20261003-204009`                                            | Ansiblex find + paste, device-local                                                          |
-| `20261004-122315`                                            | step kind decided once; gate beats hole/bridge                                               |
-| `20261003-190356` / `20261004-213447`                        | Thera slim table, exit filter in URL `space`, filters as selects                             |
-| `20261002-145653-lp-store-under-market-pilot-lookup-its-own` | Pilot Lookup left Travel                                                                     |
+| Decision                                                     | Gist                                                                                                                                                      |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20260929-234357`                                            | Travel/Intel in scope; ungated but signed-in; two ESI requests per visit                                                                                  |
+| `20260912-172628`                                            | conditions, never verdicts; unknown never zero                                                                                                            |
+| `20260912-130200`                                            | local stargate graph; key per system incl. gateless                                                                                                       |
+| `20260930-165116`                                            | one route vocabulary; CCP route costs                                                                                                                     |
+| `20260930-153212`                                            | Avoided Systems hand-entered (ESI cannot read in-game list), synced, cost not wall                                                                        |
+| `20260930-002219` / `20261005-125019`                        | zKillboard per region (supersedes per system); stargate names via `/universe/stargates/{id}`                                                              |
+| `20261003-161302` / `20261006-143832`                        | rules panel edits Travel Settings in place; preference saves the default                                                                                  |
+| `20261003-173108`                                            | up to 10 stops, exact optimizer, cost not jumps, typed order wins ties                                                                                    |
+| `20261003-175151`                                            | waypoint scope as its own default-on Permission; stops in flying order; cut at hole/bridge                                                                |
+| `20261003-181618`                                            | hub entry free of security cost; Route Safety-only at the time                                                                                            |
+| `20261004-161245`                                            | every jump count uses the local graph + saved hole/bridge settings (Jump Basis)                                                                           |
+| `20261003-204009`                                            | Ansiblex find + paste, device-local                                                                                                                       |
+| `20261004-122315`                                            | step kind decided once; gate beats hole/bridge                                                                                                            |
+| `20261003-190356` / `20261004-213447`                        | Thera slim table, exit filter in URL `space`, filters as selects (the URL params and the From and Route selects went with the tab: see `20261014-120143`) |
+| `20261002-145653-lp-store-under-market-pilot-lookup-its-own` | Pilot Lookup left Travel                                                                                                                                  |
 
 ## Interview Q&A
 
@@ -494,7 +502,7 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 11. What are the ship-kill colour thresholds and the chokepoint rule? 3 yellow, 6 orange, 10 red (`killHeat.ts:13`); chokepoints are a 7-system hand list (`chokepoints.ts:26`) because traffic, not security, defines them.
 12. How is zKillboard rate-limited? Per region, 3 concurrent, 5 min cache, nearest first, paged at 1,000 with a 10-page backstop; any failure marks the whole region's rows unavailable and is not cached (`zkillboard.ts:450-478`, `useRouteKills.ts:30`).
 13. When is a bubble tag shown? Attacker hull in group 541 or 894 and system band nullsec only; smartbomb weapon group 72 anywhere (`recentKills.ts:68-81`). It says a bubble hull was on the mail.
-14. What is the exit-band logic on the Thera tab? Feed `cN` or `J######` name = J-space; else shown-security band when the snapshot knows it, else feed `hs/ls/ns`; unknown band = K-space under no single band (`theraConnections.ts:99-106`, `20261003-190356`). J-space exits are never given a gate route.
+14. What is the exit-band logic in the Thera modal? Feed `cN` or `J######` name = J-space; else shown-security band when the snapshot knows it, else feed `hs/ls/ns`; unknown band = K-space under no single band (`theraConnections.ts:99-106`, `20261003-190356`). J-space exits are never given a gate route.
 15. Why does Thera's Jumps column ignore holes? It measures gate distance to the exit before taking the hole; letting holes in would make every exit one jump away (`jumpBasis.ts` header; `useTheraConnections.ts:91`).
 16. Where is the Ansiblex list stored, and why? Dexie `ansiblexGates` only, never synced/logged: structure access is private alliance info (`ansiblexGates.ts` header; `20261003-204009`). Found gates are accepted only for type 35841 and names matching ESI's system (`ansiblex.ts:144-159`).
 17. Which settings are device-local vs synced? Everything route-related syncs except `routeBridges` and the picked Current System (`routeBridgeSettings.ts`, `currentSystem.ts`); the Ansiblex list is Dexie only.
@@ -530,7 +538,7 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 - Station/structure Stops so waypoints land at docks.
 - Copy Route as text / CSV; saved named routes.
 - Retry control for zKillboard-unavailable rows and EVE-Scout holes.
-- Thera table: Copy signature (decision `20261003-190356` promised it), Set waypoint/Route via with bridges.
+- Thera modal: Copy signature (decision `20261003-190356` promised it), Set waypoint/Use in route with bridges.
 - Optional heuristic (nearest neighbour + 2-opt) past 10 stops, clearly labelled non-optimal.
 - Align router null rule (`<= 0`) with banding (shown < 0.1).
 - Derive chokepoints from traffic data instead of a hand list, or expose a user list.

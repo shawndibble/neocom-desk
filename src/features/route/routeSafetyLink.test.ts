@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { legPinsParam, routeToHref, routeViaHref } from './routeSafetyLink';
+import { legPinsParam, pinFirstLeg, routeToHref } from './routeSafetyLink';
 
 describe('legPinsParam', () => {
   const codec = legPinsParam();
@@ -19,9 +19,19 @@ describe('legPinsParam', () => {
   });
 });
 
-describe('routeViaHref', () => {
-  it('opens Route Safety from the origin, holes on, the hole pinned for the first leg', () => {
-    expect(routeViaHref(30000142, 'abc12')).toBe('/travel/route?from=30000142&wh=1&pin=abc12');
+describe('pinFirstLeg', () => {
+  it('pins the first leg to the hole', () => {
+    expect(pinFirstLeg([], 'abc12')).toEqual(['abc12']);
+  });
+
+  it('replaces the first leg only, keeping the later legs pins', () => {
+    expect(pinFirstLeg(['thera', '', 'gates'], 'abc12')).toEqual(['abc12', '', 'gates']);
+  });
+
+  it('does not change the pins it is given', () => {
+    const pins = ['gates'];
+    pinFirstLeg(pins, 'abc12');
+    expect(pins).toEqual(['gates']);
   });
 });
 
@@ -34,7 +44,7 @@ describe('routeToHref', () => {
     expect(routeToHref(30000142, null, 'shortest')).toBe(
       '/travel/route?pref=shortest&stops=30000142'
     );
-    expect(routeViaHref(30000142, 'abc12', 'prefer-highsec')).toContain('pref=prefer-highsec');
+    expect(routeToHref(30000142, null, 'prefer-highsec')).toContain('pref=prefer-highsec');
   });
 
   it('names the start when the count is measured from somewhere else', () => {

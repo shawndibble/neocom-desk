@@ -44,6 +44,7 @@ import {
 import { cx } from '@/lib/cx';
 import { MAX_STOPS, type TripOptions } from '@/engine/route/tripPlan';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
+import { SolarSystemSearchField } from '@/features/route/SolarSystemSearchField';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import { useIsPhone } from '@/lib/useIsPhone';
 
@@ -126,6 +127,7 @@ export function StopsPanel({
   optimizeBlocked,
   orderNote,
   nameOf,
+  quickPicks,
 }: {
   fromId: number | null;
   /** The start's name alone, for the folded phone summary. */
@@ -143,6 +145,8 @@ export function StopsPanel({
   /** Set when the flown order differs from the typed one. */
   orderNote: string | null;
   nameOf: (systemId: number) => string;
+  /** Shown under the destination field while the trip has no stops. */
+  quickPicks?: ReactNode;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -203,103 +207,128 @@ export function StopsPanel({
         </p>
       }
     >
-      <div className="space-y-3 text-xs">
-        <div className="flex items-center gap-1.5">
-          <span className="w-5 shrink-0" aria-hidden="true" />
-          <Badge>{t('travel.stops.startBadge')}</Badge>
-          <SolarSystemPicker
-            value={fromId}
-            onChange={onFromChange}
-            ariaLabel={t('travel.changeFrom', { current: fromTrigger })}
-            triggerLabel={fromTrigger}
-          />
-        </div>
-        {stops.length > 0 && (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-            accessibility={{
-              announcements,
-              screenReaderInstructions: { draggable: t('travel.stops.dragInstructions') },
-            }}
-          >
-            <SortableContext items={[...stops]} strategy={verticalListSortingStrategy}>
-              <ol
-                aria-label={t('travel.stops.listLabel')}
-                data-stops-list
-                className="focus:outline-none"
-              >
-                {stops.map((systemId, index) => (
-                  <StopRow
-                    key={systemId}
-                    systemId={systemId}
-                    index={index}
-                    name={nameOf(systemId)}
-                    security={systems?.get(systemId)?.security ?? null}
-                    onRemove={remove}
-                  />
-                ))}
-              </ol>
-            </SortableContext>
-          </DndContext>
-        )}
-        <div className="space-y-1">
-          <SolarSystemPicker
-            value={null}
-            onChange={(systemId) => {
-              // The first stop makes the panel foldable; keep it open under
-              // the pilot's hand rather than folding it away mid-edit.
-              if (stops.length === 0) setExpanded(true);
-              onStopsChange([...stops, systemId]);
-            }}
-            ariaLabel={t('travel.stops.addLabel')}
-            triggerLabel={t('travel.stops.add')}
-            disabled={full}
-            exclude={taken}
-            showSecurity
-          />
-          {full && <p className="text-text-dim">{t('travel.stops.full', { count: MAX_STOPS })}</p>}
-        </div>
-
-        <fieldset className="space-y-1.5 border-t border-line pt-3">
-          <legend className="sr-only">{t('travel.stops.orderLegend')}</legend>
-          <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
-            <Checkbox
-              role="switch"
-              checked={settings.optimize}
-              disabled={!canOptimize}
-              onChange={(event) => onSettingsChange({ optimize: event.target.checked })}
-            />
-            {t('travel.stops.optimize')}
-          </label>
-          <div className="space-y-1.5 pl-6">
-            <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
-              <Checkbox
-                checked={optionsOn && settings.returnToStart}
-                disabled={!optionsOn}
-                onChange={(event) => onSettingsChange({ returnToStart: event.target.checked })}
+      <div className="space-y-3 text-xs md:grid md:grid-cols-[minmax(0,1fr)_16rem] md:items-start md:gap-x-6 md:space-y-0">
+        <div className="min-w-0 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="w-5 shrink-0 max-md:hidden" aria-hidden="true" />
+              <Badge>{t('travel.stops.startBadge')}</Badge>
+              <SolarSystemPicker
+                value={fromId}
+                onChange={onFromChange}
+                ariaLabel={t('travel.changeFrom', { current: fromTrigger })}
+                triggerLabel={fromTrigger}
               />
-              {t('travel.stops.returnToStart')}
-            </label>
-            <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
-              <Checkbox
-                checked={optionsOn && settings.keepLastStopLast}
-                disabled={!optionsOn}
-                onChange={(event) => onSettingsChange({ keepLastStopLast: event.target.checked })}
-              />
-              {t('travel.stops.keepLastStopLast')}
-            </label>
+            </div>
+            {stops.length === 0 && (
+              <>
+                <span aria-hidden="true" className="text-text-dim">
+                  →
+                </span>
+                {/* No stops yet: the destination is the one thing to do, so it is a field, not a button. */}
+                <SolarSystemSearchField
+                  autoFocus
+                  className="min-w-[12rem] flex-1 md:max-w-sm"
+                  ariaLabel={t('travel.stops.destinationLabel')}
+                  exclude={taken}
+                  onChange={(systemId) => {
+                    setExpanded(true);
+                    onStopsChange([...stops, systemId]);
+                  }}
+                />
+              </>
+            )}
           </div>
-          {optimizeBlocked && stops.length > 1 && (
-            <p className="text-text-dim">{t('travel.stops.optimizeBlocked')}</p>
+          {stops.length === 0 && quickPicks}
+          {stops.length > 0 && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+              accessibility={{
+                announcements,
+                screenReaderInstructions: { draggable: t('travel.stops.dragInstructions') },
+              }}
+            >
+              <SortableContext items={[...stops]} strategy={verticalListSortingStrategy}>
+                <ol
+                  aria-label={t('travel.stops.listLabel')}
+                  data-stops-list
+                  className="focus:outline-none"
+                >
+                  {stops.map((systemId, index) => (
+                    <StopRow
+                      key={systemId}
+                      systemId={systemId}
+                      index={index}
+                      name={nameOf(systemId)}
+                      security={systems?.get(systemId)?.security ?? null}
+                      onRemove={remove}
+                    />
+                  ))}
+                </ol>
+              </SortableContext>
+            </DndContext>
           )}
-          {orderNote !== null && (
-            <p role="status" className="rounded-sm border border-dashed border-line px-2 py-1.5">
-              {orderNote}
-            </p>
+          {stops.length > 0 && (
+            <div className="space-y-1">
+              <SolarSystemPicker
+                value={null}
+                onChange={(systemId) => {
+                  onStopsChange([...stops, systemId]);
+                }}
+                ariaLabel={t('travel.stops.addLabel')}
+                triggerLabel={t('travel.stops.add')}
+                disabled={full}
+                exclude={taken}
+                showSecurity
+              />
+              {full && (
+                <p className="text-text-dim">{t('travel.stops.full', { count: MAX_STOPS })}</p>
+              )}
+            </div>
           )}
-        </fieldset>
+        </div>{' '}
+        {stops.length > 0 && (
+          <fieldset className="space-y-1.5 border-t border-line pt-3 md:border-t-0 md:border-l md:pl-6 md:pt-0">
+            <legend className="sr-only">{t('travel.stops.orderLegend')}</legend>
+            <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
+              <Checkbox
+                role="switch"
+                checked={settings.optimize}
+                disabled={!canOptimize}
+                onChange={(event) => onSettingsChange({ optimize: event.target.checked })}
+              />
+              {t('travel.stops.optimize')}
+            </label>
+            <div className="space-y-1.5 pl-6">
+              <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
+                <Checkbox
+                  checked={optionsOn && settings.returnToStart}
+                  disabled={!optionsOn}
+                  onChange={(event) => onSettingsChange({ returnToStart: event.target.checked })}
+                />
+                {t('travel.stops.returnToStart')}
+              </label>
+              <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
+                <Checkbox
+                  checked={optionsOn && settings.keepLastStopLast}
+                  disabled={!optionsOn}
+                  onChange={(event) => onSettingsChange({ keepLastStopLast: event.target.checked })}
+                />
+                {t('travel.stops.keepLastStopLast')}
+              </label>
+            </div>
+            {optimizeBlocked && stops.length > 1 && (
+              <p className="text-text-dim">{t('travel.stops.optimizeBlocked')}</p>
+            )}
+            {orderNote !== null && (
+              <p role="status" className="rounded-sm border border-dashed border-line px-2 py-1.5">
+                {orderNote}
+              </p>
+            )}
+          </fieldset>
+        )}
       </div>
     </CollapsiblePanel>
   );

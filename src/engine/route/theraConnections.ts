@@ -220,3 +220,8 @@ export function longestLifeFirst(rows: readonly TheraConnectionRow[]): TheraConn
       (a.exitSystemName ?? '').localeCompare(b.exitSystemName ?? '')
   );
 }
+
+/** Whether Use in route is offered: a K-space exit a gate route from the origin reaches. */
+export function canUseInRoute(row: TheraConnectionRow): boolean {
+  return row.exitSpace !== 'wormhole' && row.jumps.kind === 'known';
+}

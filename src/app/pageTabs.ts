@@ -28,13 +28,14 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
 ]);
 
 /**
- * Travel (issue #2328), with Thera/Turnur (#2330). Pilot Lookup (#2331) is its
- * tab again, and Hauling moved here from Market (#3526): a route problem, not a
- * market lookup. `/market/hauling` redirects via `PAGE_LEGACY_LOCATIONS`.
+ * Travel (issue #2328). Pilot Lookup (#2331) is its tab again, and Hauling moved
+ * here from Market (#3526): a route problem, not a market lookup.
+ * `/market/hauling` redirects via `PAGE_LEGACY_LOCATIONS`. Thera / Turnur
+ * (#2330) was a tab until it became a modal on Route Safety; `/travel/thera`
+ * redirects there.
  */
 export const TRAVEL_TABS = definePageTabs('/travel', [
   { id: 'route', labelKey: 'travel.routeTab' },
-  { id: 'thera', labelKey: 'travel.thera.tab' },
   { id: 'pilot', labelKey: 'nav.pilotLookup' },
   { id: 'hauling', labelKey: 'travel.haulingTab' },
 ]);
@@ -170,8 +171,29 @@ export const PAGE_LEGACY_LOCATIONS: Partial<
 > = {
   '/assets': legacyAssetsLocation,
   '/market': legacyMarketLocation,
+  '/travel': legacyTravelLocation,
   '/industry': legacyIndustryLocation,
 };
+
+/**
+ * Thera / Turnur was a Travel tab until it became a modal on Route Safety: an
+ * old link lands there, its origin as From and its Route Preference kept. The
+ * hub, exit and fit filters were the modal's now, local to it.
+ */
+function legacyTravelLocation(
+  pathname: string,
+  search: string
+): { pathname: string; search: string } | null {
+  if (pathname.replace(/\/$/, '') !== '/travel/thera') return null;
+  const old = new URLSearchParams(search);
+  const next = new URLSearchParams();
+  const origin = old.get('origin');
+  if (origin !== null) next.set('from', origin);
+  const pref = old.get('pref');
+  if (pref !== null) next.set('pref', pref);
+  const query = next.toString();
+  return { pathname: tabPath(TRAVEL_TABS, 'route'), search: query === '' ? '' : `?${query}` };
+}
 
 /** The Logs tab was called Records until the Logs rename. */
 function legacyIndustryLocation(

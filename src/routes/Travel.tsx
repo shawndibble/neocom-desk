@@ -8,11 +8,10 @@ import { isTabRouteDefaulted, tabPath } from '@/lib/pageTabs';
 import { HaulingTab } from '@/features/travel/HaulingTab';
 import { PilotLookupPanel } from '@/features/travel/PilotLookupPanel';
 import { RouteSafetyTab } from '@/features/travel/RouteSafetyTab';
-import { TheraTab } from '@/features/travel/TheraTab';
 
 /**
- * Travel (issue #2328): intel for getting somewhere — Route Safety and Thera/Turnur
- * connections (#2330), Pilot Lookup (#2331), back under Travel (scope decision
+ * Travel (issue #2328): intel for getting somewhere — Route Safety (with Thera/Turnur
+ * connections (#2330) as a modal on it), Pilot Lookup (#2331), back under Travel (scope decision
  * `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`), and
  * Hauling, moved here from Market (#3526).
  * Signed-in like every other route; logged-out access is a possible follow-up.
@@ -62,9 +61,7 @@ export function Travel() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {tab === 'thera' ? (
-        <TheraTab {...tabProps} />
-      ) : tab === 'pilot' ? (
+      {tab === 'pilot' ? (
         <PilotLookupPanel {...tabProps} />
       ) : tab === 'hauling' ? (
         <HaulingTab {...tabProps} />

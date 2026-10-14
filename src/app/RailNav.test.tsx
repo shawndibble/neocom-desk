@@ -239,7 +239,7 @@ describe('the More sheet', () => {
 
   it('shows recent views other than the current one', async () => {
     setPhone(true);
-    useRecentNav.setState({ value: ['/overview', '/market/appraisal', '/travel/thera'] });
+    useRecentNav.setState({ value: ['/overview', '/market/appraisal', '/travel/pilot'] });
     renderAt('/overview');
     const { sheet } = await openSheet();
 
@@ -269,13 +269,13 @@ describe('the Recent row', () => {
   });
 
   it('keeps the stored history when the first visit lands before the store has loaded', async () => {
-    await db.settings.put({ key: 'navRecent', value: ['/travel/thera', '/assets'] });
+    await db.settings.put({ key: 'navRecent', value: ['/travel/pilot', '/assets'] });
     useRecentNav.setState({ value: [], hydrated: false });
     renderAt('/market/appraisal');
     await waitFor(() =>
       expect(useRecentNav.getState().value).toEqual([
         '/market/appraisal',
-        '/travel/thera',
+        '/travel/pilot',
         '/assets',
       ])
     );
