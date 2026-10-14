@@ -134,3 +134,35 @@ describe('CurrentQueuePanel periodic ESI refetch (#408)', () => {
     expect(screen.getByText('No active in-game training queue cached.')).toBeInTheDocument();
   });
 });
+
+describe('CurrentQueuePanel as a link target', () => {
+  beforeEach(() => {
+    loadCharacterSkillQueue.mockReset();
+    loadCharacterSkillQueue.mockResolvedValue(result([]));
+  });
+
+  afterEach(() => {
+    window.history.replaceState({}, '', '/');
+    // jsdom has no scrollIntoView of its own; drop the stub so it cannot leak.
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
+
+  it('scrolls itself into view and takes focus when the URL names it (#current-queue)', async () => {
+    window.history.replaceState({}, '', '/skills/plans#current-queue');
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(<CurrentQueuePanel characterId={1} catalog={catalog} />);
+    await flush();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('heading', { name: 'Current skill queue' })).toHaveFocus();
+  });
+
+  it('leaves scroll and focus alone without the hash', async () => {
+    window.history.replaceState({}, '', '/skills/plans');
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(<CurrentQueuePanel characterId={1} catalog={catalog} />);
+    await flush();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+});

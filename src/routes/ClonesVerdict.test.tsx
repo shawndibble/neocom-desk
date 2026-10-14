@@ -249,7 +249,7 @@ describe('Clones training verdict', () => {
     // The queue is one link, not a skill-by-skill legend.
     expect(within(card).getByRole('link', { name: 'View queue' })).toHaveAttribute(
       'href',
-      '/overview'
+      '/skills/plans#current-queue'
     );
     expect(within(card).queryByText(/^Queue: /)).not.toBeInTheDocument();
     // The winning clone carries the badge, with its time and delta.

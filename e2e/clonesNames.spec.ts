@@ -1,7 +1,7 @@
 /**
  * Jump clone names in the Clones list (issues #2087, #3002): the name shows
- * beside the place, a blank one reads "Unnamed", and a long one wraps inside
- * its card instead of widening the list past its Panel, down to a phone.
+ * beside the place, and a long one wraps inside its card instead of widening
+ * the list past its Panel, down to a phone. A blank one is headed by its place.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -46,7 +46,8 @@ for (const size of [
     const row = (name: string) => list.getByRole('listitem').filter({ hasText: name });
     await expect(row('Alpha')).toContainText(PLACE);
     await expect(row('Beta')).toContainText(PLACE);
-    await expect(row('Unnamed').first()).toContainText(PLACE);
+    await expect(list.getByRole('heading', { name: PLACE, level: 3 })).toHaveCount(1);
+    await expect(list.getByText('Unnamed')).toHaveCount(0);
     await expect(row('Alpha')).not.toContainText('#');
 
     const long = list.getByText(LONG_NAME);

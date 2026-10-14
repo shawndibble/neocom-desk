@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCharacterClones, loadImplantDescriptions } from './clones';
+import { loadCharacterClones, loadImplantDetails } from './clones';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -69,13 +69,18 @@ describe('loadCharacterClones', () => {
   });
 });
 
-describe('loadImplantDescriptions', () => {
-  const type = (id: number, description: string) => ({
+describe('loadImplantDetails', () => {
+  const type = (
+    id: number,
+    description: string,
+    dogma_attributes?: { attribute_id: number; value: number }[]
+  ) => ({
     type_id: id,
     name: `Implant ${id}`,
     description,
     group_id: 300,
     published: true,
+    dogma_attributes,
   });
 
   it('strips markup, and omits failed lookups and empty descriptions', async () => {
@@ -86,8 +91,29 @@ describe('loadImplantDescriptions', () => {
       http.get(`${ESI_BASE_URL}/universe/types/2`, () => HttpResponse.json(type(2, ''))),
       http.get(`${ESI_BASE_URL}/universe/types/3`, () => HttpResponse.error())
     );
-    const result = await loadImplantDescriptions([1, 2, 3, 1]);
-    expect(result.get(1)).toBe('+3 Charisma\nbonus');
-    expect(result.size).toBe(1);
+    const result = await loadImplantDetails([1, 2, 3, 1]);
+    expect(result.get(1)?.description).toBe('+3 Charisma\nbonus');
+    expect(result.get(2)?.description).toBeUndefined();
+    expect(result.has(3)).toBe(false);
+  });
+
+  it('reads the slot and the attribute bonus', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/10209`, () =>
+        HttpResponse.json(
+          type(10209, '+5 Memory', [
+            { attribute_id: 331, value: 2 },
+            { attribute_id: 177, value: 5 },
+            { attribute_id: 175, value: 0 },
+          ])
+        )
+      )
+    );
+    const result = await loadImplantDetails([10209]);
+    expect(result.get(10209)).toEqual({
+      description: '+5 Memory',
+      slot: 2,
+      bonuses: { memory: 5 },
+    });
   });
 });

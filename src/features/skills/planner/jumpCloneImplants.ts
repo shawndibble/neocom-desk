@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadCharacterClones } from '@/features/character/clones';
+import { cloneOwnName, readCloneNicknames } from '@/features/character/cloneNicknames';
 import { loadUniverseType } from '../data';
 import { extractAttributeBonuses, sumAttributeBonuses } from '../dogma';
 import type { JumpCloneImplantSet } from './whatIfImplants';
@@ -13,14 +14,17 @@ import type { JumpCloneImplantSet } from './whatIfImplants';
 export async function loadJumpCloneImplantSets(
   characterId: number
 ): Promise<JumpCloneImplantSet[]> {
-  const { cached } = await loadCharacterClones(characterId);
+  const [{ cached }, nicknames] = await Promise.all([
+    loadCharacterClones(characterId),
+    readCloneNicknames(),
+  ]);
   const clones = cached?.data.jump_clones ?? [];
   const sets = await Promise.all(
     clones.map(async (clone, index): Promise<JumpCloneImplantSet> => {
       const types = await Promise.all(clone.implants.map((id) => loadUniverseType(id)));
       return {
         id: clone.jump_clone_id,
-        label: clone.name?.trim() || `#${index + 1}`,
+        label: cloneOwnName(clone, nicknames) ?? `#${index + 1}`,
         bonuses: sumAttributeBonuses(
           types.map((type) => extractAttributeBonuses(type?.data?.dogma_attributes))
         ),

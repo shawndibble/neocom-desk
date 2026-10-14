@@ -18,6 +18,7 @@ import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import type { JumpClone } from '@/esi/endpoints';
 import { loadCloneTrainingData, WORN_CLONE_ID } from './cloneTraining';
 import { cloneVerdictGate, runCloneVerdict, type CloneVerdictNote } from './cloneVerdictGate';
+import { cloneOwnName, readCloneNicknames } from './cloneNicknames';
 
 export interface CloneWidgetRow {
   /** `WORN_CLONE_ID` for the clone being worn. */
@@ -99,7 +100,10 @@ export async function loadCloneVerdictWidget(characterId: number): Promise<Clone
     },
     result
   );
-  const places = await Promise.all(clones.map((clone) => placeOf(characterId, clone)));
+  const [places, nicknames] = await Promise.all([
+    Promise.all(clones.map((clone) => placeOf(characterId, clone))),
+    readCloneNicknames(),
+  ]);
   const cloneById = new Map<string | number, { clone: JumpClone; place: string | null }>(
     clones.map((clone, i) => [clone.jump_clone_id, { clone, place: places[i] ?? null }])
   );
@@ -114,7 +118,7 @@ export async function loadCloneVerdictWidget(characterId: number): Promise<Clone
     cooldownReadyAt: readyAt?.getTime() ?? null,
     rows: (ready?.rows ?? []).map((row) => {
       const jump = cloneById.get(row.cloneId);
-      const own = jump?.clone.name?.trim();
+      const own = jump ? cloneOwnName(jump.clone, nicknames) : undefined;
       return {
         id: row.cloneId,
         label: row.cloneId === WORN_CLONE_ID ? null : own || (jump?.place ?? null),

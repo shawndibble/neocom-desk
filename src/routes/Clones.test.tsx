@@ -8,6 +8,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useCloneNicknames } from '@/features/character/cloneNicknames';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -132,6 +133,10 @@ const server = setupServer(
       description: '+4 <b>Willpower</b> bonus',
       group_id: 300,
       published: true,
+      dogma_attributes: [
+        { attribute_id: 331, value: 4 },
+        { attribute_id: 179, value: 4 },
+      ],
     })
   ),
   http.get(`${ESI}/universe/types/19541`, () =>
@@ -160,6 +165,7 @@ beforeEach(async () => {
   await db.settings.clear();
   await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  useCloneNicknames.setState({ value: {}, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
@@ -261,7 +267,7 @@ describe('Clones', () => {
     expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
   });
 
-  it('shows a jump clone name beside its location, trimmed, and "Unnamed" for a blank name', async () => {
+  it('heads a named clone with its name and an unnamed one with its place, never "Unnamed"', async () => {
     const station = { location_id: 60003760, location_type: 'station' as const, implants: [] };
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
@@ -279,15 +285,73 @@ describe('Clones', () => {
     const alpha = await screen.findByText('Alpha');
     expect(alpha.closest('li')).toHaveTextContent(/^Alpha\s*Jita IV - Moon 4 - Caldari Navy/);
     expect(screen.getByText('Beta')).toBeInTheDocument();
-    const rows = screen
-      .getAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant')
-      .map((el) => el.closest('li'))
-      .filter((li) => li !== null);
-    const unnamed = rows.filter((li) => !/Alpha|Beta/.test(li.textContent ?? ''));
+    expect(screen.queryByText('Unnamed')).not.toBeInTheDocument();
+    // An unnamed clone: the place is the heading, not repeated under it.
+    const unnamed = screen.getAllByRole('heading', {
+      name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+      level: 3,
+    });
     expect(unnamed).toHaveLength(2);
-    for (const li of unnamed) {
-      expect(li).toHaveTextContent(/^Unnamed\s*Jita IV - Moon 4 - Caldari Navy/);
-    }
+  });
+
+  it("names a clone in place, keeps the pilot's name over ESI's, and clears back to the place", async () => {
+    render(<App />);
+    await screen.findByText('High-grade Ascendancy Alpha');
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Rename clone in Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+      })
+    );
+    const field = screen.getByRole('textbox', { name: 'Clone name' });
+    fireEvent.change(field, { target: { value: '  Jita learning  ' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(await screen.findByRole('heading', { name: 'Jita learning', level: 3 })).toBeVisible();
+    await waitFor(async () =>
+      expect((await db.settings.get('sync.cloneNicknames'))?.value).toEqual({
+        1: 'Jita learning',
+      })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename clone Jita learning' }));
+    const again = screen.getByRole('textbox', { name: 'Clone name' });
+    fireEvent.change(again, { target: { value: '' } });
+    fireEvent.keyDown(again, { key: 'Enter' });
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Jita learning' })).not.toBeInTheDocument()
+    );
+  });
+
+  it('drops an edit on Escape', async () => {
+    render(<App />);
+    await screen.findByText('High-grade Ascendancy Alpha');
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Rename clone in Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+      })
+    );
+    const field = screen.getByRole('textbox', { name: 'Clone name' });
+    fireEvent.change(field, { target: { value: 'Not this' } });
+    fireEvent.keyDown(field, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Clone name' })).not.toBeInTheDocument()
+    );
+    expect(screen.queryByText('Not this')).not.toBeInTheDocument();
+    expect(await db.settings.get('sync.cloneNicknames')).toBeUndefined();
+  });
+
+  it('says why no clone has a name until one is named', async () => {
+    render(<App />);
+    expect(
+      await screen.findByText(/EVE no longer shares the names you gave your clones/)
+    ).toBeInTheDocument();
+  });
+
+  it('lists each implant with its slot and attribute bonus', async () => {
+    render(<App />);
+    const link = await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' });
+    const row = link.closest('li');
+    await waitFor(() => expect(row).toHaveTextContent(/^Slot 4\s*High-grade Ascendancy Alpha/));
+    expect(row).toHaveTextContent('+4 Willpower');
   });
 
   it('shows the empty state when there are no clones', async () => {
@@ -365,13 +429,6 @@ describe('Clones', () => {
     await waitFor(() => expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(3));
     expect(screen.queryByRole('button', { name: /jump/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
-  });
-
-  it('reads an unnamed clone as a dimmed "Unnamed"', async () => {
-    render(<App />);
-    const unnamed = await screen.findAllByText('Unnamed');
-    expect(unnamed).toHaveLength(2);
-    expect(unnamed[0]).toHaveClass('text-text-dim');
   });
 
   it('loads and caches the worn clone implants and the training queue', async () => {

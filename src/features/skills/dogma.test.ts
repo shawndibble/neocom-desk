@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { extractAttributeBonuses, extractRequiredSkills, sumAttributeBonuses } from './dogma';
+import {
+  extractAttributeBonuses,
+  extractImplantSlot,
+  extractRequiredSkills,
+  sumAttributeBonuses,
+} from './dogma';
 
 // Fixture mirrors a live ESI response for type 10209, "Memory Augmentation -
 // Improved" (+5 Bonus to Memory; requires Cybernetics V via 182/277).
@@ -32,6 +37,18 @@ describe('extractAttributeBonuses', () => {
 
   it('returns an empty object when every bonus attribute is zero', () => {
     expect(extractAttributeBonuses(RIFTER_DOGMA)).toEqual({});
+  });
+});
+
+describe('extractImplantSlot', () => {
+  it('reads the implant slot (attribute 331)', () => {
+    expect(extractImplantSlot([{ attribute_id: 331, value: 7 }])).toBe(7);
+  });
+
+  it('is undefined for a type with no slot', () => {
+    expect(extractImplantSlot([{ attribute_id: 177, value: 5 }])).toBeUndefined();
+    expect(extractImplantSlot(undefined)).toBeUndefined();
+    expect(extractImplantSlot([{ attribute_id: 331, value: 0 }])).toBeUndefined();
   });
 });
 

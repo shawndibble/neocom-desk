@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { SkillQueueEntry } from '@/esi/endpoints';
@@ -8,6 +8,7 @@ import { classifySkillQueue, isQueuePaused, type SkillQueueStatus } from '../que
 import type { SkillCatalog } from '../skillMap';
 import { formatCountdown } from '@/lib/duration';
 import { useTicker } from '@/lib/ticker';
+import { CURRENT_QUEUE_HASH } from './currentQueueHash';
 
 interface CurrentQueuePanelProps {
   characterId: number;
@@ -15,6 +16,9 @@ interface CurrentQueuePanelProps {
 }
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
+
+/** How long a `#current-queue` landing keeps the panel in view while the page above it settles. */
+const SETTLE_MS = 3_000;
 
 /** Countdown recompute cadence; the display is minute-grained, so 30s is fresh enough. */
 const TICK_MS = 30_000;
@@ -61,6 +65,35 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
   );
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const now = useTicker(TICK_MS);
+  const panelRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // The panel mounts only once the skill catalogue has loaded, long after the
+  // browser's own hash jump would have looked for it, and below the plan list
+  // on a phone; so it brings itself into view. Window, not the router: the
+  // panel is also rendered outside one.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (window.location.hash !== CURRENT_QUEUE_HASH || !panel) return;
+    const bring = () => panel.scrollIntoView?.({ block: 'start' });
+    bring();
+    headingRef.current?.focus({ preventScroll: true });
+    // The plan list above is still costing its plans and can grow, pushing
+    // the panel back down: follow it until the pilot moves or the page settles.
+    const container = panel.parentElement;
+    if (typeof ResizeObserver === 'undefined' || !container) return;
+    const observer = new ResizeObserver(bring);
+    observer.observe(container);
+    const PILOT_INPUT = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
+    const stop = () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+      for (const type of PILOT_INPUT) window.removeEventListener(type, stop);
+    };
+    const timer = window.setTimeout(stop, SETTLE_MS);
+    for (const type of PILOT_INPUT) window.addEventListener(type, stop, { passive: true });
+    return stop;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +137,8 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
 
   return (
     <Panel
+      ref={panelRef}
+      headingRef={headingRef}
       title={t('plans.currentQueueTitle')}
       actions={
         <span className="flex items-center gap-2 text-[0.6875rem] text-text-dim">

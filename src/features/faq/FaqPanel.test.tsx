@@ -54,6 +54,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.fittingTargetProfiles': /damage and target profiles/i,
   'sync.fittingTargetProfileId': /which ones are active/i,
   'sync.skillCloneStates': /Alpha\/Omega/i,
+  'sync.cloneNicknames': /names you gave your jump clones/i,
   'sync.miningTaxManualMoonOreTypeIds': /ore types you tagged/i,
   'sync.miningTaxManualIgnoredTypeIds': /ore types you tagged/i,
   'sync.miningTaxCompressedOre': /compressed ore/i,

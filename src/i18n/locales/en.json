@@ -6183,7 +6183,14 @@
     "implantsReauthTitle": "Log in again to see the implants you are wearing",
     "implantsReauthHint": "The implants plugged into your current clone need the read-implants permission, which this login did not grant.",
     "jumpsAway": "Jumps away",
-    "unnamed": "Unnamed"
+    "rename": "Rename",
+    "renameNamed": "Rename clone {{name}}",
+    "renamePlace": "Rename clone in {{place}}",
+    "nameField": "Clone name",
+    "nameHint": "EVE no longer shares clone names with apps, so name it here. Leave it empty to show where it is.",
+    "namesNote": "EVE no longer shares the names you gave your clones in game. Name one here with its pencil.",
+    "slot": "Slot",
+    "implantBonus": "+{{value}} {{attribute}}"
   },
   "pi": {
     "title": "Planetary Industry",
@@ -9814,7 +9821,7 @@
             "defaults": "Defaults: trade hub, industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
             "industry": "Industry: build groups, whether blueprint cost counts toward profit, and BPC Sourcing's hide auctions / hide PLEX.",
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and the structure broker fees you typed.",
-            "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
+            "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
             "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views and order), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
