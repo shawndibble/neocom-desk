@@ -34,6 +34,11 @@ const SURFACES: { name: string; path: string }[] = [
 async function openWithSampleCommunities(page: Page, path: string): Promise<void> {
   await signInAndGoto(page, './settings');
   await expect(page.locator('main')).toBeVisible();
+  await routeInApp(page, path);
+}
+
+/** Routes in-app (no re-seed), so one test can visit several surfaces. */
+async function routeInApp(page: Page, path: string): Promise<void> {
   await page.evaluate(async (target) => {
     // Indirected through variables so `tsc` leaves them alone: dev-server URLs,
     // not paths this spec's module graph resolves. The casts are checked
@@ -62,4 +67,43 @@ for (const width of CONTROL_ROW_WIDTHS) {
       await expectInlineControlsAligned(page, `${name} @${width}`);
     });
   }
+}
+
+/** Row/header rhythm: same two-line row padding as Skill plans; one-line Library headers. */
+const RHYTHM_WIDTHS = [1440, 1024, 390] as const;
+
+async function firstHeight(page: Page, selector: string): Promise<number> {
+  const row = page.locator(selector).first();
+  await expect(row).toBeVisible();
+  const box = await row.boundingBox();
+  expect(box, selector).not.toBeNull();
+  return box?.height ?? 0;
+}
+
+for (const width of RHYTHM_WIDTHS) {
+  test(`communities Library headers share one height (${width}px)`, async ({ page }) => {
+    test.skip(width === 390, 'phone layout stacks the table');
+    await page.setViewportSize({ width, height: 768 });
+    await openWithSampleCommunities(page, `/communities?community=${ADMIN}`);
+    const heights = await page
+      .locator('main table thead th')
+      .evaluateAll((ths) => ths.map((th) => Math.round(th.getBoundingClientRect().height)));
+    expect(heights.length).toBeGreaterThan(1);
+    expect(new Set(heights).size, `header heights ${heights.join(',')}`).toBe(1);
+  });
+
+  test(`communities Fittings and list rows are at least as tall as Skill plans rows (${width}px)`, async ({
+    page,
+  }) => {
+    test.skip(width === 390, 'phone rows keep their 44px floor, unchanged');
+    await page.setViewportSize({ width, height: 900 });
+    await openWithSampleCommunities(page, `/communities?community=${ADMIN}&tab=plans`);
+    const planRow = await firstHeight(page, 'main ul.divide-y > li');
+    await routeInApp(page, `/communities?community=${ADMIN}&tab=fittings`);
+    const fittingRow = await firstHeight(page, 'main ul.divide-y > li');
+    await routeInApp(page, '/communities');
+    const listRow = await firstHeight(page, 'main ul.divide-y > li');
+    expect(fittingRow).toBeGreaterThanOrEqual(planRow);
+    expect(listRow).toBeGreaterThanOrEqual(planRow);
+  });
 }

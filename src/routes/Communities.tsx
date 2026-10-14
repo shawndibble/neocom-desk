@@ -194,7 +194,7 @@ export function Communities() {
                 <li key={community.id}>
                   <button
                     type="button"
-                    className={`group flex w-full items-center gap-2.5 px-1 text-left text-xs hover:bg-surface-2 aria-[current=true]:bg-surface-2 ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
+                    className={`group flex w-full items-center gap-2.5 px-1 py-1.5 text-left text-xs hover:bg-surface-2 aria-[current=true]:bg-surface-2 ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
                     aria-current={community.id === selected?.id ? 'true' : undefined}
                     onClick={() => {
                       scrollToDetail.current = community.id !== selected?.id;
