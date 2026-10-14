@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render as renderBare, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { FittingSaveButton } from './FittingSaveButton';
+
+/** The Save to EVE item navigates, so the button needs a router. */
+const render = (ui: ReactElement) => renderBare(ui, { wrapper: MemoryRouter });
 
 function setup(canSave: boolean, onSave = vi.fn()) {
   render(

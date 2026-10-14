@@ -713,11 +713,10 @@ function FittingsPage() {
                 onSaveToEve={() => setSaveToEveOpen(true)}
                 canSaveToEve={activeCharacterId !== null && canSaveToEve === true}
                 saveToEveBlockedReason={
-                  activeCharacterId === null
-                    ? t('fittings.saveToEve.needCharacter')
-                    : canSaveToEve === false
-                      ? t('fittings.saveToEve.needPermission')
-                      : undefined
+                  activeCharacterId === null ? t('fittings.saveToEve.needCharacter') : undefined
+                }
+                saveToEveMissingGroups={
+                  activeCharacterId !== null && canSaveToEve === false ? ['fittings'] : undefined
                 }
               />
             }
