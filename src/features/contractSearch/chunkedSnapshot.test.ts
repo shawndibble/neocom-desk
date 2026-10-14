@@ -209,6 +209,22 @@ describe('loadChunkedSnapshot', () => {
     );
   });
 
+  it('takes the readFirst snapshot without touching Firestore, and falls back whole when it is null', async () => {
+    const readFirst = vi.fn().mockResolvedValueOnce({ rows: [{ id: 'r2' }], lastSyncedAt: 7 });
+    const source = { ...SOURCE, readFirst };
+    const first = await loadChunkedSnapshot(source, CHARACTER_ID);
+    expect(first.cached?.data).toEqual({ rows: [{ id: 'r2' }], lastSyncedAt: 7 });
+    expect(getDoc).not.toHaveBeenCalled();
+    expect(getDocs).not.toHaveBeenCalled();
+
+    await db.esiCache.clear();
+    resetRevalidationState();
+    readFirst.mockResolvedValueOnce(null);
+    serveDocs(9, [[{ id: 'fs' }]]);
+    const second = await loadChunkedSnapshot(source, CHARACTER_ID);
+    expect(second.cached?.data).toEqual({ rows: [{ id: 'fs' }], lastSyncedAt: 9 });
+  });
+
   it('still blocks when there is no stored snapshot to show', async () => {
     serveDocs(3, [[{ id: 'cold' }]]);
 
