@@ -63,7 +63,7 @@ describe('walletFlow', () => {
     }),
   });
 
-  it('nets income against spending over the range, as paired weekly bars and a table by type', () => {
+  it('nets income against spending over the range, as net bars and a table by type', () => {
     const view = buildView(
       'walletFlow',
       journal([
@@ -75,11 +75,12 @@ describe('walletFlow', () => {
     );
     expect(stateOf(view)).toBe('ok');
     expect(view.number.iskAmount).toBe(200);
-    expect(view.chart?.kind).toBe('diverging');
-    if (view.chart?.kind !== 'diverging') return;
-    // Seven daily bars: 300 came in yesterday, 100 went out the day before.
-    expect(view.chart.up).toEqual([0, 0, 0, 0, 0, 300, 0]);
-    expect(view.chart.down).toEqual([0, 0, 0, 0, 100, 0, 0]);
+    expect(view.chart?.kind).toBe('bars');
+    if (view.chart?.kind !== 'bars') return;
+    // Seven daily bars of net: 300 came in yesterday, 100 went out the day before.
+    expect(view.chart.values).toEqual([0, 0, 0, 0, -100, 300, 0]);
+    expect(view.chart.gains).toBe(true);
+    expect(view.chart.tips).toHaveLength(7);
     // The 20-day-old entry is outside a 7-day range.
     expect(view.table?.rows.map((r) => r.key)).toEqual(['bounty_prize', 'market_fee']);
     expect(view.rows).toEqual([]);

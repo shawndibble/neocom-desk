@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { Chart } from '@/features/overview/widgets/charts/Chart';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -183,6 +184,34 @@ export function InteractionGrammar() {
         <Cue rule={k('rules.infoTooltip')}>
           <span>{k('samples.term')}</span>
           <InfoTooltip label={k('samples.infoLabel')} content={k('samples.infoContent')} />
+        </Cue>
+        <Cue rule={k('rules.chartPoint')}>
+          <div className="w-48">
+            <Chart
+              size="S"
+              model={{
+                kind: 'bars',
+                values: [120, -40, 200],
+                gains: true,
+                max: '',
+                summary: '',
+                tips: [
+                  {
+                    title: k('samples.chartPrev'),
+                    rows: [{ label: k('samples.chartNet'), value: '+120M', tone: 'good' }],
+                  },
+                  {
+                    title: k('samples.chartPrev'),
+                    rows: [{ label: k('samples.chartNet'), value: '-40M', tone: 'bad' }],
+                  },
+                  {
+                    title: k('samples.chartLast'),
+                    rows: [{ label: k('samples.chartNet'), value: '+200M', tone: 'good' }],
+                  },
+                ],
+              }}
+            />
+          </div>
         </Cue>
         <Cue rule={k('rules.infoButton')}>
           <IconButton icon={<Icon.Info />} label={k('samples.showInfo')} />

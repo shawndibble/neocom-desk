@@ -48,6 +48,7 @@ import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { fractionBar, signedCell } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
 import { backwardBucketSums } from './chartSeries';
+import { dayTitle, rollingTitles, signTone } from './chartTips';
 import type {
   NumberModel,
   NumberSecondary,
@@ -911,8 +912,20 @@ export const profit: Builder = (feeds, { t, now, range }) => {
             kind: 'bars',
             values,
             max: t(`${C}.max`, { value: formatIskCompact(Math.max(0, ...values)) }),
+            gains: true,
+            barLabels: values.map((v) => (v === 0 ? '' : formatIskCompactSigned(v))),
             xStart: t(daily ? `${C}.daysAgo` : `${C}.weeksAgo`, { count: buckets }),
             xEnd: t(daily ? `${C}.today` : `${C}.thisWeek`),
+            tips: rollingTitles(t, daily ? 'day' : 'week', buckets).map((title, i) => ({
+              title,
+              rows: [
+                {
+                  label: t(`${C}.tip.profit`),
+                  value: formatIskCompactSigned(values[i]!),
+                  tone: signTone(values[i]!),
+                },
+              ],
+            })),
             note: t(daily ? `${C}.profit.noteDaily` : `${C}.profit.noteWeekly`),
             summary,
           },
@@ -1033,6 +1046,10 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
             max: t(`${C}.max`, { value: formatIskCompact(best) }),
             xStart: t(`${C}.daysAgo`, { count: range }),
             xEnd: t(`${C}.today`),
+            tips: rangeDates(window, today).map((date, i) => ({
+              title: dayTitle(date),
+              rows: [{ label: t(`${C}.tip.mined`), value: formatIskCompact(values[i]!) }],
+            })),
             ref: {
               value: average,
               label: t(`${C}.miningYield.average`, { value: formatIskCompact(average) }),

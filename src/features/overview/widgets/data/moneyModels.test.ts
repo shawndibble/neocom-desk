@@ -6,7 +6,7 @@ import type { NetWorthCharacter } from './kindLoaders';
 import {
   balanceChange,
   flowBuckets,
-  flowDiverging,
+  flowBars,
   flowSecondary,
   flowTable,
   lpTable,
@@ -323,19 +323,33 @@ describe('wallet flow', () => {
     });
   });
 
-  describe('flowDiverging', () => {
+  describe('flowBars', () => {
     it('is null with nothing moved', () => {
-      expect(flowDiverging(t, [], NOW, 30, 'note', 'summary')).toBeNull();
+      expect(flowBars(t, [], NOW, 30, 'note', 'summary')).toBeNull();
     });
 
-    it('labels the biggest bar, the span and the note, and keeps the summary it was given', () => {
-      const m = flowDiverging(t, [e(1, 100), e(8, -250)], NOW, 30, 'a note', 'the summary')!;
-      expect(m.kind).toBe('diverging');
-      expect(m.max).toBe('overview.widgets.chart.max{"value":"250"}');
+    it('draws one net bar per week, labels each, and keeps the summary it was given', () => {
+      const m = flowBars(t, [e(1, 100), e(8, -250)], NOW, 30, 'a note', 'the summary')!;
+      expect(m.kind).toBe('bars');
+      expect(m.gains).toBe(true);
+      expect(m.values.slice(-2)).toEqual([-250, 100]);
+      expect(m.barLabels).toHaveLength(m.values.length);
+      expect(m.max).toBe('overview.widgets.chart.max{"value":"100"}');
       expect(m.xStart).toBe('overview.widgets.chart.weeksAgo{"count":5}');
       expect(m.xEnd).toBe('overview.widgets.chart.thisWeek');
       expect(m.note).toBe('a note');
       expect(m.summary).toBe('the summary');
+    });
+
+    it('reads income, spending and net apart on hover', () => {
+      const m = flowBars(t, [e(1, 100), e(1, -30)], NOW, 7, 'n', 's')!;
+      const last = m.tips!.at(-2)!;
+      expect(last.rows.map((r) => r.label)).toEqual([
+        'overview.widgets.chart.tip.income',
+        'overview.widgets.chart.tip.spending',
+        'overview.widgets.chart.tip.net',
+      ]);
+      expect(last.rows.map((r) => r.value)).toEqual(['100', '30', '+70']);
     });
   });
 

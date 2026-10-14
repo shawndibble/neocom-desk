@@ -1,3 +1,4 @@
+import { ChartHover } from './ChartHover';
 import { stackedAreaBands } from './geometry';
 import { CHART_COLOR } from './palette';
 import { StackBar } from './StackBar';
@@ -28,21 +29,29 @@ export function StackedArea({
     <div aria-hidden="true" className="grid gap-1.5">
       <div className="grid gap-1">
         <div className="text-[0.6875rem] text-text-dim tabular-nums">{model.max}</div>
-        <svg
-          viewBox={`0 0 100 ${height}`}
-          preserveAspectRatio="none"
-          className="block w-full border-b border-line-bright"
+        <ChartHover
+          tips={model.tips}
+          layout="points"
+          className="w-full border-b border-line-bright"
           style={{ height }}
         >
-          {bands.map((points, i) => (
-            <polygon
-              key={model.layers[i]!.key}
-              points={points}
-              fill={CHART_COLOR[model.layers[i]!.color]}
-              opacity="0.85"
-            />
-          ))}
-        </svg>
+          <svg
+            aria-hidden="true"
+            viewBox={`0 0 100 ${height}`}
+            preserveAspectRatio="none"
+            className="block w-full"
+            style={{ height }}
+          >
+            {bands.map((points, i) => (
+              <polygon
+                key={model.layers[i]!.key}
+                points={points}
+                fill={CHART_COLOR[model.layers[i]!.color]}
+                opacity="0.85"
+              />
+            ))}
+          </svg>
+        </ChartHover>
         {(model.xStart || model.xEnd) && (
           <div className="flex justify-between gap-2 text-[0.6875rem] text-text-dim tabular-nums">
             <span>{model.xStart}</span>

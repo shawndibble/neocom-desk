@@ -18,6 +18,12 @@ import type { SurveySummary } from '@/engine/survey/series';
 export type ChartColor =
   'accent' | 'neutral' | 'warning' | 'iskPos' | 'iskNeg' | 's1' | 's2' | 's3' | 's4' | 's5';
 
+/** What a hover (or a tap) reads out for one point: a title and labelled figures. */
+export interface ChartTip {
+  title: string;
+  rows: { label: string; value: string; tone?: 'good' | 'bad' }[];
+}
+
 interface ChartBase {
   /** The visually hidden text equivalent. */
   summary: string;
@@ -34,6 +40,8 @@ export interface AreaChartModel extends ChartBase {
   high: string;
   /** The span, shown beside the high label ("30 days"). */
   rangeLabel?: string;
+  /** One readout per value, same length as `values`. */
+  tips?: ChartTip[];
 }
 
 export interface BarsChartModel extends ChartBase {
@@ -47,18 +55,12 @@ export interface BarsChartModel extends ChartBase {
   xEnd?: string;
   /** A dashed reference line across the bars (a daily average); its value is on the bars' own scale. */
   ref?: { value: number; label: string };
-}
-
-export interface DivergingChartModel extends ChartBase {
-  kind: 'diverging';
-  /** What came in per period, oldest first; drawn above the axis. */
-  up: number[];
-  /** What went out per period as positive magnitudes, same length as up; drawn below the axis. */
-  down: number[];
-  /** "max 250": the largest bar's value, already formatted. */
-  max: string;
-  xStart?: string;
-  xEnd?: string;
+  /** Gains and losses: green above the axis, red below it, instead of the accent. */
+  gains?: boolean;
+  /** A figure printed beside each bar (above a gain, below a loss), same length as `values`. A narrow chart prints only every few, newest first. */
+  barLabels?: string[];
+  /** One readout per value, same length as `values`. */
+  tips?: ChartTip[];
 }
 
 export interface HBarRow {
@@ -118,6 +120,8 @@ export interface StackedAreaChartModel extends ChartBase {
   max: string;
   xStart?: string;
   xEnd?: string;
+  /** One readout per day, same length as every layer's values. */
+  tips?: ChartTip[];
 }
 
 export interface StackRow {
@@ -181,7 +185,6 @@ export interface SurveyChartModel extends ChartBase {
 export type ChartModel =
   | AreaChartModel
   | BarsChartModel
-  | DivergingChartModel
   | HBarsChartModel
   | GanttChartModel
   | DonutChartModel

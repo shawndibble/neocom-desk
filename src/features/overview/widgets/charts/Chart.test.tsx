@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Chart } from './Chart';
 import type { ChartModel } from './types';
@@ -21,15 +21,22 @@ const MODELS: Record<string, ChartModel> = {
     note: 'Jobs finishing each hour',
     summary: 'Six jobs finish in the next 12 hours.',
   },
-  diverging: {
-    kind: 'diverging',
-    up: [3, 0, 5],
-    down: [1, 4, 0],
-    max: 'max 5',
+  gains: {
+    kind: 'bars',
+    values: [200, -50, 0, 300],
+    gains: true,
+    barLabels: ['+200', '-50', '', '+300'],
+    max: 'max 300',
     xStart: '3 weeks ago',
     xEnd: 'this week',
     note: 'Last 21 days',
-    summary: 'Income 8, spending 5.',
+    summary: 'Net +450.',
+    tips: [
+      { title: '3 weeks ago', rows: [{ label: 'Net', value: '+200', tone: 'good' }] },
+      { title: '2 weeks ago', rows: [{ label: 'Net', value: '-50', tone: 'bad' }] },
+      { title: 'Last week', rows: [{ label: 'Net', value: '0' }] },
+      { title: 'This week', rows: [{ label: 'Net', value: '+300', tone: 'good' }] },
+    ],
   },
   hbars: {
     kind: 'hbars',
@@ -187,16 +194,31 @@ describe('Chart', () => {
     expect(container.textContent).toContain('Jobs finishing each hour');
   });
 
-  it('draws income above the axis and spending below it, one pair per period', () => {
-    const { container } = render(<Chart model={MODELS.diverging!} size="M" />);
-    const pairs = container.querySelectorAll('.grid-rows-2');
-    expect(pairs).toHaveLength(3);
-    const bars = pairs[0]!.querySelectorAll('i');
-    expect(bars).toHaveLength(2);
-    expect(bars[0]!.style.height).toBe('60%');
-    expect(bars[1]!.style.height).toBe('25%');
-    expect(container.textContent).toContain('max 5');
+  it('draws gains green above the axis and losses red below it, each with its figure', () => {
+    const { container } = render(<Chart model={MODELS.gains!} size="M" />);
+    const bars = [...container.querySelectorAll<HTMLElement>('span > i')];
+    expect(bars).toHaveLength(4);
+    expect(bars[0]!.style.backgroundColor).toContain('isk-pos');
+    expect(bars[1]!.style.backgroundColor).toContain('isk-neg');
+    expect(bars[0]!.className).not.toContain('opacity-55');
+    for (const figure of ['+200', '-50', '+300']) expect(container.textContent).toContain(figure);
     expect(container.textContent).toContain('3 weeks ago');
+    // The labels replace the max line.
+    expect(container.textContent).not.toContain('max 300');
+  });
+
+  it('reads a bar out on hover and clears when the pointer leaves', () => {
+    const { container, getAllByText, queryAllByText } = render(
+      <Chart model={MODELS.gains!} size="M" />
+    );
+    const plot = container.querySelector<HTMLElement>('.touch-pan-y')!;
+    plot.getBoundingClientRect = () => ({ left: 0, width: 400 }) as DOMRect;
+    expect(queryAllByText('Last week')).toHaveLength(0);
+    // Four columns of 100px: x=250 is the third.
+    fireEvent.pointerMove(plot, { clientX: 250, pointerType: 'mouse' });
+    expect(getAllByText('Last week').length).toBeGreaterThan(0);
+    fireEvent.pointerLeave(plot, { pointerType: 'mouse' });
+    expect(queryAllByText('Last week')).toHaveLength(0);
   });
 
   it('draws the height the size asks for', () => {

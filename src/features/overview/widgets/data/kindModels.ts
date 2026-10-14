@@ -22,7 +22,7 @@ import { hbarsFromRows } from './chartBuilders';
 import { clonesTable, locationTable } from './characterTables';
 import {
   balanceChange,
-  flowDiverging,
+  flowBars,
   flowSecondary,
   flowTable,
   lpTable,
@@ -30,6 +30,7 @@ import {
   netWorthTable,
 } from './moneyModels';
 import { journalCoverageDays, withinRange } from './chartSeries';
+import { dayTitle, rollingTitles } from './chartTips';
 import type { FeedId, ListRow, NumberModel, TableCell } from './types';
 
 const D = 'overview.widgets.data';
@@ -108,7 +109,7 @@ const walletFlow: Builder = (feeds, { t, now, range }) => {
     rows: [],
     table: flowTable(t, flow.rows),
     summary,
-    chart: flowDiverging(t, entries, now, range, note, summary) ?? undefined,
+    chart: flowBars(t, entries, now, range, note, summary) ?? undefined,
   };
 };
 
@@ -188,6 +189,16 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
             max: t(`${C}.max`, { value: formatIskCompact(Math.max(...series.totals)) }),
             xStart: t(`${C}.daysAgo`, { count: series.days.length }),
             xEnd: t(`${C}.today`),
+            tips: series.days.map((day, i) => ({
+              title: dayTitle(day),
+              rows: [
+                ...shown.map(({ id }) => ({
+                  label: t(LAYER_LABEL_KEYS[id]),
+                  value: formatIskCompact(series.layers[id][i] ?? 0),
+                })),
+                { label: t(`${C}.tip.total`), value: formatIskCompact(series.totals[i] ?? 0) },
+              ],
+            })),
             note,
             summary,
           }
@@ -658,6 +669,10 @@ const routeSafety: Builder = (feeds, { t, now }) => {
             max: t(`${C}.routeSafety.max`, { count: peak }),
             xStart: t(`${C}.routeSafety.xStart`),
             xEnd: t(`${C}.routeSafety.xEnd`),
+            tips: rollingTitles(t, 'hour', trend.hourly.length).map((title, i) => ({
+              title,
+              rows: [{ label: t(`${C}.tip.kills`), value: count(trend.hourly![i] ?? 0) }],
+            })),
             note: t(`${C}.routeSafety.note`),
             summary: `${summary}${unreadNote}`,
           }
@@ -706,9 +721,11 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
   const killCount = inRange.filter((entry) => entry.side === 'kill').length;
   const lossCount = inRange.length - killCount;
   const perDay = new Map<string, number>();
+  const lossesPerDay = new Map<string, number>();
   for (const entry of inRange) {
     const day = new Date(entry.timeMs).toISOString().slice(0, 10);
     perDay.set(day, (perDay.get(day) ?? 0) + 1);
+    if (entry.side === 'loss') lossesPerDay.set(day, (lossesPerDay.get(day) ?? 0) + 1);
   }
   const values = days.map((date) => perDay.get(date) ?? 0);
   const peak = Math.max(...values);
@@ -773,6 +790,21 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
       max: t(`${C}.kills.max`, { count: peak }),
       xStart: t(`${C}.kills.xStart`, { count: range }),
       xEnd: t(`${C}.kills.xEnd`),
+      tips: days.map((date, i) => ({
+        title: dayTitle(date),
+        rows: [
+          {
+            label: t(`${C}.tip.kills`),
+            value: count(values[i]! - (lossesPerDay.get(date) ?? 0)),
+            tone: 'good' as const,
+          },
+          {
+            label: t(`${C}.tip.losses`),
+            value: count(lossesPerDay.get(date) ?? 0),
+            tone: 'bad' as const,
+          },
+        ],
+      })),
       note: [
         covered === null
           ? t(`${C}.kills.note`, { count: range })
