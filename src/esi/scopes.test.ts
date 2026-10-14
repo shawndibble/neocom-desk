@@ -81,6 +81,7 @@ describe('SCOPES (Base Grant)', () => {
         'esi-fittings.read_fittings.v1',
         'esi-fittings.write_fittings.v1',
         'esi-ui.write_waypoint.v1',
+        'esi-ui.open_window.v1',
       ].sort()
     );
   });

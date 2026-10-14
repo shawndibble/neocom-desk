@@ -38,6 +38,9 @@ import {
   getMarketsPrices,
   getIndustrySystemCostIndices,
   postAutopilotWaypoint,
+  postOpenWindowContract,
+  postOpenWindowInformation,
+  postOpenWindowMarketDetails,
   postRoute,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
@@ -454,6 +457,35 @@ describe('public info endpoints', () => {
       clear_other_waypoints: 'false',
       add_to_beginning: 'false',
     });
+  });
+});
+
+describe('Open in EVE', () => {
+  it.each([
+    ['postOpenWindowInformation', 'information', 'target_id'],
+    ['postOpenWindowMarketDetails', 'marketdetails', 'type_id'],
+    ['postOpenWindowContract', 'contract', 'contract_id'],
+  ] as const)('%s POSTs the id and gets 204', async (name, path, param) => {
+    let auth: string | null = null;
+    let query: Record<string, string> = {};
+    server.use(
+      http.post(`${ESI_BASE_URL}/ui/openwindow/${path}`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        auth = request.headers.get('authorization');
+        query = Object.fromEntries(new URL(request.url).searchParams);
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const fn = { postOpenWindowInformation, postOpenWindowMarketDetails, postOpenWindowContract }[
+      name
+    ];
+
+    const result = await fn(CHARACTER_ID, 30000142);
+
+    expect(result.data).toBeNull();
+    expect(auth).toBe(`Bearer token-${CHARACTER_ID}`);
+    expect(query).toEqual({ [param]: '30000142' });
   });
 });
 

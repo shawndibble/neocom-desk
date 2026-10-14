@@ -64,6 +64,7 @@ export const SCOPE_GROUPS = [
   'characterDetails',
   'fittings',
   'autopilot',
+  'openWindow',
   'currentShip',
   'corp',
   'structureMarkets',
@@ -150,6 +151,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   autopilot: {
     labelKey: 'permissions.autopilot.label',
     captionKey: 'permissions.autopilot.caption',
+    defaultOn: true,
+  },
+  openWindow: {
+    labelKey: 'permissions.openWindow.label',
+    captionKey: 'permissions.openWindow.caption',
     defaultOn: true,
   },
   currentShip: {
@@ -504,6 +510,27 @@ export const ESI_REGISTRY = {
     route: '/ui/autopilot/waypoint',
     scope: 'esi-ui.write_waypoint.v1',
     group: 'autopilot',
+  },
+  /**
+   * Base grant: Open in EVE — the sixth write exception, used only when the
+   * pilot presses it. Each opens a window in the Character's EVE client and
+   * changes nothing in the game. A Permission of its own, so a Character that
+   * signed in before it reads as lacking only this.
+   */
+  postOpenWindowInformation: {
+    route: '/ui/openwindow/information',
+    scope: 'esi-ui.open_window.v1',
+    group: 'openWindow',
+  },
+  postOpenWindowMarketDetails: {
+    route: '/ui/openwindow/marketdetails',
+    scope: 'esi-ui.open_window.v1',
+    group: 'openWindow',
+  },
+  postOpenWindowContract: {
+    route: '/ui/openwindow/contract',
+    scope: 'esi-ui.open_window.v1',
+    group: 'openWindow',
   },
   getAlliancePublicInfo: {
     route: '/alliances/{alliance_id}',

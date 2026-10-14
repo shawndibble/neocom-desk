@@ -1990,6 +1990,64 @@ export function postAutopilotWaypoint(
   });
 }
 
+// --- POST /ui/openwindow/information (esi-ui.open_window.v1) ---
+
+/**
+ * Opens the EVE client's information window on a character, corporation,
+ * alliance, inventory type, station, structure or solar system (Open in EVE).
+ * ESI answers 204 with no body; nothing in the game changes.
+ */
+export function postOpenWindowInformation(
+  characterId: number,
+  targetId: number,
+  { signal }: { signal?: AbortSignal } = {}
+): Promise<EsiResult<null>> {
+  return esiFetch<null>('/ui/openwindow/information', {
+    signal,
+    characterId,
+    method: 'POST',
+    query: { target_id: targetId },
+    endpointId: 'postOpenWindowInformation',
+  });
+}
+
+// --- POST /ui/openwindow/marketdetails (esi-ui.open_window.v1) ---
+
+/** Opens the EVE client's market window on an inventory type. */
+export function postOpenWindowMarketDetails(
+  characterId: number,
+  typeId: number,
+  { signal }: { signal?: AbortSignal } = {}
+): Promise<EsiResult<null>> {
+  return esiFetch<null>('/ui/openwindow/marketdetails', {
+    signal,
+    characterId,
+    method: 'POST',
+    query: { type_id: typeId },
+    endpointId: 'postOpenWindowMarketDetails',
+  });
+}
+
+// --- POST /ui/openwindow/contract (esi-ui.open_window.v1) ---
+
+/**
+ * Opens a contract in the EVE client. ESI refuses a contract the Character
+ * can't see in game.
+ */
+export function postOpenWindowContract(
+  characterId: number,
+  contractId: number,
+  { signal }: { signal?: AbortSignal } = {}
+): Promise<EsiResult<null>> {
+  return esiFetch<null>('/ui/openwindow/contract', {
+    signal,
+    characterId,
+    method: 'POST',
+    query: { contract_id: contractId },
+    endpointId: 'postOpenWindowContract',
+  });
+}
+
 // ---------------------------------------------------------------------------
 // The `corp` scope group (issue #295).
 //
