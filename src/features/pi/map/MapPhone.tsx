@@ -85,7 +85,7 @@ export function MapPhone(props: MapPhoneProps) {
               }
               onClick={() => props.onPlanet(type)}
               className={cx(
-                'relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-xs border px-0.5 py-1 text-[11px] font-semibold tracking-widest uppercase',
+                'relative flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-xs border px-0.5 py-1 text-[0.6875rem] font-semibold tracking-widest uppercase',
                 interactiveClassName,
                 focusRingClassName,
                 pressed
@@ -126,7 +126,7 @@ export function MapPhone(props: MapPhoneProps) {
         />
         <h3
           id="pi-map-phone-tier"
-          className="mt-3 text-[11px] font-semibold tracking-widest text-text-dim uppercase"
+          className="mt-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
         >
           {t('piMap.phone.tierHeading', {
             name: tierName(t, tier),
@@ -171,10 +171,12 @@ export function MapPhone(props: MapPhoneProps) {
                     {/* The card's title carries the accent cue at rest (DESIGN.md §6c "Phone cards"). */}
                     <span className="block">
                       {rank !== undefined && (
-                        <span className="mr-1.5 text-[11px] font-bold text-warning">#{rank}</span>
+                        <span className="mr-1.5 text-[0.6875rem] font-bold text-warning">
+                          #{rank}
+                        </span>
                       )}
                       {isNew && (
-                        <span className="mr-1.5 text-[11px] font-bold text-map-whatif">
+                        <span className="mr-1.5 text-[0.6875rem] font-bold text-map-whatif">
                           +<span className="sr-only">{t('piMap.phone.newSr')}</span>
                         </span>
                       )}
@@ -193,7 +195,7 @@ export function MapPhone(props: MapPhoneProps) {
                       <span className={cx('font-bold', VERDICT_TONE[glyph])}>{glyph}</span>
                       {formatIskCompact(figure.iskPerDay)}
                       {figure.needsCcLevel && (
-                        <span className="rounded-xs border border-warning/60 px-1 text-[10px] leading-[14px] font-semibold text-warning">
+                        <span className="rounded-xs border border-warning/60 px-1 text-[0.625rem] leading-[0.875rem] font-semibold text-warning">
                           {t('piMap.needsCcShort', { level: figure.needsCcLevel })}
                         </span>
                       )}

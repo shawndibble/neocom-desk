@@ -96,7 +96,7 @@ function NameChain({
 
 function Heading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="mt-4 mb-1.5 text-[11px] font-semibold tracking-widest text-text-dim uppercase">
+    <h3 className="mt-4 mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
       {children}
     </h3>
   );
@@ -173,7 +173,7 @@ export function ProductDetail(props: ProductDetailProps) {
           <div className="text-[1.875rem] leading-[1.1] font-semibold text-isk-pos tabular-nums">
             ≈ <IskAmount value={figure.iskPerDay} decimals={0} />
           </div>
-          <div className="text-[11px] font-semibold tracking-widest text-text-dim uppercase">
+          <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('piMap.detail.perPlanet', { type: planetName(t, figure.useType) })}
           </div>
           {figure.needsCcLevel && (
@@ -362,7 +362,9 @@ export function ProductDetail(props: ProductDetailProps) {
 
       {/* A chain estimate states its own basis above; this note is about one-planet figures. */}
       {!(view.money.kind === 'multi-planet' && view.money.estimate) && (
-        <p className="mt-4 text-[11px] leading-snug text-text-dim">{t('piMap.estimateNote')}</p>
+        <p className="mt-4 text-[0.6875rem] leading-snug text-text-dim">
+          {t('piMap.estimateNote')}
+        </p>
       )}
       <Button size="sm" className="mt-3" onClick={props.onClearTrace}>
         {t('piMap.clearTrace')}
@@ -504,7 +506,7 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
           homeSecurity={props.finder.security}
         />
       </div>
-      <p className="mt-4 text-[11px] leading-snug text-text-dim">{t('piMap.estimateNote')}</p>
+      <p className="mt-4 text-[0.6875rem] leading-snug text-text-dim">{t('piMap.estimateNote')}</p>
       <Button size="sm" className="mt-3" onClick={props.onClose}>
         {t('piMap.add.close')}
       </Button>

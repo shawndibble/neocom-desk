@@ -174,13 +174,13 @@ export default function NetWorthChart(props: NetWorthChartProps) {
       ticks={axis.ticks}
       tickFormatter={dayLabel}
       stroke="var(--color-text-dim)"
-      tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+      tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
     />
   );
   const yAxis = (
     <YAxis
       stroke="var(--color-text-dim)"
-      tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+      tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
       width={COMPACT_ISK_Y_AXIS_WIDTH}
       tickFormatter={(value: number) => formatIskCompact(value)}
     />
@@ -218,7 +218,7 @@ export default function NetWorthChart(props: NetWorthChartProps) {
                   label={{
                     value: props.walletOnlyLabel,
                     position: 'insideTopLeft',
-                    fontSize: 11,
+                    fontSize: '0.6875rem',
                     fill: 'var(--color-text-dim)',
                   }}
                 />

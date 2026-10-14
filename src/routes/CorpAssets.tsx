@@ -109,6 +109,7 @@ import { loadCorporationBlueprints } from '@/features/corp/blueprints';
 import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
+import { rootFontScale } from '@/lib/fontScale';
 
 const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_PARAM = textParam();
@@ -323,6 +324,10 @@ function corpAssetHref(
 }
 
 function estimateRowHeight(row: BrowseRow): number {
+  return rootFontScale() * baseRowHeight(row);
+}
+
+function baseRowHeight(row: BrowseRow): number {
   switch (row.kind) {
     case 'group':
     case 'match':

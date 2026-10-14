@@ -148,9 +148,9 @@ const DESKTOP_QUERY = '(min-width: 48rem)';
 
 /**
  * True at or above `md`, where the section header drops back off the touch
- * tier (issue #1118). The virtualizer sizes every section from a fixed
- * estimate with no `measureElement` behind it, so the estimate has to know
- * which tier the header is actually rendering at. Local rather than shared,
+ * tier (issue #1118). The virtualizer's first-paint estimate has to know
+ * which tier the header is actually rendering at; `measureElement` then
+ * corrects it to the real height (which also moves with the text-size setting). Local rather than shared,
  * matching `EntryList.tsx`'s own copy of this hook.
  */
 function useIsDesktop(): boolean {
@@ -684,6 +684,7 @@ export function NotificationsPanel() {
                       <div
                         key={virtualRow.key}
                         data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
                         style={{
                           position: 'absolute',
                           top: 0,

@@ -41,6 +41,7 @@ import {
 } from '@/components/ui';
 import { usePageTab } from '@/lib/usePageTab';
 import { tabBarTabs } from '@/lib/pageTabs';
+import { rootFontScale } from '@/lib/fontScale';
 import { ASSETS_TABS } from '@/app/pageTabs';
 import * as Icon from '@/components/ui/icons';
 import type { EsiEndpointId } from '@/esi/registry';
@@ -634,6 +635,10 @@ type BrowseRow =
 
 /** Estimated heights — the virtualizer windows on these, same fixed-estimate approach as the tree view it replaces. */
 function estimateRowHeight(row: BrowseRow): number {
+  return rootFontScale() * baseRowHeight(row);
+}
+
+function baseRowHeight(row: BrowseRow): number {
   switch (row.kind) {
     case 'heading':
       return 33;

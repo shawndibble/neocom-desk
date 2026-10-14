@@ -433,7 +433,7 @@ export default function PriceHistoryChart({
               <XAxis dataKey="dateLabel" height={0} tick={false} axisLine={false} />
               <YAxis
                 stroke="var(--color-accent)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 width={priceAxisWidth}
                 // The band, not the average, sets the extent now; Recharts'
                 // default `[0, dataMax]` would squash a 9,000-ISK item into
@@ -545,12 +545,12 @@ export default function PriceHistoryChart({
               <XAxis
                 dataKey="dateLabel"
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
               />
               <YAxis
                 yAxisId="volume"
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 width={priceAxisWidth}
                 tickFormatter={(value: number) =>
                   isPhone ? formatCompactNumber(value) : formatVolume(value)
@@ -569,7 +569,7 @@ export default function PriceHistoryChart({
                 orientation="right"
                 hide={isPhone}
                 stroke="var(--color-series-order-count)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 width={ordersAxisWidth}
                 tickFormatter={(value: number) => formatCompactNumber(value)}
               />

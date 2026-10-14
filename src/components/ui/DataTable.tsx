@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
+import { rootFontScale } from '@/lib/fontScale';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -1029,13 +1030,15 @@ export function DataTable<T>({
   const expandable = expandableRow !== undefined;
   // Rough per-layout heights; each mounted row is then measured, so these
   // only have to be close enough to size the rows not yet seen.
-  const estimatedRowHeight = !isStacked
-    ? density === 'compact'
-      ? 25
-      : 29
-    : dense
-      ? 52
-      : 16 + (stackColumns === 2 ? Math.ceil(columns.length / 2) * 36 : columns.length * 20);
+  const estimatedRowHeight =
+    rootFontScale() *
+    (!isStacked
+      ? density === 'compact'
+        ? 25
+        : 29
+      : dense
+        ? 52
+        : 16 + (stackColumns === 2 ? Math.ceil(columns.length / 2) * 36 : columns.length * 20));
   // Where the body starts on the page: the virtualizer's positions are
   // measured from the top of the document, not this table. A callback ref
   // plus a body-resize observer, as `NotificationsPanel` does, since
@@ -1311,7 +1314,7 @@ export function DataTable<T>({
     stacked !== false && (
       <div
         className={cx(
-          'flex min-h-[52px] items-center justify-between gap-3 px-3',
+          'flex min-h-[3.25rem] items-center justify-between gap-3 px-3',
           stacked === undefined && 'sm:hidden'
         )}
       >

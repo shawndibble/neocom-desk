@@ -785,7 +785,7 @@ export function PlanMap({
       aria-label={t('piMap.picksLabel')}
       className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-line px-3 py-1.5 text-xs"
     >
-      <span className="text-[11px] font-semibold tracking-widest text-text-dim uppercase">
+      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {picks.kind === 'recipes' ? t('piMap.picksRecipes') : t('piMap.picksTitle')}
       </span>
       {picks.kind === 'none' ? (
@@ -811,7 +811,7 @@ export function PlanMap({
                       : '[@media(hover:hover)]:hover:border-line-bright [@media(hover:hover)]:hover:bg-panel-2'
                   )}
                 >
-                  <span className="text-[11px] font-bold text-warning">#{i + 1}</span>
+                  <span className="text-[0.6875rem] font-bold text-warning">#{i + 1}</span>
                   <TypeIcon typeId={pick.typeId} size={64} width={20} height={20} />
                   <span>{pick.name}</span>
                   <span
@@ -835,7 +835,7 @@ export function PlanMap({
               {pick.needsCcLevel && <CcLevelTag level={pick.needsCcLevel} />}
             </span>
           ))}
-          <span className="text-[11px] text-text-dim">
+          <span className="text-[0.6875rem] text-text-dim">
             {picks.kind === 'rebuild'
               ? t('piMap.picksNoteRebuild', {
                   preference: t(
@@ -888,7 +888,7 @@ export function PlanMap({
               : t('piMap.whatIfTitleMany', {
                   types: listFormat.format(types.map((type) => planetName(t, type))),
                 }),
-            'text-[11px] font-semibold tracking-widest text-map-whatif uppercase'
+            'text-[0.6875rem] font-semibold tracking-widest text-map-whatif uppercase'
           )}
           {text(
             (un.productIds.length === 0

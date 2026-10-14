@@ -144,7 +144,7 @@ export function SurveyCharts({
       ticks={ticks}
       tickFormatter={formatEveClock}
       stroke="var(--color-line-bright)"
-      tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
+      tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}
       hide={hide}
     />
   );
@@ -269,7 +269,7 @@ export function SurveyCharts({
             width={compact ? COMPACT_Y_AXIS_WIDTH : Y_AXIS_WIDTH}
             tickFormatter={formatCompactNumber}
             stroke="var(--color-line-bright)"
-            tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
+            tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}
           />
           {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top. */}
           {summary.oreNames
@@ -303,7 +303,7 @@ export function SurveyCharts({
                 position="top"
                 offset={8}
                 fill="var(--color-text)"
-                fontSize={10}
+                fontSize="0.625rem"
                 formatter={(value: unknown) =>
                   typeof value === 'number' ? formatCompactNumber(value) : ''
                 }
@@ -330,7 +330,7 @@ export function SurveyCharts({
                 position: 'insideTopLeft',
                 textAnchor: 'end',
                 fill: 'var(--color-text)',
-                fontSize: 11,
+                fontSize: '0.6875rem',
               }}
             />
           )}
@@ -370,13 +370,13 @@ export function SurveyCharts({
                   width={Y_AXIS_WIDTH}
                   tickFormatter={formatCompactNumber}
                   stroke="var(--color-line-bright)"
-                  tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
+                  tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}
                   label={{
                     value: t('survey.chartRateAxis'),
                     position: 'insideTopLeft',
                     offset: 8,
                     fill: 'var(--color-text-dim)',
-                    fontSize: 10,
+                    fontSize: '0.625rem',
                   }}
                 />
                 <Area
@@ -401,7 +401,7 @@ export function SurveyCharts({
                     position="top"
                     offset={4}
                     fill="var(--color-text)"
-                    fontSize={10}
+                    fontSize="0.625rem"
                     formatter={(value: unknown) =>
                       typeof value === 'number' ? Math.round(value).toLocaleString() : ''
                     }

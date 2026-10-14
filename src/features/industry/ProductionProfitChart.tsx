@@ -94,11 +94,11 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
               dataKey="date"
               tickFormatter={formatDateTick}
               stroke="var(--color-text-dim)"
-              tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
             />
             <YAxis
               stroke="var(--color-text-dim)"
-              tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
               width={COMPACT_ISK_Y_AXIS_WIDTH}
               // SVG axis tick: IskAmount can't render here (documented exception).
               tickFormatter={(value: number) => formatIskCompact(value)}

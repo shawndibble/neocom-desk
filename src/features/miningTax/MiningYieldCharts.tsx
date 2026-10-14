@@ -326,11 +326,11 @@ function IskCharts({
                 dataKey="date"
                 tickFormatter={formatDateTick}
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
               />
               <YAxis
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 width={COMPACT_ISK_Y_AXIS_WIDTH}
                 // SVG axis text: IskAmount can't render inside the chart (documented exception).
                 tickFormatter={(value: number) => formatIskCompact(value)}
@@ -393,7 +393,7 @@ function IskCharts({
               <XAxis
                 type="number"
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 // SVG axis text: IskAmount can't render inside the chart (documented exception).
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
@@ -401,7 +401,7 @@ function IskCharts({
                 type="category"
                 dataKey="typeName"
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 interval={0}
                 width={120}
               />
@@ -421,7 +421,7 @@ function IskCharts({
                     position="right"
                     // SVG label text: IskAmount can't render inside the chart (documented exception).
                     formatter={(value: unknown) => formatIskCompact(Number(value))}
-                    style={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                    style={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                   />
                 )}
               </Bar>
@@ -558,11 +558,11 @@ function MetricCharts({
                 dataKey="date"
                 tickFormatter={formatDateTick}
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
               />
               <YAxis
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 width={COMPACT_COUNT_Y_AXIS_WIDTH}
                 tickFormatter={(value: number) => formatCompactNumber(value)}
               />
@@ -607,14 +607,14 @@ function MetricCharts({
               <XAxis
                 type="number"
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 tickFormatter={(value: number) => formatCompactNumber(value)}
               />
               <YAxis
                 type="category"
                 dataKey="typeName"
                 stroke="var(--color-text-dim)"
-                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 interval={0}
                 width={120}
               />
@@ -629,7 +629,7 @@ function MetricCharts({
                   dataKey="value"
                   position="right"
                   formatter={(value: unknown) => formatMetricCompact(metric, Number(value))}
-                  style={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                  style={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 />
               </Bar>
             </BarChart>

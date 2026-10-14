@@ -134,11 +134,11 @@ function Graph({
               domain={[0, 'dataMax']}
               tickFormatter={formatX}
               stroke="var(--color-text-dim)"
-              tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
             />
             <YAxis
               stroke="var(--color-text-dim)"
-              tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
               width={40}
               tickFormatter={(value: number) => value.toFixed(0)}
             />

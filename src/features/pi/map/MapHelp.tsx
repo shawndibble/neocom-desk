@@ -7,7 +7,7 @@ import { VERDICT_TONE } from './mapText';
 
 function Heading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="mt-4 mb-1.5 text-[11px] font-semibold tracking-widest text-text-dim uppercase first:mt-0">
+    <h3 className="mt-4 mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase first:mt-0">
       {children}
     </h3>
   );
@@ -17,7 +17,7 @@ function Sample({ className, children }: { className: string; children?: React.R
   return (
     <span
       aria-hidden="true"
-      className={`inline-grid h-3.5 w-7 place-items-center rounded-xs border text-[11px] leading-none font-bold ${className}`}
+      className={`inline-grid h-3.5 w-7 place-items-center rounded-xs border text-[0.6875rem] leading-none font-bold ${className}`}
     >
       {children}
     </span>
