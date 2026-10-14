@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
-import { Spinner } from '@/components/ui';
+import { DataAgeBadge, Spinner } from '@/components/ui';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
@@ -116,10 +116,12 @@ export function SkillPlans() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <SkillsPageHeader />
+      <SkillsPageHeader
+        meta={queueResult?.fetchedAt && <DataAgeBadge date={queueResult.fetchedAt} />}
+      />
       <SkillsSubNav />
 
-      <QueueStrip view={queueView} nowMs={nowMs} fetchedAt={queueResult?.fetchedAt} />
+      <QueueStrip view={queueView} nowMs={nowMs} />
 
       {/* The rail comes first in the DOM so a phone reads plan and attributes
           above the queue; `lg:order-last` moves it to the right column. Sticky
