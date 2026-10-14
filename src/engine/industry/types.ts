@@ -688,6 +688,8 @@ export interface BlueprintRunPool {
   ownedRuns: number;
   /** Runs one bought copy brings (`Infinity` for an original); null when nothing can be bought to top the tier up. */
   copyRuns: number | null;
+  /** ISK for one bought copy (a pilot's override price included); null when unpriced or nothing can be bought. */
+  copyPrice: number | null;
 }
 
 /** The ME/TE tier a Blueprint Acquisition row resolved to, and the Member it comes from when a Community Offer. */

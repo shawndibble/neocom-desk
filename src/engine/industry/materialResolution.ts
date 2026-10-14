@@ -286,7 +286,14 @@ export function acquisitionMaterialFor(
       me: acquisition.me,
       te: acquisition.te,
       ...(acquisition.line.community ? { community: acquisition.line.community } : {}),
-      ...(acquisition.line.pool ? { pool: acquisition.line.pool } : {}),
+      ...(acquisition.line.pool
+        ? {
+            pool: {
+              ...acquisition.line.pool,
+              copyPrice: resolvedOverride ?? acquisition.line.pool.copyPrice,
+            },
+          }
+        : {}),
     },
   };
 }

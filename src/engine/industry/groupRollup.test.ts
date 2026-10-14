@@ -552,7 +552,7 @@ describe('rollUpBuildGroup — blueprints pooled across members', () => {
   /** One member's blueprint row: `copies` bought at 100 ISK, `needed` runs from a `copyRuns`-run copy. */
   function bpRow(
     needed: number,
-    copyRuns: number,
+    copyRuns: number | null,
     copies: number,
     ownedRuns = 0
   ): MaterialCostLine {
@@ -560,10 +560,15 @@ describe('rollUpBuildGroup — blueprints pooled across members', () => {
       ...line(7, copies || 1, {
         ownedQuantity: copies ? 0 : 1,
         remainingQuantity: copies,
-        unitPrice: 100,
+        // An owned-covered member's own line is free, as `resolveTierOption` reports it.
+        unitPrice: copies ? 100 : 0,
         lineCost: copies * 100,
       }),
-      acquisitionTier: { me: 0, te: 0, pool: { neededRuns: needed, ownedRuns, copyRuns } },
+      acquisitionTier: {
+        me: 0,
+        te: 0,
+        pool: { neededRuns: needed, ownedRuns, copyRuns, copyPrice: 100 },
+      },
     };
   }
 
@@ -606,6 +611,34 @@ describe('rollUpBuildGroup — blueprints pooled across members', () => {
       lineCost: 100,
     });
     expect(rollup.materialCost).toBe(100);
+  });
+
+  it('prices a copy from the tier, not from an owned-covered member that paid nothing', () => {
+    // A owns 10 runs and needs 5; B needs 15 — the group is 10 runs short.
+    const rollup = groupOf([bpRow(5, 5, 0, 10), bpRow(15, 5, 2, 10)]);
+    expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
+      quantity: 2,
+      lineCost: 200,
+      unpriced: false,
+    });
+  });
+
+  it('buys an original once for the whole group', () => {
+    const rollup = groupOf([bpRow(5, Infinity, 1), bpRow(5, Infinity, 1)]);
+    expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
+      quantity: 1,
+      lineCost: 100,
+    });
+    expect(rollup.materialCost).toBe(100);
+  });
+
+  it('keeps the members’ own figures for a tier nothing can top up', () => {
+    const rollup = groupOf([bpRow(8, null, 0, 10), bpRow(8, null, 0, 10)]);
+    expect(rollup.tableMaterials.find((m) => m.typeID === 7)).toMatchObject({
+      quantity: 1,
+      lineCost: 0,
+    });
+    expect(rollup.materialCost).toBe(0);
   });
 
   it('leaves a lone member as it priced itself', () => {

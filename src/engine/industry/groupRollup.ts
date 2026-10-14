@@ -251,79 +251,86 @@ function poolBlueprints(members: readonly BuildGroupMember[]): {
     needed: number;
     owned: number;
     copyRuns: number | null;
-    unitPrice: number | null;
+    copyPrice: number | null;
+    /** What the members charged for this tier, kept when nothing can top it up. */
     memberCost: number;
-    memberQuantity: number;
+    memberBought: number;
   }
-  const byType = new Map<number, Map<string, Tier>>();
+  interface Blueprint {
+    tiers: Map<string, Tier>;
+    /** Rows with no runs to pool (two tiers merged into one): their own bill stands. */
+    fixedBought: number;
+    fixedCost: number;
+    fixedUnpriced: boolean;
+  }
+  const byType = new Map<number, Blueprint>();
   for (const member of members) {
     for (const row of member.tableMaterials) {
       const tier = row.acquisitionTier;
-      if (!tier?.pool) continue;
-      const tiers = byType.get(row.typeID) ?? new Map<string, Tier>();
-      byType.set(row.typeID, tiers);
-      const key = `${tier.me}:${tier.te}`;
-      const seen = tiers.get(key);
-      if (seen) {
-        seen.needed += tier.pool.neededRuns;
-        seen.owned = Math.max(seen.owned, tier.pool.ownedRuns);
-        seen.copyRuns ??= tier.pool.copyRuns;
-        seen.unitPrice ??= row.unitPrice;
-        seen.memberCost += row.lineCost;
-        seen.memberQuantity += row.quantity;
-      } else {
-        tiers.set(key, {
-          needed: tier.pool.neededRuns,
-          owned: tier.pool.ownedRuns,
-          copyRuns: tier.pool.copyRuns,
-          unitPrice: row.unitPrice,
-          memberCost: row.lineCost,
-          memberQuantity: row.quantity,
-        });
+      if (!tier) continue;
+      let blueprint = byType.get(row.typeID);
+      if (!blueprint) {
+        blueprint = { tiers: new Map(), fixedBought: 0, fixedCost: 0, fixedUnpriced: false };
+        byType.set(row.typeID, blueprint);
       }
+      if (!tier.pool) {
+        blueprint.fixedBought += row.remainingQuantity;
+        blueprint.fixedCost += row.lineCost;
+        blueprint.fixedUnpriced ||= row.unpriced;
+        continue;
+      }
+      const key = `${tier.me}:${tier.te}`;
+      const seen = blueprint.tiers.get(key) ?? {
+        needed: 0,
+        owned: 0,
+        copyRuns: tier.pool.copyRuns,
+        copyPrice: tier.pool.copyPrice,
+        memberCost: 0,
+        memberBought: 0,
+      };
+      seen.needed += tier.pool.neededRuns;
+      seen.owned = Math.max(seen.owned, tier.pool.ownedRuns);
+      seen.memberCost += row.lineCost;
+      seen.memberBought += row.remainingQuantity;
+      blueprint.tiers.set(key, seen);
     }
   }
 
   const pooled = new Map<number, PooledBlueprint>();
   let costDelta = 0;
-  for (const [typeID, tiers] of byType) {
-    let bought = 0;
-    let cost = 0;
-    let unpriced = false;
+  for (const [typeID, blueprint] of byType) {
+    if (blueprint.tiers.size === 0) continue;
+    let bought = blueprint.fixedBought;
+    let cost = blueprint.fixedCost;
+    let unpriced = blueprint.fixedUnpriced;
     let unitPrice: number | null = null;
-    for (const tier of tiers.values()) {
+    for (const tier of blueprint.tiers.values()) {
       const shortfall = Math.max(0, tier.needed - tier.owned);
-      const copies =
-        shortfall === 0
+      // An original (infinite runs) covers any shortfall in one copy; a tier
+      // nothing can top up keeps what its members reported.
+      const topUp = tier.copyRuns !== null;
+      const copies = !topUp
+        ? tier.memberBought
+        : shortfall === 0
           ? 0
-          : tier.copyRuns === null
-            ? tier.memberQuantity
-            : Math.ceil(shortfall / tier.copyRuns);
-      const tierCost = copies * (tier.unitPrice ?? 0);
+          : Math.ceil(shortfall / tier.copyRuns!) || 1;
+      const tierCost = topUp ? copies * (tier.copyPrice ?? 0) : tier.memberCost;
       bought += copies;
       cost += tierCost;
-      unpriced ||= copies > 0 && tier.unitPrice === null;
-      unitPrice ??= tier.unitPrice;
+      unpriced ||= topUp && copies > 0 && tier.copyPrice === null;
+      unitPrice ??= tier.copyPrice;
       costDelta += tierCost - tier.memberCost;
     }
+    const base = { typeID, unitPrice };
     pooled.set(
       typeID,
       bought === 0
-        ? {
-            typeID,
-            quantity: 1,
-            remainingQuantity: 0,
-            ownedQuantity: 1,
-            unitPrice,
-            lineCost: 0,
-            unpriced: false,
-          }
+        ? { ...base, quantity: 1, remainingQuantity: 0, ownedQuantity: 1, lineCost: 0, unpriced }
         : {
-            typeID,
+            ...base,
             quantity: bought,
             remainingQuantity: bought,
             ownedQuantity: 0,
-            unitPrice,
             lineCost: cost,
             unpriced,
           }

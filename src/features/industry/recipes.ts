@@ -329,6 +329,7 @@ export function acquisitionForLookup(
             neededRuns,
             ownedRuns: tier.ownedRuns,
             copyRuns: tier.extend ? tier.extend.capacityRuns : null,
+            copyPrice: tier.extend ? tier.extend.price : null,
           },
         }
       : resolved.line;
@@ -347,8 +348,8 @@ export function acquisitionForLookup(
 /**
  * The `acquisitionFor` a make-or-buy verdict (`MakeOrBuyContext`) takes: the
  * same tier choice and blueprint price the plan's own resolution would bill
- * that node — a blueprint override price
- * replaces the market one exactly as `acquisitionMaterialFor` does. Every
+ * that node, and a blueprint override price replaces the market one exactly
+ * as `acquisitionMaterialFor` does. Every
  * call resolves against its own fresh tier pool: a verdict is a what-if for
  * one material, so it must neither claim owned copies another verdict then
  * can't see nor inherit claims from one.
