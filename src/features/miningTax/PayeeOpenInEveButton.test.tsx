@@ -68,4 +68,23 @@ describe('PayeeOpenInEveButton', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('nothing to open');
     expect(infoMock).not.toHaveBeenCalled();
   });
+
+  it('sends nothing when the name matches several', async () => {
+    resolveMock.mockResolvedValue([
+      { id: 1, name: 'Twin', kind: 'corporation' },
+      { id: 2, name: 'Twin', kind: 'character' },
+    ]);
+    render(<PayeeOpenInEveButton name="Twin" />);
+    await userEvent.click(screen.getByRole('button', { name: /Open in EVE/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('nothing to open');
+    expect(infoMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed lookup as a failure, not as "no match"', async () => {
+    resolveMock.mockRejectedValue(new Error('ESI down'));
+    render(<PayeeOpenInEveButton name="Moon Corp" />);
+    await userEvent.click(screen.getByRole('button', { name: /Open in EVE/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't open it in EVE");
+    expect(infoMock).not.toHaveBeenCalled();
+  });
 });

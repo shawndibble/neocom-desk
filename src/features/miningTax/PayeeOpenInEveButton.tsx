@@ -34,11 +34,19 @@ export function PayeeOpenInEveButton({
       lookup={{
         unresolvedText: t('miningTax.payees.verify.openUnresolved', { name }),
         resolveId: async () => {
-          const matches = await resolvePayeeName(name).catch(() => []);
+          const matches = await resolvePayeeName(name);
           if (matches.length !== 1) return null;
           const [match] = matches;
-          const payee = payeeId === undefined ? undefined : await db.payees.get(payeeId);
-          if (payee) await rememberPayeeEntity(payee, match.id, match.kind);
+          // Remembering is a courtesy: a failed write must not stop the open, and a
+          // Payee that learned its id from a payment meanwhile keeps that one.
+          try {
+            const payee = payeeId === undefined ? undefined : await db.payees.get(payeeId);
+            if (payee?.entityId === undefined && payee) {
+              await rememberPayeeEntity(payee, match.id, match.kind);
+            }
+          } catch {
+            /* opened anyway; the next Settle up looks it up again */
+          }
           return match.id;
         },
       }}

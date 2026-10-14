@@ -66,6 +66,12 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
           : (result.message ?? t('openInEve.unknownError'));
         setOutcome({ tone: 'alert', text: t('openInEve.failed', { message }) });
       }
+    } catch {
+      // A lookup that threw (not one that found nothing): say so, don't go quiet.
+      setOutcome({
+        tone: 'alert',
+        text: t('openInEve.failed', { message: t('openInEve.unknownError') }),
+      });
     } finally {
       inFlight.current = false;
       setSending(false);

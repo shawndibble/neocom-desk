@@ -30,6 +30,7 @@ here — they go one per file in `docs/context/decisions/`.
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer.
+- **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation, alliance, item, station or system; a type's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
@@ -465,7 +466,6 @@ here — they go one per file in `docs/context/decisions/`.
 - **Price History**: The Market Browser item tab charting one item's daily history in a Region: **Daily Range**, average price and its moving average, **Traded Volume** and **Order Count**. Up to four other Regions can be compared by average line. Every figure comes from ESI's daily rows, none from the live **Order Book**.
 - **Price Aggregate**: One best-bid/best-ask summary per station (Fuzzwork). Still the source for Build Plan pricing; no longer what the Market Browser shows.
 - **Priority (Skill Plan)**: High/Normal/Low urgency a user assigns to a Skill Plan entry. A prerequisite's _effective_ priority is never less urgent than the most urgent entry that depends on it.
-- **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation, alliance, item, station or system; a type's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
 - **Permission**: The user-facing name for a **Scope Group**: one checkbox under "Customize permissions", labelled with the pages it unlocks. A declined Permission empties only the pages that need it. Never used for the **Core Grant**, which is not a choice.
 - **Plan Milestone**: A named goal ("Fly Loki") pinned to a Skill Plan entry's skill level, not its position, so it survives any reorder. Reorder treats it as a hard deadline: its skills finish first. Projected, _reached_ (level already trained) or _orphaned_ (step gone, level never trained). Can also come from a saved Fitting (a _fit goal_), anchored to the latest step that Fitting needs.
 - **Plan Setup**: The folded block of a Build Plan's inputs (runs, ME/TE, build location, facility, rig, tax, trade hub, material price basis), read as a row of chips until "Edit setup" opens the controls.
