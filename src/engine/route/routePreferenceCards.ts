@@ -26,9 +26,16 @@ export interface PreferenceCard {
   summary: RouteSafetySummary | null;
   /** The route's systems' security in flight order, for the card's strip; empty until planned. */
   securities: readonly (number | null)[];
+  /** Ship plus pod kills in the last hour; `null` when any system's is unknown, never 0. */
+  kills: number | null;
   /** An earlier card whose route is exactly this one's, so a reader is not told twice. */
   sameRouteAs: RoutePreferenceKind | null;
 }
+
+const killsOf = (summary: RouteSafetySummary | null): number | null =>
+  summary === null || summary.shipKills === null
+    ? null
+    : summary.shipKills + (summary.podKills ?? 0);
 
 const sameSystems = (a: readonly number[], b: readonly number[]) =>
   a.length === b.length && a.every((id, i) => id === b[i]);
@@ -52,6 +59,7 @@ export function preferenceCards(
       active: preference === active,
       summary: route?.summary ?? null,
       securities: route?.securities ?? [],
+      kills: killsOf(route?.summary ?? null),
       sameRouteAs: twin ?? null,
     };
   });

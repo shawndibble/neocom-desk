@@ -336,6 +336,24 @@ describe('Travel › Route Safety', () => {
       ).toBe(true);
     });
 
+    it('is one tab stop, and the arrow keys move the choice between the cards', async () => {
+      const user = userEvent.setup();
+      visit(`?from=${JITA}&to=${UEDAMA}`);
+
+      const group = await screen.findByRole('radiogroup', { name: 'Route preference' });
+      const safer = within(group).getByRole('radio', { name: /^Safer/ });
+      const shorter = within(group).getByRole('radio', { name: /^Shorter/ });
+      expect(safer).toHaveAttribute('tabindex', '0');
+      expect(shorter).toHaveAttribute('tabindex', '-1');
+
+      safer.focus();
+      await user.keyboard('{ArrowRight}');
+      await waitFor(() => expect(shorter).toHaveAttribute('aria-checked', 'true'));
+      expect(shorter).toHaveFocus();
+      expect(shorter).toHaveAttribute('tabindex', '0');
+      expect(safer).toHaveAttribute('tabindex', '-1');
+    });
+
     it("saves the chosen card as the pilot's Route Preference, as the rules control does", async () => {
       const user = userEvent.setup();
       visit(`?from=${JITA}&to=${UEDAMA}`);

@@ -45,11 +45,17 @@
  *
  * Ways to fly each leg (issue #2477): beside each leg's rows, gates only and
  * the way through each hub with a qualifying hole, with facts side by side
- * (`LegWays`). Clicking a way pins it in the link (`pin`), and a Thera /
- * Turnur row's Route via opens this page with its hole pinned for the first
- * leg (`routeSafetyLink.ts`). Editing the stops or their order drops the
- * pins, which belong to legs by position — except the first stop added to a
- * Route via link, which is the leg its pin was made for.
+ * (`LegWays`). Clicking a way pins it in the link (`pin`), and Use in route on
+ * a hole in the Thera / Turnur modal pins that hole for the first leg
+ * (`pinFirstLeg`). Editing the stops or their order drops the pins, which
+ * belong to legs by position — except the first stop added while a pin
+ * waits, which is the leg its pin was made for.
+ *
+ * Layout (the Briefing redesign): the Stops panel and the three preference
+ * cards (`PreferenceCards`, the trip planned under each Route Preference) run
+ * full width; the route sits beside a right column of Route rules and
+ * Incursions near you from `xl`. With no stops the destination is a search
+ * field on the page, with quick picks, and the route area is `RouteSkeleton`.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -397,14 +403,16 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
             // A new start is a new first leg: its pin no longer applies.
             onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
             stops={stops}
-            onStopsChange={(next) =>
+            onStopsChange={(next) => {
               setParams(
                 // Pins belong to legs by position: a new stop list drops them,
                 // but the first stop keeps the pin a hole's Use in route made for it.
                 { stops: next, to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
                 { push: true }
-              )
-            }
+              );
+              // The destination field this stop came from unmounts with it: focus follows to the list (§7).
+              if (stops.length === 0 && next.length > 0) focusStopsOnChange.current = true;
+            }}
             settings={settings}
             onSettingsChange={(patch) =>
               setParams({
@@ -421,7 +429,10 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
               <QuickPicks
                 current={current}
                 taken={takenSystems}
-                onPick={(systemId) => setParams({ stops: [systemId], to: null }, { push: true })}
+                onPick={(systemId) => {
+                  setParams({ stops: [systemId], to: null }, { push: true });
+                  focusStopsOnChange.current = true;
+                }}
               />
             }
           />
@@ -533,7 +544,7 @@ function RouteBody({
   killsOf: (systemId: number) => RouteKillsCell;
   avoidAction: (leg: RouteSafetyLeg, row: RouteSafetyRow) => (() => void) | null;
   holesState: RouteHolesState;
-  /** A leg is pinned: an incomplete route asks for the stop a Route via link left open. */
+  /** A leg is pinned: an incomplete route asks for the stop a Use in route pin left open. */
   pinned: boolean;
   onUse: (index: number, pin: string | null) => void;
 } & Pick<LegWaysProps, 'bridges' | 'onSetUpBridges'>) {

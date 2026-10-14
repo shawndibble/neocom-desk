@@ -90,6 +90,7 @@ export function SolarSystemSearchField({
         <ul
           id={listId}
           role="listbox"
+          aria-label={ariaLabel}
           className="absolute inset-x-0 top-full z-20 mt-1 flex flex-col rounded-xs border border-line-bright bg-panel p-1 shadow-lg"
         >
           {matches.map((system, index) => (
@@ -99,7 +100,7 @@ export function SolarSystemSearchField({
               role="option"
               aria-selected={index === highlight}
               className={cx(
-                'cursor-pointer rounded-xs px-2 py-1 hover:bg-panel-2',
+                'cursor-pointer rounded-xs px-2 py-1 hover:bg-panel-2 touch:flex touch:min-h-11 touch:items-center',
                 index === highlight && `bg-panel-2 ${activeOptionClassName}`
               )}
               onMouseDown={(event) => event.preventDefault()}

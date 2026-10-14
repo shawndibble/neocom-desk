@@ -72,6 +72,7 @@ describe('preferenceCards', () => {
       active: false,
       summary: null,
       securities: [],
+      kills: null,
       sameRouteAs: null,
     });
   });
@@ -79,5 +80,17 @@ describe('preferenceCards', () => {
   it('never matches an unanswered card against another unanswered one', () => {
     const cards = preferenceCards({}, ['prefer-highsec', 'shortest'], 'shortest');
     expect(cards.map((card) => card.sameRouteAs)).toEqual([null, null]);
+  });
+
+  it('totals ship and pod kills, and keeps an unknown total unknown rather than 0', () => {
+    const cards = preferenceCards(
+      {
+        'prefer-highsec': route([1, 2], { shipKills: 5, podKills: 2 }),
+        shortest: route([1, 2], { shipKills: null, podKills: null }),
+      },
+      ['prefer-highsec', 'shortest'],
+      'shortest'
+    );
+    expect(cards.map((card) => card.kills)).toEqual([7, null]);
   });
 });

@@ -3,7 +3,7 @@
  * nearest Incursion's staging system, each one tap to the trip's next stop.
  * A place to go, never a verdict on it.
  */
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { nearestIncursion } from '@/engine/incursions/incursionRows';
@@ -24,6 +24,7 @@ export function QuickPicks({
   onPick: (systemId: number) => void;
 }) {
   const { t } = useTranslation();
+  const labelId = useId();
   const systems = useSolarSystemIndex();
   const { rows } = useIncursions(current);
   const nearest = nearestIncursion(rows);
@@ -46,12 +47,8 @@ export function QuickPicks({
   const label = (pick: QuickPick) =>
     pick.kind === 'incursion' ? t('travel.quick.incursion', { system: pick.name }) : pick.name;
   return (
-    <div
-      role="group"
-      aria-label={t('travel.quick.label')}
-      className="flex flex-wrap items-center gap-2"
-    >
-      <span className="text-xs font-semibold uppercase tracking-wider text-text-dim">
+    <div role="group" aria-labelledby={labelId} className="flex flex-wrap items-center gap-2">
+      <span id={labelId} className="text-xs font-semibold uppercase tracking-wider text-text-dim">
         {t('travel.quick.label')}
       </span>
       {picks.map((pick) => (
