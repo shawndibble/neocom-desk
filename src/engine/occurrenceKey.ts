@@ -190,15 +190,15 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // re-observation of the old one.
     case 'priceAlertTriggered':
       return [characterId, fire.eventId, fire.typeId, fire.targetPrice, fire.direction].join(':');
+    // The Character at the Community, at the time it asked or joined: someone
+    // turned away who asks again, or a Member who leaves and rejoins, is a new
+    // occurrence and must not be deduped against the first.
+    case 'communityJoinRequest':
+    case 'communityMemberJoined':
+      return [characterId, fire.eventId, fire.communityId, fire.uid, fire.at].join(':');
     // The diff only fires on a drop into Low or Out, so the drop itself —
     // per list, item, Stock Target and status, bucketed by day — is the
     // identity: the same drop seen twice in a day is one occurrence.
-    // The Character at the Community is the identity: someone who asks again
-    // after being turned away is a new occurrence only once they left the list,
-    // which the diff already counts as a fresh arrival.
-    case 'communityJoinRequest':
-    case 'communityMemberJoined':
-      return [characterId, fire.eventId, fire.communityId, fire.uid].join(':');
     case 'stockBelowTarget':
       return [
         characterId,

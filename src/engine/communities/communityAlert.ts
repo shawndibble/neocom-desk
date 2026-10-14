@@ -4,8 +4,8 @@
  * Community the Character administers (its waiting list and its roster).
  *
  * Edge-triggered on identity (community, uid): the first poll, and a
- * Community the pilot only just came to administer, are baselines and stay
- * quiet. A Member who was waiting in the previous poll was already announced
+ * Community the pilot only just came to administer (requests the admin
+ * already sees on the page included), are baselines and stay quiet. A Member who was waiting in the previous poll was already announced
  * by the join request alert, so approving someone does not alert twice.
  */
 
@@ -16,6 +16,8 @@ export interface CommunityAlertEntry {
   kind: 'request' | 'member';
   uid: string;
   characterName: string;
+  /** When it asked (`requestedAt`) or joined (`joinedAt`): a second ask or join is its own occurrence. */
+  at: number;
 }
 
 export interface CommunityAlertSnapshot {
@@ -29,6 +31,7 @@ interface CommunityFireFields {
   communityName: string;
   uid: string;
   characterName: string;
+  at: number;
 }
 
 export interface CommunityJoinRequestFire extends CommunityFireFields {
@@ -48,6 +51,7 @@ function fields(characterId: number, entry: CommunityAlertEntry): CommunityFireF
     communityName: entry.communityName,
     uid: entry.uid,
     characterName: entry.characterName,
+    at: entry.at,
   };
 }
 
@@ -58,8 +62,14 @@ export function diffCommunityJoinRequest(
 ): CommunityJoinRequestFire[] {
   if (!prev) return [];
   const waiting = new Set(prev.entries.filter((e) => e.kind === 'request').map(key));
+  const knownCommunities = new Set(prev.entries.map((e) => e.communityId));
   return next.entries
-    .filter((entry) => entry.kind === 'request' && !waiting.has(key(entry)))
+    .filter(
+      (entry) =>
+        entry.kind === 'request' &&
+        knownCommunities.has(entry.communityId) &&
+        !waiting.has(key(entry))
+    )
     .map((entry) => ({ eventId: 'communityJoinRequest', ...fields(characterId, entry) }));
 }
 

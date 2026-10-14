@@ -1,8 +1,8 @@
-import { rememberCommunityAdmin } from '@/features/communities/communityAlertEntries';
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { rememberCommunityAdmin } from '@/features/communities/communityAlertEntries';
 import {
   Button,
   EmptyState,

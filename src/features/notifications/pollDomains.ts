@@ -1825,7 +1825,8 @@ function isCommunityAlertEntry(raw: unknown): raw is CommunityAlertEntry {
     typeof r.communityName === 'string' &&
     (r.kind === 'request' || r.kind === 'member') &&
     typeof r.uid === 'string' &&
-    typeof r.characterName === 'string'
+    typeof r.characterName === 'string' &&
+    typeof r.at === 'number'
   );
 }
 

@@ -12,6 +12,7 @@ const entry = (over: Partial<CommunityAlertEntry>): CommunityAlertEntry => ({
   kind: 'member',
   uid: 'u1',
   characterName: 'Alice',
+  at: 100,
   ...over,
 });
 const snap = (...entries: CommunityAlertEntry[]): CommunityAlertSnapshot => ({
@@ -38,6 +39,7 @@ describe('diffCommunityJoinRequest', () => {
         communityName: 'Efa Miners',
         uid: 'u2',
         characterName: 'Bob',
+        at: 100,
       },
     ]);
   });
@@ -48,10 +50,19 @@ describe('diffCommunityJoinRequest', () => {
     expect(diffCommunityJoinRequest(1, prev, next)).toEqual([]);
   });
 
-  it('treats the same uid in another community as new', () => {
-    const prev = snap(entry({ kind: 'request', communityId: 'c1' }));
-    const next = snap(entry({ kind: 'request', communityId: 'c2', communityName: 'Other' }));
+  it('treats the same uid in a community already watched as new', () => {
+    const prev = snap(entry({ kind: 'member', communityId: 'c1', uid: 'u1' }));
+    const next = snap(
+      entry({ kind: 'member', communityId: 'c1', uid: 'u1' }),
+      entry({ kind: 'request', communityId: 'c1', uid: 'u3' })
+    );
     expect(diffCommunityJoinRequest(1, prev, next)).toHaveLength(1);
+  });
+
+  it('stays quiet about requests already waiting in a community only just administered', () => {
+    const prev = snap();
+    const next = snap(entry({ kind: 'request', communityId: 'c2' }));
+    expect(diffCommunityJoinRequest(1, prev, next)).toEqual([]);
   });
 });
 
@@ -71,6 +82,7 @@ describe('diffCommunityMemberJoined', () => {
         communityName: 'Efa Miners',
         uid: 'u2',
         characterName: 'Bob',
+        at: 100,
       },
     ]);
   });

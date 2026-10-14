@@ -54,6 +54,7 @@ export async function loadCommunityAlertEntries(
         kind: 'request',
         uid: request.uid,
         characterName: request.characterName,
+        at: request.requestedAt,
       });
     }
     let roster = rosters.get(community.id);
@@ -66,6 +67,7 @@ export async function loadCommunityAlertEntries(
           kind: 'member' as const,
           uid: member.uid,
           characterName: member.characterName,
+          at: member.joinedAt,
         })),
       };
       rosters.set(community.id, roster);

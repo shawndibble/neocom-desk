@@ -70,6 +70,7 @@ describe('loadCommunityAlertEntries', () => {
         kind: 'request',
         uid: 'u2',
         characterName: 'Bob',
+        at: 1,
       },
       {
         communityId: 'c1',
@@ -77,6 +78,7 @@ describe('loadCommunityAlertEntries', () => {
         kind: 'member',
         uid: 'u1',
         characterName: 'Alice',
+        at: 1,
       },
     ]);
     expect(loadJoinRequests).toHaveBeenCalledTimes(1);
