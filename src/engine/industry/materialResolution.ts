@@ -40,6 +40,7 @@
 
 import type {
   AcquisitionResolution,
+  AcquisitionTier,
   EffectiveMaterial,
   HubPrices,
   IndustryBlueprint,
@@ -62,7 +63,7 @@ export interface ResolvedMaterial extends MaterialCostLine {
    * cost or time formula (matching `planSubBuild`'s own TE-agnostic sub-build
    * quote) — it rides along purely for display.
    */
-  acquisitionTier?: { me: number; te: number };
+  acquisitionTier?: AcquisitionTier;
 }
 
 /** A planned sub-job whose own inputs have been resolved the same way, recursively. */
@@ -269,13 +270,14 @@ export function acquisitionMaterialFor(
 ): ResolvedMaterial | null {
   if (!acquisition.line) return null;
   const resolvedOverride = usable(overridePrice);
-  const remainingQuantity = acquisition.line.owned ? 0 : 1;
+  const quantity = acquisition.line.owned ? 1 : (acquisition.line.quantity ?? 1);
+  const remainingQuantity = acquisition.line.owned ? 0 : quantity;
   const unitPrice = resolvedOverride ?? acquisition.line.unitPrice;
   return {
     typeID: acquisition.blueprintTypeID,
-    baseQuantity: 1,
-    quantity: 1,
-    ownedQuantity: 1 - remainingQuantity,
+    baseQuantity: quantity,
+    quantity,
+    ownedQuantity: quantity - remainingQuantity,
     remainingQuantity,
     unitPrice,
     lineCost: remainingQuantity * (unitPrice ?? 0),
@@ -284,6 +286,7 @@ export function acquisitionMaterialFor(
       me: acquisition.me,
       te: acquisition.te,
       ...(acquisition.line.community ? { community: acquisition.line.community } : {}),
+      ...(acquisition.line.pool ? { pool: acquisition.line.pool } : {}),
     },
   };
 }

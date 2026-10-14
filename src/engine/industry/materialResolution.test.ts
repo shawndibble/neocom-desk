@@ -8,6 +8,7 @@ import type {
 } from '@/engine/industry/types';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import {
+  acquisitionMaterialFor,
   MAX_SUB_BUILD_DEPTH,
   resolveMaterial,
   unpricedLeafTypeIds,
@@ -667,5 +668,31 @@ describe('resolveMaterial — Blueprint Acquisition (issue #838)', () => {
     );
     const row = resolved.subBuild?.inputs[0];
     expect(row).toMatchObject({ typeID: MID_BLUEPRINT_TYPE, unitPrice: 42, lineCost: 42 });
+  });
+});
+
+describe('acquisitionMaterialFor', () => {
+  it('bills one copy price per copy bought', () => {
+    const row = acquisitionMaterialFor(
+      { me: 0, te: 0, blueprintTypeID: 7, line: { unitPrice: 100, quantity: 3, owned: false } },
+      undefined
+    );
+    expect(row).toMatchObject({ quantity: 3, remainingQuantity: 3, unitPrice: 100, lineCost: 300 });
+  });
+
+  it('is a single copy when the line carries no quantity', () => {
+    const row = acquisitionMaterialFor(
+      { me: 0, te: 0, blueprintTypeID: 7, line: { unitPrice: 100, owned: false } },
+      undefined
+    );
+    expect(row).toMatchObject({ quantity: 1, lineCost: 100 });
+  });
+
+  it('applies a blueprint override price per copy', () => {
+    const row = acquisitionMaterialFor(
+      { me: 0, te: 0, blueprintTypeID: 7, line: { unitPrice: 100, quantity: 3, owned: false } },
+      40
+    );
+    expect(row).toMatchObject({ quantity: 3, unitPrice: 40, lineCost: 120 });
   });
 });

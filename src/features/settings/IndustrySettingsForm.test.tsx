@@ -4,14 +4,12 @@ import '@/i18n';
 import { db } from '@/db';
 import { useAssumedMe } from '@/features/industry/assumedMe';
 import { useAssumedTe } from '@/features/industry/assumedTe';
-import { useIncludeBlueprintCost } from '@/features/industry/includeBlueprintCost';
 import { IndustrySettingsForm } from './IndustrySettingsForm';
 
 beforeEach(async () => {
   await db.settings.clear();
   useAssumedMe.setState({ hydrated: false });
   useAssumedTe.setState({ hydrated: false });
-  useIncludeBlueprintCost.setState({ hydrated: false });
 });
 
 describe('IndustrySettingsForm', () => {
@@ -20,7 +18,6 @@ describe('IndustrySettingsForm', () => {
 
     expect(await screen.findByRole('spinbutton', { name: /Assumed ME/ })).toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: /Assumed TE/ })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /blueprint cost/ })).toBeInTheDocument();
   });
 
   it('describes Assumed ME by its note', async () => {

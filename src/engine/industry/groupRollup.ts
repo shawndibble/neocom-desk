@@ -222,6 +222,136 @@ function acquisitionTypeIds(members: readonly BuildGroupMember[]): ReadonlySet<n
   return ids;
 }
 
+/** One blueprint's pooled need across the group, replacing what each member would have bought alone. */
+interface PooledBlueprint {
+  typeID: number;
+  quantity: number;
+  remainingQuantity: number;
+  ownedQuantity: number;
+  unitPrice: number | null;
+  lineCost: number;
+  unpriced: boolean;
+}
+
+/**
+ * One blueprint used by several members is bought once for the whole group: a
+ * copy's runs are spent across plans, and runs the Character already owns are
+ * counted once, not once per plan. Each member resolved its blueprint alone
+ * (`acquisitionTier.pool` records the runs it needed and what it owned), so
+ * the group sums the needed runs per ME/TE tier and re-derives the copies:
+ * `ceil((needed - owned) / runs per copy)`. A tier nothing can top up keeps
+ * what its members reported. `costDelta` is the pooled cost minus the members'
+ * own — what the group saves (negative) or must add (positive).
+ */
+function poolBlueprints(members: readonly BuildGroupMember[]): {
+  pooled: Map<number, PooledBlueprint>;
+  costDelta: number;
+} {
+  interface Tier {
+    needed: number;
+    owned: number;
+    copyRuns: number | null;
+    unitPrice: number | null;
+    memberCost: number;
+    memberQuantity: number;
+  }
+  const byType = new Map<number, Map<string, Tier>>();
+  for (const member of members) {
+    for (const row of member.tableMaterials) {
+      const tier = row.acquisitionTier;
+      if (!tier?.pool) continue;
+      const tiers = byType.get(row.typeID) ?? new Map<string, Tier>();
+      byType.set(row.typeID, tiers);
+      const key = `${tier.me}:${tier.te}`;
+      const seen = tiers.get(key);
+      if (seen) {
+        seen.needed += tier.pool.neededRuns;
+        seen.owned = Math.max(seen.owned, tier.pool.ownedRuns);
+        seen.copyRuns ??= tier.pool.copyRuns;
+        seen.unitPrice ??= row.unitPrice;
+        seen.memberCost += row.lineCost;
+        seen.memberQuantity += row.quantity;
+      } else {
+        tiers.set(key, {
+          needed: tier.pool.neededRuns,
+          owned: tier.pool.ownedRuns,
+          copyRuns: tier.pool.copyRuns,
+          unitPrice: row.unitPrice,
+          memberCost: row.lineCost,
+          memberQuantity: row.quantity,
+        });
+      }
+    }
+  }
+
+  const pooled = new Map<number, PooledBlueprint>();
+  let costDelta = 0;
+  for (const [typeID, tiers] of byType) {
+    let bought = 0;
+    let cost = 0;
+    let unpriced = false;
+    let unitPrice: number | null = null;
+    for (const tier of tiers.values()) {
+      const shortfall = Math.max(0, tier.needed - tier.owned);
+      const copies =
+        shortfall === 0
+          ? 0
+          : tier.copyRuns === null
+            ? tier.memberQuantity
+            : Math.ceil(shortfall / tier.copyRuns);
+      const tierCost = copies * (tier.unitPrice ?? 0);
+      bought += copies;
+      cost += tierCost;
+      unpriced ||= copies > 0 && tier.unitPrice === null;
+      unitPrice ??= tier.unitPrice;
+      costDelta += tierCost - tier.memberCost;
+    }
+    pooled.set(
+      typeID,
+      bought === 0
+        ? {
+            typeID,
+            quantity: 1,
+            remainingQuantity: 0,
+            ownedQuantity: 1,
+            unitPrice,
+            lineCost: 0,
+            unpriced: false,
+          }
+        : {
+            typeID,
+            quantity: bought,
+            remainingQuantity: bought,
+            ownedQuantity: 0,
+            unitPrice,
+            lineCost: cost,
+            unpriced,
+          }
+    );
+  }
+  return { pooled, costDelta };
+}
+
+function withPooledBlueprints(
+  materials: readonly MaterialCostLine[],
+  pooled: ReadonlyMap<number, PooledBlueprint>
+): MaterialCostLine[] {
+  return materials.map((m) => {
+    const pool = pooled.get(m.typeID);
+    if (!pool) return m;
+    return {
+      ...m,
+      baseQuantity: pool.quantity,
+      quantity: pool.quantity,
+      ownedQuantity: pool.ownedQuantity,
+      remainingQuantity: pool.remainingQuantity,
+      unitPrice: pool.unitPrice,
+      lineCost: pool.lineCost,
+      unpriced: pool.unpriced,
+    };
+  });
+}
+
 function nettedAgainstLedger(
   materials: readonly MaterialCostLine[],
   ownedStock: ReadonlyMap<number, number> | undefined,
@@ -284,8 +414,15 @@ export function rollUpBuildGroup(
   members: readonly BuildGroupMember[],
   { ownedStock }: RollUpBuildGroupOptions = {}
 ): BuildGroupRollup {
-  const rawShoppingMaterials = mergeMaterials(members, (m) => m.shoppingMaterials);
-  const rawTableMaterials = mergeMaterials(members, (m) => m.tableMaterials);
+  const { pooled: pooledBlueprints, costDelta: blueprintPoolDelta } = poolBlueprints(members);
+  const rawShoppingMaterials = withPooledBlueprints(
+    mergeMaterials(members, (m) => m.shoppingMaterials),
+    pooledBlueprints
+  );
+  const rawTableMaterials = withPooledBlueprints(
+    mergeMaterials(members, (m) => m.tableMaterials),
+    pooledBlueprints
+  );
   const acquisitionIds = acquisitionTypeIds(members);
   const tableMaterials = nettedAgainstLedger(rawTableMaterials, ownedStock, acquisitionIds);
   const shoppingMaterials = nettedAgainstLedger(rawShoppingMaterials, ownedStock, acquisitionIds);
@@ -308,7 +445,8 @@ export function rollUpBuildGroup(
     (sum, raw, i) => sum + (raw.lineCost - shoppingMaterials[i]!.lineCost),
     0
   );
-  const materialCost = members.reduce((sum, m) => sum + m.result.materialCost, 0) - ownedSaving;
+  const materialCost =
+    members.reduce((sum, m) => sum + m.result.materialCost, 0) - ownedSaving + blueprintPoolDelta;
   const topLevelJobFees = members.reduce((sum, m) => sum + m.result.jobFee.total, 0);
 
   // Each member's own `profit` was computed against *its own* totalCost,
@@ -317,7 +455,7 @@ export function rollUpBuildGroup(
   // naive sum is short by exactly `ownedSaving`, the saving `materialCost`
   // already has subtracted, so it's added back here to keep `profit`
   // consistent with `totalCost` on this same rollup.
-  const profit = summedProfit === null ? null : summedProfit + ownedSaving;
+  const profit = summedProfit === null ? null : summedProfit + ownedSaving - blueprintPoolDelta;
 
   // `member.result.unpriceable` is computed against the owned-disabled tree,
   // before the ledger's netting — so a material the ledger now fully covers

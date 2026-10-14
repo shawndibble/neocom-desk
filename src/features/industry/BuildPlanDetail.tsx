@@ -326,7 +326,6 @@ export function BuildPlanDetail({
   // the pilot's own settings, never the defaults (#2054).
   const {
     assumedMe,
-    includeBlueprintCost,
     corpBlueprints,
     standing,
     bpcOffersFor,
@@ -717,7 +716,6 @@ export function BuildPlanDetail({
           bpcLastResortOffersFor,
           blueprintPurchaseOffersFor,
           communityOffersFor,
-          includeBlueprintCost,
         },
         { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
       ),
@@ -733,7 +731,6 @@ export function BuildPlanDetail({
       bpcLastResortOffersFor,
       blueprintPurchaseOffersFor,
       communityOffersFor,
-      includeBlueprintCost,
       snapshot,
       reactionSnapshot?.systemCostIndex,
     ]

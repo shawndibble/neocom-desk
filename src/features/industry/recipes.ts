@@ -317,53 +317,47 @@ export function acquisitionForLookup(
     } else {
       resolved = selectBlueprintTier(tierInputs);
     }
+    // The runs behind the line, so a Build Group can pool this blueprint
+    // across its members (`groupRollup.ts`) rather than buy a copy per plan.
+    const tier = resolved.line
+      ? tierOptions(tierInputs).find((o) => o.me === resolved.me && o.te === resolved.te)
+      : undefined;
+    const line = tier
+      ? {
+          ...resolved.line!,
+          pool: {
+            neededRuns,
+            ownedRuns: tier.ownedRuns,
+            copyRuns: tier.extend ? tier.extend.capacityRuns : null,
+          },
+        }
+      : resolved.line;
     claimBlueprintTier(pool, resolved, neededRuns);
 
     return {
       me: resolved.me,
       te: resolved.te,
       blueprintTypeID,
-      line: resolved.line,
+      line,
       coverage: resolved.coverage,
     };
   };
 }
 
 /**
- * Wraps an `acquisitionForLookup` closure so every resolution still resolves
- * its cheapest ME/TE tier (material quantities never change — only the
- * blueprint cost line does) but reports nothing to buy: the same `line: null`
- * contract an owned BPO already reports. This is what the
- * `useIncludeBlueprintCost` setting being off means, applied once here rather
- * than at each resolution pass `resolveBuildPlan.ts` runs — it wraps the
- * same top-level and nested resolutions this closure produces.
- */
-export function withoutAcquisitionCost(
-  acquisitionFor: ReturnType<typeof acquisitionForLookup>
-): ReturnType<typeof acquisitionForLookup> {
-  return (...args) => {
-    const resolved = acquisitionFor(...args);
-    return resolved ? { ...resolved, line: null } : null;
-  };
-}
-
-/**
  * The `acquisitionFor` a make-or-buy verdict (`MakeOrBuyContext`) takes: the
  * same tier choice and blueprint price the plan's own resolution would bill
- * that node — `includeBlueprintCost` off drops the price exactly as
- * `withoutAcquisitionCost` does there, and a blueprint override price
+ * that node — a blueprint override price
  * replaces the market one exactly as `acquisitionMaterialFor` does. Every
  * call resolves against its own fresh tier pool: a verdict is a what-if for
  * one material, so it must neither claim owned copies another verdict then
  * can't see nor inherit claims from one.
  */
 export function verdictAcquisitionFor(
-  sources: RecipeSources,
-  includeBlueprintCost: boolean
+  sources: RecipeSources
 ): ReturnType<typeof acquisitionForLookup> {
   return (...args) => {
-    const fresh = acquisitionForLookup(sources);
-    const resolved = (includeBlueprintCost ? fresh : withoutAcquisitionCost(fresh))(...args);
+    const resolved = acquisitionForLookup(sources)(...args);
     if (!resolved?.line || resolved.line.owned) return resolved;
     const override = usable(
       sources.blueprintAcquisition?.sourcing?.[resolved.blueprintTypeID]?.overridePrice

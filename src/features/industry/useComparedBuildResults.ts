@@ -171,7 +171,7 @@ export function useComparedBuildResults({
   // Read field by field, not as the whole object, for the same reason: only
   // a change that can move a price restarts the fetch.
   const ready = isPricingReady(pricingInputs);
-  const { assumedMe, includeBlueprintCost, standings, bpcRows, communityRows } = pricingInputs;
+  const { assumedMe, standings, bpcRows, communityRows } = pricingInputs;
 
   // Latest-ref pattern (useCompareRows.ts): a fresh `plans` array reference
   // lands on nearly every render, so the fetch effect below keys on a
@@ -214,7 +214,6 @@ export function useComparedBuildResults({
         { pi, ownedBlueprints, modifiers },
         {
           assumedMe,
-          includeBlueprintCost,
           corpBlueprints: corpForPlans,
           standings,
           bpcRows,
@@ -238,7 +237,6 @@ export function useComparedBuildResults({
     corpForPlans,
     ready,
     assumedMe,
-    includeBlueprintCost,
     standings,
     bpcRows,
     communityRows,
