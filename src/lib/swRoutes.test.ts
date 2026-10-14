@@ -73,9 +73,20 @@ describe('isContractSnapshotObject', () => {
     ).toBe(true);
   });
 
+  it('matches the courier rows object', () => {
+    expect(
+      isContractSnapshotObject(
+        at('https://data.neocomdesk.com/courier-contracts/rows.0123abcd.json')
+      )
+    ).toBe(true);
+  });
+
   it('ignores the index, which changes every publish, and other hosts', () => {
     expect(
       isContractSnapshotObject(at('https://data.neocomdesk.com/contract-offers/index.json'))
+    ).toBe(false);
+    expect(
+      isContractSnapshotObject(at('https://data.neocomdesk.com/courier-contracts/index.json'))
     ).toBe(false);
     expect(isContractSnapshotObject(at('/contract-offers/types/34.0123abcd.json'))).toBe(false);
   });

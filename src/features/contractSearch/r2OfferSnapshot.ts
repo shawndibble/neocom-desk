@@ -64,7 +64,7 @@ function isOfferRow(value: unknown): value is PublicContractOfferRow {
   return typeof row.typeId === 'number' && typeof row.contractId === 'number';
 }
 
-async function fetchJson(url: string): Promise<unknown> {
+export async function fetchJson(url: string): Promise<unknown> {
   const response = await fetch(url, { signal: AbortSignal.timeout(READ_TIMEOUT_MS) });
   if (!response.ok) throw new Error(`${url}: ${response.status}`);
   return response.json();

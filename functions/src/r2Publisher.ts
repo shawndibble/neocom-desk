@@ -20,7 +20,12 @@ import {
   buildTypeObjects,
   gzipObjectBody,
 } from './contractOfferObjects.js';
-import type { PublicContractOfferRow } from './publicContracts.js';
+import {
+  COURIER_R2_INDEX_KEY,
+  buildCourierContractR2Index,
+  buildCourierObject,
+} from './courierContractObjects.js';
+import type { PublicContractOfferRow, PublicCourierContractRow } from './publicContracts.js';
 
 export const REFRESH_AFTER_MS = 2 * 24 * 60 * 60_000;
 const UPLOAD_CONCURRENCY = 8;
@@ -161,4 +166,65 @@ export async function publishContractOffersToR2(args: {
         failed === 0 && completesFullPass ? now : refresh ? null : (previous?.fullUploadAt ?? null),
     },
   };
+}
+
+/** What the courier writer remembers between publishes (one Firestore doc). */
+export interface CourierR2PublishState {
+  /** Hash of the object that is in R2; `null` until one upload succeeds. */
+  hash: string | null;
+  /** When that object was last uploaded, for the lifecycle-refresh rule above. */
+  uploadedAt: number | null;
+}
+
+export interface CourierR2PublishResult {
+  uploaded: boolean;
+  indexWritten: boolean;
+  firstError: string | null;
+  state: CourierR2PublishState;
+}
+
+/**
+ * The courier snapshot is one object (see `courierContractObjects.ts`): upload
+ * it when its hash changed or the refresh interval lapsed, then `index.json`.
+ * A failed upload holds the index back, so readers keep the previous pair.
+ */
+export async function publishCourierContractsToR2(args: {
+  rows: readonly PublicCourierContractRow[];
+  lastSyncedAt: number;
+  previous: CourierR2PublishState | null;
+  now: number;
+  put: R2Put;
+}): Promise<CourierR2PublishResult> {
+  const { rows, lastSyncedAt, previous, now, put } = args;
+  const object = buildCourierObject(rows);
+  const due =
+    previous === null ||
+    previous.hash !== object.hash ||
+    previous.uploadedAt === null ||
+    now - previous.uploadedAt >= REFRESH_AFTER_MS;
+
+  let uploaded = false;
+  let indexWritten = false;
+  let firstError: string | null = null;
+  let state: CourierR2PublishState = previous ?? { hash: null, uploadedAt: null };
+
+  if (due) {
+    try {
+      await put(object.name, gzipObjectBody(object.body), OBJECT_HEADERS);
+      uploaded = true;
+      state = { hash: object.hash, uploadedAt: now };
+    } catch (error) {
+      firstError = String(error);
+    }
+  }
+  if (!due || uploaded) {
+    const index = buildCourierContractR2Index(object, rows.length, lastSyncedAt);
+    try {
+      await put(COURIER_R2_INDEX_KEY, JSON.stringify(index), INDEX_HEADERS);
+      indexWritten = true;
+    } catch (error) {
+      firstError ??= String(error);
+    }
+  }
+  return { uploaded, indexWritten, firstError, state };
 }
