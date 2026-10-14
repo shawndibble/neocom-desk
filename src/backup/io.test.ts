@@ -160,6 +160,8 @@ describe('restoring an existing-format backup file', () => {
     productionRuns: ['sourceJobId'],
     // costIndexOverridePct (J-Space cost index, 2026-10-12) postdates this fixture.
     buildPlans: ['costIndexOverridePct'],
+    // entityKind (Payee verification, 2026-10-14) postdates this fixture.
+    payees: ['entityKind'],
   };
   /**
    * Like `LEGACY_OMISSIONS`, but for a field that was *reshaped* rather than

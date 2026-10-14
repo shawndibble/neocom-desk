@@ -23,6 +23,7 @@ import { piPlanHref } from '@/features/pi/piPlanLink';
 import { useCompareSet } from './compareSet';
 import { useItemActions } from './itemActions';
 import { StockTargetDialog } from '@/features/stockTargets/StockTargetDialog';
+import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
@@ -70,6 +71,16 @@ export function ShowInfoMenuItem({ typeId, itemName }: { typeId: number; itemNam
     <MenuItem onSelect={() => showInfo(typeId, itemName)}>
       {t('market.contextMenu.showInfo')}
     </MenuItem>
+  );
+}
+
+/** "Open in EVE"'s two item windows (Show info, Market details), for every menu that carries `ShowInfoMenuItem`. */
+export function OpenInEveItemMenuItems({ typeId }: { typeId: number }) {
+  return (
+    <>
+      <OpenInEveMenuItem kind="information" id={typeId} />
+      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
+    </>
   );
 }
 
@@ -201,6 +212,7 @@ function useItemMenuItems(
         <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
       )}
       <ShowInfoMenuItem typeId={typeId} itemName={itemName} />
+      <OpenInEveItemMenuItems typeId={typeId} />
       <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
         {t('market.contextMenu.addToCompare')}
       </MenuItem>

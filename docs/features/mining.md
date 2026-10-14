@@ -140,7 +140,7 @@ Purpose: Moon Mining Tax. All tracked Characters by default. Files: `TaxTab.tsx`
 
 - Mining Ledger Entry: (Character, EVE date, system) with moon-ore lines summed per type; derived each refresh, never stored (`groupLedger.ts`). Moon ore = SDE moon set + manual "tag as moon ore"; ordinary ore/ice/ignored are excluded (that exclusion is the whole moon filter).
 - Assignment: stored record claiming (part of) an entry for a Payee at a tax %: `oreLines` snapshot, `estimatedValue`, `taxOwed` (both snapshotted), `status`, optional `groupId` (combined), `collectsGrowth`, `payment`, `reviewDiff` (`src/db/index.ts:659-700`).
-- Payee: per-Character free-text landlord with default tax %, Trade Hub (priced at that hub, default Jita; `20260907-100006`), legacy `systemId`, learned in-game entity id (`rememberPayeeEntity`).
+- Payee: per-Character free-text landlord with default tax %, Trade Hub (priced at that hub, default Jita; `20260907-100006`), legacy `systemId`, learned in-game entity id (`rememberPayeeEntity`), optional `entityKind` (character|corporation|alliance) set from the Name search (`PayeeNameField`, `payeeEntitySearch.ts`) or an exact-name lookup on save (`20261014-130951`); unmatched names stay unverified labels; Settle up shows Open in EVE beside "To" when the Payee has an `entityId`.
 - Statuses (`rowStatus.ts`): unassigned, outstanding, paid, needs-review, dismissed. Open = unassigned + needs-review + outstanding (`ledgerSections.ts:3`); History = paid + dismissed.
 
 ### Load pipeline (`snapshot.ts:66`, order matters)

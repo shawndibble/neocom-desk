@@ -85,6 +85,7 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { contractSearchCsvColumns } from './contractSearchCsv';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
+import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { seedFromOfferRow } from '@/features/industry/planSeed';
 import {
   PublicContractDetailModal,
@@ -1330,6 +1331,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                           typeId={row.typeId}
                           itemName={typeNames.get(row.typeId)}
                           seed={seedFromOfferRow(row)}
+                          extraItems={<OpenInEveMenuItem kind="contract" id={row.contractId} />}
                           trigger={tr}
                         />
                       )}

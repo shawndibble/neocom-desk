@@ -9,6 +9,7 @@
  * and it carries the two destinations that link displaced: View in Market and
  * Show info.
  */
+import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { interactiveClassName, focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { Link } from 'react-router-dom';
@@ -148,6 +149,7 @@ export function ProductDetail(props: ProductDetailProps) {
             {t('market.contextMenu.showInfo')}
           </Button>
         )}
+        <OpenInEveButton kind="information" id={typeId} name={product.name} />
       </div>
 
       <p className="mt-3 text-xs text-text">

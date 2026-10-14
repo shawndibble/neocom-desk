@@ -22,7 +22,7 @@ Skipped on purpose: killboards (zKillboard, EVE-KILL, nKillboard, Socket.Kill), 
 
 - **Needs a shared backend** (breaks the no-server model): SRP request workflow, shared wormhole mapper.
 - **Needs local file access** (not a web fit): RIFT and EVE Wrench settings copy/backup, live chat-log tailing.
-- **PI**: stopped-colony and storage forecasts. PI pages are mid-overhaul, so recheck afterwards.
+- **PI**: stopped-colony and storage forecasts. The PI tabs have since been rebuilt (Plan, Map, Colonies), so check these against them.
 - **No price feed**: abyssal module appraisal (MutaMarket) has no public price source here.
 - **Intel chat-log parser** (RIFT), rejected 2026-10-10: RIFT reads the chat logs live and alerts on its own; a paste-only parser here would be a weaker copy of what intel pilots already run.
 - **Niche, unverified**: Abyss run log, SRP loss-to-payout calculator, gank-efficiency and ESS raid calculators.

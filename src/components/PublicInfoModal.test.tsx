@@ -14,11 +14,17 @@ vi.mock('@/lib/zkillboard', async (importOriginal) => ({
   fetchAllianceStats: vi.fn(async () => ({ kind: 'no-history' })),
   fetchPilotKillmails: vi.fn(async () => ({ ok: true, entries: [] })),
 }));
+const openInfoMock = vi.hoisted(() => vi.fn());
+vi.mock('@/esi/endpoints', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/esi/endpoints')>()),
+  postOpenWindowInformation: openInfoMock,
+}));
 vi.mock('@/sde/loadSde', () => ({ loadTypes: vi.fn(async () => ({})) }));
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { PublicInfoModal } from './PublicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 
 const server = setupServer();
@@ -74,6 +80,71 @@ function mockNames(entries: { id: number; name: string }[]) {
     )
   );
 }
+
+describe('PublicInfoModal — Open in EVE', () => {
+  it('opens the window of the entity the active tab shows', async () => {
+    await db.characters.put({ characterId: 5, name: 'Me', ownerHash: 'oh', addedAt: 1 });
+    await db.tokens.put({
+      characterId: 5,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: ['esi-ui.open_window.v1'],
+    });
+    useActiveCharacter.setState({ activeCharacterId: 5, hydrated: true });
+    openInfoMock.mockResolvedValue({ data: null });
+    mockCharacter(91, {
+      name: 'Some Pilot',
+      corporation_id: 2,
+      alliance_id: 3,
+      birthday: '2020-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'male',
+      race_id: 1,
+    });
+    mockCorporation(2, {
+      name: 'Some Corp',
+      ticker: 'SOME',
+      ceo_id: 99,
+      creator_id: 99,
+      member_count: 42,
+      tax_rates: { isk: 10 },
+      alliance_id: 3,
+    });
+    mockAlliance(3, {
+      name: 'Some Alliance',
+      ticker: 'SOAL',
+      creator_corporation_id: 2,
+      creator_id: 99,
+      date_founded: '2019-01-01T00:00:00Z',
+    });
+    mockNames([{ id: 99, name: 'CEO Pilot' }]);
+
+    renderModal();
+    act(() => usePublicInfoModalStore.getState().open('character', 91));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(within(dialog).getByRole('tab', { name: 'Alliance' })).toBeInTheDocument()
+    );
+
+    const pressOpen = async (name: string) => {
+      openInfoMock.mockClear();
+      (await within(dialog).findByRole('button', { name: `Open in EVE: ${name}` })).click();
+      await waitFor(() => expect(openInfoMock).toHaveBeenCalledTimes(1));
+    };
+    await pressOpen('Some Pilot');
+    expect(openInfoMock).toHaveBeenCalledWith(5, 91);
+
+    within(dialog).getByRole('tab', { name: 'Corporation' }).click();
+    await screen.findByText('[SOME]');
+    await pressOpen('Some Corp');
+    expect(openInfoMock).toHaveBeenCalledWith(5, 2);
+
+    within(dialog).getByRole('tab', { name: 'Alliance' }).click();
+    await pressOpen('Some Alliance');
+    expect(openInfoMock).toHaveBeenCalledWith(5, 3);
+  });
+});
 
 describe('PublicInfoModal', () => {
   it('renders nothing when no request is open', () => {

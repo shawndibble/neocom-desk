@@ -596,6 +596,7 @@ export const PAYEES = defineEditableCollection<PayeeRecord, RemotePayeeDoc>({
     ...(p.systemId !== undefined ? { systemId: p.systemId } : {}),
     ...(p.hubId !== undefined ? { hubId: p.hubId } : {}),
     ...(p.entityId !== undefined ? { entityId: p.entityId } : {}),
+    ...(p.entityKind !== undefined ? { entityKind: p.entityKind } : {}),
     updatedAt: p.updatedAt,
     ownerHash,
     deleted: false,
@@ -608,6 +609,7 @@ export const PAYEES = defineEditableCollection<PayeeRecord, RemotePayeeDoc>({
     ...(r.systemId !== undefined ? { systemId: r.systemId } : {}),
     ...(r.hubId !== undefined ? { hubId: r.hubId } : {}),
     ...(r.entityId !== undefined ? { entityId: r.entityId } : {}),
+    ...(r.entityKind !== undefined ? { entityKind: r.entityKind } : {}),
     updatedAt: r.updatedAt,
   }),
 });

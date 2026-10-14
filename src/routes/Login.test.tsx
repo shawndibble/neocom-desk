@@ -44,13 +44,14 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-fittings.read_fittings.v1': 'in-game fittings',
 };
 
-/** The Base Grant scopes that are writes, not reads — their disclosure goes in the "Five writes" trust card, not the read sentence, which it would otherwise contradict. */
+/** The Base Grant scopes that are writes, not reads — their disclosure goes in the "Six writes" trust card, not the read sentence, which it would otherwise contradict. */
 const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-mail.organize_mail.v1': 'flags it as read in EVE',
   'esi-calendar.respond_calendar_events.v1': 'sends your response',
   'esi-mail.send_mail.v1': 'goes out through your account',
   'esi-fittings.write_fittings.v1': 'recreates it on the game',
   'esi-ui.write_waypoint.v1': 'replaces your autopilot waypoints in the client',
+  'esi-ui.open_window.v1': 'opens a window in the client',
 };
 
 const BASE_GRANT_PHRASES: Record<string, string> = {
@@ -297,7 +298,7 @@ describe('Login', () => {
       await screen.findByRole('heading', { name: /it writes only when you act/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /five writes, and nothing else/i })
+      screen.getByRole('heading', { name: /six writes, and nothing else/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /your refresh token stays on this device/i })

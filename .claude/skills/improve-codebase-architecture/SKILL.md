@@ -28,7 +28,6 @@ This command is _informed_ by the project's domain model and built on a shared d
 7. **Respect layering.** `src/engine` stays pure: no fetch, DOM or Dexie imports. Refresh tokens stay in Dexie only. Don't move logic across that line.
 8. **Tests move up, not away.** Calculation and logic modules keep TDD. Name which tests survive at the new interface and which are deleted as redundant. Never propose a deepening that reduces coverage of behavior.
 9. **UI work follows `docs/DESIGN.md`.** Don't deepen by re-implementing a `src/components/ui` primitive.
-10. **Skip `src/features/pi` and `src/routes/PlanetaryIndustry*`** unless the user names them (the PI pages are being overhauled).
 
 Each card carries a **Guardrail check** row: proposed export count, the callers that get simpler, the largest resulting file and module total, and the seam's two adapters, plus one line on guardrails 5, 7, 8 and 9 (one reason to change, layering, surviving tests, no re-implemented primitive). A card that can't fill it in is `Speculative` at best.
 

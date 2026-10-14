@@ -20,7 +20,16 @@ export interface PayeeInput {
   systemId?: number;
   /** Absent means Jita — the basis every Payee was priced at before this was settable. */
   hubId?: string;
+  /**
+   * The EVE entity this Payee is, from the name search. On `updatePayee`
+   * absent keeps what the record has (an ordinary rename must not forget what
+   * a payment taught it); `null` clears it.
+   */
+  entityId?: number | null;
+  entityKind?: PayeeEntityKind | null;
 }
+
+export type PayeeEntityKind = NonNullable<PayeeRecord['entityKind']>;
 
 export async function createPayee(characterId: number, input: PayeeInput): Promise<PayeeRecord> {
   const record: PayeeRecord = {
@@ -30,6 +39,8 @@ export async function createPayee(characterId: number, input: PayeeInput): Promi
     defaultTaxPct: input.defaultTaxPct,
     ...(input.systemId !== undefined ? { systemId: input.systemId } : {}),
     ...(input.hubId !== undefined ? { hubId: input.hubId } : {}),
+    ...(input.entityId != null ? { entityId: input.entityId } : {}),
+    ...(input.entityId != null && input.entityKind != null ? { entityKind: input.entityKind } : {}),
     updatedAt: Date.now(),
   };
   await db.payees.put(record);
@@ -55,6 +66,21 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
   // and `toRemoteDoc`'s `!== undefined` check would read a written `undefined`
   // as "no change to push", so clearing the hub has to drop the key entirely.
   if (input.hubId === undefined) delete updated.hubId;
+  // Absent keeps the stored entity; `null` clears it. A kind without an id is
+  // meaningless, so clearing the id drops the kind too.
+  if (input.entityId === null) {
+    delete updated.entityId;
+    delete updated.entityKind;
+  } else if (input.entityId !== undefined) {
+    updated.entityId = input.entityId;
+    if (input.entityId !== payee.entityId && input.entityKind === undefined) {
+      delete updated.entityKind;
+    }
+  }
+  if (input.entityKind === null) delete updated.entityKind;
+  else if (input.entityKind !== undefined && updated.entityId !== undefined) {
+    updated.entityKind = input.entityKind;
+  }
   await db.payees.put(updated);
   scheduleSync(payee.characterId);
   return updated;
@@ -76,12 +102,25 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
  */
 export async function rememberPayeeEntity(
   payee: PayeeRecord,
-  entityId: number
+  entityId: number,
+  kind?: PayeeEntityKind
 ): Promise<PayeeRecord> {
-  if (payee.entityId === entityId) return payee;
-  const updated: PayeeRecord = { ...payee, entityId, updatedAt: Date.now() };
+  if (payee.entityId === entityId) {
+    // A kind the pilot verified is never overwritten by a guess.
+    if (kind === undefined || payee.entityKind !== undefined) return payee;
+    return writeEntity({ ...payee, entityKind: kind });
+  }
+  // A different recipient: the old kind described someone else.
+  const next: PayeeRecord = { ...payee, entityId };
+  delete next.entityKind;
+  if (kind !== undefined) next.entityKind = kind;
+  return writeEntity(next);
+}
+
+async function writeEntity(next: PayeeRecord): Promise<PayeeRecord> {
+  const updated: PayeeRecord = { ...next, updatedAt: Date.now() };
   await db.payees.put(updated);
-  scheduleSync(payee.characterId);
+  scheduleSync(updated.characterId);
   return updated;
 }
 
