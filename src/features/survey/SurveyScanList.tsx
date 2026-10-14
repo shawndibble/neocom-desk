@@ -6,7 +6,7 @@
  * or a finger, and the only place a removed scan can be restored from.
  */
 import { useTranslation } from 'react-i18next';
-import { textActionClassName } from '@/components/ui';
+import { Popover, PopoverContent, PopoverTrigger, textActionClassName } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveyScan } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -15,6 +15,24 @@ interface SurveyScanListProps {
   scans: readonly SurveyScan[];
   ignored: ReadonlySet<string>;
   onSetIgnored: (scanId: string, ignored: boolean) => void;
+}
+
+interface OreLine {
+  ore: string;
+  rocks: number;
+  volume: number;
+}
+
+/** One line per ore in a scan: how many rocks and how much m³, biggest first. */
+function oreLines(scan: SurveyScan): OreLine[] {
+  const byOre = new Map<string, OreLine>();
+  for (const rock of scan.rocks) {
+    const line = byOre.get(rock.ore) ?? { ore: rock.ore, rocks: 0, volume: 0 };
+    line.rocks += 1;
+    line.volume += rock.volume;
+    byOre.set(rock.ore, line);
+  }
+  return [...byOre.values()].sort((a, b) => b.volume - a.volume);
 }
 
 const volumeOf = (scan: SurveyScan): number => scan.rocks.reduce((sum, r) => sum + r.volume, 0);
@@ -53,10 +71,26 @@ export function SurveyScanList({ scans, ignored, onSetIgnored }: SurveyScanListP
                 {isRemoved && (
                   <span className="text-xs text-text-dim">{t('survey.scanList.removed')}</span>
                 )}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button type="button" className={`${textActionClassName()} ml-auto`}>
+                      {t('survey.scanList.details')}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    aria-label={t('survey.scanList.detailsLabel', {
+                      time: formatEveClock(scan.at),
+                    })}
+                    className="w-72 p-3 text-sm"
+                  >
+                    <ScanDetails scan={scan} />
+                  </PopoverContent>
+                </Popover>
                 {id !== undefined && (
                   <button
                     type="button"
-                    className={`${textActionClassName()} ml-auto`}
+                    className={textActionClassName()}
                     onClick={() => onSetIgnored(id, !isRemoved)}
                   >
                     {isRemoved ? t('survey.scanList.restore') : t('survey.scanList.remove')}
@@ -68,5 +102,29 @@ export function SurveyScanList({ scans, ignored, onSetIgnored }: SurveyScanListP
         </ul>
       </div>
     </details>
+  );
+}
+
+function ScanDetails({ scan }: { scan: SurveyScan }) {
+  const { t, i18n } = useTranslation();
+  const lines = oreLines(scan);
+  if (lines.length === 0)
+    return <p className="text-text-dim">{t('survey.scanList.detailsEmpty')}</p>;
+  return (
+    <ul className="space-y-1 tabular-nums">
+      {lines.map((line) => (
+        <li key={line.ore} className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate text-text">{line.ore}</span>
+          <span className="text-text-dim">
+            {t('survey.scanList.detailsRocks', { count: line.rocks })}
+          </span>
+          <span className="w-24 text-right text-text-dim">
+            {t('survey.scanList.volume', {
+              volume: Math.round(line.volume).toLocaleString(i18n.language),
+            })}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
