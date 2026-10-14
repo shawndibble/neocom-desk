@@ -10,8 +10,20 @@ import type { EsiNotification } from './eveNotificationSelection.js';
 /** More pushable notifications than this for one device and Character collapse into one summary push. */
 export const SUMMARY_THRESHOLD = 3;
 
-/** Keeps one FCM data message well under its 4 KB cap. */
-export const MAX_TEXT_CHARS = 1500;
+/** FCM caps a data message at 4096 UTF-8 bytes; the rest of the payload needs ~600. */
+export const MAX_TEXT_BYTES = 2500;
+
+/** Cuts to `maxBytes` of UTF-8 on a code-point boundary. */
+export function capUtf8(text: string, maxBytes: number): string {
+  let bytes = 0;
+  let out = '';
+  for (const ch of text) {
+    bytes += Buffer.byteLength(ch);
+    if (bytes > maxBytes) break;
+    out += ch;
+  }
+  return out;
+}
 
 export interface PushMessage {
   data: Record<string, string>;
@@ -41,7 +53,7 @@ function singlePush(characterId: number, n: EsiNotification): PushMessage {
       eveType: n.type,
       notificationId: String(n.notification_id),
       notificationTimestamp: n.timestamp,
-      notificationText: (n.text ?? '').slice(0, MAX_TEXT_CHARS),
+      notificationText: capUtf8(n.text ?? '', MAX_TEXT_BYTES),
     },
   };
 }
@@ -64,12 +76,8 @@ function summaryPush(characterId: number, list: readonly EsiNotification[]): Pus
 }
 
 /** One push each, or one summary push when there are more than `SUMMARY_THRESHOLD`. */
-export function buildPushes(
-  characterId: number,
-  list: readonly EsiNotification[],
-  threshold: number = SUMMARY_THRESHOLD
-): PushMessage[] {
+export function buildPushes(characterId: number, list: readonly EsiNotification[]): PushMessage[] {
   if (list.length === 0) return [];
-  if (list.length > threshold) return [summaryPush(characterId, list)];
+  if (list.length > SUMMARY_THRESHOLD) return [summaryPush(characterId, list)];
   return list.map((n) => singlePush(characterId, n));
 }

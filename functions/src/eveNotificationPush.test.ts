@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildPushes,
   eveNotificationOccurrenceKey,
-  MAX_TEXT_CHARS,
+  MAX_TEXT_BYTES,
   SUMMARY_THRESHOLD,
 } from './eveNotificationPush.js';
 import type { EsiNotification } from './eveNotificationSelection.js';
@@ -40,8 +40,11 @@ describe('buildPushes', () => {
 
   it('caps the text and returns nothing for an empty list', () => {
     expect(buildPushes(9, [n(1, 'a'.repeat(5000))])[0]!.data.notificationText).toHaveLength(
-      MAX_TEXT_CHARS
+      MAX_TEXT_BYTES
     );
+    const cjk = buildPushes(9, [n(1, '字'.repeat(2000))])[0]!.data.notificationText;
+    expect(Buffer.byteLength(cjk)).toBeLessThanOrEqual(MAX_TEXT_BYTES);
+    expect(cjk).toMatch(/^字+$/);
     expect(buildPushes(9, [])).toEqual([]);
   });
 

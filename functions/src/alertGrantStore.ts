@@ -2,7 +2,12 @@
 // function-only (firestore.rules denies every client). Logic lives in alertGrant.ts.
 
 import type { Firestore } from 'firebase-admin/firestore';
-import type { AlertGrantDoc, AlertGrantStore, RefreshedTokens } from './alertGrant.js';
+import {
+  SsoRefreshError,
+  type AlertGrantDoc,
+  type AlertGrantStore,
+  type RefreshedTokens,
+} from './alertGrant.js';
 import { rotateStoredToken, decryptRefreshToken } from './alertGrantCrypto.js';
 import { DEVICE_REGISTRATIONS_COLLECTION } from './projectionStore.js';
 import type { PollDevice, PollerStore } from './pollEveNotifications.js';
@@ -19,42 +24,74 @@ export function firestorePollerStore(
 ): PollerStore {
   const grants = db.collection(ALERT_GRANTS_COLLECTION);
   const ref = (characterId: number) => grants.doc(String(characterId));
+  const guardedUpdate = (
+    characterId: number,
+    guardBlob: string,
+    update: Record<string, unknown>
+  ): Promise<void> =>
+    db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref(characterId));
+      const data = snap.data() as AlertGrantDoc | undefined;
+      if (data?.encryptedRefreshToken === guardBlob) tx.update(ref(characterId), update);
+    });
   return {
     async listActive() {
       const snap = await grants.where('status', '==', 'active').get();
       return snap.docs.map((d) => Number(d.id)).filter(Number.isSafeInteger);
     },
 
-    // The rotated token is written in the transaction that read the old one, so
-    // a crash after SSO rotates cannot leave the store holding a dead token. A
-    // contention retry would re-run the SSO call; that needs a concurrent write
-    // to this one doc (a re-grant), which is rare and only costs a re-authorize.
-    refresh(characterId) {
-      return db.runTransaction(async (tx) => {
-        const snap = await tx.get(ref(characterId));
-        if (!snap.exists) return null;
-        const grant = snap.data() as AlertGrantDoc;
-        if (grant.status !== 'active') return null;
-        const key = deps.key();
-        const current = decryptRefreshToken(grant.encryptedRefreshToken, characterId, key);
-        const tokens = await deps.refresh(grant.clientId, current);
-        const rotated = rotateStoredToken(
-          grant.encryptedRefreshToken,
-          tokens.refreshToken,
-          characterId,
-          key
-        );
-        if (rotated !== null) tx.update(ref(characterId), { encryptedRefreshToken: rotated });
-        return { accessToken: tokens.accessToken, grant };
+    // SSO rotates the token, so the SSO call must not run inside a retryable
+    // transaction (a retry would redeem the already-rotated token and look like
+    // invalid_grant). Read, call SSO once, then write the rotated token back in
+    // a transaction that re-reads the doc: if a re-grant replaced the token in
+    // the meantime, the rotated one is discarded instead of overwriting it.
+    async refresh(characterId) {
+      const snap = await ref(characterId).get();
+      if (!snap.exists) return { kind: 'skip' };
+      const grant = snap.data() as AlertGrantDoc;
+      if (grant.status !== 'active') return { kind: 'skip' };
+      const key = deps.key();
+      const current = decryptRefreshToken(grant.encryptedRefreshToken, characterId, key);
+      let tokens: RefreshedTokens;
+      try {
+        tokens = await deps.refresh(grant.clientId, current);
+      } catch (err) {
+        if (err instanceof SsoRefreshError && err.invalidGrant) {
+          await guardedUpdate(characterId, grant.encryptedRefreshToken, { status: 'revoked' });
+          return { kind: 'revoked' };
+        }
+        throw err;
+      }
+      const rotated = rotateStoredToken(
+        grant.encryptedRefreshToken,
+        tokens.refreshToken,
+        characterId,
+        key
+      );
+      if (rotated === null) return { kind: 'ok', accessToken: tokens.accessToken, grant };
+      const written = await db.runTransaction(async (tx) => {
+        const latest = await tx.get(ref(characterId));
+        const data = latest.data() as AlertGrantDoc | undefined;
+        if (data?.encryptedRefreshToken !== grant.encryptedRefreshToken) return false;
+        tx.update(ref(characterId), { encryptedRefreshToken: rotated });
+        return true;
       });
+      if (!written) return { kind: 'skip' };
+      return {
+        kind: 'ok',
+        accessToken: tokens.accessToken,
+        grant: { ...grant, encryptedRefreshToken: rotated },
+      };
     },
 
-    async patch(characterId, state) {
-      await ref(characterId).update(state);
+    // Poller writes are guarded on the token it refreshed with: a re-grant that
+    // landed during the ESI/FCM calls keeps its fresh state.
+    async patch(characterId, guard, state) {
+      await guardedUpdate(characterId, guard, state);
     },
 
-    async markRevoked(characterId) {
-      await ref(characterId).update({ status: 'revoked' });
+    async markRevoked(characterId, guard) {
+      await guardedUpdate(characterId, guard, { status: 'revoked' });
     },
 
     async devicesFor(characterId) {

@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SsoRefreshError, type AlertGrantDoc } from './alertGrant.js';
+import type { AlertGrantDoc } from './alertGrant.js';
 import type { NotificationsResult } from './esiNotifications.js';
 import type { PushMessage } from './eveNotificationPush.js';
-import { pollEveNotifications, type PollDevice, type PollerStore } from './pollEveNotifications.js';
+import {
+  pollEveNotifications,
+  type PollDevice,
+  type PollerStore,
+  type RefreshOutcome,
+} from './pollEveNotifications.js';
 
 const ENABLED_AT = Date.parse('2026-10-14T12:00:00Z');
 const AFTER = '2026-10-14T13:00:00Z';
@@ -34,16 +39,16 @@ const phone: PollDevice = {
 function setup(opts: {
   grants?: Record<number, AlertGrantDoc>;
   devices?: PollDevice[];
-  refresh?: (id: number) => Promise<void>;
+  refresh?: (id: number) => Promise<RefreshOutcome | void>;
   esi?: (id: number) => NotificationsResult;
   send?: (token: string, m: PushMessage) => Promise<void>;
 }) {
   const grants = opts.grants ?? { 1: grant() };
   const store = {
     listActive: vi.fn(async () => Object.keys(grants).map(Number)),
-    refresh: vi.fn(async (id: number) => {
-      await opts.refresh?.(id);
-      return { accessToken: `access-${id}`, grant: grants[id]! };
+    refresh: vi.fn(async (id: number): Promise<RefreshOutcome> => {
+      const outcome = await opts.refresh?.(id);
+      return outcome ?? { kind: 'ok', accessToken: `access-${id}`, grant: grants[id]! };
     }),
     patch: vi.fn(async () => {}),
     markRevoked: vi.fn(async () => {}),
@@ -83,7 +88,7 @@ describe('pollEveNotifications', () => {
     const summary = await pollEveNotifications(deps);
     expect(sent.map((s) => s.m.data.notificationId)).toEqual(['11', '13']);
     expect(sent.every((s) => s.token === 'fcm-phone')).toBe(true);
-    expect(store.patch).toHaveBeenCalledWith(1, {
+    expect(store.patch).toHaveBeenCalledWith(1, 'blob', {
       highWaterId: 13,
       etag: '"new"',
       seenTypes: ['KillReportVictim', 'StructureUnderAttack', 'WarDeclared'],
@@ -106,7 +111,7 @@ describe('pollEveNotifications', () => {
     });
     await pollEveNotifications(deps);
     expect(sent).toEqual([]);
-    expect(store.patch).toHaveBeenCalledWith(1, {
+    expect(store.patch).toHaveBeenCalledWith(1, 'blob', {
       highWaterId: 2,
       etag: null,
       seenTypes: ['WarDeclared'],
@@ -141,28 +146,44 @@ describe('pollEveNotifications', () => {
   it('a 403 revokes the grant and does not poll further', async () => {
     const { deps, store } = setup({ esi: () => ({ kind: 'forbidden' }) });
     const summary = await pollEveNotifications(deps);
-    expect(store.markRevoked).toHaveBeenCalledWith(1);
+    expect(store.markRevoked).toHaveBeenCalledWith(1, 'blob');
     expect(store.patch).not.toHaveBeenCalled();
     expect(summary.revoked).toBe(1);
   });
 
   it('invalid_grant at SSO revokes without calling ESI; other refresh errors only skip', async () => {
-    const dead = setup({
-      refresh: async () => {
-        throw new SsoRefreshError(400, true);
-      },
-    });
-    await pollEveNotifications(dead.deps);
-    expect(dead.store.markRevoked).toHaveBeenCalledWith(1);
+    const dead = setup({ refresh: async () => ({ kind: 'revoked' }) });
+    const summary = await pollEveNotifications(dead.deps);
+    expect(summary.revoked).toBe(1);
     expect(dead.deps.fetchNotifications).not.toHaveBeenCalled();
 
     const flaky = setup({
       refresh: async () => {
-        throw new SsoRefreshError(503, false);
+        throw new Error('SSO refresh failed (503)');
       },
     });
-    const summary = await pollEveNotifications(flaky.deps);
+    const after = await pollEveNotifications(flaky.deps);
     expect(flaky.store.markRevoked).not.toHaveBeenCalled();
+    expect(after.skipped).toBe(1);
+  });
+
+  it('a grant replaced mid-refresh is skipped', async () => {
+    const { deps } = setup({ refresh: async () => ({ kind: 'skip' }) });
+    const summary = await pollEveNotifications(deps);
+    expect(summary.skipped).toBe(1);
+    expect(deps.fetchNotifications).not.toHaveBeenCalled();
+  });
+
+  it('a transient push failure keeps state and ETag so the next poll retries', async () => {
+    const { deps, store } = setup({
+      esi: () => ({ kind: 'ok', etag: '"new"', budgetLow: false, notifications: [note(11)] }),
+      send: async () => {
+        throw Object.assign(new Error('unavailable'), { code: 'messaging/server-unavailable' });
+      },
+    });
+    const summary = await pollEveNotifications(deps);
+    expect(store.patch).not.toHaveBeenCalled();
+    expect(store.deleteDevice).not.toHaveBeenCalled();
     expect(summary.skipped).toBe(1);
   });
 
@@ -214,6 +235,6 @@ describe('pollEveNotifications', () => {
     });
     const summary = await pollEveNotifications(deps);
     expect(summary).toMatchObject({ polled: 1, skipped: 1 });
-    expect(store.patch).toHaveBeenCalledWith(2, expect.anything());
+    expect(store.patch).toHaveBeenCalledWith(2, 'blob', expect.anything());
   });
 });

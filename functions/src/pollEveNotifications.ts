@@ -4,7 +4,7 @@
 // and batching live in eveNotificationSelection.ts / eveNotificationPush.ts.
 // Nothing here logs or returns a token.
 
-import { SsoRefreshError, type AlertGrantDoc } from './alertGrant.js';
+import type { AlertGrantDoc } from './alertGrant.js';
 import { shouldDeleteDeviceToken } from './dispatchProjections.js';
 import type { NotificationsResult } from './esiNotifications.js';
 import { buildPushes, type PushMessage } from './eveNotificationPush.js';
@@ -19,20 +19,29 @@ export interface PollDevice {
   eveTypes: string[];
 }
 
+export type RefreshOutcome =
+  | { kind: 'ok'; accessToken: string; grant: AlertGrantDoc }
+  | { kind: 'revoked' }
+  | { kind: 'skip' };
+
 export interface PollerStore {
   /** Characters whose grant is `active`. */
   listActive(): Promise<number[]>;
   /**
-   * Refresh the Character's token at SSO and write the rotated one back in the
-   * same transaction that read it. Null when the grant is no longer active.
-   * Throws `SsoRefreshError` when SSO refuses.
+   * Refresh the Character's token at SSO and write the rotated one back
+   * transactionally. `grant.encryptedRefreshToken` is the stored blob after
+   * rotation. `skip`: the grant is no longer active or was replaced meanwhile.
+   * `revoked`: SSO answered `invalid_grant`; the store has marked the grant revoked.
+   * Other SSO failures throw.
    */
-  refresh(characterId: number): Promise<{ accessToken: string; grant: AlertGrantDoc } | null>;
+  refresh(characterId: number): Promise<RefreshOutcome>;
+  /** `guard` is `grant.encryptedRefreshToken`; a write is dropped if the grant was replaced since. */
   patch(
     characterId: number,
+    guard: string,
     state: { highWaterId: number | null; etag: string | null; seenTypes: string[] }
   ): Promise<void>;
-  markRevoked(characterId: number): Promise<void>;
+  markRevoked(characterId: number, guard: string): Promise<void>;
   devicesFor(characterId: number): Promise<PollDevice[]>;
   deleteDevice(deviceId: string): Promise<void>;
 }
@@ -98,24 +107,24 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
 async function pollOne(deps: PollDeps, summary: PollSummary, characterId: number): Promise<void> {
   const { store } = deps;
 
-  let refreshed: Awaited<ReturnType<PollerStore['refresh']>>;
-  try {
-    refreshed = await store.refresh(characterId);
-  } catch (err) {
-    if (err instanceof SsoRefreshError && err.invalidGrant) {
-      await store.markRevoked(characterId);
-      summary.revoked++;
-      deps.log('Alerts Grant revoked at SSO', { characterId });
-      return;
-    }
-    throw err;
+  const refreshed = await store.refresh(characterId);
+  if (refreshed.kind === 'revoked') {
+    summary.revoked++;
+    deps.log('Alerts Grant revoked at SSO', { characterId });
+    return;
   }
-  if (!refreshed) {
+  if (refreshed.kind === 'skip') {
     summary.skipped++;
     return;
   }
   const { accessToken, grant } = refreshed;
+  const guard = grant.encryptedRefreshToken;
 
+  // A 420/429 may have landed while this worker was refreshing: don't add to it.
+  if (summary.budgetStopped) {
+    summary.skipped++;
+    return;
+  }
   const result = await deps.fetchNotifications(characterId, accessToken, grant.etag);
   switch (result.kind) {
     case 'not-modified':
@@ -123,7 +132,7 @@ async function pollOne(deps: PollDeps, summary: PollSummary, characterId: number
       if (result.budgetLow) summary.budgetStopped = true;
       return;
     case 'forbidden':
-      await store.markRevoked(characterId);
+      await store.markRevoked(characterId, guard);
       summary.revoked++;
       deps.log('Alerts Grant rejected by ESI (403)', { characterId });
       return;
@@ -149,11 +158,12 @@ async function pollOne(deps: PollDeps, summary: PollSummary, characterId: number
     highWaterId: grant.highWaterId,
     enabledAt: grant.enabledAt,
     seenTypes: grant.seenTypes,
-    devices: devices.map((d) => ({ deviceId: d.deviceId, eveTypes: d.eveTypes })),
+    devices,
   });
 
   // Send first, then advance the high-water mark: a crash in between repeats a
   // push (the client dedupes on Occurrence Key) instead of losing one.
+  let transientFailure = false;
   for (const device of devices) {
     const pushable = selection.byDevice.get(device.deviceId);
     if (!pushable) continue;
@@ -168,12 +178,20 @@ async function pollOne(deps: PollDeps, summary: PollSummary, characterId: number
           await store.deleteDevice(device.deviceId);
           break;
         }
+        transientFailure = true;
         deps.log('Alerts push failed', { deviceId: device.deviceId, error: code || 'unknown' });
       }
     }
   }
 
-  await store.patch(characterId, {
+  // A transient send failure leaves the state (and ETag, which would otherwise
+  // answer 304) untouched so the next poll retries; devices that did receive
+  // the push get it again, which the client dedupes on Occurrence Key.
+  if (transientFailure) {
+    summary.skipped++;
+    return;
+  }
+  await store.patch(characterId, guard, {
     highWaterId: selection.highWaterId,
     etag: result.etag,
     seenTypes: selection.seenTypes,
