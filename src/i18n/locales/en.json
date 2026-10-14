@@ -3463,8 +3463,8 @@
         "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write, or a Community invite you send by mail, goes out through your account, saving a Fitting to EVE recreates it on the game's side, setting a route's waypoints replaces your autopilot waypoints in the client, and Open in EVE opens a window in the client. Nothing else in the app writes to EVE."
       },
       "token": {
-        "name": "Your refresh token stays on this device",
-        "desc": "It lives in this device's own storage and nowhere else — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it."
+        "name": "Your login stays on this device",
+        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications. Turn it off, or remove the character, and it is deleted."
       },
       "offline": {
         "name": "Your data stays when the signal goes",
@@ -9872,7 +9872,7 @@
     "deviceCharacters_other": "{{count}} characters are logged in on this device.",
     "deviceCharactersNone": "No characters are logged in on this device.",
     "deviceLogoutLabel": "Log out of all characters",
-    "deviceLogoutHint": "Removes every character's login and locally stored data from this device. Sync settings and everything already synced stay, and come back when you log a character in again.",
+    "deviceLogoutHint": "Removes every character's login and locally stored data from this device, and deletes any Alerts when closed token our server holds for them. Sync settings and everything already synced stay, and come back when you log a character in again.",
     "deviceLogoutHintLocalOnly": "Removes every character's login and locally stored data from this device. Sync is not set up here, so plans and other data stored only on this device are deleted too.",
     "deviceLogoutAction": "Log out",
     "deviceLogoutOpen": "Log out…",
@@ -9952,7 +9952,7 @@
           "miningHistory": "A year of mining ledger, longer than the 30 days EVE returns.",
           "jobHistory": "Delivered industry jobs, kept after ESI stops returning them. Removed with the Character.",
           "login": "Your EVE login token.",
-          "loginNote": "It never leaves this device.",
+          "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted, notifications-only token on our server for each character you turn it on for, deleted when you turn it off or remove the character.",
           "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers.",
           "ansiblex": "Route Safety's Ansiblex jump gate list, and whether Route Safety uses it. Structure access is private alliance information, so it never leaves this device."
         },
@@ -10036,6 +10036,30 @@
     "notifications": {
       "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Alerts adds a row to the Alerts page inside the app. Device pop-up choices stay on this device. Alerts choices and thresholds sync with your account's other devices.",
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
+      "alertsWhenClosed": {
+        "title": "Alerts when closed",
+        "hint": "Get EVE notifications, like a structure under attack, on this device while the app is closed. Turning it on sends you to EVE to authorize one Character for notifications only. Our server keeps an encrypted, notifications-only token for each Character you turn on. It can read nothing else, and Turn off deletes it.",
+        "stores": "Stores an encrypted, notifications-only token on our server.",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "needs-reauth": "Needs re-authorizing"
+        },
+        "turnOn": "Turn on",
+        "turnOnFor": "Turn on alerts when closed for {{name}}",
+        "turnOff": "Turn off",
+        "turnOffFor": "Turn off alerts when closed for {{name}}",
+        "reauthorize": "Re-authorize",
+        "reauthorizeFor": "Re-authorize alerts when closed for {{name}}",
+        "turnOnAll": "Turn on for all",
+        "result": {
+          "on": "Alerts when closed is on for {{name}}.",
+          "mismatch": "You authorized {{authorized}}, not {{expected}}. Nothing was saved. Press Turn on for {{expected}} again and pick {{expected}} on EVE's page.",
+          "failed": "Could not turn on alerts when closed for {{name}}. Try again.",
+          "cancelled": "Authorization cancelled. Nothing was saved.",
+          "offFailed": "Could not turn off alerts when closed for {{name}}. Check your connection and try again."
+        }
+      },
       "pushFailed": {
         "browser-refused": "Your browser refused to set up background alerts, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",
         "network": "Couldn't reach the server to set up background alerts, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import { StrictMode } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -15,6 +15,12 @@ import { assignLocation } from '@/app/navigation';
 // `beginAddCharacterLogin` ends in a real top-level navigation; jsdom cannot
 // perform one, and the assertion here is which URL it was sent, not the trip.
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
+const alertsApi = vi.hoisted(() => ({
+  saveAlertGrantRemote:
+    vi.fn<(tokens: { accessToken: string; refreshToken: string }) => Promise<void>>(),
+  deleteAlertGrantRemote: vi.fn(),
+}));
+vi.mock('@/sync/alertsGrantApi', () => alertsApi);
 
 const CHAR_ID = 2112625428;
 
@@ -85,6 +91,25 @@ function exhaustedBudget(): void {
   sessionStorage.setItem('neocom.sso.autoRetries', '1');
 }
 
+/** Stands in for Settings → Notifications: shows the router state the callback hands it. */
+function AlertsLanding() {
+  const state = useLocation().state as { alertsGrant?: { status: string } } | null;
+  return <div>settings landing: {state?.alertsGrant?.status ?? 'none'}</div>;
+}
+
+/** An Alerts Grant round trip for `expectedCharacterId`, in the layout `startAlertsLogin` writes. */
+function stashAlertsLogin(state: string, expectedCharacterId: number): void {
+  sessionStorage.setItem(
+    `neocom.sso.pkce.${state}`,
+    JSON.stringify({
+      verifier: 'verifier-1',
+      scopes: ['esi-characters.read_notifications.v1'],
+      createdAt: Date.now(),
+      intent: { kind: 'alerts', characterId: expectedCharacterId },
+    })
+  );
+}
+
 function renderCallback(search: string) {
   return render(
     <StrictMode>
@@ -94,12 +119,63 @@ function renderCallback(search: string) {
           <Route path="/characters" element={<div>characters page</div>} />
           <Route path="/overview" element={<div>overview page</div>} />
           <Route path="/login" element={<div>login page</div>} />
+          <Route path="/settings/notifications" element={<AlertsLanding />} />
           <Route path="/ships/fittings" element={<div>fittings page</div>} />
         </Routes>
       </MemoryRouter>
     </StrictMode>
   );
 }
+
+describe('Callback, Alerts Grant round trip (ADR 0020)', () => {
+  beforeEach(() => {
+    alertsApi.saveAlertGrantRemote.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('on a match sends the tokens to the server, stores no device login, and returns to Settings', async () => {
+    stashAlertsLogin('state-a', CHAR_ID);
+    renderCallback('?code=good-code&state=state-a');
+
+    expect(await screen.findByText('settings landing: on')).toBeInTheDocument();
+    expect(alertsApi.saveAlertGrantRemote).toHaveBeenCalledExactlyOnceWith({
+      accessToken: expect.any(String),
+      refreshToken: 'refresh-1',
+    });
+    expect(await db.characters.count()).toBe(0);
+    expect(await db.tokens.count()).toBe(0);
+    expect(useActiveCharacter.getState().activeCharacterId).toBeNull();
+  });
+
+  it('on a mismatch stores and sends nothing, and reports it', async () => {
+    stashAlertsLogin('state-a', 90_000_001);
+    renderCallback('?code=good-code&state=state-a');
+
+    expect(await screen.findByText('settings landing: mismatch')).toBeInTheDocument();
+    expect(alertsApi.saveAlertGrantRemote).not.toHaveBeenCalled();
+    expect(await db.tokens.count()).toBe(0);
+  });
+
+  it('a cancel at EVE returns quietly to Settings instead of the login error panel', async () => {
+    stashAlertsLogin('state-a', CHAR_ID);
+    renderCallback('?error=access_denied&state=state-a');
+
+    expect(await screen.findByText('settings landing: cancelled')).toBeInTheDocument();
+    expect(tokenRequests).toBe(0);
+  });
+
+  it('a failed exchange reports failure and never restarts as a plain login', async () => {
+    server.use(
+      http.post('https://login.eveonline.com/v2/oauth/token', () =>
+        HttpResponse.json({ error: 'invalid_grant' }, { status: 400 })
+      )
+    );
+    stashAlertsLogin('state-a', CHAR_ID);
+    renderCallback('?code=bad&state=state-a');
+
+    expect(await screen.findByText('settings landing: failed')).toBeInTheDocument();
+    expect(vi.mocked(assignLocation)).not.toHaveBeenCalled();
+  });
+});
 
 describe('Callback', () => {
   it('completes login once (StrictMode-safe) and lands a first-ever login on /overview (#1771)', async () => {

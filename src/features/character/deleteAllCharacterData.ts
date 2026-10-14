@@ -11,6 +11,7 @@
 
 import { db } from '@/db';
 import { haltSync, purgeCharacterRemoteData, signOutOfSync } from '@/sync';
+import { deleteAlertGrantsBestEffort } from '@/features/notifications/alertsGrant';
 import { setAppBadgeCount } from '@/features/notifications/badge';
 import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
 import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
@@ -50,6 +51,10 @@ export async function purgeAllRemoteCharacterData(): Promise<number[]> {
     } catch {
       unpurged.push(characterId);
     }
+    // The server-held Alerts Grant token (ADR 0020) goes too. Needs this
+    // Character's sign-in, so it runs here, before the logins are cleared; a
+    // failure leaves it to the inactivity purge, which deletes grants.
+    await deleteAlertGrantsBestEffort([characterId]);
   }
   return unpurged;
 }

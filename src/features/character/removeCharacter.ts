@@ -20,6 +20,10 @@ import { deleteFeedForCharacter } from '@/features/notifications/feed';
 import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
 import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import {
+  deleteAlertGrantsBestEffort,
+  forgetAlertsGrants,
+} from '@/features/notifications/alertsGrant';
 
 /**
  * How long the last pushes may take, all together, before removal goes ahead
@@ -86,6 +90,8 @@ export async function removeCharacterAfterSync(
   removeShared = false
 ): Promise<void> {
   if (removeShared) await removeSharedBlueprints([characterId]);
+  // Before the local removal: deleting a grant needs this Character's sign-in.
+  if (syncConfigured) await deleteAlertGrantsBestEffort([characterId]);
   if (syncConfigured) await flushSync([characterId]);
   await removeCharacter(characterId);
 }
@@ -135,6 +141,7 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await deleteShareSelections(characterId);
     }
   );
+  await forgetAlertsGrants([characterId]);
   await refreshAppBadge();
   await purgeCharacterCacheOrSuppress(characterId);
   // Not part of that purge: the shared rows aren't this Character's own —

@@ -12,6 +12,7 @@ import {
   purgeCorpScopedCache,
 } from '@/esi/cachePurge';
 import { revokedScopes } from '@/esi/scopes';
+import { ALERTS_SCOPE } from './alertsScope';
 
 export interface SsoConfig {
   clientId?: string;
@@ -88,6 +89,21 @@ interface PendingLogin {
    */
   scopes: string[] | undefined;
   createdAt: number;
+  /** Set when this round trip is not a device login — see {@link LoginIntent}. */
+  intent?: LoginIntent;
+}
+
+/**
+ * A round trip that must not become a device session (ADR 0020). An Alerts
+ * Grant asks SSO for the notifications scope alone, and its refresh token goes
+ * to the server, so landing it in `completeLogin` would replace that
+ * Character's full-scope session with a token that can read nothing else.
+ * `characterId` is the Settings row that was pressed; EVE's own page lets the
+ * user pick any Character, so the callback compares.
+ */
+export interface LoginIntent {
+  kind: 'alerts';
+  characterId: number;
 }
 
 /**
@@ -122,16 +138,39 @@ function resolveConfig(config?: SsoConfig): { clientId: string; redirectUri: str
 }
 
 /** Stash this round trip's PKCE verifier under its `state` and return the URL. */
-export async function startLogin(scopes: string[], config?: SsoConfig): Promise<string> {
+export function startLogin(scopes: string[], config?: SsoConfig): Promise<string> {
+  return beginLogin(scopes, config);
+}
+
+/**
+ * An Alerts Grant round trip for one Character's Settings row: the
+ * notifications scope only, marked so the callback never persists it as a
+ * login. Leaves `INTENT_KEY` alone — a failed callback must not restart this
+ * as a plain login, which would store the narrow token as the device session.
+ */
+export function startAlertsLogin(characterId: number, config?: SsoConfig): Promise<string> {
+  return beginLogin([ALERTS_SCOPE], config, { kind: 'alerts', characterId });
+}
+
+async function beginLogin(
+  scopes: string[],
+  config?: SsoConfig,
+  intent?: LoginIntent
+): Promise<string> {
   const { clientId, redirectUri } = resolveConfig(config);
   const verifier = generateVerifier();
   const state = generateVerifier(); // independent 32-byte random value
-  const pending: PendingLogin = { verifier, scopes, createdAt: Date.now() };
+  const pending: PendingLogin = {
+    verifier,
+    scopes,
+    createdAt: Date.now(),
+    ...(intent ? { intent } : {}),
+  };
   // Prune first: at quota, the write below would otherwise fail for room that
   // pruning was about to free. `state` is not yet written, so nothing is lost.
   prunePendingLogins(state);
   writeStorage(PKCE_PREFIX + state, JSON.stringify(pending));
-  writeStorage(INTENT_KEY, JSON.stringify(scopes));
+  if (!intent) writeStorage(INTENT_KEY, JSON.stringify(scopes));
   return buildAuthorizeUrl({
     clientId,
     redirectUri,
@@ -400,7 +439,20 @@ function readPendingLogin(key: string, allowExpired = false): PendingLogin | und
   if (typeof parsed.verifier !== 'string') return undefined;
   const createdAt = typeof parsed.createdAt === 'number' ? parsed.createdAt : 0;
   if (!allowExpired && Date.now() - createdAt > PENDING_TTL_MS) return undefined;
-  return { verifier: parsed.verifier, scopes: asScopes(parsed.scopes), createdAt };
+  const intent = parsed.intent;
+  return {
+    verifier: parsed.verifier,
+    scopes: asScopes(parsed.scopes),
+    createdAt,
+    ...(intent?.kind === 'alerts' && typeof intent.characterId === 'number'
+      ? { intent: { kind: 'alerts', characterId: intent.characterId } satisfies LoginIntent }
+      : {}),
+  };
+}
+
+/** What a live round trip was started for, or `undefined` for an ordinary device login (or none). */
+export function loginIntentFor(state: string): LoginIntent | undefined {
+  return readPendingLogin(PKCE_PREFIX + state)?.intent;
 }
 
 /** Drop expired round trips, then the oldest beyond `MAX_PENDING`. `keep` is never dropped. */
@@ -469,7 +521,11 @@ function parseScopes(raw: string | null): string[] | undefined {
  * scopes are exact, and the union cannot narrow any of them.
  */
 export function scopesForRetry(): string[] | undefined {
-  const live = pendingKeys().flatMap((key) => readPendingLogin(key)?.scopes ?? []);
+  // An Alerts round trip is not a login to restart: see `startAlertsLogin`.
+  const live = pendingKeys().flatMap((key) => {
+    const pending = readPendingLogin(key);
+    return pending?.intent ? [] : (pending?.scopes ?? []);
+  });
   if (live.length > 0) return [...new Set(live)];
   return parseScopes(readStorage(INTENT_KEY));
 }
@@ -508,27 +564,77 @@ export function clearLoginRecovery(): void {
   removeStorage(RETRY_KEY);
 }
 
+/**
+ * Resolve a callback's `state` to its Pending Login, or throw the reason it
+ * has none. Told apart for the user's sake: another round trip still pending
+ * means this callback lost a race, whereas none at all means the stash is
+ * spent or this tab never started a login.
+ */
+function pendingForCallback(state: string): { key: string; pending: PendingLogin } {
+  const key = PKCE_PREFIX + state;
+  const pending = readPendingLogin(key) ?? takeLegacyPending(state);
+  if (!pending) {
+    throw pendingKeys().length > 0
+      ? new LoginError('state-mismatch', 'SSO state mismatch')
+      : new LoginError('no-login-in-progress', 'No login in progress');
+  }
+  return { key, pending };
+}
+
 /** Handle the SSO callback: validate state, exchange code, persist character + token. */
 export async function completeLogin(
   params: { code: string; state: string },
   config?: SsoConfig
 ): Promise<CharacterRecord> {
   const { clientId } = resolveConfig(config);
-  const key = PKCE_PREFIX + params.state;
-  const pending = readPendingLogin(key) ?? takeLegacyPending(params.state);
-  if (!pending) {
-    // Told apart for the user's sake: another round trip still pending means
-    // this callback lost a race, whereas none at all means the stash is spent
-    // or this tab never started a login.
-    throw pendingKeys().length > 0
-      ? new LoginError('state-mismatch', 'SSO state mismatch')
-      : new LoginError('no-login-in-progress', 'No login in progress');
-  }
+  const { key, pending } = pendingForCallback(params.state);
   // One-shot: the code is single-use, so a second callback must not re-exchange.
   removeStorage(key);
+  // Refused before the exchange: persisting an Alerts token would replace the
+  // Character's device session with one that can read only notifications.
+  if (pending.intent) throw new LoginError('state-mismatch', 'Not a device login');
 
   const tokens = await exchangeCode({ clientId, code: params.code, verifier: pending.verifier });
   return persistTokens(tokens, pending.scopes);
+}
+
+/** What an Alerts round trip came back with. Nothing here has been stored. */
+export interface AlertsLoginResult {
+  /** The Settings row that was pressed. */
+  expectedCharacterId: number;
+  /** The Character the user actually authorized on EVE's page. */
+  characterId: number;
+  name: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
+/**
+ * Handle the callback of an Alerts round trip: exchange the code and decode
+ * who authorized, and **store nothing** — no Character row, no token row. The
+ * caller compares `characterId` with `expectedCharacterId` and, on a match,
+ * hands the tokens to the server.
+ */
+export async function completeAlertsLogin(
+  params: { code: string; state: string },
+  config?: SsoConfig
+): Promise<AlertsLoginResult> {
+  const { clientId } = resolveConfig(config);
+  const { key, pending } = pendingForCallback(params.state);
+  removeStorage(key);
+  if (pending.intent?.kind !== 'alerts')
+    throw new LoginError('state-mismatch', 'Not an Alerts login');
+
+  const tokens = await exchangeCode({ clientId, code: params.code, verifier: pending.verifier });
+  if (!tokens.refresh_token) throw new Error('Token response omitted refresh_token');
+  const decoded = decodeAccessToken(tokens.access_token);
+  return {
+    expectedCharacterId: pending.intent.characterId,
+    characterId: decoded.characterId,
+    name: decoded.name,
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+  };
 }
 
 // Single-flight per character, in this tab and — through Web Locks — across
