@@ -9821,7 +9821,7 @@
             "defaults": "Defaults: trade hub, industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
             "industry": "Industry: build groups, whether blueprint cost counts toward profit, and BPC Sourcing's hide auctions / hide PLEX.",
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and the structure broker fees you typed.",
-            "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
+            "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
             "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views and order), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
