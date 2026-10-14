@@ -7522,7 +7522,17 @@
     "emptyHint": "Couldn't load this character's corporation history yet. Try again shortly.",
     "corporation": "Corporation",
     "started": "Joined",
-    "duration": "Duration",
+    "present": "Present",
+    "now": "now",
+    "until": "to {{date}}",
+    "returned": "Returned",
+    "shortStay": "Short stay",
+    "summary": {
+      "timeInGame": "In game",
+      "corporations": "Corporations",
+      "currentTenure": "Current tenure",
+      "longest": "Longest stay"
+    },
     "current": "Current"
   },
   "contracts": {

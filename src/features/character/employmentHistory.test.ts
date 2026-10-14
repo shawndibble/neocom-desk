@@ -4,7 +4,11 @@ import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import type { CorporationHistoryEntry } from '@/esi/endpoints';
-import { deriveEmploymentHistoryRows, loadEmploymentHistory } from './employmentHistory';
+import {
+  deriveEmploymentHistoryRows,
+  deriveEmploymentSummary,
+  loadEmploymentHistory,
+} from './employmentHistory';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -24,6 +28,88 @@ const ENTRY = (
   record_id: recordId,
   corporation_id: corporationId,
   start_date: startDate,
+});
+
+const DAY_MS = 86_400_000;
+const NOW = new Date('2026-06-01T00:00:00Z').getTime();
+const daysAgo = (d: number) => new Date(NOW - d * DAY_MS).toISOString();
+
+describe('employment row flags', () => {
+  it('marks a stint as returned only when the same corp appears in an earlier record', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(900)), ENTRY(2, 200, daysAgo(500)), ENTRY(3, 100, daysAgo(100))],
+      NOW
+    );
+
+    expect(rows.map((r) => r.returned)).toEqual([true, false, false]);
+  });
+
+  it('marks stints under 14 days as short, with 14 days exactly not short', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(400)), ENTRY(2, 200, daysAgo(100)), ENTRY(3, 300, daysAgo(86))],
+      NOW
+    );
+
+    // 300 ran 86d -> now (86d); 200 ran 100d -> 86d (14d); 100 ran 400d -> 100d.
+    expect(rows.map((r) => r.shortStay)).toEqual([false, false, false]);
+    const tight = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(400)), ENTRY(2, 200, daysAgo(100)), ENTRY(3, 300, daysAgo(87))],
+      NOW
+    );
+    expect(tight.map((r) => r.shortStay)).toEqual([false, true, false]);
+  });
+
+  it('never calls the ongoing stint a short stay, however recently it began', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(400)), ENTRY(2, 200, daysAgo(3))],
+      NOW
+    );
+
+    expect(rows.map((r) => r.shortStay)).toEqual([false, false]);
+  });
+
+  it('gives each stint its tenure as a fraction of the longest', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(400)), ENTRY(2, 200, daysAgo(100))],
+      NOW
+    );
+
+    expect(rows.map((r) => r.tenureRatio)).toEqual([100 / 300, 1]);
+  });
+});
+
+describe('deriveEmploymentSummary', () => {
+  it('returns zeros and no longest for an empty history', () => {
+    expect(deriveEmploymentSummary([], NOW)).toEqual({
+      timeInGameSeconds: 0,
+      corporationCount: 0,
+      currentTenureSeconds: 0,
+      longest: null,
+    });
+  });
+
+  it('reports time in game from the earliest start, distinct corps, current tenure and longest stay', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(950)), ENTRY(2, 200, daysAgo(500)), ENTRY(3, 100, daysAgo(100))],
+      NOW
+    );
+
+    expect(deriveEmploymentSummary(rows, NOW)).toEqual({
+      timeInGameSeconds: 950 * 86_400,
+      corporationCount: 2,
+      currentTenureSeconds: 100 * 86_400,
+      longest: { corporationId: 100, seconds: 450 * 86_400 },
+    });
+  });
+
+  it('keeps the more recent stint when two tie for longest', () => {
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, daysAgo(200)), ENTRY(2, 200, daysAgo(100))],
+      NOW
+    );
+
+    expect(deriveEmploymentSummary(rows, NOW).longest?.corporationId).toBe(200);
+  });
 });
 
 describe('deriveEmploymentHistoryRows', () => {

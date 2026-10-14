@@ -103,18 +103,34 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/employment-history');
 });
 
+/** The timeline's stint cards, most-recent first. */
+const stints = () =>
+  within(screen.getByRole('list', { name: 'Employment' })).getAllByRole('listitem');
+
 describe('EmploymentHistory', () => {
+  it("shows each stint's date range once: under the name for a phone, in the gutter from md up", async () => {
+    render(<App />);
+    await screen.findByRole('link', { name: 'Past Corp' });
+
+    const past = stints()[1];
+    // Two text nodes carry the start: the gutter's (md+) and the under-name range (below md).
+    // Tailwind's `md:hidden` / `hidden md:block` show exactly one at any width.
+    const underName = within(past).getByText(/Jan 2025 – Jan 2026/);
+    expect(underName).toHaveClass('md:hidden');
+    expect(within(past).getByText('Jan 2025', { selector: 'span' })).toHaveClass('block');
+    expect(past.querySelector('.hidden.md\\:block')).not.toBeNull();
+  });
+
   it('lists corporations most-recent first, with resolved names, without any granted scope', async () => {
     render(<App />);
     // 'Past Corp' rather than 'Current Corp': the shared header names the
     // character's *current* corporation too, and it resolves first.
-    expect(await screen.findByText('Past Corp')).toBeInTheDocument();
-    const rows = screen.getAllByRole('row');
-    // Row 0 is the header; row 1 should be the most recent corp.
-    expect(rows[1]).toHaveTextContent('Current Corp');
-    expect(rows[2]).toHaveTextContent('Past Corp');
+    expect(await screen.findByRole('link', { name: 'Past Corp' })).toBeInTheDocument();
+    const rows = stints();
+    expect(rows[0]).toHaveTextContent('Current Corp');
+    expect(rows[1]).toHaveTextContent('Past Corp');
     // Past Corp ran exactly 2025-01-01 to 2026-01-01: a full non-leap year.
-    expect(rows[2]).toHaveTextContent('365d');
+    expect(rows[1]).toHaveTextContent('1y');
   });
 
   it('badges the ongoing row when it matches the character record', async () => {
@@ -122,17 +138,16 @@ describe('EmploymentHistory', () => {
     // so the ongoing row's name opens Show Info (like every row's), never /corp.
     render(<App />);
 
-    await screen.findByText('Past Corp');
-    // Row 0 is the header; row 1 is the ongoing/matching corp.
-    const rows = screen.getAllByRole('row');
-    expect(rows[1]).toHaveTextContent('Current Corp');
-    expect(rows[1]).toHaveTextContent('Current');
-    expect(within(rows[1]).getByRole('link', { name: 'Current Corp' })).toHaveAttribute(
+    await screen.findByRole('link', { name: 'Past Corp' });
+    const rows = stints();
+    expect(rows[0]).toHaveTextContent('Current Corp');
+    expect(rows[0]).toHaveTextContent('Current');
+    expect(within(rows[0]).getByRole('link', { name: 'Current Corp' })).toHaveAttribute(
       'href',
       expect.stringContaining('info=corporation-200')
     );
     // The past corp's row gets no badge either.
-    expect(rows[2]).not.toHaveTextContent('Current');
+    expect(rows[1]).not.toHaveTextContent('Current');
   });
 
   it('does not badge the ongoing row when the character record has a different corp', async () => {
@@ -166,7 +181,7 @@ describe('EmploymentHistory', () => {
     );
     render(<App />);
 
-    await screen.findByText('Past Corp');
+    await screen.findByRole('link', { name: 'Past Corp' });
     await screen.findByText('Other Corp');
     expect(screen.queryByText('Current')).toBeNull();
   });
@@ -205,10 +220,9 @@ describe('EmploymentHistory', () => {
     );
     render(<App />);
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
-    // Row 0 is the header; row 1 is the cached, ongoing/matching corp — its
-    // name may or may not have resolved yet.
-    const rows = screen.getAllByRole('row');
-    expect(rows[1]).toHaveTextContent(/#200|Current Corp/);
+    // The first stint is the cached, ongoing/matching corp — its name may or
+    // may not have resolved yet.
+    expect(stints()[0]).toHaveTextContent(/#200|Current Corp/);
   });
 
   it("renders the previous visit's rows immediately, with no spinner, while it re-reads", async () => {
@@ -248,7 +262,7 @@ describe('EmploymentHistory', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Past Corp')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Past Corp' })).toBeInTheDocument();
     // The whole point: a load really is in flight, and no spinner is shown.
     expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
     // Refresh still reports the in-flight load honestly.
@@ -279,8 +293,8 @@ describe('EmploymentHistory', () => {
 describe('Employment History corporation names (issue #729)', () => {
   it('links every name to the corporation Show Info, with no ⋮ or row menu', async () => {
     render(<App />);
-    const row = (await screen.findByText('Past Corp')).closest('tr');
-    if (!row) throw new Error('expected a Past Corp row');
+    const row = (await screen.findByRole('link', { name: 'Past Corp' })).closest('li');
+    if (!row) throw new Error('expected a Past Corp stint');
 
     expect(within(row).getByRole('link', { name: 'Past Corp' })).toHaveAttribute(
       'href',

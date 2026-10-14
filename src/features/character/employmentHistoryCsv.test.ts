@@ -11,6 +11,9 @@ function row(overrides: Partial<EmploymentHistoryRow> = {}): EmploymentHistoryRo
     startDate: '2024-03-01T12:00:00Z',
     tenureSeconds: 10 * 86_400 + 3_600,
     ongoing: false,
+    returned: false,
+    shortStay: false,
+    tenureRatio: 1,
     ...overrides,
   };
 }

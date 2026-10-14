@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { formatCountdown, formatDuration, formatSeconds, stepFinish } from './duration';
+import {
+  formatCountdown,
+  formatDuration,
+  formatSeconds,
+  formatTenure,
+  stepFinish,
+} from './duration';
 
 describe('formatDuration', () => {
   it('formats minutes only under an hour', () => {
@@ -74,5 +80,28 @@ describe('formatSeconds', () => {
   it('rounds to the nearest second before splitting, and floors negatives to 0s', () => {
     expect(formatSeconds(59.6)).toBe('1m 0s');
     expect(formatSeconds(-5)).toBe('0s');
+  });
+});
+
+describe('formatTenure', () => {
+  const DAY = 86_400;
+
+  it('counts days under two months, so a short stay never reads 0mo', () => {
+    expect(formatTenure(2 * DAY)).toBe('2d');
+    expect(formatTenure(45 * DAY)).toBe('45d');
+  });
+
+  it('counts whole months from two months up to a year', () => {
+    expect(formatTenure(60 * DAY)).toBe('1mo');
+    expect(formatTenure(200 * DAY)).toBe('6mo');
+  });
+
+  it('counts years and leftover months, dropping a zero month part', () => {
+    expect(formatTenure(365 * DAY)).toBe('1y');
+    expect(formatTenure(2 * 365 * DAY + 95 * DAY)).toBe('2y 3mo');
+  });
+
+  it('floors negatives to 0d', () => {
+    expect(formatTenure(-5)).toBe('0d');
   });
 });

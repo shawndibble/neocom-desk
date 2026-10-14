@@ -3,22 +3,17 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import {
-  DataAgeBadge,
-  DataTable,
-  EmptyState,
-  IconButton,
-  Panel,
-  Spinner,
-  type DataTableColumn,
-} from '@/components/ui';
+import { DataAgeBadge, EmptyState, IconButton, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   deriveEmploymentHistoryRows,
+  deriveEmploymentSummary,
   loadEmploymentHistory,
-  type EmploymentHistoryRow,
 } from '@/features/character/employmentHistory';
-import { CorporationLink } from '@/features/entities/EntityLink';
+import {
+  EmploymentSummaryChips,
+  EmploymentTimeline,
+} from '@/features/character/EmploymentTimeline';
 import type { CachedResult } from '@/esi/cache';
 import type { CorporationHistoryEntry } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
@@ -27,7 +22,6 @@ import { loadCharacterSpSummary } from '@/features/character/characterSp';
 import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { formatDuration } from '@/lib/duration';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { employmentHistoryCsvColumns } from '@/features/character/employmentHistoryCsv';
@@ -91,54 +85,12 @@ export function EmploymentHistory() {
     [historyResult, loadedAt]
   );
 
-  const columns = useMemo<DataTableColumn<EmploymentHistoryRow>[]>(
-    () => [
-      {
-        id: 'corporation',
-        header: t('employmentHistory.corporation'),
-        sortValue: (row) => corpNames.get(row.corporationId) ?? `#${row.corporationId}`,
-        render: (row) => {
-          const name = corpNames.get(row.corporationId) ?? `#${row.corporationId}`;
-          // Only the row that is both ongoing and matches the character's
-          // current corp gets the badge — past corps and an ongoing row the
-          // character record hasn't caught up to yet stay plain text. Never
-          // a link to /corp: this route needs no scope and a typical viewer
-          // has no Corp Access grant, so it would just land them on a
-          // rejection. The name opens Show Info instead (GLOSSARY.md round 49,
-          // amended: an entity link, not a row menu).
-          const link = <CorporationLink id={row.corporationId}>{name}</CorporationLink>;
-          if (!row.ongoing || character?.corporationId !== row.corporationId) return link;
-          return (
-            <span className="inline-flex items-center gap-2">
-              {link}
-              <span className="rounded-xs bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
-                {t('employmentHistory.current')}
-              </span>
-            </span>
-          );
-        },
-      },
-      {
-        id: 'started',
-        header: t('employmentHistory.started'),
-        className: 'whitespace-nowrap text-text-dim',
-        sortValue: (row) => row.startDate,
-        render: (row) => new Date(row.startDate).toLocaleDateString(),
-      },
-      {
-        id: 'duration',
-        header: t('employmentHistory.duration'),
-        align: 'right',
-        className: 'tabular-nums',
-        sortValue: (row) => row.tenureSeconds,
-        render: (row) => formatDuration(row.tenureSeconds),
-      },
-    ],
-    [t, corpNames, character?.corporationId]
-  );
+  const summary = useMemo(() => deriveEmploymentSummary(rows, loadedAt), [rows, loadedAt]);
+
   const csvColumns = useMemo(() => employmentHistoryCsvColumns(t, corpNames), [t, corpNames]);
   const historyExport = useTableExport({
     surface: 'employment-history',
+    source: 'rows',
     rows,
     columns: csvColumns,
   });
@@ -203,18 +155,15 @@ export function EmploymentHistory() {
                 {t('common.offlineTitle')}
               </p>
             )}
-            <DataTable
-              {...historyExport.tableProps}
-              label={t('employmentHistory.title')}
-              columns={columns}
-              rows={rows}
-              rowKey={(row) => row.recordId}
-              rowClassName={(row) => (row.ongoing ? 'bg-success/5' : undefined)}
-              // Rows already arrive most-recent-first; match it so the
-              // header shows this as the active sort rather than none.
-              defaultSort={{ columnId: 'started', direction: 'desc' }}
-              mobileSort
-            />
+            <div className="space-y-4 p-3">
+              <EmploymentSummaryChips summary={summary} names={corpNames} />
+              <EmploymentTimeline
+                rows={rows}
+                names={corpNames}
+                label={t('employmentHistory.title')}
+                currentCorporationId={character?.corporationId}
+              />
+            </div>
           </>
         )}
       </Panel>
