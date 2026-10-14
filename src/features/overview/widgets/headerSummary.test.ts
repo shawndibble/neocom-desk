@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectDeadlines, stalestFetch } from './headerSummary';
+import { collectDeadlines, fetchBreakdown, stalestFetch } from './headerSummary';
 
 const d = (at: number) => ({ at, note: 'n', severity: 'clear' as const, to: '/x' });
 
@@ -30,5 +30,25 @@ describe('stalestFetch', () => {
       fromCache: false,
     });
     expect(stalestFetch([])).toEqual({ date: null, fromCache: false });
+  });
+});
+
+describe('fetchBreakdown', () => {
+  const view = (at: number | null) => ({ fetchedAt: at === null ? null : new Date(at) });
+
+  it('lists each kind once, stalest first, with unread kinds last', () => {
+    const rows = fetchBreakdown([
+      { kind: 'wallet', view: view(5000) },
+      { kind: 'assets', view: view(1000) },
+      { kind: 'orders', view: view(null) },
+      { kind: 'wallet', view: view(5000) },
+    ]);
+    expect(rows.map((r) => r.kind)).toEqual(['assets', 'wallet', 'orders']);
+    expect(rows[0]).toEqual({ kind: 'assets', fetchedAt: new Date(1000) });
+    expect(rows[2].fetchedAt).toBeNull();
+  });
+
+  it('is empty with nothing drawn', () => {
+    expect(fetchBreakdown([])).toEqual([]);
   });
 });

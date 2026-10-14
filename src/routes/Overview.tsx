@@ -70,7 +70,6 @@ function Board({ characterId, layout }: BoardProps) {
       <CharacterHeader
         characterId={characterId}
         overview
-        aside={<OverviewDataAge widgets={layout.widgets} />}
         actions={
           <>
             <OverviewNext widgets={layout.widgets} />
@@ -78,7 +77,7 @@ function Board({ characterId, layout }: BoardProps) {
           </>
         }
       />
-      <OverviewSubNav />
+      <OverviewSubNav trailing={<OverviewDataAge widgets={layout.widgets} />} />
       <DangerBanner />
       {editing && (
         <CustomizeBar onAdd={() => setGalleryOpen(true)} onRoles={() => setRolesOpen(true)} />

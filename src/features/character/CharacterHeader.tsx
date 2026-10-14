@@ -20,11 +20,11 @@ interface CharacterHeaderProps {
   /**
    * The Overview's layout: a narrower name column (`basis-36`) and the bell
    * always shown. SP chips come from `totalSp`/`unallocatedSp` and the slots
-   * from `aside`/`actions`, none of which this flag changes; the Overview just
+   * from `actions` (and `aside`), none of which this flag changes; the Overview just
    * passes no SP (a Skill points widget carries it).
    */
   overview?: boolean;
-  /** Beside the name (the data age); wraps under it when the name is long. */
+  /** Beside the name, for a short fact about the Character itself; wraps under it when the name is long. Not a data age: that reads as the pilot being updated (see `OverviewSubNav`'s `trailing`). */
   aside?: ReactNode;
   /** In the header's own flex row, ahead of the bell (the Overview's Next deadline and Customize; Employment History's Refresh and export). */
   actions?: ReactNode;
@@ -43,9 +43,9 @@ interface CharacterHeaderProps {
  * Clones carries no controls of its own here: its `DataAgeBadge` and Refresh
  * belong to the data they describe, so they sit in its `Panel` toolbar below
  * the tabs. The Overview (`overview`) and Employment History instead put the
- * data age beside the name (`aside`) and their controls ahead of the bell
- * (`actions`): the Overview's widgets, and Employment's timeline, are the
- * page, with no panel title bar to hold them. No SP is drawn on either
+ * data age on the tab row (`OverviewSubNav`'s `trailing`) and their controls
+ * ahead of the bell (`actions`): the Overview's widgets, and Employment's
+ * timeline, are the page, with no panel title bar to hold them. No SP is drawn on either
  * (`totalSp` and `unallocatedSp` omitted). Switching Character is the rail
  * footer's and the command palette's job.
  *

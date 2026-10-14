@@ -193,12 +193,13 @@ describe('EmploymentHistory', () => {
     expect(await screen.findByRole('link', { name: 'Current Corp' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Employment' })).toBeNull();
 
-    // Data age sits beside the name; Refresh and export sit in the header with
-    // the bell. The panel below has no title bar of its own: the tab says it.
+    // Data age sits on the tab row, not in the header; Refresh and export sit in
+    // the header with the bell. The panel below has no title bar of its own: the tab says it.
     const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
     expect(within(header!).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
     expect(within(header!).getByRole('button', { name: 'Export Employment' })).toBeInTheDocument();
-    expect(await within(header!).findByText('Updated')).toBeInTheDocument();
+    const dataAge = await screen.findByText('Data updated');
+    expect(header).not.toContainElement(dataAge);
     expect(screen.queryByRole('heading', { level: 2, name: 'Employment' })).toBeNull();
 
     // No SP at all, and nothing asked ESI for skills this character never granted.

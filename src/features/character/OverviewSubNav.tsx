@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
@@ -52,28 +53,38 @@ function ClonesTab({ locked }: { locked: boolean }) {
  * (routes), not a `Tabs` widget — same reasoning as `SkillsSubNav`, and the
  * paths stay top-level rather than nesting under `/overview`, so each view
  * keeps its own `ScopeGate` and every existing bookmark still resolves.
+ *
+ * `trailing` sits at the bar's right end: the view's data age, drawn on the
+ * tab row rather than beside the name so it reads as the data's, not the
+ * pilot's.
  */
-export function OverviewSubNav() {
+export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
   const { t } = useTranslation();
   const locked = useLockedRoutes(TAB_PATHS);
 
   return (
-    <div className={tabScrollerClassName}>
-      <nav aria-label={t('nav.overview')} className={tabListClassName}>
-        <NavLink to="/overview" className={subNavClass}>
-          {t('nav.overview')}
-        </NavLink>
-        {/*
+    <div className="flex items-stretch">
+      <div className={cx(tabScrollerClassName, 'min-w-0 flex-1')}>
+        <nav aria-label={t('nav.overview')} className={tabListClassName}>
+          <NavLink to="/overview" className={subNavClass}>
+            {t('nav.overview')}
+          </NavLink>
+          {/*
           The rail used to carry this marker for /clones; the tab has to keep it
           now that the rail no longer lists the route. Informational only, and it
           is a dot inside the link with a tooltip on a wrapper, so the link stays
           named "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
         */}
-        <ClonesTab locked={locked.has('/clones')} />
-        <NavLink to="/employment-history" className={subNavClass}>
-          {t('nav.employmentHistory')}
-        </NavLink>
-      </nav>
+          <ClonesTab locked={locked.has('/clones')} />
+          <NavLink to="/employment-history" className={subNavClass}>
+            {t('nav.employmentHistory')}
+          </NavLink>
+        </nav>
+      </div>
+      {/* Outside the scroller, so a narrow phone scrolls the tabs and never hides this. */}
+      {trailing && (
+        <div className="flex shrink-0 items-center border-b border-line pr-1 pl-2">{trailing}</div>
+      )}
     </div>
   );
 }

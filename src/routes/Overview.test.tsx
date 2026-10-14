@@ -411,10 +411,23 @@ describe('Overview widget grid', () => {
     expect(main.queryByRole('button', { name: /character: /i })).not.toBeInTheDocument();
     expect(main.queryByText('Total SP')).not.toBeInTheDocument();
     expect(main.queryByText('Unallocated SP')).not.toBeInTheDocument();
-    // No header Refresh; the data age sits in the identity block beside the name.
+    // No header Refresh; the data age sits on the tab row, not beside the name.
     expect(main.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
     const heading = main.getByRole('heading', { level: 1 });
-    await waitFor(() => expect(heading.parentElement).toHaveTextContent(/Updated/));
+    const dataAge = await main.findByRole('button', { name: /Data updated/ });
+    expect(heading.parentElement).not.toContainElement(dataAge);
+  });
+
+  it('opens a per-widget table of when each read landed from the data age', async () => {
+    await seedLayout(widget('w', 'wallet', { size: 'S' }));
+    render(<App />);
+
+    await widgetCard('Wallet');
+    const trigger = await screen.findByRole('button', { name: /Data updated/ });
+    await userEvent.click(trigger);
+    const table = await screen.findByRole('table', { name: /last read its data/i });
+    expect(within(table).getByRole('rowheader', { name: 'Wallet' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh all widgets' })).toBeInTheDocument();
   });
 });
 

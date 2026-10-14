@@ -23,3 +23,25 @@ export function stalestFetch(views: readonly Pick<KindView, 'fetchedAt' | 'fromC
   }
   return { date, fromCache };
 }
+
+export interface FetchRow {
+  kind: string;
+  fetchedAt: Date | null;
+}
+
+/**
+ * One row per kind on screen (two widgets of a kind share a read), stalest
+ * first so the row that sets the header's age leads; kinds never read sit last.
+ */
+export function fetchBreakdown(
+  entries: readonly { kind: string; view: Pick<KindView, 'fetchedAt'> }[]
+): FetchRow[] {
+  const byKind = new Map<string, FetchRow>();
+  for (const { kind, view } of entries) {
+    if (!byKind.has(kind)) {
+      byKind.set(kind, { kind, fetchedAt: view.fetchedAt });
+    }
+  }
+  const time = (row: FetchRow) => row.fetchedAt?.getTime() ?? Infinity;
+  return [...byKind.values()].sort((a, b) => time(a) - time(b));
+}
