@@ -138,6 +138,12 @@
 // absent entry, and the key is never deleted, so the tombstone-expiry edge
 // does not bite it. See features/skills/cloneState.ts.
 //
+// sync.cloneNicknames: the pilot's name for each jump clone, since ESI stopped
+// returning them (esi/esi-issues#1305). A `Record<jumpCloneId, name>` blob for
+// the same exact-match reason as sync.skillCloneStates; clearing a name drops
+// its entry and the key is never deleted, so the tombstone-expiry edge does not
+// bite it. See features/character/cloneNicknames.ts.
+//
 // sync.miningTaxManualMoonOreTypeIds / sync.miningTaxManualIgnoredTypeIds
 // (decision doc 20260923-112603-manual-ore-tags-sync-across-devices,
 // superseding 20260907-090317's device-local call): the Moon Mining Tax ledger's
@@ -288,6 +294,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.avoidedSystemsEnabled',
   'sync.bpcHideAuctions',
   'sync.bpcHidePlex',
+  'sync.cloneNicknames',
   'sync.corpDarkAfterDays',
   'sync.courierHighCollateralRatio',
   'sync.defaultCharacterFilter',

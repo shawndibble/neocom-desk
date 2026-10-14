@@ -7,6 +7,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { AttributeName } from '@/engine/types';
 import type { VerdictSegment } from '@/engine/cloneVerdict';
 import { useViewRoute } from '@/features/route/useViewRoute';
+import { CURRENT_QUEUE_HASH } from '@/features/skills/planner/currentQueueHash';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 
@@ -145,7 +146,7 @@ export function CloneVerdictCard({
   const scale = Math.max(sum(stay), best ? sum(best) : 0);
   const queueLink = (
     <Link
-      to="/overview"
+      to={`/skills/plans${CURRENT_QUEUE_HASH}`}
       className={`${inlineLinkClassName} inline-flex min-h-11 items-center md:min-h-0`}
     >
       {t('clones.verdict.viewQueue')}

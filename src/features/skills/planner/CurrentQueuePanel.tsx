@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { SkillQueueEntry } from '@/esi/endpoints';
@@ -8,6 +8,7 @@ import { classifySkillQueue, isQueuePaused, type SkillQueueStatus } from '../que
 import type { SkillCatalog } from '../skillMap';
 import { formatCountdown } from '@/lib/duration';
 import { useTicker } from '@/lib/ticker';
+import { CURRENT_QUEUE_HASH } from './currentQueueHash';
 
 interface CurrentQueuePanelProps {
   characterId: number;
@@ -61,6 +62,18 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
   );
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const now = useTicker(TICK_MS);
+  const panelRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // The panel mounts only once the skill catalogue has loaded, long after the
+  // browser's own hash jump would have looked for it, and below the plan list
+  // on a phone; so it brings itself into view. Window, not the router: the
+  // panel is also rendered outside one.
+  useEffect(() => {
+    if (window.location.hash !== CURRENT_QUEUE_HASH) return;
+    panelRef.current?.scrollIntoView?.({ block: 'start' });
+    headingRef.current?.focus({ preventScroll: true });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +117,8 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
 
   return (
     <Panel
+      ref={panelRef}
+      headingRef={headingRef}
       title={t('plans.currentQueueTitle')}
       actions={
         <span className="flex items-center gap-2 text-[0.6875rem] text-text-dim">

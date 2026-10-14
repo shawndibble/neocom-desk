@@ -2,6 +2,8 @@
 import { getCharacterClones, type CharacterClones } from '@/esi/endpoints';
 import { loadUniverseType } from '@/features/skills/data';
 import { typeDescription } from '@/features/skills/typeDisplay';
+import { extractAttributeBonuses, extractImplantSlot } from '@/features/skills/dogma';
+import type { Attributes } from '@/engine/types';
 import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
 const KEY = 'clones';
@@ -18,21 +20,38 @@ export function loadCharacterClones(characterId: number): Promise<StatusResult<C
   return loadWithCacheStatus(characterId, KEY, fetchLive, { conditional });
 }
 
+/** What the clone cards show beside an implant's name. */
+export interface ImplantDetail {
+  /** Markup-stripped; absent when the type has none, so the name gets no empty tooltip. */
+  description?: string;
+  /** Implant slot 1–10; absent when the type has none. */
+  slot?: number;
+  /** Non-zero attribute bonuses (the learning implants). */
+  bonuses: Partial<Attributes>;
+}
+
 /**
- * Markup-stripped descriptions for implant types, keyed by typeID. A failed
- * lookup or an empty description leaves the id absent, so the caller renders
- * the bare name rather than an empty tooltip. `loadUniverseType` already
- * retries once; a still-failing id never rejects the whole snapshot.
+ * Description, slot and attribute bonus for implant types, keyed by typeID. A
+ * failed lookup leaves the id absent, so the caller renders the bare name.
+ * `loadUniverseType` already retries once; a still-failing id never rejects
+ * the whole snapshot.
  */
-export async function loadImplantDescriptions(
+export async function loadImplantDetails(
   typeIds: readonly number[]
-): Promise<Map<number, string>> {
+): Promise<Map<number, ImplantDetail>> {
   const unique = [...new Set(typeIds)];
   const types = await Promise.all(unique.map((id) => loadUniverseType(id).catch(() => null)));
-  const map = new Map<number, string>();
+  const map = new Map<number, ImplantDetail>();
   unique.forEach((id, i) => {
-    const description = typeDescription(types[i]?.data?.description);
-    if (description) map.set(id, description);
+    const data = types[i]?.data;
+    if (!data) return;
+    const description = typeDescription(data.description);
+    const slot = extractImplantSlot(data.dogma_attributes);
+    map.set(id, {
+      ...(description ? { description } : {}),
+      ...(slot !== undefined ? { slot } : {}),
+      bonuses: extractAttributeBonuses(data.dogma_attributes),
+    });
   });
   return map;
 }

@@ -20,6 +20,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.avoidedSystems',
   'sync.bpcHideAuctions',
   'sync.bpcHidePlex',
+  'sync.cloneNicknames',
   'sync.corpDarkAfterDays',
   'sync.courierHighCollateralRatio',
   'sync.defaultCharacterFilter',

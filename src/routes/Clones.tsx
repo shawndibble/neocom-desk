@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,17 +6,29 @@ import {
   CachedEmptyState,
   EmptyState,
   IconButton,
+  IskFigureGroup,
   Panel,
   SegmentedControl,
   Spinner,
   STAT_CHIP_TONE_TEXT_CLASS,
+  TextInput,
   Tooltip,
   type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
-import { loadCharacterClones, loadImplantDescriptions } from '@/features/character/clones';
+import {
+  loadCharacterClones,
+  loadImplantDetails,
+  type ImplantDetail,
+} from '@/features/character/clones';
+import {
+  CLONE_NICKNAME_MAX,
+  cloneOwnName,
+  useCloneNicknames,
+  withCloneNickname,
+} from '@/features/character/cloneNicknames';
 import { ItemInfoLink } from '@/features/entities';
 import { loadCharacterSpSummary } from '@/features/character/characterSp';
 import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
@@ -73,14 +85,16 @@ import {
   runCloneVerdict,
 } from '@/features/character/cloneVerdictGate';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import type { AttributeName } from '@/engine/types';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_DETAILS: ReadonlyMap<number, ImplantDetail> = new Map();
 const NO_CLONES: readonly JumpClone[] = [];
 const NO_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
 const NO_SECURITIES: ReadonlyMap<number, number> = new Map();
 const NO_IDS: readonly number[] = [];
-/** Touch-sized on a phone, compact beside a pointer. */
 /** 44px tap box on a phone; stacked wrapped links must not overlap, so no negative margins here. */
 const TOUCH_LINK = 'inline-flex min-h-11 items-center md:min-h-0';
 
@@ -107,8 +121,8 @@ interface Snapshot {
   /** Security status of every system above, keyed by solar system id; absent when unresolved. */
   securities: Map<number, number>;
   implantNames: Map<number, string>;
-  /** Markup-stripped implant descriptions for the name tooltips; absent ids get no tooltip. */
-  implantDescriptions: Map<number, string>;
+  /** Description (name tooltip), slot and attribute bonus per implant; absent ids get none. */
+  implantDetails: Map<number, ImplantDetail>;
   /** Jump-clone and home-clone location names, keyed by `location_id`. */
   locationNames: Map<number, string>;
   /** Total/unallocated SP for the shared Character-overview header. */
@@ -147,9 +161,9 @@ async function loadClonesSnapshot(
   const implantTypeIds = signal.cancelled
     ? []
     : [...new Set([...clones.flatMap((c) => c.implants), ...(wornImplants?.data ?? [])])];
-  const [implantNames, implantDescriptions] = await Promise.all([
+  const [implantNames, implantDetails] = await Promise.all([
     loadTypeNames(implantTypeIds),
-    loadImplantDescriptions(implantTypeIds),
+    loadImplantDetails(implantTypeIds),
   ]);
 
   // Ids to resolve for one location type: every jump clone of that type, plus
@@ -236,7 +250,7 @@ async function loadClonesSnapshot(
     characterSystemName: characterSystem?.name ?? null,
     securities,
     implantNames,
-    implantDescriptions,
+    implantDetails,
     locationNames,
     sp,
     loadedAt,
@@ -265,36 +279,134 @@ function ImplantLink({
 
 type PriceMap = ReadonlyMap<number, number | null>;
 
+/** Slot order, the way the game lists them; a type with no slot goes last, in ESI's order. */
+function bySlot(ids: readonly number[], details: ReadonlyMap<number, ImplantDetail>): number[] {
+  const slot = (id: number) => details.get(id)?.slot ?? Number.POSITIVE_INFINITY;
+  return ids
+    .map((id, index) => ({ id, index }))
+    .sort((a, b) => slot(a.id) - slot(b.id) || a.index - b.index)
+    .map((x) => x.id);
+}
+
+/** One implant: slot, name (Show info), then what it adds and what it is worth. */
+function ImplantRow({
+  typeId,
+  name,
+  detail,
+  price,
+  showSlot,
+}: {
+  typeId: number;
+  name: string;
+  detail: ImplantDetail | undefined;
+  /** False when no implant in the list has a known slot: no empty column. */
+  showSlot: boolean;
+  /** Undefined until priced or when unpriced: the card's footer counts those. */
+  price: number | null | undefined;
+}) {
+  const { t } = useTranslation();
+  const bonuses = Object.entries(detail?.bonuses ?? {}) as [AttributeName, number][];
+  return (
+    <li className="flex items-center gap-2 md:py-0.5">
+      {showSlot && (
+        <span className="w-4 shrink-0 text-right text-xs text-text-faint tabular-nums">
+          {detail?.slot !== undefined && (
+            <>
+              <span className="sr-only">{t('clones.slot')} </span>
+              {detail.slot}
+            </>
+          )}
+        </span>
+      )}
+      <ImplantLink
+        typeId={typeId}
+        name={name}
+        description={detail?.description}
+        className={`${TOUCH_LINK} min-w-0 flex-1 [overflow-wrap:anywhere]`}
+      />
+      <span className="flex shrink-0 items-center gap-x-2 text-xs whitespace-nowrap text-text-dim tabular-nums">
+        {bonuses.map(([attribute, value]) => (
+          <span key={attribute}>
+            {t('clones.implantBonus', {
+              value,
+              attribute: t(`clones.verdict.attribute.${attribute}`),
+            })}
+          </span>
+        ))}
+        {price != null && price > 0 && <IskAmount value={price} />}
+      </span>
+    </li>
+  );
+}
+
+/** The pilot's own name for a clone, edited in place: the heading becomes a field. */
+interface CloneRename {
+  /** The pencil's accessible name, which names the clone. */
+  label: string;
+  /** The pilot's current nickname; empty when there is none. */
+  value: string;
+  /** Shown in the empty field: what the clone is called without a name. */
+  placeholder: string;
+  onSave: (name: string) => void;
+}
+
 /** One clone's facts: where, how far, what it wears and what that is worth. */
 function CloneCard({
-  heading,
+  title,
   place,
   security,
   jumps,
   implantIds,
   implantNames,
-  implantDescriptions,
+  implantDetails,
   prices,
   training,
+  rename,
   current = false,
 }: {
-  heading: ReactNode;
-  place: string;
+  title: string;
+  /** Under a named clone's title; null when the title already is the place. */
+  place: string | null;
   security: number | undefined;
   jumps: ReactNode;
   implantIds: readonly number[];
   implantNames: ReadonlyMap<number, string>;
-  implantDescriptions: ReadonlyMap<number, string>;
+  implantDetails: ReadonlyMap<number, ImplantDetail>;
   /** Undefined until the price read settles. */
   prices: PriceMap | undefined;
   /** Queue time in this clone; absent when there is no verdict. */
   training?: { row: CloneRow | undefined; best: boolean };
+  /** Absent for the worn clone: only a jump clone has a name of its own. */
+  rename?: CloneRename;
   /** The clone the Character is wearing now: set apart from the jump clones. */
   current?: boolean;
 }) {
   const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const pencilRef = useRef<HTMLButtonElement>(null);
+  const hintId = useId();
+  const focusAfterCommit = useFocusAfterCommit();
   const value = prices ? sumImplantValue(implantIds, prices) : null;
   const delta = training?.row?.deltaSeconds ?? null;
+  const showSlot = implantIds.some((id) => implantDetails.get(id)?.slot !== undefined);
+
+  function startRename() {
+    setDraft(rename?.value ?? '');
+    setEditing(true);
+  }
+  function commit() {
+    setEditing(false);
+    if (rename && draft.trim() !== rename.value) rename.onSave(draft);
+  }
+  // Enter and Escape unmount the focused field; hand focus back to the pencil.
+  // Blur does not: the pilot is already moving on.
+  function end(save: boolean) {
+    if (save) commit();
+    else setEditing(false);
+    focusAfterCommit(pencilRef);
+  }
+
   return (
     <li
       className={`space-y-1.5 rounded-xs border p-3 text-sm ${
@@ -302,14 +414,57 @@ function CloneCard({
       }`}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-        <span className="[overflow-wrap:anywhere]">{heading}</span>
+        {editing && rename ? (
+          <TextInput
+            size="sm"
+            autoFocus
+            value={draft}
+            maxLength={CLONE_NICKNAME_MAX}
+            placeholder={rename.placeholder}
+            aria-label={t('clones.nameField')}
+            aria-describedby={hintId}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                // Focus moves to a button mid-keystroke: its keypress must not click it.
+                e.preventDefault();
+                end(true);
+              }
+              if (e.key === 'Escape') end(false);
+            }}
+            className="min-w-0 flex-1"
+          />
+        ) : (
+          <span className="flex min-w-0 items-center gap-1">
+            <h3 className="font-semibold [overflow-wrap:anywhere]">{title}</h3>
+            {rename && (
+              <IconButton
+                ref={pencilRef}
+                size="row"
+                variant="plain"
+                icon={<Icon.Rename size={Icon.ICON_SIZE.sm} className="text-text-faint" />}
+                label={rename.label}
+                tooltip={t('clones.rename')}
+                onClick={startRename}
+              />
+            )}
+          </span>
+        )}
         {/* Place, security and jumps are one phrase: they wrap together, never apart. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2">
-          <span className="text-text-dim [overflow-wrap:anywhere]">{place}</span>
+          {place !== null && (
+            <span className="text-text-dim [overflow-wrap:anywhere]">{place}</span>
+          )}
           {security !== undefined && <SecurityStatus security={security} />}
           {jumps}
         </span>
       </div>
+      {editing && (
+        <p id={hintId} className="text-xs text-text-dim">
+          {t('clones.nameHint')}
+        </p>
+      )}
       {training?.row?.totalSeconds != null && (
         <p className="flex flex-wrap items-center gap-x-2 text-xs">
           <span className="tabular-nums">
@@ -333,18 +488,22 @@ function CloneCard({
         <p className="text-text-dim">{t('clones.noImplants')}</p>
       ) : (
         <>
-          <ul className="flex flex-wrap gap-x-3 gap-y-0">
-            {implantIds.map((id) => (
-              <li key={id}>
-                <ImplantLink
+          {/* One row per implant, divided: on a phone each row is a 44px tap target,
+              and a wrapped run of 44px links read as gaps, not as a list. */}
+          <IskFigureGroup>
+            <ul className="divide-y divide-line border-y border-line">
+              {bySlot(implantIds, implantDetails).map((id) => (
+                <ImplantRow
+                  key={id}
                   typeId={id}
                   name={implantNames.get(id) ?? `Type #${id}`}
-                  description={implantDescriptions.get(id)}
-                  className={TOUCH_LINK}
+                  detail={implantDetails.get(id)}
+                  price={prices?.get(id)}
+                  showSlot={showSlot}
                 />
-              </li>
-            ))}
-          </ul>
+              ))}
+            </ul>
+          </IskFigureGroup>
           <p className="flex flex-wrap items-center gap-x-2 text-xs text-text-dim">
             <span>{t('clones.implantCount', { count: implantIds.length })}</span>
             {value && (
@@ -374,7 +533,7 @@ export function Clones() {
   const clonesNeedsReauth = data?.clonesNeedsReauth ?? false;
   const infomorphLevel = data?.infomorphLevel ?? 0;
   const implantNames = data?.implantNames ?? NO_NAMES;
-  const implantDescriptions = data?.implantDescriptions ?? NO_NAMES;
+  const implantDetails = data?.implantDetails ?? NO_DETAILS;
   const locationNames = data?.locationNames ?? NO_NAMES;
   const implantsNeedsReauth = data?.implantsNeedsReauth ?? false;
   const characterSystemId = data?.characterSystemId ?? null;
@@ -514,13 +673,17 @@ export function Clones() {
   const sort = useClonesSort((state) => state.value);
   const setSort = useClonesSort((state) => state.setValue);
   const hydrateSort = useClonesSort((state) => state.hydrate);
+  const nicknames = useCloneNicknames((state) => state.value);
+  const setNicknames = useCloneNicknames((state) => state.setValue);
+  const hydrateNicknames = useCloneNicknames((state) => state.hydrate);
   const cloneStates = useCloneStates((state) => state.value);
   const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
   const hydrateCloneStates = useCloneStates((state) => state.hydrate);
   useEffect(() => {
     void hydrateSort();
     void hydrateCloneStates();
-  }, [hydrateSort, hydrateCloneStates]);
+    void hydrateNicknames();
+  }, [hydrateSort, hydrateCloneStates, hydrateNicknames]);
   const training = data?.training ?? null;
   const readyAt = cooldown.onCooldown ? cooldown.readyAt : null;
   const verdictResult = useMemo(() => {
@@ -532,7 +695,7 @@ export function Clones() {
       readyAt
     );
   }, [training, cloneStates, cloneStatesHydrated, activeCharacterId, loadedAt, readyAt]);
-  const cloneLabel = (clone: JumpClone) => clone.name?.trim() || locationLabel(clone);
+  const cloneLabel = (clone: JumpClone) => cloneOwnName(clone, nicknames) ?? locationLabel(clone);
   const verdictCard: CloneVerdictCardState | null = (() => {
     if (!data) return null;
     const note = (message: string): CloneVerdictCardState => ({ kind: 'note', message });
@@ -603,8 +766,8 @@ export function Clones() {
   ).map((x) => x.clone);
   const bestCloneId = showTraining ? (verdictResult?.bestCloneId ?? null) : null;
   const csvColumns = useMemo(
-    () => clonesCsvColumns(t, { locationNames, implantNames }),
-    [t, locationNames, implantNames]
+    () => clonesCsvColumns(t, { locationNames, implantNames, nicknames }),
+    [t, locationNames, implantNames, nicknames]
   );
   const clonesExport = useTableExport({
     surface: 'clones',
@@ -813,7 +976,7 @@ export function Clones() {
                 {hasWorn && (
                   <CloneCard
                     current
-                    heading={<span className="font-semibold">{t('clones.wearingNow')}</span>}
+                    title={t('clones.wearingNow')}
                     place={characterSystemName ?? t('clones.unknownPlace')}
                     security={
                       characterSystemId === null ? undefined : securities.get(characterSystemId)
@@ -821,7 +984,7 @@ export function Clones() {
                     jumps={null}
                     implantIds={wornIds}
                     implantNames={implantNames}
-                    implantDescriptions={implantDescriptions}
+                    implantDetails={implantDetails}
                     prices={prices}
                     training={
                       showTraining
@@ -831,18 +994,29 @@ export function Clones() {
                   />
                 )}
                 {sortedClones.map((clone) => {
-                  const name = clone.name?.trim() || undefined;
+                  const name = cloneOwnName(clone, nicknames);
+                  const place = locationLabel(clone);
                   return (
                     <CloneCard
                       key={clone.jump_clone_id}
-                      heading={
-                        name === undefined ? (
-                          <span className="text-text-dim">{t('clones.unnamed')}</span>
-                        ) : (
-                          <span className="text-text">{name}</span>
-                        )
-                      }
-                      place={locationLabel(clone)}
+                      title={name ?? place}
+                      place={name === undefined ? null : place}
+                      rename={{
+                        label:
+                          name === undefined
+                            ? t('clones.renamePlace', { place })
+                            : t('clones.renameNamed', { name }),
+                        value: nicknames[clone.jump_clone_id] ?? '',
+                        placeholder: clone.name?.trim() || place,
+                        onSave: (next) =>
+                          void setNicknames(
+                            withCloneNickname(
+                              useCloneNicknames.getState().value,
+                              clone.jump_clone_id,
+                              next
+                            )
+                          ),
+                      }}
                       security={securityOf(clone.location_id)}
                       jumps={
                         <JumpsAwayText
@@ -854,7 +1028,7 @@ export function Clones() {
                       }
                       implantIds={clone.implants}
                       implantNames={implantNames}
-                      implantDescriptions={implantDescriptions}
+                      implantDetails={implantDetails}
                       prices={prices}
                       training={
                         showTraining

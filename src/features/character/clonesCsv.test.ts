@@ -17,18 +17,27 @@ function clone(overrides: Partial<JumpClone> = {}): JumpClone {
 
 function valuesOf(
   c: JumpClone,
-  names: { locations?: Map<number, string>; implants?: Map<number, string> } = {}
+  names: {
+    locations?: Map<number, string>;
+    implants?: Map<number, string>;
+    nicknames?: Record<number, string>;
+  } = {}
 ) {
   const columns = clonesCsvColumns(t, {
     locationNames: names.locations ?? new Map(),
     implantNames: names.implants ?? new Map(),
+    nicknames: names.nicknames ?? {},
   });
   return Object.fromEntries(columns.map((col) => [col.header, col.value(c)]));
 }
 
 describe('clonesCsvColumns', () => {
   it('orders columns name, location, implants', () => {
-    const columns = clonesCsvColumns(t, { locationNames: new Map(), implantNames: new Map() });
+    const columns = clonesCsvColumns(t, {
+      locationNames: new Map(),
+      implantNames: new Map(),
+      nicknames: {},
+    });
     expect(columns.map((c) => c.header)).toEqual([
       'clones.csvName',
       'clones.location',
@@ -43,6 +52,12 @@ describe('clonesCsvColumns', () => {
       'clones.location': 'Jita IV - Moon 4',
     });
     expect(valuesOf(clone({ name: '' }), { locations: jita })['clones.csvName']).toBeUndefined();
+  });
+
+  it("exports the pilot's own name for a clone ahead of ESI's", () => {
+    expect(
+      valuesOf(clone({ name: 'Pod A' }), { nicknames: { 1: 'Learning' } })['clones.csvName']
+    ).toBe('Learning');
   });
 
   it('labels an unresolved location by its type and id', () => {

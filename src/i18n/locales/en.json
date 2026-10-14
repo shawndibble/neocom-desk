@@ -6183,7 +6183,13 @@
     "implantsReauthTitle": "Log in again to see the implants you are wearing",
     "implantsReauthHint": "The implants plugged into your current clone need the read-implants permission, which this login did not grant.",
     "jumpsAway": "Jumps away",
-    "unnamed": "Unnamed"
+    "rename": "Rename",
+    "renameNamed": "Rename clone {{name}}",
+    "renamePlace": "Rename clone in {{place}}",
+    "nameField": "Clone name",
+    "nameHint": "EVE no longer shares clone names with apps, so name it here. Leave it empty to show its station.",
+    "slot": "Slot",
+    "implantBonus": "+{{value}} {{attribute}}"
   },
   "pi": {
     "title": "Planetary Industry",

@@ -38,6 +38,17 @@ export function extractAttributeBonuses(
   return bonuses;
 }
 
+/** dogma attribute "implantness": the implant slot, 1–10. */
+const IMPLANT_SLOT_ATTRIBUTE_ID = 331;
+
+/** The implant slot this type plugs into, or undefined for a type with none. */
+export function extractImplantSlot(
+  dogmaAttributes: readonly DogmaAttribute[] | undefined
+): number | undefined {
+  const value = dogmaAttributes?.find((a) => a.attribute_id === IMPLANT_SLOT_ATTRIBUTE_ID)?.value;
+  return value ? value : undefined;
+}
+
 /** Sum non-zero per-attribute bonuses across multiple implants into one Implants map. */
 export function sumAttributeBonuses(bonusSets: readonly Partial<Attributes>[]): Implants {
   const total: Implants = {};
