@@ -8,7 +8,10 @@ import {
   requestNotificationPermission,
   promptStateAfterAsk,
   shouldShowPermissionExplainer,
+  shouldShowAlertsOffer,
   notificationsBlocked,
+  ALERTS_OFFER_SEEN_KEY,
+  useAlertsOfferSeen,
 } from './permission';
 
 function stubNotification(permission: NotificationPermission, request?: () => Promise<unknown>) {
@@ -166,5 +169,55 @@ describe('useNotificationPromptState', () => {
     });
     await useNotificationPromptState.getState().hydrate();
     expect(useNotificationPromptState.getState().value).toEqual({ seen: true, outcome: 'granted' });
+  });
+});
+
+describe('shouldShowAlertsOffer', () => {
+  const base = {
+    hydrated: true,
+    alertsOfferSeen: false,
+    grantedHere: true,
+    permission: 'granted' as const,
+    installRequired: false,
+    characterId: 44 as number | null,
+  };
+
+  it('offers once the explainer step just ended in a grant', () => {
+    expect(shouldShowAlertsOffer(base)).toBe(true);
+  });
+
+  it('waits for hydration', () => {
+    expect(shouldShowAlertsOffer({ ...base, hydrated: false })).toBe(false);
+  });
+
+  it('never repeats once seen', () => {
+    expect(shouldShowAlertsOffer({ ...base, alertsOfferSeen: true })).toBe(false);
+  });
+
+  it('skips when the grant did not happen in this explainer (already-seen users)', () => {
+    expect(shouldShowAlertsOffer({ ...base, grantedHere: false })).toBe(false);
+  });
+
+  it.each(['denied', 'default', 'unsupported'] as const)('skips when permission is %s', (p) => {
+    expect(shouldShowAlertsOffer({ ...base, permission: p })).toBe(false);
+  });
+
+  it('skips on iOS requires-install', () => {
+    expect(shouldShowAlertsOffer({ ...base, installRequired: true })).toBe(false);
+  });
+
+  it('skips with no Character to offer it for', () => {
+    expect(shouldShowAlertsOffer({ ...base, characterId: null })).toBe(false);
+  });
+});
+
+describe('useAlertsOfferSeen', () => {
+  it('persists device-locally under a non-syncing key', async () => {
+    expect(ALERTS_OFFER_SEEN_KEY.startsWith('sync.')).toBe(false);
+    await useAlertsOfferSeen.getState().setValue(true);
+    expect(await db.settings.get(ALERTS_OFFER_SEEN_KEY)).toEqual({
+      key: ALERTS_OFFER_SEEN_KEY,
+      value: true,
+    });
   });
 });

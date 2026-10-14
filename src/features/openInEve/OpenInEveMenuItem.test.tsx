@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { RowActionsMenu } from '@/components/ui';
 import { db } from '@/db';
@@ -32,12 +32,18 @@ async function seed(scopes: string[]) {
   });
 }
 
+function Where() {
+  const { pathname, search } = useLocation();
+  return <output data-testid="where">{pathname + search}</output>;
+}
+
 function openMenu(kind: 'information' | 'marketDetails' | 'contract', id: number) {
   render(
     <MemoryRouter>
       <RowActionsMenu name="row" items={<OpenInEveMenuItem kind={kind} id={id} />}>
         <div>row</div>
       </RowActionsMenu>
+      <Where />
     </MemoryRouter>
   );
   fireEvent.contextMenu(screen.getByText('row'));
@@ -86,5 +92,14 @@ describe('OpenInEveMenuItem', () => {
     const item = await screen.findByRole('menuitem', { name: /Open in EVE/ });
     await userEvent.click(item);
     expect(infoMock).not.toHaveBeenCalled();
+  });
+
+  it('lists Grant missing Permissions, which opens Settings with the Permission flagged', async () => {
+    await seed(['esi-skills.read_skills.v1']);
+    openMenu('information', 1);
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Grant missing Permissions' })
+    );
+    expect(screen.getByTestId('where')).toHaveTextContent('/settings/permissions?grant=openWindow');
   });
 });

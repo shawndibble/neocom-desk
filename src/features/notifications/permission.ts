@@ -161,3 +161,36 @@ export function useNotificationPermission(): {
 
   return { permission, refresh };
 }
+
+export const ALERTS_OFFER_SEEN_KEY = 'notifications.alertsOfferSeen';
+
+/** Whether this device has shown the Alerts offer (ADR 0020) — once ever, per device. */
+export const useAlertsOfferSeen = createLocalSetting<boolean>({
+  key: ALERTS_OFFER_SEEN_KEY,
+  defaultValue: false,
+});
+
+/**
+ * Step two of the explainer (ADR 0020): offer Alerts when closed for the
+ * Character just signed in. Only right after this explainer's own Enable ended
+ * in a grant (`grantedHere`), so a user who already saw the explainer, and the
+ * skipped states (iOS requires-install, denied, unsupported), never see it —
+ * Settings stays their entry point.
+ */
+export function shouldShowAlertsOffer(state: {
+  hydrated: boolean;
+  alertsOfferSeen: boolean;
+  grantedHere: boolean;
+  permission: NotificationPermissionState;
+  installRequired: boolean;
+  characterId: number | null;
+}): boolean {
+  return (
+    state.hydrated &&
+    !state.alertsOfferSeen &&
+    state.grantedHere &&
+    state.permission === 'granted' &&
+    !state.installRequired &&
+    state.characterId !== null
+  );
+}

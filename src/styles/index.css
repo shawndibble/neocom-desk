@@ -1325,6 +1325,41 @@
     }
   }
 
+  /*
+   * The Grant button a "Grant missing Permissions" link sent the reader to
+   * (`features/permissions/PermissionsPanel.tsx`). An accent ring that swells
+   * and fades three times, then is gone: an attention cue, never a state.
+   * Reduced motion gets one slow fade of the same ring.
+   */
+  .grant-flash {
+    animation: grant-flash 1.2s ease-out 3;
+  }
+
+  @keyframes grant-flash {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+    35% {
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 55%, transparent);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grant-flash {
+      animation: grant-flash-fade 2.4s ease-out 1;
+    }
+  }
+
+  @keyframes grant-flash-fade {
+    0% {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 45%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+
   @keyframes row-pulse-fade {
     0% {
       background-color: color-mix(in srgb, var(--color-accent) 22%, transparent);

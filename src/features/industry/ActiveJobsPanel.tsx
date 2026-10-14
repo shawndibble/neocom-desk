@@ -1,6 +1,7 @@
 import { HintText } from '@/components/ui/HintText';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { Link, useNavigate } from 'react-router-dom';
 import { captureException } from '@sentry/react';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -1252,7 +1253,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           {needsJobSlotFanOut &&
             jobsFanOutSkipped.map((s) => (
               <p key={s.characterId} className="text-xs text-text-dim">
-                {s.name} — {t('industry.jobsCharacterNotShared')}
+                {s.name} — <GrantMissingLink groups={['industry']} />
               </p>
             ))}
         </div>

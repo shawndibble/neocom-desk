@@ -239,6 +239,7 @@ export function SettleUpDialog({
           {value}
         </span>
       </Tooltip>
+      {openInEve && <PayeeOpenInEveButton {...openInEve} />}
       <Button
         size="sm"
         className="shrink-0"
@@ -252,7 +253,6 @@ export function SettleUpDialog({
         )}
         {copied === key ? t('miningTax.settleUpCopied') : t('miningTax.settleUpCopy')}
       </Button>
-      {openInEve && <PayeeOpenInEveButton {...openInEve} />}
     </div>
   );
 
@@ -339,12 +339,6 @@ export function SettleUpDialog({
         <div className="divide-y divide-line rounded-xs border border-line bg-panel-2">
           {perPayee.length <= 1 ? (
             <>
-              {copyRow(
-                'amount',
-                t('miningTax.settleUp.amountLabel'),
-                `${formatIsk(amountToSend, 0)} ISK`,
-                String(amountToSend)
-              )}
               {perPayee.length === 1 &&
                 copyRow(
                   'to',
@@ -354,17 +348,23 @@ export function SettleUpDialog({
                   false,
                   perPayee[0]
                 )}
+              {copyRow(
+                'amount',
+                t('miningTax.settleUp.amountLabel'),
+                `${formatIsk(amountToSend, 0)} ISK`,
+                String(amountToSend)
+              )}
             </>
           ) : (
             perPayee.map((p) => (
               <div key={p.name} className="divide-y divide-line">
+                {copyRow(`to:${p.name}`, t('miningTax.settleUp.toLabel'), p.name, p.name, false, p)}
                 {copyRow(
                   `amount:${p.name}`,
                   t('miningTax.settleUp.amountLabel'),
                   `${formatIsk(p.subtotal, 0)} ISK`,
                   String(p.subtotal)
                 )}
-                {copyRow(`to:${p.name}`, t('miningTax.settleUp.toLabel'), p.name, p.name, false, p)}
               </div>
             ))
           )}
