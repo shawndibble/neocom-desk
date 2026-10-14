@@ -586,6 +586,12 @@
       "fieldPath": "*",
       "ttl": false,
       "indexes": []
+    },
+    {
+      "collectionGroup": "systemConditions",
+      "fieldPath": "hashes",
+      "ttl": false,
+      "indexes": []
     }
   ]
 }

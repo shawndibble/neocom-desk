@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { publishContractOffersToR2, REFRESH_AFTER_MS, type R2Put } from './r2Publisher.js';
+import {
+  publishContractOffersToR2,
+  PROGRESS_FLUSH_EVERY,
+  REFRESH_AFTER_MS,
+  type R2Put,
+} from './r2Publisher.js';
 import type { PublicContractOfferRow } from './publicContracts.js';
 
 const row = (over: Partial<PublicContractOfferRow> = {}): PublicContractOfferRow => ({
@@ -204,5 +209,77 @@ describe('publishContractOffersToR2 failed refresh', () => {
       put: retry.put,
     });
     expect(typePuts(retry.puts)).toHaveLength(1);
+  });
+});
+
+describe('publishContractOffersToR2 time budget', () => {
+  const many = [34, 35, 36].map((typeId) => row({ typeId }));
+
+  /** A clock that advances 100 ms per reading, so a 150 ms budget admits a bounded number of starts. */
+  const ticking = () => {
+    let t = 0;
+    return () => (t += 100);
+  };
+
+  it('stops starting uploads once the budget is spent, keeps partial hashes, and holds the index', async () => {
+    const { puts, put } = recorder();
+    const result = await publishContractOffersToR2({
+      rows: many,
+      lastSyncedAt: 1,
+      previous: null,
+      now: 1000,
+      put,
+      budgetMs: 150,
+      clock: ticking(),
+    });
+    expect(result.remaining).toBeGreaterThan(0);
+    expect(result.uploaded + result.remaining).toBe(3);
+    expect(result.failed).toBe(0);
+    expect(result.indexWritten).toBe(false);
+    expect(puts.some((p) => p.key === INDEX_KEY)).toBe(false);
+    expect(Object.keys(result.state.hashes)).toHaveLength(result.uploaded);
+    expect(result.state.fullUploadAt).toBeNull();
+  });
+
+  it('resumes from the partial state and finishes with the index last', async () => {
+    const first = await publishContractOffersToR2({
+      rows: many,
+      lastSyncedAt: 1,
+      previous: null,
+      now: 1000,
+      put: recorder().put,
+      budgetMs: 150,
+      clock: ticking(),
+    });
+    const retry = recorder();
+    const second = await publishContractOffersToR2({
+      rows: many,
+      lastSyncedAt: 1,
+      previous: first.state,
+      now: 2000,
+      put: retry.put,
+    });
+    expect(typePuts(retry.puts)).toHaveLength(first.remaining);
+    expect(second).toMatchObject({ remaining: 0, failed: 0, indexWritten: true });
+    expect(retry.puts.at(-1)!.key).toBe(INDEX_KEY);
+    expect(second.state.fullUploadAt).toBe(2000);
+  });
+
+  it('flushes progress every PROGRESS_FLUSH_EVERY uploads', async () => {
+    const flushed: number[] = [];
+    const bulk = Array.from({ length: PROGRESS_FLUSH_EVERY + 5 }, (_, i) =>
+      row({ typeId: 1000 + i })
+    );
+    await publishContractOffersToR2({
+      rows: bulk,
+      lastSyncedAt: 1,
+      previous: null,
+      now: 1000,
+      put: recorder().put,
+      onProgress: async (state) => {
+        flushed.push(Object.keys(state.hashes).length);
+      },
+    });
+    expect(flushed).toEqual([PROGRESS_FLUSH_EVERY]);
   });
 });

@@ -28,7 +28,16 @@ import {
 import type { PublicContractOfferRow, PublicCourierContractRow } from './publicContracts.js';
 
 export const REFRESH_AFTER_MS = 2 * 24 * 60 * 60_000;
-const UPLOAD_CONCURRENCY = 8;
+/**
+ * ~12k small PUTs, each dominated by round-trip latency rather than bandwidth,
+ * so 8 in flight took minutes; 32 stays well inside R2's request limits and
+ * Cloud Functions' socket and memory budget (bodies are ~450 bytes gzipped).
+ */
+const UPLOAD_CONCURRENCY = 32;
+/** Well inside the 540 s function timeout, leaving room to persist state and write the index. */
+export const UPLOAD_BUDGET_MS = 360_000;
+/** Flush recorded hashes this often, so a killed run still leaves progress behind. */
+export const PROGRESS_FLUSH_EVERY = 1000;
 
 export type R2Put = (
   key: string,
@@ -48,6 +57,8 @@ export interface R2PublishResult {
   uploaded: number;
   skipped: number;
   failed: number;
+  /** Changed types not attempted because the time budget ran out; the next run resumes them. */
+  remaining: number;
   indexWritten: boolean;
   /** First upload error message, so an auth or network fault is diagnosable from the log. */
   firstError: string | null;
@@ -85,12 +96,19 @@ export function createR2Put(config: R2Config): R2Put {
   };
 }
 
-async function runPool<T>(items: readonly T[], limit: number, work: (item: T) => Promise<void>) {
+async function runPool<T>(
+  items: readonly T[],
+  limit: number,
+  work: (item: T) => Promise<void>,
+  /** Checked before each item; once true no further items start. Returns how many were started. */
+  stop: () => boolean
+): Promise<number> {
   let next = 0;
   const worker = async () => {
-    while (next < items.length) await work(items[next++]);
+    while (next < items.length && !stop()) await work(items[next++]);
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return next;
 }
 
 export async function publishContractOffersToR2(args: {
@@ -99,8 +117,16 @@ export async function publishContractOffersToR2(args: {
   previous: R2PublishState | null;
   now: number;
   put: R2Put;
+  /** Stop starting uploads after this long (default `UPLOAD_BUDGET_MS`). */
+  budgetMs?: number;
+  /** Monotonic clock in ms; injected for tests. */
+  clock?: () => number;
+  /** Called with the hashes recorded so far every `PROGRESS_FLUSH_EVERY` uploads. */
+  onProgress?: (state: R2PublishState) => Promise<void>;
 }): Promise<R2PublishResult> {
-  const { rows, lastSyncedAt, previous, now, put } = args;
+  const { rows, lastSyncedAt, previous, now, put, onProgress } = args;
+  const clock = args.clock ?? Date.now;
+  const deadline = clock() + (args.budgetMs ?? UPLOAD_BUDGET_MS);
   const objects = buildTypeObjects(rows);
   // `fullUploadAt === null` means an earlier pass was partial: keep filling it
   // in from the recorded hashes rather than starting over.
@@ -126,22 +152,34 @@ export async function publishContractOffersToR2(args: {
   let uploaded = 0;
   let failed = 0;
   let firstError: string | null = null;
-  await runPool(changed, UPLOAD_CONCURRENCY, async (object) => {
-    try {
-      for (const part of object.parts)
-        await put(part.name, gzipObjectBody(part.body), OBJECT_HEADERS);
-      hashes[String(object.typeId)] = object.hash;
-      uploaded += 1;
-    } catch (error) {
-      failed += 1;
-      firstError ??= String(error);
-    }
+  const partialState = (): R2PublishState => ({
+    hashes: { ...hashes },
+    fullUploadAt: refresh ? null : (previous?.fullUploadAt ?? null),
   });
+  const started = await runPool(
+    changed,
+    UPLOAD_CONCURRENCY,
+    async (object) => {
+      try {
+        for (const part of object.parts)
+          await put(part.name, gzipObjectBody(part.body), OBJECT_HEADERS);
+        hashes[String(object.typeId)] = object.hash;
+        uploaded += 1;
+        if (onProgress && uploaded % PROGRESS_FLUSH_EVERY === 0)
+          await onProgress(partialState()).catch(() => undefined);
+      } catch (error) {
+        failed += 1;
+        firstError ??= String(error);
+      }
+    },
+    () => clock() >= deadline
+  );
+  const remaining = changed.length - started;
 
   // Names in the index must all exist, so a failed type holds the index back:
   // readers keep the previous index and its (still present) objects.
   let indexWritten = false;
-  if (failed === 0) {
+  if (failed === 0 && remaining === 0) {
     const index = buildContractOfferR2Index(rows, objects, lastSyncedAt);
     try {
       await put(R2_INDEX_KEY, JSON.stringify(index), INDEX_HEADERS);
@@ -156,14 +194,19 @@ export async function publishContractOffersToR2(args: {
     uploaded,
     skipped,
     failed,
+    remaining,
     indexWritten,
     firstError,
     state: {
       hashes,
-      // A failed refresh pass drops to `null` so the next run resumes from the
+      // A failed or budget-cut refresh pass drops to `null` so the next run resumes from the
       // recorded hashes instead of re-uploading everything every 30 minutes.
       fullUploadAt:
-        failed === 0 && completesFullPass ? now : refresh ? null : (previous?.fullUploadAt ?? null),
+        failed === 0 && remaining === 0 && completesFullPass
+          ? now
+          : refresh
+            ? null
+            : (previous?.fullUploadAt ?? null),
     },
   };
 }
