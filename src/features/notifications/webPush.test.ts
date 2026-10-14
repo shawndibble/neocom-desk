@@ -15,6 +15,11 @@ vi.mock('@/sync/webPushSupport', () => ({
   webPushSupport: vi.fn(),
 }));
 
+vi.mock('./projectionRebuild', () => ({
+  enabledEveTypesByCharacter: vi.fn(async () => new Map([[1, ['StructureDestroyed']]])),
+}));
+vi.mock('./foregroundPoller', () => ({ liveDependencies: vi.fn(() => ({})) }));
+
 const readyRegistration = {} as ServiceWorkerRegistration;
 
 beforeEach(() => {
@@ -46,7 +51,12 @@ describe('enableWebPush', () => {
     const result = await enableWebPush();
     expect(result).toEqual({ support: 'supported', permission: 'granted' });
     expect(requestNotificationPermission).toHaveBeenCalled();
-    expect(registerDeviceForWebPush).toHaveBeenCalledWith(expect.any(String), readyRegistration);
+    expect(registerDeviceForWebPush).toHaveBeenCalledWith(
+      expect.any(String),
+      readyRegistration,
+      new Map(),
+      { eveTypesByCharacter: new Map([[1, ['StructureDestroyed']]]) }
+    );
   });
 
   it('asks for permission before awaiting anything, so Safari still sees the tap', () => {

@@ -5,6 +5,7 @@
  * whose rows drill into that Character.
  */
 import { lazy, Suspense, useEffect, useMemo, type ReactNode, type RefObject } from 'react';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useTranslation } from 'react-i18next';
 import { guarded } from '@/app/routeChunks';
 import {
@@ -304,7 +305,7 @@ export function NetWorthPanel({
                 {row.characterName}
                 {!row.covered && (
                   <span className="block text-[0.6875rem] text-warning">
-                    {t('wallet.balanceCharacterNotShared')}
+                    <GrantMissingLink groups={['wallet']} />
                   </span>
                 )}
               </span>

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { RowActionsMenu } from '@/components/ui';
 import { db } from '@/db';
@@ -17,6 +17,7 @@ vi.mock('@/esi/endpoints', () => ({
 }));
 
 import { OpenInEveMenuItem } from './OpenInEveMenuItem';
+import { OUTCOME_VISIBLE_MS } from './useOpenInEve';
 
 const ONE = 91;
 const SCOPE = 'esi-ui.open_window.v1';
@@ -32,12 +33,18 @@ async function seed(scopes: string[]) {
   });
 }
 
+function Where() {
+  const { pathname, search } = useLocation();
+  return <output data-testid="where">{pathname + search}</output>;
+}
+
 function openMenu(kind: 'information' | 'marketDetails' | 'contract', id: number) {
   render(
     <MemoryRouter>
       <RowActionsMenu name="row" items={<OpenInEveMenuItem kind={kind} id={id} />}>
         <div>row</div>
       </RowActionsMenu>
+      <Where />
     </MemoryRouter>
   );
   fireEvent.contextMenu(screen.getByText('row'));
@@ -60,6 +67,23 @@ describe('OpenInEveMenuItem', () => {
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
     await waitFor(() => expect(infoMock).toHaveBeenCalledWith(ONE, 587));
     expect(await screen.findByRole('status')).toHaveTextContent('Opened in your EVE client.');
+  });
+
+  it('clears the result by itself after 10 seconds', async () => {
+    await seed([SCOPE]);
+    const timeout = vi.spyOn(globalThis, 'setTimeout');
+    try {
+      openMenu('information', 587);
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
+      expect(await screen.findByRole('status')).toHaveTextContent('Opened in your EVE client.');
+      const call = timeout.mock.calls.find(([, ms]) => ms === OUTCOME_VISIBLE_MS);
+      expect(OUTCOME_VISIBLE_MS).toBe(10_000);
+      expect(call).toBeDefined();
+      act(() => (call![0] as () => void)());
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   it.each([
@@ -86,5 +110,14 @@ describe('OpenInEveMenuItem', () => {
     const item = await screen.findByRole('menuitem', { name: /Open in EVE/ });
     await userEvent.click(item);
     expect(infoMock).not.toHaveBeenCalled();
+  });
+
+  it('lists Grant missing Permissions, which opens Settings with the Permission flagged', async () => {
+    await seed(['esi-skills.read_skills.v1']);
+    openMenu('information', 1);
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Grant missing Permissions' })
+    );
+    expect(screen.getByTestId('where')).toHaveTextContent('/settings/permissions?grant=openWindow');
   });
 });

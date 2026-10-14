@@ -18,6 +18,7 @@
  * would mean a read per stored Character on every visit to Settings.
  */
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Checkbox, Panel } from '@/components/ui';
@@ -46,8 +47,26 @@ const CORP_STATUS = {
   ready: 'granted',
 } as const satisfies Record<CorpAccessState, RowStatus>;
 
+/** `?grant=a,b` from a "Grant missing Permissions" link: the Permissions whose button should flash. */
+function useFlaggedGroups(): ReadonlySet<ScopeGroup> {
+  const [params] = useSearchParams();
+  const raw = params.get('grant');
+  if (!raw) return new Set();
+  const wanted = raw.split(',');
+  return new Set(SCOPE_GROUPS.filter((group) => wanted.includes(group)));
+}
+
+/** Brings the flashing button into view once, as it mounts. */
+function scrollIntoViewOnce(node: HTMLElement | null) {
+  node?.scrollIntoView?.({
+    block: 'center',
+    behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  });
+}
+
 export function PermissionsPanel() {
   const { t } = useTranslation();
+  const flagged = useFlaggedGroups();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
   const corp = useCorpAccess();
@@ -87,6 +106,7 @@ export function PermissionsPanel() {
   // Actionable rows first (stable: catalogue order within each half); a row still checking keeps the Granted half.
   const rows = [...missing, ...groups.filter((group) => statusOf(group) !== 'missing')];
   // Derived from `missing`, so a row that gets granted (or hidden) drops out of the request.
+  const firstFlagged = rows.find((group) => flagged.has(group) && missing.includes(group));
   const chosen = missing.filter((group) => picked.has(group));
 
   function toggle(group: ScopeGroup) {
@@ -179,6 +199,8 @@ export function PermissionsPanel() {
                           */}
                           <Button
                             size="sm"
+                            ref={group === firstFlagged ? scrollIntoViewOnce : undefined}
+                            className={flagged.has(group) ? 'grant-flash' : undefined}
                             aria-label={t('settings.permissions.grantAria', { permission: label })}
                             onClick={() => grant([group])}
                           >

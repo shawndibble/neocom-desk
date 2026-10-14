@@ -282,6 +282,9 @@ describe('occurrenceKey', () => {
       timestamp: '2024-01-01T00:00:00Z',
     };
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0 + 1000));
+    // functions/src/eveNotificationPush.ts derives this key server-side (#3756)
+    // and pins the same literal in its own test; the two must stay equal.
+    expect(occurrenceKey(fire, T0)).toBe('7:eveNotification:321');
   });
 
   it('keys structureReinforcementExit on the same notificationId distinctly from the live eveNotification fire (issue #359: a Feed upsert must not overwrite the shields/armor-lost row with the exit row)', () => {

@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import { resetRevalidationState, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { loadPublicBpcContracts } from './syncedContracts';
+import { resetR2ObjectMemo } from '@/features/contractSearch/r2OfferSnapshot';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 
 const getDocs = vi.hoisted(() => vi.fn());
@@ -27,6 +28,8 @@ vi.mock('firebase/firestore/lite', () => ({
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
 vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => undefined) }));
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
+
+vi.mock('@/sde/loadSde', () => ({ loadBlueprints: async () => ({ '32858': {}, '32859': {} }) }));
 
 const CHARACTER_ID = 91;
 
@@ -66,6 +69,14 @@ function copyLine(overrides: Partial<PublicContractOfferRow> = {}): PublicContra
 beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
+  // R2 unreachable: these tests cover the Firestore path (ADR 0019 fallback).
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new Error('offline');
+    })
+  );
+  resetR2ObjectMemo();
   getDocs.mockReset();
   getDoc.mockReset();
 });
@@ -182,5 +193,71 @@ describe('loadPublicBpcContracts when the cached snapshot lapsed', () => {
 
     expect(result?.data.rows).toHaveLength(1);
     expect(getDocs).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('loadPublicBpcContracts through R2 (ADR 0019)', () => {
+  const ORIGIN = 'https://data.neocomdesk.com';
+  const objectName = (typeId: number) => `contract-offers/types/${typeId}.hash.json`;
+  const r2Index = (lastSyncedAt: number) => ({
+    lastSyncedAt,
+    types: {
+      '32858': { count: 1, cheapest: 1, objects: [objectName(32858)] },
+      // Not a blueprint: must never be downloaded.
+      '34': { count: 9, cheapest: 1, objects: [objectName(34)] },
+    },
+    regionIds: [10000002],
+  });
+
+  function serveR2(index: unknown, lines: PublicContractOfferRow[]) {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === `${ORIGIN}/contract-offers/index.json`) {
+        return new Response(JSON.stringify(index), { status: 200 });
+      }
+      if (url === `${ORIGIN}/${objectName(32858)}`) {
+        return new Response(JSON.stringify(lines), { status: 200 });
+      }
+      return new Response('missing', { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('reads only the blueprint types the index lists, and no Firestore chunk', async () => {
+    const fetchMock = serveR2(r2Index(50), [copyLine()]);
+
+    const result = await loadPublicBpcContracts(CHARACTER_ID);
+
+    expect(result?.data.rows).toEqual([expect.objectContaining({ typeId: 32858 })]);
+    expect(result?.data.lastSyncedAt).toBe(50);
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      `${ORIGIN}/contract-offers/index.json`,
+      `${ORIGIN}/${objectName(32858)}`,
+    ]);
+    expect(getDocs).not.toHaveBeenCalled();
+  });
+
+  it('falls back to Firestore when R2 serves no usable index', async () => {
+    serveR2({ nonsense: true }, []);
+    getDocs.mockResolvedValue(snapshotDocs(6, [[copyLine()]]));
+
+    const result = await loadPublicBpcContracts(CHARACTER_ID);
+
+    expect(result?.data.lastSyncedAt).toBe(6);
+    expect(getDocs).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to Firestore when a named object cannot be read', async () => {
+    const fetchMock = serveR2(r2Index(50), []);
+    fetchMock.mockImplementation(async (url: string) =>
+      url.endsWith('index.json')
+        ? new Response(JSON.stringify(r2Index(50)), { status: 200 })
+        : new Response('gone', { status: 404 })
+    );
+    getDocs.mockResolvedValue(snapshotDocs(6, [[copyLine()]]));
+
+    const result = await loadPublicBpcContracts(CHARACTER_ID);
+
+    expect(result?.data.lastSyncedAt).toBe(6);
   });
 });

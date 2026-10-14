@@ -114,7 +114,7 @@ export function CommunitySharedFittings({
             <li key={fitting.id}>
               <Link
                 to={fittingEditLocation(fitting.code)}
-                className={`group flex w-full items-center gap-2 px-1 text-xs hover:bg-surface-2 ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
+                className={`group flex w-full items-center gap-2 px-1 py-1.5 text-xs hover:bg-surface-2 ${tappableRowClassName} ${focusRingClassName} focus-visible:-outline-offset-2`}
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium text-accent">{fitting.name}</span>

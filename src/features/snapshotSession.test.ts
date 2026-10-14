@@ -53,6 +53,13 @@ const ALT_UID = 'char:2';
 beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
+  // R2 unreachable: these tests cover the Firestore path (ADR 0019 fallback).
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new Error('offline');
+    })
+  );
   vi.mocked(signInWithCustomToken).mockClear();
   getDocs.mockReset();
   getDocs.mockResolvedValue({ docs: [] });

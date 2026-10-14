@@ -20,7 +20,14 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureAnySession } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { readUnchangedSnapshot } from '@/features/contractSearch/chunkedSnapshot';
-import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/esi/cache';
+import {
+  loadWithCache,
+  readCached,
+  GLOBAL_CACHE_CHARACTER_ID,
+  type CachedResult,
+} from '@/esi/cache';
+import { loadR2OfferIndex, loadR2TypeRows } from '@/features/contractSearch/r2OfferSnapshot';
+import { loadBlueprints } from '@/sde/loadSde';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import {
   bpcRowsFromContractOffers,
@@ -66,6 +73,41 @@ interface MetaDocData {
 }
 
 /**
+ * The same snapshot from R2 (ADR 0019, issue #3746): only the blueprint types
+ * are read, found by crossing the index's listed types with the SDE's
+ * blueprints, instead of every type. `null` when R2 or the SDE cannot answer,
+ * and the Firestore read takes over.
+ *
+ * One consequence: a contract's other lines are not read, so a bundle mixing
+ * one blueprint with ordinary items tallies as a single-type contract and is
+ * not flagged `isMultiType` (issue #1076). A bundle of two or more blueprint
+ * types still is.
+ */
+async function fetchSnapshotFromR2(): Promise<PublicBpcContractsSnapshot | null> {
+  const index = await loadR2OfferIndex();
+  if (!index) return null;
+  const { lastSyncedAt } = index.data;
+  // Stale but unchanged: nothing to read.
+  const cached = await readCached<PublicBpcContractsSnapshot>(GLOBAL_CACHE_CHARACTER_ID, CACHE_KEY);
+  if (cached?.lastSyncedAt === lastSyncedAt) return cached;
+  try {
+    const blueprints = await loadBlueprints();
+    const typeIds = Object.keys(blueprints)
+      .map(Number)
+      .filter((typeId) => String(typeId) in index.data.types);
+    const offers = await loadR2TypeRows(index.data, typeIds);
+    if (!offers) return null;
+    return {
+      rows: bpcRowsFromContractOffers(offers),
+      originals: bpoRowsFromContractOffers(offers),
+      lastSyncedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Every chunk's raw rows are accumulated before narrowing, rather than each
  * chunk being narrowed as it is read: `bpcRowsFromContractOffers` tallies
  * distinct for-sale types per contract (issue #1076), and a contract's own
@@ -84,6 +126,8 @@ interface MetaDocData {
  * returns the narrowed rows below.
  */
 async function fetchSnapshot(characterId: number): Promise<PublicBpcContractsSnapshot | null> {
+  const fromR2 = await fetchSnapshotFromR2();
+  if (fromR2) return fromR2;
   if (!isSyncConfigured()) return null;
   await ensureAnySession(characterId);
 

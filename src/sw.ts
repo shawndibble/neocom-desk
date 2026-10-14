@@ -33,7 +33,14 @@ import {
 } from '@/features/notifications/notificationClick';
 import { handlePush, type PushEnv } from '@/features/notifications/pushHandler';
 import { recordFeedEntry } from '@/features/notifications/feed';
-import { isEvePortraitImage, isEveTypeImage, isVersionedSdeData } from '@/lib/swRoutes';
+import { resolvePushNames } from '@/features/notifications/pushNames';
+import { db } from '@/db';
+import {
+  isContractSnapshotObject,
+  isEvePortraitImage,
+  isEveTypeImage,
+  isVersionedSdeData,
+} from '@/lib/swRoutes';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -110,6 +117,25 @@ registerRoute(
   })
 );
 
+// R2 contract-offer objects (ADR 0019): immutable, content-addressed by hash, so
+// cache-first is always correct. The server already says `immutable`; this keeps
+// them across browser-cache eviction. A short age cap, since the writer deletes
+// superseded objects after a few days and a cached one is then never named again.
+registerRoute(
+  ({ url }) => isContractSnapshotObject(url),
+  new CacheFirst({
+    cacheName: 'contract-offer-objects',
+    plugins: [
+      cacheOnly200,
+      new ExpirationPlugin({
+        maxEntries: 400,
+        maxAgeSeconds: 3 * DAY_SECONDS,
+        purgeOnQuotaError: true,
+      }),
+    ],
+  })
+);
+
 // Portraits and logos do change (a new portrait, a corp rebrand): serve the
 // cached one instantly and refresh it in the background.
 registerRoute(
@@ -150,6 +176,8 @@ function pushEnv(): PushEnv {
   return {
     showNotification: (title, options) => self.registration.showNotification(title, options),
     recordFeedEntry,
+    characterName: async (characterId) => (await db.characters.get(characterId))?.name,
+    resolveNames: (fire) => resolvePushNames(fire),
   };
 }
 

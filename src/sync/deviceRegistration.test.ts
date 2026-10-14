@@ -91,8 +91,8 @@ describe('registerDeviceForWebPush', () => {
       deviceId: 'device-1',
       fcmToken: 'fcm-token',
       characters: [
-        { characterId: 1, accessToken: 'token-1', projectionRows: [] },
-        { characterId: 2, accessToken: 'token-2', projectionRows: [] },
+        { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
+        { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
       ],
     });
     expect(result).toEqual({ deviceId: 'device-1', registered: [1], rejected: [] });
@@ -120,8 +120,8 @@ describe('registerDeviceForWebPush', () => {
       deviceId: 'device-1',
       fcmToken: 'fcm-token',
       characters: [
-        { characterId: 1, accessToken: 'token-1', projectionRows: [row] },
-        { characterId: 2, accessToken: 'token-2', projectionRows: [] },
+        { characterId: 1, accessToken: 'token-1', projectionRows: [row], eveTypes: [] },
+        { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
       ],
     });
   });
@@ -162,8 +162,8 @@ describe('registerDeviceForWebPush', () => {
       deviceId: 'device-1',
       fcmToken: 'fcm-token',
       characters: [
-        { characterId: 1, accessToken: 'token-1', projectionRows: [] },
-        { characterId: 3, accessToken: 'token-3', projectionRows: [] },
+        { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
+        { characterId: 3, accessToken: 'token-3', projectionRows: [], eveTypes: [] },
       ],
     });
     expect(result).toEqual({ deviceId: 'device-1', registered: [1], rejected: [] });
@@ -251,6 +251,21 @@ describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', ()
     call.mockClear();
     await poll(new Map([[1, [{ ...row, fireAt: row.fireAt + 60_000 }]]]));
     expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-registers when the enabled eve types change, even with identical rows', async () => {
+    const withTypes = (types: string[]) =>
+      registerDeviceForWebPush('vapid-key', registration, new Map([[1, [row]]]), {
+        skipIfUnchanged: true,
+        eveTypesByCharacter: new Map([[1, types]]),
+      });
+    await withTypes(['A']);
+    call.mockClear();
+    await withTypes(['A']);
+    expect(call).not.toHaveBeenCalled();
+    await withTypes(['A', 'B']);
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(call.mock.calls[0][0].characters[0].eveTypes).toEqual(['A', 'B']);
   });
 
   it('re-registers when the FCM token rotates', async () => {
