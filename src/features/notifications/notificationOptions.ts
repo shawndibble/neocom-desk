@@ -100,6 +100,9 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   priceAlertTriggered: '/market/browser',
   stockBelowTarget: '/market/stock',
   incursionNearby: '/travel/route',
+  // The Communities page, where the admin lets the request in or sees the Member.
+  communityJoinRequest: '/communities',
+  communityMemberJoined: '/communities',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';

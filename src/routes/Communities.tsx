@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { rememberCommunityAdmin } from '@/features/communities/communityAlertEntries';
 import {
   Button,
   EmptyState,
@@ -77,6 +78,8 @@ export function Communities() {
     (async () => {
       try {
         const list = await loadMyCommunities(characterId);
+        // Tells the Community alerts poll whether this Character has anything to watch.
+        void rememberCommunityAdmin(characterId, list).catch(() => {});
         if (cancelled) return;
         setLoaded({ characterId, list });
         setFailedFor(null);

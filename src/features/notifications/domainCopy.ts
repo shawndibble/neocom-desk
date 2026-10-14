@@ -23,6 +23,10 @@
  * A name that failed to resolve is absent from `names`; each renderer owns
  * its `#id` fallback, so poll and push degrade identically.
  */
+import type {
+  CommunityJoinRequestFire,
+  CommunityMemberJoinedFire,
+} from '@/engine/communities/communityAlert';
 import type { StockBelowTargetFire } from '@/engine/stockTargets/stockAlert';
 import type { IncursionNearbyFire } from '@/engine/incursions/incursionAlert';
 import i18n from '@/i18n';
@@ -528,6 +532,28 @@ export const stockBelowTargetCopy: DomainCopy<StockBelowTargetFire, NoNames> = {
   }),
   // The market's location id: the Stock tab opens that market (`?market=`); list ids are not numbers.
   subjectOf: (fire) => fire.locationId,
+};
+
+/* Communities ------------------------------------------------------------- */
+
+export const communityJoinRequestCopy: DomainCopy<CommunityJoinRequestFire, NoNames> = {
+  poll: (fire) => ({
+    title: fired('communityJoinRequest', 'title', { community: fire.communityName }),
+    body: fired('communityJoinRequest', 'body', {
+      name: fire.characterName,
+      community: fire.communityName,
+    }),
+  }),
+};
+
+export const communityMemberJoinedCopy: DomainCopy<CommunityMemberJoinedFire, NoNames> = {
+  poll: (fire) => ({
+    title: fired('communityMemberJoined', 'title', { community: fire.communityName }),
+    body: fired('communityMemberJoined', 'body', {
+      name: fire.characterName,
+      community: fire.communityName,
+    }),
+  }),
 };
 
 /* Incursions -------------------------------------------------------------- */

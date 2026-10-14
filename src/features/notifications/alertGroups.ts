@@ -110,6 +110,9 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   stockBelowTarget: 'warning',
   // Something to fly to, not a fault.
   incursionNearby: 'watch',
+  // Someone is waiting on the admin; a new Member needs nothing.
+  communityJoinRequest: 'watch',
+  communityMemberJoined: 'watch',
   // Waiting on you, but nothing is burning.
   spExtractionReady: 'watch',
   industryJobComplete: 'watch',
