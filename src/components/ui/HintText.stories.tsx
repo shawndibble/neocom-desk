@@ -36,3 +36,22 @@ export const Toned: Story = {
 export const DesktopOnly: Story = {
   args: { content: 'Full station name', children: 'Jita IV - Moon 4', desktopOnly: true },
 };
+
+/** @summary `onlyWhenTruncated`: the cue and tooltip appear only while the truncating parent clips the text. */
+export const OnlyWhenTruncated: Story = {
+  args: {
+    content: 'Bureau of Unified Harvesting',
+    children: 'Bureau of Unified Harvesting',
+    onlyWhenTruncated: true,
+  },
+  render: (args) => (
+    <div className="space-y-2">
+      <div className="w-32 truncate">
+        <HintText {...args}>Bureau of Unified Harvesting</HintText>
+      </div>
+      <div className="w-64 truncate">
+        <HintText {...args}>Bureau of Unified Harvesting</HintText>
+      </div>
+    </div>
+  ),
+};
