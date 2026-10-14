@@ -4,17 +4,23 @@
  * the two can't drift in who may send or what the outcome reads — the same
  * split as `useSetDestination`.
  */
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import { permissionsForEndpoints, type ScopeGroup } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { openInEve, OPEN_IN_EVE_ENDPOINTS, type OpenInEveTarget } from './sendOpenInEve';
 
-type Outcome = { tone: 'status' | 'alert'; text: string } | null;
+type Outcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
+
+const MISSING_GROUPS: readonly ScopeGroup[] = permissionsForEndpoints(OPEN_IN_EVE_ENDPOINTS);
 
 export interface OpenInEve {
   /** Why sending can't work yet — no Character, or no Open in EVE permission — or null when it can. */
-  blockedReason: string | null;
+  blockedReason: ReactNode;
+  /** The Permissions blocking it, for a menu that can't carry a link in its reason; empty otherwise. */
+  missingGroups: readonly ScopeGroup[];
   sending: boolean;
   outcome: Outcome;
   /** No-ops while blocked. */
@@ -41,11 +47,11 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
   const inFlight = useRef(false);
 
   const blockedReason =
-    characterId === null
-      ? t('openInEve.needCharacter')
-      : lacksScope
-        ? t('openInEve.permissionReason')
-        : null;
+    characterId === null ? (
+      t('openInEve.needCharacter')
+    ) : lacksScope ? (
+      <GrantMissingLink groups={MISSING_GROUPS} />
+    ) : null;
 
   async function sendFor(forCharacter: number) {
     inFlight.current = true;
@@ -61,10 +67,14 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
       if (result.ok) {
         setOutcome({ tone: 'status', text: t('openInEve.opened') });
       } else {
-        const message = result.needsPermission
-          ? t('openInEve.needPermission')
-          : (result.message ?? t('openInEve.unknownError'));
-        setOutcome({ tone: 'alert', text: t('openInEve.failed', { message }) });
+        setOutcome({
+          tone: 'alert',
+          text: result.needsPermission ? (
+            <GrantMissingLink groups={MISSING_GROUPS} />
+          ) : (
+            t('openInEve.failed', { message: result.message ?? t('openInEve.unknownError') })
+          ),
+        });
       }
     } catch {
       // A lookup that threw (not one that found nothing): say so, don't go quiet.
@@ -80,6 +90,7 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
 
   return {
     blockedReason,
+    missingGroups: lacksScope && characterId !== null ? MISSING_GROUPS : [],
     sending,
     outcome,
     send: () => {

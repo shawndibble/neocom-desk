@@ -14,6 +14,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { GrantBanner } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import {
@@ -26,7 +27,7 @@ import {
   Tooltip,
 } from '@/components/ui';
 import { db } from '@/db';
-import type { EsiEndpointId } from '@/esi/registry';
+import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { waypointSequence } from '@/engine/route/waypoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { setWaypointsInGame } from './sendWaypoints';
@@ -34,7 +35,7 @@ import type { RouteSafetyLeg } from './useRouteSafety';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
 
-type Outcome = { tone: 'status' | 'alert'; text: string } | null;
+type Outcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
 
 export function SetWaypoints({
   legs,
@@ -62,7 +63,7 @@ export function SetWaypoints({
     characterId === null
       ? t('travel.waypoints.needCharacter')
       : lacksScope
-        ? t('travel.waypoints.permissionReason')
+        ? t('permissions.grantMissing')
         : null;
 
   async function send(id: number) {
@@ -86,19 +87,20 @@ export function SetWaypoints({
       }
       const result = await setWaypointsInGame(id, waypoints);
       if (!result.ok) {
-        const message = result.needsPermission
-          ? t('travel.waypoints.needPermission')
-          : (result.message ?? t('travel.waypoints.unknownError'));
+        const message = result.message ?? t('travel.waypoints.unknownError');
         setOutcome({
           tone: 'alert',
-          text:
-            result.set === 0
-              ? t('travel.waypoints.failed', { message })
-              : t('travel.waypoints.failedPartway', {
-                  set: result.set,
-                  total: waypoints.length,
-                  message,
-                }),
+          text: result.needsPermission ? (
+            <GrantMissingLink groups={permissionsForEndpoints(ENDPOINTS)} />
+          ) : result.set === 0 ? (
+            t('travel.waypoints.failed', { message })
+          ) : (
+            t('travel.waypoints.failedPartway', {
+              set: result.set,
+              total: waypoints.length,
+              message,
+            })
+          ),
         });
         return;
       }

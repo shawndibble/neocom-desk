@@ -16,6 +16,7 @@
  * "More actions" dropdown gets it too.
  */
 import { useTranslation } from 'react-i18next';
+import { GrantMissingMenuItem } from '@/app/GrantMissingLink';
 import { DisabledMenuItem, MenuItem } from '@/components/ui';
 import { useSetDestination } from './useSetDestination';
 import { ViewRouteMenuItem } from './ViewRouteMenuItem';
@@ -29,13 +30,25 @@ export function SetWaypointMenuItem({
   placeName: string;
 }) {
   const { t } = useTranslation();
-  const { blockedReason, sending, outcome, send } = useSetDestination(locationId, placeName);
+  const { blockedReason, missingGroups, sending, outcome, send } = useSetDestination(
+    locationId,
+    placeName
+  );
   const label = t('travel.waypoints.menuItem');
 
   if (blockedReason !== null) {
     return (
       <>
-        <DisabledMenuItem reason={blockedReason}>{label}</DisabledMenuItem>
+        <DisabledMenuItem
+          reason={
+            missingGroups.length > 0
+              ? t('permissions.grantMissing')
+              : t('travel.waypoints.needCharacter')
+          }
+        >
+          {label}
+        </DisabledMenuItem>
+        {missingGroups.length > 0 && <GrantMissingMenuItem groups={missingGroups} />}
         <ViewRouteMenuItem locationId={locationId} />
       </>
     );

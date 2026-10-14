@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -25,7 +25,7 @@ interface FittingSaveButtonProps {
   onSaveAsNew: () => void;
   onSaveToEve: () => void;
   canSaveToEve: boolean;
-  saveToEveBlockedReason?: string;
+  saveToEveBlockedReason?: ReactNode;
   /** The phone's header: the button keeps its short "Save" label, and its accessible name and tooltip say where it saves. */
   compact?: boolean;
 }

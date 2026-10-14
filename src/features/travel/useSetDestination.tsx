@@ -10,20 +10,25 @@
  * `location_id` can be a container, ship or hangar item id, which ESI
  * refuses; those callers resolve it to its station first.
  */
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import type { EsiEndpointId } from '@/esi/registry';
+import { permissionsForEndpoints, type EsiEndpointId, type ScopeGroup } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { setWaypointsInGame } from './sendWaypoints';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
 
-type SetDestinationOutcome = { tone: 'status' | 'alert'; text: string } | null;
+const MISSING_GROUPS: readonly ScopeGroup[] = permissionsForEndpoints(ENDPOINTS);
+
+type SetDestinationOutcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
 
 interface SetDestination {
   /** Why sending can't work yet — no Character, or no waypoint scope — or null when it can. */
-  blockedReason: string | null;
+  blockedReason: ReactNode;
+  /** The Permissions blocking it, for a menu that can't carry a link in its reason; empty otherwise. */
+  missingGroups: readonly ScopeGroup[];
   sending: boolean;
   outcome: SetDestinationOutcome;
   /** No-ops while blocked. */
@@ -40,11 +45,11 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
   const inFlight = useRef(false);
 
   const blockedReason =
-    characterId === null
-      ? t('travel.waypoints.needCharacter')
-      : lacksScope
-        ? t('travel.waypoints.permissionReason')
-        : null;
+    characterId === null ? (
+      t('travel.waypoints.needCharacter')
+    ) : lacksScope ? (
+      <GrantMissingLink groups={MISSING_GROUPS} />
+    ) : null;
 
   async function sendFor(id: number) {
     inFlight.current = true;
@@ -55,10 +60,16 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
       if (result.ok) {
         setOutcome({ tone: 'status', text: t('market.orderDetail.destinationSet', { placeName }) });
       } else {
-        const message = result.needsPermission
-          ? t('travel.waypoints.needPermission')
-          : (result.message ?? t('travel.waypoints.unknownError'));
-        setOutcome({ tone: 'alert', text: t('travel.waypoints.failed', { message }) });
+        setOutcome({
+          tone: 'alert',
+          text: result.needsPermission ? (
+            <GrantMissingLink groups={MISSING_GROUPS} />
+          ) : (
+            t('travel.waypoints.failed', {
+              message: result.message ?? t('travel.waypoints.unknownError'),
+            })
+          ),
+        });
       }
     } finally {
       inFlight.current = false;
@@ -68,6 +79,7 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
 
   return {
     blockedReason,
+    missingGroups: lacksScope && characterId !== null ? MISSING_GROUPS : [],
     sending,
     outcome,
     send: () => {

@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { Trans, useTranslation } from 'react-i18next';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { FittingLoadState } from '@/lib/shortcuts';
 import {
@@ -713,11 +714,11 @@ function FittingsPage() {
                 onSaveToEve={() => setSaveToEveOpen(true)}
                 canSaveToEve={activeCharacterId !== null && canSaveToEve === true}
                 saveToEveBlockedReason={
-                  activeCharacterId === null
-                    ? t('fittings.saveToEve.needCharacter')
-                    : canSaveToEve === false
-                      ? t('fittings.saveToEve.needPermission')
-                      : undefined
+                  activeCharacterId === null ? (
+                    t('fittings.saveToEve.needCharacter')
+                  ) : canSaveToEve === false ? (
+                    <GrantMissingLink groups={['fittings']} />
+                  ) : undefined
                 }
               />
             }
