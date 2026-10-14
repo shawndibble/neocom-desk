@@ -14,7 +14,7 @@ interface SkillsSnapshot {
 /**
  * Each requested character's queue-corrected trained-skill map, fetched with
  * the same bounded fan-out `roster.ts` uses — a request settles on its own,
- * so one character's failure just leaves it out of the result. Callers pass
+ * so one character's failure — a throw, or no /skills payload at all — just leaves it out of the result. Callers pass
  * only the ids actually needing a fetch (`idsNeedingFetch`) and merge the
  * result into whatever is already cached for the rest of the selection.
  */
@@ -23,6 +23,8 @@ async function loadSkillsForCharacters(characterIds: readonly number[]): Promise
   const fetchedAtByCharacter = new Map<number, Date>();
   const requests = characterIds.map((characterId) => async () => {
     const corrected = await loadCorrectedSkills(characterId, Date.now());
+    // No /skills payload at all (ESI failed and nothing is cached): not a character with no skills.
+    if (corrected.skillsResult === null) return;
     skillsByCharacter.set(characterId, corrected.trained);
     if (corrected.fetchedAt) fetchedAtByCharacter.set(characterId, corrected.fetchedAt);
   });
@@ -39,9 +41,11 @@ async function loadSkillsForCharacters(characterIds: readonly number[]): Promise
 export interface CompareSkills {
   catalog: SkillCatalog | null;
   skillsByCharacter: ReadonlyMap<number, ReadonlyMap<number, TrainedSkill>>;
-  /** The selection minus anyone still waiting on a first fetch: the columns actually drawn. */
+  /** The selection minus anyone still waiting on a first fetch, or whose fetch failed: the columns actually drawn. */
   loadedIds: readonly number[];
   pendingIds: ReadonlySet<number>;
+  /** Selected characters whose fetch settled without data: no column, rather than one of false zeros. */
+  failedIds: ReadonlySet<number>;
   refreshing: boolean;
   oldestFetchedAt: Date | null;
   refresh: () => void;
@@ -65,9 +69,8 @@ export function useCompareSkills(selectedIds: readonly number[], enabled: boolea
   // column: one still waiting on its first fetch would otherwise read as a
   // column of zeros — "has not trained this", a confident false answer
   // (DESIGN §6a). A refresh keeps them settled, so their current levels stay
-  // on screen until the new data replaces them. A failed fetch settles too
-  // and still contributes zeros — surfacing per-character failures is its own
-  // gap, not this loading contract's.
+  // on screen until the new data replaces them. A failed fetch settles too,
+  // but has no skills to show: `failedIds` names it, and it gets no column.
   const [settledIds, setSettledIds] = useState<ReadonlySet<number>>(new Set());
   const [refreshNonce, setRefreshNonce] = useState(0);
   // The refresh generation last committed; `refreshNonce` ahead of it means a
@@ -114,9 +117,13 @@ export function useCompareSkills(selectedIds: readonly number[], enabled: boolea
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on selectionKey, selectedIds/refreshNonce are its inputs
   }, [selectionKey]);
 
+  const failedIds = useMemo(
+    () => new Set(selectedIds.filter((id) => settledIds.has(id) && !skillsByCharacter.has(id))),
+    [selectedIds, settledIds, skillsByCharacter]
+  );
   const loadedIds = useMemo(
-    () => selectedIds.filter((id) => settledIds.has(id)),
-    [selectedIds, settledIds]
+    () => selectedIds.filter((id) => settledIds.has(id) && !failedIds.has(id)),
+    [selectedIds, settledIds, failedIds]
   );
   const pendingIds = useMemo(
     () => new Set(selectedIds.filter((id) => !settledIds.has(id))),
@@ -136,6 +143,7 @@ export function useCompareSkills(selectedIds: readonly number[], enabled: boolea
     skillsByCharacter,
     loadedIds,
     pendingIds,
+    failedIds,
     refreshing: refreshNonce !== committedRefreshNonce,
     oldestFetchedAt,
     refresh: () => {

@@ -90,20 +90,22 @@ function SavedComparisonRow({
           type="button"
           ref={(el) => registerLoad(comparison.id, el)}
           onClick={() => onLoad(comparison)}
-          className={entityLinkClassName('flex-1 truncate text-left')}
+          className={entityLinkClassName(
+            'flex min-h-11 flex-1 items-center truncate text-left md:min-h-0 touch:min-h-11'
+          )}
         >
           {comparison.name}
         </button>
       )}
       <IconButton
         ref={renameButtonRef}
-        size="sm"
+        size="row"
         icon={<Icon.Rename />}
         label={`${t('skillCompare.rename')} ${comparison.name}`}
         onClick={() => setRenaming(true)}
       />
       <IconButton
-        size="sm"
+        size="row"
         icon={<Icon.Close />}
         label={`${t('skillCompare.delete')} ${comparison.name}`}
         tone="danger"

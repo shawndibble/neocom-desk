@@ -116,10 +116,10 @@ function LocationProbe() {
 }
 
 /** The drawer on its own, in a router: the URL carries the selection, as it does on Skills › Trained. */
-function renderDrawer(search = '') {
+function renderDrawer(search = '', onClose: () => void = () => {}, activeCharacterId = CHAR_A) {
   return render(
     <MemoryRouter initialEntries={[`/skills/trained${search}`]}>
-      <SkillCompareDrawer open onClose={() => {}} activeCharacterId={CHAR_A} />
+      <SkillCompareDrawer open onClose={onClose} activeCharacterId={activeCharacterId} />
       <LocationProbe />
     </MemoryRouter>
   );
@@ -180,6 +180,59 @@ describe('SkillCompareDrawer', () => {
     expect(within(skillRow(table, 'Spaceship Command')).getAllByRole('cell')[1]).toHaveTextContent(
       '+2'
     );
+  });
+
+  it('makes the active character the baseline even when it is not the first selected', async () => {
+    renderDrawer(`?ids=${CHAR_B},${CHAR_A}`);
+
+    const table = await screen.findByRole('table', { name: 'Skill comparison' });
+    await waitFor(() => expect(columnNames(table)).toEqual(['Pilot OneBaseline', 'Pilot Two']));
+  });
+
+  it('gives a character whose skills could not be read no column, and says so', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_B}/skills`, () =>
+        HttpResponse.json({ error: 'Character not found' }, { status: 404 })
+      )
+    );
+    renderDrawer(`?ids=${CHAR_A},${CHAR_B}`);
+
+    expect(await screen.findByText(/Couldn't load skills for Pilot Two/)).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Pilot Two/ })).not.toBeInTheDocument();
+  });
+
+  it('shows no deltas until the baseline has loaded', async () => {
+    const held = deferred();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_A}/skills`, async () => {
+        await held.promise;
+        return HttpResponse.json({
+          skills: [{ skill_id: GUNNERY, trained_skill_level: 3, skillpoints_in_skill: 24_000 }],
+          total_sp: 24_000,
+          unallocated_sp: 0,
+        });
+      })
+    );
+    renderDrawer(`?ids=${CHAR_A},${CHAR_B}`);
+
+    expect(await screen.findByRole('status', { name: 'Loading skills…' })).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Skill comparison' })).not.toBeInTheDocument();
+
+    held.resolve();
+    const table = await screen.findByRole('table', { name: 'Skill comparison' });
+    await waitFor(() => expect(columnNames(table)).toEqual(['Pilot OneBaseline', 'Pilot Two']));
+  });
+
+  it('forgets the selection from the URL when it closes', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderDrawer(`?ids=${CHAR_A},${CHAR_B}&baseline=${CHAR_B}`, onClose);
+
+    await screen.findByRole('table', { name: 'Skill comparison' });
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId('search').textContent).toBe(''));
   });
 
   it('says missing, not a bare minus, for a skill the baseline has and the character lacks', async () => {

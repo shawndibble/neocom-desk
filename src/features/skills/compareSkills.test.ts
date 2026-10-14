@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildComparisonRows,
+  levelOf,
   groupBands,
   hasDifferingLevels,
   idsNeedingFetch,
@@ -49,17 +50,6 @@ describe('buildComparisonRows', () => {
     expect(gunnery.levels.get(2)).toBe(0);
   });
 
-  it('computes maxLevel as the highest level among compared characters', () => {
-    const skillsByCharacter = new Map([
-      [1, trained([[GUNNERY, { level: 3, sp: 1000 }]])],
-      [2, trained([[GUNNERY, { level: 5, sp: 5000 }]])],
-    ]);
-
-    const rows = buildComparisonRows([1, 2], skillsByCharacter, CATALOG);
-
-    expect(rows.find((r) => r.skillTypeID === GUNNERY)?.maxLevel).toBe(5);
-  });
-
   it('sorts rows by group name, then skill name', () => {
     const skillsByCharacter = new Map([
       [
@@ -104,7 +94,6 @@ function row(levels: [number, number][]): ComparisonRow {
     name: 'Gunnery',
     groupName: 'Gunnery',
     levels: new Map(levels),
-    maxLevel: Math.max(0, ...levels.map(([, level]) => level)),
   };
 }
 
@@ -169,7 +158,6 @@ function skillRow(
     name: `Skill ${skillTypeID}`,
     groupName,
     levels: map,
-    maxLevel: Math.max(...map.values()),
   };
 }
 
@@ -208,12 +196,11 @@ describe('splitDiffering', () => {
     const result = splitDiffering([differing, identical]);
     expect(result.differing).toEqual([differing]);
     expect(result.identical).toEqual([identical]);
-    expect(result.identicalCount).toBe(1);
   });
 
   it('treats every row as identical for a single character', () => {
     const only = skillRow(1, 'A', [[1, 3]]);
-    expect(splitDiffering([only]).identicalCount).toBe(1);
+    expect(splitDiffering([only]).identical).toEqual([only]);
   });
 });
 
@@ -267,7 +254,25 @@ describe('resolveBaseline', () => {
     expect(resolveBaseline([4, 5], null)).toBe(4);
   });
 
+  it('prefers the preferred character over the first when no baseline was requested', () => {
+    expect(resolveBaseline([4, 5], null, 5)).toBe(5);
+    expect(resolveBaseline([4, 5], 4, 5)).toBe(4);
+  });
+
+  it('ignores a preferred character that is not selected', () => {
+    expect(resolveBaseline([4, 5], null, 9)).toBe(4);
+  });
+
   it('is null with nothing selected', () => {
     expect(resolveBaseline([], 1)).toBeNull();
+  });
+});
+
+describe('levelOf', () => {
+  it('reads a level of a skill, 0 when it has none or there is no character', () => {
+    const r = skillRow(1, 'A', [[1, 4]]);
+    expect(levelOf(r, 1)).toBe(4);
+    expect(levelOf(r, 2)).toBe(0);
+    expect(levelOf(r, null)).toBe(0);
   });
 });

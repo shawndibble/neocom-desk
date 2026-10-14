@@ -74,10 +74,14 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
       return;
     }
     if (seeded.current) return;
-    seeded.current = true;
-    if (selectedIds.length === 0 && activeCharacterId !== null) {
-      setParams({ ids: [activeCharacterId] });
+    if (selectedIds.length > 0) {
+      seeded.current = true;
+      return;
     }
+    // No active character yet: wait for it rather than spend the one seed.
+    if (activeCharacterId === null) return;
+    seeded.current = true;
+    setParams({ ids: [activeCharacterId] });
   }, [open, selectedIds.length, activeCharacterId, setParams]);
 
   // A hand-edited or stale `?ids=` can name a character this device has never
@@ -92,8 +96,16 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
   }, [roster, selectedIds, setParams]);
 
   const compare = useCompareSkills(selectedIds, open);
-  const { catalog, skillsByCharacter, loadedIds, pendingIds } = compare;
-  const baselineId = resolveBaseline(selectedIds, params.baseline);
+  const { catalog, skillsByCharacter, loadedIds, pendingIds, failedIds } = compare;
+  // A character whose skills could not be read has nothing to measure against
+  // or to show: it is neither a column nor a possible baseline.
+  const usableIds = useMemo(
+    () => selectedIds.filter((id) => !failedIds.has(id)),
+    [selectedIds, failedIds]
+  );
+  const baselineId = resolveBaseline(usableIds, params.baseline, activeCharacterId);
+  // Until the baseline's skills land every delta would read against nothing.
+  const baselinePending = baselineId !== null && pendingIds.has(baselineId);
 
   const nameFor = useMemo(() => {
     const byId = new Map((roster ?? []).map((c) => [c.characterId, c.name]));
@@ -118,7 +130,7 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
     () =>
       comparing && params.differingOnly
         ? splitDiffering(allRows)
-        : { differing: allRows, identical: [], identicalCount: 0 },
+        : { differing: allRows, identical: [] },
     [allRows, comparing, params.differingOnly]
   );
 
@@ -164,7 +176,7 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
         onApply={(ids, comparisonId, removed) => {
           setSomeRemoved(removed);
           latestIds.current = ids;
-          setParams({ ids, comparisonId });
+          setParams({ ids, comparisonId, baseline: null });
         }}
         onSaved={(comparisonId) => setParams({ comparisonId })}
         onUnlinked={() => setParams({ comparisonId: null })}
@@ -192,7 +204,16 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
     </div>
   );
 
-  const onlyBaseline = selectedIds.length === 1;
+  const failedNames = [...failedIds].map(nameFor).join(', ');
+  // Closing forgets the selection: it would otherwise linger in the Trained
+  // URL, shared with it and reopening the drawer on a reload.
+  function handleClose() {
+    latestIds.current = [];
+    setSomeRemoved(false);
+    setParams({ ids: [], comparisonId: null, baseline: null });
+    onClose();
+  }
+
   const content = (
     <div className="space-y-3 p-3">
       {toolbar}
@@ -230,7 +251,7 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
         </ul>
       </div>
 
-      {selectedIds.length > 1 && baselineId !== null && (
+      {usableIds.length > 1 && baselineId !== null && (
         <div className="flex flex-wrap items-center gap-2">
           <Select
             value={String(baselineId)}
@@ -238,15 +259,15 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
           >
             <SelectTrigger
               size="sm"
-              aria-label={t('skillCompare.baselineLabel')}
+              aria-label={t('skillCompare.baseline')}
               className="w-auto min-w-44"
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {selectedIds.map((id) => (
+              {usableIds.map((id) => (
                 <SelectItem key={id} value={String(id)}>
-                  {t('skillCompare.baselineLabel')}: {nameFor(id)}
+                  {t('skillCompare.baseline')}: {nameFor(id)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -264,6 +285,11 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
       {someRemoved && (
         <p className="text-[0.6875rem] text-warning uppercase">{t('skillCompare.someRemoved')}</p>
       )}
+      {failedIds.size > 0 && (
+        <p className="text-[0.6875rem] text-warning uppercase">
+          {t('skillCompare.loadFailed', { names: failedNames })}
+        </p>
+      )}
       <LiveStatus>{someRemoved ? t('skillCompare.someRemoved') : null}</LiveStatus>
 
       {selectedIds.length === 0 ? (
@@ -271,19 +297,17 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
           title={t('skillCompare.noneSelectedTitle')}
           hint={t('skillCompare.noneSelectedHint')}
         />
-      ) : !catalog || (allRows.length === 0 && pendingIds.size > 0) ? (
+      ) : !catalog || baselinePending || (pendingIds.size > 0 && loadedIds.length < 2) ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('skillCompare.loading')} />
         </div>
-      ) : allRows.length === 0 ? (
+      ) : allRows.length === 0 || (split.differing.length === 0 && split.identical.length === 0) ? (
         <EmptyState title={t('skillCompare.noDataTitle')} hint={t('skillCompare.noDataHint')} />
-      ) : onlyBaseline ? (
+      ) : loadedIds.length === 1 ? (
         <EmptyState
           title={t('skillCompare.onlyBaselineTitle')}
-          hint={t('skillCompare.onlyBaselineHint', { name: nameFor(selectedIds[0] ?? 0) })}
+          hint={t('skillCompare.onlyBaselineHint', { name: nameFor(loadedIds[0] ?? 0) })}
         />
-      ) : split.differing.length === 0 && split.identicalCount === 0 ? (
-        <EmptyState title={t('skillCompare.noDataTitle')} hint={t('skillCompare.noDataHint')} />
       ) : (
         <div className="-mx-3">
           <SkillCompareView
@@ -305,7 +329,12 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
 
   if (isPhone) {
     return (
-      <Modal open={open} onClose={onClose} placement="sheet-full" title={t('skillCompare.title')}>
+      <Modal
+        open={open}
+        onClose={handleClose}
+        placement="sheet-full"
+        title={t('skillCompare.title')}
+      >
         {content}
       </Modal>
     );
@@ -313,7 +342,7 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
   return (
     <SlideOver
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       title={t('skillCompare.title')}
       flush
       maxWidthClassName="max-w-3xl"

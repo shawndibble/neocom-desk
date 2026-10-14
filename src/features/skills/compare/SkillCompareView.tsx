@@ -8,6 +8,7 @@ import { cx } from '@/lib/cx';
 import {
   groupBands,
   levelDelta,
+  levelOf,
   type ComparisonRow,
   type GroupBand,
   type LevelDelta,
@@ -131,7 +132,8 @@ function ColumnHeader({
   );
 }
 
-const STICKY_CELL = 'sticky left-0 z-10 bg-panel';
+/** A skill name cell stays put while the character columns scroll sideways. */
+const PINNED_SKILL_CELL = 'sticky left-0 z-10 bg-panel';
 
 function BandTable({
   bands,
@@ -170,7 +172,7 @@ function BandTable({
               <th
                 scope="row"
                 className={cx(
-                  STICKY_CELL,
+                  PINNED_SKILL_CELL,
                   'border-b border-line px-3 py-1.5 text-left text-xs font-normal'
                 )}
               >
@@ -180,7 +182,7 @@ function BandTable({
                 <td key={character.characterId} className="border-b border-line px-3 py-1.5">
                   <LevelCell
                     level={row.levels.get(character.characterId) ?? 0}
-                    baselineLevel={baselineId === null ? 0 : (row.levels.get(baselineId) ?? 0)}
+                    baselineLevel={levelOf(row, baselineId)}
                     isBaseline={character.characterId === baselineId}
                   />
                 </td>
@@ -228,7 +230,7 @@ function BandCards({
                       </span>
                       <LevelCell
                         level={row.levels.get(character.characterId) ?? 0}
-                        baselineLevel={baselineId === null ? 0 : (row.levels.get(baselineId) ?? 0)}
+                        baselineLevel={levelOf(row, baselineId)}
                         isBaseline={character.characterId === baselineId}
                       />
                     </li>
@@ -260,7 +262,7 @@ function IdenticalToggle({
       aria-expanded={expanded}
       onClick={onToggle}
       className={cx(
-        'flex w-full items-center gap-1.5 px-3 py-2 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase',
+        'flex min-h-11 w-full items-center gap-1.5 px-3 py-2 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:min-h-0 touch:min-h-11',
         rowInteractiveClassName,
         focusRingInsetClassName
       )}
@@ -271,19 +273,19 @@ function IdenticalToggle({
   );
 }
 
-function RowsView({
-  rows,
-  identicalRows,
+/**
+ * The comparison itself: skills grouped in bands, each character's level as
+ * five pips with its standing against the baseline character. A table with
+ * pinned avatar headers on desktop; one card per skill on a phone, where a
+ * wide matrix would scroll sideways with the column headers off screen.
+ */
+export function SkillCompareView({
   characters,
   baselineId,
-  phone,
-}: {
-  rows: readonly ComparisonRow[];
-  identicalRows: readonly ComparisonRow[];
-  characters: readonly CompareCharacter[];
-  baselineId: number | null;
-  phone: boolean;
-}) {
+  rows,
+  identicalRows = [],
+  phone = false,
+}: SkillCompareViewProps) {
   const { t } = useTranslation();
   const [identicalOpen, setIdenticalOpen] = useState(false);
   const ids = useMemo(() => characters.map((c) => c.characterId), [characters]);
@@ -349,29 +351,5 @@ function RowsView({
         <BandTable bands={identicalBands} characters={characters} baselineId={baselineId} />
       )}
     </table>
-  );
-}
-
-/**
- * The comparison itself: skills grouped in bands, each character's level as
- * five pips with its standing against the baseline character. A table with
- * pinned avatar headers on desktop; one card per skill on a phone, where a
- * wide matrix would scroll sideways with the column headers off screen.
- */
-export function SkillCompareView({
-  characters,
-  baselineId,
-  rows,
-  identicalRows = [],
-  phone = false,
-}: SkillCompareViewProps) {
-  return (
-    <RowsView
-      rows={rows}
-      identicalRows={identicalRows}
-      characters={characters}
-      baselineId={baselineId}
-      phone={phone}
-    />
   );
 }

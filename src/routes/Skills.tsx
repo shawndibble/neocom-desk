@@ -140,9 +140,13 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 /** Every SDE skill for the active character, grouped by SDE group, with SP + attributes. */
 export function Skills() {
   const { t } = useTranslation();
-  // A retired Compare link (`/skills/compare?ids=…`) lands here with its selection: open on it.
+  // A retired Compare link (`/skills/compare?ids=…`, see `legacyPaths.ts`) lands here with its
+  // selection in the URL: open on it. The drawer clears that selection when it closes.
   const { search } = useLocation();
-  const [compareOpen, setCompareOpen] = useState(() => new URLSearchParams(search).has('ids'));
+  const [compareOpen, setCompareOpen] = useState(() => {
+    const params = new URLSearchParams(search);
+    return params.has('ids') || params.has('comparisonId');
+  });
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadSkillsSnapshot,
     undefined,

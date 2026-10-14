@@ -16,8 +16,6 @@ export interface ComparisonRow {
   groupName: string;
   /** Trained level per character id; 0 for a character that has not trained this skill. */
   levels: ReadonlyMap<number, number>;
-  /** Highest level among the compared characters, for "who's ahead" styling. */
-  maxLevel: number;
 }
 
 /**
@@ -41,18 +39,15 @@ export function buildComparisonRows(
   for (const skillTypeID of skillTypeIDs) {
     const info = bySkillTypeID.get(skillTypeID);
     const levels = new Map<number, number>();
-    let maxLevel = 0;
     for (const characterId of characterIds) {
       const level = skillsByCharacter.get(characterId)?.get(skillTypeID)?.level ?? 0;
       levels.set(characterId, level);
-      if (level > maxLevel) maxLevel = level;
     }
     rows.push({
       skillTypeID,
       name: info?.name ?? `#${skillTypeID}`,
       groupName: info?.groupName ?? '',
       levels,
-      maxLevel,
     });
   }
 
@@ -101,16 +96,20 @@ export function levelDelta(level: number, baselineLevel: number): LevelDelta {
   return { kind: 'behind', by: baselineLevel - level };
 }
 
+/** A character's level of a row's skill: 0 for one with none, or for no character at all. */
+export function levelOf(row: ComparisonRow, characterId: number | null): number {
+  return characterId === null ? 0 : (row.levels.get(characterId) ?? 0);
+}
+
 /** Rows whose levels differ across the compared characters, and the rest — kept so they can be shown on demand. */
 export function splitDiffering(rows: readonly ComparisonRow[]): {
   differing: ComparisonRow[];
   identical: ComparisonRow[];
-  identicalCount: number;
 } {
   const differing: ComparisonRow[] = [];
   const identical: ComparisonRow[] = [];
   for (const row of rows) (hasDifferingLevels(row) ? differing : identical).push(row);
-  return { differing, identical, identicalCount: identical.length };
+  return { differing, identical };
 }
 
 export interface GroupBand {
@@ -136,21 +135,23 @@ export function groupBands(
     const netDelta = new Map<number, number>();
     for (const characterId of characterIds) {
       let net = 0;
-      for (const row of band.rows) {
-        const baseline = baselineId === null ? 0 : (row.levels.get(baselineId) ?? 0);
-        net += (row.levels.get(characterId) ?? 0) - baseline;
-      }
+      for (const row of band.rows) net += levelOf(row, characterId) - levelOf(row, baselineId);
       netDelta.set(characterId, characterId === baselineId ? 0 : net);
     }
     return { ...band, netDelta };
   });
 }
 
-/** The requested baseline while it is still selected, else the first selected character. */
+/**
+ * The requested baseline while it is still selected, else the preferred
+ * character (the active one) if selected, else the first selected.
+ */
 export function resolveBaseline(
   selectedIds: readonly number[],
-  requested: number | null
+  requested: number | null,
+  preferred: number | null = null
 ): number | null {
   if (requested !== null && selectedIds.includes(requested)) return requested;
+  if (preferred !== null && selectedIds.includes(preferred)) return preferred;
   return selectedIds[0] ?? null;
 }
