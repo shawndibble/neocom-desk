@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import { focusRingClassName } from './controlStyles';
 import { Tooltip } from './Tooltip';
@@ -16,6 +16,29 @@ interface HintTextProps {
    * opens the row (`DataTable` leaves taps on `openOnTap` triggers alone).
    */
   desktopOnly?: boolean;
+  /**
+   * For a name inside a truncating parent (`truncate`, `line-clamp`): the cue
+   * and the tooltip appear only while the parent actually clips the text. A
+   * name that fits in full has nothing left to reveal.
+   */
+  onlyWhenTruncated?: boolean;
+}
+
+/** Whether the element's parent clips its content, kept current as either resizes. */
+function useParentClips(enabled: boolean) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [clips, setClips] = useState(false);
+  useEffect(() => {
+    const parent = ref.current?.parentElement;
+    if (!enabled || !parent) return;
+    const measure = () => setClips(parent.scrollWidth > parent.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(parent);
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [enabled]);
+  return { ref, clips };
 }
 
 /**
@@ -26,10 +49,27 @@ interface HintTextProps {
  * a trigger that opens a popover on click is field chrome with a caret, not
  * this.
  */
-export function HintText({ content, children, className, desktopOnly = false }: HintTextProps) {
+export function HintText({
+  content,
+  children,
+  className,
+  desktopOnly = false,
+  onlyWhenTruncated = false,
+}: HintTextProps) {
+  const { ref, clips } = useParentClips(onlyWhenTruncated);
+  // Not clipped: a plain span, no tooltip. It stays mounted so the observer
+  // keeps watching and the cue returns when the column narrows.
+  if (onlyWhenTruncated && !clips) {
+    return (
+      <span ref={ref} className={className}>
+        {children}
+      </span>
+    );
+  }
   return (
     <Tooltip content={content} openOnTap={!desktopOnly}>
       <span
+        ref={ref}
         tabIndex={0}
         className={cx(
           desktopOnly
