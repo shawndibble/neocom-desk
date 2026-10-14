@@ -1,4 +1,7 @@
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactElement } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { grantMissingPath } from '@/app/grantMissingPath';
+import type { ScopeGroup } from '@/esi/registry';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -25,7 +28,9 @@ interface FittingSaveButtonProps {
   onSaveAsNew: () => void;
   onSaveToEve: () => void;
   canSaveToEve: boolean;
-  saveToEveBlockedReason?: ReactNode;
+  saveToEveBlockedReason?: string;
+  /** The Permissions Save to EVE lacks: lists a "Grant missing Permissions" item under it. */
+  saveToEveMissingGroups?: readonly ScopeGroup[];
   /** The phone's header: the button keeps its short "Save" label, and its accessible name and tooltip say where it saves. */
   compact?: boolean;
 }
@@ -45,9 +50,11 @@ export function FittingSaveButton({
   onSaveToEve,
   canSaveToEve,
   saveToEveBlockedReason,
+  saveToEveMissingGroups = [],
   compact = false,
 }: FittingSaveButtonProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const apple = isApplePlatform();
   // Ctrl/Cmd+S saves, Ctrl/Cmd+Shift+S saves a copy — in any field too. Both
   // always swallow the browser's own "save page", even while Save is off.
@@ -110,6 +117,11 @@ export function FittingSaveButton({
           <DropdownMenuItem disabled={!canSaveToEve} onSelect={onSaveToEve}>
             {t('fittings.saveToEve.action')}
           </DropdownMenuItem>
+          {!canSaveToEve && saveToEveMissingGroups.length > 0 && (
+            <DropdownMenuItem onSelect={() => navigate(grantMissingPath(saveToEveMissingGroups))}>
+              {t('permissions.grantMissing')}
+            </DropdownMenuItem>
+          )}
           {!canSaveToEve && saveToEveBlockedReason && (
             <p className="max-w-64 px-3 pb-2 text-xs text-text-dim">{saveToEveBlockedReason}</p>
           )}

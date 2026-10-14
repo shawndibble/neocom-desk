@@ -1307,11 +1307,10 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     await expandJobs(user);
 
     // All three selected: Pilot Three's skipped notice shows.
-    expect(await screen.findByText(/Pilot Three —/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Grant missing Permissions' })).toHaveAttribute(
-      'href',
-      '/settings/permissions?grant=industry'
-    );
+    const skipped = (await screen.findByText(/Pilot Three —/)).closest('p')!;
+    expect(
+      within(skipped).getByRole('link', { name: 'Grant missing Permissions' })
+    ).toHaveAttribute('href', '/settings/permissions?grant=industry');
 
     // Narrow the filter back to "This character" — the notice list must
     // follow the same filter the job rows do (issue #607 CodeRabbit review),
@@ -1320,6 +1319,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
     expect(screen.queryByText(/Pilot Three —/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Grant missing Permissions' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
   });
 

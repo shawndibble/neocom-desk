@@ -52,12 +52,16 @@ function useFlaggedGroups(): ReadonlySet<ScopeGroup> {
   const [params] = useSearchParams();
   const raw = params.get('grant');
   if (!raw) return new Set();
-  return new Set(SCOPE_GROUPS.filter((group) => raw.split(',').includes(group)));
+  const wanted = raw.split(',');
+  return new Set(SCOPE_GROUPS.filter((group) => wanted.includes(group)));
 }
 
 /** Brings the flashing button into view once, as it mounts. */
 function scrollIntoViewOnce(node: HTMLElement | null) {
-  node?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+  node?.scrollIntoView?.({
+    block: 'center',
+    behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  });
 }
 
 export function PermissionsPanel() {
