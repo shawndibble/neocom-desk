@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { handlePush, parsePushPayload, type PushEnv, type PushPayload } from './pushHandler';
 import { notificationTagFor } from './notificationOptions';
+import { occurrenceKey } from '@/engine/occurrenceKey';
+import type { EveNotificationFire } from '@/engine/notificationDiffs';
 
 function env(overrides: Partial<PushEnv> = {}): PushEnv {
   return {
@@ -281,5 +283,162 @@ describe('handlePush', () => {
     });
     await expect(handlePush(e, VALID_RAW, Date.now())).resolves.toBeUndefined();
     expect(e.showNotification).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('server-polled EVE notifications (ADR 0020)', () => {
+  const NOW = Date.parse('2026-10-14T12:00:00Z');
+  const TEXT = [
+    'allianceName: Big Bad Alliance',
+    'structureID: 1030000000001',
+    "structureName: Athanor 'Chunk Line 3'",
+  ].join('\n');
+
+  /** Exactly what `functions/src/eveNotificationPush.ts`'s `singlePush` sends. */
+  function serverSingle(overrides: Record<string, string> = {}): string {
+    return JSON.stringify({
+      data: {
+        characterId: '777',
+        eventId: 'eveNotification',
+        occurrenceKey: '777:eveNotification:555',
+        title: 'EVE notification',
+        body: 'StructureUnderAttack',
+        fireAt: String(Date.parse('2026-10-14T11:50:00Z')),
+        eveType: 'StructureUnderAttack',
+        notificationId: '555',
+        notificationTimestamp: '2026-10-14T11:50:00Z',
+        notificationText: TEXT,
+        ...overrides,
+      },
+    });
+  }
+
+  function serverSummary(): string {
+    return JSON.stringify({
+      data: {
+        characterId: '777',
+        eventId: 'eveNotification',
+        occurrenceKey: '777:eveNotification:summary:560',
+        title: 'New EVE notifications',
+        body: '5 new EVE notifications',
+        fireAt: String(Date.parse('2026-10-14T11:55:00Z')),
+        summaryCount: '5',
+      },
+    });
+  }
+
+  const withName = (extra: Partial<PushEnv> = {}) =>
+    env({ characterName: vi.fn(async () => 'Aurelia'), ...extra });
+
+  it('renders the raw payload with the shared renderer instead of the generic copy', async () => {
+    const e = withName();
+    await handlePush(e, serverSingle(), NOW);
+
+    const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect(title).toBe('Structure under attack');
+    expect(options.body).toContain("Athanor 'Chunk Line 3'");
+    expect(options.body).toContain('Big Bad Alliance');
+  });
+
+  it('writes the feed row under the key the Foreground Poller derives', async () => {
+    const e = withName();
+    await handlePush(e, serverSingle(), NOW);
+
+    const pollerFire: EveNotificationFire = {
+      eventId: 'eveNotification',
+      characterId: 777,
+      notificationId: 555,
+      type: 'StructureUnderAttack',
+      senderId: 1,
+      senderType: 'corporation',
+      text: TEXT,
+      timestamp: '2026-10-14T11:50:00Z',
+    };
+    const [entry] = vi.mocked(e.recordFeedEntry).mock.calls[0];
+    expect(entry.id).toBe(occurrenceKey(pollerFire, NOW));
+    // ...and that is the string the server sends, so the two cannot drift apart.
+    expect(entry.id).toBe('777:eveNotification:555');
+    expect(entry.eveType).toBe('StructureUnderAttack');
+    expect(entry.firedAt).toBe(Date.parse('2026-10-14T11:50:00Z'));
+    expect(entry.title).toBe('Structure under attack');
+  });
+
+  it('keys on the derived key even when the payload key disagrees', async () => {
+    const e = withName();
+    await handlePush(e, serverSingle({ occurrenceKey: 'something-else' }), NOW);
+    expect(vi.mocked(e.recordFeedEntry).mock.calls[0][0].id).toBe('777:eveNotification:555');
+  });
+
+  it('passes resolved names to the renderer', async () => {
+    const e = withName({
+      resolveNames: vi.fn(async () => ({ entities: new Map([[98000001, 'Marmite Corp']]) })),
+    });
+    await handlePush(
+      e,
+      serverSingle({
+        eveType: 'WarDeclared',
+        notificationText: 'declaredByID: 98000001\nagainstID: 98000002',
+      }),
+      NOW
+    );
+    expect(vi.mocked(e.resolveNames)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toContain('Marmite Corp');
+  });
+
+  it('falls back to the generic body when the payload text has nothing to render', async () => {
+    const e = withName();
+    await handlePush(e, serverSingle({ notificationText: '' }), NOW);
+
+    const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect(title).toBe('EVE notification');
+    expect(options.body).toContain('Aurelia');
+    expect(options.body).toContain('Structure Under Attack');
+    expect(e.recordFeedEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it('still shows a notification when the name lookups fail', async () => {
+    const e = env({
+      characterName: vi.fn(async () => {
+        throw new Error('db blocked');
+      }),
+    });
+    await handlePush(e, serverSingle(), NOW);
+
+    expect(e.showNotification).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(e.showNotification).mock.calls[0][0]).toBe('EVE notification');
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe('StructureUnderAttack');
+  });
+
+  it('uses a neutral phrase when the Character is unknown to this device', async () => {
+    const e = env({ characterName: vi.fn(async () => undefined) });
+    await handlePush(e, serverSingle({ notificationText: '' }), NOW);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toContain('Your character');
+  });
+
+  it('shows one summary push for a burst and writes no feed row', async () => {
+    const e = withName();
+    await handlePush(e, serverSummary(), NOW);
+
+    const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect(title).toBe('New EVE notifications');
+    expect(options.body).toBe('5 new EVE notifications for Aurelia.');
+    expect(e.recordFeedEntry).not.toHaveBeenCalled();
+  });
+
+  it('words a summary without a name when the Character is unknown', async () => {
+    const e = env();
+    await handlePush(e, serverSummary(), NOW);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe('5 new EVE notifications.');
+  });
+
+  it('treats a push without the raw block like any other generic payload', async () => {
+    const e = withName();
+    await handlePush(
+      e,
+      serverSingle({ notificationId: 'nope', notificationTimestamp: '', notificationText: '' }),
+      NOW
+    );
+    expect(vi.mocked(e.showNotification).mock.calls[0][0]).toBe('EVE notification');
+    expect(vi.mocked(e.recordFeedEntry).mock.calls[0][0].id).toBe('777:eveNotification:555');
   });
 });

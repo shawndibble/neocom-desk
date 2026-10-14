@@ -8481,7 +8481,15 @@
     "fired": {
       "pushFallback": {
         "title": "Neocom Desk",
-        "body": "Something happened — open the app for details."
+        "body": "Something happened — open the app for details.",
+        "character": "Your character"
+      },
+      "eveNotificationSummary": {
+        "title": "New EVE notifications",
+        "body_one": "{{count}} new EVE notification.",
+        "body_other": "{{count}} new EVE notifications.",
+        "bodyWithCharacter_one": "{{count}} new EVE notification for {{character}}.",
+        "bodyWithCharacter_other": "{{count}} new EVE notifications for {{character}}."
       },
       "newMail": {
         "title": "New mail",

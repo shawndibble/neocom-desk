@@ -19,6 +19,13 @@
  * `eveType`) — the backend (issue #358) sends already-rendered text, since it
  * has no SDE and no i18n catalog (ADR 0010).
  *
+ * Server-polled EVE notifications (ADR 0020, issue #3757) arrive as the raw
+ * notification instead of rendered text: `notificationId`,
+ * `notificationTimestamp` and `notificationText` ride alongside the generic
+ * `title`/`body`, which stay as the floor when rendering fails. A burst
+ * arrives as one summary push (`summaryCount`) that writes no feed row; the
+ * Foreground Poller files those when the app opens.
+ *
  * The fields sit under a top-level `data` key, not flat: FCM's Admin SDK only
  * ever sends webpush `data` payloads as a `{[key: string]: string}` map, and
  * `@firebase/messaging`'s own service-worker listener confirms what reaches
@@ -39,6 +46,10 @@ import {
 } from './notificationOptions';
 import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
 import type { NewNotificationFeedEntry } from './feed';
+import { occurrenceKey } from '@/engine/occurrenceKey';
+import type { EveNotificationFire } from '@/engine/notificationDiffs';
+import { withinBudget } from './eveNotificationNamePlan';
+import { renderEveNotification, type EveNotificationNames } from './eveNotificationRender';
 
 /**
  * The service worker's own i18next instance, not `@/i18n`: that module loads
@@ -58,6 +69,17 @@ void i18n.init({
 export interface PushEnv {
   showNotification: (title: string, options: AppNotificationOptions) => Promise<void>;
   recordFeedEntry: (entry: NewNotificationFeedEntry) => Promise<void>;
+  /** The Character's name for the body copy; absent or `undefined` falls back to a neutral phrase. */
+  characterName?: (characterId: number) => Promise<string | undefined>;
+  /** Names for a raw EVE notification, already within the resolution budget; never rejects. */
+  resolveNames?: (fire: EveNotificationFire) => Promise<EveNotificationNames>;
+}
+
+/** The raw notification a server-polled push carries (issue #3756). */
+export interface RawEveNotification {
+  readonly notificationId: number;
+  readonly timestamp: string;
+  readonly text: string;
 }
 
 export interface PushPayload {
@@ -81,6 +103,10 @@ export interface PushPayload {
    * existed; the feed row then falls back to arrival time.
    */
   readonly fireAt?: number;
+  /** Present on a single server-polled EVE notification, which the worker renders itself. */
+  readonly rawNotification?: RawEveNotification;
+  /** Present on a summary push: how many new EVE notifications the Character has. */
+  readonly summaryCount?: number;
 }
 
 function isNotificationEventId(value: unknown): value is NotificationEventId {
@@ -105,29 +131,118 @@ export function parsePushPayload(rawText: string | null): PushPayload | null {
   const { data } = parsed as Record<string, unknown>;
   if (typeof data !== 'object' || data === null) return null;
 
-  const { characterId, eventId, occurrenceKey, title, body, eveType, fireAt } = data as Record<
-    string,
-    unknown
-  >;
+  const {
+    characterId,
+    eventId,
+    occurrenceKey: payloadKey,
+    title,
+    body,
+    eveType,
+    fireAt,
+    notificationId,
+    notificationTimestamp,
+    notificationText,
+    summaryCount,
+  } = data as Record<string, unknown>;
   const characterIdNum = typeof characterId === 'string' ? Number(characterId) : NaN;
   if (!Number.isFinite(characterIdNum)) return null;
   if (!isNotificationEventId(eventId)) return null;
-  if (typeof occurrenceKey !== 'string' || occurrenceKey.length === 0) return null;
+  if (typeof payloadKey !== 'string' || payloadKey.length === 0) return null;
   if (typeof title !== 'string' || title.length === 0) return null;
   if (typeof body !== 'string') return null;
   if (eveType !== undefined && typeof eveType !== 'string') return null;
   // Lenient, unlike the fields above: a bad fireAt only costs the feed row its date.
   const fireAtNum = typeof fireAt === 'string' && fireAt.length > 0 ? Number(fireAt) : NaN;
 
+  // Lenient like fireAt: a malformed raw block only costs the rendered copy, since
+  // the generic title/body are still there to show.
+  const notificationIdNum =
+    typeof notificationId === 'string' && notificationId.length > 0 ? Number(notificationId) : NaN;
+  const raw: RawEveNotification | null =
+    eventId === 'eveNotification' &&
+    typeof eveType === 'string' &&
+    Number.isSafeInteger(notificationIdNum) &&
+    typeof notificationTimestamp === 'string' &&
+    typeof notificationText === 'string'
+      ? {
+          notificationId: notificationIdNum,
+          timestamp: notificationTimestamp,
+          text: notificationText,
+        }
+      : null;
+  const summaryNum =
+    typeof summaryCount === 'string' && summaryCount.length > 0 ? Number(summaryCount) : NaN;
+
   return {
     characterId: characterIdNum,
     eventId,
-    occurrenceKey,
+    occurrenceKey: payloadKey,
     title,
     body,
     ...(eveType !== undefined ? { eveType } : {}),
     ...(Number.isFinite(fireAtNum) ? { fireAt: fireAtNum } : {}),
+    ...(raw !== null ? { rawNotification: raw } : {}),
+    ...(Number.isInteger(summaryNum) && summaryNum > 0 ? { summaryCount: summaryNum } : {}),
   };
+}
+
+interface Presented {
+  title: string;
+  body: string;
+  /** The feed row's key: the Foreground Poller's own derivation for a raw notification. */
+  feedKey: string | null;
+}
+
+/**
+ * Title and body for a payload, never throwing. A raw EVE notification is
+ * rendered here; a summary gets its own sentence; anything else shows what the
+ * sender wrote. Every failure lands on the payload's generic copy.
+ */
+async function present(env: PushEnv, payload: PushPayload, now: number): Promise<Presented> {
+  const generic: Presented = {
+    title: payload.title,
+    body: payload.body,
+    feedKey: payload.occurrenceKey,
+  };
+  try {
+    const name = (await env.characterName?.(payload.characterId)) ?? undefined;
+    if (payload.summaryCount !== undefined) {
+      return {
+        title: i18n.t('notifications.fired.eveNotificationSummary.title'),
+        body: i18n.t(
+          name === undefined
+            ? 'notifications.fired.eveNotificationSummary.body'
+            : 'notifications.fired.eveNotificationSummary.bodyWithCharacter',
+          { count: payload.summaryCount, character: name }
+        ),
+        // The Foreground Poller files the rows themselves when the app opens.
+        feedKey: null,
+      };
+    }
+    const raw = payload.rawNotification;
+    if (raw === undefined || payload.eveType === undefined) return generic;
+    const fire: EveNotificationFire = {
+      eventId: 'eveNotification',
+      characterId: payload.characterId,
+      notificationId: raw.notificationId,
+      type: payload.eveType,
+      // Not carried on the wire; nothing the renderer or the key reads.
+      senderId: 0,
+      senderType: '',
+      text: raw.text,
+      timestamp: raw.timestamp,
+    };
+    const names = (await env.resolveNames?.(fire)) ?? {};
+    const { title, body } = renderEveNotification(
+      (key, options) => i18n.t(key, options),
+      fire,
+      { name: name ?? i18n.t('notifications.fired.pushFallback.character') },
+      names
+    );
+    return { title, body, feedKey: occurrenceKey(fire, now) };
+  } catch {
+    return generic;
+  }
 }
 
 /**
@@ -139,29 +254,38 @@ export function parsePushPayload(rawText: string | null): PushPayload | null {
 export async function handlePush(env: PushEnv, rawText: string | null, now: number): Promise<void> {
   const payload = parsePushPayload(rawText);
 
-  const notify =
-    payload === null
-      ? env.showNotification(
-          i18n.t('notifications.fired.pushFallback.title'),
-          fallbackNotificationOptions(i18n.t('notifications.fired.pushFallback.body'))
-        )
-      : env.showNotification(
-          payload.title,
-          notificationOptionsFor(
-            { eventId: payload.eventId, characterId: payload.characterId },
-            payload.body
-          )
-        );
+  if (payload === null) {
+    await Promise.allSettled([
+      env.showNotification(
+        i18n.t('notifications.fired.pushFallback.title'),
+        fallbackNotificationOptions(i18n.t('notifications.fired.pushFallback.body'))
+      ),
+    ]);
+    return;
+  }
+
+  // Bounded like the name lookups: a stuck store read must not hold the
+  // notification back, because WebKit revokes the subscription on a silent push.
+  const { title, body, feedKey } = await withinBudget(present(env, payload, now), {
+    title: payload.title,
+    body: payload.body,
+    feedKey: payload.occurrenceKey,
+  });
+
+  const notify = env.showNotification(
+    title,
+    notificationOptionsFor({ eventId: payload.eventId, characterId: payload.characterId }, body)
+  );
 
   const feedWrite =
-    payload === null
+    feedKey === null
       ? Promise.resolve()
       : env.recordFeedEntry({
-          id: payload.occurrenceKey,
+          id: feedKey,
           characterId: payload.characterId,
           eventId: payload.eventId,
-          title: payload.title,
-          body: payload.body,
+          title,
+          body,
           // Never in the future, should the server's clock run ahead of this device's.
           firedAt: payload.fireAt === undefined ? now : Math.min(payload.fireAt, now),
           // So this device's Foreground Poller does not toast it a second time.
