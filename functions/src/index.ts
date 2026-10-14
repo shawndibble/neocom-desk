@@ -69,6 +69,7 @@ import {
   fetchLpStoreRows,
 } from './lpOffersSnapshot.js';
 import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicContractsArchive.js';
+import { measureContractTypeChanges, type ContractTypeHashes } from './contractTypeChanges.js';
 import {
   INSURGENCY_URL,
   LAWLESS_SYSTEMS_DOC,
@@ -901,6 +902,9 @@ export const syncLawlessSystems = onSchedule({ schedule: 'every 10 minutes' }, a
 /** Doc under `systemConditions` holding the archive version the last publish was built from. */
 const PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC = 'publicContractsArchiveFingerprint';
 
+/** Doc under `systemConditions` holding the last publish's per-type content hashes (issue #3744). */
+const PUBLIC_CONTRACTS_TYPE_HASHES_DOC = 'publicContractTypeHashes';
+
 export const syncPublicContractOffers = onSchedule(
   { schedule: 'every 30 minutes', memory: '2GiB', timeoutSeconds: 540 },
   async () => {
@@ -984,8 +988,35 @@ export const syncPublicContractOffers = onSchedule(
     // The lookup is dead once the join is done, and it is ~50k objects the
     // write would otherwise be encoding rows alongside.
     eligibleContracts.clear();
+    // Sizes the R2 per-type writer (ADR 0019): how many types change per
+    // publish. Telemetry only — a failure here must not fail the publish.
+    const typeHashesRef = db
+      .collection(SYSTEM_CONDITIONS_COLLECTION)
+      .doc(PUBLIC_CONTRACTS_TYPE_HASHES_DOC);
+    let typeHashes: ContractTypeHashes | null = null;
+    try {
+      const previousHashes = await typeHashesRef
+        .get()
+        .then((snap) => (snap.data()?.hashes as ContractTypeHashes | undefined) ?? null)
+        .catch(() => null);
+      const measured = measureContractTypeChanges(rows, previousHashes);
+      typeHashes = measured.hashes;
+      logInfo('public contract type changes', {
+        ...measured.stats,
+        firstRun: previousHashes === null,
+      });
+    } catch (err) {
+      logWarn('public contract type change measurement failed', { error: String(err) });
+    }
     await writePublicContractOffersSnapshot(db, sortContractOfferRows(rows));
     await writePublicCourierContractsSnapshot(db, sortCourierContractRows(courierRows));
+    if (typeHashes !== null) {
+      await typeHashesRef
+        .set({ hashes: typeHashes, updatedAt: Date.now() })
+        .catch((err) =>
+          logWarn('public contract type hashes write failed', { error: String(err) })
+        );
+    }
     if (fingerprint !== null) await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
   }
 );
