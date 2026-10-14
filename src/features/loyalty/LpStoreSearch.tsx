@@ -141,11 +141,15 @@ export function LpStoreSearch({
         search.heldStores.length > 0 ? (
           <Panel
             title={t('loyaltyStore.search.heldPanel')}
-            meta={t('loyaltyStore.search.storeCount', { count: search.heldStores.length })}
+            meta={
+              <span className="text-[0.6875rem] text-text-dim tabular-nums">
+                {search.heldStores.length}
+              </span>
+            }
           >
             <ul className="flex flex-col divide-y divide-line">
               {search.heldStores.map((store) => (
-                <li key={store.corporationId} className="py-1.5">
+                <li key={store.corporationId} className="py-1.5 text-xs">
                   <Link
                     to={lpStorePath(store.corporationId)}
                     className={entityLinkClassName('flex items-baseline justify-between gap-3')}
@@ -192,11 +196,15 @@ export function LpStoreSearch({
           {result.corporations.length > 0 && (
             <Panel
               title={t('loyaltyStore.search.storesPanel')}
-              meta={t('loyaltyStore.search.storeCount', { count: result.corporations.length })}
+              meta={
+                <span className="text-[0.6875rem] text-text-dim tabular-nums">
+                  {result.corporations.length}
+                </span>
+              }
             >
               <ul className="flex flex-col divide-y divide-line">
                 {result.corporations.map((corp) => (
-                  <li key={corp.corporationId} className="py-1.5">
+                  <li key={corp.corporationId} className="py-1.5 text-xs">
                     <Link
                       to={lpStorePath(corp.corporationId)}
                       state={{ from: 'lp-search', q: query } satisfies LpSearchCrumbState}
@@ -218,7 +226,11 @@ export function LpStoreSearch({
             <Panel
               key={group.typeId}
               title={group.name}
-              meta={t('loyaltyStore.search.storeCount', { count: group.stores.length })}
+              meta={
+                <span className="text-[0.6875rem] text-text-dim tabular-nums">
+                  {group.stores.length}
+                </span>
+              }
               padded={false}
             >
               <DataTable
