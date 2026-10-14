@@ -94,21 +94,12 @@ export function EmploymentHistory() {
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       {/*
-        The header carries this tab's data age (beside the name) and its Refresh
-        and export (level with the bell, at the bell's size), as the Overview's
-        does. They stay here in the empty and failed states too: those are the
+        The header carries this tab's Refresh and export (level with the bell, at
+        the bell's size), as the Overview's does; its data age sits on the tab row. They stay here in the empty and failed states too: those are the
         ones a Refresh is for. No SP: this tab has no use for it.
       */}
       <CharacterHeader
         characterId={activeCharacterId}
-        aside={
-          historyResult && (
-            <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
-              {t('employmentHistory.updated')}
-              <DataAgeBadge date={historyResult.fetchedAt} alwaysVisible />
-            </span>
-          )
-        }
         actions={
           <div className="flex items-center gap-2">
             <IconButton
@@ -125,7 +116,16 @@ export function EmploymentHistory() {
           </div>
         }
       />
-      <OverviewSubNav />
+      <OverviewSubNav
+        trailing={
+          historyResult && (
+            <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
+              {t('employmentHistory.updated')}
+              <DataAgeBadge date={historyResult.fetchedAt} alwaysVisible />
+            </span>
+          )
+        }
+      />
 
       <Panel padded={false}>
         {loading && !data ? (

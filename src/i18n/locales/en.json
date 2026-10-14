@@ -4381,7 +4381,7 @@
     "header": {
       "next": "Next",
       "nextGoTo": "Opens the page for {{note}}",
-      "updated": "Updated",
+      "updated": "Data updated",
       "stalest": "Oldest: {{name}}, {{age}}",
       "breakdownCaption": "When each widget on the Overview last read its data",
       "breakdownWidget": "Widget",
@@ -7571,7 +7571,7 @@
     "emptyHint": "Couldn't load this character's corporation history yet. Try again shortly.",
     "corporation": "Corporation",
     "started": "Joined",
-    "updated": "Updated",
+    "updated": "Data updated",
     "present": "Present",
     "now": "now",
     "until": "to {{date}}",

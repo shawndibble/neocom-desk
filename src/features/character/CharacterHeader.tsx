@@ -43,8 +43,8 @@ interface CharacterHeaderProps {
  * Clones carries no controls of its own here: its `DataAgeBadge` and Refresh
  * belong to the data they describe, so they sit in its `Panel` toolbar below
  * the tabs. The Overview (`overview`) and Employment History instead put the
- * data age beside the name (`aside`) and their controls ahead of the bell
- * (`actions`): the Overview's widgets, and Employment's timeline, are the
+ * data age on the tab row (`OverviewSubNav`'s `trailing`) and their controls
+ * ahead of the bell (`actions`): the Overview's widgets, and Employment's timeline, are the
  * page, with no panel title bar to hold them. No SP is drawn on either
  * (`totalSp` and `unallocatedSp` omitted). Switching Character is the rail
  * footer's and the command palette's job.
