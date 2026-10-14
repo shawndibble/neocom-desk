@@ -11,14 +11,17 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
-import { resetRevalidationState } from '@/esi/cache';
+import { resetRevalidationState, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { loadPublicBpcContracts } from './syncedContracts';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 
 const getDocs = vi.hoisted(() => vi.fn());
+const getDoc = vi.hoisted(() => vi.fn());
 
 vi.mock('firebase/firestore/lite', () => ({
   getDocs,
+  getDoc,
+  doc: (_db: unknown, collectionName: string, id: string) => ({ path: `${collectionName}/${id}` }),
   collection: (_db: unknown, name: string) => ({ name }),
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
@@ -64,6 +67,7 @@ beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
   getDocs.mockReset();
+  getDoc.mockReset();
 });
 
 describe('loadPublicBpcContracts', () => {
@@ -125,5 +129,58 @@ describe('loadPublicBpcContracts', () => {
       expect.objectContaining({ contractId: 1, isMultiType: false }),
       expect.objectContaining({ contractId: 2, isMultiType: false }),
     ]);
+  });
+});
+
+describe('loadPublicBpcContracts when the cached snapshot lapsed', () => {
+  async function seedLapsed(lastSyncedAt: number): Promise<void> {
+    await db.esiCache.put({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: 'publicContractOffers',
+      value: { rows: [], originals: [], lastSyncedAt, marker: 'cached' },
+      fetchedAt: Date.now() - 31 * 60_000,
+    });
+  }
+
+  it('costs one meta read and no collection read when lastSyncedAt is unchanged', async () => {
+    await seedLapsed(5);
+    getDoc.mockResolvedValue({ data: () => ({ lastSyncedAt: 5 }) });
+
+    const result = await loadPublicBpcContracts(CHARACTER_ID);
+
+    expect(result?.data).toMatchObject({ marker: 'cached' });
+    expect(getDoc).toHaveBeenCalledTimes(1);
+    expect(getDocs).not.toHaveBeenCalled();
+  });
+
+  it('does the full read when lastSyncedAt changed', async () => {
+    await seedLapsed(5);
+    getDoc.mockResolvedValue({ data: () => ({ lastSyncedAt: 6 }) });
+    getDocs.mockResolvedValue(snapshotDocs(6, [[copyLine()]]));
+
+    const result = await loadPublicBpcContracts(CHARACTER_ID);
+
+    expect(result?.data.lastSyncedAt).toBe(6);
+    expect(getDocs).toHaveBeenCalledTimes(1);
+  });
+
+  it('does the full read when nothing is cached', async () => {
+    getDocs.mockResolvedValue(snapshotDocs(6, [[copyLine()]]));
+
+    await loadPublicBpcContracts(CHARACTER_ID);
+
+    expect(getDoc).not.toHaveBeenCalled();
+    expect(getDocs).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the full read when the meta check fails', async () => {
+    await seedLapsed(5);
+    getDoc.mockRejectedValue(new Error('offline'));
+    getDocs.mockResolvedValue(snapshotDocs(5, [[copyLine()]]));
+
+    const result = await loadPublicBpcContracts(CHARACTER_ID);
+
+    expect(result?.data.rows).toHaveLength(1);
+    expect(getDocs).toHaveBeenCalledTimes(1);
   });
 });
