@@ -175,3 +175,34 @@ describe('publishContractOffersToR2', () => {
     expect(Object.keys(result.state.hashes)).toEqual(['34']);
   });
 });
+
+describe('publishContractOffersToR2 failed refresh', () => {
+  it('resumes from recorded hashes instead of re-uploading everything', async () => {
+    const first = await publishContractOffersToR2({
+      rows,
+      lastSyncedAt: 1,
+      previous: null,
+      now: 1000,
+      put: recorder().put,
+    });
+    const due = 1000 + REFRESH_AFTER_MS;
+    const partial = await publishContractOffersToR2({
+      rows,
+      lastSyncedAt: 2,
+      previous: first.state,
+      now: due,
+      put: recorder((key) => key.includes('/35.')).put,
+    });
+    expect(partial.firstError).toContain('boom');
+    expect(partial.state.fullUploadAt).toBeNull();
+    const retry = recorder();
+    await publishContractOffersToR2({
+      rows,
+      lastSyncedAt: 2,
+      previous: partial.state,
+      now: due + 1800_000,
+      put: retry.put,
+    });
+    expect(typePuts(retry.puts)).toHaveLength(1);
+  });
+});

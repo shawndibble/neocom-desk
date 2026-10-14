@@ -926,8 +926,8 @@ async function publishOffersToR2(
   try {
     const endpoint = process.env.R2_ENDPOINT;
     const bucket = process.env.R2_BUCKET;
-    if (!endpoint || !bucket) {
-      logWarn('R2 offers publish skipped: R2_ENDPOINT / R2_BUCKET not set');
+    if (!endpoint?.startsWith('https://') || !bucket) {
+      logWarn('R2 offers publish skipped: R2_ENDPOINT (https) / R2_BUCKET not set');
       return;
     }
     const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_CONTRACTS_R2_STATE_DOC);
@@ -948,10 +948,10 @@ async function publishOffersToR2(
       }),
     });
     await stateRef.set(result.state);
-    const { uploaded, skipped, failed, indexWritten } = result;
+    const { uploaded, skipped, failed, indexWritten, firstError } = result;
     (result.failed > 0 || !result.indexWritten ? logWarn : logInfo)(
       'public contract offers R2 publish',
-      { uploaded, skipped, failed, indexWritten }
+      { uploaded, skipped, failed, indexWritten, firstError }
     );
   } catch (error) {
     logError('public contract offers R2 publish failed', { error: String(error) });
@@ -1067,7 +1067,6 @@ export const syncPublicContractOffers = onSchedule(
       logWarn('public contract type change measurement failed', { error: String(err) });
     }
     const lastSyncedAt = await writePublicContractOffersSnapshot(db, sortContractOfferRows(rows));
-    await publishOffersToR2(db, rows, lastSyncedAt);
     await writePublicCourierContractsSnapshot(db, sortCourierContractRows(courierRows));
     if (typeHashes !== null) {
       await typeHashesRef
@@ -1077,6 +1076,8 @@ export const syncPublicContractOffers = onSchedule(
         );
     }
     if (fingerprint !== null) await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
+    // Last, so a slow or failing R2 can never delay or skip the Firestore publish.
+    await publishOffersToR2(db, rows, lastSyncedAt);
   }
 );
 

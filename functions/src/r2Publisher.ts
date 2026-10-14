@@ -4,8 +4,8 @@
  * hash changed, then `index.json` last. The upload itself is injected (`R2Put`)
  * so this stays testable; `createR2Put` is the SigV4 implementation.
  *
- * Config: `R2_ENDPOINT` (https://<account>.r2.cloudflarestorage.com),
- * `R2_BUCKET`, `R2_PUBLIC_BASE_URL` in functions/.env; the access key pair
+ * Config: `R2_ENDPOINT` (https://<account>.r2.cloudflarestorage.com) and
+ * `R2_BUCKET` in functions/.env; the access key pair
  * comes from the Firebase secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`.
  *
  * An R2 lifecycle rule deletes objects after a few days, which would also
@@ -44,6 +44,8 @@ export interface R2PublishResult {
   skipped: number;
   failed: number;
   indexWritten: boolean;
+  /** First upload error message, so an auth or network fault is diagnosable from the log. */
+  firstError: string | null;
   state: R2PublishState;
 }
 
@@ -118,14 +120,16 @@ export async function publishContractOffersToR2(args: {
 
   let uploaded = 0;
   let failed = 0;
+  let firstError: string | null = null;
   await runPool(changed, UPLOAD_CONCURRENCY, async (object) => {
     try {
       for (const part of object.parts)
         await put(part.name, gzipObjectBody(part.body), OBJECT_HEADERS);
       hashes[String(object.typeId)] = object.hash;
       uploaded += 1;
-    } catch {
+    } catch (error) {
       failed += 1;
+      firstError ??= String(error);
     }
   });
 
@@ -137,8 +141,9 @@ export async function publishContractOffersToR2(args: {
     try {
       await put(R2_INDEX_KEY, JSON.stringify(index), INDEX_HEADERS);
       indexWritten = true;
-    } catch {
+    } catch (error) {
       // Next publish retries; the objects are already uploaded and recorded.
+      firstError ??= String(error);
     }
   }
 
@@ -147,9 +152,13 @@ export async function publishContractOffersToR2(args: {
     skipped,
     failed,
     indexWritten,
+    firstError,
     state: {
       hashes,
-      fullUploadAt: failed === 0 && completesFullPass ? now : (previous?.fullUploadAt ?? null),
+      // A failed refresh pass drops to `null` so the next run resumes from the
+      // recorded hashes instead of re-uploading everything every 30 minutes.
+      fullUploadAt:
+        failed === 0 && completesFullPass ? now : refresh ? null : (previous?.fullUploadAt ?? null),
     },
   };
 }
