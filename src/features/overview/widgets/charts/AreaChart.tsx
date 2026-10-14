@@ -17,6 +17,7 @@ export function AreaChart({ model, height }: { model: AreaChartModel; height: nu
           style={{ height }}
         >
           <svg
+            aria-hidden="true"
             viewBox={`0 0 100 ${height}`}
             preserveAspectRatio="none"
             className="block w-full text-accent"

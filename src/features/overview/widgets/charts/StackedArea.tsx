@@ -36,6 +36,7 @@ export function StackedArea({
           style={{ height }}
         >
           <svg
+            aria-hidden="true"
             viewBox={`0 0 100 ${height}`}
             preserveAspectRatio="none"
             className="block w-full"
