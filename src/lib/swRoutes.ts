@@ -39,10 +39,15 @@ export function isEvePortraitImage(url: URL): boolean {
 }
 
 /**
- * A per-type object of the R2 offers snapshot (ADR 0019). Its name carries its
+ * An object of an R2 contract snapshot (ADR 0019): a per-type offers object or
+ * the courier rows object. Its name carries its
  * content hash, so the bytes behind a URL never change. The sibling `index.json`
  * is deliberately not matched: it changes every publish.
  */
 export function isContractSnapshotObject(url: URL): boolean {
-  return url.origin === SNAPSHOT_ORIGIN && url.pathname.startsWith('/contract-offers/types/');
+  return (
+    url.origin === SNAPSHOT_ORIGIN &&
+    (url.pathname.startsWith('/contract-offers/types/') ||
+      url.pathname.startsWith('/courier-contracts/rows.'))
+  );
 }
