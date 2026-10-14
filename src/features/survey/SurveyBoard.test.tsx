@@ -93,7 +93,6 @@ describe('SurveyBoard', () => {
   it('shows progress, pace and rocks left for two scans', async () => {
     render(<SurveyBoard scans={SCANS} url={URL} expiresAt={Date.UTC(2026, 9, 15)} />);
     expect(screen.getByText('13% mined')).toBeTruthy();
-    expect(screen.getByText('2 scans')).toBeTruthy();
     expect(screen.getByText('43.3')).toBeTruthy();
     // 169,000 of the 195,000 m³ the scans have shown of this ore is left.
     expect(screen.getByText(/87% left/)).toBeTruthy();
@@ -230,6 +229,17 @@ describe('SurveyBoard', () => {
       // Newest first.
       await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
       expect(onSetIgnored).toHaveBeenCalledWith('scan1', true);
+    });
+
+    it("shows a scan's ores, rock counts and volume in a details popover", async () => {
+      render(<SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} onSetIgnored={() => {}} />);
+      await userEvent.click(screen.getByText('2 scans', { selector: 'summary' }));
+      // Newest first: the second scan, whose 29,000 m3 rock shrank to 3,000.
+      await userEvent.click(screen.getAllByRole('button', { name: 'Details' })[0]);
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog.textContent).toContain('Clear Icicle');
+      expect(dialog.textContent).toContain('5 rocks');
+      expect(dialog.textContent).toContain('169,000 m³');
     });
 
     it('leaves a removed scan out of the totals, and offers to restore it', async () => {
