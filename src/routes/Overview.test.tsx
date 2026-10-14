@@ -426,6 +426,7 @@ describe('Overview widget grid', () => {
     await userEvent.click(trigger);
     const table = await screen.findByRole('table', { name: /last read its data/i });
     expect(within(table).getByRole('rowheader', { name: 'Wallet' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh all widgets' })).toBeInTheDocument();
   });
 });
 

@@ -4387,6 +4387,7 @@
       "breakdownWidget": "Widget",
       "breakdownUpdated": "Updated",
       "breakdownNever": "Not read yet",
+      "refreshAll": "Refresh all widgets",
       "customize": "Customize"
     },
     "customize": {

@@ -25,12 +25,14 @@ import {
   buttonClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useKindViews, viewKey } from './widgets/data/useWidgetView';
+import { useOverviewRefresh } from './widgets/data/refreshContext';
 import { useOverviewEdit } from './widgets/editContext';
 import { collectDeadlines, fetchBreakdown, stalestFetch } from './widgets/headerSummary';
 import { getKind } from './widgets/kinds';
@@ -85,6 +87,7 @@ function useOverviewSummary(widgets: readonly Widget[]) {
 export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
   const { t } = useTranslation();
   const { fetchedAt, breakdown, now } = useOverviewSummary(widgets);
+  const { refresh } = useOverviewRefresh();
   if (!fetchedAt) return null;
   const title = (kind: string) => {
     const def = getKind(kind);
@@ -103,7 +106,11 @@ export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded-xs text-[0.6875rem] text-text-dim hover:text-text"
+            className={cx(
+              'inline-flex cursor-pointer items-center gap-1 rounded-xs border border-line px-1.5 py-0.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:bg-panel-2 hover:text-text',
+              interactiveClassName,
+              focusRingClassName
+            )}
           >
             {t('overview.header.updated')}
             <DataAgeBadge date={fetchedAt} alwaysVisible tooltip={false} />
@@ -141,6 +148,12 @@ export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
             ))}
           </tbody>
         </table>
+        <div className="border-t border-line p-2">
+          <Button size="sm" onClick={refresh} className="w-full">
+            <Icon.Refresh aria-hidden="true" />
+            {t('overview.header.refreshAll')}
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
