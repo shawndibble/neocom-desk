@@ -702,15 +702,23 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     // stand in. They ignore the other filters, which only matters until the
     // snapshot arrives and the stats are computed as before.
     if (!haveFull && offerIndex) {
-      return new Map<number, ContractOfferStats>(
+      const stats = new Map<number, ContractOfferStats>(
         [...offerIndex.types.values()].map((entry) => [
           entry.typeId,
           { offerCount: entry.count, cheapest: entry.cheapest },
         ])
       );
+      // Read through R2 the full rows never arrive, so the types whose rows
+      // were read get their real, filter-aware stats; the rest keep the index's.
+      if (early.rows !== null) {
+        for (const [typeId, typeStats] of contractOfferStats(nonTypeRows, plexPrice)) {
+          stats.set(typeId, typeStats);
+        }
+      }
+      return stats;
     }
     return contractOfferStats(nonTypeRows, plexPrice);
-  }, [haveFull, offerIndex, nonTypeRows, plexPrice]);
+  }, [haveFull, offerIndex, early.rows, nonTypeRows, plexPrice]);
 
   /**
    * Cheapest first, so the rows arrive in the order the table's default

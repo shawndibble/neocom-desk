@@ -12,10 +12,11 @@ import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import {
   loadOfferIndex,
   loadOffersForTypes,
+  readSpan,
   type OfferIndex,
 } from '@/features/contractSearch/publicContractOfferIndex';
 
-/** A search naming more chunk docs than this is cheaper to answer from the full download that is already running. */
+/** A search naming more chunk docs than this is cheaper to answer from the full download that is already running. R2 has no such download running (`loadPublicContractOffers`), so it has no cap. */
 const MAX_EARLY_CHUNKS = 12;
 /** Typing re-ranks the matching types on every keystroke; read once the box has settled. */
 const SETTLE_MS = 150;
@@ -52,16 +53,6 @@ function sameIndex(a: OfferIndex | null, b: OfferIndex | null): boolean {
   return a?.lastSyncedAt === b?.lastSyncedAt;
 }
 
-function chunkSpan(index: OfferIndex, typeIds: ReadonlySet<number>): number {
-  const chunks = new Set<number>();
-  for (const typeId of typeIds) {
-    const entry = index.types.get(typeId);
-    if (!entry) continue;
-    for (let chunk = entry.firstChunk; chunk <= entry.lastChunk; chunk += 1) chunks.add(chunk);
-  }
-  return chunks.size;
-}
-
 /** The searched types' offers, or `null` when none were read (not applicable, failed, or still pending). */
 export type EarlyOffers = { rows: readonly PublicContractOfferRow[] | null };
 
@@ -73,11 +64,18 @@ export function useEarlyOffers(
   characterId: number | null,
   enabled: boolean
 ): EarlyOffers {
+  // With R2 the full snapshot is never downloaded, so a search that names no
+  // type (a region or price filter alone) reads every listed type instead.
+  const wanted = useMemo<ReadonlySet<number> | null>(
+    () => typeIds ?? (index?.r2 ? new Set(index.types.keys()) : null),
+    [typeIds, index]
+  );
   const key = useMemo(() => {
-    if (!enabled || index === null || typeIds === null || typeIds.size === 0) return null;
-    if (chunkSpan(index, typeIds) > MAX_EARLY_CHUNKS) return null;
-    return `${index.lastSyncedAt}:${[...typeIds].sort((a, b) => a - b).join(',')}`;
-  }, [enabled, index, typeIds]);
+    if (!enabled || index === null || wanted === null || wanted.size === 0) return null;
+    if (!index.r2 && readSpan(index, wanted) > MAX_EARLY_CHUNKS) return null;
+    const scope = typeIds === null ? 'all' : [...typeIds].sort((a, b) => a - b).join(',');
+    return `${index.lastSyncedAt}:${scope}`;
+  }, [enabled, index, wanted, typeIds]);
 
   const [answer, setAnswer] = useState<{
     key: string;
@@ -85,10 +83,10 @@ export function useEarlyOffers(
   } | null>(null);
 
   useEffect(() => {
-    if (key === null || index === null || typeIds === null || characterId === null) return;
+    if (key === null || index === null || wanted === null || characterId === null) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      void loadOffersForTypes(index, typeIds, characterId).then((rows) => {
+      void loadOffersForTypes(index, wanted, characterId).then((rows) => {
         if (!cancelled) setAnswer({ key, rows });
       });
     }, SETTLE_MS);
