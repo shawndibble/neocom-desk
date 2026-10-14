@@ -41,6 +41,21 @@ describe('useEarlyOffers with an R2 index', () => {
     await waitFor(() => expect(result.current.rows).toEqual([ROW]));
   });
 
+  it('reports a failed read, since no full snapshot is coming to replace it', async () => {
+    loadOffersForTypes.mockResolvedValue(null);
+    const { result } = renderHook(() => useEarlyOffers(R2_INDEX, new Set([1]), 7, true));
+
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    expect(result.current.rows).toBeNull();
+  });
+
+  it('answers an index that lists no type with no offers instead of waiting', () => {
+    const empty = offerIndexFromR2({ lastSyncedAt: 5, types: {}, regionIds: [] });
+    const { result } = renderHook(() => useEarlyOffers(empty, null, 7, true));
+
+    expect(result.current.rows).toEqual([]);
+  });
+
   it('reads nothing while disabled', () => {
     const { result } = renderHook(() => useEarlyOffers(R2_INDEX, null, 7, false));
 

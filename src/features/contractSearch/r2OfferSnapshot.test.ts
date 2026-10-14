@@ -64,6 +64,10 @@ describe('parseR2OfferIndex', () => {
       'an object name outside the types prefix',
       { ...INDEX, types: { '34': { count: 1, cheapest: 1, objects: ['../secrets.json'] } } },
     ],
+    [
+      'a non-numeric type key',
+      { ...INDEX, types: { abc: { count: 1, cheapest: 1, objects: [obj(34, 'aaaa')] } } },
+    ],
     ['regionIds that are not numbers', { ...INDEX, regionIds: ['x'] }],
   ])('rejects %s', (_label, raw) => {
     expect(parseR2OfferIndex(raw)).toBeNull();
@@ -134,6 +138,11 @@ describe('loadR2TypeRows', () => {
     };
     expect(await loadR2TypeRows(next, [34])).toEqual([row(34, 9)]);
     expect(urlsRead(fetchMock)).toEqual([obj(34, 'aaaa'), obj(34, 'cccc')]);
+  });
+
+  it('is null when an object holds rows without the fields consumers read', async () => {
+    serve({ [`${ORIGIN}/${obj(34, 'aaaa')}`]: [null, { typeId: 'x' }] });
+    expect(await loadR2TypeRows(INDEX, [34])).toBeNull();
   });
 
   it('is null, not partial rows, when any object cannot be read', async () => {

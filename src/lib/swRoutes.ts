@@ -4,6 +4,7 @@
  */
 
 const EVE_IMAGE_ORIGIN = 'https://images.evetech.net';
+/** Same host as `R2_SNAPSHOT_ORIGIN` (`contractSearch/r2OfferSnapshot.ts`), restated because that module pulls Dexie into the worker. */
 const SNAPSHOT_ORIGIN = 'https://data.neocomdesk.com';
 
 /**

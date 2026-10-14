@@ -73,24 +73,6 @@ interface MetaDocData {
 }
 
 /**
- * Every chunk's raw rows are accumulated before narrowing, rather than each
- * chunk being narrowed as it is read: `bpcRowsFromContractOffers` tallies
- * distinct for-sale types per contract (issue #1076), and a contract's own
- * lines are not guaranteed to land in one chunk — the backend sorts by
- * contract before slicing into fixed-size chunks (`functions/src/index.ts`'s
- * `chunkRows`), so a contract can still straddle a chunk boundary if its own
- * line count is large enough (a real case: one archived bundle ran to 493
- * lines). Narrowing per chunk would tally each half of such a contract as
- * its own single-type listing — silently wrong in exactly the case this
- * fix exists for.
- *
- * `getDocs` already pulls every chunk doc into memory in one round trip (this
- * loop's `snapshot.docs` is not a network stream), so accumulating raw rows
- * first costs one transient array for the duration of this call, not a
- * second live copy — discarded the moment `bpcRowsFromContractOffers`
- * returns the narrowed rows below.
- */
-/**
  * The same snapshot from R2 (ADR 0019, issue #3746): only the blueprint types
  * are read, found by crossing the index's listed types with the SDE's
  * blueprints, instead of every type. `null` when R2 or the SDE cannot answer,
@@ -125,6 +107,24 @@ async function fetchSnapshotFromR2(): Promise<PublicBpcContractsSnapshot | null>
   }
 }
 
+/**
+ * Every chunk's raw rows are accumulated before narrowing, rather than each
+ * chunk being narrowed as it is read: `bpcRowsFromContractOffers` tallies
+ * distinct for-sale types per contract (issue #1076), and a contract's own
+ * lines are not guaranteed to land in one chunk — the backend sorts by
+ * contract before slicing into fixed-size chunks (`functions/src/index.ts`'s
+ * `chunkRows`), so a contract can still straddle a chunk boundary if its own
+ * line count is large enough (a real case: one archived bundle ran to 493
+ * lines). Narrowing per chunk would tally each half of such a contract as
+ * its own single-type listing — silently wrong in exactly the case this
+ * fix exists for.
+ *
+ * `getDocs` already pulls every chunk doc into memory in one round trip (this
+ * loop's `snapshot.docs` is not a network stream), so accumulating raw rows
+ * first costs one transient array for the duration of this call, not a
+ * second live copy — discarded the moment `bpcRowsFromContractOffers`
+ * returns the narrowed rows below.
+ */
 async function fetchSnapshot(characterId: number): Promise<PublicBpcContractsSnapshot | null> {
   const fromR2 = await fetchSnapshotFromR2();
   if (fromR2) return fromR2;

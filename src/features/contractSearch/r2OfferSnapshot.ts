@@ -51,9 +51,17 @@ export function parseR2OfferIndex(raw: unknown): R2OfferIndex | null {
   const { lastSyncedAt, types, regionIds } = raw as Record<string, unknown>;
   if (typeof lastSyncedAt !== 'number' || !(lastSyncedAt > 0)) return null;
   if (typeof types !== 'object' || types === null) return null;
-  if (!Object.values(types).every(isIndexEntry)) return null;
+  const entries = Object.entries(types);
+  if (!entries.every(([key, entry]) => /^\d+$/.test(key) && isIndexEntry(entry))) return null;
   if (!Array.isArray(regionIds) || !regionIds.every((id) => typeof id === 'number')) return null;
   return { lastSyncedAt, types: types as R2OfferIndex['types'], regionIds };
+}
+
+/** The fields every consumer reads unguarded; a row without them would throw in a render. */
+function isOfferRow(value: unknown): value is PublicContractOfferRow {
+  if (typeof value !== 'object' || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.typeId === 'number' && typeof row.contractId === 'number';
 }
 
 async function fetchJson(url: string): Promise<unknown> {
@@ -94,7 +102,7 @@ function readObject(name: string): Promise<PublicContractOfferRow[]> {
   let pending = objectMemo.get(name);
   if (!pending) {
     pending = fetchJson(`${R2_SNAPSHOT_ORIGIN}/${name}`).then((body) => {
-      if (!Array.isArray(body)) throw new Error(`${name}: not an array`);
+      if (!Array.isArray(body) || !body.every(isOfferRow)) throw new Error(`${name}: bad rows`);
       return body as PublicContractOfferRow[];
     });
     // A failed read must not poison the memo for the retry.

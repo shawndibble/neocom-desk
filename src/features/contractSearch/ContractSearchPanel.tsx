@@ -551,7 +551,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   // or names still resolving, an empty set means "not known", not "no match".
   const typesKnown = offerIndex !== null && !namingTypes;
   const awaitingRows =
-    !haveFull && early.rows === null && !(typesKnown && typeIds !== null && typeIds.size === 0);
+    !haveFull &&
+    early.rows === null &&
+    !early.failed &&
+    !(typesKnown && typeIds !== null && typeIds.size === 0);
 
   const { value: endpoints } = useCourierEndpoints(courierRows);
   // Synchronous, so the haul list never empties while its ends are being

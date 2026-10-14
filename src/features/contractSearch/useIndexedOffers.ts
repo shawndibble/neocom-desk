@@ -53,10 +53,15 @@ function sameIndex(a: OfferIndex | null, b: OfferIndex | null): boolean {
   return a?.lastSyncedAt === b?.lastSyncedAt;
 }
 
-/** The searched types' offers, or `null` when none were read (not applicable, failed, or still pending). */
-export type EarlyOffers = { rows: readonly PublicContractOfferRow[] | null };
+/**
+ * The searched types' offers, or `null` when none were read (not applicable,
+ * failed, or still pending). `failed` is set only when a read was attempted and
+ * came back empty-handed: with R2 no full snapshot is coming to replace it.
+ */
+export type EarlyOffers = { rows: readonly PublicContractOfferRow[] | null; failed?: true };
 
 const NONE: EarlyOffers = { rows: null };
+const NO_OFFERS: EarlyOffers = { rows: [] };
 
 export function useEarlyOffers(
   index: OfferIndex | null,
@@ -98,7 +103,9 @@ export function useEarlyOffers(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, characterId]);
 
+  // An R2 index listing no type has nothing to read and nothing coming.
+  if (enabled && index?.r2 && wanted?.size === 0) return NO_OFFERS;
   if (key === null) return NONE;
   if (answer?.key !== key) return NONE;
-  return { rows: answer.rows };
+  return answer.rows === null && index?.r2 ? { rows: null, failed: true } : { rows: answer.rows };
 }
