@@ -75,6 +75,8 @@ describe('verifyEveAccessToken', () => {
       characterId: CHARACTER_ID,
       ownerHash: OWNER_HASH,
       name: 'Test Pilot',
+      scopes: ['esi-skills.read_skills.v1'],
+      clientId: CLIENT_ID,
     });
   });
 

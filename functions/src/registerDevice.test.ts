@@ -241,6 +241,8 @@ describe('buildDeviceRegistration', () => {
       characterId: token === 'token-1' ? 1 : 2,
       ownerHash: 'hash',
       name: 'Pilot',
+      scopes: [],
+      clientId: 'c',
     }));
 
     const result = await buildDeviceRegistration(input, opts);
@@ -254,6 +256,8 @@ describe('buildDeviceRegistration', () => {
       characterId: token === 'token-1' ? 1 : 2,
       ownerHash: 'hash',
       name: 'Pilot',
+      scopes: [],
+      clientId: 'c',
     }));
 
     const result = await buildDeviceRegistration(input, opts);
@@ -267,7 +271,7 @@ describe('buildDeviceRegistration', () => {
   it('drops a character whose access token fails verification, keeping the rest', async () => {
     verifyMock.mockImplementation(async (token) => {
       if (token === 'token-1') throw new Error('expired');
-      return { characterId: 2, ownerHash: 'hash', name: 'Pilot' };
+      return { characterId: 2, ownerHash: 'hash', name: 'Pilot', scopes: [], clientId: 'c' };
     });
 
     const result = await buildDeviceRegistration(input, opts);
@@ -282,7 +286,13 @@ describe('buildDeviceRegistration', () => {
   it('drops a character whose verified identity does not match the claimed characterId', async () => {
     // A caller claiming characterId 1 but presenting a token that verifies as
     // some other character must not be written under the claimed id.
-    verifyMock.mockResolvedValue({ characterId: 999, ownerHash: 'hash', name: 'Someone else' });
+    verifyMock.mockResolvedValue({
+      characterId: 999,
+      ownerHash: 'hash',
+      name: 'Someone else',
+      scopes: [],
+      clientId: 'c',
+    });
 
     const result = await buildDeviceRegistration(input, opts);
 

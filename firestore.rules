@@ -199,6 +199,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Alerts Grant (issue #3753, ADR 0020): one doc per Character holding the
+    // encrypted notifications-only refresh token. Written and read only by
+    // saveAlertGrant / deleteAlertGrant / the poller (admin). No client path,
+    // not even the owner's: the token must never reach a device.
+    match /alertGrants/{characterId} {
+      allow read, write: if false;
+    }
+
     // Projection rows (issue #358, ADR 0010, GLOSSARY.md round 45): one doc
     // per device per occurrence, doc id `{deviceId}:{Occurrence Key}` (issue
     // #2240; legacy rows keep the bare Occurrence Key). Written by registerDevice
