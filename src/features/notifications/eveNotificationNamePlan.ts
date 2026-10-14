@@ -52,10 +52,14 @@ export function entityIdsToResolve(
 export const RESOLUTION_BUDGET_MS = 3_000;
 
 /** Resolves to `fallback` if `work` has not settled within the budget. Never rejects. */
-export async function withinBudget<T>(work: Promise<T>, fallback: T): Promise<T> {
+export async function withinBudget<T>(
+  work: Promise<T>,
+  fallback: T,
+  budgetMs: number = RESOLUTION_BUDGET_MS
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expiry = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), RESOLUTION_BUDGET_MS);
+    timer = setTimeout(() => resolve(fallback), budgetMs);
   });
   try {
     return await Promise.race([work.catch(() => fallback), expiry]);

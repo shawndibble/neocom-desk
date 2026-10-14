@@ -3,6 +3,7 @@ import { handlePush, parsePushPayload, type PushEnv, type PushPayload } from './
 import { notificationTagFor } from './notificationOptions';
 import { occurrenceKey } from '@/engine/occurrenceKey';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
+import type { EveNotificationNames } from './eveNotificationRender';
 
 function env(overrides: Partial<PushEnv> = {}): PushEnv {
   return {
@@ -396,7 +397,7 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     expect(e.recordFeedEntry).toHaveBeenCalledTimes(1);
   });
 
-  it('still shows a notification when the name lookups fail', async () => {
+  it('still renders when the Character name read fails', async () => {
     const e = env({
       characterName: vi.fn(async () => {
         throw new Error('db blocked');
@@ -405,8 +406,7 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     await handlePush(e, serverSingle(), NOW);
 
     expect(e.showNotification).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(e.showNotification).mock.calls[0][0]).toBe('EVE notification');
-    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe('StructureUnderAttack');
+    expect(vi.mocked(e.showNotification).mock.calls[0][0]).toBe('Structure under attack');
   });
 
   it('uses a neutral phrase when the Character is unknown to this device', async () => {
@@ -440,5 +440,43 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     );
     expect(vi.mocked(e.showNotification).mock.calls[0][0]).toBe('EVE notification');
     expect(vi.mocked(e.recordFeedEntry).mock.calls[0][0].id).toBe('777:eveNotification:555');
+  });
+
+  it('renders with ids when the name lookup hangs, instead of dropping to generic copy', async () => {
+    vi.useFakeTimers();
+    try {
+      // Stands in for `resolvePushNames`, which gives up at the resolution budget.
+      const e = withName({
+        resolveNames: vi.fn(
+          () => new Promise<EveNotificationNames>((resolve) => setTimeout(() => resolve({}), 3_000))
+        ),
+      });
+      const done = handlePush(
+        e,
+        serverSingle({
+          eveType: 'WarDeclared',
+          notificationText: 'declaredByID: 98000001\nagainstID: 98000002',
+        }),
+        NOW
+      );
+      await vi.advanceTimersByTimeAsync(6_000);
+      await done;
+      expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toContain('#98000001');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still shows the generic copy when the Character name read hangs forever', async () => {
+    vi.useFakeTimers();
+    try {
+      const e = env({ characterName: vi.fn(() => new Promise<string>(() => {})) });
+      const done = handlePush(e, serverSingle({ notificationText: '' }), NOW);
+      await vi.advanceTimersByTimeAsync(6_000);
+      await done;
+      expect(e.showNotification).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

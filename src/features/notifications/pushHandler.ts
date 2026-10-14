@@ -48,7 +48,7 @@ import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
 import type { NewNotificationFeedEntry } from './feed';
 import { occurrenceKey } from '@/engine/occurrenceKey';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
-import { withinBudget } from './eveNotificationNamePlan';
+import { RESOLUTION_BUDGET_MS, withinBudget } from './eveNotificationNamePlan';
 import { renderEveNotification, type EveNotificationNames } from './eveNotificationRender';
 
 /**
@@ -193,19 +193,30 @@ interface Presented {
   feedKey: string | null;
 }
 
+/** The sender's own generic copy, keyed by the payload's key — the floor every failure lands on. */
+function genericPresented(payload: PushPayload): Presented {
+  return { title: payload.title, body: payload.body, feedKey: payload.occurrenceKey };
+}
+
+const NAME_READ_BUDGET_MS = 1_000;
+/** Backstop over `present` as a whole: the name read plus the lookup budget, plus slack. */
+const PRESENT_BUDGET_MS = NAME_READ_BUDGET_MS + RESOLUTION_BUDGET_MS + 1_000;
+
 /**
  * Title and body for a payload, never throwing. A raw EVE notification is
  * rendered here; a summary gets its own sentence; anything else shows what the
  * sender wrote. Every failure lands on the payload's generic copy.
  */
 async function present(env: PushEnv, payload: PushPayload, now: number): Promise<Presented> {
-  const generic: Presented = {
-    title: payload.title,
-    body: payload.body,
-    feedKey: payload.occurrenceKey,
-  };
+  const generic = genericPresented(payload);
   try {
-    const name = (await env.characterName?.(payload.characterId)) ?? undefined;
+    // Short, so the name lookups below keep their own budget inside `handlePush`'s backstop.
+    const name =
+      (await withinBudget(
+        Promise.resolve(env.characterName?.(payload.characterId)),
+        undefined,
+        NAME_READ_BUDGET_MS
+      )) ?? undefined;
     if (payload.summaryCount !== undefined) {
       return {
         title: i18n.t('notifications.fired.eveNotificationSummary.title'),
@@ -266,11 +277,11 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
 
   // Bounded like the name lookups: a stuck store read must not hold the
   // notification back, because WebKit revokes the subscription on a silent push.
-  const { title, body, feedKey } = await withinBudget(present(env, payload, now), {
-    title: payload.title,
-    body: payload.body,
-    feedKey: payload.occurrenceKey,
-  });
+  const { title, body, feedKey } = await withinBudget(
+    present(env, payload, now),
+    genericPresented(payload),
+    PRESENT_BUDGET_MS
+  );
 
   const notify = env.showNotification(
     title,
