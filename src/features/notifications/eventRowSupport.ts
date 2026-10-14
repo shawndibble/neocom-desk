@@ -2,6 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import { PERMISSIONS } from '@/esi/registry';
 import type { CorpCapabilities } from '@/engine/corpRoles';
+import type { ScopeGroup } from '@/esi/registry';
 import { eventApplicability } from './eventApplicability';
 import { eventEntry } from './eventEntries';
 import type { NotificationEventId } from './events';
@@ -52,4 +53,30 @@ export function useEventAvailability(
           : t(PERMISSIONS[state.missingPermission].labelKey),
     };
   };
+}
+
+/**
+ * The Permission some Characters have not granted for these events, and how
+ * many Characters that is. A scope gap only: a corp role gap cannot be fixed by
+ * granting anything, and the dimmed chip's tooltip already says so.
+ */
+export function missingPermissionSummary(
+  eventIds: readonly NotificationEventId[],
+  context: Pick<EventRowContext, 'characters' | 'scopesByCharacterId'>
+): { permission: ScopeGroup; count: number } | null {
+  let permission: ScopeGroup | null = null;
+  const missing = new Set<number>();
+  for (const eventId of eventIds) {
+    for (const character of context.characters) {
+      const state = eventApplicability(
+        eventId,
+        context.scopesByCharacterId.get(character.characterId) ?? EMPTY_SCOPES,
+        undefined
+      );
+      if (state.missingPermission === null) continue;
+      permission ??= state.missingPermission;
+      missing.add(character.characterId);
+    }
+  }
+  return permission === null ? null : { permission, count: missing.size };
 }

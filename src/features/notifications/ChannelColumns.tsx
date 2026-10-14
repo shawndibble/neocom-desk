@@ -1,8 +1,6 @@
 /**
- * The two delivery-channel columns, shared by the "All Characters" section
- * and each Character's own section so the grid track and the captions above
- * it can't drift apart (they were duplicated, with a comment asking the next
- * editor to keep them in sync by hand).
+ * The two delivery-channel columns, shared by every row of the event list so
+ * the grid track and the captions above it can't drift apart.
  *
  * The captions matter more than they look: a column of bare checkboxes says
  * nothing about what it does, and the two channels are genuinely
@@ -14,8 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { NOTIFICATION_CHANNELS } from './eventSelection';
 
 /**
- * One fixed-width track per delivery channel, shared by every grid in both
- * sections — the column captions, the select-all rows, the event rows, the
+ * One fixed-width track per delivery channel, shared by every grid on the page — the column captions, the select-all rows, the event rows, the
  * Family headers and the eve-type rows. They are independent grids that only
  * *look* like columns, so an auto track would size each to its own content
  * and the captions would drift off the checkboxes below the moment a caption

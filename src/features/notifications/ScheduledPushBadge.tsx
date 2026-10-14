@@ -7,7 +7,7 @@ import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
  *
  * `role="img"` plus `aria-label` rather than a focusable trigger (the
  * `MaterialsTable` pattern, not the column captions' one): the meaning has to
- * reach a screen reader, but there are seventeen rows per Character here and
+ * reach a screen reader, but there are seventeen rows here and
  * a tab stop on each would make the panel worse to keyboard through than the
  * badge is worth.
  */

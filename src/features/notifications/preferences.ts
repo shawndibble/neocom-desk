@@ -442,7 +442,7 @@ async function writeBroadcastFlags(
 
 /**
  * Broadcasts one event's channel value to every known Character at once
- * (issue #738) — the "All Characters" master row's per-event control. A
+ * (issue #738) — the event-first list's row-level control. A
  * one-time broadcast to Characters that exist right now, not a saved default
  * applied to ones added later; each can still be edited independently
  * afterward.
@@ -461,7 +461,7 @@ export async function broadcastEventChannelPref(
   );
 }
 
-/** Same as `broadcastEventChannelPref`, for the master row's own select-all across every Event too. */
+/** Same as `broadcastEventChannelPref`, across every Event at once (no row uses it now). */
 export async function broadcastAllEventsChannelPref(
   characterIds: readonly number[],
   value: NotificationPreferencesValue,
@@ -498,7 +498,7 @@ async function writeBroadcastEveTypeFlags(
 
 /**
  * Broadcasts one EVE Notification type's channel value to every known
- * Character at once (issue #745) — the "All Characters" section's per-type
+ * Character at once (issue #745) — the EVE type rows'
  * control underneath `eveNotification`, same one-time-broadcast contract as
  * `broadcastEventChannelPref`.
  */

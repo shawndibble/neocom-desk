@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventApplicability, applicableCharacterIds } from './eventApplicability';
+import { eventApplicability } from './eventApplicability';
 import { NOTIFICATION_EVENTS } from './events';
 
 const scopeOf = (id: string) => NOTIFICATION_EVENTS.find((e) => e.id === id)!.scope!;
@@ -23,16 +23,5 @@ describe('eventApplicability', () => {
   it('reads an unresolved corp capability as held, never a false lock', () => {
     const scopes = new Set([scopeOf('corpMemberJoined')]);
     expect(eventApplicability('corpMemberJoined', scopes, undefined).rowEnabled).toBe(true);
-  });
-});
-
-describe('applicableCharacterIds', () => {
-  it('keeps only characters the event applies to, in the given order', () => {
-    const scopes = new Map<number, ReadonlySet<string>>([
-      [1, new Set([scopeOf('newMail')])],
-      [2, new Set()],
-      [3, new Set([scopeOf('newMail')])],
-    ]);
-    expect(applicableCharacterIds('newMail', [3, 2, 1], scopes, new Map())).toEqual([3, 1]);
   });
 });

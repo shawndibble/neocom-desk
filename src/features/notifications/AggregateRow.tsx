@@ -38,10 +38,12 @@ export interface AggregateRowProps {
   browserBlocked: boolean;
   /** A search that names Characters narrows the chips to them; null shows all. */
   visibleCharacterIds: ReadonlySet<number> | null;
-  /** Open the row because a search asked for it. Honoured on desktop only: a phone never opens sheets on its own. */
+  /** Open the row because a search asked for it. Honoured on desktop only: a phone never opens sheets on its own. The user can still close it. */
   forceExpanded: boolean;
   isDesktop: boolean;
-  /** Hints and per-Character controls shown under the chips when open. */
+  /** Always visible under the row, open or not: delivery caveats and who has not granted a Permission. */
+  notes?: ReactNode;
+  /** Controls shown under the chips when open. */
   children?: ReactNode;
 }
 
@@ -58,11 +60,13 @@ export function AggregateRow({
   visibleCharacterIds,
   forceExpanded,
   isDesktop,
+  notes,
   children,
 }: AggregateRowProps) {
   const { t } = useTranslation();
-  const [opened, setOpened] = useState(false);
-  const open = opened || (forceExpanded && isDesktop);
+  // null until the user toggles the row: then their choice wins over the search's.
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const open = chosen ?? (forceExpanded && isDesktop);
 
   const applicableIds = characters
     .filter((character) => availability(character.characterId).enabled)
@@ -89,14 +93,20 @@ export function AggregateRow({
     </div>
   );
 
+  // One Character has nothing to compare, but a row nobody can use still says so.
   const summaryText =
-    characters.length < 2
-      ? null
-      : applicableIds.length === 0
-        ? t('settings.notifications.summary.unavailable')
-        : summary.alike
-          ? t('settings.notifications.summary.alike', { count: applicableIds.length })
-          : t('settings.notifications.summary.differ', { count: summary.differingIds.length });
+    applicableIds.length === 0
+      ? t('settings.notifications.summary.unavailable')
+      : characters.length < 2
+        ? null
+        : applicableIds.length < characters.length && summary.alike
+          ? t('settings.notifications.summary.partial', {
+              count: applicableIds.length,
+              total: characters.length,
+            })
+          : summary.alike
+            ? t('settings.notifications.summary.alike', { count: applicableIds.length })
+            : t('settings.notifications.summary.differ', { count: summary.differingIds.length });
 
   return (
     <li>
@@ -112,7 +122,7 @@ export function AggregateRow({
             type="button"
             aria-expanded={open}
             aria-haspopup={isDesktop ? undefined : 'dialog'}
-            onClick={() => setOpened((value) => !value)}
+            onClick={() => setChosen(!open)}
             className={cx(
               'flex min-h-11 min-w-0 items-center gap-1.5 py-2 text-left md:min-h-9',
               tone === 'type' ? 'text-text-dim' : 'text-text',
@@ -151,11 +161,12 @@ export function AggregateRow({
           ))}
         </div>
       </div>
+      {notes !== undefined && <div className="space-y-1 px-3 pt-0.5 pb-2 pl-8">{notes}</div>}
       {open && isDesktop && (
         <div className="border-t border-line bg-panel-2 px-3 py-3 md:pl-8">{body}</div>
       )}
       {!isDesktop && (
-        <Modal open={open} onClose={() => setOpened(false)} title={label} placement="sheet-full">
+        <Modal open={open} onClose={() => setChosen(false)} title={label} placement="sheet-full">
           {body}
         </Modal>
       )}

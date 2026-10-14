@@ -10168,14 +10168,16 @@
         "browser": "{{event}} for every character, device notifications",
         "feed": "{{event}} for every character, Alerts list"
       },
-      "chipLegend": "D is Device, A is Alerts. Highlighted characters differ from the rest.",
+      "chipLegend": "D is Device, A is Alerts. Characters marked with a warning differ from the rest.",
+      "chipDiffers": "Differs from the rest",
       "chipLetter": {
         "browser": "D",
         "feed": "A"
       },
       "summary": {
-        "alike_one": "1 character",
+        "alike_one": "All {{count}} alike",
         "alike_other": "All {{count}} alike",
+        "partial": "{{count}} of {{total}} can use this",
         "differ_one": "{{count}} differs",
         "differ_other": "{{count}} differ",
         "unavailable": "None can use this"

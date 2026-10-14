@@ -8,7 +8,7 @@ import type { NotificationEventId } from './events';
 /** Search starts filtering sections at this many characters (matches skillGroupFilter.ts). */
 export const NOTIFICATION_SEARCH_MIN_QUERY_LENGTH = 3;
 
-export interface NotificationSection {
+export interface NotificationCharacter {
   characterId: number;
   characterName: string;
 }
@@ -33,7 +33,7 @@ export interface NotificationEventSearchResult {
  * no filter is active.
  */
 export function filterNotificationEvents(
-  characters: readonly NotificationSection[],
+  characters: readonly NotificationCharacter[],
   events: readonly NotificationEventLabel[],
   query: string
 ): NotificationEventSearchResult | null {

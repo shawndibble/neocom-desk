@@ -10,7 +10,12 @@ import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { AggregateRow } from './AggregateRow';
 import { CHANNEL_COLUMNS } from './ChannelColumns';
 import { eveTypeLabel } from './eveTypeLabel';
-import { useEventAvailability, type EventRowContext } from './eventRowSupport';
+import { PermissionNote } from './PermissionNote';
+import {
+  missingPermissionSummary,
+  useEventAvailability,
+  type EventRowContext,
+} from './eventRowSupport';
 import { eventLabelKey } from './events';
 import {
   NOTIFICATION_CHANNELS,
@@ -44,6 +49,7 @@ export function EveNotificationRow({
   const availability = useEventAvailability(eventId, context);
   const { prefsValue } = context;
   const currentValue = () => useNotificationPreferences.getState().value;
+  const missing = missingPermissionSummary([eventId], context);
   const applicableIds = context.characters
     .filter((character) => availability(character.characterId).enabled)
     .map((character) => character.characterId);
@@ -72,8 +78,10 @@ export function EveNotificationRow({
       }
       browserBlocked={context.browserBlocked}
       visibleCharacterIds={context.visibleCharacterIds}
-      forceExpanded={context.forceExpanded}
+      // Never opened by a search: its list is the longest on the page.
+      forceExpanded={false}
       isDesktop={context.isDesktop}
+      notes={missing !== null ? <PermissionNote {...missing} /> : undefined}
     >
       <div className="space-y-2">
         <p className="text-[0.6875rem] text-text-dim">{t('settings.notifications.eveTypesHint')}</p>
@@ -122,7 +130,6 @@ export function EveNotificationRow({
                       key={type}
                       tone="type"
                       label={typeLabel}
-                      labelAccessory={undefined}
                       characters={context.characters}
                       availability={availability}
                       readValue={(id, channel) =>

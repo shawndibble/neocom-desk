@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { ChannelColumnHeadings } from './ChannelColumns';
 import { groupNotificationEvents } from './eventGroups';
 import { NotificationEventRow } from './NotificationEventRow';
-import type { EventRowContext } from './eventRowSupport';
+import { PermissionNote } from './PermissionNote';
+import { missingPermissionSummary, type EventRowContext } from './eventRowSupport';
 import { EveNotificationRow } from './EveNotificationRow';
 import type { NotificationEventId } from './events';
 
@@ -23,6 +24,8 @@ export function NotificationEventList({
 }) {
   const { t } = useTranslation();
   const layout = groupNotificationEvents(eventIds);
+  // Every corp event rides the one opt-in Corporation Permission, so the group says it once.
+  const corpMissing = missingPermissionSummary(layout.corp, context);
   const heading = (text: string) => (
     <h3 className="border-t border-line bg-panel/40 px-3 py-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
       {text}
@@ -44,9 +47,10 @@ export function NotificationEventList({
       {layout.corp.length > 0 && (
         <section>
           {heading(t('settings.notifications.corpGroup'))}
-          <p className="border-t border-line bg-panel/60 px-3 py-1.5 text-[0.6875rem] text-text-dim">
-            {t('settings.notifications.corpEventBestEffortHint')}
-          </p>
+          <div className="space-y-1 border-t border-line bg-panel/60 px-3 py-1.5 text-[0.6875rem] text-text-dim">
+            <p>{t('settings.notifications.corpEventBestEffortHint')}</p>
+            {corpMissing !== null && <PermissionNote {...corpMissing} />}
+          </div>
           <ul className="divide-y divide-line border-t border-line">
             {layout.corp.map((eventId) => (
               <NotificationEventRow key={eventId} eventId={eventId} context={context} />

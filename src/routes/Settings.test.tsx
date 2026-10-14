@@ -530,7 +530,6 @@ describe('Settings — Notifications (issue #170)', () => {
     // Issue #358: extractor-expiring moved from an app-open poll to a
     // scheduled push delivered up to 72 hours ahead; the disclosure text
     // must reflect that, not the old 5-minute poll wording.
-    const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
 
@@ -538,8 +537,9 @@ describe('Settings — Notifications (issue #170)', () => {
       expect(rowCheckbox('Planetary Extractor Expiring', 'device')).toBeInTheDocument();
       expect(rowCheckbox('Planetary Extractor Expiring', 'Alerts')).toBeInTheDocument();
     });
-    const sheet = await openEvent(user, 'Planetary Extractor Expiring');
-    expect(sheet.getByText(/delivered up to 72 hours ahead/i)).toBeInTheDocument();
+    // On the row's face, whether or not the row is open.
+    expect(screen.getByText(/delivered up to 72 hours ahead/i)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('a row is indeterminate once characters disagree, and one click brings everyone to on', async () => {
@@ -742,8 +742,9 @@ describe('Settings — Notifications (issue #170)', () => {
       name: 'New Mail, Pilot Two, device notifications',
     });
     expect(pilotTwoMail).toHaveAttribute('aria-disabled', 'true');
-    expect(sheet.getByText(/1 character hasn't granted Mail/)).toBeInTheDocument();
-    expect(sheet.getByRole('link', { name: 'Manage permissions' })).toBeInTheDocument();
+    // Said on the row's face, so it is visible without opening anything.
+    expect(screen.getByText(/1 character hasn't granted Mail/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Manage permissions' })).toBeInTheDocument();
     fireEvent.pointerMove(pilotTwoMail);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs the Mail permission');
 
@@ -791,7 +792,8 @@ describe('Settings — Notifications (issue #170)', () => {
     await notificationsPanel();
     const sheet = await openEvent(user, 'Member Joined');
 
-    expect(sheet.getAllByText(/hasn't granted/)).toHaveLength(1);
+    // Once, on the Corp notifications group, not on each of its five rows.
+    expect(screen.getAllByText(/hasn't granted/)).toHaveLength(1);
     // The row is still listed for that character, and still disabled.
     expect(
       sheet.getByRole('checkbox', { name: 'Member Joined, Pilot Two, device notifications' })
@@ -1135,7 +1137,8 @@ describe('Settings — Notifications with twenty characters', () => {
     await waitFor(() => expect(rowCheckbox('Skill Level Complete', 'device')).toBeChecked());
 
     expect(panel.getAllByRole('checkbox', { name: /^Skill Level Complete/ })).toHaveLength(2);
-    expect(panel.getAllByText('All 20 alike').length).toBeGreaterThan(0);
+    // The default fixture Character holds no notification scopes, so each row counts the 20 that can use it of the 21.
+    expect(panel.getAllByText('20 of 21 can use this').length).toBeGreaterThan(0);
     // Nothing per character is mounted until a row is opened.
     expect(panel.queryByText('Pilot 007')).toBeNull();
   });

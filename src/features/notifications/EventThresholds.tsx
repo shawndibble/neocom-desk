@@ -25,11 +25,14 @@ export function ThresholdControls({
   thresholds,
   values,
   onChange,
+  showHint = true,
 }: {
   characterId: number;
   thresholds: EventThresholds;
   values: Required<CharacterEventThresholds>;
   onChange: (key: ThresholdKey, amount: number) => void;
+  /** False when the caller shows the group's hint once for several Characters. */
+  showHint?: boolean;
 }) {
   const { t } = useTranslation();
   const wraps = thresholds.fields.length > 1;
@@ -44,7 +47,7 @@ export function ThresholdControls({
           onChange={(amount) => onChange(field.key, amount)}
         />
       ))}
-      {thresholds.hintKey !== null && (
+      {showHint && thresholds.hintKey !== null && (
         <p className="mt-1 text-[0.6875rem] text-text-dim">{t(thresholds.hintKey)}</p>
       )}
     </div>

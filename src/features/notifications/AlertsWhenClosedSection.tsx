@@ -32,6 +32,9 @@ interface CharacterRef {
   name: string;
 }
 
+/** Names listed on the closed section's face before "+N more". */
+const SHOWN_NAMES = 5;
+
 type Notice = { tone: 'info' | 'warning'; text: string } | null;
 
 export function AlertsWhenClosedSection({ characters }: { characters: readonly CharacterRef[] }) {
@@ -121,13 +124,12 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     );
   };
 
-  const onIds = characters.filter(
+  const enabled = characters.filter(
     (character) => alertsRowState(grants[character.characterId]) === 'on'
   );
   const needsReauth = characters.filter(
     (character) => alertsRowState(grants[character.characterId]) === 'needs-reauth'
   );
-  const SHOWN_NAMES = 5;
 
   return (
     <section aria-labelledby="alerts-when-closed-heading" className="space-y-2">
@@ -149,12 +151,11 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
         </h3>
         <span className="font-mono text-[0.6875rem] text-text-dim">
           {t('settings.notifications.alertsWhenClosed.summary', {
-            on: onIds.length,
+            on: enabled.length,
             total: characters.length,
           })}
           {needsReauth.length > 0 && (
-            <span className="text-warning">
-              {' · '}
+            <span className="ml-2 text-warning">
               {t('settings.notifications.alertsWhenClosed.needsReauthCount', {
                 count: needsReauth.length,
               })}
@@ -167,9 +168,9 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
           </Button>
         )}
       </div>
-      {!expanded && onIds.length > 0 && (
+      {!expanded && enabled.length > 0 && (
         <ul className="flex flex-wrap gap-1.5">
-          {onIds.slice(0, SHOWN_NAMES).map((character) => (
+          {enabled.slice(0, SHOWN_NAMES).map((character) => (
             <li
               key={character.characterId}
               className="rounded-xs border border-accent/60 px-1.5 py-0.5 text-[0.6875rem] text-accent"
@@ -177,10 +178,10 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
               {character.name}
             </li>
           ))}
-          {onIds.length > SHOWN_NAMES && (
+          {enabled.length > SHOWN_NAMES && (
             <li className="rounded-xs border border-line px-1.5 py-0.5 text-[0.6875rem] text-text-dim">
               {t('settings.notifications.alertsWhenClosed.more', {
-                count: onIds.length - SHOWN_NAMES,
+                count: enabled.length - SHOWN_NAMES,
               })}
             </li>
           )}

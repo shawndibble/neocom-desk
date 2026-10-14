@@ -1,7 +1,7 @@
 /**
- * Whether a Notification Event applies to a Character right now — the one
- * scope/capability read the Settings rows and the cross-Character summary
- * share, so they cannot disagree about which Characters a row covers.
+ * Whether a Notification Event applies to a Character right now: the one
+ * scope/capability read every Settings row uses, so rows cannot disagree about
+ * which Characters they cover.
  */
 import type { CorpCapabilities } from '@/engine/corpRoles';
 import type { ScopeGroup } from '@/esi/registry';
@@ -37,23 +37,4 @@ export function eventApplicability(
     rowEnabled: hasScope && !capabilityMissing,
     missingPermission: missingEventPermission(eventId, grantedScopes),
   };
-}
-
-const NO_SCOPES: ReadonlySet<string> = new Set();
-
-/** The Characters (in the order given) an event's row can actually write to. */
-export function applicableCharacterIds(
-  eventId: NotificationEventId,
-  characterIds: readonly number[],
-  scopesByCharacterId: ReadonlyMap<number, ReadonlySet<string>>,
-  capabilitiesByCharacterId: ReadonlyMap<number, CorpCapabilities>
-): number[] {
-  return characterIds.filter(
-    (id) =>
-      eventApplicability(
-        eventId,
-        scopesByCharacterId.get(id) ?? NO_SCOPES,
-        capabilitiesByCharacterId.get(id)
-      ).rowEnabled
-  );
 }

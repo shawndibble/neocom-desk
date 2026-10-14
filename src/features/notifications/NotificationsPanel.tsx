@@ -220,14 +220,17 @@ export function NotificationsPanel() {
    * first, and the active Character is the one this session already knows is
    * signed in with a usable token.
    */
+  const characterRefs = useMemo(
+    () => characterList.map((c) => ({ characterId: c.characterId, name: c.name })),
+    [characterList]
+  );
   const orderedCharacters = useMemo(() => {
-    const refs = characterList.map((c) => ({ characterId: c.characterId, name: c.name }));
-    if (activeCharacterId === null) return refs;
+    if (activeCharacterId === null) return characterRefs;
     return [
-      ...refs.filter((c) => c.characterId === activeCharacterId),
-      ...refs.filter((c) => c.characterId !== activeCharacterId),
+      ...characterRefs.filter((c) => c.characterId === activeCharacterId),
+      ...characterRefs.filter((c) => c.characterId !== activeCharacterId),
     ];
-  }, [characterList, activeCharacterId]);
+  }, [characterRefs, activeCharacterId]);
 
   const filterResult = useMemo(
     () =>
@@ -396,7 +399,7 @@ export function NotificationsPanel() {
           <EmptyState title={t('settings.notifications.emptyTitle')} />
         ) : (
           <>
-            {isSyncConfigured() && <AlertsWhenClosedSection characters={orderedCharacters} />}
+            {isSyncConfigured() && <AlertsWhenClosedSection characters={characterRefs} />}
             <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}

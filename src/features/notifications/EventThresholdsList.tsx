@@ -2,13 +2,11 @@
  * An event's warn-ahead times, one set per Character: thresholds are saved per
  * Character (`preferences.ts`), so the event-first page lists them under the
  * chips instead of repeating them on every row. Closed by default, and only
- * for Characters the event applies to and has switched on.
+ * for the Characters the caller passes (those the event applies to and has on).
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Caret } from '@/components/ui';
-import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
+import { Disclosure } from '@/components/ui/Disclosure';
 import { ThresholdControls } from './EventThresholds';
 import type { EventThresholds } from './eventEntries';
 import {
@@ -26,7 +24,6 @@ export function EventThresholdsList({
   prefsValue,
 }: {
   thresholds: EventThresholds;
-  /** Already narrowed to Characters the event applies to and has on. */
   characters: readonly CharacterRef[];
   prefsValue: NotificationPreferencesValue;
 }) {
@@ -34,21 +31,15 @@ export function EventThresholdsList({
   const [open, setOpen] = useState(false);
   if (characters.length === 0) return null;
   return (
-    <div className="space-y-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className={cx(
-          'flex min-h-11 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text md:min-h-0',
-          interactiveClassName,
-          focusRingInsetClassName
+    <Disclosure
+      label={t('settings.notifications.warnAheadTimes', { count: characters.length })}
+      expanded={open}
+      onToggle={() => setOpen((value) => !value)}
+    >
+      <div className="space-y-2 pt-1">
+        {thresholds.hintKey !== null && (
+          <p className="text-[0.6875rem] text-text-dim">{t(thresholds.hintKey)}</p>
         )}
-      >
-        <Caret expanded={open} />
-        {t('settings.notifications.warnAheadTimes', { count: characters.length })}
-      </button>
-      {open && (
         <ul className="space-y-2">
           {characters.map((character) => (
             <li key={character.characterId} className="space-y-1">
@@ -57,6 +48,7 @@ export function EventThresholdsList({
                 characterId={character.characterId}
                 thresholds={thresholds}
                 values={characterEventThresholds(prefsValue, character.characterId)}
+                showHint={false}
                 onChange={(key, amount) =>
                   void updateNotificationPrefs(
                     character.characterId,
@@ -72,7 +64,7 @@ export function EventThresholdsList({
             </li>
           ))}
         </ul>
-      )}
-    </div>
+      </div>
+    </Disclosure>
   );
 }

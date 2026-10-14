@@ -7,6 +7,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { ChannelCheckbox } from './ChannelCheckbox';
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from './eventSelection';
@@ -62,6 +63,13 @@ export function CharacterChipGrid({
             >
               <CharacterAvatar characterId={character.characterId} size="sm" loading="lazy" />
               <span className="min-w-0 flex-1 truncate text-text">{character.name}</span>
+              {differs && (
+                // Colour is never the only signal: a mark and, for a screen reader, words.
+                <span className="shrink-0 text-warning">
+                  <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                  <span className="sr-only">{t('settings.notifications.chipDiffers')}</span>
+                </span>
+              )}
               {NOTIFICATION_CHANNELS.map((channel) => (
                 <span key={channel} className="flex items-center gap-0.5 last:ml-1">
                   <ChannelCheckbox

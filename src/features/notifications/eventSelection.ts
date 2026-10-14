@@ -157,7 +157,7 @@ export function toggleAllEventsOnChannel(
 
 /**
  * Cross-character select-all/mixed state for one event on one channel (issue
- * #738's "All Characters" master row): the same three-state read as
+ * #738's event-first row): the same three-state read as
  * `selectionStateForEvents`, but the axis being summarized is Characters
  * instead of Events — one event, every known Character's own value for it.
  */
@@ -173,7 +173,7 @@ export function selectionStateForEventAcrossCharacters(
 }
 
 /**
- * Cross-character, cross-event select-all/mixed state for the master row's
+ * Cross-character, cross-event select-all/mixed state for the row-level
  * own select-all header (issue #738) — checked only when every known
  * Character agrees every Event is on for this channel.
  */
@@ -446,7 +446,7 @@ export function toggleAllEveTypesOnChannel(
 /**
  * Cross-character select-all/mixed state for one EVE Notification type on one
  * channel — the eve-type counterpart of `selectionStateForEventAcrossCharacters`
- * (issue #738), for the "All Characters" section's per-type rows underneath
+ * (issue #738), for the EVE type rows underneath
  * `eveNotification` (issue #745). One type, every known Character's own value
  * for it.
  */
@@ -463,7 +463,7 @@ export function selectionStateForEveTypeAcrossCharacters(
 
 /**
  * Cross-character, cross-type select-all/mixed state for a Family's own
- * select-all header in the "All Characters" section (issue #745) — the
+ * family select-all header (issue #745) — the
  * eve-type counterpart of `selectionStateForAllCharactersAllEvents`, scoped
  * to whatever `types` the caller passes (a single Family's types here).
  */
@@ -530,7 +530,7 @@ export function broadcastEveTypeChannelFlags(
  * Broadcast cascade for a whole set of EVE Notification types' channel across
  * every known Character at once (issue #745) — the eve-type counterpart of
  * `broadcastAllEventsChannelFlags`, used for a Family's own select-all in the
- * "All Characters" section.
+ * the EVE family headers.
  */
 export function broadcastAllEveTypesChannelFlags(
   characterIds: readonly number[],
