@@ -26,7 +26,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
-import { Button, Panel, EmptyState, SearchInput, Checkbox } from '@/components/ui';
+import { Button, Panel, EmptyState, SearchInput, Checkbox, InfoTooltip } from '@/components/ui';
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
 import { NotificationEventList } from './NotificationEventList';
@@ -334,66 +334,86 @@ export function NotificationsPanel() {
             </Button>
           </div>
         )}
-        <label
-          className={`flex items-center gap-2 text-xs font-medium text-text ${tappableRowClassName}`}
-        >
-          <Checkbox
-            checked={prefsValue.masterEnabled}
-            onChange={() =>
-              void setDeviceNotificationPrefs(
-                withMasterEnabled(prefsValue, !prefsValue.masterEnabled)
-              )
-            }
-          />
-          {t('settings.notifications.masterSwitchLabel')}
-        </label>
-
         {/*
-          The two delivery channels, nested under the master switch and
-          disabled with it. They are independent rather than a fallback
-          chain: browser notifications need a permission grant and an OS that
-          will raise one (never iOS while the app is closed, ADR 0007), while
-          the Overview feed works everywhere and is the only channel some
-          devices will ever see — so switching one off must not touch the
-          other.
+          One row: the master switch, then the two delivery channels it gates.
+          The channels are independent rather than a fallback chain: device
+          pop-ups need a permission grant and an OS that will raise one (never
+          iOS while the app is closed, ADR 0007), while the Alerts list works
+          everywhere and is the only channel some devices will ever see, so
+          switching one off must not touch the other. Their longer
+          explanations sit behind the info buttons (and in the sr-only text the
+          checkboxes are described by) instead of taking two paragraphs of the
+          page's first screen.
         */}
-        <fieldset disabled={!prefsValue.masterEnabled} className="ml-6 space-y-2">
-          <legend className="sr-only">{t('settings.notifications.channelsLegend')}</legend>
-          <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
-            <Checkbox
-              aria-describedby="notifications-browser-channel-hint"
-              checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
-              disabled={browserBlocked}
-              onChange={() =>
-                void setDeviceNotificationPrefs(
-                  withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
-                )
-              }
-            />
-            {t('settings.notifications.browserChannelLabel')}
-          </label>
-          <p
-            id="notifications-browser-channel-hint"
-            className="ml-6 text-[0.6875rem] text-text-dim"
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-0.5">
+          <label
+            className={`flex items-center gap-2 text-xs font-medium text-text ${tappableRowClassName}`}
           >
-            {t('settings.notifications.browserChannelHint')}
-          </p>
-          <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
             <Checkbox
-              aria-describedby="notifications-feed-channel-hint"
-              checked={isFeedChannelEnabled(prefsValue)}
+              checked={prefsValue.masterEnabled}
               onChange={() =>
                 void setDeviceNotificationPrefs(
-                  withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue))
+                  withMasterEnabled(prefsValue, !prefsValue.masterEnabled)
                 )
               }
             />
-            {t('settings.notifications.feedChannelLabel')}
+            {t('settings.notifications.masterSwitchLabel')}
           </label>
-          <p id="notifications-feed-channel-hint" className="ml-6 text-[0.6875rem] text-text-dim">
-            {t('settings.notifications.feedChannelHint')}
-          </p>
-        </fieldset>
+          <fieldset disabled={!prefsValue.masterEnabled} className="contents">
+            <legend className="sr-only">{t('settings.notifications.channelsLegend')}</legend>
+            <span className="flex items-center gap-1.5">
+              <label
+                className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}
+              >
+                <Checkbox
+                  aria-describedby="notifications-browser-channel-hint"
+                  checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
+                  disabled={browserBlocked}
+                  onChange={() =>
+                    void setDeviceNotificationPrefs(
+                      withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
+                    )
+                  }
+                />
+                {t('settings.notifications.browserChannelLabel')}
+              </label>
+              <InfoTooltip
+                label={t('settings.notifications.channelInfoLabel', {
+                  channel: t('settings.notifications.browserChannelLabel'),
+                })}
+                content={t('settings.notifications.browserChannelHint')}
+              />
+              <span id="notifications-browser-channel-hint" className="sr-only">
+                {t('settings.notifications.browserChannelHint')}
+              </span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <label
+                className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}
+              >
+                <Checkbox
+                  aria-describedby="notifications-feed-channel-hint"
+                  checked={isFeedChannelEnabled(prefsValue)}
+                  onChange={() =>
+                    void setDeviceNotificationPrefs(
+                      withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue))
+                    )
+                  }
+                />
+                {t('settings.notifications.feedChannelLabel')}
+              </label>
+              <InfoTooltip
+                label={t('settings.notifications.channelInfoLabel', {
+                  channel: t('settings.notifications.feedChannelLabel'),
+                })}
+                content={t('settings.notifications.feedChannelHint')}
+              />
+              <span id="notifications-feed-channel-hint" className="sr-only">
+                {t('settings.notifications.feedChannelHint')}
+              </span>
+            </span>
+          </fieldset>
+        </div>
 
         {characterList.length === 0 ? (
           <EmptyState title={t('settings.notifications.emptyTitle')} />

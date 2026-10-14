@@ -118,22 +118,24 @@ export function AggregateRow({
       >
         {/* The checkboxes are siblings of the toggle, not inside its <button>: an interactive control inside a button is invalid HTML and folds both names together. */}
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5">
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-haspopup={isDesktop ? undefined : 'dialog'}
-            onClick={() => setChosen(!open)}
-            className={cx(
-              'flex min-h-11 min-w-0 items-center gap-1.5 py-2 text-left md:min-h-9',
-              tone === 'type' ? 'text-text-dim' : 'text-text',
-              interactiveClassName,
-              focusRingInsetClassName
-            )}
-          >
-            <Caret expanded={open && isDesktop} />
-            <span className="min-w-0 truncate">{label}</span>
-          </button>
-          {labelAccessory}
+          <div className="flex min-w-0 items-center gap-1.5">
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-haspopup={isDesktop ? undefined : 'dialog'}
+              onClick={() => setChosen(!open)}
+              className={cx(
+                'flex min-h-11 min-w-0 items-center gap-1.5 py-2 text-left md:min-h-9',
+                tone === 'type' ? 'text-text-dim' : 'text-text',
+                interactiveClassName,
+                focusRingInsetClassName
+              )}
+            >
+              <Caret expanded={open && isDesktop} />
+              <span className="min-w-0 truncate">{label}</span>
+            </button>
+            {labelAccessory}
+          </div>
           {summaryText !== null && (
             <span
               className={cx(

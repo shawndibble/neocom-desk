@@ -25,6 +25,7 @@ export function ChannelCheckbox({
   missingPermissionLabel,
   checked,
   onToggle,
+  caption,
 }: {
   channel: NotificationChannel;
   eventLabel: string;
@@ -34,11 +35,23 @@ export function ChannelCheckbox({
   missingPermissionLabel?: string;
   checked: boolean;
   onToggle: () => void;
+  /**
+   * A short visible caption beside the box (the chips' D and A). It lives inside
+   * the label so a click on it toggles the box: a caption outside the label looks
+   * clickable and does nothing, which reads as a click that did not register.
+   */
+  caption?: string;
 }) {
   const { t } = useTranslation();
   const label = t(`settings.notifications.toggleLabel.${channel}`, { event: eventLabel });
   const checkbox = (
-    <label className={touchCheckboxLabelClassName}>
+    <label
+      className={
+        caption === undefined
+          ? touchCheckboxLabelClassName
+          : 'inline-flex cursor-pointer items-center justify-center gap-0.5 py-1 touch:min-h-11 touch:min-w-11'
+      }
+    >
       <Checkbox
         checked={enabled && checked}
         onChange={onToggle}
@@ -52,6 +65,11 @@ export function ChannelCheckbox({
         aria-label={label}
         className={enabled ? undefined : 'cursor-not-allowed! opacity-40'}
       />
+      {caption !== undefined && (
+        <span aria-hidden="true" className="font-mono text-[0.625rem] text-text-dim">
+          {caption}
+        </span>
+      )}
     </label>
   );
   if (enabled) return checkbox;
