@@ -4,7 +4,7 @@ Route `/overview` (`src/routes/Overview.tsx`). Landing page for a signed-in Char
 
 | Feature                                                                       | Where                                                   |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Character header (portrait, name, corp/alliance links, SP)                    | `src/features/character/CharacterHeader.tsx`            |
+| Character header (portrait, name, corp/alliance links)                        | `src/features/character/CharacterHeader.tsx`            |
 | Summary strip: next deadline, training, wallet, data age, refresh, edit cards | `src/features/overview/SummaryStrip.tsx`                |
 | 11 domain cards                                                               | `src/features/overview/cards.tsx`                       |
 | Alerts column / folded line                                                   | `AlertsColumn` `cards.tsx:866`                          |
