@@ -10045,7 +10045,7 @@
     "fontScaleExtraLarge": "Extra large",
     "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Alerts adds a row to the Alerts page inside the app. Device pop-up choices stay on this device. Alerts choices and thresholds sync with your account's other devices.",
+      "hint": "Device raises a pop-up. Alerts adds a row to the Alerts page. Device choices stay on this device; Alerts choices and warn-ahead times sync across your devices.",
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
       "alertsWhenClosed": {
         "title": "Alerts when closed",
@@ -10152,6 +10152,7 @@
       "walletBalanceChangedThresholdLabel": "Notify on changes of at least:",
       "walletBalanceChangedThresholdHint": "Accepts shorthand: 10.5m, 10,500,000, or 10500000 (b = billion, m = million, t = thousand).",
       "channelsLegend": "Delivery channels",
+      "channelInfoLabel": "About {{channel}}",
       "browserChannelLabel": "Device notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
       "feedChannelLabel": "Alerts notifications",
