@@ -4,6 +4,7 @@
  * `import()` (see `PriceHistoryPanel.tsx`) — importing it eagerly would put
  * Recharts back in the initial page bundle.
  */
+import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
@@ -266,11 +267,11 @@ export default function PriceHistoryChart({
   // legend and the tooltip carry that series instead — and abbreviates the
   // left-hand ticks.
   const isPhone = useIsPhone();
-  const priceAxisWidth = isPhone ? COMPACT_ISK_Y_AXIS_WIDTH : GROUPED_NUMBER_Y_AXIS_WIDTH;
+  const priceAxisWidth = scalePx(isPhone ? COMPACT_ISK_Y_AXIS_WIDTH : GROUPED_NUMBER_Y_AXIS_WIDTH);
   // The one value both strips read: the lower one sizes its order-count axis
   // from it, the upper one leaves exactly that much empty margin where the
   // axis would be. Two separately-written widths is how the plots drift.
-  const ordersAxisWidth = isPhone ? 0 : COMPACT_COUNT_Y_AXIS_WIDTH;
+  const ordersAxisWidth = isPhone ? 0 : scalePx(COMPACT_COUNT_Y_AXIS_WIDTH);
 
   const drawnComparisons = useMemo(
     () => comparisons.filter((c) => c.status === 'ready'),

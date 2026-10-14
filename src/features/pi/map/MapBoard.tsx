@@ -444,7 +444,7 @@ export function MapBoard(props: MapBoardProps) {
                 total: graph.tiers[tier].length,
               })}
             />
-            <ul className="flex flex-1 flex-col justify-center gap-[3px]">
+            <ul className="flex flex-1 flex-col justify-center gap-[0.1875rem]">
               {graph.tiers[tier].map((product) => {
                 if (!visible(product.typeId)) {
                   return (
@@ -503,7 +503,7 @@ export function MapBoard(props: MapBoardProps) {
                         onKeyDown={(e) => clickOnSpace(e) || move(key, e)}
                         onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                         className={cx(
-                          'grid h-11 w-full md:h-[2.125rem] touch:h-11 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0 pr-[5px] pl-[3px] text-left text-xs',
+                          'grid h-11 w-full md:h-[2.125rem] touch:h-11 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0 pr-[0.3125rem] pl-[0.1875rem] text-left text-xs',
                           interactiveClassName,
                           focusRingClassName,
                           goal
@@ -559,7 +559,7 @@ export function MapBoard(props: MapBoardProps) {
                       <span
                         aria-hidden="true"
                         className={cx(
-                          'pointer-events-none absolute top-1/2 -left-[15px] z-[1] grid h-[1.125rem] min-w-[1.375rem] -translate-y-1/2 place-items-center rounded-xs border border-warning px-[3px] text-[0.6875rem] font-bold',
+                          'pointer-events-none absolute top-1/2 -left-[0.9375rem] z-[1] grid h-[1.125rem] min-w-[1.375rem] -translate-y-1/2 place-items-center rounded-xs border border-warning px-[0.1875rem] text-[0.6875rem] font-bold',
                           goal ? 'bg-warning text-bg' : 'bg-bg text-warning'
                         )}
                       >
@@ -610,7 +610,7 @@ function ColumnHead(props: {
         </h4>
         <InfoTooltip label={props.infoLabel} content={props.info} />
       </div>
-      <p className="mt-[3px] text-[0.6875rem] leading-[1.25] text-text-dim">{props.sub}</p>
+      <p className="mt-[0.1875rem] text-[0.6875rem] leading-[1.25] text-text-dim">{props.sub}</p>
       {props.count && <span className="sr-only">{props.count}</span>}
     </div>
   );
@@ -681,7 +681,7 @@ function PlanetToggle({
         onKeyDown={props.onKeyDown}
         onClick={props.onClick}
         className={cx(
-          'relative flex w-[4.5rem] flex-col items-center gap-[3px] rounded-xs border border-transparent px-0 py-[3px] text-text',
+          'relative flex w-[4.5rem] flex-col items-center gap-[0.1875rem] rounded-xs border border-transparent px-0 py-[0.1875rem] text-text',
           interactiveClassName,
           focusRingInsetClassName,
           '[@media(hover:hover)]:hover:border-line-bright [@media(hover:hover)]:hover:bg-panel-2',
@@ -719,25 +719,25 @@ function PlanetToggle({
         </span>
         <span aria-hidden="true" className="flex min-h-[0.875rem] flex-wrap justify-center gap-0.5">
           {have && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-success/50 px-[3px] text-[0.6875rem] font-semibold tracking-wider text-success uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-success/50 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-wider text-success uppercase">
               {t('piMap.tagHave')}
             </span>
           )}
           {props.ranks.map((rank) => (
             <span
               key={rank}
-              className="inline-flex h-3.5 items-center rounded-xs border border-warning/60 px-[3px] text-[0.6875rem] font-semibold text-warning"
+              className="inline-flex h-3.5 items-center rounded-xs border border-warning/60 px-[0.1875rem] text-[0.6875rem] font-semibold text-warning"
             >
               #{rank}
             </span>
           ))}
           {props.tracedNeed && !props.tracedNeed.have && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-danger/50 px-[3px] text-[0.6875rem] font-semibold tracking-wider text-danger uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-danger/50 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-wider text-danger uppercase">
               {t('piMap.tagNeed')}
             </span>
           )}
           {props.whatIf && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-map-whatif/60 px-[3px] text-[0.6875rem] font-semibold tracking-wider text-map-whatif uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-map-whatif/60 px-[0.1875rem] text-[0.6875rem] font-semibold tracking-wider text-map-whatif uppercase">
               {t('piMap.tagWhatIf')}
             </span>
           )}

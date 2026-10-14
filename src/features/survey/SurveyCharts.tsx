@@ -9,6 +9,7 @@
  * Ore layers borrow the clock-kind tokens (DESIGN.md "Clock kinds"): the same
  * rule every other categorical series follows, so no new palette.
  */
+import { scalePx } from '@/lib/fontScale';
 import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -118,7 +119,7 @@ export function SurveyCharts({
   const rateLabels = summary.intervals.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
   // Scans can bunch up in time, so labels are thinned to the ones that fit.
   // Every scan keeps its dot; the tooltip carries the rest.
-  const plotPx = Math.max(0, plotWidth - Y_AXIS_WIDTH - MARGIN.right);
+  const plotPx = Math.max(0, plotWidth - scalePx(Y_AXIS_WIDTH) - MARGIN.right);
   const pxAt = (at: number) => ((at - domain[0]) / (domain[1] - domain[0])) * plotPx;
   // Before the chart reports a width there is nothing to measure, so show all.
   const thin = (labels: { x: number; weight: number }[], gap: number) =>
@@ -126,11 +127,11 @@ export function SurveyCharts({
   // The projected finish row sits after the scans and draws no label.
   const deltaShown = thin(
     rows.slice(0, summary.points.length).map((r) => ({ x: pxAt(r.at), weight: r.total ?? 0 })),
-    DELTA_LABEL_GAP
+    scalePx(DELTA_LABEL_GAP)
   );
   const rateShown = thin(
     rateLabels.map((r) => ({ x: pxAt(r.at), weight: r.rate })),
-    RATE_LABEL_GAP
+    scalePx(RATE_LABEL_GAP)
   );
   const chartRows = rows.map((r, i) => (deltaShown.has(i) ? { ...r, totalLabel: r.total } : r));
   const shownRateLabels = rateLabels.filter((_, i) => rateShown.has(i));
@@ -266,7 +267,7 @@ export function SurveyCharts({
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
           {xAxis(!compact)}
           <YAxis
-            width={compact ? COMPACT_Y_AXIS_WIDTH : Y_AXIS_WIDTH}
+            width={scalePx(compact ? COMPACT_Y_AXIS_WIDTH : Y_AXIS_WIDTH)}
             tickFormatter={formatCompactNumber}
             stroke="var(--color-line-bright)"
             tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}
@@ -367,7 +368,7 @@ export function SurveyCharts({
                 <CartesianGrid stroke="var(--color-line)" vertical={false} />
                 {xAxis(false)}
                 <YAxis
-                  width={Y_AXIS_WIDTH}
+                  width={scalePx(Y_AXIS_WIDTH)}
                   tickFormatter={formatCompactNumber}
                   stroke="var(--color-line-bright)"
                   tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}

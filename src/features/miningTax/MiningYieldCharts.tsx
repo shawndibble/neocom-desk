@@ -4,6 +4,7 @@
  * `market/PriceHistoryChart.tsx` — this must only ever be reached through a
  * dynamic `import()` from `OverviewTab.tsx`, never imported eagerly.
  */
+import { scalePx } from '@/lib/fontScale';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
@@ -331,7 +332,7 @@ function IskCharts({
               <YAxis
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                width={COMPACT_ISK_Y_AXIS_WIDTH}
+                width={scalePx(COMPACT_ISK_Y_AXIS_WIDTH)}
                 // SVG axis text: IskAmount can't render inside the chart (documented exception).
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
@@ -403,7 +404,7 @@ function IskCharts({
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 interval={0}
-                width={120}
+                width={scalePx(120)}
               />
               <Tooltip
                 content={(props) => <CompareTooltip {...props} showRefining={showRefining} />}
@@ -563,7 +564,7 @@ function MetricCharts({
               <YAxis
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
-                width={COMPACT_COUNT_Y_AXIS_WIDTH}
+                width={scalePx(COMPACT_COUNT_Y_AXIS_WIDTH)}
                 tickFormatter={(value: number) => formatCompactNumber(value)}
               />
               <Tooltip content={(props) => <MetricRateTooltip {...props} metric={metric} />} />
@@ -616,7 +617,7 @@ function MetricCharts({
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 interval={0}
-                width={120}
+                width={scalePx(120)}
               />
               <Tooltip content={(props) => <MetricCompareTooltip {...props} metric={metric} />} />
               <Bar

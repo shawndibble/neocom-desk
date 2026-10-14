@@ -50,8 +50,20 @@ function applyFontScale(scale: FontScale): void {
  */
 export function rootFontScale(): number {
   if (typeof document === 'undefined') return 1;
+  // `applyFontScale` and the boot script both write a percentage inline, which
+  // reads without forcing a style recalc — this runs once per virtual row.
+  const inline = document.documentElement.style.fontSize;
+  if (inline.endsWith('%')) {
+    const pct = parseFloat(inline);
+    if (Number.isFinite(pct) && pct > 0) return pct / 100;
+  }
   const px = parseFloat(getComputedStyle(document.documentElement).fontSize);
   return Number.isFinite(px) && px > 0 ? px / 16 : 1;
+}
+
+/** A px size beside rem text (a chart axis gutter), grown with the text-size setting. */
+export function scalePx(px: number): number {
+  return Math.round(px * rootFontScale());
 }
 
 export const useFontScale = createLocalSetting<FontScale>({

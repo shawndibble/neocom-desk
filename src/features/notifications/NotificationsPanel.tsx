@@ -33,7 +33,8 @@
  * Characters actually on screen mount, and `CharacterNotificationSection` is
  * memoized so an edit to one Character's preferences doesn't force React to
  * re-diff every other Character's rows.
- */ import {
+ */ import { rootFontScale } from '@/lib/fontScale';
+import {
   focusRingInsetClassName,
   interactiveClassName,
   touchCheckboxLabelClassName,
@@ -150,7 +151,7 @@ const DESKTOP_QUERY = '(min-width: 48rem)';
  * True at or above `md`, where the section header drops back off the touch
  * tier (issue #1118). The virtualizer's first-paint estimate has to know
  * which tier the header is actually rendering at; `measureElement` then
- * corrects it to the real height (which also moves with the text-size setting). Local rather than shared,
+ * corrects it to the real height. Local rather than shared,
  * matching `EntryList.tsx`'s own copy of this hook.
  */
 function useIsDesktop(): boolean {
@@ -475,21 +476,24 @@ export function NotificationsPanel() {
         : NOTIFICATION_EVENT_IDS;
       const grantedScopes = scopesByCharacterId.get(character.characterId) ?? EMPTY_SCOPES;
       const characterCapabilities = capabilitiesByCharacterId.get(character.characterId);
-      return estimateCharacterSectionHeight({
-        expanded,
-        touchViewport: !isDesktop,
-        visibleEventIds,
-        rowEnabledFor: (eventId) =>
-          characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
-        missingPermissionFor: (eventId) =>
-          characterEventRowState(eventId, grantedScopes, characterCapabilities)
-            .missingPermission !== null,
-        hasEveNotificationScope: characterEventRowState(
-          'eveNotification',
-          grantedScopes,
-          characterCapabilities
-        ).hasScope,
-      });
+      return (
+        rootFontScale() *
+        estimateCharacterSectionHeight({
+          expanded,
+          touchViewport: !isDesktop,
+          visibleEventIds,
+          rowEnabledFor: (eventId) =>
+            characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
+          missingPermissionFor: (eventId) =>
+            characterEventRowState(eventId, grantedScopes, characterCapabilities)
+              .missingPermission !== null,
+          hasEveNotificationScope: characterEventRowState(
+            'eveNotification',
+            grantedScopes,
+            characterCapabilities
+          ).hasScope,
+        })
+      );
     },
     getItemKey: (index) => visibleCharacters[index].characterId,
     // `virtualRow.start` is otherwise measured from the top of the
