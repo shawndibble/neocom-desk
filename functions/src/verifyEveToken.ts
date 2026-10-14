@@ -29,6 +29,10 @@ export interface EveTokenClaims {
   ownerHash: string;
   /** Character name (informational only). */
   name: string;
+  /** Scopes the token carries (`scp` claim; EVE sends a string for one scope, an array for many). */
+  scopes: string[];
+  /** The one of this deployment's client_ids the token is bound to. */
+  clientId: string;
 }
 
 export interface VerifyOptions {
@@ -49,6 +53,17 @@ export function uidForCharacter(characterId: number): string {
   return `char:${characterId}`;
 }
 
+function scopesOf(scp: unknown): string[] {
+  if (typeof scp === 'string') return [scp];
+  return Array.isArray(scp) ? scp.filter((s): s is string => typeof s === 'string') : [];
+}
+
+/** Inverse of `uidForCharacter`; undefined for any other uid shape. */
+export function characterIdForUid(uid: string): number | undefined {
+  const match = /^char:(\d+)$/.exec(uid);
+  return match ? Number(match[1]) : undefined;
+}
+
 /**
  * Verify signature (via JWKS), issuer, audience, and expiry; return identity.
  * Throws on any validation failure.
@@ -65,10 +80,12 @@ export async function verifyEveAccessToken(
   // jwtVerify only proved the generic "EVE Online" audience. Also require the
   // token to be bound to one of THIS deployment's apps (see header comment).
   const audiences = Array.isArray(payload.aud) ? payload.aud : payload.aud ? [payload.aud] : [];
-  const boundToKnownApp =
-    audiences.some((aud) => opts.clientIds.includes(aud)) ||
-    (typeof payload.azp === 'string' && opts.clientIds.includes(payload.azp));
-  if (!boundToKnownApp) {
+  const clientId =
+    audiences.find((aud) => opts.clientIds.includes(aud)) ??
+    (typeof payload.azp === 'string' && opts.clientIds.includes(payload.azp)
+      ? payload.azp
+      : undefined);
+  if (clientId === undefined) {
     throw new Error('Token was minted for a different EVE application (client_id mismatch)');
   }
 
@@ -84,6 +101,8 @@ export async function verifyEveAccessToken(
     characterId: Number(match[1]),
     ownerHash,
     name: typeof payload.name === 'string' ? payload.name : '',
+    scopes: scopesOf(payload.scp),
+    clientId,
   };
 }
 

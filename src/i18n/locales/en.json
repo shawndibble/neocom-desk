@@ -3459,8 +3459,8 @@
     "trustHeading": "It reads. It writes only when you act.",
     "trust": {
       "readOnly": {
-        "name": "Five writes, and nothing else",
-        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write, or a Community invite you send by mail, goes out through your account, saving a Fitting to EVE recreates it on the game's side, and setting a route's waypoints replaces your autopilot waypoints in the client. Nothing else in the app writes to EVE."
+        "name": "Six writes, and nothing else",
+        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write, or a Community invite you send by mail, goes out through your account, saving a Fitting to EVE recreates it on the game's side, setting a route's waypoints replaces your autopilot waypoints in the client, and Open in EVE opens a window in the client. Nothing else in the app writes to EVE."
       },
       "token": {
         "name": "Your refresh token stays on this device",
@@ -5544,7 +5544,21 @@
       "moveAndDelete": "Move and delete",
       "deleteAnyway": "Delete anyway",
       "deleteAnywayHint": "Deleting anyway keeps those entries, but they will show as \"Unknown Payee\" until you assign them again.",
-      "deleteFailed": "Couldn’t delete {{name}} — nothing was changed. Try again."
+      "deleteFailed": "Couldn’t delete {{name}} — nothing was changed. Try again.",
+      "verify": {
+        "openUnresolved": "Couldn't find one character, corporation or alliance named {{name}}, so there is nothing to open.",
+        "suggestionsLabel": "Matching characters, corporations and alliances",
+        "kind": {
+          "character": "Character",
+          "corporation": "Corporation",
+          "alliance": "Alliance"
+        },
+        "verifiedNote": "{{kind}} — verified, so Settle up can open it in EVE.",
+        "linkedNote": "Linked to an EVE character or corporation from a payment.",
+        "unverifiedNote": "Unverified — not a character, corporation or alliance we could find. It stays a free-text label.",
+        "unverifiedShort": "Unverified",
+        "linkedShort": "Linked"
+      }
     },
     "settleUp": {
       "arrival": {
@@ -9705,6 +9719,10 @@
       "label": "Character details",
       "caption": "Implants, clones, location, contacts, standings and loyalty."
     },
+    "openWindow": {
+      "label": "Open in EVE",
+      "caption": "Open an item, pilot, corporation, contract or market in your EVE client from a Show info window, a row menu or a contract."
+    },
     "autopilot": {
       "label": "Autopilot waypoints",
       "caption": "Set waypoints in your EVE client from Route Safety, order books and the station right-click menus."
@@ -9942,7 +9960,7 @@
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
           "crashes": "Crash reports: the error and the page it happened on. No IP addresses; request and response bodies are never captured; EVE tokens are stripped first.",
           "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
-          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account, saving a Fitting to EVE creates or replaces it there, and Route Safety's Set waypoints in game replaces your autopilot waypoints. Nothing else is ever written.",
+          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account, saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
           "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
@@ -10822,6 +10840,18 @@
     "noOrigin": "Set your current system to filter by distance.",
     "graphUnavailable": "Distances are unavailable offline. Showing every distance.",
     "distanceUnavailable": "Distance unavailable — the local stargate snapshot couldn't be read."
+  },
+  "openInEve": {
+    "information": "Open in EVE",
+    "marketDetails": "Open market in EVE",
+    "contract": "Open contract in EVE",
+    "sending": "Opening in EVE…",
+    "opened": "Opened in your EVE client.",
+    "needCharacter": "Log in a character to open this in its EVE client.",
+    "permissionReason": "This character hasn't granted the Open in EVE permission.",
+    "needPermission": "This character hasn't granted the Open in EVE permission. Log in again to allow it.",
+    "failed": "Couldn't open it in EVE: {{message}}",
+    "unknownError": "Is your character logged in to the game?"
   },
   "travel": {
     "incursions": {

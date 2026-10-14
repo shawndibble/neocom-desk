@@ -60,6 +60,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
 import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan';
+import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
 import {
@@ -246,9 +247,12 @@ export function ItemDetailModal({
       closeOnBack={onLeave === undefined}
       title={itemName}
       titleActions={
-        showOpenInMarket ? (
-          <OpenInMarketLink typeId={typeId} onNavigate={leave} replace={onLeave !== undefined} />
-        ) : undefined
+        <>
+          <OpenInEveButton kind="information" id={typeId} name={itemName} />
+          {showOpenInMarket && (
+            <OpenInMarketLink typeId={typeId} onNavigate={leave} replace={onLeave !== undefined} />
+          )}
+        </>
       }
     >
       {loading ? (

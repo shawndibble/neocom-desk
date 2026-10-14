@@ -129,6 +129,7 @@ import {
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
 import { jumpsCellSortValue, renderJumpsCell } from '@/features/route/jumpsCell';
+import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { loadCharacterBlueprints } from '@/features/industry/data';
@@ -279,6 +280,21 @@ function marketLookupRegion(
  * owned blueprint inside a container or ship).
  */
 function waypointItemFor(row: BpcSearchRow, ownedPlaceIds: ReadonlyMap<number, number>): ReactNode {
+  const waypoint = waypointOnlyItemFor(row, ownedPlaceIds);
+  // A contract row also opens its window in the EVE client.
+  if (row.source !== 'contract') return waypoint;
+  return (
+    <>
+      {waypoint}
+      <OpenInEveMenuItem kind="contract" id={row.contract.contractId} />
+    </>
+  );
+}
+
+function waypointOnlyItemFor(
+  row: BpcSearchRow,
+  ownedPlaceIds: ReadonlyMap<number, number>
+): ReactNode {
   if (row.locationName === null) return null;
   const placeId =
     row.source === 'contract'
@@ -289,7 +305,10 @@ function waypointItemFor(row: BpcSearchRow, ownedPlaceIds: ReadonlyMap<number, n
           ? ownedPlaceIds.get(row.itemId)
           : undefined;
   return placeId === undefined ? null : (
-    <SetWaypointMenuItem locationId={placeId} placeName={row.locationName} />
+    <>
+      <SetWaypointMenuItem locationId={placeId} placeName={row.locationName} />
+      <OpenInEveMenuItem kind="information" id={placeId} />
+    </>
   );
 }
 

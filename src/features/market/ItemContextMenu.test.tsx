@@ -40,6 +40,16 @@ function renderMenu(typeId: number, itemName: string) {
   );
 }
 
+describe('ItemContextMenu — Open in EVE', () => {
+  it('offers both the item window and its market window right after Show info', async () => {
+    renderMenu(TRITANIUM, 'Tritanium');
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Open in EVE' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Open market in EVE' })).toBeInTheDocument();
+  });
+});
+
 describe('ItemContextMenu — View in Industry as material (issue #414)', () => {
   it('offers the action when the caller supplies it, and invokes it on select', async () => {
     const onViewInIndustryAsMaterial = vi.fn();

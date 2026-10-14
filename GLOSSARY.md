@@ -30,6 +30,7 @@ here — they go one per file in `docs/context/decisions/`.
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer.
+- **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation, alliance, item, station or system; a type's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
@@ -453,7 +454,7 @@ here — they go one per file in `docs/context/decisions/`.
   each one's size, view, rename, character scope and range. One per pilot, not
   per Character, and synced as a whole.
 - **Owned-Stock Offer**: A materials row's "Use assets" offer: the owned quantity it would write (detected stock in the owned-stock scope, capped at what the row needs), or none. "Use all" is every row's offer at once; "Use none" clears every row. One rule for a Build Plan and a Build Group alike.
-- **Payee**: Who the Moon Mining Tax ledger owes: user-managed name, default tax %, optional moon/system tag, optional Trade Hub. The tag lets the app suggest the Payee and rate for a future **Mining Ledger Entry** from that system. The Trade Hub is the order book this Payee's ore is valued at (absent means Jita). May also carry `entityId`, the EVE character or corporation the ISK goes to, learned when a **Made Payment** to that recipient is confirmed.
+- **Payee**: Who the Moon Mining Tax ledger owes: user-managed name, default tax %, optional moon/system tag, optional Trade Hub. The tag lets the app suggest the Payee and rate for a future **Mining Ledger Entry** from that system. The Trade Hub is the order book this Payee's ore is valued at (absent means Jita). May also carry `entityId`, the EVE character or corporation the ISK goes to, learned when a **Made Payment** to that recipient is confirmed, or set by picking the Payee from the name search. Then it also carries `entityKind` (character, corporation or alliance), which marks it verified; a name that matches none stays an unverified free-text label (a moon or place), and Settle up opens a verified Payee in EVE.
 - **Pending Login**: One authorize round trip this tab has started and not yet finished: its PKCE verifier, its **Requested Scopes**, and when it began, stored under its own `state`. Per-`state` so two round trips started together both stay valid; an abandoned one is forgotten.
 - **PI Product Detail**: What a product or item name on the Planetary Industry tabs opens: the Map tab with that product's drawer open. How to make it (factory, planet types, inputs, the chain) and why or why not. The §6c "Entities" override for PI.
 - **Pin Budget**: The CPU and Powergrid a Command Center supplies to one colony, and the fixed amount each pin draws from it. **This is the pin cap; the game defines no pin-count limit.** Scales with the colony's own **Command Center upgrade level**, bought per colony with ISK; the **Command Center Upgrades** skill only caps that level.

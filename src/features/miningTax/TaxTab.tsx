@@ -829,11 +829,18 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     setPayeeFilter(isSolePayeeFilter(payeeId) ? 'all' : new Set([payeeId]));
   }
 
+  function entityIdFor(payeeId: string | undefined): { payeeEntityId?: number } {
+    const id = allPayees.find((p) => p.id === payeeId)?.entityId;
+    return id === undefined ? {} : { payeeEntityId: id };
+  }
+
   function settleUpRowsFor(members: readonly GroupMember[]): SettleUpRow[] {
     return members.map((m) => ({
       assignment: m.assignment,
       characterName: m.row.characterName,
       payeeName: payeeName(m.assignment.payeeId),
+      ...(m.assignment.payeeId === undefined ? {} : { payeeId: m.assignment.payeeId }),
+      ...entityIdFor(m.assignment.payeeId),
     }));
   }
 

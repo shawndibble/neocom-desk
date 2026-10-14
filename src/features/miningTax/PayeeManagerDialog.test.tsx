@@ -7,6 +7,17 @@ import { db, type PayeeRecord } from '@/db';
 import { PayeeManagerDialog } from './PayeeManagerDialog';
 import { loadPayees } from './payees';
 
+const searchMock = vi.hoisted(() => ({
+  searchPayeeEntities: vi.fn(async () => [] as unknown[]),
+  resolvePayeeName: vi.fn(async () => [] as unknown[]),
+}));
+vi.mock('./payeeEntitySearch', () => ({
+  MIN_PAYEE_SEARCH_LENGTH: 3,
+  searchPayeeEntities: searchMock.searchPayeeEntities,
+  resolvePayeeName: searchMock.resolvePayeeName,
+}));
+vi.mock('@/app/useGrantedScopes', () => ({ useEndpointsGranted: () => true }));
+
 const syncMock = vi.hoisted(() => ({
   scheduleSync: vi.fn(),
 }));
@@ -359,5 +370,84 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
         'Couldn’t delete Bureau of Unified Harvesting — nothing was changed. Try again.'
       )
     ).toBeInTheDocument();
+  });
+});
+
+describe('PayeeManagerDialog — entity verification', () => {
+  const corp = { id: 98_000_001, name: 'Moon Corp', kind: 'corporation' };
+
+  it('stores the entity of a picked suggestion', async () => {
+    searchMock.searchPayeeEntities.mockResolvedValue([corp]);
+    renderDialog();
+
+    await userEvent.type(screen.getByLabelText('Name'), 'Moon');
+    await userEvent.click(await screen.findByRole('option', { name: /Moon Corp/ }));
+    expect(screen.getByText(/Corporation — verified/)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Default tax %'), '10');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]).toMatchObject({
+        name: 'Moon Corp',
+        entityId: 98_000_001,
+        entityKind: 'corporation',
+      });
+    });
+  });
+
+  it('attaches a single exact-name match on save', async () => {
+    searchMock.searchPayeeEntities.mockResolvedValue([]);
+    searchMock.resolvePayeeName.mockResolvedValue([corp]);
+    renderDialog();
+
+    await userEvent.type(screen.getByLabelText('Name'), 'Moon Corp');
+    await userEvent.type(screen.getByLabelText('Default tax %'), '10');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]).toMatchObject({ entityKind: 'corporation' });
+    });
+  });
+
+  it('saves a moon label with no match as an unverified free-text Payee', async () => {
+    searchMock.searchPayeeEntities.mockResolvedValue([]);
+    searchMock.resolvePayeeName.mockResolvedValue([]);
+    renderDialog();
+
+    await userEvent.type(screen.getByLabelText('Name'), 'Moon 1 Planet 2');
+    await userEvent.type(screen.getByLabelText('Default tax %'), '10');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR)).length).toBe(1);
+    });
+    const [payee] = await loadPayees(CHAR);
+    expect('entityId' in payee).toBe(false);
+    expect(await screen.findByText(/Unverified/)).toBeInTheDocument();
+  });
+
+  it('clears the verification when the name is edited afterwards', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Moon Corp',
+      defaultTaxPct: 10,
+      entityId: 98_000_001,
+      entityKind: 'corporation',
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
+    searchMock.resolvePayeeName.mockResolvedValue([]);
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Moon Corp' }));
+    await userEvent.type(screen.getByLabelText('Name'), ' Holdings');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      const [payee] = await loadPayees(CHAR);
+      expect(payee.name).toBe('Moon Corp Holdings');
+      expect('entityId' in payee || 'entityKind' in payee).toBe(false);
+    });
   });
 });

@@ -112,6 +112,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { OrderDetailModal } from './OrderDetailModal';
 import { useOrderDetail } from './useOrderDetail';
 import { useStructureFees } from './structureFees';
+import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { itemKey } from './orderDetailView';
 import {
@@ -705,7 +706,10 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
             )}
             {/* Only where the Location column names it: an unnamed structure has nothing to show. */}
             {row.stationName !== null && (
-              <SetWaypointMenuItem locationId={row.locationId} placeName={row.stationName} />
+              <>
+                <SetWaypointMenuItem locationId={row.locationId} placeName={row.stationName} />
+                <OpenInEveMenuItem kind="information" id={row.locationId} />
+              </>
             )}
           </>
         }

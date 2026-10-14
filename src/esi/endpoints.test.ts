@@ -38,7 +38,12 @@ import {
   getMarketsPrices,
   getIndustrySystemCostIndices,
   postAutopilotWaypoint,
+  postOpenWindowContract,
+  postOpenWindowInformation,
+  postOpenWindowMarketDetails,
   postRoute,
+  getCharacterSearch,
+  postUniverseIds,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
 
@@ -454,6 +459,35 @@ describe('public info endpoints', () => {
       clear_other_waypoints: 'false',
       add_to_beginning: 'false',
     });
+  });
+});
+
+describe('Open in EVE', () => {
+  it.each([
+    ['postOpenWindowInformation', 'information', 'target_id'],
+    ['postOpenWindowMarketDetails', 'marketdetails', 'type_id'],
+    ['postOpenWindowContract', 'contract', 'contract_id'],
+  ] as const)('%s POSTs the id and gets 204', async (name, path, param) => {
+    let auth: string | null = null;
+    let query: Record<string, string> = {};
+    server.use(
+      http.post(`${ESI_BASE_URL}/ui/openwindow/${path}`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        auth = request.headers.get('authorization');
+        query = Object.fromEntries(new URL(request.url).searchParams);
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const fn = { postOpenWindowInformation, postOpenWindowMarketDetails, postOpenWindowContract }[
+      name
+    ];
+
+    const result = await fn(CHARACTER_ID, 30000142);
+
+    expect(result.data).toBeNull();
+    expect(auth).toBe(`Bearer token-${CHARACTER_ID}`);
+    expect(query).toEqual({ [param]: '30000142' });
   });
 });
 
@@ -1060,5 +1094,46 @@ describe('market and industry public endpoints', () => {
     const result = await getIndustrySystemCostIndices();
 
     expect(result.data?.[0].solar_system_id).toBe(30000142);
+  });
+});
+
+describe('entity name search and resolution', () => {
+  it('getCharacterSearch asks for corporation and alliance buckets and returns them', async () => {
+    let categories: string | null = null;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/search`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        categories = new URL(request.url).searchParams.get('categories');
+        return HttpResponse.json({ character: [1], corporation: [2], alliance: [3] });
+      })
+    );
+
+    const result = await getCharacterSearch(
+      CHARACTER_ID,
+      ['character', 'corporation', 'alliance'],
+      'moon'
+    );
+
+    expect(categories).toBe('character,corporation,alliance');
+    expect(result.data).toEqual({ character: [1], corporation: [2], alliance: [3] });
+  });
+
+  it('postUniverseIds returns the corporations and alliances buckets', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/ids`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json({
+          corporations: [{ id: 2, name: 'Moon Corp' }],
+          alliances: [{ id: 3, name: 'Moon Corp' }],
+        });
+      })
+    );
+
+    const result = await postUniverseIds(['Moon Corp']);
+
+    expect(result.corporations).toEqual([{ id: 2, name: 'Moon Corp' }]);
+    expect(result.alliances).toEqual([{ id: 3, name: 'Moon Corp' }]);
   });
 });

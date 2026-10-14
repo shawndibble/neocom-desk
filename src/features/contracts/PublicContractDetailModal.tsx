@@ -54,6 +54,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { ContractMarketValueRow } from './ContractMarketValueRow';
 import { CopyContractIdButton } from './CopyContractIdButton';
+import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import {
   mergeContractItemLines,
   planSeedForLine,
@@ -243,6 +244,7 @@ export function PublicContractDetailModal({
           <dd className="flex items-center gap-1 tabular-nums">
             {contractId}
             <CopyContractIdButton contractId={contractId} />
+            <OpenInEveButton kind="contract" id={contractId} />
           </dd>
         </dl>
 

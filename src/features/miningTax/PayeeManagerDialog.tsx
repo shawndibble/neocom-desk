@@ -19,7 +19,9 @@ import type { PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { deletePayee } from './ledgerActions';
-import { createPayee, loadPayees, updatePayee } from './payees';
+import { PayeeNameField } from './PayeeNameField';
+import { resolvePayeeName, type PayeeEntityMatch } from './payeeEntitySearch';
+import { createPayee, loadPayees, updatePayee, type PayeeEntityKind } from './payees';
 import { payeeSystemNames } from './payeeSystemNames';
 import { hubForPayee } from './pricing';
 import type { TrackedCharacter } from './snapshot';
@@ -79,6 +81,14 @@ interface DraftPayee {
    * checkbox learned.
    */
   systemId?: number;
+  /**
+   * The EVE entity this Payee is: set by picking a suggestion, or carried from
+   * the stored Payee (a payment may have taught it the id without a kind).
+   */
+  entityId?: number;
+  entityKind?: PayeeEntityKind;
+  /** The name the entity was verified under; editing away from it clears the verification. */
+  verifiedName?: string;
 }
 
 const EMPTY_DRAFT: DraftPayee = {
@@ -174,6 +184,11 @@ export function PayeeManagerDialog({
       // does when pricing — the picker never opens on a blank selection.
       hubId: hubForPayee(payee.hubId).id,
       systemId: payee.systemId,
+      entityId: payee.entityId,
+      entityKind: payee.entityKind,
+      // Only a kind-verified name is tied to its entity; an id learned from a
+      // payment stays through a rename (the label can differ from the name).
+      verifiedName: payee.entityKind !== undefined ? payee.name : undefined,
     });
     setError(null);
     setFormOpen(true);
@@ -190,6 +205,21 @@ export function PayeeManagerDialog({
       setError(t('miningTax.payeeTaxPctInvalid'));
       return;
     }
+    // A name typed without picking a suggestion gets one exact-name lookup. A
+    // single match is attached; none, several, or a failed lookup leave a
+    // free-text label — a moon or place name must always be saveable.
+    let { entityId, entityKind } = draft;
+    if (entityId === undefined) {
+      try {
+        const matches = await resolvePayeeName(name);
+        if (matches.length === 1) {
+          entityId = matches[0].id;
+          entityKind = matches[0].kind;
+        }
+      } catch {
+        // Unverified, not blocked.
+      }
+    }
     // The default hub is stored as *no* hub, which is what every Payee
     // predating this field already means — so "Jita" never becomes a second
     // way of saying the same thing that only some records carry.
@@ -197,6 +227,9 @@ export function PayeeManagerDialog({
       name,
       defaultTaxPct: pct,
       systemId: draft.systemId,
+      entityId: entityId ?? null,
+      // An id with no kind (learned from a payment) keeps whatever the record has.
+      entityKind: entityKind ?? (entityId === undefined ? null : undefined),
       ...(draft.hubId === DEFAULT_TRADE_HUB.id ? {} : { hubId: draft.hubId }),
     };
     const existing = draft.id ? payees.find((p) => p.id === draft.id) : undefined;
@@ -208,6 +241,26 @@ export function PayeeManagerDialog({
     closeForm();
     await refresh();
     onChanged();
+  }
+
+  function handleNameChange(name: string) {
+    // Editing the name after verifying clears the verification.
+    const stale = draft.verifiedName !== undefined && name !== draft.verifiedName;
+    setDraft({
+      ...draft,
+      name,
+      ...(stale ? { entityId: undefined, entityKind: undefined, verifiedName: undefined } : {}),
+    });
+  }
+
+  function handlePick(match: PayeeEntityMatch) {
+    setDraft({
+      ...draft,
+      name: match.name,
+      entityId: match.id,
+      entityKind: match.kind,
+      verifiedName: match.name,
+    });
   }
 
   async function handleDelete(payee: PayeeRecord, moveToPayeeId?: string) {
@@ -299,6 +352,14 @@ export function PayeeManagerDialog({
                             systems: systems.join(', '),
                           })
                         : t('miningTax.payees.detail', { pct: payee.defaultTaxPct, hub })}
+                      <span>
+                        {' · '}
+                        {payee.entityKind !== undefined
+                          ? t(`miningTax.payees.verify.kind.${payee.entityKind}`)
+                          : payee.entityId !== undefined
+                            ? t('miningTax.payees.verify.linkedShort')
+                            : t('miningTax.payees.verify.unverifiedShort')}
+                      </span>
                     </p>
                   </div>
                   <IconButton
@@ -320,13 +381,27 @@ export function PayeeManagerDialog({
               {draft.id ? t('miningTax.editPayeeTitle') : t('miningTax.addPayeeTitle')}
             </p>
             <Fields>
-              <Field label={t('miningTax.payees.nameLabel')} htmlFor={`${formId}-name`}>
-                <TextInput
+              <Field
+                label={t('miningTax.payees.nameLabel')}
+                htmlFor={`${formId}-name`}
+                note={
+                  draft.entityKind !== undefined
+                    ? t('miningTax.payees.verify.verifiedNote', {
+                        kind: t(`miningTax.payees.verify.kind.${draft.entityKind}`),
+                      })
+                    : draft.entityId !== undefined
+                      ? t('miningTax.payees.verify.linkedNote')
+                      : draft.id
+                        ? t('miningTax.payees.verify.unverifiedNote')
+                        : undefined
+                }
+              >
+                <PayeeNameField
                   id={`${formId}-name`}
-                  className="w-full"
+                  characterId={initialCharacterId}
                   value={draft.name}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  placeholder={t('miningTax.payeeNamePlaceholder')}
+                  onChange={handleNameChange}
+                  onPick={handlePick}
                 />
               </Field>
               <Field label={t('miningTax.payees.taxPctLabel')} htmlFor={`${formId}-pct`}>

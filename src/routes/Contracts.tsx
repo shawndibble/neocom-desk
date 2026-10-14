@@ -16,6 +16,7 @@ import {
   IskAmount,
   PageHeader,
   Panel,
+  RowActionsMenu,
   SearchInput,
   Spinner,
   Tabs,
@@ -31,6 +32,7 @@ import {
   contractsHistoryColumnsStore,
   type ContractsHistoryColumnId,
 } from './contractsColumns';
+import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';
 import { contractAmount } from '@/features/character/contractAmount';
@@ -858,6 +860,15 @@ export function Contracts() {
                 rows={filteredContracts}
                 rowKey={contractRowKey}
                 virtualize="auto"
+                rowMoreActions
+                rowContextMenu={(contract, tr) => (
+                  <RowActionsMenu
+                    name={`${t('contractDetail.contractIdLabel')} ${contract.contract_id}`}
+                    items={<OpenInEveMenuItem kind="contract" id={contract.contract_id} />}
+                  >
+                    {tr}
+                  </RowActionsMenu>
+                )}
                 highlightRowKey={highlightedContractId}
                 {...historySortProps}
                 stackLayout="dense"

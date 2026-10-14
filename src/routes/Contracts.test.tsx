@@ -19,6 +19,12 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 
+const openContractMock = vi.hoisted(() => vi.fn());
+vi.mock('@/esi/endpoints', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/esi/endpoints')>()),
+  postOpenWindowContract: openContractMock,
+}));
+
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
     needRefresh: [false, vi.fn()],
@@ -257,10 +263,10 @@ describe('Contracts', () => {
     expect(lapsed.parentElement).toHaveAttribute('tabindex', '0');
   });
 
-  it('has no More-actions button: the title cell opens the detail modal', async () => {
+  it('gives each row a More-actions button whose only row action is Open in EVE', async () => {
     render(<App />);
     await screen.findByText('Rifter fit');
-    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^More actions/ }).length).toBeGreaterThan(0);
   });
 
   it('opens the contract detail modal on click', async () => {
@@ -693,7 +699,20 @@ describe('Contracts row right-click (issue #676)', () => {
     return row;
   }
 
-  it('has no custom row menu: no Copy title or Copy Contract ID, and no modal on right-click', async () => {
+  it('opens the contract in the EVE client from the row menu', async () => {
+    openContractMock.mockResolvedValue({ data: null });
+    await db.tokens.update(CHAR_ID, {
+      scopes: ['esi-contracts.read_character_contracts.v1', 'esi-ui.open_window.v1'],
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await openContractMenu('Rifter fit');
+    await user.click(await screen.findByRole('menuitem', { name: 'Open contract in EVE' }));
+    await waitFor(() => expect(openContractMock).toHaveBeenCalledWith(CHAR_ID, 1));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('has no row copies: no Copy title or Copy Contract ID, and no modal on right-click', async () => {
     render(<App />);
     await openContractMenu('Rifter fit');
 
