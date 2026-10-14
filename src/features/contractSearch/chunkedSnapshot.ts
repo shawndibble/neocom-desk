@@ -79,6 +79,11 @@ export interface ChunkedSnapshotSource {
    * is.
    */
   staleAfterMs: number;
+  /**
+   * Tried before Firestore (ADR 0019): a read from somewhere cheaper. Null means
+   * unavailable, and the Firestore chunk read takes over whole.
+   */
+  readFirst?: () => Promise<ChunkedSnapshot<unknown> | null>;
 }
 
 /** Mirrors `functions/src/publicContracts.ts`'s `chunkDocId`; `chunkedSnapshot.test.ts` pins the two together. */
@@ -238,6 +243,8 @@ async function fetchSnapshot<TRow>(
   source: ChunkedSnapshotSource,
   characterId: number
 ): Promise<ChunkedSnapshot<TRow> | null> {
+  const first = (await source.readFirst?.()) as ChunkedSnapshot<TRow> | null | undefined;
+  if (first) return first;
   if (!isSyncConfigured()) return null;
   await ensureAnySession(characterId);
 

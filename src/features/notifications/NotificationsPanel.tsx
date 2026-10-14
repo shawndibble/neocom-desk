@@ -105,6 +105,7 @@ import {
   NOTIFICATION_CHANNELS,
   NOTIFICATION_FAMILIES,
   eveTypesByFamily,
+  extraEveTypes,
   type NotificationChannel,
   type EventEnabledMap,
   type EveTypeEnabledMap,
@@ -112,6 +113,7 @@ import {
 import { eveTypeLabel } from './eveTypeLabel';
 import { filterNotificationSections } from './notificationSearch';
 import { estimateCharacterSectionHeight } from './notificationRows';
+import { useSeenEveTypesStore } from './seenEveTypes';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
 import {
@@ -142,6 +144,9 @@ const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]
 
 /** Module scope so `useUrlParam` sees a stable codec identity across renders. */
 const SEARCH_PARAM = textParam();
+
+/** Stable identity for a Character with no seen types, so it doesn't break `CharacterNotificationSection`'s memo. */
+const NO_EXTRA_TYPES: readonly string[] = [];
 
 /** Stable identity for a Character with no token row yet, so it doesn't itself break `CharacterNotificationSection`'s memo. */
 const EMPTY_SCOPES: ReadonlySet<string> = new Set();
@@ -233,6 +238,22 @@ export function NotificationsPanel() {
   const tokens = useLiveQuery(() => db.tokens.toArray());
 
   const prefsValue = useNotificationPreferences((state) => state.value);
+  // Types the server has seen for each Character (issue #3755): a toggle for
+  // one appears the next time Settings opens, so this is read, not awaited.
+  const seenEveTypes = useSeenEveTypesStore((state) => state.value);
+  useEffect(() => {
+    void useSeenEveTypesStore.getState().hydrate();
+  }, []);
+  const extraTypesByCharacter = useMemo(
+    () =>
+      new Map(
+        Object.entries(seenEveTypes).map(([characterId, seen]) => [
+          Number(characterId),
+          extraEveTypes(seen),
+        ])
+      ),
+    [seenEveTypes]
+  );
 
   useEffect(() => {
     void hydrateNotificationPreferences();
@@ -489,6 +510,7 @@ export function NotificationsPanel() {
           missingPermissionFor: (eventId) =>
             characterEventRowState(eventId, grantedScopes, characterCapabilities)
               .missingPermission !== null,
+          extraEveTypeCount: extraTypesByCharacter.get(character.characterId)?.length ?? 0,
           hasEveNotificationScope: characterEventRowState(
             'eveNotification',
             grantedScopes,
@@ -717,6 +739,9 @@ export function NotificationsPanel() {
                           )}
                           prefs={characterEventPrefs(prefsValue, character.characterId)}
                           eveTypePrefs={characterEveTypePrefs(prefsValue, character.characterId)}
+                          seenExtraTypes={
+                            extraTypesByCharacter.get(character.characterId) ?? NO_EXTRA_TYPES
+                          }
                           thresholds={characterEventThresholds(prefsValue, character.characterId)}
                           browserBlocked={browserBlocked}
                           onToggleExpanded={toggleExpanded}
@@ -755,6 +780,8 @@ interface CharacterNotificationSectionProps {
    */
   prefs: EventEnabledMap;
   eveTypePrefs: EveTypeEnabledMap;
+  /** Seen ESI types outside the allow-list, shown as an "Other" group (issue #3755). */
+  seenExtraTypes: readonly string[];
   thresholds: Required<CharacterEventThresholds>;
   browserBlocked: boolean;
   onToggleExpanded: (characterId: number) => void;
@@ -775,6 +802,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
   characterCapabilities,
   prefs,
   eveTypePrefs,
+  seenExtraTypes,
   thresholds,
   browserBlocked,
   onToggleExpanded,
@@ -913,17 +941,23 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                     eveNotification event (issue #274, AC3).
                     Enumerated from the closed allow-list,
                     grouped by Notification Family (issue #352),
-                    rather than discovered from the feed, so
-                    every type is toggle-able immediately rather
-                    than only after it has fired once.
+                    so every type is toggle-able immediately
+                    rather than only after it has fired once.
+                    Types the server has seen beyond the list
+                    (issue #3755) follow in an Other group.
                   */}
         {eventId === 'eveNotification' && hasScope && (
           <div className="border-t border-line bg-panel/60 pl-3">
             <p className="px-3 py-1.5 text-[0.6875rem] text-text-dim">
               {t('settings.notifications.eveTypesHint')}
             </p>
-            {NOTIFICATION_FAMILIES.map((family) => {
-              const familyTypes = eveTypesByFamily(family);
+            {[
+              ...NOTIFICATION_FAMILIES.map((family) => ({
+                key: family,
+                types: eveTypesByFamily(family),
+              })),
+              { key: 'other', types: seenExtraTypes },
+            ].map(({ key: family, types: familyTypes }) => {
               if (familyTypes.length === 0) return null;
               const familyLabel = t(`settings.notifications.family.${family}`);
               return (

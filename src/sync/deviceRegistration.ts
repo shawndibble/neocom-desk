@@ -27,10 +27,13 @@ interface RegisterDeviceResponse {
   deviceId: string;
   registered: number[];
   rejected: number[];
+  /** Per Character (id as a string): the ESI types the server has seen. Absent from an older deployed function. */
+  seenTypes?: Record<string, string[]>;
 }
 
 /** No Projection to upload for a Character this call doesn't mention. */
 const NO_PROJECTION_ROWS: readonly ProjectionRow[] = [];
+const NO_EVE_TYPES: readonly string[] = [];
 
 /**
  * How long an unchanged registration is trusted before the poll re-sends it
@@ -107,7 +110,8 @@ function digest(text: string): string {
 function registrationFingerprint(
   fcmToken: string,
   characterIds: readonly number[],
-  projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]>
+  projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]>,
+  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>
 ): string {
   const characters = [...characterIds]
     .sort((a, b) => a - b)
@@ -125,6 +129,7 @@ function registrationFingerprint(
           row.body,
           row.eveType ?? null,
         ]),
+      [...(eveTypesByCharacter.get(characterId) ?? NO_EVE_TYPES)].sort(),
     ]);
   return digest(JSON.stringify([getDeviceId(), fcmToken, characters]));
 }
@@ -145,6 +150,13 @@ export interface RegisterDeviceOptions {
    * enable always reaches the backend.
    */
   skipIfUnchanged?: boolean;
+  /**
+   * Each Character's browser-enabled ESI types (issue #3755, ADR 0020),
+   * replacing this device's previous list server-side. A Character with no
+   * entry uploads an empty list. Part of the fingerprint, so changing a
+   * toggle is never skipped.
+   */
+  eveTypesByCharacter?: ReadonlyMap<number, readonly string[]>;
 }
 
 /**
@@ -165,7 +177,7 @@ export async function registerDeviceForWebPush(
   vapidKey: string,
   serviceWorkerRegistration: ServiceWorkerRegistration,
   projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]> = new Map(),
-  { skipIfUnchanged = false }: RegisterDeviceOptions = {}
+  { skipIfUnchanged = false, eveTypesByCharacter = new Map() }: RegisterDeviceOptions = {}
 ): Promise<RegisterDeviceResponse | null> {
   // Checked before `getToken`: a late rebuild on an emptied roster (after
   // Remove / Log out) must not mint a fresh FCM token just to discard it.
@@ -186,7 +198,8 @@ export async function registerDeviceForWebPush(
   const fingerprint = registrationFingerprint(
     fcmToken,
     characters.map((character) => character.characterId),
-    projectionsByCharacter
+    projectionsByCharacter,
+    eveTypesByCharacter
   );
   const now = Date.now();
   if (skipIfUnchanged) {
@@ -220,6 +233,7 @@ export async function registerDeviceForWebPush(
         characterId: number;
         accessToken: string;
         projectionRows: readonly ProjectionRow[];
+        eveTypes: readonly string[];
       }[];
     },
     RegisterDeviceResponse
@@ -240,6 +254,7 @@ export async function registerDeviceForWebPush(
       characters: withAccessTokens.map((character) => ({
         ...character,
         projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,
+        eveTypes: eveTypesByCharacter.get(character.characterId) ?? NO_EVE_TYPES,
       })),
     });
     // Remembered only when every Character landed: one that couldn't get a

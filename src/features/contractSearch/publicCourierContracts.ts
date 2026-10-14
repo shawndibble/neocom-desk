@@ -10,7 +10,8 @@
  * loan contracts together under 620 against ~370k offer rows, so this is a
  * single chunk doc. That is why the panel reads it on mount rather than on the
  * first Courier click — deferring it would buy nothing and cost a fetch on the
- * way in. It is read *separately* from the offers snapshot, though: see
+ * way in. It comes from R2 when that answers and from Firestore otherwise
+ * (`r2CourierSnapshot.ts`). It is read *separately* from the offers snapshot, though: see
  * `ContractSearchPanel.tsx` for why pairing the two was the wrong trade.
  */
 import {
@@ -18,6 +19,7 @@ import {
   type ChunkedSnapshotRead,
   type ChunkedSnapshotSource,
 } from '@/features/contractSearch/chunkedSnapshot';
+import { readR2CourierSnapshot } from '@/features/contractSearch/r2CourierSnapshot';
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 
 const SOURCE: ChunkedSnapshotSource = {
@@ -26,6 +28,8 @@ const SOURCE: ChunkedSnapshotSource = {
   cacheKey: 'publicCourierContracts',
   /** Published by the same job as the offers snapshot, so the same window. */
   staleAfterMs: 30 * 60_000,
+  /** R2 first (ADR 0019, issue #3748); the Firestore chunk is the fallback. */
+  readFirst: readR2CourierSnapshot,
 };
 
 export function loadPublicCourierContracts(

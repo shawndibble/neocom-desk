@@ -82,7 +82,13 @@ import {
   fetchLpStoreRows,
 } from './lpOffersSnapshot.js';
 import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicContractsArchive.js';
-import { createR2Put, publishContractOffersToR2, type R2PublishState } from './r2Publisher.js';
+import {
+  createR2Put,
+  publishContractOffersToR2,
+  publishCourierContractsToR2,
+  type CourierR2PublishState,
+  type R2PublishState,
+} from './r2Publisher.js';
 import { measureContractTypeChanges, type ContractTypeHashes } from './contractTypeChanges.js';
 import {
   INSURGENCY_URL,
@@ -192,11 +198,8 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
     );
   }
 
-  const { registration, rejected, projections } = await buildDeviceRegistration(
-    input,
-    verifyOptions,
-    logError
-  );
+  const { registration, rejected, projections, eveTypesByCharacter } =
+    await buildDeviceRegistration(input, verifyOptions, logError);
 
   if (registration.characterIds.length === 0) {
     throw new HttpsError('unauthenticated', 'No character access token could be verified');
@@ -207,9 +210,25 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
     fcmToken: registration.fcmToken,
     characterIds: registration.characterIds,
     projections,
+    eveTypesByCharacter,
   });
 
-  return { deviceId: input.deviceId, registered: registration.characterIds, rejected };
+  // The types the server has seen for each Character (alertGrants, ADR 0020),
+  // so the client can offer a toggle for them. Only `seenTypes` is read out.
+  const { store } = alertGrantDeps();
+  const seenTypes: Record<string, string[]> = {};
+  await Promise.all(
+    registration.characterIds.map(async (characterId) => {
+      try {
+        seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
+      } catch (err) {
+        // The registration already landed; a failed read only delays new toggles.
+        logError('Device registration: seenTypes read failed', { characterId, error: String(err) });
+      }
+    })
+  );
+
+  return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
 });
 
 // Alerts Grant custody (issue #3753, ADR 0020). `ALERTS_TOKEN_KEY` is a Firebase
@@ -989,6 +1008,9 @@ const PUBLIC_CONTRACTS_TYPE_HASHES_DOC = 'publicContractTypeHashes';
 /** Doc under `systemConditions` holding what the R2 writer last published (issue #3745). */
 const PUBLIC_CONTRACTS_R2_STATE_DOC = 'publicContractR2State';
 
+/** Doc under `systemConditions` holding what the R2 courier writer last published (issue #3748). */
+const PUBLIC_COURIERS_R2_STATE_DOC = 'publicCourierR2State';
+
 const R2_ACCESS_KEY_ID = defineSecret('R2_ACCESS_KEY_ID');
 const R2_SECRET_ACCESS_KEY = defineSecret('R2_SECRET_ACCESS_KEY');
 
@@ -1033,6 +1055,48 @@ async function publishOffersToR2(
     );
   } catch (error) {
     logError('public contract offers R2 publish failed', { error: String(error) });
+  }
+}
+
+/** Same contract as `publishOffersToR2`, for the courier snapshot (issue #3748): never throws. */
+async function publishCourierToR2(
+  db: Firestore,
+  rows: readonly PublicCourierContractRow[],
+  lastSyncedAt: number
+): Promise<void> {
+  try {
+    const endpoint = process.env.R2_ENDPOINT;
+    const bucket = process.env.R2_BUCKET;
+    if (!endpoint?.startsWith('https://') || !bucket) {
+      logWarn('R2 courier publish skipped: R2_ENDPOINT (https) / R2_BUCKET not set');
+      return;
+    }
+    const stateRef = db.collection(SYSTEM_CONDITIONS_COLLECTION).doc(PUBLIC_COURIERS_R2_STATE_DOC);
+    const previous = await stateRef
+      .get()
+      .then((snap) => (snap.exists ? (snap.data() as CourierR2PublishState) : null))
+      .catch(() => null);
+    const result = await publishCourierContractsToR2({
+      rows,
+      lastSyncedAt,
+      previous,
+      now: Date.now(),
+      put: createR2Put({
+        endpoint,
+        bucket,
+        accessKeyId: R2_ACCESS_KEY_ID.value(),
+        secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
+      }),
+    });
+    await stateRef.set(result.state);
+    const { uploaded, indexWritten, firstError } = result;
+    (indexWritten ? logInfo : logWarn)('public courier contracts R2 publish', {
+      uploaded,
+      indexWritten,
+      firstError,
+    });
+  } catch (error) {
+    logError('public courier contracts R2 publish failed', { error: String(error) });
   }
 }
 
@@ -1155,6 +1219,8 @@ export const syncPublicContractOffers = onSchedule(
     }
     if (fingerprint !== null) await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
     // Last, so a slow or failing R2 can never delay or skip the Firestore publish.
+    // Courier first: one small object, so a slow offers upload cannot starve it of the time budget.
+    await publishCourierToR2(db, courierRows, lastSyncedAt);
     await publishOffersToR2(db, rows, lastSyncedAt);
   }
 );

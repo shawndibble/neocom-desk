@@ -14,10 +14,16 @@
 import type { ProjectionRow } from '@/engine/projection';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import { hasEventScope, type NotificationEventId } from './events';
-import { isEventEnabledFor, type EventEnabledMap } from './eventSelection';
+import {
+  EVE_ALLOWED_TYPES,
+  enabledEveTypesForBrowser,
+  isEventEnabledFor,
+  type EventEnabledMap,
+} from './eventSelection';
 import type { PollDependencies } from './foregroundPoller';
 import { POLL_DOMAINS, type PollDomain } from './pollDomains';
 import type { PollerState } from './pollerState';
+import { useSeenEveTypesStore } from './seenEveTypes';
 
 export type ProjectionRebuildDependencies = Pick<
   PollDependencies,
@@ -28,6 +34,7 @@ export type ProjectionRebuildDependencies = Pick<
   | 'masterEnabled'
   | 'browserChannelEnabled'
   | 'eventPrefsFor'
+  | 'eveTypePrefsFor'
   | 'permission'
   | 'uploadProjection'
 >;
@@ -46,6 +53,53 @@ function mayProject(
   eventPrefs: EventEnabledMap
 ): boolean {
   return hasEventScope(eventId, scopes) && isEventEnabledFor(eventPrefs, eventId, 'browser');
+}
+
+/**
+ * Each Character's browser-enabled ESI types for the upload (issue #3755,
+ * ADR 0020). A Character the device cannot read notifications for, or a
+ * device whose browser channel is off, uploads an empty list — an early
+ * return would leave the server pushing the last list.
+ */
+export async function enabledEveTypesByCharacter(
+  deps: Pick<
+    ProjectionRebuildDependencies,
+    | 'characters'
+    | 'grantedScopes'
+    | 'eveTypePrefsFor'
+    | 'masterEnabled'
+    | 'browserChannelEnabled'
+    | 'permission'
+  >
+): Promise<Map<number, string[]>> {
+  const [masterEnabled, browserAllowed, characters] = await Promise.all([
+    deps.masterEnabled(),
+    deps.browserChannelEnabled(),
+    deps.characters(),
+  ]);
+  const browserEnabled = masterEnabled && browserAllowed && deps.permission() === 'granted';
+  const seenStore = useSeenEveTypesStore.getState();
+  await seenStore.hydrate();
+  const seen = useSeenEveTypesStore.getState().value;
+
+  const byCharacter = new Map<number, string[]>();
+  await mapWithConcurrencyLimit(characters, ESI_FANOUT_CONCURRENCY, async (character) => {
+    byCharacter.set(character.characterId, []);
+    if (!browserEnabled) return;
+    const [scopes, typePrefs] = await Promise.all([
+      deps.grantedScopes(character.characterId),
+      deps.eveTypePrefsFor(character.characterId),
+    ]);
+    if (!hasEventScope('eveNotification', scopes)) return;
+    byCharacter.set(
+      character.characterId,
+      enabledEveTypesForBrowser(typePrefs, [
+        ...EVE_ALLOWED_TYPES,
+        ...(seen[String(character.characterId)] ?? []),
+      ])
+    );
+  });
+  return byCharacter;
 }
 
 /**
@@ -113,5 +167,5 @@ async function rebuildOnce(
     }
   });
 
-  await deps.uploadProjection(rowsByCharacter);
+  await deps.uploadProjection(rowsByCharacter, await enabledEveTypesByCharacter(deps));
 }

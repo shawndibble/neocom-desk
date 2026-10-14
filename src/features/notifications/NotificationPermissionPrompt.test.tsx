@@ -6,6 +6,10 @@ import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-d
 import '@/i18n';
 import { db } from '@/db';
 import { NotificationPermissionPrompt } from './NotificationPermissionPrompt';
+import { ALERTS_OFFER_SEEN_KEY, useAlertsOfferSeen } from './permission';
+import { beginAlertsLogin } from '@/app/loginFlow';
+
+vi.mock('@/app/loginFlow', () => ({ beginAlertsLogin: vi.fn(async () => undefined) }));
 import {
   NOTIFICATION_PERMISSION_PROMPT_KEY,
   DEFAULT_NOTIFICATION_PROMPT_STATE,
@@ -15,9 +19,14 @@ import {
 const CHAR_ID = 44;
 
 function stubNotification(permission: NotificationPermission, answer: NotificationPermission) {
-  const requestPermission = vi.fn(async () => answer);
-  vi.stubGlobal('Notification', { permission, requestPermission });
-  return requestPermission;
+  const stub = { permission, requestPermission: vi.fn() };
+  // Like a real browser: the live permission changes once the ask resolves.
+  stub.requestPermission.mockImplementation(async () => {
+    stub.permission = answer;
+    return answer;
+  });
+  vi.stubGlobal('Notification', stub);
+  return stub.requestPermission;
 }
 
 const navigateRef: { current: NavigateFunction | null } = { current: null };
@@ -47,6 +56,8 @@ beforeEach(async () => {
   await db.settings.clear();
   sessionStorage.clear();
   navigateRef.current = null;
+  vi.mocked(beginAlertsLogin).mockClear();
+  useAlertsOfferSeen.setState({ value: false, hydrated: false });
   useNotificationPromptState.setState({
     value: DEFAULT_NOTIFICATION_PROMPT_STATE,
     hydrated: false,
@@ -153,5 +164,81 @@ describe('NotificationPermissionPrompt', () => {
     renderPastFirstScreen();
     await waitFor(() => expect(useNotificationPromptState.getState().hydrated).toBe(true));
     expect(screen.queryByText(/turn on notifications/i)).not.toBeInTheDocument();
+  });
+
+  describe('step two: Alerts offer (issue #3758)', () => {
+    it('offers Alerts for the signed-in Character right after a grant, without asking SSO inside the permission step', async () => {
+      stubNotification('default', 'granted');
+      const user = userEvent.setup();
+      renderPastFirstScreen();
+
+      await user.click(await screen.findByRole('button', { name: /^enable$/i }));
+      expect(await screen.findByText(/alerts when neocom is closed/i)).toBeInTheDocument();
+      expect(screen.getByText(/Pilot One/)).toBeInTheDocument();
+      expect(beginAlertsLogin).not.toHaveBeenCalled();
+    });
+
+    it('Turn on starts the Alerts flow for that Character and records the offer as seen', async () => {
+      stubNotification('default', 'granted');
+      const user = userEvent.setup();
+      renderPastFirstScreen();
+
+      await user.click(await screen.findByRole('button', { name: /^enable$/i }));
+      await user.click(await screen.findByRole('button', { name: /^turn on$/i }));
+      expect(beginAlertsLogin).toHaveBeenCalledWith(CHAR_ID);
+      expect((await db.settings.get(ALERTS_OFFER_SEEN_KEY))?.value).toBe(true);
+    });
+
+    it('puts the offer back when the Alerts flow fails to start', async () => {
+      vi.mocked(beginAlertsLogin).mockRejectedValueOnce(new Error('offline'));
+      stubNotification('default', 'granted');
+      const user = userEvent.setup();
+      renderPastFirstScreen();
+
+      await user.click(await screen.findByRole('button', { name: /^enable$/i }));
+      await user.click(await screen.findByRole('button', { name: /^turn on$/i }));
+      await waitFor(async () =>
+        expect((await db.settings.get(ALERTS_OFFER_SEEN_KEY))?.value).toBe(false)
+      );
+      expect(await screen.findByText(/alerts when neocom is closed/i)).toBeInTheDocument();
+    });
+
+    it('Not now suppresses it for good without starting the flow', async () => {
+      stubNotification('default', 'granted');
+      const user = userEvent.setup();
+      renderPastFirstScreen();
+
+      await user.click(await screen.findByRole('button', { name: /^enable$/i }));
+      await screen.findByText(/alerts when neocom is closed/i);
+      await user.click(screen.getByRole('button', { name: /not now/i }));
+      await waitFor(() =>
+        expect(screen.queryByText(/alerts when neocom is closed/i)).not.toBeInTheDocument()
+      );
+      expect(beginAlertsLogin).not.toHaveBeenCalled();
+      expect((await db.settings.get(ALERTS_OFFER_SEEN_KEY))?.value).toBe(true);
+    });
+
+    it('never shows after a denial', async () => {
+      stubNotification('default', 'denied');
+      const user = userEvent.setup();
+      renderPastFirstScreen();
+
+      await user.click(await screen.findByRole('button', { name: /^enable$/i }));
+      await waitFor(() =>
+        expect(screen.queryByText(/turn on notifications/i)).not.toBeInTheDocument()
+      );
+      expect(screen.queryByText(/alerts when neocom is closed/i)).not.toBeInTheDocument();
+    });
+
+    it('never shows for a player who already saw the explainer', async () => {
+      stubNotification('granted', 'granted');
+      await db.settings.put({
+        key: NOTIFICATION_PERMISSION_PROMPT_KEY,
+        value: { seen: true, outcome: 'granted' },
+      });
+      renderPastFirstScreen();
+      await waitFor(() => expect(useNotificationPromptState.getState().hydrated).toBe(true));
+      expect(screen.queryByText(/alerts when neocom is closed/i)).not.toBeInTheDocument();
+    });
   });
 });

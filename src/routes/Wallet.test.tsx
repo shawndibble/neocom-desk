@@ -928,7 +928,9 @@ describe('Wallet', () => {
       // All three selected: Pilot Three is left out, named by the scope readout
       // and flagged on its own row.
       expect(await screen.findByLabelText(/All characters · 2 of 3/)).toBeInTheDocument();
-      expect(await screen.findByText(/hasn't granted wallet access/)).toBeInTheDocument();
+      expect(
+        await screen.findByRole('link', { name: 'Grant missing Permissions' })
+      ).toBeInTheDocument();
 
       // Narrow the filter back to "This character" — the notice list must
       // follow the same filter the balance rows do (issue #607 CodeRabbit
@@ -936,7 +938,9 @@ describe('Wallet', () => {
       await user.click(screen.getByRole('button', { name: /^All characters/ }));
       await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
-      expect(screen.queryByText(/hasn't granted wallet access/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: 'Grant missing Permissions' })
+      ).not.toBeInTheDocument();
       expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
       expect(screen.queryByRole('table', { name: 'Balance by character' })).not.toBeInTheDocument();
     });

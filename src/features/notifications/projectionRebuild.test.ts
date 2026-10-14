@@ -9,6 +9,7 @@ import type { EventEnabledMap } from './eventSelection';
 import type { CharacterRef, DomainPollState } from './foregroundPoller';
 import { calendarDomain, type PollDomain } from './pollDomains';
 import type { PollerState } from './pollerState';
+import { useSeenEveTypesStore } from './seenEveTypes';
 import { rebuildProjection, type ProjectionRebuildDependencies } from './projectionRebuild';
 
 const NOW = 1_000_000;
@@ -46,6 +47,7 @@ function deps(
     masterEnabled: async () => true,
     browserChannelEnabled: async () => true,
     eventPrefsFor: async () => ({ calendarEventStarting: true }),
+    eveTypePrefsFor: async () => ({}),
     permission: () => 'granted',
     uploadProjection,
     ...rest,
@@ -62,6 +64,7 @@ async function uploaded(
 
 beforeEach(async () => {
   await db.settings.clear();
+  useSeenEveTypesStore.setState({ value: {}, hydrated: true });
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: true });
 });
 
@@ -184,5 +187,40 @@ describe('rebuildProjection', () => {
     const read = new Set(prev.mock.calls.map(([domain]) => domain.id));
     expect(read.has('mail')).toBe(false);
     expect(read.has('calendar')).toBe(true);
+  });
+});
+
+describe('eve type upload (issue #3755)', () => {
+  const NOTIFICATION_SCOPE = 'esi-characters.read_notifications.v1';
+
+  it('uploads each Character’s browser-enabled types, defaults plus seen ones', async () => {
+    useSeenEveTypesStore.setState({ value: { '1': ['SeenKind'] }, hydrated: true });
+    const { deps: d, uploadProjection } = deps({
+      grantedScopes: async () => new Set([NOTIFICATION_SCOPE]),
+      eveTypePrefsFor: async () => ({
+        StructureDestroyed: { browser: false },
+        SeenKind: { browser: true },
+      }),
+    });
+    await rebuildProjection(d);
+    const types = uploadProjection.mock.calls[0][1].get(CHAR.characterId);
+    expect(types).toContain('SeenKind');
+    expect(types).toContain('StructureLostShields');
+    expect(types).not.toContain('StructureDestroyed');
+  });
+
+  it('uploads an empty list when the browser channel is off', async () => {
+    const { deps: d, uploadProjection } = deps({
+      grantedScopes: async () => new Set([NOTIFICATION_SCOPE]),
+      browserChannelEnabled: async () => false,
+    });
+    await rebuildProjection(d);
+    expect(uploadProjection.mock.calls[0][1].get(CHAR.characterId)).toEqual([]);
+  });
+
+  it('uploads an empty list for a Character without the notifications scope', async () => {
+    const { deps: d, uploadProjection } = deps();
+    await rebuildProjection(d);
+    expect(uploadProjection.mock.calls[0][1].get(CHAR.characterId)).toEqual([]);
   });
 });
