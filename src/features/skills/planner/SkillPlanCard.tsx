@@ -71,7 +71,7 @@ export function SkillPlanCard({
           remapInfo={remapInfo}
           scheduleInputs={scheduleInputs}
           height="sidebar"
-          showNewPlan={false}
+          bare
         />
       </PopoverContent>
     </Popover>

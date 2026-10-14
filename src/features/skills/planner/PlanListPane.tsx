@@ -41,8 +41,11 @@ interface PlanListPaneProps {
    * `schedulePlan` — the call the editor and Calendar make, so the three agree.
    */
   scheduleInputs?: PlanStatsInputs;
-  /** Off where the host already offers New plan beside the list (the plans popover). */
-  showNewPlan?: boolean;
+  /**
+   * Just the rows, with no "Plans" panel or New plan button around them: for a
+   * host that is itself the surface and already offers New plan (the plans popover).
+   */
+  bare?: boolean;
 }
 
 /**
@@ -61,7 +64,7 @@ export function PlanListPane({
   className,
   activePlanId,
   scheduleInputs,
-  showNewPlan = true,
+  bare = false,
 }: PlanListPaneProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -145,17 +148,8 @@ export function PlanListPane({
     syncAfterEdit();
   }
 
-  return (
-    <Panel
-      className={className}
-      title={t('plans.title')}
-      headingRef={headingRef}
-      actions={
-        showNewPlan ? (
-          <NewPlanSplitButton activeCharacterId={activeCharacterId} remapInfo={remapInfo} />
-        ) : undefined
-      }
-    >
+  const content = (
+    <>
       {showImplantsNote && (
         <div className="border-b border-line px-3 empty:hidden">
           <ImplantsAssumedNote
@@ -203,6 +197,19 @@ export function PlanListPane({
           />
         )}
       </div>
+    </>
+  );
+
+  if (bare) return <div className={className}>{content}</div>;
+
+  return (
+    <Panel
+      className={className}
+      title={t('plans.title')}
+      headingRef={headingRef}
+      actions={<NewPlanSplitButton activeCharacterId={activeCharacterId} remapInfo={remapInfo} />}
+    >
+      {content}
     </Panel>
   );
 }
