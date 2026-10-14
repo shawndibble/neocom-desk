@@ -104,9 +104,10 @@ test.describe('Travel at 390px', () => {
     await page.setViewportSize(PHONE);
   });
 
-  test('Route Safety with no stops shows Add a stop without a tap', async ({ page }) => {
+  test('Route Safety with no stops shows the destination field without a tap', async ({ page }) => {
     await signInAndGoto(page, './travel/route');
-    await expect(page.getByRole('button', { name: /^add stop/i })).toBeVisible(COLD_LOAD);
+    await expect(page.getByRole('combobox', { name: /^destination/i })).toBeVisible(COLD_LOAD);
+    await expect(page.getByRole('button', { name: /^add stop/i })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Edit stops' })).toHaveCount(0);
   });
 

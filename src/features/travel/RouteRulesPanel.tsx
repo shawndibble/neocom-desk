@@ -217,12 +217,14 @@ export function RouteHoleFields({
       {onBrowseWormholes ? (
         <>
           {/* The switch toggles; the label beside it is a button that opens the modal (a window that only shows a list: no "…"). */}
-          <div className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
-            <Checkbox
-              checked={enabled}
-              aria-label={t('travel.holes.enabled')}
-              onChange={() => onChange({ field: 'enabled', value: !enabled })}
-            />
+          <div className="flex items-center gap-2 font-semibold">
+            <label className={tappableRowClassName}>
+              <Checkbox
+                checked={enabled}
+                aria-label={t('travel.holes.enabled')}
+                onChange={() => onChange({ field: 'enabled', value: !enabled })}
+              />
+            </label>
             <Button size="sm" variant="ghost" aria-haspopup="dialog" onClick={onBrowseWormholes}>
               {t('travel.holes.enabled')}
             </Button>
