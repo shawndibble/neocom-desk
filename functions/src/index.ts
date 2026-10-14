@@ -4,6 +4,7 @@
 // against EVE's published JWKS before any Firebase credential is minted.
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
@@ -14,8 +15,20 @@ import {
   verifyEveAccessToken,
   verifyOptionsFromEnv,
   uidForCharacter,
+  characterIdForUid,
   type EveTokenClaims,
 } from './verifyEveToken.js';
+import {
+  AlertGrantError,
+  deleteAlertGrant as deleteAlertGrantFor,
+  parseSaveAlertGrantInput,
+  refreshAtSso,
+  revokeAtSso,
+  saveAlertGrant as saveAlertGrantFor,
+  type AlertGrantDeps,
+} from './alertGrant.js';
+import { parseAlertsKey } from './alertGrantCrypto.js';
+import { firestoreAlertGrantStore } from './alertGrantStore.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
 import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
 import {
@@ -198,6 +211,57 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
   return { deviceId: input.deviceId, registered: registration.characterIds, rejected };
 });
 
+// Alerts Grant custody (issue #3753, ADR 0020). `ALERTS_TOKEN_KEY` is a Firebase
+// secret (base64, 32 bytes): `firebase functions:secrets:set ALERTS_TOKEN_KEY`.
+// Nothing here logs or returns a token; firestore.rules denies `alertGrants`.
+const ALERTS_TOKEN_KEY = defineSecret('ALERTS_TOKEN_KEY');
+
+function alertGrantDeps(): AlertGrantDeps {
+  return {
+    store: firestoreAlertGrantStore(getFirestore()),
+    key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
+    verify: (accessToken) => verifyEveAccessToken(accessToken, verifyOptions),
+    refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
+    revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
+    now: () => Date.now(),
+    log: (message, data) => logWarn(message, data),
+  };
+}
+
+function alertGrantHttpsError(err: unknown): never {
+  if (err instanceof AlertGrantError) throw new HttpsError(err.code, err.message);
+  // Opaque: the cause could sit next to key material, so log the name only.
+  logError('Alerts Grant call failed', { error: err instanceof Error ? err.name : 'unknown' });
+  throw new HttpsError('internal', 'Alerts Grant call failed');
+}
+
+// The device's full-scope session is not involved: the callable's proof is the
+// notifications-only access token itself, verified like registerDevice does.
+export const saveAlertGrant = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  async (request) => {
+    try {
+      return await saveAlertGrantFor(alertGrantDeps(), parseSaveAlertGrantInput(request.data));
+    } catch (err) {
+      return alertGrantHttpsError(err);
+    }
+  }
+);
+
+// Deleting needs the Character's own signed-in session, so one Character
+// cannot drop another's grant.
+export const deleteAlertGrant = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  async (request) => {
+    const { uid } = callerOf(request);
+    try {
+      return await deleteAlertGrantFor(alertGrantDeps(), characterIdForUid(uid)!);
+    } catch (err) {
+      return alertGrantHttpsError(err);
+    }
+  }
+);
+
 /**
  * dispatchProjections: fires whatever is due (issue #358, ADR 0010,
  * GLOSSARY.md round 45). Runs every 5 minutes, matching the Foreground
@@ -279,55 +343,70 @@ export const purgeNotificationFeed = onSchedule('every 24 hours', async () => {
  * large backlog for the next tick; the parent doc survives until its
  * subcollections are empty, so a half-purged account stays stale.
  */
-export const purgeStaleAccounts = onSchedule('every 24 hours', async () => {
-  const db = getFirestore();
-  const now = Date.now();
-  let passes = 0;
-  let purged = 0;
+export const purgeStaleAccounts = onSchedule(
+  { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY] },
+  async () => {
+    const db = getFirestore();
+    const now = Date.now();
+    let passes = 0;
+    let purged = 0;
 
-  for (const ref of await db.collection('characters').listDocuments()) {
-    const snap = await ref.get();
-    const action = decideAccountAction(lastSyncedAtOf(snap.data()), now);
-    if (action === 'keep') continue;
-    if (action === 'seed') {
-      await ref.set({ [LAST_SYNCED_FIELD]: now }, { merge: true });
-      continue;
-    }
-
-    // Shared Community data lives outside `characters/{uid}`, so the
-    // subcollection sweep below would never reach it (ADR 0018).
-    try {
-      await purgeCharacterCommunities(db, ref.id);
-    } catch (err) {
-      // Leave the account (and its stale heartbeat) in place so tomorrow's
-      // run retries it, rather than letting one bad Community abort the rest.
-      logWarn('Stale account purge: Community cleanup failed, will retry', {
-        uid: ref.id,
-        error: err instanceof Error ? err.message : err,
-      });
-      continue;
-    }
-
-    for (const sub of await ref.listCollections()) {
-      for (;;) {
-        if (passes >= STALE_ACCOUNT_MAX_PASSES) {
-          logWarn('Stale account purge: pass limit reached, backlog continues next run', {
-            purged,
-          });
-          return;
-        }
-        const page = await sub.limit(STALE_ACCOUNT_BATCH_SIZE).get();
-        if (page.empty) break;
-        passes += 1;
-        const batch = db.batch();
-        for (const doc of page.docs) batch.delete(doc.ref);
-        await batch.commit();
+    for (const ref of await db.collection('characters').listDocuments()) {
+      const snap = await ref.get();
+      const action = decideAccountAction(lastSyncedAtOf(snap.data()), now);
+      if (action === 'keep') continue;
+      if (action === 'seed') {
+        await ref.set({ [LAST_SYNCED_FIELD]: now }, { merge: true });
+        continue;
       }
+
+      // Shared Community data lives outside `characters/{uid}`, so the
+      // subcollection sweep below would never reach it (ADR 0018).
+      try {
+        await purgeCharacterCommunities(db, ref.id);
+      } catch (err) {
+        // Leave the account (and its stale heartbeat) in place so tomorrow's
+        // run retries it, rather than letting one bad Community abort the rest.
+        logWarn('Stale account purge: Community cleanup failed, will retry', {
+          uid: ref.id,
+          error: err instanceof Error ? err.message : err,
+        });
+        continue;
+      }
+
+      // The server-held Alerts Grant token goes with the account (ADR 0020).
+      try {
+        const characterId = characterIdForUid(ref.id);
+        if (characterId !== undefined) await deleteAlertGrantFor(alertGrantDeps(), characterId);
+      } catch (err) {
+        logWarn('Stale account purge: Alerts Grant cleanup failed, will retry', {
+          uid: ref.id,
+          error: err instanceof Error ? err.name : 'unknown',
+        });
+        continue;
+      }
+
+      for (const sub of await ref.listCollections()) {
+        for (;;) {
+          if (passes >= STALE_ACCOUNT_MAX_PASSES) {
+            logWarn('Stale account purge: pass limit reached, backlog continues next run', {
+              purged,
+            });
+            return;
+          }
+          const page = await sub.limit(STALE_ACCOUNT_BATCH_SIZE).get();
+          if (page.empty) break;
+          passes += 1;
+          const batch = db.batch();
+          for (const doc of page.docs) batch.delete(doc.ref);
+          await batch.commit();
+        }
+      }
+      await ref.delete();
+      purged += 1;
     }
-    await ref.delete();
-    purged += 1;
   }
-});
+);
 
 // Communities (issue #3596, ADR 0018). Every write that enforces a cap or
 // deletes another doc goes through these callables (communitiesStore.ts); the
