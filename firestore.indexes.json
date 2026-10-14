@@ -580,6 +580,12 @@
           "queryScope": "COLLECTION"
         }
       ]
+    },
+    {
+      "collectionGroup": "publicContractOffersIndex",
+      "fieldPath": "*",
+      "ttl": false,
+      "indexes": []
     }
   ]
 }
