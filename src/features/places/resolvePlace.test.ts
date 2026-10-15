@@ -96,4 +96,28 @@ describe('resolvePlace', () => {
     expect(place).toEqual({ name: null, systemId: 30000142 });
     expect(s.calls).toEqual(['stationSystemId:60003760']);
   });
+
+  it('settle: a failed name read keeps the system, and a failed system read keeps the name', async () => {
+    const failing = { ...source() };
+    failing.stationName = () => Promise.reject(new Error('boom'));
+    const ref = { locationId: 60003760, characterId: 7 };
+    expect(await resolvePlace(ref, failing, { settle: true })).toEqual({
+      name: null,
+      systemId: 30000142,
+    });
+    const noSystem = { ...source() };
+    noSystem.stationSystemId = () => Promise.reject(new Error('boom'));
+    expect(await resolvePlace(ref, noSystem, { settle: true })).toEqual({
+      name: 'Jita IV - Moon 4',
+      systemId: null,
+    });
+  });
+
+  it('without settle a throwing read propagates', async () => {
+    const failing = { ...source() };
+    failing.stationName = () => Promise.reject(new Error('boom'));
+    await expect(resolvePlace({ locationId: 60003760, characterId: 7 }, failing)).rejects.toThrow(
+      'boom'
+    );
+  });
 });

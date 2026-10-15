@@ -84,11 +84,15 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
   for (const s of stacks) if (!byPlace.has(s.locationId)) byPlace.set(s.locationId, s);
   await Promise.all(
     [...byPlace].map(async ([id, stack]) => {
-      const place = await resolvePlace({
-        locationId: id,
-        characterId: stack.characterId,
-        kind: stack.locationType === 'station' ? 'station' : 'structure',
-      }).catch(() => ({ name: null, systemId: null }));
+      const place = await resolvePlace(
+        {
+          locationId: id,
+          characterId: stack.characterId,
+          kind: stack.locationType === 'station' ? 'station' : 'structure',
+        },
+        undefined,
+        { settle: true }
+      );
       places.set(id, place.name ?? String(id));
       systems.set(id, place.systemId);
     })
