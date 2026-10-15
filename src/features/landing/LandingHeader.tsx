@@ -57,11 +57,17 @@ export function LandingHeader({
   const { t } = useTranslation();
   const ctaOut = useAllOutOfView(ctaRefs);
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur supports-[backdrop-filter]:bg-bg/60">
+    <header
+      data-cta-open={ctaOut}
+      className="group sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur supports-[backdrop-filter]:bg-bg/60"
+    >
       <div className="mx-auto flex max-w-[96rem] items-center gap-4 px-4 py-2 sm:px-6">
         <div className="flex items-center gap-2">
           <LogoMark className="size-7" />
-          <span className="text-sm font-bold tracking-wide">{t('app.name')}</span>
+          {/* On a phone the login button needs the room: the name goes visually hidden while it shows. */}
+          <span className="text-sm font-bold tracking-wide whitespace-nowrap max-sm:group-data-[cta-open=true]:sr-only">
+            {t('app.name')}
+          </span>
         </div>
         <nav aria-label={t('login.header.nav')} className="hidden flex-1 justify-center md:flex">
           <ul className="flex gap-1">
