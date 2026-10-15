@@ -19,7 +19,7 @@ import {
   Wallet,
   type IconProps,
 } from '@/components/ui/icons';
-import { DESKTOP_SIZE, PHONE_SIZE, type Screenshot } from './screenshots';
+import { DESKTOP_SIZE, type Screenshot } from './screenshots';
 
 /** One catalog entry: its glyph and the `login.features.<key>` name. */
 export interface Feature {
@@ -30,32 +30,29 @@ export interface Feature {
 /**
  * One tab of the showcase: an area of the app, the screenshot that shows it,
  * what it does (`login.showcase.<id>.<bullet>`), and the catalog entries it
- * covers. Together the tabs name every `login.features.*` row exactly once.
- * `phone` is the capture of the same area on a phone, laid over the desktop
- * frame's corner where one exists.
+ * covers. Together the tabs name every `login.features.*` row exactly once; a
+ * row that only repeats the tab's own name is not listed under the tab. Each
+ * capture is used once on the whole page (`screenshotReferences.test.ts`).
  */
 export interface ShowcaseTab {
   id: string;
   shot: Screenshot;
-  phone?: Screenshot;
   bullets: string[];
   features: Feature[];
 }
 
 const desktop = (file: string, key: string): Screenshot => ({ file, key, size: DESKTOP_SIZE });
-const phone = (file: string, key: string): Screenshot => ({ file, key, size: PHONE_SIZE });
 
 export const SHOWCASE_TABS: ShowcaseTab[] = [
   {
     id: 'industry',
-    shot: desktop('desktop-build-plan', 'buildPlan'),
+    shot: desktop('desktop-industry-jobs', 'industryJobs'),
     bullets: ['costs', 'verdict', 'setup', 'jobs'],
     features: [{ icon: Industry, key: 'industry' }],
   },
   {
     id: 'market',
-    shot: desktop('desktop-order-detail', 'orderDetail'),
-    phone: phone('phone-market-jumps', 'phoneMarketJumps'),
+    shot: desktop('desktop-market', 'market'),
     bullets: ['orders', 'market', 'wallet', 'assets'],
     features: [
       { icon: Market, key: 'market' },
@@ -66,8 +63,7 @@ export const SHOWCASE_TABS: ShowcaseTab[] = [
   },
   {
     id: 'ships',
-    shot: desktop('desktop-ship-tree', 'shipTree'),
-    phone: phone('phone-route-safety', 'phoneRouteSafety'),
+    shot: desktop('desktop-skills', 'skills'),
     bullets: ['tree', 'fitting', 'skills', 'travel'],
     features: [
       { icon: Ships, key: 'ships' },

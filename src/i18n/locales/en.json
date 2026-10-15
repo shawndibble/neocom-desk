@@ -3297,7 +3297,6 @@
       "nav": "Page sections",
       "answers": "Answers",
       "features": "Features",
-      "how": "How it works",
       "trust": "Trust",
       "community": "Community",
       "faq": "FAQ",
@@ -3427,8 +3426,20 @@
         "caption": "Alerts for everything that needs you"
       },
       "corporation": {
-        "alt": "The Corporation overview: deadlines per day for the next 14 days and a fuel list that puts the structure running out soonest first.",
+        "alt": "The Corporation overview: standing and runway, deadlines per day for the next 14 days, and fuel and moon chunk lists that put what runs out soonest first.",
         "caption": "One deadline-ranked board for the corp"
+      },
+      "industryJobs": {
+        "alt": "The Industry page: a table of running and finished jobs with progress and time left, above a list of Build Plans ranked by profit, margin and a build or buy verdict.",
+        "caption": "Jobs and Build Plans on one page"
+      },
+      "market": {
+        "alt": "The Market page with Tritanium open: the best sell and buy prices, the spread and the sell order book with each station, quantity, jumps and expiry.",
+        "caption": "A live order book with jumps from you"
+      },
+      "skills": {
+        "alt": "The Skills page: the skill in training with its time left, the queue grouped by this week and the next three weeks, and the character\u2019s attributes.",
+        "caption": "A training queue you can read at a glance"
       },
       "mail": {
         "alt": "Mail in two panes: the inbox on the left with unread mail in bold, the open mail on the right with reply and forward buttons.",
@@ -3438,7 +3449,7 @@
     "featuresHeading": "Everything outside the client",
     "showcase": {
       "label": "Areas of the app",
-      "covers": "Covers",
+      "covers": "Also includes",
       "industry": {
         "tab": "Industry",
         "costs": "A Build Plan costs materials, job cost and taxes at live hub prices.",
@@ -3487,26 +3498,6 @@
         "record": "Alerts keeps the record of everything that fired, for every character, grouped by type.",
         "choose": "Notifications lets you pick which events fire, for which character, as a device pop-up or in the in-app list.",
         "closed": "Alerts when closed is opt-in per character, and is how an alert reaches you with the app shut."
-      }
-    },
-    "how": {
-      "heading": "How it works",
-      "steps": {
-        "login": {
-          "title": "Log in with EVE",
-          "body": "You log in on EVE Online’s own page. Neocom Desk reads your data, and writes to EVE only when you act.",
-          "alt": "The login area of this page: the Log in with EVE Online button and the link to log in with custom permissions."
-        },
-        "share": {
-          "title": "Choose what to share",
-          "body": "Grant every permission or pick your own. Skills and structure lookup are required; the rest are optional, and you can add more later in Settings.",
-          "alt": "The Log in with custom permissions dialog: skills and structure lookup marked required, every other permission an optional checkbox."
-        },
-        "answers": {
-          "title": "See your answers",
-          "body": "The Overview gathers what needs you next: training, wallet, orders and alerts. Open any page for the detail.",
-          "alt": "The Overview after logging in, with the alerts bell open."
-        }
       }
     },
     "features": {

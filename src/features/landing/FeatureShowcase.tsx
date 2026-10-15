@@ -10,10 +10,9 @@ import { SHOWCASE_TABS, type ShowcaseTab } from './showcaseTabs';
 
 /**
  * The features band: tabs by area, each showing one large, uncropped
- * screenshot in a window frame beside what that area does. Where the area also
- * has a phone capture it overlays the frame's lower-right corner (from `sm`
- * up; a phone's own width has no room for it), so the page shows the desktop
- * beside the client and the phone for lookups. Selecting a picture enlarges it.
+ * screenshot in a window frame beside what that area does, and, where the tab
+ * bundles more than its own name, an "Also includes" row of the other features.
+ * Selecting a picture enlarges it.
  */
 export function FeatureShowcase() {
   const { t } = useTranslation();
@@ -21,6 +20,11 @@ export function FeatureShowcase() {
   const [tabId, setTabId] = useState(SHOWCASE_TABS[0].id);
   const [zoomed, setZoomed] = useState<Screenshot | null>(null);
   const tab = SHOWCASE_TABS.find((entry) => entry.id === tabId) ?? SHOWCASE_TABS[0];
+  // A feature that only repeats the tab's own name says nothing the tab does not.
+  const tabName = t(`login.showcase.${tab.id}.tab`);
+  const alsoIncludes = tab.features.filter(
+    ({ key }) => t(`login.features.${key}.name`) !== tabName
+  );
   return (
     <div className="mt-6">
       <Tabs
@@ -42,20 +46,28 @@ export function FeatureShowcase() {
                 </li>
               ))}
             </ul>
-            <p className="mt-6 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('login.showcase.covers')}
-            </p>
-            <ul className="mt-2 flex flex-wrap gap-2">
-              {tab.features.map(({ icon: Icon, key }) => (
-                <li
-                  key={key}
-                  className="flex items-center gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-sm"
-                >
-                  <Icon size={ICON_SIZE.md} aria-hidden="true" className="shrink-0 text-accent" />
-                  {t(`login.features.${key}.name`)}
-                </li>
-              ))}
-            </ul>
+            {alsoIncludes.length > 0 && (
+              <>
+                <p className="mt-6 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('login.showcase.covers')}
+                </p>
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {alsoIncludes.map(({ icon: Icon, key }) => (
+                    <li
+                      key={key}
+                      className="flex items-center gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-sm"
+                    >
+                      <Icon
+                        size={ICON_SIZE.md}
+                        aria-hidden="true"
+                        className="shrink-0 text-accent"
+                      />
+                      {t(`login.features.${key}.name`)}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         </div>
       </TabPanel>
@@ -71,15 +83,11 @@ function useEnlargeLabel() {
     t('login.screenshotEnlarge', { alt: t(`login.screenshots.${shot.key}.alt`) });
 }
 
-/**
- * A window around the desktop capture: a title bar carrying the caption, then
- * the whole picture, never cropped. The phone capture, when there is one, sits
- * over the lower-right corner in its own phone-shaped frame.
- */
+/** A window around the capture: a title bar carrying the caption, then the whole picture, never cropped. */
 function WindowFrame({ tab, onOpen }: { tab: ShowcaseTab; onOpen: (shot: Screenshot) => void }) {
   const { t } = useTranslation();
   const enlargeLabel = useEnlargeLabel();
-  const { shot, phone: phoneShot } = tab;
+  const { shot } = tab;
   return (
     <div className="relative border border-line bg-panel">
       <div className="flex items-center gap-3 border-b border-line px-3 py-2">
@@ -93,20 +101,6 @@ function WindowFrame({ tab, onOpen }: { tab: ShowcaseTab; onOpen: (shot: Screens
         </span>
       </div>
       <ShotButton shot={shot} label={enlargeLabel(shot)} onOpen={() => onOpen(shot)} />
-      {phoneShot && (
-        <div
-          className={cx(
-            'absolute right-3 bottom-3 hidden w-[17%] min-w-20 sm:block',
-            'border-2 border-line bg-bg shadow-lg'
-          )}
-        >
-          <ShotButton
-            shot={phoneShot}
-            label={enlargeLabel(phoneShot)}
-            onOpen={() => onOpen(phoneShot)}
-          />
-        </div>
-      )}
     </div>
   );
 }
