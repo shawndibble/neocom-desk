@@ -921,7 +921,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     await expandJobs();
     fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
-    expect(await screen.findByText('No build plan for Widget Beta')).toBeInTheDocument();
+    expect(await screen.findByText('No Build Plan for Widget Beta')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create Build Plan' }));
 
     await waitFor(() => expect(location?.pathname).toMatch(/^\/industry\/plans\/.+/));
