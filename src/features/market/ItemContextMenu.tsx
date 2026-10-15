@@ -45,6 +45,10 @@ export interface ItemContextMenuProps {
   onViewInIndustryAsMaterial?: () => void;
   /** Leaves out "Set stock target…" where the page already edits the Stock Target in place (Assets › Targets). */
   hideStockTarget?: boolean;
+  /** Leaves out "Build Plan" where the page is already a Build Plan (Industry › Plans detail). */
+  hideBuildPlan?: boolean;
+  /** Leaves out "Add to Compare" where the page has no Compare drawer to show the set (Industry › Plans detail). */
+  hideCompare?: boolean;
   /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
   extraItems?: ReactNode;
   /** A right-click or hold on a link in the row stays the browser's (`RowActionsMenu`'s `linksKeepBrowserMenu`). */
@@ -212,9 +216,11 @@ function useItemMenuItems(
       )}
       <ShowInfoMenuItem typeId={typeId} itemName={itemName} />
       <OpenInEveItemMenuItems typeId={typeId} />
-      <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
-        {t('market.contextMenu.addToCompare')}
-      </MenuItem>
+      {!props.hideCompare && (
+        <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
+          {t('market.contextMenu.addToCompare')}
+        </MenuItem>
+      )}
       {onCompareVariations && (
         <MenuItem onSelect={onCompareVariations}>
           {t('market.contextMenu.compareVariations')}
@@ -224,15 +230,17 @@ function useItemMenuItems(
       <MenuItem onSelect={() => void writeToClipboard(itemName)}>
         {t('market.contextMenu.copyName')}
       </MenuItem>
-      <MenuItem
-        disabled={!blueprintTypeID}
-        onSelect={() => {
-          if (blueprintTypeID)
-            navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
-        }}
-      >
-        {buildPlanLabel}
-      </MenuItem>
+      {!props.hideBuildPlan && (
+        <MenuItem
+          disabled={!blueprintTypeID}
+          onSelect={() => {
+            if (blueprintTypeID)
+              navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
+          }}
+        >
+          {buildPlanLabel}
+        </MenuItem>
+      )}
       {onViewInIndustryAsMaterial && (
         <MenuItem onSelect={onViewInIndustryAsMaterial}>
           {t('market.contextMenu.viewInIndustryAsMaterial')}
