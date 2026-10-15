@@ -499,6 +499,23 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Requests (issue #3807, ADR 0021): a Member's ask for items, read by the
+      // whole Community. Created, extended, closed and reopened only through
+      // the callables (the open-Requests and lines caps can't be counted here),
+      // so no client write is allowed, not even by the requester. Not named
+      // `requests`: that is the Join Requests collection above.
+      match /itemRequests/{requestId} {
+        allow get, list: if isMember();
+        allow write: if false;
+
+        // One Member's Pledges on the Request (issue #3808 opens the owner's
+        // write; until then nothing writes here).
+        match /pledges/{pledgeUid} {
+          allow get, list: if isMember();
+          allow write: if false;
+        }
+      }
+
       // Shared Fittings (issue #3605): one flat collection per Community, so a
       // list is one query however many Members there are. The doc id is
       // `<uid>~saved-<fitting id>` or `<uid>~game-<ESI fitting id>`; binding

@@ -448,3 +448,62 @@ describe('shared Fittings', () => {
     await assertFails(setDoc(doc(db, FIT_1), fit({ hull: 7 })));
   });
 });
+
+// Requests (issue #3807, ADR 0021): the whole Community reads them; only the
+// callables write, so even the requester's own client writes are denied.
+describe('Requests', () => {
+  const REQ = `${C}/itemRequests/r1`;
+  const PLEDGE = `${REQ}/pledges/char:2`;
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, REQ), {
+        ownerUid: 'char:1',
+        ownerHash: 'hash-1',
+        ownerName: 'One',
+        location: 'Efa',
+        terms: '',
+        lines: [{ typeId: 1, name: 'Tritanium', quantity: 5, kind: 'item' }],
+        createdAt: 1,
+        lastActivityAt: 1,
+        expiresAt: 2,
+        closed: false,
+      });
+      await setDoc(doc(db, PLEDGE), { lines: { 0: { quantity: 1, delivered: 0 } } });
+    });
+  });
+
+  it('lets any Member list and read them and their Pledges', async () => {
+    const db = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(getDoc(doc(db, REQ)));
+    await assertSucceeds(getDocs(collection(db, `${C}/itemRequests`)));
+    await assertSucceeds(getDoc(doc(db, PLEDGE)));
+    await assertSucceeds(getDocs(collection(db, `${REQ}/pledges`)));
+  });
+
+  it('hides them from a non-Member, an unauthenticated visitor and a transferred Character', async () => {
+    for (const db of [
+      characterAuth(env, 3, 'hash-3').firestore(),
+      env.unauthenticatedContext().firestore(),
+      characterAuth(env, 2, 'hash-2-new-owner').firestore(),
+    ]) {
+      await assertFails(getDoc(doc(db, REQ)));
+      await assertFails(getDocs(collection(db, `${C}/itemRequests`)));
+      await assertFails(getDoc(doc(db, PLEDGE)));
+    }
+  });
+
+  it('denies every client write, the requester’s and another Member’s alike', async () => {
+    for (const db of [
+      characterAuth(env, 1, 'hash-1').firestore(),
+      characterAuth(env, 2, 'hash-2').firestore(),
+    ]) {
+      await assertFails(updateDoc(doc(db, REQ), { closed: true }));
+      await assertFails(updateDoc(doc(db, REQ), { terms: 'hijacked' }));
+      await assertFails(deleteDoc(doc(db, REQ)));
+      await assertFails(setDoc(doc(db, `${C}/itemRequests/r2`), { ownerUid: 'char:1' }));
+      await assertFails(setDoc(doc(db, PLEDGE), { lines: {} }));
+    }
+  });
+});

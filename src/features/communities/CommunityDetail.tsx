@@ -28,7 +28,10 @@ import { CommunityHeader } from './CommunityHeader';
 import { CommunityLibrary } from './CommunityLibrary';
 import { CommunitySharedFittings } from './CommunitySharedFittings';
 import { CommunitySharedPlans } from './CommunitySharedPlans';
+import { isOpenRequest } from '@/engine/communities/requests';
 import { isContentTab, type CommunityTab, type ContentTab } from './communityTabs';
+import { RequestsTab } from './RequestsTab';
+import { useCommunityRequests } from './useCommunityRequests';
 import { CommunityMemberList } from './CommunityMemberList';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CommunityInvites } from './CommunityInvites';
@@ -112,6 +115,10 @@ export function CommunityDetail({
   const tabsId = useTabsId();
   const [tab, setTab] = useState<CommunityTab>(initialTab);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
+  // The board is read once its tab has been opened, then kept for the tab's count.
+  const [requestsOpened, setRequestsOpened] = useState(initialTab === 'requests');
+  const board = useCommunityRequests(characterId, community.id, requestsOpened);
+  const openRequests = board.requests?.filter((r) => isOpenRequest(r, now)).length;
   const manageMenu = useOpenAfterMenu();
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
 
@@ -253,6 +260,11 @@ export function CommunityDetail({
             { id: 'fittings', label: tabLabels.fittings },
             { id: 'plans', label: tabLabels.plans },
             {
+              id: 'requests',
+              label: t('communities.tabs.requests'),
+              count: openRequests,
+            },
+            {
               id: 'members',
               label: t('communities.members'),
               // The roster once loaded, so the tab and the header card never disagree.
@@ -264,6 +276,7 @@ export function CommunityDetail({
             const next = id as CommunityTab;
             // My sharing follows the content tabs; the roster has none.
             if (!isContentTab(next) && sharingOpen) closeSharing();
+            if (next === 'requests') setRequestsOpened(true);
             setTab(next);
           }}
           label={t('communities.tabs.label')}
@@ -279,6 +292,16 @@ export function CommunityDetail({
               />
               <Panel key={contentKey}>{everyoneViews[tab]()}</Panel>
             </div>
+          ) : tab === 'requests' ? (
+            <RequestsTab
+              characterId={characterId}
+              communityId={community.id}
+              myUid={myUid}
+              requests={board.requests}
+              failed={board.failed}
+              now={now}
+              onReload={board.reload}
+            />
           ) : (
             <Panel>
               {membersFailed ? (

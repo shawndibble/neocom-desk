@@ -10,6 +10,7 @@
  * tabs' Everyone views fill, and the sample Character's own share shows under
  * Mine.
  */
+import type { CommunityRequest, RequestLine } from '@/engine/communities/requests';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
@@ -176,6 +177,85 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
     ],
   };
 
+  const wanted = (
+    id: string,
+    ownerUid: string,
+    ownerName: string,
+    location: string,
+    terms: string,
+    ageHours: number,
+    lines: RequestLine[]
+  ): CommunityRequest => ({
+    id,
+    ownerUid,
+    ownerName,
+    location,
+    terms,
+    lines,
+    createdAt: now - ageHours * 3_600_000,
+    lastActivityAt: now - ageHours * 3_600_000,
+    expiresAt: now - ageHours * 3_600_000 + 30 * DAY,
+    closed: false,
+  });
+  const item = (typeId: number, name: string, quantity: number): RequestLine => ({
+    typeId,
+    name,
+    quantity,
+    kind: 'item',
+  });
+  const itemRequests: Record<string, CommunityRequest[]> = {
+    [SAMPLE_ADMIN_COMMUNITY_ID]: [
+      wanted(
+        'req-1',
+        'char:2119000001',
+        'Ilvara Nokk',
+        'Badivefi, Khanid',
+        'Budget 300M total, payment negotiable',
+        2,
+        [
+          item(16634, 'Reactive Metals', 350000),
+          item(16633, 'Toxic Metals', 300000),
+          item(16655, 'Chiral Structures', 175000),
+        ]
+      ),
+      wanted(
+        'req-2',
+        'char:2119000002',
+        'Dax Orrelin',
+        'Amarr (region)',
+        '90% JBV, will accept contracts daily',
+        24,
+        [
+          {
+            typeId: 11534,
+            name: 'Scan Acquisition Array I Blueprint',
+            quantity: 2,
+            kind: 'bpc',
+            runs: 10,
+            me: 10,
+          },
+          {
+            typeId: 11535,
+            name: 'Scan Rangefinding Array I Blueprint',
+            quantity: 2,
+            kind: 'bpc',
+            runs: 10,
+            me: 10,
+          },
+        ]
+      ),
+      wanted('req-3', ME, SAMPLE_ACTIVE_CHARACTER.name, 'Efa', '', 72, [
+        { typeId: 33328, name: 'Ishtar Blueprint', quantity: 3, kind: 'bpc', runs: 5 },
+      ]),
+      wanted('req-4', 'char:2119000003', 'Thessaly Brandt', 'Jita', '', 120, [
+        item(34, 'Tritanium', 10000000),
+        item(35, 'Pyerite', 2000000),
+        item(36, 'Mexallon', 400000),
+      ]),
+    ],
+    [SAMPLE_MEMBER_COMMUNITY_ID]: [],
+  };
+
   const byId = (id: string) => communities.find((community) => community.id === id);
   const patch = (id: string, change: Partial<CommunitySummary>) => {
     const community = byId(id);
@@ -188,6 +268,7 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
     loadRequests: (id) => (requests[id] ?? []).map((entry) => ({ ...entry })),
     loadLibraries: (id) => libraries[id] ?? [],
     loadFittings: (id) => (fittings[id] ?? []).map((entry) => ({ ...entry })),
+    loadItemRequests: (id) => (itemRequests[id] ?? []).map((entry) => ({ ...entry })),
     loadPlans: (id) => (plans[id] ?? []).map((entry) => ({ ...entry })),
     call: (name, data) => {
       const { communityId, memberUid, accept, requireApproval } = data as {
@@ -197,6 +278,32 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
         requireApproval: boolean;
       };
       switch (name) {
+        case 'postCommunityRequestCallable': {
+          const draft = data as { location: string; terms: string; lines: RequestLine[] };
+          const posted = wanted(
+            `req-${Math.random().toString(36).slice(2, 8)}`,
+            ME,
+            SAMPLE_ACTIVE_CHARACTER.name,
+            draft.location,
+            draft.terms,
+            0,
+            draft.lines
+          );
+          itemRequests[communityId] = [posted, ...(itemRequests[communityId] ?? [])];
+          return { requestId: posted.id };
+        }
+        case 'extendCommunityRequestCallable': {
+          const { requestId } = data as { requestId: string };
+          const found = itemRequests[communityId]?.find((entry) => entry.id === requestId);
+          if (found) found.expiresAt = now + 30 * DAY;
+          return { expiresAt: now + 30 * DAY };
+        }
+        case 'setCommunityRequestClosedCallable': {
+          const { requestId, closed } = data as { requestId: string; closed: boolean };
+          const found = itemRequests[communityId]?.find((entry) => entry.id === requestId);
+          if (found) found.closed = closed;
+          return {};
+        }
         case 'revokeCommunityInviteCallable':
           patch(communityId, { inviteCode: null });
           return {};

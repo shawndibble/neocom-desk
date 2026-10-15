@@ -9,6 +9,7 @@
  * (`sharedFittings.ts`, `sharedPlans.ts`) reading "no stand-in".
  */
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
+import type { CommunityRequest } from '@/engine/communities/requests';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedPlan } from '@/engine/communities/sharedPlans';
 import type { CommunityMember, CommunitySummary, JoinRequest } from './communityStore';
@@ -23,6 +24,8 @@ export interface CommunityBackendOverride {
   loadLibraries?: (communityId: string) => MemberLibrary[];
   /** Every Fitting shared into the Community, by anyone. */
   loadFittings?: (communityId: string) => SharedFitting[];
+  /** Every Request on the board, any status. */
+  loadItemRequests?: (communityId: string) => CommunityRequest[];
   /** Every Skill Plan shared into the Community, by anyone. */
   loadPlans?: (communityId: string) => SharedPlan[];
 }

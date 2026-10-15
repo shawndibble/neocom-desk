@@ -17,4 +17,20 @@ The board counts **lines** ("1 delivered · 2 pledged · 3 needed lines"), never
 
 Not shown, specified in the ticket text: My pledges slide-out (the same shape as My sharing), the loading and failed states (as the other Community tabs), and the Message button's behaviour (opens an in-game mail).
 
+## Deviations in the first build (issue #3807)
+
+The Requests tab, board, read-only side panel, compose step 1 and the empty state are built (`pages-communities--requests-*` stories). Where they differ from the pictures:
+
+- **Not built, by scope (other tickets):** Pledge controls and the over-pledge note (#3808), the delivery note and Message button, the "My pledges" button and the "and 1 Pledge in progress" half of the strip (#3808), the "I can fill" chip and the distance select (#3811), compose step 2 and the mail count (#3810). The strip reads "You have N open Requests." and carries only New request….
+- **Compose button:** step 1 ends in **Post request** (posts without mail) where the picture has "Next: who to mail".
+- **Statuses and bars:** with no Pledges yet every Request is Open and every bar is empty. Closed and Expired exist as statuses (Mine lists a closed Request so it can be reopened) and are not pictured.
+- **Panel title:** the requester sees "Your request" (the picture's "You's request" is the sample name run through the template).
+- **Panel for a Member:** only the terms and each line's progress, no controls. The requester's panel reads Reopen request when closed.
+- **Added to compose:** a blueprint line gets a Blueprint copy / Original (loan) select and, for a copy, optional Runs, ME and TE fields on a second row (the scope decision lets a BPC line carry them; the picture has no entry point). A line is typed by name: a type name ending "Blueprint".
+- **Pasted list** is the proportional font like the picture, not monospace; unrecognised pasted names are listed under the box.
+- **Compose labels** sit above their fields (the compose PNGs show them beside); two fields side by side at md, one column on a phone.
+- **Search results** list under the add box as a plain list of buttons.
+- **Search placeholder** ends in "…" (the i18n convention test requires it).
+- **Column header** Age has no default sort (rows arrive newest first); Request, Status and Age sort.
+
 Delete this folder and the story when the last ticket that links it closes.

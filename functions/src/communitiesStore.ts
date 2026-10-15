@@ -32,6 +32,7 @@ import {
   type CreateCommunityInput,
   type JoinCommunityInput,
 } from './communities.js';
+import { REQUESTS_COLLECTION as ITEM_REQUESTS_COLLECTION } from './communityRequests.js';
 
 const LIBRARY_COLLECTION = 'library';
 const REQUESTS_COLLECTION = 'requests';
@@ -44,9 +45,9 @@ export interface CallerCharacter {
   ownerHash: string;
 }
 
-const communityRef = (db: Firestore, communityId: string) =>
+export const communityRef = (db: Firestore, communityId: string) =>
   db.collection(COMMUNITIES_COLLECTION).doc(communityId);
-const memberRef = (db: Firestore, communityId: string, uid: string) =>
+export const memberRef = (db: Firestore, communityId: string, uid: string) =>
   communityRef(db, communityId).collection(COMMUNITY_MEMBERS_COLLECTION).doc(uid);
 /** A Character waiting for the admin to let them in (a Community that approves new Members). */
 const requestRef = (db: Firestore, communityId: string, uid: string) =>
@@ -54,7 +55,7 @@ const requestRef = (db: Firestore, communityId: string, uid: string) =>
 const indexCollection = (db: Firestore, uid: string) =>
   db.collection('characters').doc(uid).collection(CHARACTER_COMMUNITIES_COLLECTION);
 
-function fail(decision: string): never {
+export function fail(decision: string): never {
   switch (decision) {
     case 'too-many-communities':
       throw new HttpsError(
@@ -89,7 +90,7 @@ function fail(decision: string): never {
   }
 }
 
-async function loadCommunity(db: Firestore, communityId: string) {
+export async function loadCommunity(db: Firestore, communityId: string) {
   const snap = await communityRef(db, communityId).get();
   if (!snap.exists) throw new HttpsError('not-found', 'Community not found');
   return snap;
@@ -100,7 +101,7 @@ async function loadCommunity(db: Firestore, communityId: string) {
  * with: a sold Character keeps its uid but gets a new ownerHash, and must not
  * act on, or be told it holds, the previous owner's membership.
  */
-async function isCurrentMember(db: Firestore, communityId: string, caller: CallerCharacter) {
+export async function isCurrentMember(db: Firestore, communityId: string, caller: CallerCharacter) {
   const member = await memberRef(db, communityId, caller.uid).get();
   return member.exists && member.get('ownerHash') === caller.ownerHash;
 }
@@ -370,8 +371,9 @@ export async function decideJoinRequest(
 
 /**
  * Everything one Member shared into a Community: their blueprint library
- * chunks, their shared Fittings (issue #3605) and their shared Skill Plans. Every delete-on-leave path
- * goes through this so a new kind of shared data can't be missed in one.
+ * chunks, their shared Fittings (issue #3605), their shared Skill Plans and
+ * their Requests with the Pledges under them. Every delete-on-leave path goes
+ * through this so a new kind of shared data can't be missed in one.
  */
 async function deleteMemberShares(db: Firestore, communityId: string, uid: string): Promise<void> {
   await db.recursiveDelete(memberRef(db, communityId, uid).collection(LIBRARY_COLLECTION));
@@ -383,6 +385,12 @@ async function deleteMemberShares(db: Firestore, communityId: string, uid: strin
     .collection(SKILL_PLANS_COLLECTION)
     .where('ownerUid', '==', uid)
     .get();
+  // Requests (ADR 0021): a Member's own, with the Pledges under them.
+  const posted = await communityRef(db, communityId)
+    .collection(ITEM_REQUESTS_COLLECTION)
+    .where('ownerUid', '==', uid)
+    .get();
+  for (const request of posted.docs) await db.recursiveDelete(request.ref);
   const writer = db.bulkWriter();
   // Awaited, so a delete that fails after its retries fails the leave rather than orphaning a readable copy.
   const deletes = [...fittings.docs, ...plans.docs].map((shared) => writer.delete(shared.ref));

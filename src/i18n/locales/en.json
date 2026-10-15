@@ -8110,7 +8110,8 @@
       "label": "Community",
       "blueprints": "Blueprints",
       "fittings": "Fittings",
-      "plans": "Skill plans"
+      "plans": "Skill plans",
+      "requests": "Requests"
     },
     "plans": {
       "hint": "Skill plans are shared one at a time, never all at once. Members can copy a shared plan to their own plans; it keeps your later edits up to date here.",
@@ -8221,6 +8222,104 @@
       "tooMany": "This Character is already in 10 Communities.",
       "failed": "Could not join. Try again.",
       "open": "Open the Community"
+    },
+    "board": {
+      "summary_zero": "You have no open Requests.",
+      "summary_one": "You have {{count}} open Request.",
+      "summary_other": "You have {{count}} open Requests.",
+      "new": "New request…",
+      "search": "Search Requests",
+      "searchPlaceholder": "Search item, requester or place…",
+      "filters": {
+        "open": "Open",
+        "mine": "Mine"
+      },
+      "tableLabel": "Requests",
+      "columns": {
+        "request": "Request",
+        "terms": "Terms",
+        "progress": "Progress",
+        "status": "Status",
+        "age": "Age"
+      },
+      "more_one": "+ {{count}} more",
+      "more_other": "+ {{count}} more",
+      "you": "You",
+      "progressLines": "{{delivered}} delivered · {{pledged}} pledged · {{needed}} needed lines",
+      "progressUnits": "{{delivered}} delivered · {{pledged}} pledged · {{needed}} needed",
+      "status": {
+        "open": "Open",
+        "pledged": "Pledged",
+        "partDelivered": "Part delivered",
+        "delivered": "Delivered",
+        "closed": "Closed",
+        "expired": "Expired"
+      },
+      "age": {
+        "now": "now",
+        "minutes": "{{count}}m",
+        "hours": "{{count}}h",
+        "days": "{{count}}d"
+      },
+      "left": "{{count}}d left",
+      "leftUnderDay": "<1d left",
+      "empty": "No requests yet",
+      "emptyHint": "Post what you're looking for and Members can pledge to supply it.",
+      "noMatch": "No Requests match your search",
+      "noneOpen": "No open Requests",
+      "noneMine": "You have no Requests",
+      "loadFailed": "Couldn't load this Community's Requests.",
+      "panelTitle": "{{name}}'s request",
+      "panelTitleMine": "Your request",
+      "posted": "posted {{age}}",
+      "closesIn": "closes in {{count}}d",
+      "closesUnderDay": "closes in under a day",
+      "closedNote": "closed",
+      "termsLabel": "Terms:",
+      "linesLabel": "Lines",
+      "kind": {
+        "bpc": "BPC",
+        "bpo": "BPO"
+      },
+      "spec": {
+        "runs": "runs {{count}}",
+        "me": "ME {{value}}",
+        "te": "TE {{value}}"
+      },
+      "extend": "Extend 30 days",
+      "close": "Close request",
+      "reopen": "Reopen request",
+      "actionFailed": "That didn't go through. Try again.",
+      "tooManyOpen": "You already have the most open Requests a Member can hold here. Close one first.",
+      "compose": {
+        "title": "New request",
+        "location": "Location (optional)",
+        "terms": "Terms (optional)",
+        "termsPlaceholder": "Budget, price basis, payment negotiable…",
+        "paste": "Paste a list (an Appraisal, an inventory copy)",
+        "unmatched_one": "{{count}} line wasn't recognised and was left out: {{names}}",
+        "unmatched_other": "{{count}} lines weren't recognised and were left out: {{names}}",
+        "catalogueFailed": "Couldn't load the item list, so pasting and searching won't work. Close this and try again.",
+        "over": "{{count}} more than the {{max}}-line limit. Remove some lines to post.",
+        "duplicate": "{{name}} is listed twice as the same kind. Change one or remove it.",
+        "quantityOf": "{{name}} quantity",
+        "removeLine": "Remove {{name}}",
+        "remove": "Remove",
+        "removed": "{{name}} removed",
+        "kindOf": "{{name}}: copy or original",
+        "kindBpc": "Blueprint copy",
+        "kindBpo": "Original (loan)",
+        "runs": "Runs",
+        "me": "ME",
+        "te": "TE",
+        "addLabel": "Add an item",
+        "addPlaceholder": "Add an item or blueprint…",
+        "results": "Matching items",
+        "added": "{{name}} added",
+        "tooManyLines": "A Request holds at most {{count}} lines.",
+        "failed": "Couldn't post the Request. Try again.",
+        "post": "Post request"
+      }
     }
   },
   "contacts": {
