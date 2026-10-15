@@ -97,9 +97,9 @@ interface PlanVerdictHeroProps {
    * Visible "More actions" button beside the product heading (WCAG 2.1.1,
    * issue #1498) — the hero's `<h2>` has no focusable trigger of its own, so
    * this is that surface's only keyboard path to the item menu. Omitted
-   * where the caller has none to offer.
+   * where the caller has none to offer. `bordered` asks for the ⋮ as a
+   * bordered button the height of a small `Button`, to stand beside one.
    */
-  /** `bordered` asks for the ⋮ as a bordered button the height of a small `Button`, to stand beside one. */
   itemActionsFor?: (typeId: number, bordered?: boolean) => ReactElement;
   runs: number;
   /** The owned BPC's real run limit when the plan's runs exceed it and nothing extends it (issue #1775); the hero names the blueprint instead of a generic empty state. */
@@ -341,7 +341,7 @@ export function PlanVerdictHero({
           Two doors into one modal only made the hero's action row ambiguous
           about which button was the primary one.
         */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 xl:items-end">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="primary"
