@@ -555,18 +555,16 @@ function PlanRow({
             // group, rename, duplicate, delete) is the trailing ⋮, also the row's
             // right-click menu.
             <span className="flex min-w-0 flex-1">
-              <Tooltip content={plan.name}>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    if (!guard.swallowClick(event)) onSelect(plan.id);
-                  }}
-                  onDoubleClick={() => setRenaming(true)}
-                  className={entityLinkClassName('dt-primary min-w-0 truncate text-left')}
-                >
-                  {plan.name}
-                </button>
-              </Tooltip>
+              <button
+                type="button"
+                onClick={(event) => {
+                  if (!guard.swallowClick(event)) onSelect(plan.id);
+                }}
+                onDoubleClick={() => setRenaming(true)}
+                className={entityLinkClassName('dt-primary min-w-0 truncate text-left')}
+              >
+                {plan.name}
+              </button>
             </span>
           )}
           {/* Kept, not withheld, while the verdict is "Fix location": the figures
