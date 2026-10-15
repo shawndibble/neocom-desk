@@ -5,6 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
 import { Spinner, TabPanel, Toast, useTimedToast } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
+import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import {
   INDUSTRY_TABS_ID,
@@ -92,6 +93,9 @@ export function IndustryGroupPage() {
     });
   }
 
+  // Same account-wide skill gate a member's own page applies to its Auto Build.
+  const accountSkills = useAccountSkillLevels([...ownedStockSnapshot.characterNames.keys()]);
+
   /** @see BuildGroupPanel's `onAutoBuild` doc — same one-shot bulk build/buy control, run once per member. */
   async function handleAutoBuildGroup(options: { strategy: BuildStrategy; depth: number }) {
     if (activeCharacterId === null || groupId === undefined || !catalog) return;
@@ -116,7 +120,8 @@ export function IndustryGroupPage() {
       options,
       pricingInputs.corpBlueprints,
       bpcRows,
-      pricingInputs.communityRows
+      pricingInputs.communityRows,
+      accountSkills
     );
     if (picks.size === 0) return;
     await patchBuildPlans([...picks.keys()], (p) => {
