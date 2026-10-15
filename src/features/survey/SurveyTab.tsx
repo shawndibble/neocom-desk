@@ -4,7 +4,9 @@
  * then on. The first scan stores a `survey` Share Link; a later paste that only
  * shrinks the field adds a scan to it, and the short link is what other pilots
  * open or paste into. A paste that is a different field starts a new survey, or
- * asks first when the pilot owns the one in view.
+ * asks first when the pilot owns the one in view and it could still be that
+ * field (it fits the first scan); one that doesn't even fit the first scan
+ * starts a new survey without asking.
  *
  * Like the other mining tabs, this one owns its `PageHeader`; the shared tab
  * bar is handed down from `routes/MoonMiningTax.tsx`.
@@ -143,16 +145,16 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
           // Against what the survey counts: a removed bad paste is no field to match.
           const counted = countedScans(found.scans, found.ignored);
           const latest = counted[counted.length - 1];
+          const pasted = parseSurveyScan(text) ?? [];
           const sameField =
             choice === 'existing' ||
             latest === undefined ||
-            classifyScan(
-              lastSeenField(counted.map((scan) => scan.rocks)),
-              parseSurveyScan(text) ?? []
-            ) === 'update';
+            classifyScan(lastSeenField(counted.map((scan) => scan.rocks)), pasted) === 'update';
           if (!sameField) {
             const names = (await db.characters.toArray()).map((c) => c.name);
-            if (!ownsSurvey(found.owner, names)) return await startWith(text);
+            // Not even a subset of the first scan: clearly another field, so no question to ask.
+            const clearlyNew = classifyScan(counted[0]!.rocks, pasted) === 'different';
+            if (clearlyNew || !ownsSurvey(found.owner, names)) return await startWith(text);
             setAsking({ text, forId: currentId });
             return 'ok';
           }

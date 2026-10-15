@@ -46,6 +46,8 @@ const SCAN =
   'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km\nClear Icicle\t55\t55,000 m3\t11,300,000.00 ISK\t10 km';
 // Rocks only shrink: one rock gone, the other untouched.
 const SHRUNK = 'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km';
+// More m3 than the latest scan shows, yet within what the first scan showed: could be the same field.
+const GREW = 'Clear Icicle\t40\t40,000 m3\t8,000,000.00 ISK\t28 km';
 // An ore the survey never showed: another field.
 const DIFFERENT = 'Blue Ice\t10\t1,000 m3\t1.00 ISK\t5 km';
 const ID = 'abc123XYZ';
@@ -240,11 +242,42 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
     });
   });
 
-  it("asks the owner what to do with a different field, and 'Create new survey' starts one", async () => {
+  // The field has been mined down since the first scan, so a bigger rock reads as a different field.
+  function shrunkSince() {
+    loadSurvey.mockResolvedValue({
+      ok: true,
+      ignored: new Set(),
+      expiresAt: EXPIRES,
+      owner: 'Shawn Dibble',
+      tax: null,
+      scans: [
+        { at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! },
+        { at: Date.UTC(2026, 9, 8, 19), rocks: parseSurveyScan(SHRUNK)! },
+      ],
+    });
+  }
+
+  it('starts a new survey without asking when the paste does not even fit the first scan', async () => {
     await useCurrentSurveyId.getState().setValue(ID);
     renderTab();
     await screen.findByText('0% mined');
     pasteInApp(DIFFERENT);
+    await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('group', { name: /different field/i })).toBeNull();
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: DIFFERENT,
+      expiresAt: EXPIRES,
+      by: 'Shawn Dibble',
+    });
+  });
+
+  it("asks the owner what to do with a different field, and 'Create new survey' starts one", async () => {
+    await useCurrentSurveyId.getState().setValue(ID);
+    shrunkSince();
+    renderTab();
+    await screen.findByText(/% mined/);
+    pasteInApp(GREW);
     await screen.findByRole('group', { name: /different field/i });
     expect(addSurveyScan).not.toHaveBeenCalled();
     expect(startSurvey).not.toHaveBeenCalled();
@@ -253,7 +286,7 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
     await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
     expect(addSurveyScan).toHaveBeenCalledWith({
       id: ID,
-      text: DIFFERENT,
+      text: GREW,
       expiresAt: EXPIRES,
       by: 'Shawn Dibble',
     });
@@ -264,14 +297,15 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
 
   it("'Add to existing survey' puts the different field on the survey in view anyway", async () => {
     await useCurrentSurveyId.getState().setValue(ID);
+    shrunkSince();
     renderTab();
-    await screen.findByText('0% mined');
-    pasteInApp(DIFFERENT);
+    await screen.findByText(/% mined/);
+    pasteInApp(GREW);
     fireEvent.click(await screen.findByRole('button', { name: 'Add to existing survey' }));
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
     expect(addSurveyScan).toHaveBeenCalledWith({
       id: ID,
-      text: DIFFERENT,
+      text: GREW,
       expiresAt: EXPIRES,
       by: 'Shawn Dibble',
     });
