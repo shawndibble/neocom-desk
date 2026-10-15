@@ -205,8 +205,10 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     case 'communityJoinRequest':
     case 'communityMemberJoined':
       return [characterId, fire.eventId, fire.communityId, fire.uid, fire.at].join(':');
-    // The latest new Pledge in the Community: a Pledger who withdraws and
-    // Pledges again writes a later `at`, so it is its own occurrence.
+    // The latest new Pledge in the Community, by Request, Pledger and the time
+    // it was written. A re-Pledge after a poll that saw the withdrawal writes a
+    // later `at` and is its own occurrence; the same Pledge read twice, or an
+    // update to it, is not (the diff does not refire it either).
     case 'communityRequestPledged':
       return [characterId, fire.eventId, fire.communityId, fire.requestId, fire.uid, fire.at].join(
         ':'

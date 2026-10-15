@@ -158,7 +158,7 @@ export async function editRequest(
       location: input.location,
       terms: input.terms,
       lines: input.lines,
-      notify: input.notify,
+      ...(input.notify ? { notify: input.notify } : {}),
       lastActivityAt: now,
     });
   });

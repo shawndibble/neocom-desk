@@ -358,6 +358,16 @@ describe('parseRemovePledgeInput', () => {
 });
 
 describe('editing a Request', () => {
+  it('keeps the stored notify when an edit omits it (an older client), and takes one that is given', () => {
+    expect(parseEditRequestInput(post({ requestId: 'r1' })).notify).toBeUndefined();
+    expect(
+      parseEditRequestInput(post({ requestId: 'r1', notify: { app: false, mail: true } })).notify
+    ).toEqual({ app: false, mail: true });
+    expect(() =>
+      parseEditRequestInput(post({ requestId: 'r1', notify: { app: 1, mail: true } }))
+    ).toThrow();
+  });
+
   it('parses a post plus the Request id', () => {
     expect(parseEditRequestInput(post({ requestId: 'r1' })).requestId).toBe('r1');
     expect(() => parseEditRequestInput(post())).toThrow();

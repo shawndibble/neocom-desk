@@ -76,8 +76,10 @@ export interface PostRequestInput {
   notify: RequestNotify;
 }
 
-export interface EditRequestInput extends PostRequestInput {
+/** An edit that omits `notify` (an older client) keeps the stored choice. */
+export interface EditRequestInput extends Omit<PostRequestInput, 'notify'> {
   requestId: string;
+  notify?: RequestNotify;
 }
 
 export interface RequestIdInput {
@@ -190,10 +192,14 @@ export function parsePostRequestInput(data: unknown): PostRequestInput {
 }
 
 export function parseEditRequestInput(data: unknown): EditRequestInput {
-  return {
+  const given = record(data).notify;
+  const parsed: EditRequestInput = {
     ...parsePostRequestInput(data),
     requestId: docId(record(data).requestId, 'requestId'),
   };
+  // Parsing fills in the default; an edit that said nothing must not apply it.
+  if (given === undefined || given === null) delete parsed.notify;
+  return parsed;
 }
 
 export function parseRequestIdInput(data: unknown): RequestIdInput {

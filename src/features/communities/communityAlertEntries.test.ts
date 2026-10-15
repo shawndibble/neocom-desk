@@ -3,7 +3,7 @@ import { db } from '@/db';
 import { uidForCharacter } from '@/sync/uid';
 import { loadCommunityAlertEntries, rememberCommunityAdmin } from './communityAlertEntries';
 import { rememberCommunityWatch } from './requestBadge';
-import { loadCommunityPledges, loadRequests } from './requestStore';
+import { loadMyRequests, loadPledges } from './requestStore';
 import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 import {
   loadCommunityMembers,
@@ -16,7 +16,7 @@ const session = vi.hoisted(() => ({ uid: null as string | null }));
 vi.mock('@/sync/firebaseApp', () => ({
   getSyncAuth: () => ({ currentUser: session.uid ? { uid: session.uid } : null }),
 }));
-vi.mock('./requestStore', () => ({ loadRequests: vi.fn(), loadCommunityPledges: vi.fn() }));
+vi.mock('./requestStore', () => ({ loadMyRequests: vi.fn(), loadPledges: vi.fn() }));
 vi.mock('./communityStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./communityStore')>()),
   loadMyCommunities: vi.fn(),
@@ -133,34 +133,33 @@ describe('loadCommunityAlertEntries: Pledges on my Requests', () => {
   });
 
   beforeEach(() => {
-    vi.mocked(loadCommunityPledges).mockResolvedValue(new Map());
-    vi.mocked(loadRequests).mockResolvedValue([]);
+    vi.mocked(loadPledges).mockResolvedValue([]);
+    vi.mocked(loadMyRequests).mockResolvedValue([]);
   });
 
   it('reads nothing for a Character in no Community', async () => {
     expect(await loadCommunityAlertEntries(CHARACTER)).toEqual([]);
-    expect(loadRequests).not.toHaveBeenCalled();
+    expect(loadMyRequests).not.toHaveBeenCalled();
   });
 
   it('lists each own open Request that wants the app, and the Pledges on it by others', async () => {
     await rememberCommunityWatch(CHARACTER, [member()]);
     vi.mocked(loadMyCommunities).mockResolvedValue([member()]);
-    vi.mocked(loadRequests).mockResolvedValue([
+    vi.mocked(loadMyRequests).mockResolvedValue([
       request(),
       request({ id: 'r2', notify: { app: false, mail: true } }),
       request({ id: 'r3', closed: true }),
-      request({ id: 'r4', ownerUid: 'char:5' }),
     ]);
-    vi.mocked(loadCommunityPledges).mockResolvedValue(
-      new Map([
-        ['r1', [pledge('u2'), pledge(me)]],
-        ['r2', [pledge('u3')]],
-      ])
+    vi.mocked(loadPledges).mockImplementation(async (_c, _community, requestId) =>
+      requestId === 'r1' ? [pledge('u2'), pledge(me)] : [pledge('u3')]
     );
     vi.mocked(loadCommunityMembers).mockResolvedValue([
       { uid: 'u2', characterName: 'Bob', joinedAt: 1, libraryAsOf: null },
     ]);
-    expect(await loadCommunityAlertEntries(CHARACTER)).toEqual([
+    const entries = await loadCommunityAlertEntries(CHARACTER);
+    expect(loadPledges).toHaveBeenCalledTimes(1);
+    expect(loadPledges).toHaveBeenCalledWith(CHARACTER, 'c1', 'r1');
+    expect(entries).toEqual([
       {
         communityId: 'c1',
         communityName: 'Efa Miners',
@@ -187,16 +186,16 @@ describe('loadCommunityAlertEntries: Pledges on my Requests', () => {
   it('reads no Pledges in a Community where none of my Requests wants the app', async () => {
     await rememberCommunityWatch(CHARACTER, [member()]);
     vi.mocked(loadMyCommunities).mockResolvedValue([member()]);
-    vi.mocked(loadRequests).mockResolvedValue([request({ notify: { app: false, mail: true } })]);
+    vi.mocked(loadMyRequests).mockResolvedValue([request({ notify: { app: false, mail: true } })]);
     expect(await loadCommunityAlertEntries(CHARACTER)).toEqual([]);
-    expect(loadCommunityPledges).not.toHaveBeenCalled();
+    expect(loadPledges).not.toHaveBeenCalled();
   });
 
   it('reads the roster once for names it has not seen, and falls back to no name when that fails', async () => {
     await rememberCommunityWatch(CHARACTER, [member()]);
     vi.mocked(loadMyCommunities).mockResolvedValue([member({ id: 'c9' })]);
-    vi.mocked(loadRequests).mockResolvedValue([request()]);
-    vi.mocked(loadCommunityPledges).mockResolvedValue(new Map([['r1', [pledge('u7')]]]));
+    vi.mocked(loadMyRequests).mockResolvedValue([request()]);
+    vi.mocked(loadPledges).mockResolvedValue([pledge('u7')]);
     vi.mocked(loadCommunityMembers).mockRejectedValue(new Error('offline'));
     const entries = await loadCommunityAlertEntries(CHARACTER);
     expect(entries?.find((e) => e.kind === 'pledge')?.characterName).toBe('');
@@ -206,8 +205,19 @@ describe('loadCommunityAlertEntries: Pledges on my Requests', () => {
     await rememberCommunityAdmin(CHARACTER, [community()]);
     await rememberCommunityWatch(CHARACTER, [community()]);
     vi.mocked(loadMyCommunities).mockResolvedValue([community({ id: 'c5', memberCount: 1 })]);
-    vi.mocked(loadRequests).mockResolvedValue([request()]);
+    vi.mocked(loadMyRequests).mockResolvedValue([request()]);
     const entries = await loadCommunityAlertEntries(CHARACTER);
     expect(entries?.map((e) => e.kind)).toEqual(['pledgeRequest']);
+  });
+
+  it('does not read the roster again every poll for a Pledger who has left', async () => {
+    await rememberCommunityWatch(CHARACTER, [member()]);
+    vi.mocked(loadMyCommunities).mockResolvedValue([member({ id: 'c8' })]);
+    vi.mocked(loadMyRequests).mockResolvedValue([request()]);
+    vi.mocked(loadPledges).mockResolvedValue([pledge('gone')]);
+    vi.mocked(loadCommunityMembers).mockResolvedValue([]);
+    await loadCommunityAlertEntries(CHARACTER);
+    await loadCommunityAlertEntries(CHARACTER);
+    expect(loadCommunityMembers).toHaveBeenCalledTimes(1);
   });
 });

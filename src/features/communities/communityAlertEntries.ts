@@ -18,7 +18,8 @@
  * Pledges are read only for a Character the Communities page has listed a
  * Community for (`rememberCommunityWatch`, the same flag the Requests badge
  * uses), and per Community only when one of its own open Requests asked for
- * the app: the board is read, then the Community's Pledges in one query. A
+ * the app: the Character's own Requests are queried by `ownerUid`, then the
+ * Pledges of each of those (never the whole board). A
  * Pledger's name is read from the roster only when a Pledger has not been seen
  * before; without it the alert says "A Member".
  */
@@ -56,30 +57,37 @@ async function loadPledgeEntries(
   requests: typeof import('./requestStore')
 ): Promise<CommunityAlertEntry[]> {
   const now = Date.now();
-  const mine = (await requests.loadRequests(characterId, community.id)).filter(
-    (request) => request.ownerUid === myUid && request.notify.app && isOpenRequest(request, now)
+  // Only the Character's own Requests are read (one query on ownerUid), and
+  // each one's Pledges from its own subcollection: no board, no Community sweep.
+  const mine = (await requests.loadMyRequests(characterId, community.id)).filter(
+    (request) => request.notify.app && isOpenRequest(request, now)
   );
   if (mine.length === 0) return [];
   const base = { communityId: community.id, communityName: community.name };
-  const label = (lines: readonly { name: string }[]) => lines[0]?.name ?? '';
-  const pledges = await requests.loadCommunityPledges(characterId, community.id);
+  const pledgesOf = await Promise.all(
+    mine.map(async (request) => ({
+      request,
+      pledges: (await requests.loadPledges(characterId, community.id, request.id)).filter(
+        (pledge) => pledge.uid !== myUid
+      ),
+    }))
+  );
   const names = pledgerNames.get(community.id) ?? new Map<string, string>();
   pledgerNames.set(community.id, names);
-  const others = mine.flatMap((request) =>
-    (pledges.get(request.id) ?? []).filter((pledge) => pledge.uid !== myUid)
-  );
-  if (others.some((pledge) => !names.has(pledge.uid))) {
+  const unseen = pledgesOf.flatMap(({ pledges }) => pledges).filter((p) => !names.has(p.uid));
+  if (unseen.length > 0) {
     try {
-      for (const member of await store.loadCommunityMembers(characterId, community.id)) {
-        names.set(member.uid, member.characterName);
-      }
+      const roster = await store.loadCommunityMembers(characterId, community.id);
+      for (const member of roster) names.set(member.uid, member.characterName);
+      // Not on the roster (the Pledger left): remembered as unknown, so it is not read for again.
+      for (const pledge of unseen) if (!names.has(pledge.uid)) names.set(pledge.uid, '');
     } catch {
       // No names this time: the alert says "A Member", and the next poll tries again.
     }
   }
   const entries: CommunityAlertEntry[] = [];
-  for (const request of mine) {
-    const requestRef = { requestId: request.id, requestLabel: label(request.lines) };
+  for (const { request, pledges } of pledgesOf) {
+    const requestRef = { requestId: request.id, requestLabel: request.lines[0]?.name ?? '' };
     entries.push({
       ...base,
       ...requestRef,
@@ -88,8 +96,7 @@ async function loadPledgeEntries(
       characterName: '',
       at: request.createdAt,
     });
-    for (const pledge of pledges.get(request.id) ?? []) {
-      if (pledge.uid === myUid) continue;
+    for (const pledge of pledges) {
       entries.push({
         ...base,
         ...requestRef,

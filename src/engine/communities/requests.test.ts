@@ -237,6 +237,15 @@ describe('constants shared with the callables', () => {
     expect(MAX_REQUEST_MAILS_PER_DAY).toBe(constant('MAX_REQUEST_MAILS_PER_DAY'));
   });
 
+  it('matches the server default notification choice', () => {
+    const match =
+      /export const DEFAULT_NOTIFY: RequestNotify = \{ app: (true|false), mail: (true|false) \};/.exec(
+        server
+      );
+    if (!match) throw new Error('DEFAULT_NOTIFY not found in functions/src/communityRequests.ts');
+    expect(DEFAULT_NOTIFY).toEqual({ app: match[1] === 'true', mail: match[2] === 'true' });
+  });
+
   it('matches the server line kinds', () => {
     expect(server).toContain("['item', 'bpc', 'bpo']");
   });

@@ -177,16 +177,23 @@ describe('diffCommunityRequestPledged', () => {
     expect(diffCommunityRequestPledged(1, prev, next)).toEqual([]);
   });
 
-  it('stays quiet about Pledges that were already on a Request only just watched', () => {
-    const prev = at(1000, mine({ requestId: 'r0', uid: 'me' }));
+  it('counts a Request absent from the previous poll as watched with nothing Pledged, whatever the clocks say', () => {
+    const prev = at(1000, mine({ requestId: 'r0' }));
+    // createdAt is the server's clock: far in the past of this device's, and it makes no difference.
     const next = at(2000, mine({ requestId: 'r0' }), mine({ requestId: 'r1', at: 10 }), pledge());
-    expect(diffCommunityRequestPledged(1, prev, next)).toEqual([]);
+    expect(diffCommunityRequestPledged(1, prev, next)).toHaveLength(1);
+    const ahead = at(
+      2000,
+      mine({ requestId: 'r0' }),
+      mine({ requestId: 'r1', at: 9e12 }),
+      pledge()
+    );
+    expect(diffCommunityRequestPledged(1, prev, ahead)).toHaveLength(1);
   });
 
-  it('announces a Pledge on a Request posted since the last poll', () => {
-    const prev = at(1000);
-    const next = at(2000, mine({ at: 1500 }), pledge({ at: 1800 }));
-    expect(diffCommunityRequestPledged(1, prev, next)).toHaveLength(1);
+  it('does not repeat a Pledge when a Request drops out of one poll and returns', () => {
+    const prev = at(1000, mine(), pledge({ at: 100 }));
+    expect(diffCommunityRequestPledged(1, prev, at(2000, mine(), pledge({ at: 100 })))).toEqual([]);
   });
 
   it('ignores a Pledge whose Request is not being watched', () => {

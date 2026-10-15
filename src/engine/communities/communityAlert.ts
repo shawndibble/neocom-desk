@@ -121,21 +121,23 @@ export interface CommunityRequestPledgedFire {
   requestLabel: string;
   /** New Pledges in this Community since the last poll. */
   count: number;
-  /** When the latest was written: a Pledger who withdraws and Pledges again is a new occurrence. */
+  /** When the latest was written. */
   at: number;
 }
 
 const pledgeKey = (entry: CommunityAlertEntry) =>
   `${entry.communityId}:${entry.requestId ?? ''}:${entry.uid}`;
-const watchedKey = (entry: CommunityAlertEntry) => `${entry.communityId}:${entry.requestId ?? ''}`;
 
 /**
- * A Member's Pledge that was not there at the previous poll, on a Request the
- * previous poll already watched or one posted since it (a Request cannot have
- * been Pledged on before it existed). A Request only just watched, say after
- * it was switched to the app or a Community was joined, is a baseline: its
- * Pledges are not announced. Several in one Community make one fire, naming
- * the latest.
+ * A Member's Pledge that was not there at the previous poll. Identity only, no
+ * clock: a Request the previous poll did not list (just posted, or just
+ * switched to the app) is watched with nothing Pledged, so a Pledge on it
+ * fires. Several in one Community make one fire, naming the latest.
+ *
+ * What counts as a repeat is a Pledge (Request and Pledger) the previous poll
+ * listed. A Pledger who withdraws and Pledges again fires only if a poll saw
+ * the withdrawal in between; within one poll gap, or while the Pledge document
+ * survives, it is the same Pledge and stays quiet.
  */
 export function diffCommunityRequestPledged(
   characterId: number,
@@ -143,16 +145,18 @@ export function diffCommunityRequestPledged(
   next: CommunityAlertSnapshot
 ): CommunityRequestPledgedFire[] {
   if (!prev) return [];
-  const watched = new Set(prev.entries.filter((e) => e.kind === 'pledgeRequest').map(watchedKey));
-  const created = new Set(
-    next.entries.filter((e) => e.kind === 'pledgeRequest' && e.at > prev.nowMs).map(watchedKey)
-  );
   const seen = new Set(prev.entries.filter((e) => e.kind === 'pledge').map(pledgeKey));
+  // A Pledge counts only on a Request this poll lists as the pilot's own, open and wanting the app.
+  const listed = new Set(
+    next.entries
+      .filter((e) => e.kind === 'pledgeRequest')
+      .map((e) => `${e.communityId}:${e.requestId}`)
+  );
   const fresh = next.entries.filter(
     (e) =>
       e.kind === 'pledge' &&
       !seen.has(pledgeKey(e)) &&
-      (watched.has(watchedKey(e)) || created.has(watchedKey(e)))
+      listed.has(`${e.communityId}:${e.requestId}`)
   );
   const byCommunity = new Map<string, CommunityAlertEntry[]>();
   for (const entry of fresh) {
