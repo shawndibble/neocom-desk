@@ -43,10 +43,11 @@ export function CommunityHeader({
   return (
     // Manage stays top-right on a phone too; the name wraps beside it.
     <div className="flex items-start gap-3 rounded-xs border border-line bg-panel p-3 md:p-4">
-      <div className="flex min-w-0 flex-1 items-stretch gap-3">
+      {/* A grid, not a flex row: a stretched flex item doesn't derive its width from aspect-ratio, a grid item does. */}
+      <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] gap-3">
         <span
           aria-hidden="true"
-          className="grid aspect-square min-h-10 shrink-0 place-items-center self-stretch rounded-xs border border-accent-dim bg-panel-2 text-sm font-semibold text-accent"
+          className="grid aspect-square min-h-10 place-items-center rounded-xs border border-accent-dim bg-panel-2 text-sm font-semibold text-accent"
         >
           {communityInitials(community.name)}
         </span>
