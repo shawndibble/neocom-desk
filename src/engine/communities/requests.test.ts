@@ -386,6 +386,15 @@ describe('withPledgeLine and withdrawPledgeLine', () => {
     });
     expect(before[0].quantity).toBe(10);
   });
+  it('updating keeps a typed delivered amount', () => {
+    const before = { 0: { quantity: 10, delivered: 4, contractIds: [], manual: 4 } };
+    expect(withPledgeLine(before, 0, 25)[0]).toEqual({
+      quantity: 25,
+      delivered: 4,
+      contractIds: [],
+      manual: 4,
+    });
+  });
   it('withdrawing drops one line and leaves the others', () => {
     const before = {
       0: { quantity: 10, delivered: 0, contractIds: [] },

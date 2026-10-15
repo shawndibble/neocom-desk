@@ -10,7 +10,12 @@
  * tabs' Everyone views fill, and the sample Character's own share shows under
  * Mine.
  */
-import type { CommunityRequest, RequestLine, RequestPledge } from '@/engine/communities/requests';
+import type {
+  CommunityRequest,
+  PledgeEntry,
+  RequestLine,
+  RequestPledge,
+} from '@/engine/communities/requests';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
@@ -32,7 +37,20 @@ export const SAMPLE_MEMBER_COMMUNITY_ID = 'sample-providence-co-op';
 const ME = uidForCharacter(SAMPLE_ACTIVE_CHARACTER.characterId);
 const OTHER = uidForCharacter(SAMPLE_CHARACTERS[1].characterId);
 
-export function createCommunitiesFixture(now = Date.now()): CommunityBackendOverride {
+export interface CommunitiesFixtureOptions {
+  /**
+   * Adds the Member's delivery states to the board's Request panel (issue
+   * #3809): a copy delivered with ME 8 where 10 was asked (flagged), and a
+   * delivered amount the Member typed (manual). Off by default so the board's
+   * pictured counts stay as the mockup shows them.
+   */
+  deliveryDemo?: boolean;
+}
+
+export function createCommunitiesFixture(
+  now = Date.now(),
+  options: CommunitiesFixtureOptions = {}
+): CommunityBackendOverride {
   const communities: CommunitySummary[] = [
     {
       id: SAMPLE_ADMIN_COMMUNITY_ID,
@@ -277,15 +295,24 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
     updatedAt: now - ageHours * 3_600_000,
   });
   const entry = (quantity: number, delivered = 0) => ({ quantity, delivered, contractIds: [] });
+  const myReactivePledge: Record<number, PledgeEntry> = { 0: entry(150000) };
+  if (options.deliveryDemo) {
+    myReactivePledge[2] = { quantity: 175000, delivered: 40000, contractIds: [], manual: 40000 };
+  }
   // Request id to its Pledges, per Community: the board's pictured progress and statuses.
   const pledges: Record<string, Record<string, RequestPledge[]>> = {
     [SAMPLE_ADMIN_COMMUNITY_ID]: {
       'req-1': [
-        pledge(ME, { 0: entry(150000) }),
+        pledge(ME, myReactivePledge),
         pledge('char:2119000002', { 0: entry(260000, 120000) }),
         pledge('char:2119000003', { 1: entry(90000) }),
       ],
-      'req-2': [pledge('char:2119000003', { 0: entry(1) })],
+      'req-2': [
+        pledge('char:2119000003', { 0: entry(1) }),
+        ...(options.deliveryDemo
+          ? [pledge(ME, { 0: { quantity: 2, delivered: 1, contractIds: [91] } })]
+          : []),
+      ],
       'req-3': [pledge('char:2119000004', { 0: entry(3, 3) })],
     },
   };
@@ -311,6 +338,15 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
       const others = (board[requestId] ?? []).filter((p) => p.uid !== ME);
       board[requestId] = lines ? [...others, pledge(ME, lines, 0)] : others;
     },
+    syncDeliveries: () => ({
+      status: 'ok',
+      updated: 0,
+      flags: new Map(
+        options.deliveryDemo
+          ? [['req-2#0', [{ contractId: 91, attribute: 'me', asked: 10, got: 8 }]]]
+          : []
+      ),
+    }),
     loadPlans: (id) => (plans[id] ?? []).map((entry) => ({ ...entry })),
     call: (name, data) => {
       const { communityId, memberUid, accept, requireApproval } = data as {

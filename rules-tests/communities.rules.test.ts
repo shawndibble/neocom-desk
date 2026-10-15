@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   assertFails,
   assertSucceeds,
@@ -17,6 +17,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
+import { batchLines } from '../src/engine/communities/delivery';
 import { characterAuth, createRulesEnv } from './testEnv';
 
 // Communities (issue #3596, ADR 0018): reads are gated by Community
@@ -685,6 +686,99 @@ describe('Requests', () => {
         ])
       );
       await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc(lines)));
+    });
+
+    it('accepts every write the delivery batcher plans, worst cases included (#3809)', async () => {
+      // Pins `batchLines`' cost model to the rules' 1000-expression budget: an
+      // unbatched write of four full lines is denied, a batched one never is.
+      const COUNT = 12;
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(
+          doc(ctx.firestore(), REQ),
+          request({
+            lines: Array.from({ length: COUNT }, (_, i) => ({
+              typeId: i + 1,
+              name: `T${i}`,
+              quantity: 50,
+              kind: 'item',
+            })),
+          })
+        );
+      });
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      const idCounts = [20, 20, 0, 1, 5, 10, 20, 3, 3, 3, 2, 20];
+      const changed = idCounts.map((count, index) => ({
+        index,
+        entry: {
+          quantity: 50,
+          delivered: 40,
+          contractIds: Array.from({ length: count }, (_, i) => i + 1),
+          manual: index % 2 === 0 ? 40 : undefined,
+        },
+      }));
+      let stored: Record<string, unknown> = { 0: entry(1) };
+      for (const batch of batchLines(changed)) {
+        expect(batch.length).toBeLessThanOrEqual(4);
+        for (const { index, entry: e } of batch) {
+          stored = {
+            ...stored,
+            [String(index)]: {
+              quantity: e.quantity,
+              delivered: e.delivered,
+              contractIds: e.contractIds,
+              ...(e.manual !== undefined ? { manual: e.manual } : {}),
+            },
+          };
+        }
+        await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc(stored)));
+      }
+    });
+
+    it('denies one write that changes four full lines: the budget the batcher respects (#3809)', async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(
+          doc(ctx.firestore(), REQ),
+          request({
+            lines: Array.from({ length: 4 }, (_, i) => ({
+              typeId: i + 1,
+              name: `T${i}`,
+              quantity: 50,
+              kind: 'item',
+            })),
+          })
+        );
+      });
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      const ids = Array.from({ length: 20 }, (_, i) => i + 1);
+      const lines = Object.fromEntries(
+        Array.from({ length: 4 }, (_, i) => [
+          String(i),
+          entry(50, { delivered: 40, contractIds: ids }),
+        ])
+      );
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc(lines)));
+    });
+
+    it('bounds a typed delivered amount: a positive whole number up to the cap (#3809)', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertSucceeds(
+        setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { delivered: 3, manual: 3 }) }))
+      );
+      for (const manual of [0, -1, 1.5, 'x', 1_000_000_000_001]) {
+        await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { manual }) })));
+      }
+    });
+
+    it('denies marking a delivery once the Request is closed or expired (#3809)', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      for (const parent of [CLOSED_REQ, EXPIRED_REQ]) {
+        await assertFails(
+          setDoc(
+            doc(db, `${parent}/pledges/char:2`),
+            pledgeDoc({ 0: entry(1, { delivered: 1, contractIds: [9] }) })
+          )
+        );
+      }
     });
 
     it('denies lines or an entry that is not a map', async () => {

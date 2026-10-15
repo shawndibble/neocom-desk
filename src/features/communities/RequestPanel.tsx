@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
+import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button, SlideOver } from '@/components/ui';
+import { permissionsForEndpoints } from '@/esi/registry';
+import { pledgeEntryAfterManual } from '@/engine/communities/delivery';
 import {
   canPledge,
   isStalePledge,
@@ -18,6 +22,8 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
 import { callableErrorReason } from './callableError';
+import { DELIVERY_ENDPOINTS, slotKey } from './requestDelivery';
+import { useDeliverySync } from './useDeliverySync';
 import { daysLeft } from './requestFormat';
 import {
   extendRequest,
@@ -26,6 +32,8 @@ import {
   setRequestClosed,
   updateMyPledge,
 } from './requestStore';
+
+const DELIVERY_GROUPS = permissionsForEndpoints(DELIVERY_ENDPOINTS);
 
 /** "BPC, runs 10, ME 10": what the requester asked of a blueprint line, empty for a plain item. */
 function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unknown>) => string) {
@@ -105,6 +113,14 @@ export function RequestPanel({
 
   const myPledge = pledges.find((p) => p.uid === myUid);
   const mayPledge = canPledge(request, myUid, now);
+  const lacksContracts = useCharacterLacksEndpoints(characterId, DELIVERY_ENDPOINTS);
+  const delivery = useDeliverySync({
+    characterId,
+    communityId,
+    requestId: request.id,
+    enabled: mayPledge && myPledge !== undefined && !lacksContracts,
+    refreshPledges,
+  });
 
   const changePledge = async (key: string, change: Parameters<typeof updateMyPledge>[3]) => {
     setPledgeBusy(key);
@@ -191,11 +207,44 @@ export function RequestPanel({
                 onWithdraw={() =>
                   void changePledge(key, (lines) => withdrawPledgeLine(lines, index))
                 }
+                flags={delivery?.flags.get(slotKey(request.id, index))}
+                manualEntry={mayPledge && lacksContracts}
+                onSaveDelivered={(amount) =>
+                  void changePledge(key, (lines) => {
+                    const stored = lines[index];
+                    return stored
+                      ? { ...lines, [index]: pledgeEntryAfterManual(stored, amount) }
+                      : lines;
+                  })
+                }
               />
             );
           })}
         </ul>
-        {mayPledge && <p className="text-xs text-text-dim">{t('communities.board.pledgeNote')}</p>}
+        {mayPledge && (
+          <p className="text-xs text-text-dim">
+            {t('communities.board.deliveryNote', { name: request.ownerName })}
+          </p>
+        )}
+        {mayPledge && lacksContracts && myPledge && (
+          <p className="text-xs text-text-dim">
+            {t('communities.board.deliveryNeedsPermission')}{' '}
+            <GrantMissingLink groups={DELIVERY_GROUPS} />
+          </p>
+        )}
+        {!mayPledge && !mine && myPledge && (
+          <p className="text-xs text-text-dim">{t('communities.board.deliveryClosed')}</p>
+        )}
+        {delivery?.status === 'read-failed' && (
+          <p role="alert" className="text-xs text-text-dim">
+            {t('communities.board.deliveryReadFailed')}
+          </p>
+        )}
+        {delivery?.status === 'write-failed' && (
+          <p role="alert" className="text-xs text-text-dim">
+            {t('communities.board.deliveryWriteFailed')}
+          </p>
+        )}
         {pledgeError && (
           <p role="alert" className="text-xs text-danger">
             {pledgeError}
