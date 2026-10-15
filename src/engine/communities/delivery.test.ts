@@ -5,6 +5,7 @@ import {
   matchDeliveries,
   MAX_CONTRACT_IDS_PER_LINE,
   pledgeEntryAfterManual,
+  previousFromEntry,
   type ContractHeader,
   type DeliveryContract,
   type DeliverySlot,
@@ -18,8 +19,6 @@ const bpc: RequestLine = {
   quantity: 2,
   kind: 'bpc',
   runs: 10,
-  me: 10,
-  te: 20,
 };
 const bpo: RequestLine = { typeId: 200, name: 'Ishtar Blueprint', quantity: 1, kind: 'bpo' };
 
@@ -29,7 +28,8 @@ const slot = (key: string, line: RequestLine, quantity: number, over: Partial<De
     line,
     quantity,
     since: 0,
-    order: 0,
+    requesterId: 22,
+    order: [0, 0],
     previousAuto: 0,
     previousContractIds: [],
     ...over,
@@ -38,8 +38,9 @@ const slot = (key: string, line: RequestLine, quantity: number, over: Partial<De
 const contract = (
   contractId: number,
   items: DeliveryContract['items'],
-  completedAt = contractId
-): DeliveryContract => ({ contractId, completedAt, items });
+  completedAt = contractId,
+  recipients: number[] = [22]
+): DeliveryContract => ({ contractId, completedAt, recipients, items });
 
 describe('matchDeliveries', () => {
   it('counts a finished contract of the right type against the Pledge', () => {
@@ -74,11 +75,11 @@ describe('matchDeliveries', () => {
 
   it('serves two lines from one contract', () => {
     const out = matchDeliveries(
-      [slot('ore', ore, 300), slot('bpc', bpc, 2, { order: 1 })],
+      [slot('ore', ore, 300), slot('bpc', bpc, 2, { order: [0, 1] })],
       [
         contract(7, [
           { typeId: 100, quantity: 300, blueprint: null },
-          { typeId: 200, quantity: 1, blueprint: 'copy', runs: 10, me: 10, te: 20 },
+          { typeId: 200, quantity: 1, blueprint: 'copy', runs: 10 },
         ]),
       ]
     );
@@ -88,7 +89,7 @@ describe('matchDeliveries', () => {
 
   it('allocates to the oldest Pledge first, spilling over to the next', () => {
     const out = matchDeliveries(
-      [slot('new', ore, 100, { order: 2 }), slot('old', ore, 100, { order: 1 })],
+      [slot('new', ore, 100, { order: [0, 2] }), slot('old', ore, 100, { order: [0, 1] })],
       [contract(1, [{ typeId: 100, quantity: 150, blueprint: null }])]
     );
     expect(out.get('old')?.delivered).toBe(100);
@@ -114,19 +115,16 @@ describe('matchDeliveries', () => {
   it('counts a BPC with other attributes and flags the difference', () => {
     const out = matchDeliveries(
       [slot('bpc', bpc, 2)],
-      [contract(5, [{ typeId: 200, quantity: 1, blueprint: 'copy', runs: 5, me: 8, te: 20 }])]
+      [contract(5, [{ typeId: 200, quantity: 1, blueprint: 'copy', runs: 5 }])]
     );
     const result = out.get('bpc');
     expect(result?.delivered).toBe(1);
-    expect(result?.flags).toEqual([
-      { contractId: 5, attribute: 'runs', asked: 10, got: 5 },
-      { contractId: 5, attribute: 'me', asked: 10, got: 8 },
-    ]);
+    expect(result?.flags).toEqual([{ contractId: 5, attribute: 'runs', asked: 10, got: 5 }]);
   });
 
   it('does not flag attributes the contract does not carry or the line did not ask for', () => {
     const out = matchDeliveries(
-      [slot('bpc', { ...bpc, me: undefined, te: undefined }, 2)],
+      [slot('bpc', { ...bpc, runs: undefined }, 2)],
       [contract(5, [{ typeId: 200, quantity: 1, blueprint: 'copy', runs: 10 }])]
     );
     expect(out.get('bpc')?.flags).toEqual([]);
@@ -180,6 +178,51 @@ describe('matchDeliveries', () => {
     expect(matchDeliveries([slot('a', ore, 300, { manual: 900 })], []).get('a')?.delivered).toBe(
       300
     );
+  });
+});
+
+describe('requesters', () => {
+  const item = [{ typeId: 100, quantity: 50, blueprint: null }] as const;
+  const slots = [
+    slot('x', ore, 100, { requesterId: 1, order: [1, 0] }),
+    slot('y', ore, 100, { requesterId: 2, order: [2, 0] }),
+  ];
+
+  it('credits only the slot of the pilot the contract went to', () => {
+    const toX = matchDeliveries(slots, [contract(1, [...item], 1, [1])]);
+    expect(toX.get('x')?.delivered).toBe(50);
+    expect(toX.get('y')?.delivered).toBe(0);
+    const toY = matchDeliveries(slots, [contract(2, [...item], 2, [2])]);
+    expect(toY.get('x')?.delivered).toBe(0);
+    expect(toY.get('y')?.delivered).toBe(50);
+  });
+
+  it('allocates per requester: a spill-over never reaches another requester', () => {
+    const out = matchDeliveries(slots, [
+      contract(3, [{ typeId: 100, quantity: 150, blueprint: null }], 3, [1]),
+    ]);
+    expect(out.get('x')?.delivered).toBe(100);
+    expect(out.get('y')?.delivered).toBe(0);
+  });
+});
+
+describe('clearing a typed amount', () => {
+  it('lets the contract figure come back on the next run', () => {
+    const typed = { quantity: 300, delivered: 50, contractIds: [1], manual: 50 };
+    const cleared = pledgeEntryAfterManual(typed, 0);
+    expect(cleared.delivered).toBe(0);
+    const out = matchDeliveries(
+      [slot('a', ore, 300, previousFromEntry(cleared))],
+      [contract(1, [{ typeId: 100, quantity: 50, blueprint: null }])]
+    );
+    expect(out.get('a')?.delivered).toBe(50);
+  });
+
+  it('caps a typed amount at the Pledge', () => {
+    expect(pledgeEntryAfterManual({ quantity: 10, delivered: 0 }, 99)).toMatchObject({
+      delivered: 10,
+      manual: 10,
+    });
   });
 });
 

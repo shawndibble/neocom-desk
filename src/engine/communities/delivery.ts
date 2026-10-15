@@ -24,14 +24,14 @@ export interface DeliveryItem {
   /** Null for anything that is not a blueprint. */
   blueprint: 'copy' | 'original' | null;
   runs?: number;
-  me?: number;
-  te?: number;
 }
 
 export interface DeliveryContract {
   contractId: number;
   /** When it finished, ms since epoch. */
   completedAt: number;
+  /** Who the contract went to (its assignee and acceptor Character ids). */
+  recipients: readonly number[];
   items: readonly DeliveryItem[];
 }
 
@@ -40,12 +40,14 @@ export interface DeliverySlot {
   /** Caller's identity for the slot, e.g. `<requestId>#<index>`. */
   key: string;
   line: RequestLine;
+  /** The requester's Character id: only a contract to them counts toward this slot. */
+  requesterId: number;
   /** The Pledged quantity: delivery never counts above it. */
   quantity: number;
   /** A contract finished before this (the Request's creation) is not a delivery to it. */
   since: number;
-  /** Lower is older: Pledges are served oldest first. */
-  order: number;
+  /** Pledges are served oldest first: see `slotOrder`. */
+  order: SlotOrder;
   /** What an earlier run recorded from contracts. */
   previousAuto: number;
   previousContractIds: readonly number[];
@@ -53,9 +55,20 @@ export interface DeliverySlot {
   manual?: number;
 }
 
+/** Oldest Request first, then the lower line index. */
+export type SlotOrder = readonly [requestCreatedAt: number, lineIndex: number];
+
+export const slotOrder = (requestCreatedAt: number, lineIndex: number): SlotOrder => [
+  requestCreatedAt,
+  lineIndex,
+];
+
+const byOrder = (a: SlotOrder, b: SlotOrder) => a[0] - b[0] || a[1] - b[1];
+
 export interface DeliveryFlag {
   contractId: number;
-  attribute: 'runs' | 'me' | 'te';
+  /** Only runs: ESI's personal contract items carry no ME or TE. */
+  attribute: 'runs';
   asked: number;
   got: number;
 }
@@ -66,9 +79,9 @@ export interface SlotDelivery {
   flags: DeliveryFlag[];
 }
 
-const bpcAttributes = ['runs', 'me', 'te'] as const;
-
-function accepts(line: RequestLine, item: DeliveryItem): boolean {
+function accepts(slot: DeliverySlot, contract: DeliveryContract, item: DeliveryItem): boolean {
+  const line = slot.line;
+  if (!contract.recipients.includes(slot.requesterId)) return false;
   if (item.typeId !== line.typeId) return false;
   if (line.kind === 'bpc') return item.blueprint === 'copy';
   if (line.kind === 'bpo') return item.blueprint === 'original';
@@ -80,7 +93,7 @@ export function matchDeliveries(
   slots: readonly DeliverySlot[],
   contracts: readonly DeliveryContract[]
 ): Map<string, SlotDelivery> {
-  const ordered = [...slots].sort((a, b) => a.order - b.order);
+  const ordered = [...slots].sort((a, b) => byOrder(a.order, b.order));
   const sorted = [...contracts].sort(
     (a, b) => a.completedAt - b.completedAt || a.contractId - b.contractId
   );
@@ -98,27 +111,28 @@ export function matchDeliveries(
       let left = item.quantity;
       for (const slot of ordered) {
         if (left <= 0) break;
-        if (contract.completedAt < slot.since || !accepts(slot.line, item)) continue;
+        if (contract.completedAt < slot.since || !accepts(slot, contract, item)) continue;
         const room = slot.quantity - (counted.get(slot.key) ?? 0);
         if (room <= 0) continue;
         const take = Math.min(room, left);
         left -= take;
         counted.set(slot.key, (counted.get(slot.key) ?? 0) + take);
         matched.get(slot.key)?.add(contract.contractId);
-        if (slot.line.kind === 'bpc') {
-          for (const attribute of bpcAttributes) {
-            const asked = slot.line[attribute];
-            const got = item[attribute];
-            const list = flags.get(slot.key) ?? [];
-            if (
-              asked !== undefined &&
-              got !== undefined &&
-              asked !== got &&
-              !list.some((f) => f.contractId === contract.contractId && f.attribute === attribute)
-            ) {
-              list.push({ contractId: contract.contractId, attribute, asked, got });
-            }
-          }
+        const asked = slot.line.runs;
+        const list = flags.get(slot.key) ?? [];
+        if (
+          slot.line.kind === 'bpc' &&
+          asked !== undefined &&
+          item.runs !== undefined &&
+          asked !== item.runs &&
+          !list.some((f) => f.contractId === contract.contractId)
+        ) {
+          list.push({
+            contractId: contract.contractId,
+            attribute: 'runs',
+            asked,
+            got: item.runs,
+          });
         }
       }
     }
@@ -153,12 +167,11 @@ export function pledgeEntryAfterManual(entry: PledgeEntry, amount: number): Pled
   const auto = autoPart(entry);
   const rest: PledgeEntry = { quantity: entry.quantity, delivered: entry.delivered };
   if (entry.contractIds) rest.contractIds = entry.contractIds;
+  // Clearing leaves `auto`, which is 0 when the typed amount was what showed:
+  // the caller re-runs the contract sync so the figure comes back from contracts.
   if (amount <= 0) return { ...rest, delivered: auto };
-  return {
-    ...rest,
-    delivered: Math.min(entry.quantity, Math.max(auto, amount)),
-    manual: amount,
-  };
+  const typed = Math.min(amount, entry.quantity);
+  return { ...rest, delivered: Math.min(entry.quantity, Math.max(auto, typed)), manual: typed };
 }
 
 /** The slot's starting state from a stored entry. */

@@ -205,13 +205,13 @@ export const RequestsPanelAsMember: Story = {
 /** @summary A Member's panel in the phone shell. */
 export const RequestsPanelAsMemberPhone: Story = { ...RequestsPanelAsMember, globals: phone };
 
-/** @summary Delivery marked from contracts: a copy counted but flagged ("ME 8, asked 10") and a typed amount marked manual, under the delivery sentence. */
+/** @summary Delivery marked from contracts: a copy counted but flagged ("runs 5, asked 10") and a typed amount marked manual, under the delivery sentence. */
 export const RequestsPanelDelivery: Story = {
   parameters: { shell: requestsShell(SAMPLE_ADMIN_COMMUNITY_ID), deliveryDemo: true },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByText(/^Scan Acquisition Array/));
-    await canvas.findByText(/ME 8, asked 10/);
+    await canvas.findByText(/runs 5, asked 10/);
   },
 };
 

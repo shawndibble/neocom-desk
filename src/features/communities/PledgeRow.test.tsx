@@ -68,10 +68,10 @@ describe('PledgeRow delivery', () => {
   it('says in words which BPC attribute differs from the ask', () => {
     setup({
       flags: [
-        { contractId: 5, attribute: 'me', asked: 10, got: 8 },
-        { contractId: 6, attribute: 'me', asked: 10, got: 8 },
+        { contractId: 5, attribute: 'runs', asked: 10, got: 5 },
+        { contractId: 6, attribute: 'runs', asked: 10, got: 5 },
       ],
     });
-    expect(screen.getByText('Counted, but not as asked: ME 8, asked 10.')).toBeInTheDocument();
+    expect(screen.getByText('Counted, but not as asked: runs 5, asked 10.')).toBeInTheDocument();
   });
 });

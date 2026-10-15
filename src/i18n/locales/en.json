@@ -8322,9 +8322,7 @@
       "deliveredInvalid": "Enter a whole number from 0 up to {{max}}.",
       "deliveryFlag": "Counted, but not as asked: {{details}}.",
       "deliveryFlagDetail": {
-        "runs": "runs {{got}}, asked {{asked}}",
-        "me": "ME {{got}}, asked {{asked}}",
-        "te": "TE {{got}}, asked {{asked}}"
+        "runs": "runs {{got}}, asked {{asked}}"
       },
       "admin": {
         "removeRequest": "Remove request…",

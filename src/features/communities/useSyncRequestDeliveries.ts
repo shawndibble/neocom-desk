@@ -6,16 +6,16 @@ export const DELIVERY_BOOT_DELAY_MS = 45 * 1000;
 /** Then every half hour; a run with no open Pledge costs two reads per Community. */
 export const DELIVERY_INTERVAL_MS = 30 * 60 * 1000;
 
-let sweeping = false;
-
 /**
  * Marks Pledge deliveries from each Character's finished contracts (issue
  * #3809): one sweep after boot, then on a timer, for as long as the app is
  * open. No setting: a Character without the contracts Permission is skipped
  * before it is signed in. The active Character goes last so the Firebase
  * session is left on it (see `usePublishSharedLibraries`). A failed run is
- * silent here and retried; the Request panel runs it again on open and says
- * what went wrong.
+ * logged here and retried; the Request panel runs it again on open and says
+ * what went wrong. Overlapping runs are not a concern: `syncRequestDeliveries`
+ * shares one run per Character and Community, and a sweep stops between
+ * Characters once the effect is cleaned up.
  */
 export function useSyncRequestDeliveries(
   characterIds: readonly number[] | undefined,
@@ -24,32 +24,33 @@ export function useSyncRequestDeliveries(
   const key = characterIds?.join(',') ?? '';
   useEffect(() => {
     if (!characterIds?.length || !isSyncConfigured()) return;
+    let cancelled = false;
     const sweep = async () => {
-      if (sweeping) return;
-      sweeping = true;
-      try {
-        const { hasDeliveryScope, syncRequestDeliveries } = await import('./requestDelivery');
-        const { listCommunityIds } = await import('./communityStore');
-        const ordered = [...characterIds].sort(
-          (a, b) => Number(a === activeCharacterId) - Number(b === activeCharacterId)
-        );
-        for (const id of ordered) {
-          if (!(await hasDeliveryScope(id))) continue;
-          try {
-            for (const communityId of await listCommunityIds(id)) {
-              await syncRequestDeliveries(id, communityId);
-            }
-          } catch {
-            // Offline or signed out for this Character: the next sweep retries.
+      const { hasDeliveryScope, syncRequestDeliveries } = await import('./requestDelivery');
+      const { listCommunityIds } = await import('./communityStore');
+      const ordered = [...characterIds].sort(
+        (a, b) => Number(a === activeCharacterId) - Number(b === activeCharacterId)
+      );
+      for (const id of ordered) {
+        if (cancelled) return;
+        if (!(await hasDeliveryScope(id))) continue;
+        try {
+          for (const communityId of await listCommunityIds(id)) {
+            if (cancelled) return;
+            await syncRequestDeliveries(id, communityId);
           }
+        } catch (err) {
+          // Offline or signed out for this Character: the next sweep retries.
+          console.warn('Request delivery sweep failed for a Character', err);
         }
-      } finally {
-        sweeping = false;
       }
     };
-    const boot = setTimeout(() => void sweep(), DELIVERY_BOOT_DELAY_MS);
-    const timer = setInterval(() => void sweep(), DELIVERY_INTERVAL_MS);
+    const run = () =>
+      void sweep().catch((err) => console.warn('Request delivery sweep failed', err));
+    const boot = setTimeout(run, DELIVERY_BOOT_DELAY_MS);
+    const timer = setInterval(run, DELIVERY_INTERVAL_MS);
     return () => {
+      cancelled = true;
       clearTimeout(boot);
       clearInterval(timer);
     };

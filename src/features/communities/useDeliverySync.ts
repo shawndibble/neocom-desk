@@ -14,6 +14,7 @@ export function useDeliverySync({
   communityId,
   requestId,
   enabled,
+  tick,
   refreshPledges,
 }: {
   characterId: number;
@@ -21,6 +22,8 @@ export function useDeliverySync({
   requestId: string;
   /** The viewer has a Pledge on an open Request of someone else. */
   enabled: boolean;
+  /** Changes to run the sync again, e.g. after a typed amount is saved or cleared. */
+  tick: number;
   refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
 }): DeliverySyncResult | null {
   const [result, setResult] = useState<DeliverySyncResult | null>(null);
@@ -35,6 +38,6 @@ export function useDeliverySync({
     return () => {
       cancelled = true;
     };
-  }, [characterId, communityId, requestId, enabled, refreshPledges]);
+  }, [characterId, communityId, requestId, enabled, tick, refreshPledges]);
   return enabled ? result : null;
 }

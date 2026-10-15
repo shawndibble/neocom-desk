@@ -40,7 +40,7 @@ const OTHER = uidForCharacter(SAMPLE_CHARACTERS[1].characterId);
 export interface CommunitiesFixtureOptions {
   /**
    * Adds the Member's delivery states to the board's Request panel (issue
-   * #3809): a copy delivered with ME 8 where 10 was asked (flagged), and a
+   * #3809): a copy delivered with 5 runs where 10 were asked (flagged), and a
    * delivered amount the Member typed (manual). Off by default so the board's
    * pictured counts stay as the mockup shows them.
    */
@@ -343,7 +343,7 @@ export function createCommunitiesFixture(
       updated: 0,
       flags: new Map(
         options.deliveryDemo
-          ? [['req-2#0', [{ contractId: 91, attribute: 'me', asked: 10, got: 8 }]]]
+          ? [['req-2#0', [{ contractId: 91, attribute: 'runs', asked: 10, got: 5 }]]]
           : []
       ),
     }),

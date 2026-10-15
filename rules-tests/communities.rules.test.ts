@@ -759,6 +759,23 @@ describe('Requests', () => {
       await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc(lines)));
     });
 
+    it('bounds delivered and a typed amount by the Pledged quantity, and contract ids at 20 (#3809)', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertSucceeds(
+        setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { delivered: 5, manual: 5 }) }))
+      );
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { delivered: 6 }) })));
+      await assertFails(
+        setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { delivered: 5, manual: 6 }) }))
+      );
+      await assertFails(
+        setDoc(
+          doc(db, PLEDGE),
+          pledgeDoc({ 0: entry(5, { contractIds: Array.from({ length: 21 }, (_, i) => i + 1) }) })
+        )
+      );
+    });
+
     it('bounds a typed delivered amount: a positive whole number up to the cap (#3809)', async () => {
       const db = characterAuth(env, 2, 'hash-2').firestore();
       await assertSucceeds(

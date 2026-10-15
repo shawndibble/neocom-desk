@@ -395,6 +395,15 @@ describe('withPledgeLine and withdrawPledgeLine', () => {
       manual: 4,
     });
   });
+  it('lowering a Pledge lowers what was delivered and typed with it', () => {
+    const before = { 0: { quantity: 10, delivered: 8, contractIds: [], manual: 8 } };
+    expect(withPledgeLine(before, 0, 5)[0]).toEqual({
+      quantity: 5,
+      delivered: 5,
+      contractIds: [],
+      manual: 5,
+    });
+  });
   it('withdrawing drops one line and leaves the others', () => {
     const before = {
       0: { quantity: 10, delivered: 0, contractIds: [] },
