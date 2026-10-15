@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, within, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -12,6 +12,14 @@ import {
   useNotificationPreferences,
   type NotificationPreferencesValue,
 } from './preferences';
+
+// Preference writes schedule a sync, which lazy-loads Firebase; that import can
+// land after the test environment is torn down and fail the whole shard.
+vi.mock('@/sync', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/sync')>()),
+  setSyncedSetting: vi.fn(async () => {}),
+  scheduleSync: vi.fn(),
+}));
 
 const ALL_SCOPES = new Set(
   NOTIFICATION_EVENTS.map((event) => event.scope).filter((scope) => scope !== undefined)
