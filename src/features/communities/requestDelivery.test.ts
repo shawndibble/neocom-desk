@@ -113,6 +113,28 @@ describe('syncRequestDeliveries', () => {
     expect(JSON.stringify(mocks.update.mock.calls)).not.toContain('123456789');
   });
 
+  it('keeps an amount typed after the run read the Pledge, and drops one cleared meanwhile', async () => {
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    const change = mocks.update.mock.calls[0]?.[3] as (l: Record<number, PledgeEntry>) => unknown;
+    // Typed 200 while the run was in flight: contracts show 120, the typed amount stands.
+    expect(change({ 0: { quantity: 300, delivered: 200, contractIds: [], manual: 200 } })).toEqual({
+      0: { quantity: 300, delivered: 200, contractIds: [7], manual: 200 },
+    });
+  });
+
+  it('does not write back a typed amount the Member cleared while the run was in flight', async () => {
+    mocks.pledges.mockResolvedValue(
+      new Map([
+        ['r1', [pledge({ 0: { quantity: 300, delivered: 250, contractIds: [], manual: 250 } })]],
+      ])
+    );
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    const change = mocks.update.mock.calls[0]?.[3] as (l: Record<number, PledgeEntry>) => unknown;
+    expect(change({ 0: { quantity: 300, delivered: 0, contractIds: [] } })).toEqual({
+      0: { quantity: 300, delivered: 120, contractIds: [7] },
+    });
+  });
+
   it('writes nothing when the stored Pledge already matches (idempotent)', async () => {
     mocks.pledges.mockResolvedValue(
       new Map([['r1', [pledge({ 0: { quantity: 300, delivered: 120, contractIds: [7] } })]]])

@@ -75,7 +75,10 @@ export interface DeliveryFlag {
 }
 
 export interface SlotDelivery {
+  /** What the line shows: the larger of `auto` and a typed amount, within the Pledge. */
   delivered: number;
+  /** What contracts alone account for, within the Pledge. */
+  auto: number;
   contractIds: number[];
   flags: DeliveryFlag[];
 }
@@ -168,6 +171,7 @@ export function matchDeliveries(
       .slice(-MAX_CONTRACT_IDS_PER_LINE);
     result.set(slot.key, {
       delivered: Math.min(slot.quantity, Math.max(auto, slot.manual ?? 0)),
+      auto: Math.min(slot.quantity, auto),
       contractIds: ids,
       flags: flags.get(slot.key) ?? [],
     });

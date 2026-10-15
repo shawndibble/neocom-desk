@@ -217,7 +217,7 @@ async function writeDeliveries(
   let updated = 0;
   let writeFailed = false;
   for (const { request, pledge } of planned) {
-    const changed: { index: number; entry: PledgeEntry }[] = [];
+    const changed: { index: number; entry: PledgeEntry; auto: number }[] = [];
     for (const [i, entry] of Object.entries(pledge.lines)) {
       const index = Number(i);
       const next = result.get(slotKey(request.id, index));
@@ -229,6 +229,7 @@ async function writeDeliveries(
         changed.push({
           index,
           entry: { ...entry, delivered: next.delivered, contractIds: next.contractIds },
+          auto: next.auto,
         });
       }
     }
@@ -236,13 +237,16 @@ async function writeDeliveries(
       try {
         await updateMyPledge(characterId, communityId, request.id, (lines) => {
           const out = { ...lines };
-          for (const { index, entry } of batch) {
+          for (const { index, entry, auto } of batch) {
             const stored = out[index];
             // Withdrawn meanwhile: nothing to mark.
             if (!stored) continue;
+            // The amount typed since this run read the Pledge (or while it ran)
+            // is in the stored entry, not in `entry`: it must survive, and a
+            // typed amount cleared meanwhile must not come back.
             out[index] = {
               ...stored,
-              delivered: Math.min(entry.delivered, stored.quantity),
+              delivered: Math.min(Math.max(auto, stored.manual ?? 0), stored.quantity),
               contractIds: [...(entry.contractIds ?? [])],
             };
           }
