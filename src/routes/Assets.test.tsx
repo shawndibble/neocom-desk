@@ -1519,9 +1519,9 @@ describe('cross-character search (issue #85)', () => {
       );
       await user.click(within(panel).getByRole('button', { name: 'More actions for Rifter' }));
       expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeVisible();
-      expect(screen.getByRole('menuitem', { name: 'Show fitting' })).toBeVisible();
-      expect(screen.getByRole('menuitem', { name: 'Plan route' })).toBeVisible();
-      await user.click(screen.getByRole('menuitem', { name: 'Open location assets' }));
+      expect(await screen.findByRole('menuitem', { name: 'Show fitting' })).toBeVisible();
+      expect(await screen.findByRole('menuitem', { name: 'Plan route' })).toBeVisible();
+      await user.click(await screen.findByRole('menuitem', { name: 'Open location assets' }));
       await waitFor(() => expect(window.location.pathname).toContain('/assets/items/60003760'));
     });
 
