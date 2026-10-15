@@ -637,6 +637,13 @@ describe('contracts table', () => {
     ...over,
   });
 
+  it('lists the outstanding item exchanges as their own tile', () => {
+    const view = buildView('contracts', { contracts: ok(data({ exchanges: 3 })) as never }, ctx());
+    const tile = view.rows.find((row) => row.key === 'exchanges');
+    expect(tile?.value).toBe('3');
+    expect(tile?.tone).toBe('watch');
+  });
+
   it('with nothing on a clock, counts the hauls in progress', () => {
     const view = buildView('contracts', { contracts: ok(data()) as never }, ctx());
     expect(view.number.value).toBe('2');

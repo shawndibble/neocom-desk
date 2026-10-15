@@ -995,11 +995,16 @@ export function diffContractAccepted(
   next: ContractSnapshot
 ): ContractNotificationFire[] {
   if (!prev) return [];
-  const prevStatusById = new Map(prev.entries.map((entry) => [entry.contractId, entry.status]));
+  const prevById = new Map(prev.entries.map((entry) => [entry.contractId, entry]));
   const fires: ContractNotificationFire[] = [];
   for (const entry of next.entries) {
     if (entry.status !== 'in_progress') continue;
-    if (prevStatusById.get(entry.contractId) === 'in_progress') continue;
+    const before = prevById.get(entry.contractId);
+    if (before?.status === 'in_progress') continue;
+    // ESI keeps an accepted courier `outstanding`, which baselines saved before
+    // `withAcceptedCourierInProgress` recorded as is: an outstanding entry that already
+    // had an acceptor was accepted earlier and merely changed label.
+    if (before?.status === 'outstanding' && before.acceptorId !== 0) continue;
     fires.push({
       eventId: 'contractAccepted',
       characterId,
