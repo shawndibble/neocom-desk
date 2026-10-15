@@ -31,6 +31,7 @@ import { CommunitySharedPlans } from './CommunitySharedPlans';
 import { isOpenRequest } from '@/engine/communities/requests';
 import { isContentTab, type CommunityTab, type ContentTab } from './communityTabs';
 import { RequestsTab } from './RequestsTab';
+import { markRequestsSeen } from './requestBadge';
 import { useCommunityRequests } from './useCommunityRequests';
 import { CommunityMemberList } from './CommunityMemberList';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -119,6 +120,11 @@ export function CommunityDetail({
   const [requestsOpened, setRequestsOpened] = useState(initialTab === 'requests');
   const board = useCommunityRequests(characterId, community.id, requestsOpened);
   const openRequests = board.requests?.filter((r) => isOpenRequest(r, now)).length;
+  // Looking at the Requests tab is what makes them not new for the Communities nav badge.
+  const requestsShown = tab === 'requests' && board.requests !== null;
+  useEffect(() => {
+    if (requestsShown) void markRequestsSeen(characterId, community.id).catch(() => undefined);
+  }, [requestsShown, characterId, community.id]);
   const manageMenu = useOpenAfterMenu();
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
 
@@ -303,6 +309,7 @@ export function CommunityDetail({
               pledgesFailed={board.pledgesFailed}
               failed={board.failed}
               now={now}
+              members={members}
               onReload={board.reload}
               refreshPledges={board.refreshPledges}
             />

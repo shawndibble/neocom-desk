@@ -1,3 +1,4 @@
+import { useNavBadges } from './navBadges';
 import { Fragment, memo, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { Link, useLocation } from 'react-router-dom';
@@ -84,6 +85,8 @@ interface RailPageProps {
   hidden: ReadonlySet<string>;
   editing: boolean;
   activeViewPath: string | null;
+  badge?: number;
+  badgeLabelKey?: string;
 }
 
 /**
@@ -100,6 +103,8 @@ const RailPage = memo(function RailPage({
   hidden,
   editing,
   activeViewPath,
+  badge,
+  badgeLabelKey,
 }: RailPageProps) {
   const { t } = useTranslation();
   const listId = useId();
@@ -118,6 +123,8 @@ const RailPage = memo(function RailPage({
           to={page.path}
           label={label}
           locked={locked}
+          badge={badge}
+          badgeLabelKey={badgeLabelKey}
           className={cx('flex-1', editing && pageHidden && 'line-through')}
         />
         {shownViews.length > 0 && (
@@ -207,6 +214,7 @@ const RailNavBody = memo(function RailNavBody({
 }) {
   const { t } = useTranslation();
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
+  const navBadge = useNavBadges();
   // One corp-access read for the rail (`useCorpNavVisible` is the same read).
   const { state: corpState, capabilities } = useCorpAccess();
   const corporationId = useActiveCorporationId();
@@ -308,6 +316,7 @@ const RailNavBody = memo(function RailNavBody({
                     hidden={hidden}
                     editing={editing}
                     activeViewPath={activeViewPath}
+                    {...navBadge(page.path)}
                   />
                 ))}
               </div>
@@ -342,6 +351,7 @@ const RailNavBody = memo(function RailNavBody({
                         to={page.path}
                         label={label}
                         locked={page.gating === 'scope' && locked.has(page.path)}
+                        {...navBadge(page.path)}
                         className="flex-1"
                       />
                       <IconButton

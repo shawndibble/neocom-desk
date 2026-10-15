@@ -22,7 +22,7 @@ Not shown, specified in the ticket text: My pledges slide-out (the same shape as
 The Requests tab, board, read-only side panel, compose step 1 and the empty state are built (`pages-communities--requests-*` stories). Where they differ from the pictures:
 
 - **Not built, by scope (other tickets):** Pledge controls and the over-pledge note (#3808), the delivery note and Message button, the "My pledges" button and the "and 1 Pledge in progress" half of the strip (#3808), the "I can fill" chip and the distance select (#3811), compose step 2 and the mail count (#3810). The strip reads "You have N open Requests." and carries only New request….
-- **Compose button:** step 1 ends in **Post request** (posts without mail) where the picture has "Next: who to mail".
+- **Compose button:** step 1 ended in **Post request** (posted without mail) where the picture has "Next: who to mail"; #3810 replaced it with the picture's button (see below).
 - **Statuses and bars:** with no Pledges yet every Request is Open and every bar is empty. Closed and Expired exist as statuses (Mine lists a closed Request so it can be reopened) and are not pictured.
 - **Panel title:** the requester sees "Your request" (the picture's "You's request" is the sample name run through the template).
 - **Panel for a Member:** only the terms and each line's progress, no controls. The requester's panel reads Reopen request when closed.
@@ -55,5 +55,15 @@ Built: Pledge / Update pledge / Withdraw with the inline quantity field per line
 - **Stale grey-out** applies to the viewer's own Pledge only (the panel shows aggregates for everyone else).
 - **Quantity field validation:** a non-whole or zero value shows "Enter a whole number above 0." and disables the button.
 - **Sample names** in the story differ from the pictures (the story's fixture names are Ilvara Nokk and friends, as in #3807).
+## Deviations in compose step 2 (issue #3810)
+
+Built as `pages-communities--requests-compose-recipients` (and `-phone`); the shape is the picture's: intro line with the day's count, a bordered list of label rows (checkbox, name, "Shares N of these blueprints" at the right, 44px touch rows), Back on the left, "Post request and mail N Members" on the right. Where it differs:
+
+- **Sample data:** the story shows the sample Community's eight other Members, not four; the two sharing a matching blueprint are pre-ticked.
+- **Matching:** "Shares N of these blueprints" counts the Request's blueprint lines the Member shares (a copy line is met by a copy or an original; an original line only by a shared original). Plain item lines match nobody, so a Request of only items pre-ticks nobody. Sharers come first, then the rest by name.
+- **Nobody ticked:** the button reads "Post request" and posts without mail (the picture only shows the ticked case).
+- **Not pictured, added:** a permission note (Grant permission) with the boxes disabled while the Character lacks the send-mail permission; a one-line note when more are ticked than the day has mails left, or none are left; a warning when what Members share could not be read.
+- **After posting with mail:** the dialog stays open and lists each recipient with a text result (Mailed, refused, not confirmed, daily limit), then Done. Not pictured.
+- **Nav badge:** the Communities item carries a count of new Requests (the rail's existing badge, `NavItem`); it has no picture.
 
 Delete this folder and the story when the last ticket that links it closes.

@@ -537,6 +537,9 @@ export interface MailInviteReservation {
  * so the client must send it). The cap lives here, in one transaction, not in
  * the UI. A revoked link has nothing to mail: not-found.
  */
+// NOTE: functions/src/communityRequestsStore.ts (reserveRequestMail and its confirm/release)
+// mirrors this reserve/confirm/release on purpose, with its own cap and collections. Keep the
+// refund and retake rules in step; they were not merged to leave the invite path untouched.
 export async function reserveMailInvite(
   db: Firestore,
   caller: CallerCharacter,

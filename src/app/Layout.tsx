@@ -1,3 +1,4 @@
+import { useNavBadges } from './navBadges';
 import { UnreadAlertsContext } from '@/components/ui/unreadAlertsContext';
 import { memo, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
@@ -38,6 +39,7 @@ import { NotificationPermissionPrompt } from '@/features/notifications/Notificat
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
 import { NetWorthSnapshotRecorder } from '@/features/netWorth/NetWorthSnapshotRecorder';
 import { AlertsPanelProvider } from '@/features/notifications/AlertsPanelContext';
+import { useRequestBadgePoll } from '@/features/communities/requestBadge';
 import { useAlertBadge } from '@/features/notifications/useUnreadAlertCount';
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
@@ -331,6 +333,9 @@ export const Layout = memo(function Layout() {
   // the sheet are all mounted on every route, so a hook inside each would open
   // several Dexie live queries over the same feed.
   const alertBadge = useAlertBadge();
+  // New Requests on the Communities item, read while the app is open (issue #3810).
+  useRequestBadgePoll();
+  const navBadge = useNavBadges();
   const tabs = barTabs(useMobileTabs((state) => state.value));
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -421,6 +426,7 @@ export const Layout = memo(function Layout() {
                 label={t(NAV_LABEL_KEYS[path])}
                 locked={locked.has(path)}
                 presentation="tab"
+                {...navBadge(path)}
               />
             ))}
             <button

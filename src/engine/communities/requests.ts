@@ -19,6 +19,8 @@ export const REQUEST_LIFETIME_DAYS = 30;
 export const MAX_PLEDGE_QUANTITY = 1_000_000_000_000;
 /** A Pledge with nothing delivered this long after it was last written greys out. */
 export const STALE_PLEDGE_DAYS = 14;
+/** Mails one Member may send about Requests a UTC day: mails, not lines. Apart from the 20 mail invites. */
+export const MAX_REQUEST_MAILS_PER_DAY = 100;
 
 export type RequestLineKind = 'item' | 'bpc' | 'bpo';
 
@@ -322,4 +324,60 @@ export function myPledgeRows(
     });
   }
   return rows.sort((a, b) => b.updatedAt - a.updatedAt || a.index - b.index);
+}
+
+/** A Member the requester may mail, and how many of the Request's blueprints they share. */
+export interface RequestRecipient {
+  uid: string;
+  characterName: string;
+  shared: number;
+}
+
+/**
+ * Everyone but the requester, those sharing the Request's blueprints first. A
+ * blueprint line counts once for a Member however many copies they share; an
+ * original (BPO) line needs an original shared (runs -1), a copy line is met
+ * by any copy or original. Plain item lines match nobody: nothing a Member
+ * shares says who holds Reactive Metals.
+ */
+export function requestRecipients(
+  lines: readonly RequestLine[],
+  members: readonly { uid: string; characterName: string }[],
+  libraries: readonly { uid: string; items: readonly { typeId: number; runs: number }[] }[],
+  myUid: string
+): RequestRecipient[] {
+  const blueprintLines = lines.filter((line) => line.kind !== 'item');
+  const library = new Map(libraries.map((l) => [l.uid, l.items]));
+  return members
+    .filter((member) => member.uid !== myUid)
+    .map((member) => {
+      const items = library.get(member.uid) ?? [];
+      const shared = blueprintLines.filter((line) =>
+        items.some(
+          (item) => item.typeId === line.typeId && (line.kind !== 'bpo' || item.runs === -1)
+        )
+      ).length;
+      return { uid: member.uid, characterName: member.characterName, shared };
+    })
+    .sort((a, b) => b.shared - a.shared || a.characterName.localeCompare(b.characterName));
+}
+
+/** Request mails still to send today, given the day's count. */
+export const requestMailsLeft = (used: number) => Math.max(0, MAX_REQUEST_MAILS_PER_DAY - used);
+
+/**
+ * Open Requests from other Members posted after `seenAt` (when this Member
+ * last looked at the Community's Requests): the number on the Communities nav
+ * item.
+ */
+export function countNewRequests(
+  requests: readonly CommunityRequest[],
+  myUid: string,
+  seenAt: number,
+  now: number
+): number {
+  return requests.filter(
+    (request) =>
+      request.ownerUid !== myUid && request.createdAt > seenAt && isOpenRequest(request, now)
+  ).length;
 }

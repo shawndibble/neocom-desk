@@ -3,6 +3,7 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { rememberCommunityAdmin } from '@/features/communities/communityAlertEntries';
+import { rememberCommunityWatch } from '@/features/communities/requestBadge';
 import {
   Button,
   EmptyState,
@@ -80,6 +81,8 @@ export function Communities() {
         const list = await loadMyCommunities(characterId);
         // Tells the Community alerts poll whether this Character has anything to watch.
         void rememberCommunityAdmin(characterId, list).catch(() => {});
+        // And the nav badge's poll, whether it has any board to read.
+        void rememberCommunityWatch(characterId, list).catch(() => {});
         if (cancelled) return;
         setLoaded({ characterId, list });
         setFailedFor(null);

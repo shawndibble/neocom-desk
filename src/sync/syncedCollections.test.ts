@@ -165,7 +165,7 @@ describe('declared collections vs the hand-written Firestore config', () => {
   );
   // Read-only subcollections the Community callables write (admin SDK): a
   // Character's membership index (issue #3596). Never synced from the client.
-  const SERVER_WRITTEN_SUBCOLLECTIONS = ['communities', 'mailInviteQuota'];
+  const SERVER_WRITTEN_SUBCOLLECTIONS = ['communities', 'mailInviteQuota', 'requestMailQuota'];
   const ruledSubcollections = [...characterBlock.matchAll(/match \/(\w+)\/\{\w+\} \{/g)]
     .map((m) => m[1])
     .filter((name) => !SERVER_WRITTEN_SUBCOLLECTIONS.includes(name));

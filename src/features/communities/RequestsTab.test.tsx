@@ -11,6 +11,10 @@ const store = vi.hoisted(() => ({
   extendRequest: vi.fn(),
   setRequestClosed: vi.fn(),
   updateMyPledge: vi.fn(),
+  loadRequestMailsToday: vi.fn(),
+  reserveRequestMail: vi.fn(),
+  confirmRequestMail: vi.fn(),
+  releaseRequestMail: vi.fn(),
 }));
 vi.mock('./requestStore', () => store);
 
@@ -111,6 +115,7 @@ function renderTab(
         pledgesFailed={pledgesFailed}
         failed={false}
         now={NOW}
+        members={[]}
         onReload={onReload}
         refreshPledges={refreshPledges}
       />
@@ -142,6 +147,7 @@ beforeEach(async () => {
   store.setRequestClosed.mockResolvedValue(undefined);
   store.updateMyPledge.mockResolvedValue(null);
   refreshPledges.mockResolvedValue([]);
+  store.loadRequestMailsToday.mockResolvedValue(0);
 });
 
 describe('RequestsTab board', () => {
@@ -222,6 +228,12 @@ describe('Request panel', () => {
   });
 });
 
+/** Step 1 to step 2 to posted: nobody is ticked, so no mail goes out. */
+async function postFromDialog(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Next: who to mail' }));
+  await user.click(await screen.findByRole('button', { name: 'Post request' }));
+}
+
 describe('New request dialog', () => {
   it('posts a pasted list with an edited quantity and the location and terms', async () => {
     const user = userEvent.setup();
@@ -237,7 +249,7 @@ describe('New request dialog', () => {
     await user.clear(quantity);
     await user.type(quantity, '75');
     await user.click(screen.getByRole('button', { name: 'Remove Tritanium' }));
-    await user.click(screen.getByRole('button', { name: 'Post request' }));
+    await postFromDialog(user);
     expect(store.postRequest).toHaveBeenCalledWith(1, 'c1', {
       location: 'Efa',
       terms: '90% JBV',
@@ -269,7 +281,7 @@ describe('New request dialog', () => {
     await user.click(await screen.findByRole('button', { name: 'Ishtar Blueprint' }));
     expect(screen.getByLabelText('Ishtar Blueprint quantity')).toHaveValue('1');
     await user.type(screen.getByLabelText('Runs'), '5');
-    await user.click(screen.getByRole('button', { name: 'Post request' }));
+    await postFromDialog(user);
     expect(store.postRequest.mock.calls[0][2].lines).toEqual([
       { typeId: 99, name: 'Ishtar Blueprint', quantity: 1, kind: 'bpc', runs: 5 },
     ]);
@@ -279,13 +291,13 @@ describe('New request dialog', () => {
     const user = userEvent.setup();
     renderTab([]);
     await user.click(screen.getByRole('button', { name: 'New request…' }));
-    expect(await screen.findByRole('button', { name: 'Post request' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Next: who to mail' })).toBeDisabled();
     await user.click(screen.getByLabelText(/Paste a list/));
     await user.paste('Tritanium 5');
     const quantity = await screen.findByLabelText('Tritanium quantity');
     await user.clear(quantity);
     await user.type(quantity, 'lots');
-    expect(screen.getByRole('button', { name: 'Post request' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next: who to mail' })).toBeDisabled();
   });
 
   it('shows the cap message when the server refuses', async () => {
@@ -296,7 +308,7 @@ describe('New request dialog', () => {
     await user.click(await screen.findByLabelText(/Paste a list/));
     await user.paste('Tritanium 5');
     await screen.findByLabelText('Tritanium quantity');
-    await user.click(screen.getByRole('button', { name: 'Post request' }));
+    await postFromDialog(user);
     expect(await screen.findByRole('alert')).toHaveTextContent(/most open Requests/);
   });
 
@@ -307,10 +319,10 @@ describe('New request dialog', () => {
     await user.click(await screen.findByLabelText(/Paste a list/));
     await user.paste(Array.from({ length: 51 }, (_, i) => `Bulk ${i + 1} 5`).join('\n'));
     expect(await screen.findByText(/1 more than the 50-line limit/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Post request' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next: who to mail' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Remove Bulk 1' }));
     expect(screen.queryByText(/-line limit/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Post request' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Next: who to mail' })).toBeEnabled();
   });
 
   it('adds the same blueprint again as the other kind, so a copy and an original coexist', async () => {
@@ -323,7 +335,7 @@ describe('New request dialog', () => {
     await user.type(search, 'ishtar');
     await user.click(await screen.findByRole('button', { name: 'Ishtar Blueprint' }));
     expect(screen.getAllByLabelText('Ishtar Blueprint quantity')).toHaveLength(2);
-    await user.click(screen.getByRole('button', { name: 'Post request' }));
+    await postFromDialog(user);
     expect(store.postRequest.mock.calls[0][2].lines.map((l: { kind: string }) => l.kind)).toEqual([
       'bpc',
       'bpo',

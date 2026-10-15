@@ -8,8 +8,11 @@
 
 import { type Firestore, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import { decideMailRelease, utcDayKey } from './communities.js';
 import {
   REQUESTS_COLLECTION,
+  MAX_REQUEST_MAILS_PER_DAY,
+  decideRequestMail,
   REQUEST_LIFETIME_MS,
   MAX_OPEN_REQUESTS_PER_MEMBER,
   decideExtend,
@@ -20,7 +23,12 @@ import {
   type PostRequestInput,
   type OwnerActionDecision,
 } from './communityRequests.js';
-import { communityRef, memberRef, type CallerCharacter } from './communitiesStore.js';
+import {
+  communityRef,
+  loadCommunity,
+  memberRef,
+  type CallerCharacter,
+} from './communitiesStore.js';
 
 const requestCollection = (db: Firestore, communityId: string) =>
   communityRef(db, communityId).collection(REQUESTS_COLLECTION);
@@ -169,6 +177,199 @@ export async function setRequestClosed(
         lastActivityAt: now,
         expiresAt: now + REQUEST_LIFETIME_MS,
       });
+    }
+  });
+}
+
+// Request mail (issue #3810): the client sends the in-game mail with its own
+// token, so the 100-a-day cap, the one-per-recipient rule and the "sent" stamp
+// live in reserve/confirm/release, the same shape as the mail invites'.
+//   communities/{id}/itemRequests/{requestId}/mails/{targetCharacterId}  one recipient's slot
+//   characters/{uid}/requestMailQuota/{day}                              the sender's count for the day
+const MAILS_COLLECTION = 'mails';
+const REQUEST_MAIL_QUOTA_COLLECTION = 'requestMailQuota';
+const requestMailRef = (db: Firestore, communityId: string, requestId: string, target: number) =>
+  requestCollection(db, communityId)
+    .doc(requestId)
+    .collection(MAILS_COLLECTION)
+    .doc(String(target));
+const requestMailQuotaRef = (db: Firestore, uid: string, day: string) =>
+  db.collection('characters').doc(uid).collection(REQUEST_MAIL_QUOTA_COLLECTION).doc(day);
+
+export interface RequestMailReservation {
+  communityName: string;
+  /** The requester's name as the Member doc has it (never trusted from the client). */
+  requesterName: string;
+  /** Request mails left today after this one. */
+  remaining: number;
+}
+
+function failMail(decision: 'already-mailed' | 'daily-cap'): never {
+  if (decision === 'daily-cap') {
+    throw new HttpsError('resource-exhausted', 'Daily Request mail limit reached', {
+      reason: 'daily-cap',
+    });
+  }
+  throw new HttpsError('already-exists', 'This Member was already mailed about this Request', {
+    reason: 'already-mailed',
+  });
+}
+
+/**
+ * Claims one of the requester's daily Request mails and the one-per-recipient
+ * slot before the client sends it. Only the requester, on their own open
+ * Request, to another Member of the same Community (a Request mail is never a
+ * way to message an arbitrary Character). The cap is counted here, in one
+ * transaction.
+ */
+export async function reserveRequestMail(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  requestId: string,
+  targetCharacterId: number,
+  targetName: string,
+  now = Date.now()
+): Promise<RequestMailReservation> {
+  const community = await loadCommunity(db, communityId);
+  const day = utcDayKey(now);
+  const quota = requestMailQuotaRef(db, caller.uid, day);
+  const mail = requestMailRef(db, communityId, requestId, targetCharacterId);
+  const targetUid = `char:${targetCharacterId}`;
+  if (targetUid === caller.uid) {
+    throw new HttpsError('invalid-argument', 'A Request is not mailed to its requester');
+  }
+
+  const { remaining, requesterName } = await db.runTransaction(async (tx) => {
+    const { characterName } = await requireMember(tx, db, communityId, caller);
+    const request = await tx.get(requestCollection(db, communityId).doc(requestId));
+    if (!request.exists || request.get('ownerUid') !== caller.uid) {
+      throw new HttpsError('not-found', 'Request not found');
+    }
+    if (
+      !isOpenRequest(
+        {
+          closed: request.get('closed') === true,
+          expiresAt: Number(request.get('expiresAt') ?? 0),
+        },
+        now
+      )
+    ) {
+      throw new HttpsError('failed-precondition', 'That Request is no longer open');
+    }
+    if (!(await tx.get(memberRef(db, communityId, targetUid))).exists) {
+      throw new HttpsError('not-found', 'Not a Member of this Community');
+    }
+    const quotaSnap = await tx.get(quota);
+    const mailSnap = await tx.get(mail);
+    const dailyCount = Number(quotaSnap.get('count') ?? 0);
+    const decision = decideRequestMail({
+      dailyCount,
+      existing: mailSnap.exists
+        ? {
+            sentAt: typeof mailSnap.get('sentAt') === 'number' ? mailSnap.get('sentAt') : null,
+            reservedAt: Number(mailSnap.get('reservedAt') ?? 0),
+            attempts: Number(mailSnap.get('attempts') ?? 1),
+            day: typeof mailSnap.get('day') === 'string' ? mailSnap.get('day') : undefined,
+          }
+        : null,
+      now,
+      day,
+    });
+    if (decision === 'retake' || decision === 'retake-charged') {
+      // A crashed tab left this reserved: let the requester try again. On the same day it costs
+      // nothing; after midnight today's count pays, and the slot moves to today so a release
+      // refunds today's count.
+      const attempts = Number(mailSnap.get('attempts') ?? 1) + 1;
+      if (decision === 'retake') {
+        tx.update(mail, { reservedAt: now, attempts });
+        return { remaining: MAX_REQUEST_MAILS_PER_DAY - dailyCount, requesterName: characterName };
+      }
+      tx.set(quota, {
+        count: dailyCount + 1,
+        refunds: Number(quotaSnap.get('refunds') ?? 0),
+        ownerHash: caller.ownerHash,
+      });
+      tx.update(mail, { reservedAt: now, attempts, day });
+      return {
+        remaining: MAX_REQUEST_MAILS_PER_DAY - (dailyCount + 1),
+        requesterName: characterName,
+      };
+    }
+    if (decision !== 'ok') failMail(decision);
+    tx.set(quota, {
+      count: dailyCount + 1,
+      refunds: Number(quotaSnap.get('refunds') ?? 0),
+      ownerHash: caller.ownerHash,
+    });
+    tx.set(mail, {
+      senderUid: caller.uid,
+      targetName,
+      day,
+      reservedAt: now,
+      attempts: 1,
+      sentAt: null,
+    });
+    return {
+      remaining: MAX_REQUEST_MAILS_PER_DAY - (dailyCount + 1),
+      requesterName: characterName,
+    };
+  });
+  return { communityName: String(community.get('name') ?? ''), requesterName, remaining };
+}
+
+/** The mail went out: stamp the time. */
+export async function confirmRequestMail(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  requestId: string,
+  targetCharacterId: number,
+  now = Date.now()
+): Promise<void> {
+  const mail = requestMailRef(db, communityId, requestId, targetCharacterId);
+  await db.runTransaction(async (tx) => {
+    await requireMember(tx, db, communityId, caller);
+    const snap = await tx.get(mail);
+    if (snap.exists && snap.get('senderUid') === caller.uid) tx.update(mail, { sentAt: now });
+  });
+}
+
+/**
+ * The send definitely failed: give back the slot and the day's count. The same
+ * rules as the mail invites (`decideMailRelease`): a fresh, unconfirmed
+ * reservation of this sender's, a few times a day.
+ */
+export async function releaseRequestMail(
+  db: Firestore,
+  caller: CallerCharacter,
+  communityId: string,
+  requestId: string,
+  targetCharacterId: number,
+  now = Date.now()
+): Promise<void> {
+  const mail = requestMailRef(db, communityId, requestId, targetCharacterId);
+  await db.runTransaction(async (tx) => {
+    await requireMember(tx, db, communityId, caller);
+    const snap = await tx.get(mail);
+    if (!snap.exists || snap.get('senderUid') !== caller.uid) return;
+    const quota = requestMailQuotaRef(db, caller.uid, String(snap.get('day')));
+    const quotaSnap = await tx.get(quota);
+    const refundsToday = Number(quotaSnap.get('refunds') ?? 0);
+    const decision = decideMailRelease({
+      existing: {
+        sentAt: typeof snap.get('sentAt') === 'number' ? snap.get('sentAt') : null,
+        reservedAt: Number(snap.get('reservedAt') ?? 0),
+        attempts: Number(snap.get('attempts') ?? 1),
+      },
+      refundsToday,
+      now,
+    });
+    if (decision !== 'refund') return;
+    tx.delete(mail);
+    if (quotaSnap.exists) {
+      const count = Number(quotaSnap.get('count') ?? 0);
+      tx.update(quota, { count: Math.max(0, count - 1), refunds: refundsToday + 1 });
     }
   });
 }

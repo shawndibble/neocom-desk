@@ -1,15 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAIL_MAX_ATTEMPTS_PER_TARGET,
+  MAIL_RESERVATION_STALE_MS,
+  MAX_MAIL_INVITES_PER_DAY,
+} from './communities.js';
+import {
   MAX_LINES_PER_REQUEST,
+  MAX_REQUEST_MAILS_PER_DAY,
   MAX_OPEN_REQUESTS_PER_MEMBER,
   MAX_TERMS_LENGTH,
   REQUEST_LIFETIME_MS,
   decideExtend,
+  decideRequestMail,
   decidePost,
   decideSetClosed,
   isOpenRequest,
   nextExpiry,
   parsePostRequestInput,
+  parseRequestMailInput,
   parseRequestIdInput,
   parseSetClosedInput,
 } from './communityRequests.js';
@@ -161,5 +169,111 @@ describe('decisions', () => {
     expect(nextExpiry(1000, 5)).toBe(1000 + REQUEST_LIFETIME_MS);
     const far = 1000 + 2 * REQUEST_LIFETIME_MS;
     expect(nextExpiry(1000, far)).toBe(far);
+  });
+});
+
+describe('Request mail', () => {
+  const NOW = 1_000_000;
+  const DAY = '2026-10-14';
+  const reserved = (
+    over: Partial<{ sentAt: number | null; attempts: number; day: string }> = {}
+  ) => ({
+    sentAt: null,
+    reservedAt: NOW,
+    attempts: 1,
+    day: DAY,
+    ...over,
+  });
+
+  it('is capped at 100 mails a day, separate from the 20 invites', () => {
+    expect(MAX_REQUEST_MAILS_PER_DAY).toBe(100);
+    expect(MAX_MAIL_INVITES_PER_DAY).toBe(20);
+  });
+
+  it('parses a reservation request', () => {
+    expect(
+      parseRequestMailInput({
+        communityId: 'c1',
+        requestId: 'r1',
+        targetCharacterId: 42,
+        targetName: 'Bo Tanner',
+      })
+    ).toEqual({
+      communityId: 'c1',
+      requestId: 'r1',
+      targetCharacterId: 42,
+      targetName: 'Bo Tanner',
+    });
+    expect(() =>
+      parseRequestMailInput({
+        communityId: 'c1',
+        requestId: 'r1',
+        targetCharacterId: 0,
+        targetName: 'x',
+      })
+    ).toThrow();
+    expect(() =>
+      parseRequestMailInput({ communityId: 'c1', targetCharacterId: 4, targetName: 'x' })
+    ).toThrow();
+  });
+
+  it('allows up to the daily cap, counting mails', () => {
+    const state = { existing: null, now: NOW };
+    expect(
+      decideRequestMail({ ...state, day: DAY, dailyCount: MAX_REQUEST_MAILS_PER_DAY - 1 })
+    ).toBe('ok');
+    expect(decideRequestMail({ ...state, day: DAY, dailyCount: MAX_REQUEST_MAILS_PER_DAY })).toBe(
+      'daily-cap'
+    );
+    // The invite count is not the Request-mail count.
+    expect(decideRequestMail({ ...state, day: DAY, dailyCount: MAX_MAIL_INVITES_PER_DAY })).toBe(
+      'ok'
+    );
+  });
+
+  it('reports a repeat recipient before the cap', () => {
+    expect(
+      decideRequestMail({
+        dailyCount: MAX_REQUEST_MAILS_PER_DAY,
+        existing: reserved({ sentAt: 1 }),
+        now: NOW,
+        day: DAY,
+      })
+    ).toBe('already-mailed');
+  });
+
+  it('retakes a stale unconfirmed reservation a few times, never a sent one', () => {
+    const later = NOW + MAIL_RESERVATION_STALE_MS;
+    const at = (existing: ReturnType<typeof reserved>, now: number) =>
+      decideRequestMail({ dailyCount: 5, existing, now, day: DAY });
+    expect(at(reserved(), NOW + 1000)).toBe('already-mailed');
+    expect(at(reserved(), later)).toBe('retake');
+    expect(at(reserved({ attempts: MAIL_MAX_ATTEMPTS_PER_TARGET }), later)).toBe('already-mailed');
+    expect(at(reserved({ sentAt: 1 }), later)).toBe('already-mailed');
+  });
+
+  it('retakes free on the same day, charged and capped on a later one', () => {
+    const later = NOW + MAIL_RESERVATION_STALE_MS;
+    const stale = reserved({ day: '2026-10-13' });
+    const at = (existing: ReturnType<typeof reserved>, dailyCount: number) =>
+      decideRequestMail({ dailyCount, existing, now: later, day: DAY });
+    expect(at(reserved(), MAX_REQUEST_MAILS_PER_DAY)).toBe('retake');
+    expect(at(stale, 5)).toBe('retake-charged');
+    expect(at(stale, MAX_REQUEST_MAILS_PER_DAY - 1)).toBe('retake-charged');
+    expect(at(stale, MAX_REQUEST_MAILS_PER_DAY)).toBe('daily-cap');
+  });
+
+  it('stops retaking a recipient after the attempts allowed, on any day', () => {
+    const later = NOW + MAIL_RESERVATION_STALE_MS;
+    for (const day of [DAY, '2026-10-13']) {
+      expect(
+        decideRequestMail({
+          dailyCount: 0,
+          existing: reserved({ day, attempts: MAIL_MAX_ATTEMPTS_PER_TARGET }),
+          now: later,
+          day: DAY,
+        })
+      ).toBe('already-mailed');
+    }
   });
 });

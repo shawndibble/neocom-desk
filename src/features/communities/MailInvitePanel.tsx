@@ -31,6 +31,9 @@ type Problem =
 /** EVE renders mail as limited HTML: a name must not bring tags of its own. */
 const plain = (text: string) => text.replace(/[<>]/g, '');
 
+// NOTE: src/features/communities/requestMail.ts (sendRequestMails) repeats this reserve, send,
+// release-or-confirm loop for Request mail. Keep the refund rules in step; not merged so the
+// invite panel stayed untouched.
 /** Only an answer from ESI that refuses the mail proves it was not sent; a timeout or 5xx proves nothing. */
 const isDefiniteRejection = (err: unknown) =>
   err instanceof EsiError && err.status >= 400 && err.status < 500;

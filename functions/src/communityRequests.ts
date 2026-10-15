@@ -7,7 +7,15 @@
 // they are unit testable. The admin-SDK half is communityRequestsStore.ts.
 
 import { HttpsError } from 'firebase-functions/v2/https';
-import { boundedString, docId, record } from './communities.js';
+import {
+  MAIL_MAX_ATTEMPTS_PER_TARGET,
+  MAIL_RESERVATION_STALE_MS,
+  MAX_CHARACTER_NAME_LENGTH,
+  boundedString,
+  docId,
+  record,
+  type MailInviteRecord,
+} from './communities.js';
 
 export const REQUESTS_COLLECTION = 'itemRequests';
 /** One Member's Pledges on a Request live in `{request}/pledges/{uid}` (issue #3808, written by the Member under firestore.rules; this side only deletes them on leave). */
@@ -15,6 +23,12 @@ export const PLEDGES_COLLECTION = 'pledges';
 
 /** Open (not closed, not expired) Requests one Member may hold in one Community. */
 export const MAX_OPEN_REQUESTS_PER_MEMBER = 10;
+/**
+ * Mails one Member may send about Requests per UTC day (issue #3810): a mail
+ * is one recipient, however many lines the Request has. Counted apart from
+ * the 20 mail invites an admin sends (`MAX_MAIL_INVITES_PER_DAY`).
+ */
+export const MAX_REQUEST_MAILS_PER_DAY = 100;
 /** Lines on one Request. */
 export const MAX_LINES_PER_REQUEST = 50;
 export const MAX_LOCATION_LENGTH = 100;
@@ -215,4 +229,57 @@ export function decideSetClosed(state: {
 /** The next expiry: 30 days from `now`, never earlier than the one it already has. */
 export function nextExpiry(now: number, current: number): number {
   return Math.max(current, now + REQUEST_LIFETIME_MS);
+}
+
+export interface RequestMailInput extends RequestIdInput {
+  targetCharacterId: number;
+  /** Display only: the Member's name as listed. */
+  targetName: string;
+}
+
+export function parseRequestMailInput(data: unknown): RequestMailInput {
+  const d = record(data);
+  const id = d.targetCharacterId;
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0) {
+    throw new HttpsError('invalid-argument', 'targetCharacterId must be a Character id');
+  }
+  return {
+    ...parseRequestIdInput(data),
+    targetCharacterId: id,
+    targetName: boundedString(d.targetName, 'targetName', MAX_CHARACTER_NAME_LENGTH),
+  };
+}
+
+/**
+ * `retake` is free (the same UTC day's own reservation, left by a crashed tab).
+ * `retake-charged` is a retake on a later UTC day: the old reservation was
+ * counted on its own day, so today's count pays for the new send.
+ */
+export type RequestMailDecision =
+  'ok' | 'retake' | 'retake-charged' | 'already-mailed' | 'daily-cap';
+
+/**
+ * One mail per recipient per Request comes first, so a repeat never reads as a
+ * cap. A stale unconfirmed reservation may be retaken a few times
+ * (`MAIL_MAX_ATTEMPTS_PER_TARGET`); across midnight it is charged to today and
+ * held to today's cap. (The same rules as the mail invites'; see
+ * `decideMailInvite` in communities.ts, which this mirrors on purpose.)
+ */
+export function decideRequestMail(state: {
+  dailyCount: number;
+  existing: (MailInviteRecord & { day?: string }) | null;
+  now: number;
+  /** Today's UTC day key. */
+  day: string;
+}): RequestMailDecision {
+  const { existing } = state;
+  if (existing) {
+    const stale = state.now - existing.reservedAt >= MAIL_RESERVATION_STALE_MS;
+    if (existing.sentAt !== null || !stale || existing.attempts >= MAIL_MAX_ATTEMPTS_PER_TARGET) {
+      return 'already-mailed';
+    }
+    if (existing.day === undefined || existing.day === state.day) return 'retake';
+    return state.dailyCount >= MAX_REQUEST_MAILS_PER_DAY ? 'daily-cap' : 'retake-charged';
+  }
+  return state.dailyCount >= MAX_REQUEST_MAILS_PER_DAY ? 'daily-cap' : 'ok';
 }

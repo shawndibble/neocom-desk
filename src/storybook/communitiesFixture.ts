@@ -109,7 +109,15 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
         ],
       },
       { uid: OTHER, items: [blueprint(24699, -1, 'Amarr'), blueprint(950, 10, 'Amarr')] },
-      { uid: 'char:2119000001', items: [blueprint(2184, -1, 'Jita'), blueprint(691, 5, 'Jita')] },
+      {
+        uid: 'char:2119000001',
+        items: [
+          blueprint(2184, -1, 'Jita'),
+          blueprint(691, 5, 'Jita'),
+          blueprint(32881, 8, 'Jita'),
+        ],
+      },
+      { uid: 'char:2119000002', items: [blueprint(691, 10, 'Dodixie')] },
       { uid: 'char:2119000003', items: [blueprint(940, -1, 'Dodixie')] },
     ],
     [SAMPLE_MEMBER_COMMUNITY_ID]: [
@@ -294,6 +302,7 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
     loadRequests: (id) => (requests[id] ?? []).map((entry) => ({ ...entry })),
     loadLibraries: (id) => libraries[id] ?? [],
     loadFittings: (id) => (fittings[id] ?? []).map((entry) => ({ ...entry })),
+    loadRequestMailsToday: () => 3,
     loadItemRequests: (id) => (itemRequests[id] ?? []).map((entry) => ({ ...entry })),
     loadAllPledges: (id) => Object.fromEntries(Object.entries(pledges[id] ?? {})),
     loadPledges: (id, requestId) => (pledges[id]?.[requestId] ?? []).map((entry) => ({ ...entry })),
@@ -325,6 +334,15 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
           itemRequests[communityId] = [posted, ...(itemRequests[communityId] ?? [])];
           return { requestId: posted.id };
         }
+        case 'reserveCommunityRequestMailCallable':
+          return {
+            communityName: communities.find((c) => c.id === communityId)?.name ?? '',
+            requesterName: SAMPLE_ACTIVE_CHARACTER.name,
+            remaining: 96,
+          };
+        case 'confirmCommunityRequestMailCallable':
+        case 'releaseCommunityRequestMailCallable':
+          return {};
         case 'extendCommunityRequestCallable': {
           const { requestId } = data as { requestId: string };
           const found = itemRequests[communityId]?.find((entry) => entry.id === requestId);
