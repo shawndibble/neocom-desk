@@ -125,7 +125,7 @@ export function SkillDetailModal() {
       closeOnBack={false}
       titleActions={
         <OpenInEveButton
-          kind="information"
+          kind="marketDetails"
           id={request.typeID}
           name={state.status === 'ready' ? state.data.name : undefined}
         />
