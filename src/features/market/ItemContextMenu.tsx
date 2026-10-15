@@ -296,8 +296,10 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
  * trigger — it builds its own copy of the items rather than reading a
  * surrounding `ItemContextMenu`'s.
  */
-export function ItemMoreActions(props: ItemMenuProps) {
-  const { typeId, itemName } = props;
+export function ItemMoreActions(
+  props: ItemMenuProps & { variant?: 'ghost' | 'plain'; size?: 'row' | 'sm' }
+) {
+  const { typeId, itemName, variant, size } = props;
   const [alertOpen, setAlertOpen] = useState(false);
   const [stockOpen, setStockOpen] = useState(false);
   const items = useItemMenuItems(
@@ -309,7 +311,7 @@ export function ItemMoreActions(props: ItemMenuProps) {
   return (
     <>
       <RowActionsContext.Provider value={{ name: itemName, items }}>
-        <RowMoreActions />
+        <RowMoreActions variant={variant} size={size} />
       </RowActionsContext.Provider>
       {alertOpen && (
         <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
