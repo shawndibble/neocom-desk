@@ -5472,6 +5472,8 @@
       "compareChartTitle": "Raw vs. refined value by type",
       "compareChartTitleRawOnly": "Value by ore type",
       "refiningHiddenNote": "Refining hidden. Raw value only.",
+      "refiningHiddenCompressedNote": "Refining hidden. Raw compressed value only.",
+      "assumesCompressedNote": "Assumes compressed.",
       "chartMetric": {
         "title": "Chart metric",
         "iskOption": "ISK",

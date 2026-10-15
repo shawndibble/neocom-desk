@@ -36,7 +36,9 @@ so their data is unusable; surfaced #2390).
 EVE Omni, Canopus, Eve-Omnitool, Eve Deep Industry, SNOW//OPS, New Eden Command,
 eve-hub.ru, Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas (all
 closed classes 1-3 or intel/dev infra; Slipway Jobs view + slot deduction is
-already Active Jobs / job-slot count).
+already Active Jobs / job-slot count), Pod Warden (native PI/skill/order/in-game-
+notification push app — PI alerts covered by kill-tests 12/17 and ADR 0020),
+Isktracker - Incursions (unexamined, non-pipeline).
 
 **Remit widened (#2328, decision `20260929-234357`): intel and travel tools are
 in scope** — route safety (kills/jumps along a route), Thera/Turnur connections
@@ -171,6 +173,11 @@ for the module or route.
 - **Wallet/LP**: balance chart, corp division sync, ISK/LP ranking nets ISK
   cost, the `required_items` turn-in _and_ a build cost. **Assets**: portfolio
   value.
+- **Appraisal**: saved shopping lists minus owned with a hold-fit bar (#2868,
+  #2931). **Mining**: ISK/m³ survey colouring and chart metric (#3222, #2160).
+  **Stock**: `/market/stock` restock list with Build Group action (the owner
+  rejected #643 before it; it shipped later as Stock Targets). **Orders**:
+  outbid suggested price, copyable.
 - **Open Orders**: sell-through, multi-char aggregation. **Quickbar**: price
   alerts, multi-hub handoff. **Mining**: moon-ore ledger tax tracking
   (renter-side only), ore/ice yield. **Corp Ops Board**: structure fuel clock.
@@ -285,7 +292,12 @@ demand a turn-in `offerProfit` subtracts and the `<dl>` never shows). #1051
 (`marketWideTrees.json` bakes the TOP blueprint's `time`). Unblocked: #1085
 (assembled volume on hull material lines).
 
-**New.** #2390 NARROW — Skills › Certificates tab: CCP's SDE certificates,
+**New.** #3791 NARROW — Market-Wide says invention-only T2/T3 products are not
+ranked (static note, no count: "no source" also covers faction/lottery BPOs).
+#3792 NARROW — Fitting Add panel previews whole-fit stat change on hover/focus,
+pointer only (generic `diffFittingStats`; touch has no path). #3793 NARROW —
+Assets select bar "Copy with quantities" (`Name xQty`), no Appraisal hand-off.
+#2390 NARROW — Skills › Certificates tab: CCP's SDE certificates,
 combat groups only, grade + next-grade gap + "Add to plan"; Alpha cap shown only
 on Alpha characters. #1091 NARROW — contract notifications announce completion and failure,
 not just acceptance; every status is stored but only the edge into `in_progress`
@@ -348,6 +360,15 @@ Grouped by the test that killed them; the reason is what stops a re-pitch.
   into #1051), Production Log double-sale detection (no join key — **watch:** an
   ESI order↔transaction correlation makes the FIX proposable). **32**:
   Production Run using `IndustryJob.cost` (no job id).
+- **Re-pitched, still dead:** invention/decryptor planning (`.out-of-scope/
+invention-planning.md`, #2848 not planned — only the Market-Wide label
+  survived, #3791); Per-blueprint "Need Hauling / Need BP" status in a Build Plan
+  (EVE Horizon; 18 — shows only on exceptions — plus `OwnedBlueprintsPanel`
+  location, Assets Move, and a station/container matching join); wallet top/flop
+  items, ROI and weekday-by-hour heatmap (10, 11 — no cost basis, ~30 days of
+  journal); hauling top-routes list (needs order books for many hub pairs, the
+  shared ESI budget); quiet hours/digest (#2871 not planned); repeat "still not
+  fixed" reminders and auto-resolve (noise; could erase a live fire).
 - **On remit, not a kill-test:** "can this character fly this fit" (EVE Empire —
   PvP/PvE; distinct from #1015); Compass and EVE-NAV capital jump planning (a
   second account plus a multi-billion hull, no ISK-pipeline leg); Eve Supply
