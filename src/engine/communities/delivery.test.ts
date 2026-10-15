@@ -10,7 +10,7 @@ import {
   type DeliveryContract,
   type DeliverySlot,
 } from './delivery';
-import type { RequestLine } from './requests';
+import { withPledgeLine, type RequestLine } from './requests';
 
 const ore: RequestLine = { typeId: 100, name: 'Reactive Metals', quantity: 500, kind: 'item' };
 const bpc: RequestLine = {
@@ -187,21 +187,109 @@ describe('matchDeliveries', () => {
     expect(out.get('a')?.delivered).toBe(100);
   });
 
-  it('does not double count a contract whose id was trimmed from the recorded list', () => {
+  it('does not double count contracts whose ids were trimmed from the recorded list', () => {
     const contracts = Array.from({ length: MAX_CONTRACT_IDS_PER_LINE + 5 }, (_, i) =>
       contract(i + 1, [{ typeId: 100, quantity: 1, blueprint: null }])
     );
     const first = matchDeliveries([slot('a', ore, 1000)], contracts).get('a')!;
+    expect(first.contractIds).toHaveLength(MAX_CONTRACT_IDS_PER_LINE);
     const again = matchDeliveries(
       [
         slot('a', ore, 1000, {
-          previousAuto: first.delivered,
+          previousAuto: first.auto,
+          previousThrough: first.through,
           previousContractIds: first.contractIds,
         }),
       ],
       contracts
     ).get('a')!;
     expect(again.delivered).toBe(MAX_CONTRACT_IDS_PER_LINE + 5);
+  });
+
+  it('counts a late contract whose id is below a full recorded list', () => {
+    const ids = Array.from({ length: MAX_CONTRACT_IDS_PER_LINE }, (_, i) => 5000 + i);
+    const out = matchDeliveries(
+      [
+        slot('a', ore, 1000, {
+          previousAuto: 60,
+          previousThrough: 100,
+          previousContractIds: ids,
+        }),
+      ],
+      [contract(4990, [{ typeId: 100, quantity: 30, blueprint: null }], 200)]
+    ).get('a')!;
+    expect(out.delivered).toBe(90);
+    expect(out.auto).toBe(90);
+    expect(out.through).toBe(200);
+  });
+
+  it('keeps the contract figure under a larger typed amount once the contract has aged out', () => {
+    const typed = {
+      quantity: 300,
+      delivered: 50,
+      contractIds: [1],
+      manual: 50,
+      auto: 40,
+      through: 5,
+    };
+    const cleared = pledgeEntryAfterManual(typed, 0);
+    expect(cleared.delivered).toBe(40);
+    const out = matchDeliveries([slot('a', ore, 300, previousFromEntry(cleared))], []);
+    expect(out.get('a')?.delivered).toBe(40);
+  });
+
+  it('does not zero the contract base when the typed amount equals it', () => {
+    const entry = {
+      quantity: 300,
+      delivered: 40,
+      contractIds: [1],
+      manual: 40,
+      auto: 40,
+      through: 5,
+    };
+    const out = matchDeliveries([slot('a', ore, 300, previousFromEntry(entry))], []);
+    expect(out.get('a')).toMatchObject({ delivered: 40, auto: 40 });
+    expect(pledgeEntryAfterManual(entry, 0).delivered).toBe(40);
+  });
+
+  it('restores the contract figure when a lowered Pledge is raised back', () => {
+    const lowered = withPledgeLine(
+      { 0: { quantity: 100, delivered: 80, contractIds: [1], auto: 80, through: 5 } },
+      0,
+      30
+    );
+    expect(lowered[0]).toMatchObject({ delivered: 30, auto: 80 });
+    const raised = withPledgeLine(lowered, 0, 100);
+    expect(raised[0]).toMatchObject({ delivered: 80, auto: 80 });
+    const out = matchDeliveries([slot('a', ore, 30, previousFromEntry(lowered[0]))], []);
+    expect(out.get('a')).toMatchObject({ delivered: 30, auto: 80 });
+  });
+
+  it('counts a contract toward one Pledge: an older Request does not take what a newer one recorded', () => {
+    const a = contract(7, [{ typeId: 100, quantity: 40, blueprint: null }], 50);
+    const out = matchDeliveries(
+      [
+        slot('r0', ore, 100, { order: [1, 0] }),
+        slot('r1', ore, 100, {
+          order: [2, 0],
+          previousAuto: 40,
+          previousThrough: 50,
+          previousContractIds: [7],
+        }),
+      ],
+      [a]
+    );
+    expect(out.get('r1')?.delivered).toBe(40);
+    expect(out.get('r0')?.delivered).toBe(0);
+  });
+
+  it('does not let through hide a contract an unread horizon might precede', () => {
+    const out = matchDeliveries(
+      [slot('a', ore, 1000)],
+      [contract(9, [{ typeId: 100, quantity: 5, blueprint: null }], 500)],
+      { horizon: 400 }
+    );
+    expect(out.get('a')).toMatchObject({ delivered: 5, through: 0 });
   });
 
   it('keeps the most recent contract ids when more than the cap match', () => {
@@ -280,9 +368,9 @@ describe('pledgeEntryAfterManual', () => {
   it('records the amount and takes the larger of it and the contract figure', () => {
     expect(
       pledgeEntryAfterManual({ quantity: 300, delivered: 120, contractIds: [1] }, 200)
-    ).toEqual({ quantity: 300, delivered: 200, contractIds: [1], manual: 200 });
+    ).toEqual({ quantity: 300, delivered: 200, contractIds: [1], manual: 200, auto: 120 });
     expect(pledgeEntryAfterManual({ quantity: 300, delivered: 120, contractIds: [1] }, 50)).toEqual(
-      { quantity: 300, delivered: 120, contractIds: [1], manual: 50 }
+      { quantity: 300, delivered: 120, contractIds: [1], manual: 50, auto: 120 }
     );
   });
 
@@ -341,8 +429,10 @@ describe('batchLines', () => {
     entry: {
       quantity: 5,
       delivered: 1,
-      contractIds: Array.from({ length: 20 }, (_, i) => i + 1),
+      contractIds: Array.from({ length: 10 }, (_, i) => i + 1),
       manual: 1,
+      auto: 1,
+      through: 1,
     },
   });
 
@@ -362,7 +452,7 @@ describe('batchLines', () => {
     ]);
   });
 
-  it('puts a full 20-id line in a write of its own', () => {
+  it('puts a full 10-id line in a write of its own', () => {
     const batches = batchLines([light(0), heavy(1), light(2)]);
     expect(batches.map((b) => b.map((l) => l.index))).toEqual([[0], [1], [2]]);
   });

@@ -21,11 +21,13 @@ vi.mock('./requestStore', () => ({
   updateMyPledge: mocks.update,
 }));
 
+import { notePledgeEdit } from './pledgeWrites';
 import { syncRequestDeliveries, toDeliveryItem } from './requestDelivery';
 
 const ME = 11;
 const REQUESTER = 22;
 const NOW = Date.parse('2026-10-15T00:00:00Z');
+const DONE = Date.parse('2026-10-13T00:00:00Z');
 
 const request = (over: Partial<CommunityRequest> = {}): CommunityRequest => ({
   id: 'r1',
@@ -109,7 +111,9 @@ describe('syncRequestDeliveries', () => {
     expect(result).toMatchObject({ status: 'ok', updated: 1 });
     const change = mocks.update.mock.calls[0]?.[3] as (l: Record<number, PledgeEntry>) => unknown;
     const written = change({ 0: { quantity: 300, delivered: 0, contractIds: [] } });
-    expect(written).toEqual({ 0: { quantity: 300, delivered: 120, contractIds: [7] } });
+    expect(written).toEqual({
+      0: { quantity: 300, delivered: 120, contractIds: [7], auto: 120, through: DONE },
+    });
     expect(JSON.stringify(mocks.update.mock.calls)).not.toContain('123456789');
   });
 
@@ -118,7 +122,14 @@ describe('syncRequestDeliveries', () => {
     const change = mocks.update.mock.calls[0]?.[3] as (l: Record<number, PledgeEntry>) => unknown;
     // Typed 200 while the run was in flight: contracts show 120, the typed amount stands.
     expect(change({ 0: { quantity: 300, delivered: 200, contractIds: [], manual: 200 } })).toEqual({
-      0: { quantity: 300, delivered: 200, contractIds: [7], manual: 200 },
+      0: {
+        quantity: 300,
+        delivered: 200,
+        contractIds: [7],
+        manual: 200,
+        auto: 120,
+        through: DONE,
+      },
     });
   });
 
@@ -131,13 +142,72 @@ describe('syncRequestDeliveries', () => {
     await syncRequestDeliveries(ME, 'c1', NOW);
     const change = mocks.update.mock.calls[0]?.[3] as (l: Record<number, PledgeEntry>) => unknown;
     expect(change({ 0: { quantity: 300, delivered: 0, contractIds: [] } })).toEqual({
-      0: { quantity: 300, delivered: 120, contractIds: [7] },
+      0: { quantity: 300, delivered: 120, contractIds: [7], auto: 120, through: DONE },
+    });
+  });
+
+  it('does not join, nor let write, a run that began before a hand edit of the Pledge', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    const held = new Promise((resolve) => (release = resolve));
+    const open = { cached: { data: [contract(7)], truncated: false }, needsReauth: false };
+    mocks.contracts.mockReturnValueOnce(held.then(() => open)).mockResolvedValue(open);
+    const stale = syncRequestDeliveries(ME, 'c1', NOW);
+    // The Member clears or re-pledges while that run is still reading.
+    notePledgeEdit(ME, 'c1');
+    const fresh = await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(fresh.updated).toBe(1);
+    expect(mocks.contracts).toHaveBeenCalledTimes(2);
+    release(undefined);
+    await stale;
+    // Only the fresh run wrote.
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a Pledge withdrawn and pledged afresh meanwhile alone', async () => {
+    mocks.pledges.mockResolvedValue(
+      new Map([
+        [
+          'r1',
+          [pledge({ 0: { quantity: 300, delivered: 40, contractIds: [3], auto: 40, through: 1 } })],
+        ],
+      ])
+    );
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    const change = mocks.update.mock.calls[0]?.[3] as (l: Record<number, PledgeEntry>) => unknown;
+    const fresh = { 0: { quantity: 300, delivered: 0, contractIds: [] } };
+    expect(change(fresh)).toEqual(fresh);
+  });
+
+  it('adds only a new contract to a Pledge whose earlier one has aged out', async () => {
+    mocks.pledges.mockResolvedValue(
+      new Map([
+        [
+          'r1',
+          [pledge({ 0: { quantity: 300, delivered: 40, contractIds: [3], auto: 40, through: 1 } })],
+        ],
+      ])
+    );
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    const change = mocks.update.mock.calls[0]?.[3] as (l: Record<number, PledgeEntry>) => unknown;
+    expect(
+      change({ 0: { quantity: 300, delivered: 40, contractIds: [3], auto: 40, through: 1 } })
+    ).toEqual({
+      0: { quantity: 300, delivered: 160, contractIds: [3, 7], auto: 160, through: DONE },
     });
   });
 
   it('writes nothing when the stored Pledge already matches (idempotent)', async () => {
     mocks.pledges.mockResolvedValue(
-      new Map([['r1', [pledge({ 0: { quantity: 300, delivered: 120, contractIds: [7] } })]]])
+      new Map([
+        [
+          'r1',
+          [
+            pledge({
+              0: { quantity: 300, delivered: 120, contractIds: [7], auto: 120, through: DONE },
+            }),
+          ],
+        ],
+      ])
     );
     const result = await syncRequestDeliveries(ME, 'c1', NOW);
     expect(result).toMatchObject({ status: 'ok', updated: 0 });

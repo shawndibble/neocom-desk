@@ -1,0 +1,7 @@
+# Scope decisions — Pledge deliveries store the contract figure and its finish time
+
+_Recorded 2026-10-15._
+
+- **A Pledge line stores `auto` (what contracts alone account for) and `through` (the latest finish time counted into it), beside `delivered`, `contractIds` and `manual`.** The figure was being rebuilt from a capped id list, which double counted or lost deliveries once contracts aged out of ESI, a typed amount hid the contract figure, or a late contract carried a lower id than a full list. A visible contract is already counted when its id is recorded or it finished by `through`; `delivered` is the larger of `auto` and `manual`, never their sum; new `auto` is the old plus newly counted contracts. `auto` is kept unclamped so lowering then raising a Pledge restores it. Rules out rebuilding delivery from the id list; entries without the fields still read (auto from `delivered`, ids only).
+- **`contractIds` is capped at 10 a line (was 20), as evidence only.** The rules' 1000-expression budget is the binding limit and the two new fields cost about 20 more a line; ten ids keep a full line writable alone. Older lines with more ids are trimmed when next rewritten.
+- **A contract counts toward one Pledge.** A contract another of the Member's Pledges already records is not credited to a Pledge that does not (oldest Request first for new ones), so pledging on an older Request later never counts a delivery twice.

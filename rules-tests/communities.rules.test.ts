@@ -640,7 +640,7 @@ describe('Requests', () => {
       await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ x: entry(1) })));
     });
 
-    it('validates every contract id: positive integers, at most 20 a line', async () => {
+    it('validates every contract id: positive integers, at most 10 a line', async () => {
       const db = characterAuth(env, 2, 'hash-2').firestore();
       await assertSucceeds(
         setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1, { contractIds: [1, 2, 3, 19] }) }))
@@ -648,7 +648,7 @@ describe('Requests', () => {
       await assertSucceeds(
         setDoc(
           doc(db, PLEDGE),
-          pledgeDoc({ 0: entry(1, { contractIds: Array.from({ length: 20 }, (_, i) => i + 1) }) })
+          pledgeDoc({ 0: entry(1, { contractIds: Array.from({ length: 10 }, (_, i) => i + 1) }) })
         )
       );
       for (const contractIds of [
@@ -664,7 +664,8 @@ describe('Requests', () => {
     });
 
     it('still allows a write that changes several lines at once', async () => {
-      const SEVERAL = 4;
+      // Four plain lines cost more than the rules' budget since `auto`/`through`; the batcher splits at three.
+      const SEVERAL = 3;
       await env.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(
           doc(ctx.firestore(), REQ),
@@ -706,7 +707,7 @@ describe('Requests', () => {
         );
       });
       const db = characterAuth(env, 2, 'hash-2').firestore();
-      const idCounts = [20, 20, 0, 1, 5, 10, 20, 3, 3, 3, 2, 20];
+      const idCounts = [10, 10, 0, 1, 5, 10, 10, 3, 3, 3, 2, 10];
       const changed = idCounts.map((count, index) => ({
         index,
         entry: {
@@ -714,6 +715,8 @@ describe('Requests', () => {
           delivered: 40,
           contractIds: Array.from({ length: count }, (_, i) => i + 1),
           manual: index % 2 === 0 ? 40 : undefined,
+          auto: 90,
+          through: 1_760_000_000_000,
         },
       }));
       let stored: Record<string, unknown> = { 0: entry(1) };
@@ -727,6 +730,8 @@ describe('Requests', () => {
               delivered: e.delivered,
               contractIds: e.contractIds,
               ...(e.manual !== undefined ? { manual: e.manual } : {}),
+              auto: e.auto,
+              through: e.through,
             },
           };
         }
@@ -749,17 +754,23 @@ describe('Requests', () => {
         );
       });
       const db = characterAuth(env, 2, 'hash-2').firestore();
-      const ids = Array.from({ length: 20 }, (_, i) => i + 1);
+      const ids = Array.from({ length: 10 }, (_, i) => i + 1);
       const lines = Object.fromEntries(
         Array.from({ length: 4 }, (_, i) => [
           String(i),
-          entry(50, { delivered: 40, contractIds: ids }),
+          entry(50, {
+            delivered: 40,
+            contractIds: ids,
+            manual: 40,
+            auto: 90,
+            through: 1_760_000_000_000,
+          }),
         ])
       );
       await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc(lines)));
     });
 
-    it('bounds delivered and a typed amount by the Pledged quantity, and contract ids at 20 (#3809)', async () => {
+    it('bounds delivered and a typed amount by the Pledged quantity, and contract ids at 10 (#3809)', async () => {
       const db = characterAuth(env, 2, 'hash-2').firestore();
       await assertSucceeds(
         setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { delivered: 5, manual: 5 }) }))
@@ -771,9 +782,27 @@ describe('Requests', () => {
       await assertFails(
         setDoc(
           doc(db, PLEDGE),
-          pledgeDoc({ 0: entry(5, { contractIds: Array.from({ length: 21 }, (_, i) => i + 1) }) })
+          pledgeDoc({ 0: entry(5, { contractIds: Array.from({ length: 11 }, (_, i) => i + 1) }) })
         )
       );
+    });
+
+    it('bounds the stored contract figure and its finish time, and accepts entries without them (#3809)', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      // `auto` is kept unclamped: above a lowered quantity is fine.
+      await assertSucceeds(
+        setDoc(
+          doc(db, PLEDGE),
+          pledgeDoc({ 0: entry(5, { delivered: 5, auto: 80, through: 1_760_000_000_000 }) })
+        )
+      );
+      await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5) })));
+      for (const bad of [-1, 1.5, 'x']) {
+        await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { auto: bad }) })));
+      }
+      for (const bad of [-1, 1.5, 'x']) {
+        await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { through: bad }) })));
+      }
     });
 
     it('bounds a typed delivered amount: a positive whole number up to the cap (#3809)', async () => {

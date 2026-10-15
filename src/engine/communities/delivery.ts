@@ -6,8 +6,11 @@
  * Idempotent by construction. `delivered` is recomputed from the whole set of
  * matching contracts on every run, never incremented, so running twice (or on
  * two devices) gives one answer. Because ESI only keeps recent contracts, what
- * an earlier run recorded is carried as a base (`previousAuto`), and only
- * contracts that run had not already counted are added on top of it.
+ * an earlier run recorded is stored on the entry itself (`auto`, and `through`:
+ * the latest finish time counted), so a contract is already counted when its id
+ * is recorded or it finished by `through`; only the rest is added on top. The
+ * id list is capped evidence, never the source of the figure. A contract
+ * counts toward one Pledge: not one another of the Member's Pledges records.
  *
  * Only the Request, the line, a quantity and contract ids ever leave this
  * module's result for Firestore: no prices, no issuer, no other contents.
@@ -15,7 +18,7 @@
 import type { PledgeEntry, RequestLine } from './requests';
 
 /** Mirrors the rules' cap on `contractIds` a line. */
-export const MAX_CONTRACT_IDS_PER_LINE = 20;
+export const MAX_CONTRACT_IDS_PER_LINE = 10;
 /** A Pledge write may change at most this many lines (the rules' expression budget). */
 export const MAX_LINES_PER_PLEDGE_WRITE = 4;
 
@@ -49,9 +52,12 @@ export interface DeliverySlot {
   since: number;
   /** Pledges are served oldest first: see `slotOrder`. */
   order: SlotOrder;
-  /** What an earlier run recorded from contracts. */
+  /** What an earlier run recorded from contracts, unclamped (a lowered Pledge keeps it). */
   previousAuto: number;
+  /** The contracts it recorded: evidence only, capped, in recorded order. */
   previousContractIds: readonly number[];
+  /** The latest finish time of any contract counted so far; absent on an entry from before it was stored. */
+  previousThrough?: number;
   /** An amount the Member typed. */
   manual?: number;
 }
@@ -77,8 +83,10 @@ export interface DeliveryFlag {
 export interface SlotDelivery {
   /** What the line shows: the larger of `auto` and a typed amount, within the Pledge. */
   delivered: number;
-  /** What contracts alone account for, within the Pledge. */
+  /** What contracts alone account for, unclamped: stored as it is, clamped only to show. */
   auto: number;
+  /** The latest finish time of any contract counted so far, ms. */
+  through: number;
   contractIds: number[];
   flags: DeliveryFlag[];
 }
@@ -92,38 +100,45 @@ function accepts(slot: DeliverySlot, contract: DeliveryContract, item: DeliveryI
   return true;
 }
 
-/**
- * Whether a contract id is one a stored entry already counts. The recorded
- * list keeps only the highest ids, so at the cap a lower id was trimmed, not new.
- */
-function recordedTest(ids: readonly number[]): (id: number) => boolean {
-  const set = new Set(ids);
-  const floor = ids.length >= MAX_CONTRACT_IDS_PER_LINE ? Math.min(...ids) : -Infinity;
-  return (id) => set.has(id) || id < floor;
-}
-
 /** Matches contracts to slots; one entry per slot, in any order. */
 export function matchDeliveries(
   slots: readonly DeliverySlot[],
-  contracts: readonly DeliveryContract[]
+  contracts: readonly DeliveryContract[],
+  options: {
+    /**
+     * Contracts finishing at or after this may not all have been read (a
+     * failed item read): they are counted, but `through` never passes below
+     * it, so an unread one is not mistaken for already counted next run.
+     */
+    horizon?: number;
+  } = {}
 ): Map<string, SlotDelivery> {
+  const horizon = options.horizon ?? Infinity;
   const ordered = [...slots].sort((a, b) => byOrder(a.order, b.order));
   const sorted = [...contracts].sort(
     (a, b) => a.completedAt - b.completedAt || a.contractId - b.contractId
   );
-  const counted = new Map<string, number>();
-  /** Of `counted`, what came from contracts the stored entry already records. */
-  const countedRecorded = new Map<string, number>();
-  const recorded = new Map<string, (id: number) => boolean>();
-  const matched = new Map<string, Set<number>>();
+  /** Contract ids a slot already records, by slot: the evidence for "counted on another slot". */
+  const recordedOn = new Map<number, Set<string>>();
+  for (const slot of slots) {
+    for (const id of slot.previousContractIds) {
+      recordedOn.set(id, (recordedOn.get(id) ?? new Set()).add(slot.key));
+    }
+  }
+  const auto = new Map<string, number>();
+  const through = new Map<string, number>();
+  const matched = new Map<string, number[]>();
   const flags = new Map<string, DeliveryFlag[]>();
   for (const slot of slots) {
-    counted.set(slot.key, 0);
-    countedRecorded.set(slot.key, 0);
-    recorded.set(slot.key, recordedTest(slot.previousContractIds));
-    matched.set(slot.key, new Set());
+    auto.set(slot.key, slot.previousAuto);
+    through.set(slot.key, slot.previousThrough ?? 0);
+    matched.set(slot.key, []);
     flags.set(slot.key, []);
   }
+  /** Counted already: by id, or finished no later than what an earlier run counted through. */
+  const alreadyCounted = (slot: DeliverySlot, contract: DeliveryContract) =>
+    slot.previousContractIds.includes(contract.contractId) ||
+    (slot.previousThrough !== undefined && contract.completedAt <= slot.previousThrough);
 
   for (const contract of sorted) {
     for (const item of contract.items) {
@@ -131,25 +146,31 @@ export function matchDeliveries(
       for (const slot of ordered) {
         if (left <= 0) break;
         if (contract.completedAt < slot.since || !accepts(slot, contract, item)) continue;
-        const room = slot.quantity - (counted.get(slot.key) ?? 0);
+        if (alreadyCounted(slot, contract)) continue;
+        // A contract counts toward one Pledge: not one that another of this
+        // Member's Pledges already records.
+        const elsewhere = recordedOn.get(contract.contractId);
+        if (elsewhere && [...elsewhere].some((key) => key !== slot.key)) continue;
+        const room = slot.quantity - (auto.get(slot.key) ?? 0);
         if (room <= 0) continue;
         const take = Math.min(room, left);
         left -= take;
-        counted.set(slot.key, (counted.get(slot.key) ?? 0) + take);
-        if (recorded.get(slot.key)?.(contract.contractId)) {
-          countedRecorded.set(slot.key, (countedRecorded.get(slot.key) ?? 0) + take);
+        auto.set(slot.key, (auto.get(slot.key) ?? 0) + take);
+        if (contract.completedAt < horizon) {
+          through.set(slot.key, Math.max(through.get(slot.key) ?? 0, contract.completedAt));
         }
-        matched.get(slot.key)?.add(contract.contractId);
+        const list = matched.get(slot.key) ?? [];
+        if (!list.includes(contract.contractId)) list.push(contract.contractId);
         const asked = slot.line.runs;
-        const list = flags.get(slot.key) ?? [];
+        const flagList = flags.get(slot.key) ?? [];
         if (
           slot.line.kind === 'bpc' &&
           asked !== undefined &&
           item.runs !== undefined &&
           asked !== item.runs &&
-          !list.some((f) => f.contractId === contract.contractId)
+          !flagList.some((f) => f.contractId === contract.contractId)
         ) {
-          list.push({
+          flagList.push({
             contractId: contract.contractId,
             attribute: 'runs',
             asked,
@@ -162,16 +183,15 @@ export function matchDeliveries(
 
   const result = new Map<string, SlotDelivery>();
   for (const slot of slots) {
-    // What an earlier run recorded from contracts ESI no longer shows is a base;
-    // what it recorded from contracts still visible is in `counted` already.
-    const aged = Math.max(0, slot.previousAuto - (countedRecorded.get(slot.key) ?? 0));
-    const auto = aged + (counted.get(slot.key) ?? 0);
-    const ids = [...new Set([...slot.previousContractIds, ...(matched.get(slot.key) ?? [])])]
-      .sort((a, b) => a - b)
-      .slice(-MAX_CONTRACT_IDS_PER_LINE);
+    const total = auto.get(slot.key) ?? 0;
+    // Recorded order, the newest last; the list is evidence only, `through` carries the rest.
+    const ids = [...new Set([...slot.previousContractIds, ...(matched.get(slot.key) ?? [])])].slice(
+      -MAX_CONTRACT_IDS_PER_LINE
+    );
     result.set(slot.key, {
-      delivered: Math.min(slot.quantity, Math.max(auto, slot.manual ?? 0)),
-      auto: Math.min(slot.quantity, auto),
+      delivered: Math.min(slot.quantity, Math.max(total, slot.manual ?? 0)),
+      auto: total,
+      through: through.get(slot.key) ?? 0,
       contractIds: ids,
       flags: flags.get(slot.key) ?? [],
     });
@@ -179,9 +199,18 @@ export function matchDeliveries(
   return result;
 }
 
-/** What contracts alone account for in a stored entry: `delivered`, unless the typed amount is what shows. */
+/**
+ * What contracts alone account for in a stored entry: its `auto`. An entry
+ * from before `auto` was stored: `delivered`, unless a typed amount is what shows.
+ */
 function autoPart(entry: PledgeEntry): number {
+  if (entry.auto !== undefined) return entry.auto;
   return entry.manual !== undefined && entry.delivered <= entry.manual ? 0 : entry.delivered;
+}
+
+/** What a line shows: the larger of contracts and the typed amount, never above the Pledge. */
+export function shownDelivered(entry: PledgeEntry): number {
+  return Math.min(entry.quantity, Math.max(autoPart(entry), entry.manual ?? 0));
 }
 
 /**
@@ -192,19 +221,28 @@ function autoPart(entry: PledgeEntry): number {
 export function pledgeEntryAfterManual(entry: PledgeEntry, amount: number): PledgeEntry {
   const auto = autoPart(entry);
   const rest: PledgeEntry = { quantity: entry.quantity, delivered: entry.delivered };
-  if (entry.contractIds) rest.contractIds = entry.contractIds;
-  // Clearing leaves `auto`, which is 0 when the typed amount was what showed:
-  // the caller re-runs the contract sync so the figure comes back from contracts.
-  if (amount <= 0) return { ...rest, delivered: auto };
+  // A legacy entry whose contract figure is unknown (0) stays without `auto`: see `previousFromEntry`.
+  if (entry.auto !== undefined || auto > 0) rest.auto = auto;
+  const unknownFigure = entry.auto === undefined && auto === 0;
+  // Their ids prove nothing for such an entry (see `previousFromEntry`): the visible contracts count again.
+  if (entry.contractIds) rest.contractIds = amount <= 0 && unknownFigure ? [] : entry.contractIds;
+  if (entry.through !== undefined) rest.through = entry.through;
+  // Clearing shows what contracts account for; the caller re-runs the contract sync.
+  if (amount <= 0) return { ...rest, delivered: Math.min(entry.quantity, auto) };
   const typed = Math.min(amount, entry.quantity);
   return { ...rest, delivered: Math.min(entry.quantity, Math.max(auto, typed)), manual: typed };
 }
 
 /** The slot's starting state from a stored entry. */
 export function previousFromEntry(entry: PledgeEntry) {
+  const previousAuto = autoPart(entry);
+  // An entry from before `auto` was stored, showing a typed amount: its contract
+  // figure is unknown (0), so its ids prove nothing and the visible contracts count again.
+  const idsProve = entry.auto !== undefined || entry.manual === undefined || previousAuto > 0;
   return {
-    previousAuto: autoPart(entry),
-    previousContractIds: entry.contractIds ?? [],
+    previousAuto,
+    previousContractIds: idsProve ? (entry.contractIds ?? []) : [],
+    ...(entry.through !== undefined ? { previousThrough: entry.through } : {}),
     ...(entry.manual !== undefined ? { manual: entry.manual } : {}),
   };
 }
@@ -252,20 +290,21 @@ export function eligibleContracts<C extends ContractHeader>(
 /**
  * The rules' evaluation budget a changed entry costs, measured on the Firestore
  * emulator (rules-tests/communities.rules.test.ts pins it): about 350 for the
- * document, then per changed line ~110 plus ~27 for each contract id and ~35
- * for a typed amount, against a hard limit of 1000. Rounded up.
+ * document, then per changed line ~130 (with `auto` and `through`) plus ~27
+ * for each contract id and ~35 for a typed amount, against a hard limit of
+ * 1000. Rounded up.
  */
 export function pledgeLineCost(entry: PledgeEntry): number {
-  return 110 + 27 * (entry.contractIds?.length ?? 0) + (entry.manual !== undefined ? 35 : 0);
+  return 130 + 27 * (entry.contractIds?.length ?? 0) + (entry.manual !== undefined ? 35 : 0);
 }
 
 /** What one write's changed lines may cost together; a single line always goes alone if over. */
-export const PLEDGE_WRITE_BUDGET = 480;
+export const PLEDGE_WRITE_BUDGET = 520;
 
 /**
  * Splits changed lines into writes the rules accept: at most
  * `MAX_LINES_PER_PLEDGE_WRITE` lines and within `PLEDGE_WRITE_BUDGET`. A line
- * too heavy for any company goes in a write of its own (a full 20-id line
+ * too heavy for any company goes in a write of its own (a full 10-id line
  * alone is accepted).
  */
 export function batchLines<T extends { entry: PledgeEntry }>(changed: readonly T[]): T[][] {

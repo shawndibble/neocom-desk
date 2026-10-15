@@ -30,7 +30,7 @@ import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
 import { callCommunity } from './communityStore';
-import { trackPledgeWrite } from './pledgeWrites';
+import { trackPledgeWrite, underFirebaseSession } from './pledgeWrites';
 
 const KINDS: readonly RequestLineKind[] = ['item', 'bpc', 'bpo'];
 
@@ -58,10 +58,10 @@ export async function loadRequests(
 ): Promise<CommunityRequest[]> {
   const override = communityBackendOverride();
   if (override?.loadItemRequests) return override.loadItemRequests(communityId);
-  await ensureSignedIn(characterId);
-  const snap = await getDocs(
-    collection(getSyncFirestore(), 'communities', communityId, 'itemRequests')
-  );
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDocs(collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'));
+  });
   return snap.docs
     .map((entry): CommunityRequest | null => {
       const d = entry.data();
@@ -163,6 +163,8 @@ function readPledge(uid: string, d: Record<string, unknown>): RequestPledge | nu
         ? e.contractIds.filter((id): id is number => typeof id === 'number')
         : [],
       ...(typeof e.manual === 'number' && e.manual > 0 ? { manual: e.manual } : {}),
+      ...(typeof e.auto === 'number' && e.auto >= 0 ? { auto: e.auto } : {}),
+      ...(typeof e.through === 'number' && e.through >= 0 ? { through: e.through } : {}),
     };
   }
   const stamp = d.updatedAt as { toMillis?: () => number } | undefined;
@@ -177,10 +179,19 @@ export async function loadPledges(
 ): Promise<RequestPledge[]> {
   const override = communityBackendOverride();
   if (override?.loadPledges) return override.loadPledges(communityId, requestId);
-  await ensureSignedIn(characterId);
-  const snap = await getDocs(
-    collection(getSyncFirestore(), 'communities', communityId, 'itemRequests', requestId, 'pledges')
-  );
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDocs(
+      collection(
+        getSyncFirestore(),
+        'communities',
+        communityId,
+        'itemRequests',
+        requestId,
+        'pledges'
+      )
+    );
+  });
   return snap.docs
     .map((entry) => readPledge(entry.id, entry.data()))
     .filter((pledge): pledge is RequestPledge => pledge !== null);
@@ -204,10 +215,12 @@ export async function loadCommunityPledges(
     }
     return found;
   }
-  await ensureSignedIn(characterId);
-  const snap = await getDocs(
-    query(collectionGroup(getSyncFirestore(), 'pledges'), where('communityId', '==', communityId))
-  );
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDocs(
+      query(collectionGroup(getSyncFirestore(), 'pledges'), where('communityId', '==', communityId))
+    );
+  });
   for (const entry of snap.docs) {
     const requestId = entry.ref.parent.parent?.id;
     const pledge = readPledge(entry.id, entry.data());
@@ -238,7 +251,9 @@ export async function updateMyPledge(
     override.savePledge(communityId, requestId, Object.keys(next).length === 0 ? null : next);
     return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
   }
-  return trackPledgeWrite(() => writeMyPledge(characterId, communityId, requestId, uid, change));
+  return trackPledgeWrite(() =>
+    underFirebaseSession(() => writeMyPledge(characterId, communityId, requestId, uid, change))
+  );
 }
 
 async function writeMyPledge(
@@ -270,7 +285,14 @@ async function writeMyPledge(
     }
     const lines: Record<
       string,
-      { quantity: number; delivered: number; contractIds: number[]; manual?: number }
+      {
+        quantity: number;
+        delivered: number;
+        contractIds: number[];
+        manual?: number;
+        auto?: number;
+        through?: number;
+      }
     > = {};
     for (const [index, entry] of Object.entries(next)) {
       lines[index] = {
@@ -278,6 +300,8 @@ async function writeMyPledge(
         delivered: entry.delivered,
         contractIds: [...(entry.contractIds ?? [])],
         ...(entry.manual !== undefined ? { manual: entry.manual } : {}),
+        ...(entry.auto !== undefined ? { auto: entry.auto } : {}),
+        ...(entry.through !== undefined ? { through: entry.through } : {}),
       };
     }
     tx.set(ref, { ownerHash, communityId, lines, updatedAt: serverTimestamp() });

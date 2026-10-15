@@ -23,6 +23,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
 import { callableErrorReason } from './callableError';
+import { notePledgeEdit } from './pledgeWrites';
 import { DELIVERY_ENDPOINTS, slotKey } from './requestDelivery';
 import { useDeliverySync } from './useDeliverySync';
 import { describeExpiry } from './requestFormat';
@@ -128,12 +129,16 @@ export function RequestPanel({
   const changePledge = async (key: string, change: Parameters<typeof updateMyPledge>[3]) => {
     setPledgeBusy(key);
     setPledgeError(null);
+    // A delivery run that began before this edit read the Pledge as it was: it must not write over it.
+    notePledgeEdit(characterId, communityId);
     try {
       await updateMyPledge(characterId, communityId, request.id, change);
       await refreshPledges(request.id);
-    } catch {
+    } catch (err) {
+      console.warn('Pledge could not be saved', err);
       setPledgeError(t('communities.board.pledgeFailed'));
     } finally {
+      notePledgeEdit(characterId, communityId);
       setPledgeBusy(null);
     }
   };

@@ -61,6 +61,14 @@ export interface PledgeEntry {
    * every automatic recompute and is never added to it.
    */
   manual?: number;
+  /**
+   * What contracts alone account for, kept as counted: it is not clamped to a
+   * lowered `quantity`, so raising the Pledge back restores it (#3809). Absent
+   * on an entry from before it was stored.
+   */
+  auto?: number;
+  /** The latest finish time (ms) of any contract counted into `auto`. Absent likewise. */
+  through?: number;
 }
 
 /** One Member's Pledges on a Request, keyed by line index. */
@@ -287,14 +295,21 @@ type PledgeLines = Readonly<Record<number, PledgeEntry>>;
 /** The lines with `quantity` Pledged on `index`; a repeat keeps what was delivered (up to the new quantity) and its contracts. */
 export function withPledgeLine(lines: PledgeLines, index: number, quantity: number): PledgeLines {
   const before = lines[index];
+  const manual = before?.manual !== undefined ? Math.min(before.manual, quantity) : undefined;
   return {
     ...lines,
     [index]: {
       quantity,
-      // The rules bound both by the quantity, so lowering a Pledge lowers them too.
-      delivered: Math.min(before?.delivered ?? 0, quantity),
+      // The rules bound these by the quantity, so lowering a Pledge lowers them
+      // too; `auto` is kept as counted, so raising it back restores the figure.
+      delivered:
+        before?.auto !== undefined
+          ? Math.min(quantity, Math.max(before.auto, manual ?? 0))
+          : Math.min(before?.delivered ?? 0, quantity),
       contractIds: [...(before?.contractIds ?? [])],
-      ...(before?.manual !== undefined ? { manual: Math.min(before.manual, quantity) } : {}),
+      ...(manual !== undefined ? { manual } : {}),
+      ...(before?.auto !== undefined ? { auto: before.auto } : {}),
+      ...(before?.through !== undefined ? { through: before.through } : {}),
     },
   };
 }

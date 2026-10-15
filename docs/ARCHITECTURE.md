@@ -399,11 +399,12 @@ fetch+memoize the built JSON once per session.
   Pledges on that Request, written directly by its owner under `firestore.rules`
   (not on one's own Request, only while it is open, line indexes the Request has,
   positive integer quantities up to 10^12; the Pledger's client asserts
-  `delivered`, `contractIds` and an optional typed `manual` amount (issue
-  #3809), so they are shape-bounded: at most 20 positive integer contract ids a
-  line). Rules cannot loop, so the 50 line keys are unrolled and only keys a
+  `delivered`, `contractIds`, an optional typed `manual` amount (issue
+  #3809) and the stored contract figure `auto` and its `through` finish time, so
+  they are shape-bounded: at most 10 positive integer contract ids a line, kept as
+  capped evidence; `auto` and `through` are non-negative whole numbers). Rules cannot loop, so the 50 line keys are unrolled and only keys a
   write changes are validated. The 1000-expression budget is the binding limit:
-  a changed line costs about 110 plus 27 per contract id (35 more with
+  a changed line costs about 130 plus 27 per contract id (35 more with
   `manual`), over ~350 for the document, so one write of four full lines is
   denied; `batchLines` in `src/engine/communities/delivery.ts` splits writes to
   fit and `rules-tests/communities.rules.test.ts` pins its cost model. `…/mails/{targetId}` and

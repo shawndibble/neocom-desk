@@ -14,6 +14,7 @@ import { db as localDb } from '@/db';
 import type { ContractItem } from '@/esi/endpoints';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import {
+  MAX_CONTRACT_IDS_PER_LINE,
   batchLines,
   contractCompletedAt,
   eligibleContracts,
@@ -36,6 +37,7 @@ import { loadContracts } from '@/features/character/contracts';
 import { loadContractItems } from '@/features/character/contractItems';
 import { characterIdForUid, uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
+import { pledgeEditVersion } from './pledgeWrites';
 import { loadCommunityPledges, loadRequests, updateMyPledge } from './requestStore';
 
 /** The Permission delivery marking needs. */
@@ -149,7 +151,7 @@ async function readContracts(
   slots: readonly DeliverySlot[]
 ): Promise<
   | { status: 'needs-scope' | 'read-failed' }
-  | { status: 'ok'; contracts: DeliveryContract[]; degraded: boolean }
+  | { status: 'ok'; contracts: DeliveryContract[]; degraded: boolean; horizon: number }
 > {
   const contractsRead = await loadContracts(characterId);
   if (contractsRead.needsReauth) return { status: 'needs-scope' };
@@ -161,13 +163,21 @@ async function readContracts(
   const eligible = eligibleContracts(contractsRead.cached.data, characterId, requesters, since);
   const contracts: DeliveryContract[] = [];
   let reads = 0;
+  // Eligible contracts whose items were not read this run: nothing finishing at
+  // or after the earliest of them may be recorded as counted-through.
+  let horizon = Infinity;
+  const unread = (contract: (typeof eligible)[number]) => {
+    horizon = Math.min(horizon, contractCompletedAt(contract));
+  };
   for (const contract of eligible) {
     if ((itemReadFailures.get(contract.contract_id) ?? 0) >= GIVE_UP_AFTER) {
       degraded = true;
+      unread(contract);
       continue;
     }
     if (reads >= MAX_ITEM_READS_PER_RUN) {
       degraded = true;
+      for (const rest of eligible.slice(eligible.indexOf(contract))) unread(rest);
       break;
     }
     reads += 1;
@@ -179,6 +189,7 @@ async function readContracts(
       );
       degraded = true;
       // The first failure may be the error limit or a rate limit: do not press on.
+      for (const rest of eligible.slice(eligible.indexOf(contract))) unread(rest);
       break;
     }
     contracts.push({
@@ -188,7 +199,7 @@ async function readContracts(
       items: items.data.map(toDeliveryItem).filter((item): item is DeliveryItem => item !== null),
     });
   }
-  return { status: 'ok', contracts, degraded };
+  return { status: 'ok', contracts, degraded, horizon };
 }
 
 /** Whether the Request is now closed or expired, read fresh; 'unknown' when that cannot be told. */
@@ -207,48 +218,82 @@ async function requestIsClosed(
   }
 }
 
-/** Writes changed lines per Request in batches the rules accept. Returns lines updated and whether a save failed. */
+/** Whether an entry carries any contract-derived history. */
+const hasHistory = (entry: PledgeEntry) =>
+  (entry.auto ?? 0) > 0 || (entry.contractIds?.length ?? 0) > 0;
+
+/**
+ * Writes changed lines per Request in batches the rules accept. Returns lines
+ * updated and whether a save failed. Stops quietly once the Member has edited a
+ * Pledge by hand since the run began (`startVersion`): the run read it as it was.
+ */
 async function writeDeliveries(
   characterId: number,
   communityId: string,
   planned: readonly Planned[],
   result: ReadonlyMap<string, SlotDelivery>,
-  now: number
+  now: number,
+  startVersion: number
 ): Promise<{ updated: number; writeFailed: boolean }> {
   let updated = 0;
   let writeFailed = false;
   for (const { request, pledge } of planned) {
-    const changed: { index: number; entry: PledgeEntry; auto: number }[] = [];
-    for (const [i, entry] of Object.entries(pledge.lines)) {
+    const changed: {
+      index: number;
+      entry: PledgeEntry;
+      before: PledgeEntry;
+      next: SlotDelivery;
+    }[] = [];
+    for (const [i, before] of Object.entries(pledge.lines)) {
       const index = Number(i);
       const next = result.get(slotKey(request.id, index));
       if (!next) continue;
       const same =
-        next.delivered === entry.delivered &&
-        next.contractIds.join(',') === (entry.contractIds ?? []).join(',');
+        next.delivered === before.delivered &&
+        next.auto === (before.auto ?? 0) &&
+        next.through === (before.through ?? 0) &&
+        next.contractIds.join(',') === (before.contractIds ?? []).join(',');
       if (!same) {
         changed.push({
           index,
-          entry: { ...entry, delivered: next.delivered, contractIds: next.contractIds },
-          auto: next.auto,
+          before,
+          next,
+          entry: {
+            ...before,
+            delivered: next.delivered,
+            auto: next.auto,
+            through: next.through,
+            contractIds: next.contractIds,
+          },
         });
       }
     }
     for (const batch of batchLines(changed)) {
+      if (pledgeEditVersion(characterId, communityId) !== startVersion)
+        return { updated, writeFailed };
       try {
         await updateMyPledge(characterId, communityId, request.id, (lines) => {
           const out = { ...lines };
-          for (const { index, entry, auto } of batch) {
+          for (const { index, before, next } of batch) {
             const stored = out[index];
             // Withdrawn meanwhile: nothing to mark.
             if (!stored) continue;
-            // The amount typed since this run read the Pledge (or while it ran)
-            // is in the stored entry, not in `entry`: it must survive, and a
-            // typed amount cleared meanwhile must not come back.
+            // Withdrawn and pledged afresh while this run was reading: its figures
+            // belong to the old Pledge.
+            if (hasHistory(before) && !hasHistory(stored)) continue;
+            // Never lower what is stored (another device may be ahead); the typed
+            // amount typed since this run read the Pledge is in `stored`, not in
+            // the run, so it survives and one cleared meanwhile does not come back.
+            const auto = Math.max(next.auto, stored.auto ?? 0);
+            const ids = [...new Set([...(stored.contractIds ?? []), ...next.contractIds])].slice(
+              -MAX_CONTRACT_IDS_PER_LINE
+            );
             out[index] = {
               ...stored,
               delivered: Math.min(Math.max(auto, stored.manual ?? 0), stored.quantity),
-              contractIds: [...(entry.contractIds ?? [])],
+              auto,
+              through: Math.max(next.through, stored.through ?? 0),
+              contractIds: ids,
             };
           }
           return out;
@@ -272,11 +317,13 @@ async function writeDeliveries(
   return { updated, writeFailed };
 }
 
-const running = new Map<string, Promise<DeliverySyncResult>>();
+const running = new Map<string, { run: Promise<DeliverySyncResult>; version: number }>();
 
 /**
  * One run for one Character in one Community. Concurrent calls for the same
- * pair (the background sweep and a panel opening) share one run. Never throws.
+ * pair (the background sweep and a panel opening) share one run, unless the
+ * Member has edited a Pledge by hand since it began: that run read the old
+ * Pledge, so a fresh one starts. Never throws.
  */
 export function syncRequestDeliveries(
   characterId: number,
@@ -284,22 +331,26 @@ export function syncRequestDeliveries(
   now: number = Date.now()
 ): Promise<DeliverySyncResult> {
   const key = `${characterId}:${communityId}`;
+  const version = pledgeEditVersion(characterId, communityId);
   const existing = running.get(key);
-  if (existing) return existing;
-  const run = doSync(characterId, communityId, now)
+  if (existing && existing.version === version) return existing.run;
+  const run: Promise<DeliverySyncResult> = doSync(characterId, communityId, now, version)
     .catch((err): DeliverySyncResult => {
       console.warn('Request delivery: could not read', err);
       return { status: 'read-failed', updated: 0, flags: new Map() };
     })
-    .finally(() => running.delete(key));
-  running.set(key, run);
+    .finally(() => {
+      if (running.get(key)?.run === run) running.delete(key);
+    });
+  running.set(key, { run, version });
   return run;
 }
 
 async function doSync(
   characterId: number,
   communityId: string,
-  now: number
+  now: number,
+  startVersion: number
 ): Promise<DeliverySyncResult> {
   const none = new Map<string, readonly DeliveryFlag[]>();
   const override = communityBackendOverride();
@@ -319,7 +370,7 @@ async function doSync(
   const read = await readContracts(characterId, slots);
   if (read.status !== 'ok') return { status: read.status, updated: 0, flags: none };
 
-  const result = matchDeliveries(slots, read.contracts);
+  const result = matchDeliveries(slots, read.contracts, { horizon: read.horizon });
   const flags = new Map<string, readonly DeliveryFlag[]>();
   for (const [key, value] of result) if (value.flags.length > 0) flags.set(key, value.flags);
 
@@ -328,7 +379,8 @@ async function doSync(
     communityId,
     planned,
     result,
-    now
+    now,
+    startVersion
   );
   return {
     status: writeFailed ? 'write-failed' : read.degraded ? 'read-failed' : 'ok',

@@ -8,6 +8,7 @@ const fire = vi.hoisted(() => ({
   docs: [] as { id: string; data: Record<string, unknown> }[],
   /** How many times the transaction callback runs: a retry re-reads the document. */
   attempts: 1,
+  reads: [] as string[],
   /** Runs before each retry's read, as another device's write would. */
   beforeRetry: null as null | (() => void),
 }));
@@ -18,9 +19,12 @@ vi.mock('firebase/firestore/lite', () => ({
   where: () => ({}),
   query: (q: unknown) => q,
   doc: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
-  getDocs: async () => ({
-    docs: fire.docs.map((d) => ({ id: d.id, data: () => d.data, ref: {} })),
-  }),
+  getDocs: async () => {
+    fire.reads.push(`read as ${session.current}`);
+    return {
+      docs: fire.docs.map((d) => ({ id: d.id, data: () => d.data, ref: {} })),
+    };
+  },
   getDoc: async () => ({
     exists: () => fire.stored !== null,
     data: () => fire.stored ?? undefined,
@@ -38,6 +42,7 @@ vi.mock('firebase/firestore/lite', () => ({
     for (let attempt = 0; attempt < fire.attempts; attempt += 1) {
       if (attempt > 0) fire.beforeRetry?.();
       fire.sets.length = 0;
+      fire.reads.push(`write as ${session.current}`);
       out = await run({
         get: async () => ({ exists: () => fire.stored !== null, data: () => fire.stored }),
         set: (_ref, data) => {
@@ -54,7 +59,16 @@ vi.mock('firebase/firestore/lite', () => ({
   },
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
-vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: async () => 'char:1' }));
+const session = vi.hoisted(() => ({ current: 0, log: [] as string[] }));
+vi.mock('@/sync/syncAuth', () => ({
+  ensureSignedIn: async (characterId: number) => {
+    session.log.push(`signin ${characterId}`);
+    // Signing in takes a moment, and swaps the session once it lands.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    session.current = characterId;
+    return `char:${characterId}`;
+  },
+}));
 vi.mock('@/db', () => ({
   db: { characters: { get: async () => ({ characterId: 1, ownerHash: 'owner-1' }) } },
 }));
@@ -75,6 +89,9 @@ beforeEach(() => {
   fire.docs = [];
   fire.attempts = 1;
   fire.beforeRetry = null;
+  fire.reads = [];
+  session.current = 0;
+  session.log = [];
 });
 
 describe('updateMyPledge', () => {
@@ -115,6 +132,18 @@ describe('updateMyPledge', () => {
   });
 });
 
+describe('the Firebase session', () => {
+  it('is never swapped under a Pledge write by another Character’s read', async () => {
+    fire.stored = { lines: { 0: { quantity: 100, delivered: 0, contractIds: [] } } };
+    const write = updateMyPledge(1, 'c1', 'r1', (lines) => lines);
+    // The background sweep starts reading as another Character while the write signs in.
+    const read = loadRequests(2, 'c1');
+    await Promise.all([write, read]);
+    expect(fire.reads).toEqual(['write as 1', 'read as 2']);
+    expect(session.log).toEqual(['signin 1', 'signin 2']);
+  });
+});
+
 describe('reading malformed documents', () => {
   it('skips a Request with no readable line and drops lines without a type or quantity', async () => {
     fire.docs = [
@@ -139,6 +168,24 @@ describe('reading malformed documents', () => {
       { typeId: 1, name: '', quantity: 2, kind: 'item' },
       { typeId: 3, name: '', quantity: 4, kind: 'bpc', runs: 10, me: 9, te: 8 },
     ]);
+  });
+
+  it('reads the stored contract figure and finish time, ignoring bad ones', async () => {
+    fire.docs = [
+      {
+        id: 'char:2',
+        data: {
+          lines: {
+            0: { quantity: 10, auto: 80, through: 5 },
+            1: { quantity: 10, auto: -1, through: 'x' },
+          },
+        },
+      },
+    ];
+    const pledges = await loadPledges(1, 'c1', 'r1');
+    expect(pledges[0]?.lines[0]).toMatchObject({ auto: 80, through: 5 });
+    expect(pledges[0]?.lines[1]).not.toHaveProperty('auto');
+    expect(pledges[0]?.lines[1]).not.toHaveProperty('through');
   });
 
   it('skips a Pledge with no lines map and bad entries, defaulting what is missing', async () => {
