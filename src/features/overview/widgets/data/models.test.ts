@@ -618,7 +618,7 @@ describe('mail table', () => {
 });
 
 describe('contracts table', () => {
-  const noItems = { inProgress: 2, dueSoon: 0, overdue: 0, soonest: null, items: [] };
+  const noItems = { inProgress: 2, exchanges: 0, dueSoon: 0, overdue: 0, soonest: null, items: [] };
   const data = (over: Record<string, unknown> = {}) => ({
     summary: { ...noItems, ...over },
     route: null,
@@ -635,6 +635,13 @@ describe('contracts table', () => {
     collateral: 90_000_000,
     price: null,
     ...over,
+  });
+
+  it('lists the outstanding item exchanges as their own tile', () => {
+    const view = buildView('contracts', { contracts: ok(data({ exchanges: 3 })) as never }, ctx());
+    const tile = view.rows.find((row) => row.key === 'exchanges');
+    expect(tile?.value).toBe('3');
+    expect(tile?.tone).toBe('watch');
   });
 
   it('with nothing on a clock, counts the hauls in progress', () => {

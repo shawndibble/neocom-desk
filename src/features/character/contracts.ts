@@ -1,5 +1,6 @@
 /** Fetch + cache layer for the Contracts view. */
 import { getCharacterContracts, type Contract } from '@/esi/endpoints';
+import { withAcceptedCourierInProgress } from '@/engine/contractStatus';
 import {
   conditionalPagedFetch,
   loadPaginatedWithCacheStatus,
@@ -18,7 +19,16 @@ export function loadContracts(characterId: number): Promise<StatusResult<Contrac
   const { fetchLive, conditional } = conditionalPagedFetch((options) =>
     getCharacterContracts(characterId, options)
   );
-  return loadPaginatedWithCacheStatus(characterId, KEY, fetchLive, { conditional });
+  // Mapped after the cache read, not before the write: a 304 keeps the stored rows as they were.
+  return loadPaginatedWithCacheStatus(characterId, KEY, fetchLive, { conditional }).then(
+    (result) => ({
+      ...result,
+      cached: result.cached && {
+        ...result.cached,
+        data: result.cached.data.map(withAcceptedCourierInProgress),
+      },
+    })
+  );
 }
 
 // Re-exported rather than defined here: the predicate is pure and now lives

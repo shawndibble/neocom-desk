@@ -31,6 +31,8 @@ export interface ContractDeadlineItem {
 export interface ContractsBoardSummary {
   /** Accepted couriers, whatever their deliver-by. */
   inProgress: number;
+  /** Item exchanges nobody has accepted yet, issued by the pilot or sent to them, whatever their expiry. */
+  exchanges: number;
   /** Couriers and own listings due within the window (overdue couriers included). */
   dueSoon: number;
   /** Accepted couriers already past their deliver-by. */
@@ -46,6 +48,7 @@ export function summarizeContractsBoard(
   nowMs: number
 ): ContractsBoardSummary {
   let inProgress = 0;
+  let exchanges = 0;
   let dueSoon = 0;
   let overdue = 0;
   let soonest: ContractDeadlineItem | null = null;
@@ -62,6 +65,13 @@ export function summarizeContractsBoard(
   });
 
   for (const c of contracts) {
+    if (
+      c.type === 'item_exchange' &&
+      c.status === 'outstanding' &&
+      ((c.issuer_id === characterId && !c.for_corporation) || c.assignee_id === characterId)
+    ) {
+      exchanges += 1;
+    }
     // Only hauls this pilot is carrying: the feed also lists couriers they issued for someone else to deliver.
     if (c.type === 'courier' && c.status === 'in_progress' && c.acceptor_id === characterId) {
       // Keep the offer expiry rather than guess, as the other courier surfaces do.
@@ -89,5 +99,5 @@ export function summarizeContractsBoard(
     }
   }
   items.sort((a, b) => a.atMs - b.atMs);
-  return { inProgress, dueSoon, overdue, soonest, items };
+  return { inProgress, exchanges, dueSoon, overdue, soonest, items };
 }

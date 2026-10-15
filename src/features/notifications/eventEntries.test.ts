@@ -102,7 +102,7 @@ describe('one event through its entry', () => {
     const contract = { contractId: 7, issuerId: C, acceptorId: 2 };
     const fires = entry.diff(
       C,
-      { entries: [{ ...contract, status: 'outstanding' }], nowMs: T0 },
+      { entries: [{ ...contract, status: 'outstanding', acceptorId: 0 }], nowMs: T0 },
       { entries: [{ ...contract, status: 'in_progress' }], nowMs: T0 }
     );
     expect(fires).toEqual([{ eventId: 'contractAccepted', characterId: C, contractId: 7 }]);

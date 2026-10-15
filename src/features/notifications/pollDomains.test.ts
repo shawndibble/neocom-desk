@@ -175,7 +175,10 @@ describe('POLL_DOMAINS', () => {
 
 describe('domain.diff: events derived from their entries (issue #1285)', () => {
   const contract = { contractId: 7, issuerId: 1, acceptorId: 2 };
-  const prev = { entries: [{ ...contract, status: 'outstanding' as const }], nowMs: 1 };
+  const prev = {
+    entries: [{ ...contract, status: 'outstanding' as const, acceptorId: 0 }],
+    nowMs: 1,
+  };
   const next = { entries: [{ ...contract, status: 'in_progress' as const }], nowMs: 2 };
 
   it("lists each domain's events in catalog order, from the entries naming its source", () => {
