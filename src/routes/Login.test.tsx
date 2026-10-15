@@ -199,7 +199,7 @@ describe('Login', () => {
     const covered: Record<string, string[]> = {
       Industry: [],
       'Market & orders': ['Market', 'Open Orders', 'Wallet', 'Assets'],
-      'Ships & travel': ['Ships', 'Skills', 'Clones', 'Travel'],
+      Skills: ['Ships', 'Clones', 'Travel'],
       'Planetary & mining': ['Planetary Industry', 'Mining'],
       Corporation: [],
       Mail: ['Mail & Calendar', 'Contracts', 'Contacts & Standings'],
@@ -219,9 +219,9 @@ describe('Login', () => {
       expect(panel.queryByRole('listitem', { name: tab })).toBeNull();
       seen.push(tab);
     }
-    // 14 chips; the other 3 catalog rows (Industry, Corporation, Alerts) are named by their tab.
-    expect(seen.filter((name) => !(name in covered))).toHaveLength(14);
-    for (const row of ['Industry', 'Corporation', 'Alerts']) expect(seen).toContain(row);
+    // 13 chips; the other 4 catalog rows (Industry, Corporation, Alerts, Skills) are named by their tab.
+    expect(seen.filter((name) => !(name in covered))).toHaveLength(13);
+    for (const row of ['Industry', 'Corporation', 'Alerts', 'Skills']) expect(seen).toContain(row);
   });
 
   it('has no How it works section or header link any more', async () => {
@@ -454,7 +454,7 @@ describe('Login', () => {
     await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
   });
 
-  it('adds a header login button, wired like the hero one, once neither large login button is in view', async () => {
+  it('adds a header login button, wired like the hero one, once the hero login button is out of view', async () => {
     const user = userEvent.setup();
     type Entry = { target: Element; isIntersecting: boolean };
     let report: (entries: Entry[]) => void = () => {};
@@ -481,12 +481,10 @@ describe('Login', () => {
       renderLogin();
       const name = { name: /log in with eve online/i };
       const before = (await screen.findAllByRole('button', name)).length;
-      // The hero's and the closing call to action's wrappers are the two targets.
-      expect(observed).toHaveLength(2);
-      act(() => report([{ target: observed[0], isIntersecting: false }]));
-      act(() => report([{ target: observed[1], isIntersecting: true }]));
+      // Only the hero's wrapper is watched: the closing call to action does not hide the header's button.
+      expect(observed).toHaveLength(1);
       expect(within(screen.getByRole('banner')).queryByRole('button', name)).toBeNull();
-      act(() => report([{ target: observed[1], isIntersecting: false }]));
+      act(() => report([{ target: observed[0], isIntersecting: false }]));
       const header = within(screen.getByRole('banner'));
       await user.click(header.getByRole('button', name));
       expect(screen.getAllByRole('button', name)).toHaveLength(before + 1);

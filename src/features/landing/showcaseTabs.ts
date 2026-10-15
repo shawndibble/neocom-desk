@@ -62,12 +62,12 @@ export const SHOWCASE_TABS: ShowcaseTab[] = [
     ],
   },
   {
-    id: 'ships',
+    id: 'skills',
     shot: desktop('desktop-skills', 'skills'),
-    bullets: ['tree', 'fitting', 'skills', 'travel'],
+    bullets: ['queue', 'plans', 'tree', 'clones'],
     features: [
-      { icon: Ships, key: 'ships' },
       { icon: Skills, key: 'skills' },
+      { icon: Ships, key: 'ships' },
       { icon: Clones, key: 'clones' },
       { icon: NavTravel, key: 'travel' },
     ],

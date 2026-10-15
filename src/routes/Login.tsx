@@ -36,8 +36,7 @@ export function Login() {
   // The large login buttons (hero and closing call to action); the sticky
   // header shows its own only while neither is in view.
   const heroCtaRef = useRef<HTMLDivElement>(null);
-  const bottomCtaRef = useRef<HTMLDivElement>(null);
-  const ctaRefs = useMemo(() => [heroCtaRef, bottomCtaRef], []);
+  const ctaRefs = useMemo(() => [heroCtaRef], []);
 
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
@@ -139,7 +138,7 @@ export function Login() {
             <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">
               {t('login.bottomCtaBody')}
             </p>
-            <div ref={bottomCtaRef} className="mt-6 flex flex-col items-center gap-3">
+            <div className="mt-6 flex flex-col items-center gap-3">
               <EveSsoButton
                 size="large"
                 pending={pending}

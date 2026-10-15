@@ -3464,12 +3464,12 @@
         "wallet": "Each Wallet journal line links to the contract or item behind it.",
         "assets": "Assets finds a thing and drills into stations, ships and containers."
       },
-      "ships": {
-        "tab": "Ships & travel",
+      "skills": {
+        "tab": "Skills",
+        "queue": "Your skill queue shows what finishes when, and when it runs dry.",
+        "plans": "Skill Plans work out when a plan finishes and how to get there faster.",
         "tree": "The Ship Tree marks every hull “can fly” or the training time it still needs, with its Mastery tiers.",
-        "fitting": "Build a fit on the ring and see its DPS against a target profile.",
-        "skills": "Skill Plans work out when a plan finishes and how to get there faster. Clones shows where each jump clone is and when the next jump is allowed.",
-        "travel": "Route Safety flags the chokepoints between two systems, and Pilot Lookup reads a pilot’s killboard history."
+        "clones": "Clones shows where each jump clone is and when the next jump is allowed."
       },
       "planetary": {
         "tab": "Planetary & mining",
