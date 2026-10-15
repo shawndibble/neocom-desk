@@ -197,6 +197,41 @@ describe('buildOpenOrderRows — station tier', () => {
   });
 });
 
+describe('buildOpenOrderRows — competition not checked (prices unreachable)', () => {
+  it('flags a row whose station was never priced, instead of reading it as healthy', () => {
+    const row = firstRow(baseInput({ stationPrices: new Map() }));
+    expect(row.competitionUnchecked).toBe(true);
+  });
+
+  it('does not flag a station that was priced but has no orders on my side', () => {
+    const row = firstRow(
+      baseInput({
+        stationPrices: new Map([
+          ['60003760:100', { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }],
+        ]),
+      })
+    );
+    expect(row.competitionUnchecked).toBe(false);
+  });
+
+  it('does not flag a row whose deep book was read, even with no station price', () => {
+    const row = firstRow(
+      baseInput({
+        stationPrices: new Map(),
+        deepCompetition: new Map([[1, { competitors: [], truncated: false }]]),
+      })
+    );
+    expect(row.competitionUnchecked).toBe(false);
+  });
+
+  it('does not count an unchecked row as needing attention merely for being unchecked', () => {
+    const rows = buildOpenOrderRows(baseInput({ stationPrices: new Map() }));
+    expect(rows[0].competitionUnchecked).toBe(true);
+    expect(rows[0].problem).toBe('healthy');
+    expect(needsAttentionCount(rows)).toBe(0);
+  });
+});
+
 describe('buildOpenOrderRows — worstScope and deep undercut', () => {
   it('is null when neither station nor deep check beats me', () => {
     const row = firstRow(baseInput());
@@ -834,6 +869,14 @@ describe('summariseOrderGroup', () => {
       { characterId: 10, characterName: 'Alpha', count: 2 },
       { characterId: 20, characterName: 'Beta', count: 1 },
     ]);
+  });
+
+  it('counts the rows whose competition was not checked', () => {
+    const summary = summariseOrderGroup([
+      { ...SUMMARY_BASE_ROW, competitionUnchecked: true },
+      { ...SUMMARY_BASE_ROW, orderId: 2 },
+    ]);
+    expect(summary.uncheckedCount).toBe(1);
   });
 
   it('leaves the worst gap null when nothing in the group is undercut', () => {

@@ -28,7 +28,16 @@ vi.mock('@/sde/loadSde', () => ({
   })),
 }));
 
-const pricesMock = vi.hoisted(() => ({ getHubPrices: vi.fn() }));
+const pricesMock = vi.hoisted(() => {
+  const getHubPrices = vi.fn();
+  return {
+    getHubPrices,
+    getHubPricesWithStatus: vi.fn(async (...args: unknown[]) => ({
+      prices: (await getHubPrices(...args)) as Map<number, unknown>,
+      unreachable: false,
+    })),
+  };
+});
 vi.mock('@/market/prices', () => pricesMock);
 
 const CHAR_ID = 91;

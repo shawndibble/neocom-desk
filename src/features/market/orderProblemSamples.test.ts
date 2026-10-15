@@ -67,6 +67,26 @@ describe('recordOrderProblemSamples', () => {
     expect(stored.get(2)).toEqual([{ at: NOW, problem: 'undercutStation' }]);
   });
 
+  it('records no sample for an order whose competition was not checked, but keeps its history', async () => {
+    await recordOrderProblemSamples(
+      [{ orderId: 1, characterId: 10, problem: 'undercutStation' }],
+      [10],
+      NOW
+    );
+    await recordOrderProblemSamples(
+      [
+        { orderId: 1, characterId: 10, problem: 'healthy', unchecked: true },
+        { orderId: 2, characterId: 10, problem: 'healthy', unchecked: true },
+      ],
+      [10],
+      NOW + SPACING
+    );
+    const stored = await loadOrderProblemSamples([10]);
+    // Order 1 is still open, so its earlier reading survives; no false 'healthy' joined it.
+    expect(stored.get(1)).toEqual([{ at: NOW, problem: 'undercutStation' }]);
+    expect(stored.has(2)).toBe(false);
+  });
+
   it('appends a later reading and keeps the series oldest-first', async () => {
     await recordOrderProblemSamples(
       [{ orderId: 1, characterId: 10, problem: 'healthy' }],

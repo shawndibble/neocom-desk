@@ -9798,7 +9798,10 @@
         "topBidAction": "Nothing. This one is doing fine.",
         "noCostBasis": "No cost basis",
         "noCostBasisHelp": "Nothing is linked to this order and your wallet buys don't cover it, so we can't work out your lowest safe price.",
-        "noCostBasisAction": "Link the build that made this, or let your wallet cover every unit. A build needs a build plan on the Industry page first."
+        "noCostBasisAction": "Link the build that made this, or let your wallet cover every unit. A build needs a build plan on the Industry page first.",
+        "notChecked": "Not checked",
+        "notCheckedHelp": "Market prices couldn't be loaded (prices unavailable offline), so we can't say whether anyone beats this order.",
+        "notCheckedAction": "Nothing to do. It is checked again when prices load."
       },
       "legendTitle": "What the badges mean",
       "legendOpen": "What do these badges mean?",
@@ -9845,7 +9848,9 @@
         "outbid": "Outbid buy order",
         "outbidHint": "Someone bids higher on your buy order, so sellers go to them first.",
         "healthy": "Healthy",
-        "healthyHint": "Nothing wrong here. Nobody beats your price."
+        "healthyHint": "Nothing wrong here. Nobody beats your price.",
+        "healthyUncheckedHint_one": "Nothing wrong that we can see. Competition wasn't checked for {{count}} order: prices unavailable offline.",
+        "healthyUncheckedHint_other": "Nothing wrong that we can see. Competition wasn't checked for {{count}} orders: prices unavailable offline."
       },
       "floorLabel": "Never sell below",
       "floorHelp": "Change an order's price and you pay the broker fee all over again (discounted by your Relist Discount), so this is the lowest price worth editing to. Leave the order alone and it sells, the fee is already paid, so you break even a little lower.",

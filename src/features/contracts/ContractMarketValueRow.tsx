@@ -23,17 +23,24 @@ export function ContractMarketValueRow({
   hubName: string;
 }) {
   const { t } = useTranslation();
+  // Every line failed to price because the source was unreachable: "0 ISK
+  // (+N unpriced)" would read as a real, worthless bundle.
+  const unavailable = value.unreachable && value.total === 0 && value.unpriced > 0;
   return (
     <div className="flex items-baseline justify-between gap-3 border-t border-line py-1.5">
       <span className="text-text-dim">{t('contracts.detailMarketValue', { hub: hubName })}</span>
-      <span className="tabular-nums font-semibold">
-        {formatIskAuto(value.total, CONTRACT_ISK_CENTS_BELOW)}
-        {value.unpriced > 0 && (
-          <span className="ml-1.5 font-normal text-text-dim">
-            {t('contracts.detailMarketValueUnpriced', { count: value.unpriced })}
-          </span>
-        )}
-      </span>
+      {unavailable ? (
+        <span className="font-normal text-text-dim">{t('common.pricesUnavailableOffline')}</span>
+      ) : (
+        <span className="tabular-nums font-semibold">
+          {formatIskAuto(value.total, CONTRACT_ISK_CENTS_BELOW)}
+          {value.unpriced > 0 && (
+            <span className="ml-1.5 font-normal text-text-dim">
+              {t('contracts.detailMarketValueUnpriced', { count: value.unpriced })}
+            </span>
+          )}
+        </span>
+      )}
     </div>
   );
 }

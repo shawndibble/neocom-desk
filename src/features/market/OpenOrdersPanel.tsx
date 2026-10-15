@@ -380,6 +380,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
         orderId: row.orderId,
         characterId: row.characterId,
         problem: sampledProblem(row.problems),
+        unchecked: row.competitionUnchecked === true,
       })),
       characterIds,
       snapshot.now
@@ -1308,7 +1309,12 @@ function groupHeaderLine(
     t,
   }: { showCharacters: boolean; t: (key: string, options?: Record<string, unknown>) => string }
 ): ReactNode {
-  const parts: ReactNode[] = [t(`market.orders.group.${problem}Hint`)];
+  const unchecked = problem === 'healthy' ? (summary?.uncheckedCount ?? 0) : 0;
+  const parts: ReactNode[] = [
+    unchecked > 0
+      ? t('market.orders.group.healthyUncheckedHint', { count: unchecked })
+      : t(`market.orders.group.${problem}Hint`),
+  ];
   if (summary) {
     parts.push(
       <Trans

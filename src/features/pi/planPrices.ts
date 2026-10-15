@@ -52,7 +52,7 @@ export async function loadPlanPrices(hub: TradeHub, typeIds: number[]): Promise<
     return { prices: {}, buyPrices: {}, unpriced: [], failed: false, fetchedAt: new Date() };
 
   let snapshot: { hubPrices: Record<number, number>; hubBuyPrices: Record<number, number> };
-  let unreachable = false;
+  let unreachable: boolean;
   try {
     const read = await loadMarketSnapshot(hub, wanted);
     snapshot = { hubPrices: read.hubPrices, hubBuyPrices: read.hubBuyPrices ?? {} };

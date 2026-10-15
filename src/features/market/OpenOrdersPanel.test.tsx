@@ -183,7 +183,22 @@ beforeEach(() => {
   mockedNpcStations.mockResolvedValue([
     { id: STATION_A, name: 'Jita IV - Moon 4', systemId: 30000142 },
   ]);
-  mockedStationPrices.mockResolvedValue(new Map());
+  // The real loader returns an entry (null prices = no orders) for every type
+  // of each station it reached; an absent entry means the station's fetch failed.
+  mockedStationPrices.mockImplementation(
+    async (requests) =>
+      new Map(
+        requests.flatMap(({ stationId, typeIds }) =>
+          typeIds.map(
+            (typeId) =>
+              [
+                stationPriceKey(stationId, typeId),
+                { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 },
+              ] as const
+          )
+        )
+      )
+  );
   mockedCostBases.mockResolvedValue(new Map());
   mockedSkills.mockResolvedValue(
     skillsFixture([
@@ -565,6 +580,33 @@ describe('OpenOrdersPanel', () => {
     expect(csv).toContain('"Tritanium","Sell",500,');
     expect(csv).toContain(`"${TYPE_NAMES.get(EXPIRING_ORDER.type_id)}","Sell",`);
     spy.mockRestore();
+  });
+
+  it('says competition was not checked, instead of Healthy, when station prices could not be fetched', async () => {
+    const user = userEvent.setup();
+    mockedStationPrices.mockResolvedValue(new Map());
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [NO_COST_BASIS_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
+
+    const group = await screen.findByTestId('order-group-healthy');
+    expect(within(group).queryByText(/Nobody beats your price/)).not.toBeInTheDocument();
+    expect(within(group).getByText(/Competition wasn't checked for 1 order/)).toBeInTheDocument();
+    const row = within(group).getByRole('row', { name: /Pyerite/ });
+    expect(within(row).getByText('Not checked')).toBeInTheDocument();
+    expect(within(row).queryByText('Best price')).not.toBeInTheDocument();
   });
 
   it('all-healthy: no "0 of N orders match" line, and the healthy sentence shows once', async () => {

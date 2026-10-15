@@ -130,6 +130,14 @@ export interface OpenOrderRow {
    * nothing — and false whenever the sample history is too thin to judge.
    */
   frequentlyUndercut: boolean;
+  /**
+   * Nothing could tell whether anyone beats this order: the station's prices
+   * never loaded (Fuzzwork unreachable, e.g. offline) and no deeper book was
+   * read either. Such a row's `problem` says nothing about competition, so it
+   * must not read as "Healthy" / "nobody beats you", and must not be recorded
+   * as an undercut sample. Absent means checked.
+   */
+  competitionUnchecked?: boolean;
 }
 
 export interface CharacterSkills {
@@ -377,6 +385,9 @@ function buildRow(
     frequentlyUndercut:
       problem === 'healthy' &&
       wasFrequentlyUndercut(input.problemSamples?.get(order.order_id) ?? [], input.now),
+    // `loadStationBestPrices` returns an entry for every type of a station it
+    // reached (null prices for "no orders"), so a missing one is a failed read.
+    competitionUnchecked: aggregate === undefined && deepUndercut === null,
   };
 }
 
@@ -466,6 +477,8 @@ export interface OpenOrderGroupSummary {
   worstGapPct: number | null;
   /** Descending by count, then by name, so the header's order is stable across refreshes. */
   byCharacter: GroupCharacterShare[];
+  /** Rows whose competition was not checked (`competitionUnchecked`). */
+  uncheckedCount: number;
 }
 
 function rowGapPct(row: OpenOrderRow): number | null {
@@ -477,9 +490,11 @@ function rowGapPct(row: OpenOrderRow): number | null {
 export function summariseOrderGroup(rows: readonly OpenOrderRow[]): OpenOrderGroupSummary {
   let iskTiedUp = 0;
   let worstGapPct: number | null = null;
+  let uncheckedCount = 0;
   const shares = new Map<number, GroupCharacterShare>();
   for (const row of rows) {
     iskTiedUp += row.iskTiedUp;
+    if (row.competitionUnchecked) uncheckedCount++;
     const gap = rowGapPct(row);
     if (gap !== null && (worstGapPct === null || gap > worstGapPct)) worstGapPct = gap;
     const share = shares.get(row.characterId);
@@ -494,5 +509,5 @@ export function summariseOrderGroup(rows: readonly OpenOrderRow[]): OpenOrderGro
   const byCharacter = [...shares.values()].sort(
     (a, b) => b.count - a.count || a.characterName.localeCompare(b.characterName)
   );
-  return { iskTiedUp, worstGapPct, byCharacter };
+  return { iskTiedUp, worstGapPct, byCharacter, uncheckedCount };
 }

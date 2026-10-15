@@ -31,13 +31,13 @@ vi.mock('@/features/character/typeNames', () => ({
 
 /** One ISK figure per type, so the per-side totals are checkable by hand. */
 vi.mock('@/market/prices', () => ({
-  getHubPrices: vi.fn(
-    async () =>
-      new Map([
-        [40520, { sellMin: 1_000_000_000, buyMax: null }],
-        [40519, { sellMin: 100_000_000, buyMax: null }],
-      ])
-  ),
+  getHubPricesWithStatus: vi.fn(async () => ({
+    unreachable: false,
+    prices: new Map([
+      [40520, { sellMin: 1_000_000_000, buyMax: null }],
+      [40519, { sellMin: 100_000_000, buyMax: null }],
+    ]),
+  })),
 }));
 
 function item(overrides: Partial<PublicContractItem> & { record_id: number }): PublicContractItem {

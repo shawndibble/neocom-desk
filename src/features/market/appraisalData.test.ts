@@ -569,7 +569,9 @@ describe('compareHubs', () => {
   it('flags every hub unreachable when Fuzzwork is down, and none when it answers', async () => {
     server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));
     const down = await compareHubs('Damage Control II\t3', 100);
-    expect(down.every((row) => row.unreachable && row.buy === null && row.sell === null)).toBe(true);
+    expect(down.every((row) => row.unreachable && row.buy === null && row.sell === null)).toBe(
+      true
+    );
 
     clearMarketPriceCache();
     server.use(aggregates(PRICED));

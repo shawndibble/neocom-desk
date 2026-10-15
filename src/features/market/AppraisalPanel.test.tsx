@@ -345,6 +345,7 @@ describe('AppraisalPanel', () => {
         refinesOreOrIce: false,
         accountingLevel: 0,
         brokerRelationsLevel: 0,
+        pricesUnreachable: false,
         ...overrides,
       };
     }
@@ -592,6 +593,7 @@ describe('AppraisalPanel', () => {
         refinesOreOrIce: false,
         accountingLevel: null,
         brokerRelationsLevel: null,
+        pricesUnreachable: false,
         ...overrides,
       };
     }
@@ -799,6 +801,7 @@ describe('AppraisalPanel', () => {
         refinesOreOrIce: false,
         accountingLevel: null,
         brokerRelationsLevel: null,
+        pricesUnreachable: false,
         ...overrides,
       };
     }
