@@ -3494,8 +3494,8 @@
       "steps": {
         "login": {
           "title": "Log in with EVE",
-          "body": "You sign in on EVE Online’s own page. Neocom Desk reads your data, and writes to EVE only when you act.",
-          "alt": "The sign-in area of this page: the Log in with EVE Online button and the link to log in with custom permissions."
+          "body": "You log in on EVE Online’s own page. Neocom Desk reads your data, and writes to EVE only when you act.",
+          "alt": "The login area of this page: the Log in with EVE Online button and the link to log in with custom permissions."
         },
         "share": {
           "title": "Choose what to share",
