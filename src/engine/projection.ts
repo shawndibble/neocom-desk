@@ -50,6 +50,9 @@ import {
   type CloneJumpEntrySnapshot,
   type CloneJumpReadyFire,
   type ContractEntrySnapshot,
+  ordersInBatch,
+  type OrderExpiryEntrySnapshot,
+  type OrdersLapsingFire,
   type ContractNotificationFire,
   type ColonySnapshotEntry,
   type CalendarEventEntrySnapshot,
@@ -90,6 +93,8 @@ export const PROJECTABLE_EVENT_IDS = [
   'characterNotTraining',
   'skillQueueEnding',
   'courierDeliveryDue',
+  'contractExpiring',
+  'ordersLapsing',
   'industryJobComplete',
   'cloneJumpReady',
   'planetaryExtractionDone',
@@ -110,8 +115,10 @@ export type ProjectionWording = 'assert' | 'hedge';
  * hedges when an ordinary in-game action, taken while the app is closed,
  * routinely falsifies that prediction before it lands.
  *
- * Five do. `courierDeliveryDue` (issue #1713) is falsified by delivering the
- * haul — the very thing it prompts. `structureFuelLow` is falsified by a refuel. Both planetary
+ * Seven do. `courierDeliveryDue` (issue #1713) is falsified by delivering the
+ * haul — the very thing it prompts. `contractExpiring` and `ordersLapsing`
+ * (issue #3797) are falsified by relisting or accepting — likewise the very
+ * thing they prompt. `structureFuelLow` is falsified by a refuel. Both planetary
  * events are falsified by the move a pilot makes on every reset run —
  * stopping an extractor program and installing a new one. `skillQueueEnding`
  * (issue #1410) is falsified the same way by topping up the skill queue in
@@ -139,6 +146,8 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
     case 'planetaryExtractorExpiring':
     case 'skillQueueEnding':
     case 'courierDeliveryDue':
+    case 'contractExpiring':
+    case 'ordersLapsing':
       return 'hedge';
     case 'skillLevelComplete':
     case 'characterNotTraining':
@@ -487,6 +496,27 @@ export function projectContracts(
 ): ProjectionRow[] {
   const rows: ProjectionRow[] = [];
   for (const entry of entries) {
+    const { expiresMs, expiringLeadMs } = entry;
+    if (
+      entry.status === 'outstanding' &&
+      entry.issuerId === characterId &&
+      expiresMs !== undefined &&
+      expiringLeadMs !== undefined
+    ) {
+      const expiringAt = expiresMs - expiringLeadMs;
+      if (inHorizon(expiringAt, nowMs, horizonMs)) {
+        const fire: ContractNotificationFire = {
+          eventId: 'contractExpiring',
+          characterId,
+          contractId: entry.contractId,
+          deadlineMs: expiresMs,
+          thresholdMs: expiringLeadMs,
+        };
+        rows.push(
+          buildRow(characterId, 'contractExpiring', fire, expiringAt, copy(fire, characterName, {}))
+        );
+      }
+    }
     const { deliveryDeadlineMs, dueLeadMs } = entry;
     if (entry.status !== 'in_progress' || entry.acceptorId !== characterId) continue;
     if (deliveryDeadlineMs === undefined || dueLeadMs === undefined) continue;
@@ -502,6 +532,45 @@ export function projectContracts(
     rows.push(
       buildRow(characterId, 'courierDeliveryDue', fire, fireAt, copy(fire, characterName, {}))
     );
+  }
+  return rows;
+}
+
+/**
+ * `ordersLapsing` (issue #3797): one batched row per batch of open orders
+ * lapsing within `ORDER_BATCH_WINDOW_MS` of each other, at the batch's
+ * soonest expiry minus the lead. Pure snapshot arithmetic: expiry and lead
+ * are baked into the entries by `pollDomains.ts`'s `orderExpiryDomain`.
+ */
+export function projectOrdersLapsing(
+  characterId: number,
+  characterName: string,
+  entries: readonly OrderExpiryEntrySnapshot[],
+  copy: PushCopy<OrdersLapsingFire, Record<string, never>>,
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): ProjectionRow[] {
+  let rest = entries
+    .filter((entry) => entry.expiresMs > nowMs)
+    .sort((a, b) => a.expiresMs - b.expiresMs);
+  const rows: ProjectionRow[] = [];
+  while (rest.length > 0) {
+    const { expiresMs: soonestMs, leadMs } = rest[0];
+    const batch = ordersInBatch(rest);
+    const fireAt = soonestMs - leadMs;
+    if (inHorizon(fireAt, nowMs, horizonMs)) {
+      const fire: OrdersLapsingFire = {
+        eventId: 'ordersLapsing',
+        characterId,
+        count: batch,
+        soonestMs,
+        thresholdMs: leadMs,
+      };
+      rows.push(
+        buildRow(characterId, 'ordersLapsing', fire, fireAt, copy(fire, characterName, {}))
+      );
+    }
+    rest = rest.slice(batch);
   }
   return rows;
 }

@@ -282,6 +282,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     stockTargets: async () => [],
     incursions: async () => [],
     communities: async () => [],
+    orderExpiry: async () => [],
     marketOrderUndercut: loadMarketOrderUndercut,
   };
   const states: Record<string, DomainPollState> = {
@@ -305,6 +306,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     incursions: domainState(undefined, undefined),
     communities: domainState(undefined, undefined),
     marketOrderUndercut: domainState(undefined, undefined),
+    orderExpiry: domainState(undefined, undefined),
   };
 
   return {
@@ -959,7 +961,11 @@ describe('runForegroundPoll', () => {
     const loadContracts = vi.fn(async () => []);
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE]),
-      eventPrefsFor: async () => ({ contractAccepted: false, courierDeliveryDue: false }),
+      eventPrefsFor: async () => ({
+        contractAccepted: false,
+        courierDeliveryDue: false,
+        contractExpiring: false,
+      }),
       loadContracts,
     });
     await runForegroundPoll(deps);

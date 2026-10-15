@@ -8547,6 +8547,15 @@
         "title": "Courier delivery due",
         "body": "{{character}}'s courier contract must be delivered in under {{hours}} hours."
       },
+      "contractExpiring": {
+        "title": "Contract expiring",
+        "body": "{{character}}'s issued contract expires in under {{hours}} hours."
+      },
+      "ordersLapsing": {
+        "title": "Market orders lapsing",
+        "body_one": "{{character}} has {{count}} market order that lapses in under {{hours}} hours.",
+        "body_other": "{{character}} has {{count}} market orders that lapse in under {{hours}} hours."
+      },
       "skillQueueEnding": {
         "title": "Skill queue ending soon",
         "body": "{{character}}'s skill queue will run dry in under {{hours}} hours."
@@ -10120,6 +10129,8 @@
         "contractCompleted": "Contract Completed",
         "contractFailed": "Contract Failed",
         "courierDeliveryDue": "Courier Delivery Due",
+        "contractExpiring": "Contract Expiring",
+        "ordersLapsing": "Orders Lapsing",
         "walletBalanceChanged": "Wallet Balance Changed",
         "eveNotification": "EVE Notifications",
         "structureFuelLow": "Structure Fuel Low",
@@ -10144,6 +10155,12 @@
       "courierDeliveryDueLeadTimeLabel": "Warn this far before a courier delivery is due:",
       "courierDeliveryDueLeadTimeOption_one": "{{count}} hour",
       "courierDeliveryDueLeadTimeOption_other": "{{count}} hours",
+      "contractExpiringLeadTimeLabel": "Warn this far before a contract you issued expires:",
+      "contractExpiringLeadTimeOption_one": "{{count}} hour",
+      "contractExpiringLeadTimeOption_other": "{{count}} hours",
+      "ordersLapsingLeadTimeLabel": "Warn this far before market orders lapse:",
+      "ordersLapsingLeadTimeOption_one": "{{count}} hour",
+      "ordersLapsingLeadTimeOption_other": "{{count}} hours",
       "skillQueueEndingLeadTimeLabel": "Warn this far before the skill queue runs dry:",
       "skillQueueEndingLeadTimeOption_one": "{{count}} hour",
       "skillQueueEndingLeadTimeOption_other": "{{count}} hours",

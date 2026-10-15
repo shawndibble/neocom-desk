@@ -46,6 +46,8 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       extractorExpiringLeadHours: ['planetaryExtractorExpiring'],
       skillQueueEndingLeadHours: ['skillQueueEnding'],
       courierDeliveryDueLeadHours: ['courierDeliveryDue'],
+      contractExpiringLeadHours: ['contractExpiring'],
+      ordersLapsingLeadHours: ['ordersLapsing'],
       walletBalanceChangedThresholdIsk: ['walletBalanceChanged'],
       incursionNearbyJumps: ['incursionNearby'],
       structureFuelLowDays: ['structureFuelLow'],
@@ -196,6 +198,58 @@ describe('one event through its entry', () => {
     expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
       'courierDeliveryDueLeadHours',
     ]);
+  });
+
+  it('contractExpiring: fires for an issued outstanding contract, pushes hedged, owns its lead-hours threshold', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.contractExpiring;
+    const contract = {
+      contractId: 9,
+      status: 'outstanding' as const,
+      issuerId: 42,
+      acceptorId: 0,
+      expiresMs: 1_800_000_000_000 + 20 * 3_600_000,
+      expiringLeadMs: 24 * 3_600_000,
+    };
+    const fires = entry.diff(
+      42,
+      { entries: [contract], nowMs: 1_800_000_000_000 - 10 * 3_600_000 * 4 },
+      { entries: [contract], nowMs: 1_800_000_000_000 }
+    );
+    expect(fires).toHaveLength(1);
+    expect(entry.copy.poll(fires[0], PILOT, {}).body).toBe(
+      "Kestrel's issued contract expires in under 24 hours."
+    );
+    expect(entry.copy.subjectOf?.(fires[0])).toBe(9);
+    expect(entry.projection.push(fires[0], PILOT, {}).body).toBe(
+      "Kestrel's issued contract was due to expire in under 24 hours."
+    );
+    expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
+      'contractExpiringLeadHours',
+    ]);
+  });
+
+  it('ordersLapsing: one batched fire with a count, pushes hedged, owns its lead-hours threshold', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.ordersLapsing;
+    const now = 1_800_000_000_000;
+    const hour = 3_600_000;
+    const orders = [1, 2, 3].map((orderId) => ({
+      orderId,
+      expiresMs: now + 20 * hour,
+      leadMs: 24 * hour,
+    }));
+    const fires = entry.diff(
+      42,
+      { entries: orders, nowMs: now - 10 * hour },
+      { entries: orders, nowMs: now }
+    );
+    expect(fires).toHaveLength(1);
+    expect(entry.copy.poll(fires[0], PILOT, {}).body).toBe(
+      'Kestrel has 3 market orders that lapse in under 24 hours.'
+    );
+    expect(entry.projection.push(fires[0], PILOT, {}).body).toBe(
+      'Kestrel had 3 market orders due to lapse within 24 hours.'
+    );
+    expect(entry.thresholds.fields.map((field) => field.key)).toEqual(['ordersLapsingLeadHours']);
   });
 
   it('skillQueueEnding: fires as the tail crosses its lead time, pushes hedged, owns its own lead-hours threshold', () => {
