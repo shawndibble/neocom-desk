@@ -23,9 +23,9 @@ const PILL_TONE: Record<PillTone, string> = {
 };
 
 /**
- * One verdict as a pill. The heading (Acquisition Verdict, Sale
- * Profitability, Use-or-Sell) stays in the accessible name so the three read
- * as the separately-labelled statements ADR 0006 asks for, while the eye gets
+ * One verdict as a pill. The heading (Acquisition Verdict, Use-or-Sell)
+ * stays in the accessible name so each reads as a separately-labelled
+ * statement, as ADR 0006 asks, while the eye gets
  * the tone and the glyph — never colour alone (docs/DESIGN.md §7).
  */
 export function VerdictPill({

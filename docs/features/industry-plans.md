@@ -209,7 +209,7 @@ Modal "Import a fit" (`industry.fitImportTitle`) opened from toolbar icon or rou
 - Big figure = Sale Profitability: net profit after sales tax + broker (ADR 0006), tone-coded, `IskAmount` (tap shows exact). "Unknown" when unpriced; spinner while prices load; "No price data yet" hint.
 - Qualifier line: margin %, ISK/h, duration, break-even price (net, always).
 - `PlanSlotLine`: "<Character>: uses 1 <pool> slot - N free - done by <EVE time> if started now" (hidden without slot data).
-- Pills: Acquisition Verdict ("BUILD saves X ISK" / "BUY is cheaper by X ISK" / Unknown; no fees, ADR 0006), Use-or-sell verdict pill (only when owned stock > 0, instant-sell basis).
+- Pills: Acquisition Verdict ("BUILD saves X ISK" / "BUY is cheaper by X ISK" / Unknown; no fees, ADR 0006). The use-or-sell verdict is not in the hero; it lives in the Costs panel.
 - `BpcCoverageWarning` when profit unknown because an owned BPC's runs < plan runs; one-click "Set runs to N".
 - Log Production button (primary; disabled if blueprint has no product) opens the Production Runs form.
 - No Breakdown button here; it lives on the Costs panel header.
