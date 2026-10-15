@@ -160,11 +160,22 @@ async function readContracts(
 
   const requesters = new Set(slots.map((slot) => slot.requesterId));
   const since = Math.min(...slots.map((slot) => slot.since));
-  const eligible = eligibleContracts(contractsRead.cached.data, characterId, requesters, since);
+  // Oldest first: a capped or failed run reads the contracts that come first in time, so
+  // what is left unread is always the newest and the horizon only ever holds back the tail.
+  const eligible = eligibleContracts(
+    contractsRead.cached.data,
+    characterId,
+    requesters,
+    since
+  ).sort(
+    (a, b) => contractCompletedAt(a) - contractCompletedAt(b) || a.contract_id - b.contract_id
+  );
   const contracts: DeliveryContract[] = [];
   let reads = 0;
   // Eligible contracts whose items were not read this run: nothing finishing at
-  // or after the earliest of them may be recorded as counted-through.
+  // or after the earliest of them is counted (see `matchDeliveries`). One given up
+  // on after repeated failures is skipped for good instead: it never counts and
+  // does not hold the rest back.
   let horizon = Infinity;
   const unread = (contract: (typeof eligible)[number]) => {
     horizon = Math.min(horizon, contractCompletedAt(contract));
@@ -172,7 +183,6 @@ async function readContracts(
   for (const contract of eligible) {
     if ((itemReadFailures.get(contract.contract_id) ?? 0) >= GIVE_UP_AFTER) {
       degraded = true;
-      unread(contract);
       continue;
     }
     if (reads >= MAX_ITEM_READS_PER_RUN) {
@@ -180,7 +190,6 @@ async function readContracts(
       for (const rest of eligible.slice(eligible.indexOf(contract))) unread(rest);
       break;
     }
-    reads += 1;
     const items = await loadContractItems(characterId, contract.contract_id).catch(() => null);
     if (!items) {
       itemReadFailures.set(
@@ -192,6 +201,8 @@ async function readContracts(
       for (const rest of eligible.slice(eligible.indexOf(contract))) unread(rest);
       break;
     }
+    // A cached read costs nothing: only live ones count against the run's cap.
+    if (!items.fromCache) reads += 1;
     contracts.push({
       contractId: contract.contract_id,
       completedAt: contractCompletedAt(contract),

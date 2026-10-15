@@ -526,8 +526,8 @@ service cloud.firestore {
         // alone account for, kept unclamped so a lowered Pledge can be raised
         // back; `through` is the latest finish time (ms) counted into it. The
         // client asserts all of them, so they are only shape-bounded here:
-        // `delivered` and `manual` within 0/1..quantity, `auto` and `through`
-        // non-negative whole numbers, up to 10 positive
+        // `delivered` and `manual` within 0/1..quantity, `auto` up to 10^12 and
+        // `through` up to 4*10^12 (a ms timestamp), whole numbers, up to 10 positive
         // integer contract ids a line (the elements are a nested chain that
         // stops at the list's size, so an empty list costs almost nothing).
         // `communityId` repeats the path so one collection-group query can read
@@ -545,8 +545,8 @@ service cloud.firestore {
           function pledgeEntryOk(e) {
             return e is map
               && e.keys().hasOnly(['quantity', 'delivered', 'contractIds', 'manual', 'auto', 'through'])
-              && (!('auto' in e) || (e.auto is int && e.auto >= 0))
-              && (!('through' in e) || (e.through is int && e.through >= 0))
+              && (!('auto' in e) || (e.auto is int && e.auto >= 0 && e.auto <= 1000000000000))
+              && (!('through' in e) || (e.through is int && e.through >= 0 && e.through <= 4000000000000))
               && (!('manual' in e) || (e.manual is int && e.manual >= 1 && e.manual <= e.quantity))
               && e.quantity is int && e.quantity >= 1 && e.quantity <= 1000000000000
               && e.delivered is int && e.delivered >= 0 && e.delivered <= e.quantity

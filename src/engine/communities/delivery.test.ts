@@ -206,6 +206,56 @@ describe('matchDeliveries', () => {
     expect(again.delivered).toBe(MAX_CONTRACT_IDS_PER_LINE + 5);
   });
 
+  it('does not recredit a contract to another Pledge once its id has been trimmed', () => {
+    const A = contract(7, [{ typeId: 100, quantity: 40, blueprint: null }], 10);
+    const newer = Array.from({ length: MAX_CONTRACT_IDS_PER_LINE + 1 }, (_, i) =>
+      contract(100 + i, [{ typeId: 100, quantity: 1, blueprint: null }], 20 + i)
+    );
+    const first = matchDeliveries([slot('r1', ore, 1000, { order: [2, 0] })], [A, ...newer]).get(
+      'r1'
+    )!;
+    expect(first.contractIds).not.toContain(7);
+    const out = matchDeliveries(
+      [
+        slot('r0', ore, 1000, { order: [1, 0] }),
+        slot('r1', ore, 1000, {
+          order: [2, 0],
+          previousAuto: first.auto,
+          previousThrough: first.through,
+          previousContractIds: first.contractIds,
+        }),
+      ],
+      [A, ...newer]
+    );
+    expect(out.get('r0')?.delivered).toBe(0);
+    expect(out.get('r1')?.delivered).toBe(40 + MAX_CONTRACT_IDS_PER_LINE + 1);
+  });
+
+  it('credits the other item of a multi-item contract to the line that asks for it', () => {
+    const other: RequestLine = { typeId: 101, name: 'Other', quantity: 5, kind: 'item' };
+    const A = contract(
+      7,
+      [
+        { typeId: 100, quantity: 5, blueprint: null },
+        { typeId: 101, quantity: 5, blueprint: null },
+      ],
+      10
+    );
+    const out = matchDeliveries(
+      [
+        slot('l0', { ...ore, quantity: 5 }, 5, {
+          previousAuto: 5,
+          previousThrough: 10,
+          previousContractIds: [7],
+        }),
+        slot('l1', other, 5, { order: [0, 1] }),
+      ],
+      [A]
+    );
+    expect(out.get('l0')?.delivered).toBe(5);
+    expect(out.get('l1')?.delivered).toBe(5);
+  });
+
   it('counts a late contract whose id is below a full recorded list', () => {
     const ids = Array.from({ length: MAX_CONTRACT_IDS_PER_LINE }, (_, i) => 5000 + i);
     const out = matchDeliveries(
@@ -283,13 +333,45 @@ describe('matchDeliveries', () => {
     expect(out.get('r0')?.delivered).toBe(0);
   });
 
-  it('does not let through hide a contract an unread horizon might precede', () => {
-    const out = matchDeliveries(
-      [slot('a', ore, 1000)],
-      [contract(9, [{ typeId: 100, quantity: 5, blueprint: null }], 500)],
-      { horizon: 400 }
+  it('counts nothing finished at or after a contract it could not read, run after run', () => {
+    // X (finished at 100) is unreadable; 12 later contracts of 10 each.
+    const later = Array.from({ length: 12 }, (_, i) =>
+      contract(200 + i, [{ typeId: 100, quantity: 10, blueprint: null }], 101 + i)
     );
-    expect(out.get('a')).toMatchObject({ delivered: 5, through: 0 });
+    let entry = {
+      previousAuto: 0,
+      previousContractIds: [] as number[],
+      previousThrough: undefined as number | undefined,
+    };
+    for (let run = 0; run < 3; run += 1) {
+      const out = matchDeliveries(
+        [slot('a', ore, 1000, entry.previousThrough === undefined ? {} : entry)],
+        later,
+        { horizon: 100 }
+      ).get('a')!;
+      expect(out.delivered).toBe(0);
+      entry = {
+        previousAuto: out.auto,
+        previousContractIds: out.contractIds,
+        previousThrough: out.through,
+      };
+    }
+  });
+
+  it('counts the contracts once the horizon moves, and then stays stable', () => {
+    const later = Array.from({ length: 12 }, (_, i) =>
+      contract(200 + i, [{ typeId: 100, quantity: 10, blueprint: null }], 101 + i)
+    );
+    let entry: Partial<DeliverySlot> = {};
+    for (let run = 0; run < 3; run += 1) {
+      const out = matchDeliveries([slot('a', ore, 1000, entry)], later).get('a')!;
+      expect(out.delivered).toBe(120);
+      entry = {
+        previousAuto: out.auto,
+        previousContractIds: out.contractIds,
+        previousThrough: out.through,
+      };
+    }
   });
 
   it('keeps the most recent contract ids when more than the cap match', () => {

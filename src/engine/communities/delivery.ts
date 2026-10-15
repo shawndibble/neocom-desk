@@ -106,9 +106,10 @@ export function matchDeliveries(
   contracts: readonly DeliveryContract[],
   options: {
     /**
-     * Contracts finishing at or after this may not all have been read (a
-     * failed item read): they are counted, but `through` never passes below
-     * it, so an unread one is not mistaken for already counted next run.
+     * The earliest finish time of a contract that could not be read (a failed
+     * or capped item read). Nothing finishing at or after it is counted: an
+     * unread contract blocks what came after until it is read or given up, so
+     * `through` never passes a contract that was not looked at.
      */
     horizon?: number;
   } = {}
@@ -118,13 +119,6 @@ export function matchDeliveries(
   const sorted = [...contracts].sort(
     (a, b) => a.completedAt - b.completedAt || a.contractId - b.contractId
   );
-  /** Contract ids a slot already records, by slot: the evidence for "counted on another slot". */
-  const recordedOn = new Map<number, Set<string>>();
-  for (const slot of slots) {
-    for (const id of slot.previousContractIds) {
-      recordedOn.set(id, (recordedOn.get(id) ?? new Set()).add(slot.key));
-    }
-  }
   const auto = new Map<string, number>();
   const through = new Map<string, number>();
   const matched = new Map<string, number[]>();
@@ -141,24 +135,35 @@ export function matchDeliveries(
     (slot.previousThrough !== undefined && contract.completedAt <= slot.previousThrough);
 
   for (const contract of sorted) {
+    if (contract.completedAt >= horizon) break;
     for (const item of contract.items) {
       let left = item.quantity;
       for (const slot of ordered) {
         if (left <= 0) break;
         if (contract.completedAt < slot.since || !accepts(slot, contract, item)) continue;
         if (alreadyCounted(slot, contract)) continue;
-        // A contract counts toward one Pledge: not one that another of this
-        // Member's Pledges already records.
-        const elsewhere = recordedOn.get(contract.contractId);
-        if (elsewhere && [...elsewhere].some((key) => key !== slot.key)) continue;
+        // A contract counts toward one Pledge: not an item another of this
+        // Member's Pledges for the same requester already took, by id or by
+        // having counted through its finish time.
+        if (
+          slots.some(
+            (other) =>
+              other !== slot &&
+              accepts(other, contract, item) &&
+              (other.previousContractIds.includes(contract.contractId) ||
+                (other.previousThrough !== undefined &&
+                  other.previousThrough >= contract.completedAt &&
+                  other.since <= contract.completedAt))
+          )
+        ) {
+          continue;
+        }
         const room = slot.quantity - (auto.get(slot.key) ?? 0);
         if (room <= 0) continue;
         const take = Math.min(room, left);
         left -= take;
         auto.set(slot.key, (auto.get(slot.key) ?? 0) + take);
-        if (contract.completedAt < horizon) {
-          through.set(slot.key, Math.max(through.get(slot.key) ?? 0, contract.completedAt));
-        }
+        through.set(slot.key, Math.max(through.get(slot.key) ?? 0, contract.completedAt));
         const list = matched.get(slot.key) ?? [];
         if (!list.includes(contract.contractId)) list.push(contract.contractId);
         const asked = slot.line.runs;

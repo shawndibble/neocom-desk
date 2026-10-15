@@ -320,6 +320,84 @@ describe('syncRequestDeliveries', () => {
     expect(mocks.items.mock.calls[0]?.[1]).toBe(42);
   });
 
+  it('on a first sync with more contracts than one run reads, counts the oldest and holds back the rest', async () => {
+    const DAYS = 86_400_000;
+    // 45 contracts, newest first as ESI lists them; contract n finished n days after day 0.
+    const all = Array.from({ length: 45 }, (_, i) => 45 - i).map((n) =>
+      contract(1000 + n, {
+        date_completed: new Date(Date.parse('2026-09-01T00:00:00Z') + n * DAYS).toISOString(),
+      })
+    );
+    mocks.contracts.mockResolvedValue({
+      cached: { data: all, truncated: false },
+      needsReauth: false,
+    });
+    const read = new Set<number>();
+    mocks.items.mockImplementation(async (_c: number, id: number) => {
+      const fromCache = read.has(id);
+      read.add(id);
+      return {
+        fromCache,
+        data: [{ record_id: 1, type_id: 100, quantity: 1, is_included: true, is_singleton: false }],
+      };
+    });
+    mocks.requests.mockResolvedValue([request({ createdAt: Date.parse('2026-08-01T00:00:00Z') })]);
+    let stored: Record<number, PledgeEntry> = {
+      0: { quantity: 500, delivered: 0, contractIds: [] },
+    };
+    mocks.pledges.mockImplementation(async () => new Map([['r1', [pledge(stored)]]]));
+    mocks.update.mockImplementation(async (_c, _g, _r, change) => {
+      stored = change(stored) as Record<number, PledgeEntry>;
+    });
+    const first = await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(first.status).toBe('read-failed');
+    // The 40 oldest are counted; the 5 newest wait for the next run.
+    expect(stored[0]?.auto).toBe(40);
+    // The next run (their items now cached or read) counts them once, and a third adds nothing.
+    mocks.items.mockClear();
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(stored[0]?.auto).toBe(45);
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(stored[0]?.auto).toBe(45);
+  });
+
+  it('holds back what finished after an unreadable contract, then releases it once given up', async () => {
+    const early = contract(91, { date_completed: '2026-10-11T00:00:00Z' });
+    const later = [92, 93, 94].map((id, i) =>
+      contract(id, { date_completed: `2026-10-1${2 + i}T00:00:00Z` })
+    );
+    mocks.contracts.mockResolvedValue({
+      cached: { data: [...later, early], truncated: false },
+      needsReauth: false,
+    });
+    mocks.items.mockImplementation(async (_c: number, id: number) =>
+      id === 91
+        ? null
+        : {
+            data: [
+              { record_id: 1, type_id: 100, quantity: 10, is_included: true, is_singleton: false },
+            ],
+          }
+    );
+    let stored: Record<number, PledgeEntry> = {
+      0: { quantity: 500, delivered: 0, contractIds: [] },
+    };
+    mocks.pledges.mockImplementation(async () => new Map([['r1', [pledge(stored)]]]));
+    mocks.update.mockImplementation(async (_c, _g, _r, change) => {
+      stored = change(stored) as Record<number, PledgeEntry>;
+    });
+    // X (91) fails: nothing after it counts, run after run, until it is given up (twice).
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(stored[0]?.auto ?? 0).toBe(0);
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(stored[0]?.auto ?? 0).toBe(0);
+    // Given up: skipped for good, the three later ones count once and stay stable.
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(stored[0]?.auto).toBe(30);
+    await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(stored[0]?.auto).toBe(30);
+  });
+
   it('skips Requests that are closed or the Member’s own', async () => {
     mocks.requests.mockResolvedValue([request({ closed: true })]);
     const result = await syncRequestDeliveries(ME, 'c1', NOW);

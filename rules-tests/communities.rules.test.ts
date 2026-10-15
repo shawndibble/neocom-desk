@@ -797,10 +797,10 @@ describe('Requests', () => {
         )
       );
       await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5) })));
-      for (const bad of [-1, 1.5, 'x']) {
+      for (const bad of [-1, 1.5, 'x', 1_000_000_000_001]) {
         await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { auto: bad }) })));
       }
-      for (const bad of [-1, 1.5, 'x']) {
+      for (const bad of [-1, 1.5, 'x', 4_000_000_000_001]) {
         await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5, { through: bad }) })));
       }
     });
