@@ -30,7 +30,7 @@ here — they go one per file in `docs/context/decisions/`.
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer.
-- **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation, alliance, item, station or system; a type's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
+- **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation or alliance; an item's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.

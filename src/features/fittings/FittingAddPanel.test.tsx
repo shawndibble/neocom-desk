@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -9,6 +9,9 @@ import { FittingAddPanel } from './FittingAddPanel';
 import { FittingItemActionsProvider } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import type { VariantEvaluator } from './useFittingEvaluation';
+import type { FittingStats } from '@/engine/fittings/types';
+import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import { db } from '@/db';
 import { clearHullFitMemory } from './hullFitService';
 import type { ChargeEngineStats } from './dogmaFittingEngine';
@@ -31,6 +34,64 @@ vi.mock('@/market/prices', () => ({
 
 const fitting: Fitting = { name: 'Rifter', shipTypeId: 587, modules: [], drones: [], cargo: [] };
 const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
+
+function layer(hp: number) {
+  return {
+    hp,
+    ehp: hp * 1.5,
+    emResonance: 0.8,
+    thermalResonance: 0.7,
+    kineticResonance: 0.6,
+    explosiveResonance: 0.5,
+  };
+}
+
+function neutralStats(ehp: number): FittingStats {
+  return {
+    cpuUsed: 100,
+    cpuTotal: 400,
+    powergridUsed: 500,
+    powergridTotal: 1000,
+    calibrationUsed: 100,
+    calibrationTotal: 400,
+    droneDps: 50,
+    droneBandwidthUsed: 25,
+    droneBandwidthTotal: 50,
+    maxActiveDrones: 0,
+    droneBandwidthByType: {},
+    hardpoints: { turrets: 0, launchers: 0 },
+    droneCapacity: 75,
+    capacitor: { stable: true, stablePercentage: 62 },
+    capacitorCapacity: 1500,
+    capacitorRechargeTime: 300000,
+    shield: layer(5000),
+    armor: layer(4000),
+    hull: layer(3000),
+    targeting: {
+      maxTargetRange: 60000,
+      maxLockedTargets: 6,
+      scanResolution: 400,
+      signatureRadius: 120,
+    },
+    navigation: { maxVelocity: 250, agility: 3.5, mass: 10000000, warpSpeed: 3 },
+    unknownItemTypeIds: [],
+    applied: { weapons: [], droneControlRange: 20000 },
+    slotCounts: { high: 4, medium: 4, low: 4, rig: 3, subsystem: 0 },
+    modules: [],
+    offense: {
+      weapons: [],
+      dps: 0,
+      sustainedDps: 0,
+      volley: 0,
+      overheated: null,
+      chargelessWeaponCount: 0,
+    },
+    repair: { shield: 0, armor: 0, hull: 0 },
+    overheated: null,
+    ...neutralExtendedStats(),
+    ehp,
+  } as FittingStats;
+}
 
 const catalogue: FittingCatalogue = {
   types: {},
@@ -120,6 +181,73 @@ describe('FittingAddPanel', () => {
 
     await user.click(dc2);
     expect(onAdd).toHaveBeenCalledWith(2, 'low');
+  });
+
+  describe('hover preview', () => {
+    function previewProps(afterEhp: number) {
+      const compare = vi.fn(async () => ({
+        before: neutralStats(20000),
+        after: neutralStats(afterEhp),
+      }));
+      const variants = { fitting, profile, engine, compare } as unknown as VariantEvaluator;
+      const build = vi.fn((f: Fitting, typeId: number) => ({
+        ...f,
+        modules: [{ slot: 'low' as const, slotIndex: 0, typeId, state: 'active' as const }],
+      }));
+      return { preview: { variants, build }, compare, build };
+    }
+
+    beforeEach(() => {
+      checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+        return new Map(
+          ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: true }])
+        );
+      });
+    });
+
+    it('shows the whole-Fitting change on hover, clears on leave, and click still adds', async () => {
+      const user = userEvent.setup();
+      const { preview, compare } = previewProps(24000);
+      const named = {
+        ...catalogue,
+        types: { 1: { name: 'Damage Control I' } } as unknown as FittingCatalogue['types'],
+      };
+      const { onAdd } = renderPanel({ preview, catalogue: named });
+
+      const dc1 = await screen.findByRole('button', { name: /Damage Control I$/ });
+      await user.hover(dc1);
+      const readout = await screen.findByRole('status');
+      expect(readout).toHaveTextContent('Adding Damage Control I');
+      expect(readout).toHaveTextContent('EHP 20000 → 24000');
+      expect(readout).toHaveTextContent('Fits · Can fly');
+      expect(compare).toHaveBeenCalledTimes(1);
+
+      await user.unhover(dc1);
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+      await user.click(dc1);
+      expect(onAdd).toHaveBeenCalledWith(1, 'low');
+    });
+
+    it('shows the same readout on keyboard focus and clears on blur', async () => {
+      const { preview } = previewProps(24000);
+      renderPanel({ preview });
+
+      const dc1 = await screen.findByRole('button', { name: /Damage Control I$/ });
+      act(() => dc1.focus());
+      expect(await screen.findByRole('status')).toHaveTextContent('EHP 20000 → 24000');
+
+      act(() => dc1.blur());
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('stays off without a preview prop (touch)', async () => {
+      const user = userEvent.setup();
+      renderPanel();
+
+      await user.hover(await screen.findByRole('button', { name: /Damage Control I$/ }));
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
   });
 
   it('says when a filter hid the search matches, and one tap shows them', async () => {

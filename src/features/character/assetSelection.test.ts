@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { parseAppraisalPaste } from '../../engine/market/appraisalPaste';
 import {
   selectionStateForIds,
   toggleSelection,
   selectAll,
   namesForSelection,
+  quantityLinesForSelection,
 } from './assetSelection';
 
 describe('selectionStateForIds', () => {
@@ -89,5 +91,34 @@ describe('namesForSelection', () => {
 
   it('skips ids with no matching asset', () => {
     expect(namesForSelection([1, 999], assetsByItemId, typeNames)).toEqual(['Tritanium']);
+  });
+});
+
+describe('quantityLinesForSelection', () => {
+  const assetsByItemId = new Map([
+    [1, { type_id: 34, quantity: 1000 }],
+    [2, { type_id: 34, quantity: 2500 }],
+    [3, { type_id: 35, quantity: 1 }],
+  ]);
+  const typeNames = new Map([[34, 'Tritanium']]);
+
+  it('sums quantities of the same type into one "Name xQty" line', () => {
+    expect(quantityLinesForSelection([1, 2, 3], assetsByItemId, typeNames)).toEqual([
+      'Tritanium x3500',
+      'Type #35 x1',
+    ]);
+  });
+
+  it('skips ids with no matching asset', () => {
+    expect(quantityLinesForSelection([1, 999], assetsByItemId, typeNames)).toEqual([
+      'Tritanium x1000',
+    ]);
+  });
+
+  it('round-trips through the Appraisal paste parser', () => {
+    const text = quantityLinesForSelection([1, 2], assetsByItemId, typeNames).join('\n');
+    expect(parseAppraisalPaste(text).map((e) => [e.name, e.quantity])).toEqual([
+      ['Tritanium', 3500],
+    ]);
   });
 });

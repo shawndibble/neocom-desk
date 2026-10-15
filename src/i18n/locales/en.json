@@ -467,6 +467,11 @@
       "noSlotRoom": "No free {{rack}} left",
       "noResources": "Too much CPU, powergrid or calibration for this hull",
       "cantAdd": "Can't add: {{reasons}}",
+      "preview": {
+        "title": "Adding {{name}}",
+        "more_one": "and {{count}} more change",
+        "more_other": "and {{count}} more changes"
+      },
       "openButton": "Add module",
       "tab": {
         "modules": "Modules",
@@ -5472,6 +5477,8 @@
       "compareChartTitle": "Raw vs. refined value by type",
       "compareChartTitleRawOnly": "Value by ore type",
       "refiningHiddenNote": "Refining hidden. Raw value only.",
+      "refiningHiddenCompressedNote": "Refining hidden. Raw compressed value only.",
+      "assumesCompressedNote": "Assumes compressed.",
       "chartMetric": {
         "title": "Chart metric",
         "iskOption": "ISK",
@@ -5896,7 +5903,8 @@
       "deselectAll": "Deselect all",
       "addToQuickbar": "Add to Quickbar",
       "addToCompare": "Add to Compare",
-      "copyNames": "Copy names"
+      "copyNames": "Copy names",
+      "copyWithQuantities": "Copy with quantities"
     },
     "itemCount_one": "{{count, number}} item",
     "itemCount_other": "{{count, number}} items",
@@ -11851,6 +11859,7 @@
         "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
         "infoTooltip": "? circle: explains a term (InfoTooltip)",
         "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
+        "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
         "infoButton": "ⓘ IconButton: opens Show Info or an explanation modal",
         "pencil": "Faint pencil after a value: edit in place",
         "assumed": "Amber warning mark: a default you have not confirmed",
@@ -11917,6 +11926,7 @@
         "infoLabel": "About material efficiency",
         "infoContent": "Percent of materials saved per run.",
         "showInfo": "Show info",
+        "addPreviewName": "Damage Control II",
         "editableValue": "Fleet name",
         "assumedFee": "Assuming NPC station fees",
         "myOrder": "5.50",
