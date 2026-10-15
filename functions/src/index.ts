@@ -75,6 +75,12 @@ import {
   transferAdmin,
   type CallerCharacter,
 } from './communitiesStore.js';
+import {
+  parsePostRequestInput,
+  parseRequestIdInput,
+  parseSetClosedInput,
+} from './communityRequests.js';
+import { extendRequest, postRequest, setRequestClosed } from './communityRequestsStore.js';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
 import {
   LP_STORE_OFFERS_CHUNK_SIZE,
@@ -602,6 +608,28 @@ export const deleteCommunityCallable = onCall<unknown>(
       callerOf(request),
       parseCommunityIdInput(request.data).communityId
     );
+  }
+);
+
+// Community Requests (issue #3807, ADR 0021): posting counts the caller's open
+// Requests, so it is a callable; extend and close/reopen are the requester's own.
+export const postCommunityRequestCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
+  postRequest(getFirestore(), callerOf(request), parsePostRequestInput(request.data))
+);
+
+export const extendCommunityRequestCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) => {
+    const { communityId, requestId } = parseRequestIdInput(request.data);
+    return extendRequest(getFirestore(), callerOf(request), communityId, requestId);
+  }
+);
+
+export const setCommunityRequestClosedCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, requestId, closed } = parseSetClosedInput(request.data);
+    await setRequestClosed(getFirestore(), callerOf(request), communityId, requestId, closed);
   }
 );
 

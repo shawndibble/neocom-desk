@@ -1,5 +1,6 @@
 import { useLayoutEffect, type ReactNode } from 'react';
 import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
+import { userEvent, within } from 'storybook/test';
 import { setCommunityBackendOverride } from '@/features/communities/communityStore';
 import {
   createCommunitiesFixture,
@@ -113,4 +114,61 @@ export const AdminInvites: Story = {
   parameters: {
     shell: { path: `/communities?community=${SAMPLE_ADMIN_COMMUNITY_ID}&tab=invites` },
   },
+};
+
+const requestsPath = (id: string) => `/communities?community=${id}&tab=requests`;
+
+/** Clicks the board row whose first line is `name`, the way a pilot opens its side panel. */
+const openRequest =
+  (name: string): Story['play'] =>
+  async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByText(new RegExp(`^${name}`)));
+  };
+
+/** @summary Requests: the board of the Community's Requests, Open and Mine filters, search, a table. */
+export const RequestsBoard: Story = {
+  parameters: { shell: { path: requestsPath(SAMPLE_ADMIN_COMMUNITY_ID) } },
+};
+
+/** @summary The Requests board in the phone shell (dense cards). */
+export const RequestsBoardPhone: Story = { ...RequestsBoard, globals: phone };
+
+/** @summary A Request opened as a Member: terms and each line's progress, read-only. */
+export const RequestsPanelAsMember: Story = {
+  ...RequestsBoard,
+  play: openRequest('Reactive Metals'),
+};
+
+/** @summary A Member's panel in the phone shell. */
+export const RequestsPanelAsMemberPhone: Story = { ...RequestsPanelAsMember, globals: phone };
+
+/** @summary Your own Request: Extend 30 days and Close request. */
+export const RequestsPanelAsRequester: Story = {
+  ...RequestsBoard,
+  play: openRequest('Ishtar Blueprint'),
+};
+
+/** @summary New request: location, terms, pasted list, editable lines, add an item. */
+export const RequestsCompose: Story = {
+  ...RequestsBoard,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole('button', { name: /new request/i }));
+    const dialog = within(document.body);
+    await userEvent.type(await dialog.findByLabelText(/^Location/), 'Badivefi');
+    await userEvent.click(dialog.getByLabelText(/Paste a list/));
+    await userEvent.paste(
+      'Reactive Metals\t350,000\nToxic Metals\t300,000\nChiral Structures\t175,000'
+    );
+    await dialog.findByText('Chiral Structures', { selector: 'span' });
+  },
+};
+
+/** @summary New request in the phone shell. */
+export const RequestsComposePhone: Story = { ...RequestsCompose, globals: phone };
+
+/** @summary A Community with no Requests yet. */
+export const RequestsEmpty: Story = {
+  parameters: { shell: { path: requestsPath(SAMPLE_MEMBER_COMMUNITY_ID) } },
 };

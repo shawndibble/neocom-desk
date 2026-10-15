@@ -44,14 +44,14 @@ export interface JoinRequestDecisionInput extends RemoveMemberInput {
   accept: boolean;
 }
 
-function record(data: unknown): Record<string, unknown> {
+export function record(data: unknown): Record<string, unknown> {
   if (typeof data !== 'object' || data === null) {
     throw new HttpsError('invalid-argument', 'object input required');
   }
   return data as Record<string, unknown>;
 }
 
-function boundedString(value: unknown, field: string, max: number): string {
+export function boundedString(value: unknown, field: string, max: number): string {
   const text = typeof value === 'string' ? value.trim() : '';
   if (text.length === 0 || text.length > max) {
     throw new HttpsError('invalid-argument', `${field} must be 1-${max} characters`);
@@ -61,7 +61,7 @@ function boundedString(value: unknown, field: string, max: number): string {
 
 // A Firestore doc id built from client input: no '/' (a path escape) and
 // nothing outside the ids this module and the client mint.
-function docId(value: unknown, field: string): string {
+export function docId(value: unknown, field: string): string {
   const text = boundedString(value, field, 128);
   if (!/^[A-Za-z0-9_:-]+$/.test(text)) {
     throw new HttpsError('invalid-argument', `${field} is not a valid id`);

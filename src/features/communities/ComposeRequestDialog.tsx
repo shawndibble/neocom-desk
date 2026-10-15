@@ -1,0 +1,382 @@
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Button,
+  LiveStatus,
+  Modal,
+  NativeSelect,
+  SearchInput,
+  TextArea,
+  TextInput,
+} from '@/components/ui';
+import {
+  MAX_LINES_PER_REQUEST,
+  MAX_LOCATION_LENGTH,
+  MAX_TERMS_LENGTH,
+  defaultKind,
+  isBlueprintName,
+  mergeLines,
+  parseQuantity,
+  type RequestLine,
+  type RequestLineKind,
+} from '@/engine/communities/requests';
+import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
+import { matchAppraisalEntries, type AppraisalCatalogue } from '@/engine/market/appraisalMatch';
+import { loadAppraisalCatalogue } from '@/features/market/appraisalData';
+import { callableErrorReason } from './callableError';
+import { postRequest } from './requestStore';
+import { namedLike, needleOf } from './shareLists';
+
+/** What a pilot changed on a line since it came from the paste or the search, as typed. */
+interface LineEdit {
+  quantity?: string;
+  kind?: RequestLineKind;
+  runs?: string;
+  me?: string;
+  te?: string;
+}
+
+const SEARCH_RESULTS = 8;
+const MIN_SEARCH_CHARS = 2;
+
+/** An optional whole number as typed: blank is none, anything else must be in range. */
+function optionalNumber(text: string | undefined, min: number, max: number) {
+  const trimmed = (text ?? '').trim();
+  if (trimmed === '') return { value: undefined, valid: true };
+  const value = Number(trimmed);
+  const valid = /^\d+$/.test(trimmed) && value >= min && value <= max;
+  return { value: valid ? value : undefined, valid };
+}
+
+interface ResolvedLine {
+  line: RequestLine;
+  quantityValid: boolean;
+  specValid: boolean;
+}
+
+function resolveLine(base: RequestLine, edit: LineEdit | undefined): ResolvedLine {
+  const quantity = edit?.quantity === undefined ? base.quantity : parseQuantity(edit.quantity);
+  const kind = edit?.kind ?? base.kind;
+  const runs = optionalNumber(edit?.runs, 1, 1_000_000);
+  const me = optionalNumber(edit?.me, 0, 10);
+  const te = optionalNumber(edit?.te, 0, 20);
+  const line: RequestLine = { ...base, kind, quantity: quantity ?? 0 };
+  if (kind === 'bpc') {
+    if (runs.value !== undefined) line.runs = runs.value;
+    if (me.value !== undefined) line.me = me.value;
+    if (te.value !== undefined) line.te = te.value;
+  }
+  return {
+    line,
+    quantityValid: quantity !== null,
+    specValid: kind !== 'bpc' || (runs.valid && me.valid && te.valid),
+  };
+}
+
+/**
+ * Step 1 of a new Request (the mockup's compose dialog): an optional location
+ * and terms, lines from a pasted pile (the Appraisal parser) or added by
+ * search, each line's quantity editable. Posting needs no mail; the recipient
+ * step is a later ticket. The pasted lines are recomputed from the box on
+ * every change, so edits and removals are kept per item rather than in a list
+ * the paste would overwrite.
+ */
+export function ComposeRequestDialog({
+  characterId,
+  communityId,
+  onClose,
+  onPosted,
+}: {
+  characterId: number;
+  communityId: string;
+  onClose: () => void;
+  onPosted: () => void;
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const [location, setLocation] = useState('');
+  const [terms, setTerms] = useState('');
+  const [text, setText] = useState('');
+  const [added, setAdded] = useState<RequestLine[]>([]);
+  const [edits, setEdits] = useState<Record<number, LineEdit>>({});
+  const [removed, setRemoved] = useState<ReadonlySet<number>>(new Set());
+  const [search, setSearch] = useState('');
+  const [announce, setAnnounce] = useState<{ text: string; key: number }>({ text: '', key: 0 });
+  const [catalogue, setCatalogue] = useState<AppraisalCatalogue | null>(null);
+  const [catalogueFailed, setCatalogueFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadAppraisalCatalogue().then(
+      (loaded) => !cancelled && setCatalogue(loaded),
+      () => !cancelled && setCatalogueFailed(true)
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const matches = useMemo(
+    () =>
+      catalogue && text.trim() !== ''
+        ? matchAppraisalEntries(parseAppraisalPaste(text), catalogue)
+        : { matched: [], unmatched: [] },
+    [catalogue, text]
+  );
+
+  const { lines, over } = useMemo(() => {
+    const pasted = matches.matched.map((m): RequestLine => ({
+      typeId: m.typeId,
+      name: m.name,
+      quantity: m.quantity,
+      kind: defaultKind(m.name),
+    }));
+    const merged = mergeLines(pasted, added);
+    return {
+      lines: merged.lines
+        .filter((line) => !removed.has(line.typeId))
+        .map((line) => resolveLine(line, edits[line.typeId])),
+      over: merged.dropped,
+    };
+  }, [matches, added, removed, edits]);
+
+  const results = useMemo(() => {
+    const needle = needleOf(search);
+    if (!catalogue || needle.length < MIN_SEARCH_CHARS) return [];
+    return namedLike([...catalogue.values()], needle).slice(0, SEARCH_RESULTS);
+  }, [catalogue, search]);
+
+  const edit = (typeId: number, patch: LineEdit) =>
+    setEdits((current) => ({ ...current, [typeId]: { ...current[typeId], ...patch } }));
+
+  const addItem = (item: { typeId: number; name: string }) => {
+    setRemoved((current) => {
+      const next = new Set(current);
+      next.delete(item.typeId);
+      return next;
+    });
+    setAdded(
+      (current) =>
+        mergeLines(current, [
+          { typeId: item.typeId, name: item.name, quantity: 1, kind: defaultKind(item.name) },
+        ]).lines
+    );
+    setSearch('');
+    setAnnounce((a) => ({
+      text: t('communities.board.compose.added', { name: item.name }),
+      key: a.key + 1,
+    }));
+    searchRef.current?.focus();
+  };
+
+  const invalid = lines.some((l) => !l.quantityValid || !l.specValid);
+  const canPost = lines.length > 0 && !invalid && !busy;
+
+  const post = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await postRequest(characterId, communityId, {
+        location: location.trim(),
+        terms: terms.trim(),
+        lines: lines.map((l) => l.line),
+      });
+      onPosted();
+    } catch (err) {
+      const reason = callableErrorReason(err);
+      setError(
+        reason === 'too-many-open-requests'
+          ? t('communities.board.tooManyOpen')
+          : reason === 'too-many-lines'
+            ? t('communities.board.compose.tooManyLines', { count: MAX_LINES_PER_REQUEST })
+            : t('communities.board.compose.failed')
+      );
+      setBusy(false);
+    }
+  };
+
+  const unmatched = matches.unmatched.length;
+
+  return (
+    <Modal open onClose={onClose} title={t('communities.board.compose.title')} placement="wide">
+      <form
+        className="space-y-4 text-sm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (canPost) void post();
+        }}
+      >
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-xs text-text-dim">{t('communities.board.compose.location')}</span>
+            <TextInput
+              value={location}
+              maxLength={MAX_LOCATION_LENGTH}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs text-text-dim">{t('communities.board.compose.terms')}</span>
+            <TextInput
+              value={terms}
+              maxLength={MAX_TERMS_LENGTH}
+              placeholder={t('communities.board.compose.termsPlaceholder')}
+              onChange={(e) => setTerms(e.target.value)}
+            />
+          </label>
+        </div>
+        <label className="block space-y-1">
+          <span className="text-xs text-text-dim">{t('communities.board.compose.paste')}</span>
+          <TextArea
+            rows={4}
+            value={text}
+            aria-describedby={unmatched > 0 ? `${id}-unmatched` : undefined}
+            onChange={(e) => setText(e.target.value)}
+          />
+        </label>
+        {unmatched > 0 && (
+          <p id={`${id}-unmatched`} className="text-xs text-warning">
+            {t('communities.board.compose.unmatched', {
+              count: unmatched,
+              names: matches.unmatched.map((u) => u.name).join(', '),
+            })}
+          </p>
+        )}
+        {catalogueFailed && (
+          <p role="alert" className="text-xs text-danger">
+            {t('communities.board.compose.catalogueFailed')}
+          </p>
+        )}
+        {over > 0 && (
+          <p className="text-xs text-warning">
+            {t('communities.board.compose.over', { count: over, max: MAX_LINES_PER_REQUEST })}
+          </p>
+        )}
+        {lines.length > 0 && (
+          <ul
+            aria-label={t('communities.board.linesLabel')}
+            className="divide-y divide-line rounded-xs border border-line"
+          >
+            {lines.map(({ line, quantityValid, specValid }) => {
+              const e = edits[line.typeId];
+              const blueprint = isBlueprintName(line.name);
+              return (
+                <li key={line.typeId} className="space-y-1.5 px-3 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate">{line.name}</span>
+                    <TextInput
+                      size="sm"
+                      inputMode="numeric"
+                      aria-label={t('communities.board.compose.quantityOf', { name: line.name })}
+                      aria-invalid={!quantityValid || undefined}
+                      className="w-28 tabular-nums"
+                      value={e?.quantity ?? String(line.quantity)}
+                      onChange={(ev) => edit(line.typeId, { quantity: ev.target.value })}
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={t('communities.board.compose.removeLine', { name: line.name })}
+                      onClick={() => {
+                        setRemoved((current) => new Set(current).add(line.typeId));
+                        setAnnounce((a) => ({
+                          text: t('communities.board.compose.removed', { name: line.name }),
+                          key: a.key + 1,
+                        }));
+                        searchRef.current?.focus();
+                      }}
+                    >
+                      {t('communities.board.compose.remove')}
+                    </Button>
+                  </div>
+                  {blueprint && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
+                      <NativeSelect
+                        size="sm"
+                        className="w-44"
+                        aria-label={t('communities.board.compose.kindOf', { name: line.name })}
+                        value={line.kind}
+                        onChange={(ev) =>
+                          edit(line.typeId, { kind: ev.target.value as RequestLineKind })
+                        }
+                      >
+                        <option value="bpc">{t('communities.board.compose.kindBpc')}</option>
+                        <option value="bpo">{t('communities.board.compose.kindBpo')}</option>
+                      </NativeSelect>
+                      {line.kind === 'bpc' &&
+                        (
+                          [
+                            ['runs', t('communities.board.compose.runs')],
+                            ['me', t('communities.board.compose.me')],
+                            ['te', t('communities.board.compose.te')],
+                          ] as const
+                        ).map(([field, label]) => (
+                          <label key={field} className="flex items-center gap-1">
+                            {label}
+                            <TextInput
+                              size="sm"
+                              inputMode="numeric"
+                              aria-invalid={!specValid || undefined}
+                              className="w-16 tabular-nums"
+                              value={
+                                e?.[field] ?? (line[field] === undefined ? '' : String(line[field]))
+                              }
+                              onChange={(ev) => edit(line.typeId, { [field]: ev.target.value })}
+                            />
+                          </label>
+                        ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="space-y-1">
+          <SearchInput
+            ref={searchRef}
+            aria-label={t('communities.board.compose.addLabel')}
+            placeholder={t('communities.board.compose.addPlaceholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {results.length > 0 && (
+            <ul
+              aria-label={t('communities.board.compose.results')}
+              className="divide-y divide-line rounded-xs border border-line"
+            >
+              {results.map((item) => (
+                <li key={item.typeId}>
+                  <button
+                    type="button"
+                    className="block w-full px-3 py-1.5 text-left hover:bg-panel-2 focus-visible:bg-panel-2"
+                    onClick={() => addItem(item)}
+                  >
+                    {item.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>
+        {error && (
+          <p role="alert" className="text-xs text-danger">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canPost}>
+            {t('communities.board.compose.post')}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

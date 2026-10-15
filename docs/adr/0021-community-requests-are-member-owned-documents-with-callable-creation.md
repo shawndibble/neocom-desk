@@ -14,12 +14,12 @@ Pledges non-exclusive, so nothing needs a transaction to stay correct.
 
 ## Decision
 
-- `communities/{id}/requests/{requestId}` holds a Request (lines, location,
+- `communities/{id}/itemRequests/{requestId}` holds a Request (the collection is `itemRequests`: `requests` already holds the Join Requests waiting for the admin, ADR 0018) (lines, location,
   terms, owner uid, timestamps, closed flag). It is created, extended and
   closed through callables, because creation must enforce caps (open Requests
   per Member, lines per Request, recipients per mail) and the mail reservation
   that rules cannot count.
-- `communities/{id}/requests/{requestId}/pledges/{uid}` holds one Member's
+- `communities/{id}/itemRequests/{requestId}/pledges/{uid}` holds one Member's
   Pledges on that Request: per line a quantity and a delivered quantity with
   the contract ids behind it. Written directly by its owner under rules that
   bound quantities and require Community membership; never by another Member.

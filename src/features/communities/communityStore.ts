@@ -169,7 +169,11 @@ function libraryAsOf(data: Record<string, unknown>): number | null {
   return stamp.toMillis();
 }
 
-async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
+export async function callCommunity<In, Out>(
+  characterId: number,
+  name: string,
+  data: In
+): Promise<Out> {
   const override = communityBackendOverride();
   if (override) return override.call(name, data) as Out;
   await ensureSignedIn(characterId);
@@ -193,7 +197,7 @@ export async function previewInvite(inviteCode: string): Promise<InvitePreview> 
 }
 
 export function joinCommunity(characterId: number, inviteCode: string, characterName: string) {
-  return call<
+  return callCommunity<
     { inviteCode: string; characterName: string },
     { communityId: string; alreadyMember: boolean; pending?: boolean }
   >(characterId, 'joinCommunityCallable', { inviteCode, characterName });
@@ -204,7 +208,10 @@ export async function setRequireApproval(
   communityId: string,
   requireApproval: boolean
 ): Promise<void> {
-  await call(characterId, 'setCommunityApprovalCallable', { communityId, requireApproval });
+  await callCommunity(characterId, 'setCommunityApprovalCallable', {
+    communityId,
+    requireApproval,
+  });
 }
 
 export async function decideJoinRequest(
@@ -213,7 +220,7 @@ export async function decideJoinRequest(
   memberUid: string,
   accept: boolean
 ): Promise<void> {
-  await call(characterId, 'decideCommunityJoinRequestCallable', {
+  await callCommunity(characterId, 'decideCommunityJoinRequestCallable', {
     communityId,
     memberUid,
     accept,
@@ -234,7 +241,7 @@ export function reserveMailInvite(
   targetCharacterId: number,
   targetName: string
 ) {
-  return call<
+  return callCommunity<
     { communityId: string; targetCharacterId: number; targetName: string },
     MailInviteReservation
   >(characterId, 'reserveCommunityMailInviteCallable', {
@@ -250,7 +257,7 @@ export async function confirmMailInvite(
   targetCharacterId: number,
   targetName: string
 ): Promise<void> {
-  await call(characterId, 'confirmCommunityMailInviteCallable', {
+  await callCommunity(characterId, 'confirmCommunityMailInviteCallable', {
     communityId,
     targetCharacterId,
     targetName,
@@ -264,7 +271,7 @@ export async function releaseMailInvite(
   targetCharacterId: number,
   targetName: string
 ): Promise<void> {
-  await call(characterId, 'releaseCommunityMailInviteCallable', {
+  await callCommunity(characterId, 'releaseCommunityMailInviteCallable', {
     communityId,
     targetCharacterId,
     targetName,
@@ -306,27 +313,26 @@ export async function loadMailInviteStatus(
 }
 
 export function createCommunity(characterId: number, name: string, characterName: string) {
-  return call<{ name: string; characterName: string }, { communityId: string; inviteCode: string }>(
-    characterId,
-    'createCommunityCallable',
-    { name, characterName }
-  );
+  return callCommunity<
+    { name: string; characterName: string },
+    { communityId: string; inviteCode: string }
+  >(characterId, 'createCommunityCallable', { name, characterName });
 }
 
 export async function leaveCommunity(characterId: number, communityId: string): Promise<void> {
-  await call(characterId, 'leaveCommunityCallable', { communityId });
+  await callCommunity(characterId, 'leaveCommunityCallable', { communityId });
 }
 
 export async function deleteCommunity(characterId: number, communityId: string): Promise<void> {
-  await call(characterId, 'deleteCommunityCallable', { communityId });
+  await callCommunity(characterId, 'deleteCommunityCallable', { communityId });
 }
 
 export async function revokeInvite(characterId: number, communityId: string): Promise<void> {
-  await call(characterId, 'revokeCommunityInviteCallable', { communityId });
+  await callCommunity(characterId, 'revokeCommunityInviteCallable', { communityId });
 }
 
 export function regenerateInvite(characterId: number, communityId: string) {
-  return call<{ communityId: string }, { inviteCode: string }>(
+  return callCommunity<{ communityId: string }, { inviteCode: string }>(
     characterId,
     'regenerateCommunityInviteCallable',
     { communityId }
@@ -338,7 +344,7 @@ export async function removeMember(
   communityId: string,
   memberUid: string
 ): Promise<void> {
-  await call(characterId, 'removeCommunityMemberCallable', { communityId, memberUid });
+  await callCommunity(characterId, 'removeCommunityMemberCallable', { communityId, memberUid });
 }
 
 export async function transferAdmin(
@@ -346,5 +352,5 @@ export async function transferAdmin(
   communityId: string,
   memberUid: string
 ): Promise<void> {
-  await call(characterId, 'transferCommunityAdminCallable', { communityId, memberUid });
+  await callCommunity(characterId, 'transferCommunityAdminCallable', { communityId, memberUid });
 }
