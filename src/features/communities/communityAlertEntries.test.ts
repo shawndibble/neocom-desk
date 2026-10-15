@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { uidForCharacter } from '@/sync/uid';
 import { loadCommunityAlertEntries, rememberCommunityAdmin } from './communityAlertEntries';
+import { rememberCommunityWatch } from './requestBadge';
+import { loadMyRequests, loadPledges } from './requestStore';
+import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 import {
   loadCommunityMembers,
   loadJoinRequests,
@@ -13,6 +16,7 @@ const session = vi.hoisted(() => ({ uid: null as string | null }));
 vi.mock('@/sync/firebaseApp', () => ({
   getSyncAuth: () => ({ currentUser: session.uid ? { uid: session.uid } : null }),
 }));
+vi.mock('./requestStore', () => ({ loadMyRequests: vi.fn(), loadPledges: vi.fn() }));
 vi.mock('./communityStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./communityStore')>()),
   loadMyCommunities: vi.fn(),
@@ -101,5 +105,119 @@ describe('loadCommunityAlertEntries', () => {
     expect(await loadCommunityAlertEntries(CHARACTER)).toEqual([]);
     expect(await loadCommunityAlertEntries(CHARACTER)).toEqual([]);
     expect(loadMyCommunities).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('loadCommunityAlertEntries: Pledges on my Requests', () => {
+  const me = uidForCharacter(CHARACTER);
+  const member = (over: Partial<CommunitySummary> = {}) =>
+    community({ adminUid: 'someone-else', ...over });
+  const request = (over: Partial<CommunityRequest> = {}): CommunityRequest => ({
+    id: 'r1',
+    ownerUid: me,
+    ownerName: 'Me',
+    location: '',
+    terms: '',
+    lines: [{ typeId: 34, name: 'Tritanium', quantity: 10, kind: 'item' }],
+    createdAt: 500,
+    lastActivityAt: 500,
+    expiresAt: Date.now() + 86_400_000,
+    closed: false,
+    notify: { app: true, mail: false },
+    ...over,
+  });
+  const pledge = (uid: string, updatedAt = 900): RequestPledge => ({
+    uid,
+    lines: { 0: { quantity: 5, delivered: 0 } },
+    updatedAt,
+  });
+
+  beforeEach(() => {
+    vi.mocked(loadPledges).mockResolvedValue([]);
+    vi.mocked(loadMyRequests).mockResolvedValue([]);
+  });
+
+  it('reads nothing for a Character in no Community', async () => {
+    expect(await loadCommunityAlertEntries(CHARACTER)).toEqual([]);
+    expect(loadMyRequests).not.toHaveBeenCalled();
+  });
+
+  it('lists each own open Request that wants the app, and the Pledges on it by others', async () => {
+    await rememberCommunityWatch(CHARACTER, [member()]);
+    vi.mocked(loadMyCommunities).mockResolvedValue([member()]);
+    vi.mocked(loadMyRequests).mockResolvedValue([
+      request(),
+      request({ id: 'r2', notify: { app: false, mail: true } }),
+      request({ id: 'r3', closed: true }),
+    ]);
+    vi.mocked(loadPledges).mockImplementation(async (_c, _community, requestId) =>
+      requestId === 'r1' ? [pledge('u2'), pledge(me)] : [pledge('u3')]
+    );
+    vi.mocked(loadCommunityMembers).mockResolvedValue([
+      { uid: 'u2', characterName: 'Bob', joinedAt: 1, libraryAsOf: null },
+    ]);
+    const entries = await loadCommunityAlertEntries(CHARACTER);
+    expect(loadPledges).toHaveBeenCalledTimes(1);
+    expect(loadPledges).toHaveBeenCalledWith(CHARACTER, 'c1', 'r1');
+    expect(entries).toEqual([
+      {
+        communityId: 'c1',
+        communityName: 'Efa Miners',
+        kind: 'pledgeRequest',
+        uid: me,
+        characterName: '',
+        at: 500,
+        requestId: 'r1',
+        requestLabel: 'Tritanium',
+      },
+      {
+        communityId: 'c1',
+        communityName: 'Efa Miners',
+        kind: 'pledge',
+        uid: 'u2',
+        characterName: 'Bob',
+        at: 900,
+        requestId: 'r1',
+        requestLabel: 'Tritanium',
+      },
+    ]);
+  });
+
+  it('reads no Pledges in a Community where none of my Requests wants the app', async () => {
+    await rememberCommunityWatch(CHARACTER, [member()]);
+    vi.mocked(loadMyCommunities).mockResolvedValue([member()]);
+    vi.mocked(loadMyRequests).mockResolvedValue([request({ notify: { app: false, mail: true } })]);
+    expect(await loadCommunityAlertEntries(CHARACTER)).toEqual([]);
+    expect(loadPledges).not.toHaveBeenCalled();
+  });
+
+  it('reads the roster once for names it has not seen, and falls back to no name when that fails', async () => {
+    await rememberCommunityWatch(CHARACTER, [member()]);
+    vi.mocked(loadMyCommunities).mockResolvedValue([member({ id: 'c9' })]);
+    vi.mocked(loadMyRequests).mockResolvedValue([request()]);
+    vi.mocked(loadPledges).mockResolvedValue([pledge('u7')]);
+    vi.mocked(loadCommunityMembers).mockRejectedValue(new Error('offline'));
+    const entries = await loadCommunityAlertEntries(CHARACTER);
+    expect(entries?.find((e) => e.kind === 'pledge')?.characterName).toBe('');
+  });
+
+  it('keeps the admin entries and adds the Pledge ones for a Member who is both', async () => {
+    await rememberCommunityAdmin(CHARACTER, [community()]);
+    await rememberCommunityWatch(CHARACTER, [community()]);
+    vi.mocked(loadMyCommunities).mockResolvedValue([community({ id: 'c5', memberCount: 1 })]);
+    vi.mocked(loadMyRequests).mockResolvedValue([request()]);
+    const entries = await loadCommunityAlertEntries(CHARACTER);
+    expect(entries?.map((e) => e.kind)).toEqual(['pledgeRequest']);
+  });
+
+  it('does not read the roster again every poll for a Pledger who has left', async () => {
+    await rememberCommunityWatch(CHARACTER, [member()]);
+    vi.mocked(loadMyCommunities).mockResolvedValue([member({ id: 'c8' })]);
+    vi.mocked(loadMyRequests).mockResolvedValue([request()]);
+    vi.mocked(loadPledges).mockResolvedValue([pledge('gone')]);
+    vi.mocked(loadCommunityMembers).mockResolvedValue([]);
+    await loadCommunityAlertEntries(CHARACTER);
+    await loadCommunityAlertEntries(CHARACTER);
+    expect(loadCommunityMembers).toHaveBeenCalledTimes(1);
   });
 });

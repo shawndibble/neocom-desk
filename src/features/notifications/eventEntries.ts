@@ -43,9 +43,11 @@ import {
 import {
   diffCommunityJoinRequest,
   diffCommunityMemberJoined,
+  diffCommunityRequestPledged,
   type CommunityAlertSnapshot,
   type CommunityJoinRequestFire,
   type CommunityMemberJoinedFire,
+  type CommunityRequestPledgedFire,
 } from '@/engine/communities/communityAlert';
 import {
   SKILL_QUEUE_NOTIFICATION_DIFFS,
@@ -138,6 +140,7 @@ import {
   incursionNearbyCopy,
   communityJoinRequestCopy,
   communityMemberJoinedCopy,
+  communityRequestPledgedCopy,
   type IncursionNames,
   type DomainCopy,
   type NoNames,
@@ -177,7 +180,8 @@ export type AnyNotificationFire =
   | StockBelowTargetFire
   | IncursionNearbyFire
   | CommunityJoinRequestFire
-  | CommunityMemberJoinedFire;
+  | CommunityMemberJoinedFire
+  | CommunityRequestPledgedFire;
 
 /* -------------------------------------------------------------------------- */
 /* Snapshot sources                                                            */
@@ -593,6 +597,14 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     source: SNAPSHOT_SOURCES.communities,
     diff: diffCommunityMemberJoined,
     copy: communityMemberJoinedCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  communityRequestPledged: defineEvent({
+    source: SNAPSHOT_SOURCES.communities,
+    diff: diffCommunityRequestPledged,
+    copy: communityRequestPledgedCopy,
     projection: null,
     thresholds: null,
     rowHintKey: null,

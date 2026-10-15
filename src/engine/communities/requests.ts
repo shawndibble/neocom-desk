@@ -20,7 +20,7 @@ export const REQUEST_LIFETIME_DAYS = 30;
 export const MAX_PLEDGE_QUANTITY = 1_000_000_000_000;
 /** A Pledge with nothing delivered this long after it was last written greys out. */
 export const STALE_PLEDGE_DAYS = 14;
-/** Mails one Member may send about Requests a UTC day: mails, not lines. Apart from the 20 mail invites. */
+/** Pledge mails one Member may send a UTC day: mails, not lines. Apart from the 20 mail invites. */
 export const MAX_REQUEST_MAILS_PER_DAY = 100;
 
 export type RequestLineKind = 'item' | 'bpc' | 'bpo';
@@ -47,6 +47,7 @@ export interface CommunityRequest {
   lastActivityAt: number;
   expiresAt: number;
   closed: boolean;
+  notify: RequestNotify;
 }
 
 /** One Member's quantity on one line: what they can provide, and what is marked delivered. */
@@ -363,48 +364,34 @@ export function myPledgeRows(
   return rows.sort((a, b) => b.updatedAt - a.updatedAt || a.index - b.index);
 }
 
-/** A Member the requester may mail, and how many of the Request's blueprints they share. */
-export interface RequestRecipient {
-  uid: string;
-  characterName: string;
-  shared: number;
-  /** The requester's own character: listed first, so they can mail themselves the Request. */
-  self: boolean;
+/** The Request's lines a Pledge covers, in line order, each with the quantity Pledged (not the quantity asked). */
+export function pledgedRequestLines(
+  request: Pick<CommunityRequest, 'lines'>,
+  pledged: Readonly<Record<number, { quantity: number }>>
+): RequestLine[] {
+  return request.lines.flatMap((line, index) => {
+    const entry = pledged[index];
+    return entry && entry.quantity > 0 ? [{ ...line, quantity: entry.quantity }] : [];
+  });
 }
 
-/**
- * Everyone but the requester, those sharing the Request's blueprints first. A
- * blueprint line counts once for a Member however many copies they share; an
- * original (BPO) line needs an original shared (runs -1), a copy line is met
- * by any copy or original. Plain item lines match nobody: nothing a Member
- * shares says who holds Reactive Metals.
- */
-export function requestRecipients(
-  lines: readonly RequestLine[],
-  members: readonly { uid: string; characterName: string }[],
-  libraries: readonly { uid: string; items: readonly { typeId: number; runs: number }[] }[],
-  myUid: string
-): RequestRecipient[] {
-  const blueprintLines = lines.filter((line) => line.kind !== 'item');
-  const library = new Map(libraries.map((l) => [l.uid, l.items]));
-  return members
-    .map((member) => {
-      const self = member.uid === myUid;
-      const items = library.get(member.uid) ?? [];
-      // Nobody's own blueprints are "shared with" themselves.
-      const shared = self ? 0 : blueprintLines.filter((line) => libraryCovers(line, items)).length;
-      return { uid: member.uid, characterName: member.characterName, shared, self };
-    })
-    .sort(
-      (a, b) =>
-        Number(b.self) - Number(a.self) ||
-        b.shared - a.shared ||
-        a.characterName.localeCompare(b.characterName)
-    );
+/** How the requester hears about a Pledge on their Request: the bell, an in-game mail from the Pledger, both or neither. */
+export interface RequestNotify {
+  app: boolean;
+  mail: boolean;
 }
 
-/** Request mails still to send today, given the day's count. */
-export const requestMailsLeft = (used: number) => Math.max(0, MAX_REQUEST_MAILS_PER_DAY - used);
+/** A Request stored before the choice existed reads as this. */
+export const DEFAULT_NOTIFY: RequestNotify = { app: true, mail: false };
+
+/** A stored `notify`; a missing or malformed flag takes its default. */
+export function readNotify(raw: unknown): RequestNotify {
+  const d = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+  return {
+    app: typeof d.app === 'boolean' ? d.app : DEFAULT_NOTIFY.app,
+    mail: typeof d.mail === 'boolean' ? d.mail : DEFAULT_NOTIFY.mail,
+  };
+}
 
 /**
  * Open Requests from other Members posted after `seenAt` (when this Member

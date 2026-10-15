@@ -209,7 +209,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       priceAlert: ['priceAlertTriggered'],
       stockTargets: ['stockBelowTarget'],
       incursions: ['incursionNearby'],
-      communities: ['communityJoinRequest', 'communityMemberJoined'],
+      communities: ['communityJoinRequest', 'communityMemberJoined', 'communityRequestPledged'],
     });
   });
 

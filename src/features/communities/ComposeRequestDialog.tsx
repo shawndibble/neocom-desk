@@ -26,28 +26,18 @@ import { matchAppraisalEntries, type AppraisalCatalogue } from '@/engine/market/
 import { loadAppraisalCatalogue } from '@/features/market/appraisalData';
 import { LocationPicker } from './LocationPicker';
 import { callableErrorReason } from './callableError';
-import { ComposeMailResults, ComposeRecipientsField } from './ComposeRecipients';
-import { useComposeRecipients } from './useComposeRecipients';
-import { communityRequestsUrl, type CommunityMember } from './communityStore';
-import {
-  buildRequestMail,
-  requestMailDeps,
-  sendRequestMails,
-  type RequestMailRecipient,
-  type RequestMailResult,
-} from './requestMailSend';
+import { RequestNotifyChoice } from './RequestNotifyChoice';
 import { editRequest, postRequest } from './requestStore';
-import type { CommunityRequest } from '@/engine/communities/requests';
+import {
+  DEFAULT_NOTIFY,
+  type CommunityRequest,
+  type RequestNotify,
+} from '@/engine/communities/requests';
 import { namedLike, needleOf } from './shareLists';
 
-/**
- * What a caller may start the dialog with: Ask to copy (issue #3813) fills in
- * the line and adds the holder as a Mail to chip, on top of the Members who share a
- * matching blueprint.
- */
+/** What a caller may start the dialog with: Ask to copy (issue #3813) fills in its one blueprint line. */
 export interface ComposePrefill {
   lines?: readonly RequestLine[];
-  tickedUids?: readonly string[];
 }
 
 /** Editing a Request of one's own (instead of posting a new one). */
@@ -56,8 +46,6 @@ export interface ComposeEditing {
   /** Members have Pledged: the lines keep their items and kinds, only quantities and specs change. */
   linesLocked: boolean;
 }
-
-type Phase = 'compose' | 'mailing' | 'done';
 
 /** What a pilot changed on a line since it came from the paste or the search, as typed. */
 interface LineEdit {
@@ -115,22 +103,16 @@ function resolveLine(base: RequestLine, edit: LineEdit | undefined): ResolvedLin
 }
 
 /**
- * A new Request. An optional location
- * and terms, lines from a pasted pile (the Appraisal parser) or added by
- * search, each line's quantity editable. Below them (issue #3810) a Mail to
- * field: my own character, the Members sharing a matching blueprint and anyone
- * added by name are chips; posting sends one in-game mail to each chip covering
- * the whole list, with a result per recipient; with no chips it posts without
- * mail. The same dialog edits a Request of one's own (`editing`).
- * The Request posts first and stands whatever happens to the mails. The pasted lines are recomputed from the box on every change, so
- * edits and removals are kept per item rather than in a list the paste would
- * overwrite.
+ * A new Request: an optional location and terms, lines from a pasted pile (the
+ * Appraisal parser) or added by search, each line's quantity editable, and how
+ * to hear about a Pledge (`RequestNotifyChoice`). The same dialog edits a
+ * Request of one's own (`editing`). The pasted lines are recomputed from the
+ * box on every change, so edits and removals are kept per item rather than in
+ * a list the paste would overwrite.
  */
 export function ComposeRequestDialog({
   characterId,
   communityId,
-  myUid,
-  members,
   prefill,
   editing,
   onClose,
@@ -138,13 +120,10 @@ export function ComposeRequestDialog({
 }: {
   characterId: number;
   communityId: string;
-  myUid: string;
-  /** The roster, for the Mail to field; null until it has loaded. */
-  members: readonly CommunityMember[] | null;
   prefill?: ComposePrefill;
   editing?: ComposeEditing;
   onClose: () => void;
-  /** The Request is posted (before any mail goes out): refetch the board. */
+  /** The Request is posted or saved: refetch the board. */
   onPosted: () => void;
 }) {
   const { t } = useTranslation();
@@ -163,9 +142,7 @@ export function ComposeRequestDialog({
   const [catalogueFailed, setCatalogueFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [phase, setPhase] = useState<Phase>('compose');
-  const [mailResults, setMailResults] = useState<RequestMailResult[]>([]);
-  const [mailed, setMailed] = useState<RequestMailRecipient[]>([]);
+  const [notify, setNotify] = useState<RequestNotify>(editing?.request.notify ?? DEFAULT_NOTIFY);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -255,15 +232,6 @@ export function ComposeRequestDialog({
   const invalid = lines.some((l) => !l.quantityValid || !l.specValid || l.duplicate);
   const canSubmit = lines.length > 0 && !invalid && over === 0;
   const linesLocked = editing?.linesLocked ?? false;
-  const recipients = useComposeRecipients({
-    characterId,
-    communityId,
-    myUid,
-    members,
-    lines: lines.map((l) => l.line),
-    tickedUids: prefill?.tickedUids,
-    enabled: !editing,
-  });
 
   const save = async () => {
     if (!editing) return;
@@ -274,6 +242,7 @@ export function ComposeRequestDialog({
         location: location.trim(),
         terms: terms.trim(),
         lines: lines.map((l) => l.line),
+        notify,
       });
     } catch (err) {
       const reason = callableErrorReason(err);
@@ -289,23 +258,23 @@ export function ComposeRequestDialog({
     onClose();
   };
 
-  const post = async (tickedRecipients: RequestMailRecipient[]) => {
+  const post = async () => {
     setBusy(true);
     setError(null);
     const draft = {
       location: location.trim(),
       terms: terms.trim(),
       lines: lines.map((l) => l.line),
+      notify,
     };
-    let requestId: string;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      ({ requestId } = await Promise.race([
+      await Promise.race([
         postRequest(characterId, communityId, draft),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(TIMED_OUT), POST_TIMEOUT_MS);
         }),
-      ]));
+      ]);
     } catch (err) {
       const reason = err === TIMED_OUT ? null : callableErrorReason(err);
       setError(
@@ -322,36 +291,8 @@ export function ComposeRequestDialog({
     } finally {
       clearTimeout(timer);
     }
-    // The Request stands from here on, whatever happens to the mails.
     onPosted();
-    if (tickedRecipients.length === 0) {
-      onClose();
-      return;
-    }
-    setMailed(tickedRecipients);
-    setMailResults([]);
-    setPhase('mailing');
-    setBusy(false);
-    try {
-      await sendRequestMails(
-        {
-          communityId,
-          requestId,
-          recipients: tickedRecipients,
-          compose: (reservation) =>
-            buildRequestMail(t, {
-              communityName: reservation.communityName,
-              requesterName: reservation.requesterName,
-              ...draft,
-              link: communityRequestsUrl(communityId),
-            }),
-          onResult: (result) => setMailResults((current) => [...current, result]),
-        },
-        requestMailDeps(characterId, communityId, requestId)
-      );
-    } finally {
-      setPhase('done');
-    }
+    onClose();
   };
 
   const unmatched = matches.unmatched.length;
@@ -359,232 +300,207 @@ export function ComposeRequestDialog({
   return (
     <Modal
       open
-      // The post is in flight, or the mails are going out under this dialog: it
-      // stays until each has a result, or the mails would send invisibly.
-      onClose={phase === 'mailing' || busy ? () => undefined : onClose}
+      // The post is in flight: it stays until it has a result.
+      onClose={busy ? () => undefined : onClose}
       title={t(editing ? 'communities.board.compose.editTitle' : 'communities.board.compose.title')}
       placement="wide"
     >
-      {phase === 'compose' ? (
-        <form
-          className="space-y-4 text-sm"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!canSubmit || busy) return;
-            if (editing) void save();
-            else if (recipients.ready) void post(recipients.ticked);
-          }}
-        >
-          <div className="grid gap-3 md:grid-cols-2">
-            <LocationPicker
-              value={location}
-              maxLength={MAX_LOCATION_LENGTH}
-              onChange={setLocation}
+      <form
+        className="space-y-4 text-sm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!canSubmit || busy) return;
+          if (editing) void save();
+          else void post();
+        }}
+      >
+        <div className="grid gap-3 md:grid-cols-2">
+          <LocationPicker value={location} maxLength={MAX_LOCATION_LENGTH} onChange={setLocation} />
+          <label className="block space-y-1">
+            <span className="block text-xs text-text-dim">
+              {t('communities.board.compose.terms')}
+            </span>
+            <TextInput
+              className="w-full"
+              value={terms}
+              maxLength={MAX_TERMS_LENGTH}
+              placeholder={t('communities.board.compose.termsPlaceholder')}
+              onChange={(e) => setTerms(e.target.value)}
             />
-            <label className="block space-y-1">
-              <span className="block text-xs text-text-dim">
-                {t('communities.board.compose.terms')}
-              </span>
-              <TextInput
-                className="w-full"
-                value={terms}
-                maxLength={MAX_TERMS_LENGTH}
-                placeholder={t('communities.board.compose.termsPlaceholder')}
-                onChange={(e) => setTerms(e.target.value)}
-              />
-            </label>
-          </div>
-          {linesLocked && (
-            <p role="status" className="text-xs text-text-dim">
-              {t('communities.board.compose.linesLockedNote')}
-            </p>
-          )}
-          {!linesLocked && (
-            <label className="block space-y-1">
-              <span className="block text-xs text-text-dim">
-                {t('communities.board.compose.paste')}
-              </span>
-              <TextArea
-                rows={4}
-                value={text}
-                aria-describedby={unmatched > 0 ? `${id}-unmatched` : undefined}
-                onChange={(e) => setText(e.target.value)}
-              />
-            </label>
-          )}
-          {unmatched > 0 && (
-            <p id={`${id}-unmatched`} className="text-xs text-warning">
-              {t('communities.board.compose.unmatched', {
-                count: unmatched,
-                names: matches.unmatched.map((u) => u.name).join(', '),
-              })}
-            </p>
-          )}
-          {catalogueFailed && (
-            <p role="alert" className="text-xs text-danger">
-              {t('communities.board.compose.catalogueFailed')}
-            </p>
-          )}
-          {over > 0 && (
-            <p className="text-xs text-warning">
-              {t('communities.board.compose.over', { count: over, max: MAX_LINES_PER_REQUEST })}
-            </p>
-          )}
-          {lines.length > 0 && (
-            <ul
-              aria-label={t('communities.board.linesLabel')}
-              className="divide-y divide-line rounded-xs border border-line"
-            >
-              {lines.map(({ key, line, quantityValid, specValid, duplicate }) => {
-                const e = edits[key];
-                const blueprint = isBlueprintName(line.name);
-                return (
-                  <li key={key} className="space-y-1.5 px-3 py-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate">{line.name}</span>
-                      <TextInput
+          </label>
+        </div>
+        {linesLocked && (
+          <p role="status" className="text-xs text-text-dim">
+            {t('communities.board.compose.linesLockedNote')}
+          </p>
+        )}
+        {!linesLocked && (
+          <label className="block space-y-1">
+            <span className="block text-xs text-text-dim">
+              {t('communities.board.compose.paste')}
+            </span>
+            <TextArea
+              rows={4}
+              value={text}
+              aria-describedby={unmatched > 0 ? `${id}-unmatched` : undefined}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </label>
+        )}
+        {unmatched > 0 && (
+          <p id={`${id}-unmatched`} className="text-xs text-warning">
+            {t('communities.board.compose.unmatched', {
+              count: unmatched,
+              names: matches.unmatched.map((u) => u.name).join(', '),
+            })}
+          </p>
+        )}
+        {catalogueFailed && (
+          <p role="alert" className="text-xs text-danger">
+            {t('communities.board.compose.catalogueFailed')}
+          </p>
+        )}
+        {over > 0 && (
+          <p className="text-xs text-warning">
+            {t('communities.board.compose.over', { count: over, max: MAX_LINES_PER_REQUEST })}
+          </p>
+        )}
+        {lines.length > 0 && (
+          <ul
+            aria-label={t('communities.board.linesLabel')}
+            className="divide-y divide-line rounded-xs border border-line"
+          >
+            {lines.map(({ key, line, quantityValid, specValid, duplicate }) => {
+              const e = edits[key];
+              const blueprint = isBlueprintName(line.name);
+              return (
+                <li key={key} className="space-y-1.5 px-3 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate">{line.name}</span>
+                    <TextInput
+                      size="sm"
+                      inputMode="numeric"
+                      aria-label={t('communities.board.compose.quantityOf', {
+                        name: line.name,
+                      })}
+                      aria-invalid={!quantityValid || undefined}
+                      className="w-28 tabular-nums"
+                      value={e?.quantity ?? String(line.quantity)}
+                      onChange={(ev) => edit(key, { quantity: ev.target.value })}
+                    />
+                    {!linesLocked && (
+                      <Button
                         size="sm"
-                        inputMode="numeric"
-                        aria-label={t('communities.board.compose.quantityOf', {
+                        variant="ghost"
+                        aria-label={t('communities.board.compose.removeLine', {
                           name: line.name,
                         })}
-                        aria-invalid={!quantityValid || undefined}
-                        className="w-28 tabular-nums"
-                        value={e?.quantity ?? String(line.quantity)}
-                        onChange={(ev) => edit(key, { quantity: ev.target.value })}
-                      />
-                      {!linesLocked && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={t('communities.board.compose.removeLine', {
-                            name: line.name,
-                          })}
-                          onClick={() => {
-                            setRemoved((current) => new Set(current).add(key));
-                            setAnnounce((a) => ({
-                              text: t('communities.board.compose.removed', { name: line.name }),
-                              key: a.key + 1,
-                            }));
-                            searchRef.current?.focus();
-                          }}
-                        >
-                          {t('communities.board.compose.remove')}
-                        </Button>
-                      )}
-                    </div>
-                    {blueprint && (
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
-                        {/* Native select: two options in a modal, where a phone gets the OS picker. */}
-                        <NativeSelect
-                          size="sm"
-                          className="w-44"
-                          aria-label={t('communities.board.compose.kindOf', { name: line.name })}
-                          value={line.kind}
-                          disabled={linesLocked}
-                          onChange={(ev) => edit(key, { kind: ev.target.value as RequestLineKind })}
-                        >
-                          <option value="bpc">{t('communities.board.compose.kindBpc')}</option>
-                          <option value="bpo">{t('communities.board.compose.kindBpo')}</option>
-                        </NativeSelect>
-                        {line.kind === 'bpc' &&
-                          (
-                            [
-                              ['runs', t('communities.board.compose.runs')],
-                              ['me', t('communities.board.compose.me')],
-                              ['te', t('communities.board.compose.te')],
-                            ] as const
-                          ).map(([field, label]) => (
-                            <label key={field} className="flex items-center gap-1">
-                              {label}
-                              <TextInput
-                                size="sm"
-                                inputMode="numeric"
-                                aria-invalid={!specValid || undefined}
-                                className="w-16 tabular-nums"
-                                value={
-                                  e?.[field] ??
-                                  (line[field] === undefined ? '' : String(line[field]))
-                                }
-                                onChange={(ev) => edit(key, { [field]: ev.target.value })}
-                              />
-                            </label>
-                          ))}
-                      </div>
-                    )}
-                    {duplicate && (
-                      <p role="alert" className="text-xs text-danger">
-                        {t('communities.board.compose.duplicate', { name: line.name })}
-                      </p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {!linesLocked && (
-            <div className="space-y-1">
-              <SearchInput
-                ref={searchRef}
-                aria-label={t('communities.board.compose.addLabel')}
-                placeholder={t('communities.board.compose.addPlaceholder')}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              {results.length > 0 && (
-                <ul
-                  aria-label={t('communities.board.compose.results')}
-                  className="divide-y divide-line rounded-xs border border-line"
-                >
-                  {results.map((item) => (
-                    <li key={item.typeId}>
-                      <button
-                        type="button"
-                        className="block w-full px-3 py-1.5 text-left hover:bg-panel-2 focus-visible:bg-panel-2"
-                        onClick={() => addItem(item)}
+                        onClick={() => {
+                          setRemoved((current) => new Set(current).add(key));
+                          setAnnounce((a) => ({
+                            text: t('communities.board.compose.removed', { name: line.name }),
+                            key: a.key + 1,
+                          }));
+                          searchRef.current?.focus();
+                        }}
                       >
-                        {item.name}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          {!editing && <ComposeRecipientsField state={recipients} />}
-          {error && (
-            <p role="alert" className="text-xs text-danger">
-              {error}
-            </p>
-          )}
-          <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={onClose}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              type="submit"
-              loading={busy}
-              disabled={!canSubmit || (!editing && !recipients.ready)}
-            >
-              {editing
-                ? t('communities.board.compose.save')
-                : recipients.ticked.length > 0
-                  ? t('communities.board.compose.postAndMail', { count: recipients.ticked.length })
-                  : t('communities.board.compose.post')}
-            </Button>
+                        {t('communities.board.compose.remove')}
+                      </Button>
+                    )}
+                  </div>
+                  {blueprint && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
+                      {/* Native select: two options in a modal, where a phone gets the OS picker. */}
+                      <NativeSelect
+                        size="sm"
+                        className="w-44"
+                        aria-label={t('communities.board.compose.kindOf', { name: line.name })}
+                        value={line.kind}
+                        disabled={linesLocked}
+                        onChange={(ev) => edit(key, { kind: ev.target.value as RequestLineKind })}
+                      >
+                        <option value="bpc">{t('communities.board.compose.kindBpc')}</option>
+                        <option value="bpo">{t('communities.board.compose.kindBpo')}</option>
+                      </NativeSelect>
+                      {line.kind === 'bpc' &&
+                        (
+                          [
+                            ['runs', t('communities.board.compose.runs')],
+                            ['me', t('communities.board.compose.me')],
+                            ['te', t('communities.board.compose.te')],
+                          ] as const
+                        ).map(([field, label]) => (
+                          <label key={field} className="flex items-center gap-1">
+                            {label}
+                            <TextInput
+                              size="sm"
+                              inputMode="numeric"
+                              aria-invalid={!specValid || undefined}
+                              className="w-16 tabular-nums"
+                              value={
+                                e?.[field] ?? (line[field] === undefined ? '' : String(line[field]))
+                              }
+                              onChange={(ev) => edit(key, { [field]: ev.target.value })}
+                            />
+                          </label>
+                        ))}
+                    </div>
+                  )}
+                  {duplicate && (
+                    <p role="alert" className="text-xs text-danger">
+                      {t('communities.board.compose.duplicate', { name: line.name })}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {!linesLocked && (
+          <div className="space-y-1">
+            <SearchInput
+              ref={searchRef}
+              aria-label={t('communities.board.compose.addLabel')}
+              placeholder={t('communities.board.compose.addPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {results.length > 0 && (
+              <ul
+                aria-label={t('communities.board.compose.results')}
+                className="divide-y divide-line rounded-xs border border-line"
+              >
+                {results.map((item) => (
+                  <li key={item.typeId}>
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-1.5 text-left hover:bg-panel-2 focus-visible:bg-panel-2"
+                      onClick={() => addItem(item)}
+                    >
+                      {item.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        </form>
-      ) : (
-        <ComposeMailResults
-          phase={phase}
-          mailed={mailed}
-          mailResults={mailResults}
-          onClose={onClose}
-        />
-      )}
+        )}
+        <RequestNotifyChoice value={notify} onChange={setNotify} />
+        {error && (
+          <p role="alert" className="text-xs text-danger">
+            {error}
+          </p>
+        )}
+        <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canSubmit}>
+            {editing ? t('communities.board.compose.save') : t('communities.board.compose.post')}
+          </Button>
+        </div>
+      </form>
     </Modal>
   );
 }

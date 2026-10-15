@@ -53,7 +53,7 @@ export function communityInviteUrl(inviteCode: string): string {
   return `${window.location.origin}${base}/communities/join/${inviteCode}`;
 }
 
-/** Where a Request mail sends a Member: the Community's Requests tab (a Member signs in first, as for any page). */
+/** Where a Pledge mail sends the requester: the Community's Requests tab (a Member signs in first, as for any page). */
 export function communityRequestsUrl(communityId: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   return `${window.location.origin}${base}/communities?community=${encodeURIComponent(communityId)}&tab=requests`;

@@ -13,6 +13,9 @@ import {
   REQUESTS_COLLECTION,
   MAX_REQUEST_MAILS_PER_DAY,
   decideRequestMail,
+  decidePledgeMail,
+  characterIdOfUid,
+  pledgedLineCount,
   REQUEST_LIFETIME_MS,
   MAX_OPEN_REQUESTS_PER_MEMBER,
   decideEdit,
@@ -112,6 +115,7 @@ export async function postRequest(
       location: input.location,
       terms: input.terms,
       lines: input.lines,
+      notify: input.notify,
       createdAt: now,
       lastActivityAt: now,
       expiresAt: now + REQUEST_LIFETIME_MS,
@@ -154,6 +158,7 @@ export async function editRequest(
       location: input.location,
       terms: input.terms,
       lines: input.lines,
+      ...(input.notify ? { notify: input.notify } : {}),
       lastActivityAt: now,
     });
   });
@@ -229,25 +234,29 @@ export async function setRequestClosed(
   });
 }
 
-// Request mail (issue #3810): the client sends the in-game mail with its own
-// token, so the 100-a-day cap, the one-per-recipient rule and the "sent" stamp
-// live in reserve/confirm/release, the same shape as the mail invites'.
-//   communities/{id}/itemRequests/{requestId}/mails/{targetCharacterId}  one recipient's slot
+// Pledge mail: when a Member Pledges on a Request that asked for mail, the
+// Pledger's client sends the in-game mail to the requester with its own token,
+// so the 100-a-day cap, the once-per-Pledger-per-Request rule and the "sent"
+// stamp live in reserve/confirm/release, the same shape as the mail invites'.
+//   communities/{id}/itemRequests/{requestId}/pledgeMails/{pledgerUid}  the Pledger's slot
 //   characters/{uid}/requestMailQuota/{day}                              the sender's count for the day
-const MAILS_COLLECTION = 'mails';
+const PLEDGE_MAILS_COLLECTION = 'pledgeMails';
 const REQUEST_MAIL_QUOTA_COLLECTION = 'requestMailQuota';
-const requestMailRef = (db: Firestore, communityId: string, requestId: string, target: number) =>
+const pledgeMailRef = (db: Firestore, communityId: string, requestId: string, pledgerUid: string) =>
   requestCollection(db, communityId)
     .doc(requestId)
-    .collection(MAILS_COLLECTION)
-    .doc(String(target));
+    .collection(PLEDGE_MAILS_COLLECTION)
+    .doc(pledgerUid);
 const requestMailQuotaRef = (db: Firestore, uid: string, day: string) =>
   db.collection('characters').doc(uid).collection(REQUEST_MAIL_QUOTA_COLLECTION).doc(day);
 
-export interface RequestMailReservation {
+export interface PledgeMailReservation {
   communityName: string;
-  /** The requester's name as the Member doc has it (never trusted from the client). */
+  /** The Pledger's name as the Member doc has it (never trusted from the client). */
+  pledgerName: string;
+  /** The Request owner's name and Character: where the mail goes, from the Request itself. */
   requesterName: string;
+  requesterCharacterId: number;
   /** Request mails left today after this one. */
   remaining: number;
 }
@@ -258,54 +267,76 @@ function failMail(decision: 'already-mailed' | 'daily-cap'): never {
       reason: 'daily-cap',
     });
   }
-  throw new HttpsError('already-exists', 'This Member was already mailed about this Request', {
+  throw new HttpsError('already-exists', 'You already mailed the requester about this Request', {
     reason: 'already-mailed',
   });
 }
 
+function failPledgeMail(decision: Exclude<ReturnType<typeof decidePledgeMail>, 'ok'>): never {
+  switch (decision) {
+    case 'not-found':
+      throw new HttpsError('not-found', 'Request not found');
+    case 'own-request':
+      throw new HttpsError('invalid-argument', 'A Request is not mailed to its requester');
+    case 'closed':
+      throw new HttpsError('failed-precondition', 'That Request is no longer open');
+    case 'mail-off':
+      throw new HttpsError('failed-precondition', 'The requester did not ask for mail', {
+        reason: 'mail-off',
+      });
+    case 'no-pledge':
+      throw new HttpsError('failed-precondition', 'Pledge on the Request first', {
+        reason: 'no-pledge',
+      });
+  }
+}
+
 /**
- * Claims one of the requester's daily Request mails and the one-per-recipient
- * slot before the client sends it. Only the requester, on their own open
- * Request, to another Member of the same Community (a Request mail is never a
- * way to message an arbitrary Character). The cap is counted here, in one
- * transaction.
+ * Claims one of the Pledger's daily Request mails and their once-per-Request
+ * slot before the client sends it. Only a Member, with a Pledge on another
+ * Member's open Request that asked for mail; the recipient is the Request's
+ * owner, read here. The cap is counted here, in one transaction.
  */
-export async function reserveRequestMail(
+export async function reservePledgeMail(
   db: Firestore,
   caller: CallerCharacter,
   communityId: string,
   requestId: string,
-  targetCharacterId: number,
-  targetName: string,
   now = Date.now()
-): Promise<RequestMailReservation> {
+): Promise<PledgeMailReservation> {
   const community = await loadCommunity(db, communityId);
   const day = utcDayKey(now);
   const quota = requestMailQuotaRef(db, caller.uid, day);
-  const mail = requestMailRef(db, communityId, requestId, targetCharacterId);
-  const targetUid = `char:${targetCharacterId}`;
-  if (targetUid === caller.uid) {
-    throw new HttpsError('invalid-argument', 'A Request is not mailed to its requester');
-  }
+  const mail = pledgeMailRef(db, communityId, requestId, caller.uid);
 
-  const { remaining, requesterName } = await db.runTransaction(async (tx) => {
+  const reserved = await db.runTransaction(async (tx) => {
     const { characterName } = await requireMember(tx, db, communityId, caller);
-    const request = await tx.get(requestCollection(db, communityId).doc(requestId));
-    if (!request.exists || request.get('ownerUid') !== caller.uid) {
-      throw new HttpsError('not-found', 'Request not found');
-    }
-    if (
-      !isOpenRequest(
+    const requestRef = requestCollection(db, communityId).doc(requestId);
+    const request = await tx.get(requestRef);
+    const pledge = request.exists
+      ? await tx.get(requestRef.collection(PLEDGES_COLLECTION).doc(caller.uid))
+      : null;
+    const ownerUid = request.exists ? String(request.get('ownerUid')) : null;
+    const eligibility = decidePledgeMail({
+      exists: request.exists,
+      ownerUid,
+      callerUid: caller.uid,
+      isOpen: isOpenRequest(
         {
           closed: request.get('closed') === true,
           expiresAt: Number(request.get('expiresAt') ?? 0),
         },
         now
-      )
+      ),
+      notifyMail: request.get('notify.mail') === true,
+      pledgedLines: pledge?.exists ? pledgedLineCount(pledge.get('lines')) : 0,
+    });
+    if (eligibility !== 'ok') failPledgeMail(eligibility);
+    const requesterCharacterId = characterIdOfUid(String(ownerUid));
+    if (
+      requesterCharacterId === null ||
+      !(await tx.get(memberRef(db, communityId, String(ownerUid)))).exists
     ) {
-      throw new HttpsError('failed-precondition', 'That Request is no longer open');
-    }
-    if (!(await tx.get(memberRef(db, communityId, targetUid))).exists) {
       throw new HttpsError('not-found', 'Not a Member of this Community');
     }
     const quotaSnap = await tx.get(quota);
@@ -324,14 +355,19 @@ export async function reserveRequestMail(
       now,
       day,
     });
+    const who = {
+      pledgerName: characterName,
+      requesterName: String(request.get('ownerName') ?? ''),
+      requesterCharacterId,
+    };
     if (decision === 'retake' || decision === 'retake-charged') {
-      // A crashed tab left this reserved: let the requester try again. On the same day it costs
+      // A crashed tab left this reserved: let the Pledger try again. On the same day it costs
       // nothing; after midnight today's count pays, and the slot moves to today so a release
       // refunds today's count.
       const attempts = Number(mailSnap.get('attempts') ?? 1) + 1;
       if (decision === 'retake') {
         tx.update(mail, { reservedAt: now, attempts });
-        return { remaining: MAX_REQUEST_MAILS_PER_DAY - dailyCount, requesterName: characterName };
+        return { ...who, remaining: MAX_REQUEST_MAILS_PER_DAY - dailyCount };
       }
       tx.set(quota, {
         count: dailyCount + 1,
@@ -339,10 +375,7 @@ export async function reserveRequestMail(
         ownerHash: caller.ownerHash,
       });
       tx.update(mail, { reservedAt: now, attempts, day });
-      return {
-        remaining: MAX_REQUEST_MAILS_PER_DAY - (dailyCount + 1),
-        requesterName: characterName,
-      };
+      return { ...who, remaining: MAX_REQUEST_MAILS_PER_DAY - (dailyCount + 1) };
     }
     if (decision !== 'ok') failMail(decision);
     tx.set(quota, {
@@ -350,32 +383,21 @@ export async function reserveRequestMail(
       refunds: Number(quotaSnap.get('refunds') ?? 0),
       ownerHash: caller.ownerHash,
     });
-    tx.set(mail, {
-      senderUid: caller.uid,
-      targetName,
-      day,
-      reservedAt: now,
-      attempts: 1,
-      sentAt: null,
-    });
-    return {
-      remaining: MAX_REQUEST_MAILS_PER_DAY - (dailyCount + 1),
-      requesterName: characterName,
-    };
+    tx.set(mail, { senderUid: caller.uid, day, reservedAt: now, attempts: 1, sentAt: null });
+    return { ...who, remaining: MAX_REQUEST_MAILS_PER_DAY - (dailyCount + 1) };
   });
-  return { communityName: String(community.get('name') ?? ''), requesterName, remaining };
+  return { communityName: String(community.get('name') ?? ''), ...reserved };
 }
 
 /** The mail went out: stamp the time. */
-export async function confirmRequestMail(
+export async function confirmPledgeMail(
   db: Firestore,
   caller: CallerCharacter,
   communityId: string,
   requestId: string,
-  targetCharacterId: number,
   now = Date.now()
 ): Promise<void> {
-  const mail = requestMailRef(db, communityId, requestId, targetCharacterId);
+  const mail = pledgeMailRef(db, communityId, requestId, caller.uid);
   await db.runTransaction(async (tx) => {
     await requireMember(tx, db, communityId, caller);
     const snap = await tx.get(mail);
@@ -388,15 +410,14 @@ export async function confirmRequestMail(
  * rules as the mail invites (`decideMailRelease`): a fresh, unconfirmed
  * reservation of this sender's, a few times a day.
  */
-export async function releaseRequestMail(
+export async function releasePledgeMail(
   db: Firestore,
   caller: CallerCharacter,
   communityId: string,
   requestId: string,
-  targetCharacterId: number,
   now = Date.now()
 ): Promise<void> {
-  const mail = requestMailRef(db, communityId, requestId, targetCharacterId);
+  const mail = pledgeMailRef(db, communityId, requestId, caller.uid);
   await db.runTransaction(async (tx) => {
     await requireMember(tx, db, communityId, caller);
     const snap = await tx.get(mail);

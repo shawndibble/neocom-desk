@@ -642,9 +642,9 @@ service cloud.firestore {
           allow delete: if isMember() && request.auth.uid == pledgeUid;
         }
 
-        // The Request mails sent about it (issue #3810), one doc per recipient:
-        // the callables' bookkeeping, never read or written by a client.
-        match /mails/{targetId} {
+        // The Pledge mails sent about it, one doc per Pledger: the callables'
+        // bookkeeping, never read or written by a client.
+        match /pledgeMails/{pledgerUid} {
           allow read, write: if false;
         }
       }

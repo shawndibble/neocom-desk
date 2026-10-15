@@ -31,7 +31,6 @@ import { jumpRangeLimit, type JumpRange } from '@/engine/route/jumpRange';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
 import { ComposeRequestDialog } from './ComposeRequestDialog';
-import type { CommunityMember } from './communityStore';
 import { MyPledgesPanel } from './MyPledgesPanel';
 import { PledgeBar } from './PledgeBar';
 import { RequestPanel } from './RequestPanel';
@@ -82,7 +81,6 @@ export function RequestsTab({
   pledgesFailed,
   failed,
   now,
-  members,
   onReload,
   refreshPledges,
 }: {
@@ -102,8 +100,6 @@ export function RequestsTab({
   pledgesFailed: boolean;
   failed: boolean;
   now: number;
-  /** The roster, for compose's Mail to field; null until it has loaded. */
-  members: readonly CommunityMember[] | null;
   onReload: () => void;
   /** Re-reads one Request's Pledges after a Pledge write. */
   refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
@@ -241,8 +237,6 @@ export function RequestsTab({
     <ComposeRequestDialog
       characterId={characterId}
       communityId={communityId}
-      myUid={myUid}
-      members={members}
       onClose={() => setComposing(false)}
       onPosted={() => {
         setFilter('mine');
@@ -256,8 +250,6 @@ export function RequestsTab({
     <ComposeRequestDialog
       characterId={characterId}
       communityId={communityId}
-      myUid={myUid}
-      members={members}
       editing={{ request: editing, linesLocked: (pledges.get(editing.id) ?? []).length > 0 }}
       onClose={() => setEditingId(null)}
       onPosted={onReload}

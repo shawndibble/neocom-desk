@@ -23,8 +23,10 @@ import type {
   PledgeEntry,
   RequestLine,
   RequestLineKind,
+  RequestNotify,
   RequestPledge,
 } from '@/engine/communities/requests';
+import { readNotify } from '@/engine/communities/requests';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
@@ -51,6 +53,26 @@ function readLine(raw: unknown): RequestLine | null {
   return line;
 }
 
+function readRequest(id: string, d: Record<string, unknown>): CommunityRequest | null {
+  const lines = (Array.isArray(d.lines) ? d.lines : [])
+    .map(readLine)
+    .filter((line): line is RequestLine => line !== null);
+  if (lines.length === 0) return null;
+  return {
+    id,
+    ownerUid: String(d.ownerUid ?? ''),
+    ownerName: String(d.ownerName ?? ''),
+    location: String(d.location ?? ''),
+    terms: String(d.terms ?? ''),
+    lines,
+    createdAt: Number(d.createdAt ?? 0),
+    lastActivityAt: Number(d.lastActivityAt ?? 0),
+    expiresAt: Number(d.expiresAt ?? 0),
+    closed: d.closed === true,
+    notify: readNotify(d.notify),
+  };
+}
+
 /** Every Request on a Community's board, newest first. A document that does not read as a Request is skipped. */
 export async function loadRequests(
   characterId: number,
@@ -63,25 +85,35 @@ export async function loadRequests(
     return getDocs(collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'));
   });
   return snap.docs
-    .map((entry): CommunityRequest | null => {
-      const d = entry.data();
-      const lines = (Array.isArray(d.lines) ? d.lines : [])
-        .map(readLine)
-        .filter((line): line is RequestLine => line !== null);
-      if (lines.length === 0) return null;
-      return {
-        id: entry.id,
-        ownerUid: String(d.ownerUid ?? ''),
-        ownerName: String(d.ownerName ?? ''),
-        location: String(d.location ?? ''),
-        terms: String(d.terms ?? ''),
-        lines,
-        createdAt: Number(d.createdAt ?? 0),
-        lastActivityAt: Number(d.lastActivityAt ?? 0),
-        expiresAt: Number(d.expiresAt ?? 0),
-        closed: d.closed === true,
-      };
-    })
+    .map((entry) => readRequest(entry.id, entry.data()))
+    .filter((request): request is CommunityRequest => request !== null)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * Only this Member's own Requests in a Community: one single-field query on
+ * `ownerUid` (no composite index), a few documents instead of the whole board.
+ */
+export async function loadMyRequests(
+  characterId: number,
+  communityId: string
+): Promise<CommunityRequest[]> {
+  const myUid = uidForCharacter(characterId);
+  const override = communityBackendOverride();
+  if (override?.loadItemRequests) {
+    return override.loadItemRequests(communityId).filter((request) => request.ownerUid === myUid);
+  }
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDocs(
+      query(
+        collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'),
+        where('ownerUid', '==', myUid)
+      )
+    );
+  });
+  return snap.docs
+    .map((entry) => readRequest(entry.id, entry.data()))
     .filter((request): request is CommunityRequest => request !== null)
     .sort((a, b) => b.createdAt - a.createdAt);
 }
@@ -90,6 +122,7 @@ export interface PostRequestDraft {
   location: string;
   terms: string;
   lines: RequestLine[];
+  notify: RequestNotify;
 }
 
 export function postRequest(characterId: number, communityId: string, draft: PostRequestDraft) {

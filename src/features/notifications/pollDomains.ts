@@ -153,6 +153,7 @@ import type {
   CommunityAlertEntry,
   CommunityJoinRequestFire,
   CommunityMemberJoinedFire,
+  CommunityRequestPledgedFire,
   CommunityAlertSnapshot,
 } from '@/engine/communities/communityAlert';
 import { INCURSION_STATES } from '@/engine/incursions/incursionRows';
@@ -1898,7 +1899,7 @@ export const incursionDomain = defineDomain<
   },
 });
 
-/* Communities: join requests and new Members ------------------------------ */
+/* Communities: join requests, new Members and Request Pledges ------------------------------ */
 
 function isCommunityAlertEntry(raw: unknown): raw is CommunityAlertEntry {
   if (typeof raw !== 'object' || raw === null) return false;
@@ -1906,10 +1907,15 @@ function isCommunityAlertEntry(raw: unknown): raw is CommunityAlertEntry {
   return (
     typeof r.communityId === 'string' &&
     typeof r.communityName === 'string' &&
-    (r.kind === 'request' || r.kind === 'member') &&
+    (r.kind === 'request' ||
+      r.kind === 'member' ||
+      r.kind === 'pledgeRequest' ||
+      r.kind === 'pledge') &&
     typeof r.uid === 'string' &&
     typeof r.characterName === 'string' &&
-    typeof r.at === 'number'
+    typeof r.at === 'number' &&
+    (r.requestId === undefined || typeof r.requestId === 'string') &&
+    (r.requestLabel === undefined || typeof r.requestLabel === 'string')
   );
 }
 
@@ -1924,7 +1930,7 @@ function isCommunityAlertEntry(raw: unknown): raw is CommunityAlertEntry {
 export const communitiesDomain = defineDomain<
   CommunityAlertEntry,
   CommunityAlertSnapshot,
-  CommunityJoinRequestFire | CommunityMemberJoinedFire
+  CommunityJoinRequestFire | CommunityMemberJoinedFire | CommunityRequestPledgedFire
 >({
   source: SNAPSHOT_SOURCES.communities,
   stateKey: 'notifications.pollerState.communities',

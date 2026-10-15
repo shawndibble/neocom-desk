@@ -9,6 +9,7 @@ const fire = vi.hoisted(() => ({
   /** How many times the transaction callback runs: a retry re-reads the document. */
   attempts: 1,
   reads: [] as string[],
+  wheres: [] as unknown[][],
   /** Runs before each retry's read, as another device's write would. */
   beforeRetry: null as null | (() => void),
 }));
@@ -16,7 +17,10 @@ const fire = vi.hoisted(() => ({
 vi.mock('firebase/firestore/lite', () => ({
   collection: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
   collectionGroup: () => ({}),
-  where: () => ({}),
+  where: (...args: unknown[]) => {
+    fire.wheres.push(args);
+    return {};
+  },
   query: (q: unknown) => q,
   doc: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
   getDocs: async () => {
@@ -73,7 +77,7 @@ vi.mock('@/db', () => ({
   db: { characters: { get: async () => ({ characterId: 1, ownerHash: 'owner-1' }) } },
 }));
 
-import { loadPledges, loadRequests, updateMyPledge } from './requestStore';
+import { loadMyRequests, loadPledges, loadRequests, updateMyPledge } from './requestStore';
 
 const entry = (over: Partial<PledgeEntry> = {}): PledgeEntry => ({
   quantity: 100,
@@ -210,5 +214,24 @@ describe('reading malformed documents', () => {
       0: { quantity: 10, delivered: 0, contractIds: [] },
       3: { quantity: 20, delivered: 5, contractIds: [1, 2] },
     });
+  });
+});
+
+describe('loadMyRequests', () => {
+  it('asks only for the Character’s own Requests, with one single-field filter', async () => {
+    fire.wheres.length = 0;
+    fire.docs = [
+      {
+        id: 'r1',
+        data: {
+          ownerUid: 'char:1',
+          lines: [{ typeId: 34, name: 'Tritanium', quantity: 5 }],
+          notify: { app: false, mail: true },
+        },
+      },
+    ];
+    const mine = await loadMyRequests(1, 'c1');
+    expect(fire.wheres).toEqual([['ownerUid', '==', 'char:1']]);
+    expect(mine.map((r) => [r.id, r.notify])).toEqual([['r1', { app: false, mail: true }]]);
   });
 });

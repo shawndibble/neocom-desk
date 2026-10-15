@@ -106,6 +106,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // The Communities page, where the admin lets the request in or sees the Member.
   communityJoinRequest: '/communities',
   communityMemberJoined: '/communities',
+  // The Communities page: the requester opens the Community and its Requests tab.
+  communityRequestPledged: '/communities',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';

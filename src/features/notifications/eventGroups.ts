@@ -47,6 +47,7 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   incursionNearby: 'world',
   communityJoinRequest: 'world',
   communityMemberJoined: 'world',
+  communityRequestPledged: 'world',
   structureFuelLow: 'corp',
   corpIndustryJobReady: 'corp',
   corpMemberJoined: 'corp',
