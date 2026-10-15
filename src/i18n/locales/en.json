@@ -5898,7 +5898,8 @@
       "deselectAll": "Deselect all",
       "addToQuickbar": "Add to Quickbar",
       "addToCompare": "Add to Compare",
-      "copyNames": "Copy names"
+      "copyNames": "Copy names",
+      "copyWithQuantities": "Copy with quantities"
     },
     "itemCount_one": "{{count, number}} item",
     "itemCount_other": "{{count, number}} items",

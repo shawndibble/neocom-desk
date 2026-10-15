@@ -115,6 +115,7 @@ import { useStationSort } from '@/features/character/stationSortPreference';
 import { useAssetSort, type AssetSortField } from '@/features/character/assetSortPreference';
 import {
   namesForSelection,
+  quantityLinesForSelection,
   selectAll,
   selectionStateForIds,
   toggleSelection,
@@ -1549,6 +1550,10 @@ export function Assets() {
     const names = namesForSelection([...selectedIds], assetsByItemId, mergedTypeNames);
     void writeToClipboard(names.join('\n'));
   }
+  function handleBulkCopyWithQuantities() {
+    const lines = quantityLinesForSelection([...selectedIds], assetsByItemId, mergedTypeNames);
+    void writeToClipboard(lines.join('\n'));
+  }
 
   /** Every leaf item_id currently in `rows` — whichever of the three list shapes is on screen (issue #415's "Select all in view"). */
   function collectRowItemIds(): number[] {
@@ -1842,6 +1847,9 @@ export function Assets() {
                   </Button>
                   <Button size="sm" onClick={handleBulkCopyNames}>
                     {t('assets.select.copyNames')}
+                  </Button>
+                  <Button size="sm" onClick={handleBulkCopyWithQuantities}>
+                    {t('assets.select.copyWithQuantities')}
                   </Button>
                 </>
               )}
