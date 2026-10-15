@@ -1,7 +1,8 @@
 /**
  * Open in EVE: asks the Character's running EVE client to open a window — an
- * information window (character, corporation, alliance, type, station,
- * structure, system), a type's market, or a contract. One ESI call, nothing in
+ * information window (character, corporation, alliance: the only targets ESI
+ * documents; it 204s for a type but the client ignores it), a type's market,
+ * or a contract. One ESI call, nothing in
  * the game changes. Which button or menu item sends it is `useOpenInEve`'s job.
  */
 import { EsiError } from '@/esi/errors';

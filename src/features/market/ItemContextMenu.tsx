@@ -74,14 +74,13 @@ export function ShowInfoMenuItem({ typeId, itemName }: { typeId: number; itemNam
   );
 }
 
-/** "Open in EVE"'s two item windows (Show info, Market details), for every menu that carries `ShowInfoMenuItem`. */
+/**
+ * "Open in EVE" for an item, for every menu that carries `ShowInfoMenuItem`.
+ * Market details only: ESI's information window opens characters,
+ * corporations and alliances, and silently ignores an inventory type.
+ */
 export function OpenInEveItemMenuItems({ typeId }: { typeId: number }) {
-  return (
-    <>
-      <OpenInEveMenuItem kind="information" id={typeId} />
-      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
-    </>
-  );
+  return <OpenInEveMenuItem kind="marketDetails" id={typeId} />;
 }
 
 /** The item menu's "View in Market", keeping the page's region or hub; reused as `ShowInfoMenuItem` is. */
