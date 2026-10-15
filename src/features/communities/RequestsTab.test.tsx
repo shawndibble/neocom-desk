@@ -948,8 +948,9 @@ describe('Telling the requester about a Pledge', () => {
     });
     renderTab([wantsMail()]);
     const panel = await open(user);
+    // The Permission state resolves asynchronously, so wait for it rather than race it.
     expect(
-      within(panel).getByText(/Sending it needs the Send mail Permission/)
+      await within(panel).findByText(/Sending it needs the Send mail Permission/)
     ).toBeInTheDocument();
     await pledge(user, panel);
     await waitFor(() => expect(store.updateMyPledge).toHaveBeenCalled());
