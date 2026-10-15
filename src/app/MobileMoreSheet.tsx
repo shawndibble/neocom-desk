@@ -1,3 +1,4 @@
+import { useNavBadges } from './navBadges';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -110,6 +111,7 @@ export function MobileMoreSheet({
     setTimeout(() => useCommandPalette.getState().show(), 0);
   }
 
+  const navBadge = useNavBadges();
   // Corp is in `groups` only while visible (`inSheet`), and never locked.
   const tile = (page: NavPage) => {
     const link = (
@@ -120,6 +122,7 @@ export function MobileMoreSheet({
         locked={page.gating === 'scope' && locked.has(page.path)}
         presentation="tile"
         onClick={onClose}
+        {...navBadge(page.path)}
       />
     );
     if (!editing || !canHide(page.path)) return link;

@@ -78,9 +78,17 @@ import {
 import {
   parsePostRequestInput,
   parseRequestIdInput,
+  parseRequestMailInput,
   parseSetClosedInput,
 } from './communityRequests.js';
-import { extendRequest, postRequest, setRequestClosed } from './communityRequestsStore.js';
+import {
+  confirmRequestMail,
+  extendRequest,
+  postRequest,
+  releaseRequestMail,
+  reserveRequestMail,
+  setRequestClosed,
+} from './communityRequestsStore.js';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
 import {
   LP_STORE_OFFERS_CHUNK_SIZE,
@@ -630,6 +638,53 @@ export const setCommunityRequestClosedCallable = onCall<unknown>(
   async (request) => {
     const { communityId, requestId, closed } = parseSetClosedInput(request.data);
     await setRequestClosed(getFirestore(), callerOf(request), communityId, requestId, closed);
+  }
+);
+
+// Request mail (issue #3810): the client sends the EVE mail with its own token;
+// the 100-a-day cap and the one-per-recipient rule live in these three.
+export const reserveCommunityRequestMailCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) => {
+    const { communityId, requestId, targetCharacterId, targetName } = parseRequestMailInput(
+      request.data
+    );
+    return reserveRequestMail(
+      getFirestore(),
+      callerOf(request),
+      communityId,
+      requestId,
+      targetCharacterId,
+      targetName
+    );
+  }
+);
+
+export const confirmCommunityRequestMailCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, requestId, targetCharacterId } = parseRequestMailInput(request.data);
+    await confirmRequestMail(
+      getFirestore(),
+      callerOf(request),
+      communityId,
+      requestId,
+      targetCharacterId
+    );
+  }
+);
+
+export const releaseCommunityRequestMailCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, requestId, targetCharacterId } = parseRequestMailInput(request.data);
+    await releaseRequestMail(
+      getFirestore(),
+      callerOf(request),
+      communityId,
+      requestId,
+      targetCharacterId
+    );
   }
 );
 

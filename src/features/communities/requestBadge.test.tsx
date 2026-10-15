@@ -1,0 +1,101 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
+import { db } from '@/db';
+import type { CommunityRequest } from '@/engine/communities/requests';
+
+const auth = vi.hoisted(() => ({ uid: 'char:1' as string | null }));
+vi.mock('@/sync/firebaseApp', () => ({
+  getSyncAuth: () => ({ currentUser: auth.uid ? { uid: auth.uid } : null }),
+}));
+const store = vi.hoisted(() => ({ loadMyCommunities: vi.fn() }));
+vi.mock('./communityStore', () => store);
+const requestStore = vi.hoisted(() => ({ loadRequests: vi.fn() }));
+vi.mock('./requestStore', () => requestStore);
+
+import {
+  markRequestsSeen,
+  refreshRequestBadge,
+  rememberCommunityWatch,
+  resetRequestBadge,
+  useNewRequestCount,
+} from './requestBadge';
+
+const DAY = 86_400_000;
+const NOW = 100 * DAY;
+const request = (id: string, over: Partial<CommunityRequest> = {}): CommunityRequest => ({
+  id,
+  ownerUid: 'char:2',
+  ownerName: 'Two',
+  location: '',
+  terms: '',
+  lines: [{ typeId: 1, name: 'Tritanium', quantity: 1, kind: 'item' }],
+  createdAt: NOW - 1000,
+  lastActivityAt: NOW - 1000,
+  expiresAt: NOW + DAY,
+  closed: false,
+  ...over,
+});
+const community = (id: string) => ({
+  id,
+  name: id,
+  adminUid: 'char:9',
+  inviteCode: null,
+  memberCount: 2,
+});
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  await db.settings.clear();
+  auth.uid = 'char:1';
+  resetRequestBadge();
+  store.loadMyCommunities.mockResolvedValue([community('c1'), community('c2')]);
+  requestStore.loadRequests.mockResolvedValue([
+    request('a'),
+    request('b'),
+    request('mine', { ownerUid: 'char:1' }),
+  ]);
+});
+
+describe('Communities nav badge', () => {
+  it('reads nothing for a Character with no Community on record', async () => {
+    await refreshRequestBadge(1, NOW);
+    expect(store.loadMyCommunities).not.toHaveBeenCalled();
+  });
+
+  it('treats what is already on a board at the first read as seen, then counts what arrives', async () => {
+    await rememberCommunityWatch(1, [community('c1')]);
+    const { result } = renderHook(() => useNewRequestCount());
+    await refreshRequestBadge(1, NOW);
+    expect(result.current).toBe(0);
+    requestStore.loadRequests.mockResolvedValue([
+      request('a'),
+      request('c', { createdAt: NOW + 5 }),
+      request('mine', { ownerUid: 'char:1', createdAt: NOW + 6 }),
+    ]);
+    await act(() => refreshRequestBadge(1, NOW + 10));
+    // Two Communities each show the new Request; nothing of mine, nothing already seen.
+    expect(result.current).toBe(2);
+  });
+
+  it('clears a Community’s count when its Requests tab is looked at', async () => {
+    await rememberCommunityWatch(1, [community('c1')]);
+    await db.settings.bulkPut([
+      { key: 'communityRequestsSeen:1:c1', value: NOW - DAY },
+      { key: 'communityRequestsSeen:1:c2', value: NOW - DAY },
+    ]);
+    const { result } = renderHook(() => useNewRequestCount());
+    await act(() => refreshRequestBadge(1, NOW));
+    expect(result.current).toBe(4);
+    await act(() => markRequestsSeen(1, 'c1', NOW));
+    expect(result.current).toBe(2);
+    await act(() => refreshRequestBadge(1, NOW + 1));
+    expect(result.current).toBe(2);
+  });
+
+  it('stays quiet while the Firebase session is not this Character’s', async () => {
+    await rememberCommunityWatch(1, [community('c1')]);
+    auth.uid = 'char:77';
+    await refreshRequestBadge(1, NOW);
+    expect(store.loadMyCommunities).not.toHaveBeenCalled();
+  });
+});

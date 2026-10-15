@@ -121,6 +121,15 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Request mails a Member sent today, by UTC day (issue #3810): the count
+      // the Request-mail callables keep, read to show "N of 100 mails sent today".
+      // Same shape and the same missing-doc allowance as mailInviteQuota.
+      match /requestMailQuota/{day} {
+        allow get: if isOwner() && (resource == null || hashMatches());
+        allow list: if isOwner();
+        allow write: if false;
+      }
+
       match /communities/{communityId} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();
@@ -622,6 +631,12 @@ service cloud.firestore {
           allow get, list: if isMember();
           allow create, update: if pledgeWritable();
           allow delete: if isMember() && request.auth.uid == pledgeUid;
+        }
+
+        // The Request mails sent about it (issue #3810), one doc per recipient:
+        // the callables' bookkeeping, never read or written by a client.
+        match /mails/{targetId} {
+          allow read, write: if false;
         }
       }
 

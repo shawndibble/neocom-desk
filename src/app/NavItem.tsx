@@ -59,6 +59,8 @@ export interface NavItemProps {
    * screen reader would read out as "Alerts 12".
    */
   badge?: number;
+  /** The i18n key naming the count in the link's accessible name; defaults to the alerts wording. */
+  badgeLabelKey?: string;
   /**
    * `rail` (default) is the desktop rail's full-width row; `tab` the phone tab
    * bar's equal share of the viewport; `tile` a More-sheet tile. One component
@@ -83,6 +85,7 @@ export function NavItem({
   label,
   locked,
   badge,
+  badgeLabelKey,
   presentation = 'rail',
   className,
   onClick,
@@ -131,7 +134,7 @@ export function NavItem({
       onPointerDown={warm}
       className={(state) => cx(linkClass(state), className)}
       data-locked={locked ? 'true' : undefined}
-      aria-label={counted ? t('nav.alertsWithCount', { count: badge }) : undefined}
+      aria-label={counted ? t(badgeLabelKey ?? 'nav.alertsWithCount', { count: badge }) : undefined}
     >
       {Glyph && (
         <Glyph

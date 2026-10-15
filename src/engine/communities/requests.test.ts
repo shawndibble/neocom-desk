@@ -5,6 +5,7 @@ import {
   MAX_LOCATION_LENGTH,
   MAX_OPEN_REQUESTS_PER_MEMBER,
   MAX_PLEDGE_QUANTITY,
+  MAX_REQUEST_MAILS_PER_DAY,
   MAX_TERMS_LENGTH,
   STALE_PLEDGE_DAYS,
   REQUEST_LIFETIME_DAYS,
@@ -25,6 +26,9 @@ import {
   pledgeOverage,
   withdrawPledgeLine,
   withPledgeLine,
+  countNewRequests,
+  requestMailsLeft,
+  requestRecipients,
   parseQuantity,
   requestProgress,
   requestStatus,
@@ -227,6 +231,7 @@ describe('constants shared with the callables', () => {
     expect(MAX_LOCATION_LENGTH).toBe(constant('MAX_LOCATION_LENGTH'));
     expect(MAX_TERMS_LENGTH).toBe(constant('MAX_TERMS_LENGTH'));
     expect(REQUEST_LIFETIME_DAYS * 24 * 60 * 60 * 1000).toBe(constant('REQUEST_LIFETIME_MS'));
+    expect(MAX_REQUEST_MAILS_PER_DAY).toBe(constant('MAX_REQUEST_MAILS_PER_DAY'));
   });
 
   it('matches the server line kinds', () => {
@@ -440,5 +445,112 @@ describe('pledge constants shared with the rules', () => {
   it('pins the quantity cap and the line cap in firestore.rules', () => {
     expect(rules).toContain(`<= ${MAX_PLEDGE_QUANTITY}`);
     expect(rules.match(/'(\d+)'/g)).toContain(`'${MAX_LINES_PER_REQUEST - 1}'`);
+  });
+});
+
+describe('requestRecipients', () => {
+  const members = [
+    { uid: 'char:1', characterName: 'Me' },
+    { uid: 'char:2', characterName: 'Eli Park' },
+    { uid: 'char:3', characterName: 'Bo Tanner' },
+    { uid: 'char:4', characterName: 'Cael Ito' },
+  ];
+  const bpc = (typeId: number) => line(typeId, 1, { kind: 'bpc', name: `BP ${typeId} Blueprint` });
+  const bpo = (typeId: number) => line(typeId, 1, { kind: 'bpo', name: `BP ${typeId} Blueprint` });
+  const share = (uid: string, ...items: { typeId: number; runs?: number }[]) => ({
+    uid,
+    items: items.map((i) => ({ runs: 10, ...i })),
+  });
+
+  it('leaves the requester out and lists everyone else, sharers first', () => {
+    const out = requestRecipients(
+      [bpc(10), bpc(11)],
+      members,
+      [share('char:3', { typeId: 10 }, { typeId: 11 }), share('char:4', { typeId: 11 })],
+      'char:1'
+    );
+    expect(out.map((r) => [r.uid, r.shared])).toEqual([
+      ['char:3', 2],
+      ['char:4', 1],
+      ['char:2', 0],
+    ]);
+  });
+
+  it('counts a line once however many copies the Member shares', () => {
+    const out = requestRecipients(
+      [bpc(10)],
+      members,
+      [share('char:2', { typeId: 10 }, { typeId: 10 }, { typeId: 10 })],
+      'char:1'
+    );
+    expect(out.find((r) => r.uid === 'char:2')?.shared).toBe(1);
+  });
+
+  it('matches an original request only to a Member sharing an original', () => {
+    const libraries = [
+      share('char:2', { typeId: 10, runs: 5 }),
+      share('char:3', { typeId: 10, runs: -1 }),
+    ];
+    const out = requestRecipients([bpo(10)], members, libraries, 'char:1');
+    expect(out.map((r) => [r.uid, r.shared])).toEqual([
+      ['char:3', 1],
+      ['char:4', 0],
+      ['char:2', 0],
+    ]);
+    // A copy request is met by an original too: it can be copied.
+    expect(
+      requestRecipients([bpc(10)], members, libraries, 'char:1').filter((r) => r.shared > 0)
+    ).toHaveLength(2);
+  });
+
+  it('does not match plain item lines, and orders ties by name', () => {
+    const out = requestRecipients(
+      [line(10, 5)],
+      members,
+      [share('char:2', { typeId: 10 })],
+      'char:1'
+    );
+    expect(out.map((r) => [r.characterName, r.shared])).toEqual([
+      ['Bo Tanner', 0],
+      ['Cael Ito', 0],
+      ['Eli Park', 0],
+    ]);
+  });
+});
+
+describe('requestMailsLeft', () => {
+  it('is the day’s allowance less what is used, never negative', () => {
+    expect(requestMailsLeft(3)).toBe(MAX_REQUEST_MAILS_PER_DAY - 3);
+    expect(requestMailsLeft(MAX_REQUEST_MAILS_PER_DAY + 5)).toBe(0);
+  });
+});
+
+describe('countNewRequests', () => {
+  const now = 10 * DAY;
+  const base = (over: Partial<CommunityRequest>): CommunityRequest => ({
+    id: 'r',
+    ownerUid: 'char:2',
+    ownerName: 'Two',
+    location: '',
+    terms: '',
+    lines: [line(1, 1)],
+    createdAt: 9 * DAY,
+    lastActivityAt: 9 * DAY,
+    expiresAt: now + DAY,
+    closed: false,
+    ...over,
+  });
+
+  it('counts open Requests from others posted after the last look', () => {
+    const requests = [
+      base({ id: 'new' }),
+      base({ id: 'old', createdAt: 5 * DAY }),
+      base({ id: 'mine', ownerUid: 'char:1' }),
+      base({ id: 'closed', closed: true }),
+      base({ id: 'expired', expiresAt: now - 1 }),
+    ];
+    expect(countNewRequests(requests, 'char:1', 8 * DAY, now)).toBe(1);
+    expect(countNewRequests(requests, 'char:1', 0, now)).toBe(2);
+    expect(countNewRequests([], 'char:1', 0, now)).toBe(0);
   });
 });

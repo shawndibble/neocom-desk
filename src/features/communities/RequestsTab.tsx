@@ -26,7 +26,8 @@ import {
   type RequestPledge,
   type RequestStatus,
 } from '@/engine/communities/requests';
-import { ComposeRequestDialog } from './ComposeRequestDialog';
+import { ComposeRequestDialog, type ComposePrefill } from './ComposeRequestDialog';
+import type { CommunityMember } from './communityStore';
 import { MyPledgesPanel } from './MyPledgesPanel';
 import { PledgeBar } from './PledgeBar';
 import { RequestPanel } from './RequestPanel';
@@ -77,6 +78,8 @@ export function RequestsTab({
   pledgesFailed,
   failed,
   now,
+  members,
+  initialCompose,
   onReload,
   refreshPledges,
 }: {
@@ -92,6 +95,10 @@ export function RequestsTab({
   pledgesFailed: boolean;
   failed: boolean;
   now: number;
+  /** The roster, for compose step 2; null until it has loaded. */
+  members: readonly CommunityMember[] | null;
+  /** Open New request… on mount with this filled in (a Library "Request this" starts here). */
+  initialCompose?: ComposePrefill;
   onReload: () => void;
   /** Re-reads one Request's Pledges after a Pledge write. */
   refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
@@ -101,7 +108,7 @@ export function RequestsTab({
   const [filter, setFilter] = useState<RequestFilter>('open');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposing] = useState(initialCompose !== undefined);
   const [pledgesOpen, setPledgesOpen] = useState(false);
   const [maxJumps, setMaxJumps] = useState<number | null>(null);
   const shared = useSharedBlueprintTypes(characterId, communityId, myUid, requests !== null);
@@ -224,9 +231,11 @@ export function RequestsTab({
     <ComposeRequestDialog
       characterId={characterId}
       communityId={communityId}
+      myUid={myUid}
+      members={members}
+      prefill={initialCompose}
       onClose={() => setComposing(false)}
       onPosted={() => {
-        setComposing(false);
         setFilter('mine');
         setQuery('');
         onReload();
