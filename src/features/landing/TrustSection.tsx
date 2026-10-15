@@ -49,23 +49,30 @@ export function TrustSection() {
         The scope list sits here rather than beside the hero button: it is
         what a hesitant reader wants after the trust points and immediately
         before the closing CTA. Closed, it is a list of area names and counts.
+        From lg the accordion fills the left column and the notes the right.
       */}
-      <p className="mt-6 max-w-3xl text-sm text-text-dim">{t('login.permissionsHint')}</p>
-      <div className="mt-3 max-w-3xl">
-        <ScopesAccordion />
+      <div className="mt-8 grid gap-8 lg:grid-cols-2 lg:gap-10">
+        <div>
+          <p className="text-sm text-text-dim">{t('login.permissionsHint')}</p>
+          <div className="mt-3">
+            <ScopesAccordion />
+          </div>
+        </div>
+        <div className="space-y-3 text-sm text-text-dim lg:border-l lg:border-line lg:pl-10">
+          <p>{t('login.scopes.planetsNote')}</p>
+          <p>{t('login.scopes.separateNote')}</p>
+          <p>
+            {t('login.permissionsPrivacy')}{' '}
+            <a href="/privacy.html" className={inlineLinkClassName}>
+              {t('login.footerPrivacy')}
+            </a>
+          </p>
+          <p>
+            {t('login.scopes.revoke')}{' '}
+            <ExternalLink href={AUTHORIZED_APPS_URL}>{t('login.scopes.revokeLink')}</ExternalLink>
+          </p>
+        </div>
       </div>
-      <p className="mt-3 max-w-3xl text-sm text-text-dim">{t('login.scopes.planetsNote')}</p>
-      <p className="mt-2 max-w-3xl text-sm text-text-dim">{t('login.scopes.separateNote')}</p>
-      <p className="mt-2 max-w-3xl text-sm text-text-dim">
-        {t('login.permissionsPrivacy')}{' '}
-        <a href="/privacy.html" className={inlineLinkClassName}>
-          {t('login.footerPrivacy')}
-        </a>
-      </p>
-      <p className="mt-2 max-w-3xl text-sm text-text-dim">
-        {t('login.scopes.revoke')}{' '}
-        <ExternalLink href={AUTHORIZED_APPS_URL}>{t('login.scopes.revokeLink')}</ExternalLink>
-      </p>
     </>
   );
 }

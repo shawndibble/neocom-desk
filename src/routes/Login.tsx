@@ -1,5 +1,5 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -10,6 +10,7 @@ import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/u
 import { CommunitySection } from '@/features/landing/CommunitySection';
 import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
 import { LandingFaq } from '@/features/landing/LandingFaq';
+import { LandingBackdrop, LandingSection } from '@/features/landing/LandingSection';
 import { TrustSection } from '@/features/landing/TrustSection';
 import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
@@ -75,53 +76,65 @@ export function Login() {
           button. The live preview sits under it as the proof, rather than
           beside it competing for the first look.
         */}
-        <section className="mx-auto flex max-w-[96rem] flex-col items-center gap-12 px-4 py-16 text-center sm:px-6">
-          <div className="flex flex-col items-center">
-            <p className="lp-hero-in lp-hero-in-0 text-[0.6875rem] font-bold tracking-[0.14em] text-accent uppercase">
-              {t('login.eyebrow')}
-            </p>
-            <h1 className="lp-hero-in lp-hero-in-1 mt-3 max-w-3xl text-4xl leading-tight font-semibold text-balance sm:text-5xl">
-              {t('login.heading')}
-            </h1>
-            <p className="lp-hero-in lp-hero-in-2 mt-4 max-w-xl text-text-dim text-balance">
-              {t('app.tagline')}
-            </p>
-            <div
-              ref={heroCtaRef}
-              className="lp-hero-in lp-hero-in-3 lp-cta-glow mt-7 flex flex-col items-center gap-3"
-            >
-              <EveSsoButton
-                size="large"
-                pending={pending}
-                onClick={onLogin}
-                label={t('login.button')}
-              />
-              <CustomizeLink onClick={() => setCustomizing(true)} />
+        <section className="relative isolate overflow-hidden">
+          <LandingBackdrop tone="space" ship={{ ship: 'megathron', side: 'right' }} eager />
+          <div className="relative mx-auto flex max-w-[96rem] flex-col items-center gap-12 px-4 py-16 text-center sm:px-6">
+            <div className="flex flex-col items-center">
+              <p className="lp-hero-in lp-hero-in-0 text-[0.6875rem] font-bold tracking-[0.14em] text-accent uppercase">
+                {t('login.eyebrow')}
+              </p>
+              <h1 className="lp-hero-in lp-hero-in-1 mt-3 max-w-3xl text-4xl leading-tight font-semibold text-balance sm:text-5xl">
+                {t('login.heading')}
+              </h1>
+              <p className="lp-hero-in lp-hero-in-2 mt-4 max-w-xl text-text-dim text-balance">
+                {t('app.tagline')}
+              </p>
+              <div
+                ref={heroCtaRef}
+                className="lp-hero-in lp-hero-in-3 lp-cta-glow mt-7 flex flex-col items-center gap-3"
+              >
+                <EveSsoButton
+                  size="large"
+                  pending={pending}
+                  onClick={onLogin}
+                  label={t('login.button')}
+                />
+                <CustomizeLink onClick={() => setCustomizing(true)} />
+              </div>
             </div>
-          </div>
 
-          <OverviewDemo />
+            <OverviewDemo />
+          </div>
         </section>
 
-        <LandingSection id="login-answers" heading={t('login.answersHeading')}>
+        <LandingSection
+          id="login-answers"
+          heading={t('login.answersHeading')}
+          ship={{ ship: 'venture', side: 'right' }}
+        >
           <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
           <QuestionGrid />
         </LandingSection>
-        <LandingSection id="login-features" heading={t('login.featuresHeading')}>
+        <LandingSection
+          id="login-features"
+          heading={t('login.featuresHeading')}
+          ship={{ ship: 'hulk', side: 'right' }}
+        >
           <FeatureShowcase />
         </LandingSection>
-        <LandingSection id="login-trust" heading={t('login.trustHeading')}>
+        <LandingSection id="login-trust" heading={t('login.trustHeading')} tone="panel">
           <TrustSection />
         </LandingSection>
-        <LandingSection id="login-community" heading={t('login.communityHeading')}>
+        <LandingSection id="login-community" heading={t('login.communityHeading')} tone="space">
           <CommunitySection />
         </LandingSection>
-        <LandingSection id="login-faq" heading={t('login.faqHeading')}>
+        <LandingSection id="login-faq" heading={t('login.faqHeading')} tone="panel">
           <LandingFaq />
         </LandingSection>
 
-        <section className="border-t border-line">
-          <Reveal className="px-6 py-14 text-center">
+        <section className="relative isolate overflow-hidden">
+          <LandingBackdrop tone="space" ship={{ ship: 'orca', side: 'left' }} />
+          <Reveal className="relative mx-auto max-w-6xl px-6 py-20 text-center">
             <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
             <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">
               {t('login.bottomCtaBody')}
@@ -156,38 +169,6 @@ export function Login() {
         </ExternalLink>
       </footer>
     </div>
-  );
-}
-
-/**
- * One titled band of the landing page. Named as a landmark rather than left an
- * anonymous `<section>`: on a page this long, "skip to what it does" and "skip
- * to what it asks for" are real navigation, and the name doubles as the handle
- * a test grabs a section by — several labels here (Clones, Market) also appear
- * in the hero's preview panel, so an unscoped query would be ambiguous.
- */
-function LandingSection({
-  id,
-  heading,
-  children,
-}: {
-  id: string;
-  heading: string;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      id={id}
-      aria-labelledby={`${id}-heading`}
-      className="scroll-mt-16 border-t border-line"
-    >
-      <Reveal className="mx-auto max-w-6xl px-6 py-14">
-        <h2 id={`${id}-heading`} className="text-xl font-semibold">
-          {heading}
-        </h2>
-        {children}
-      </Reveal>
-    </section>
   );
 }
 
