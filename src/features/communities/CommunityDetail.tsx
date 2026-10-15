@@ -117,11 +117,7 @@ export function CommunityDetail({
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   // The board is read once its tab has been opened, then kept for the tab's count.
   const [requestsOpened, setRequestsOpened] = useState(initialTab === 'requests');
-  const board = useCommunityRequests(
-    characterId,
-    community.id,
-    requestsOpened || tab === 'requests'
-  );
+  const board = useCommunityRequests(characterId, community.id, requestsOpened);
   const openRequests = board.requests?.filter((r) => isOpenRequest(r, now)).length;
   const manageMenu = useOpenAfterMenu();
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);

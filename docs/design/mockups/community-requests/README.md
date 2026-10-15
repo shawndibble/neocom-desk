@@ -28,6 +28,7 @@ The Requests tab, board, read-only side panel, compose step 1 and the empty stat
 - **Panel for a Member:** only the terms and each line's progress, no controls. The requester's panel reads Reopen request when closed.
 - **Added to compose:** a blueprint line gets a Blueprint copy / Original (loan) select and, for a copy, optional Runs, ME and TE fields on a second row (the scope decision lets a BPC line carry them; the picture has no entry point). A line is typed by name: a type name ending "Blueprint".
 - **Pasted list** is the proportional font like the picture, not monospace; unrecognised pasted names are listed under the box.
+- **Compose labels** sit above their fields (the compose PNGs show them beside); two fields side by side at md, one column on a phone.
 - **Search results** list under the add box as a plain list of buttons.
 - **Search placeholder** ends in "…" (the i18n convention test requires it).
 - **Column header** Age has no default sort (rows arrive newest first); Request, Status and Age sort.

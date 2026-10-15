@@ -103,11 +103,33 @@ describe('decisions', () => {
   });
 
   it('lets only the owner extend, and not a closed Request', () => {
-    const base = { exists: true, ownerUid: 'char:1', callerUid: 'char:1', closed: false };
+    const base = {
+      exists: true,
+      ownerUid: 'char:1',
+      callerUid: 'char:1',
+      closed: false,
+      isOpen: true,
+      openCount: 0,
+    };
     expect(decideExtend(base)).toBe('ok');
     expect(decideExtend({ ...base, exists: false })).toBe('not-found');
     expect(decideExtend({ ...base, callerUid: 'char:2' })).toBe('not-owner');
-    expect(decideExtend({ ...base, closed: true })).toBe('closed');
+    expect(decideExtend({ ...base, closed: true, isOpen: false })).toBe('closed');
+  });
+
+  it('holds extending an expired Request to the open cap, but not one still open', () => {
+    const atCap = {
+      exists: true,
+      ownerUid: 'char:1',
+      callerUid: 'char:1',
+      closed: false,
+      openCount: MAX_OPEN_REQUESTS_PER_MEMBER,
+    };
+    expect(decideExtend({ ...atCap, isOpen: false })).toBe('too-many-open-requests');
+    expect(decideExtend({ ...atCap, isOpen: true })).toBe('ok');
+    expect(
+      decideExtend({ ...atCap, isOpen: false, openCount: MAX_OPEN_REQUESTS_PER_MEMBER - 1 })
+    ).toBe('ok');
   });
 
   it('lets only the owner close or reopen, and holds a reopen to the cap', () => {

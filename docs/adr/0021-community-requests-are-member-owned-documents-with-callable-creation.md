@@ -14,8 +14,8 @@ Pledges non-exclusive, so nothing needs a transaction to stay correct.
 
 ## Decision
 
-- `communities/{id}/itemRequests/{requestId}` holds a Request (the collection is `itemRequests`: `requests` already holds the Join Requests waiting for the admin, ADR 0018) (lines, location,
-  terms, owner uid, timestamps, closed flag). It is created, extended and
+- `communities/{id}/itemRequests/{requestId}` holds a Request (lines, location,
+  terms, owner uid, timestamps, closed flag). The collection is `itemRequests` because `requests` already holds the Join Requests waiting for the admin (ADR 0018). It is created, extended and
   closed through callables, because creation must enforce caps (open Requests
   per Member, lines per Request, recipients per mail) and the mail reservation
   that rules cannot count.

@@ -168,16 +168,27 @@ export function decidePost(openCount: number): PostDecision {
 export type OwnerActionDecision =
   'ok' | 'not-found' | 'not-owner' | 'closed' | 'not-closed' | 'too-many-open-requests';
 
-/** Extend: the owner's own, still-open Request (a closed one is reopened first). */
+/**
+ * Extend: the owner's own, unclosed Request (a closed one is reopened first).
+ * Extending an expired one makes it open again, so it counts against the open
+ * cap like a new post; extending one that is still open never can.
+ */
 export function decideExtend(state: {
   exists: boolean;
   ownerUid: string | null;
   callerUid: string;
   closed: boolean;
+  /** Whether it is open now: not closed and not past its expiry. */
+  isOpen: boolean;
+  /** The caller's open Requests in this Community, this one included when open. */
+  openCount: number;
 }): OwnerActionDecision {
   if (!state.exists) return 'not-found';
   if (state.ownerUid !== state.callerUid) return 'not-owner';
-  return state.closed ? 'closed' : 'ok';
+  if (state.closed) return 'closed';
+  return !state.isOpen && state.openCount >= MAX_OPEN_REQUESTS_PER_MEMBER
+    ? 'too-many-open-requests'
+    : 'ok';
 }
 
 /**

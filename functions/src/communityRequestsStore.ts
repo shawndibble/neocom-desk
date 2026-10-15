@@ -25,7 +25,7 @@ import { communityRef, memberRef, type CallerCharacter } from './communitiesStor
 const requestCollection = (db: Firestore, communityId: string) =>
   communityRef(db, communityId).collection(REQUESTS_COLLECTION);
 
-function failOwnerAction(decision: OwnerActionDecision): never {
+function failRequestDecision(decision: OwnerActionDecision): never {
   switch (decision) {
     case 'not-found':
       throw new HttpsError('not-found', 'Request not found');
@@ -86,7 +86,7 @@ export async function postRequest(
   await db.runTransaction(async (tx) => {
     const { characterName } = await requireMember(tx, db, input.communityId, caller);
     const decision = decidePost(await countOpen(tx, db, input.communityId, caller.uid, now));
-    if (decision !== 'ok') failOwnerAction(decision);
+    if (decision !== 'ok') failRequestDecision(decision);
     tx.set(ref, {
       ownerUid: caller.uid,
       ownerHash: caller.ownerHash,
@@ -115,13 +115,17 @@ export async function extendRequest(
     await requireMember(tx, db, communityId, caller);
     const ref = requestCollection(db, communityId).doc(requestId);
     const snap = await tx.get(ref);
+    const expiry = Number(snap.get('expiresAt') ?? 0);
+    const isOpen = snap.exists && snap.get('closed') !== true && expiry > now;
     const decision = decideExtend({
       exists: snap.exists,
       ownerUid: snap.exists ? String(snap.get('ownerUid')) : null,
       callerUid: caller.uid,
       closed: snap.get('closed') === true,
+      isOpen,
+      openCount: isOpen ? 0 : await countOpen(tx, db, communityId, caller.uid, now),
     });
-    if (decision !== 'ok') failOwnerAction(decision);
+    if (decision !== 'ok') failRequestDecision(decision);
     const expiresAt = nextExpiry(now, Number(snap.get('expiresAt') ?? 0));
     tx.update(ref, { expiresAt, lastActivityAt: now });
     return { expiresAt };
@@ -154,7 +158,7 @@ export async function setRequestClosed(
       wantClosed: closed,
       openCount: wasClosed && !closed ? await countOpen(tx, db, communityId, caller.uid, now) : 0,
     });
-    if (decision !== 'ok') failOwnerAction(decision);
+    if (decision !== 'ok') failRequestDecision(decision);
     if (closed === wasClosed) return;
     if (closed) {
       tx.update(ref, { closed: true, closedAt: now, lastActivityAt: now });

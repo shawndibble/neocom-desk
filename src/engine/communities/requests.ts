@@ -140,7 +140,11 @@ export function filterRequests(
   });
 }
 
-const sameLine = (a: RequestLine, b: RequestLine) => a.typeId === b.typeId && a.kind === b.kind;
+/** A line's identity: a BPC and a BPO of one blueprint are two lines. The server dedupes on it. */
+export const lineKey = (line: Pick<RequestLine, 'typeId' | 'kind'>) =>
+  `${line.typeId}:${line.kind}`;
+
+const sameLine = (a: RequestLine, b: RequestLine) => lineKey(a) === lineKey(b);
 
 /** Adds lines to a list, summing a repeated item and kind; stops at the line cap. */
 export function mergeLines(

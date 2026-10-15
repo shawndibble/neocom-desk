@@ -17,6 +17,10 @@ vi.mock('@/features/market/appraisalData', () => ({
         ['tritanium', { typeId: 34, name: 'Tritanium' }],
         ['pyerite', { typeId: 35, name: 'Pyerite' }],
         ['ishtar blueprint', { typeId: 99, name: 'Ishtar Blueprint' }],
+        ...Array.from({ length: 60 }, (_, i): [string, { typeId: number; name: string }] => [
+          `bulk ${i + 1}`,
+          { typeId: 1000 + i, name: `Bulk ${i + 1}` },
+        ]),
       ])
     ),
 }));
@@ -200,5 +204,35 @@ describe('New request dialog', () => {
     await screen.findByLabelText('Tritanium quantity');
     await user.click(screen.getByRole('button', { name: 'Post request' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/most open Requests/);
+  });
+
+  it('refuses to post when a paste goes over the line cap, until enough lines are removed', async () => {
+    const user = userEvent.setup();
+    renderTab([]);
+    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(await screen.findByLabelText(/Paste a list/));
+    await user.paste(Array.from({ length: 51 }, (_, i) => `Bulk ${i + 1} 5`).join('\n'));
+    expect(await screen.findByText(/1 more than the 50-line limit/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Post request' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Remove Bulk 1' }));
+    expect(screen.queryByText(/-line limit/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Post request' })).toBeEnabled();
+  });
+
+  it('adds the same blueprint again as the other kind, so a copy and an original coexist', async () => {
+    const user = userEvent.setup();
+    renderTab([]);
+    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    const search = await screen.findByRole('searchbox', { name: 'Add an item' });
+    await user.type(search, 'ishtar');
+    await user.click(await screen.findByRole('button', { name: 'Ishtar Blueprint' }));
+    await user.type(search, 'ishtar');
+    await user.click(await screen.findByRole('button', { name: 'Ishtar Blueprint' }));
+    expect(screen.getAllByLabelText('Ishtar Blueprint quantity')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Post request' }));
+    expect(store.postRequest.mock.calls[0][2].lines.map((l: { kind: string }) => l.kind)).toEqual([
+      'bpc',
+      'bpo',
+    ]);
   });
 });

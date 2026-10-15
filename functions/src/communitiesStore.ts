@@ -371,8 +371,9 @@ export async function decideJoinRequest(
 
 /**
  * Everything one Member shared into a Community: their blueprint library
- * chunks, their shared Fittings (issue #3605) and their shared Skill Plans and their Requests. Every delete-on-leave path
- * goes through this so a new kind of shared data can't be missed in one.
+ * chunks, their shared Fittings (issue #3605), their shared Skill Plans and
+ * their Requests with the Pledges under them. Every delete-on-leave path goes
+ * through this so a new kind of shared data can't be missed in one.
  */
 async function deleteMemberShares(db: Firestore, communityId: string, uid: string): Promise<void> {
   await db.recursiveDelete(memberRef(db, communityId, uid).collection(LIBRARY_COLLECTION));

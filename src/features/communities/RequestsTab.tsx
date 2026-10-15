@@ -122,7 +122,7 @@ export function RequestsTab({
           </span>
         </span>
       ),
-      sortValue: ({ request }) => request.ownerName.toLowerCase(),
+      sortValue: ({ request }) => request.lines[0].name.toLowerCase(),
     },
     {
       id: 'terms',

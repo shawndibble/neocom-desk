@@ -15,6 +15,7 @@ import {
   MAX_TERMS_LENGTH,
   defaultKind,
   isBlueprintName,
+  lineKey,
   mergeLines,
   parseQuantity,
   type RequestLine,
@@ -49,7 +50,10 @@ function optionalNumber(text: string | undefined, min: number, max: number) {
 }
 
 interface ResolvedLine {
+  /** The line as it came in (paste or search): what edits and removals are filed under. */
+  key: string;
   line: RequestLine;
+  duplicate: boolean;
   quantityValid: boolean;
   specValid: boolean;
 }
@@ -67,7 +71,9 @@ function resolveLine(base: RequestLine, edit: LineEdit | undefined): ResolvedLin
     if (te.value !== undefined) line.te = te.value;
   }
   return {
+    key: lineKey(base),
     line,
+    duplicate: false,
     quantityValid: quantity !== null,
     specValid: kind !== 'bpc' || (runs.valid && me.valid && te.valid),
   };
@@ -98,8 +104,8 @@ export function ComposeRequestDialog({
   const [terms, setTerms] = useState('');
   const [text, setText] = useState('');
   const [added, setAdded] = useState<RequestLine[]>([]);
-  const [edits, setEdits] = useState<Record<number, LineEdit>>({});
-  const [removed, setRemoved] = useState<ReadonlySet<number>>(new Set());
+  const [edits, setEdits] = useState<Record<string, LineEdit>>({});
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
   const [search, setSearch] = useState('');
   const [announce, setAnnounce] = useState<{ text: string; key: number }>({ text: '', key: 0 });
   const [catalogue, setCatalogue] = useState<AppraisalCatalogue | null>(null);
@@ -134,11 +140,15 @@ export function ComposeRequestDialog({
       quantity: m.quantity,
       kind: defaultKind(m.name),
     }));
-    const merged = mergeLines(pasted, added);
+    // Removed lines go first, so removing one never lets a dropped one back in; the cap counts what is left.
+    const kept = [...pasted, ...added].filter((line) => !removed.has(lineKey(line)));
+    const merged = mergeLines([], kept);
+    const resolved = merged.lines.map((line) => resolveLine(line, edits[lineKey(line)]));
+    // A kind change can land two lines on one typeId:kind, which the server refuses.
+    const counts = new Map<string, number>();
+    for (const r of resolved) counts.set(lineKey(r.line), (counts.get(lineKey(r.line)) ?? 0) + 1);
     return {
-      lines: merged.lines
-        .filter((line) => !removed.has(line.typeId))
-        .map((line) => resolveLine(line, edits[line.typeId])),
+      lines: resolved.map((r) => ({ ...r, duplicate: (counts.get(lineKey(r.line)) ?? 0) > 1 })),
       over: merged.dropped,
     };
   }, [matches, added, removed, edits]);
@@ -149,21 +159,37 @@ export function ComposeRequestDialog({
     return namedLike([...catalogue.values()], needle).slice(0, SEARCH_RESULTS);
   }, [catalogue, search]);
 
-  const edit = (typeId: number, patch: LineEdit) =>
-    setEdits((current) => ({ ...current, [typeId]: { ...current[typeId], ...patch } }));
+  const edit = (key: string, patch: LineEdit) =>
+    setEdits((current) => ({ ...current, [key]: { ...current[key], ...patch } }));
 
+  // A blueprint added again becomes the other kind (copy and original can both be asked for);
+  // anything else already listed gets one more.
   const addItem = (item: { typeId: number; name: string }) => {
-    setRemoved((current) => {
-      const next = new Set(current);
-      next.delete(item.typeId);
-      return next;
-    });
-    setAdded(
-      (current) =>
-        mergeLines(current, [
-          { typeId: item.typeId, name: item.name, quantity: 1, kind: defaultKind(item.name) },
-        ]).lines
-    );
+    const first = defaultKind(item.name);
+    const kinds: RequestLineKind[] = isBlueprintName(item.name)
+      ? [first, first === 'bpc' ? 'bpo' : 'bpc']
+      : [first];
+    const listed = (kind: RequestLineKind) =>
+      lines.some(
+        (l) =>
+          l.key === lineKey({ typeId: item.typeId, kind }) ||
+          lineKey(l.line) === lineKey({ typeId: item.typeId, kind })
+      );
+    const free = kinds.find((kind) => !listed(kind));
+    if (free) {
+      const line: RequestLine = { typeId: item.typeId, name: item.name, quantity: 1, kind: free };
+      setRemoved((current) => {
+        const next = new Set(current);
+        next.delete(lineKey(line));
+        return next;
+      });
+      setAdded((current) => mergeLines(current, [line]).lines);
+    } else {
+      const existing = lines.find((l) => l.line.typeId === item.typeId);
+      if (existing) {
+        edit(existing.key, { quantity: String(existing.line.quantity + 1) });
+      }
+    }
     setSearch('');
     setAnnounce((a) => ({
       text: t('communities.board.compose.added', { name: item.name }),
@@ -172,8 +198,8 @@ export function ComposeRequestDialog({
     searchRef.current?.focus();
   };
 
-  const invalid = lines.some((l) => !l.quantityValid || !l.specValid);
-  const canPost = lines.length > 0 && !invalid && !busy;
+  const invalid = lines.some((l) => !l.quantityValid || !l.specValid || l.duplicate);
+  const canPost = lines.length > 0 && !invalid && over === 0 && !busy;
 
   const post = async () => {
     setBusy(true);
@@ -211,16 +237,22 @@ export function ComposeRequestDialog({
       >
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block space-y-1">
-            <span className="text-xs text-text-dim">{t('communities.board.compose.location')}</span>
+            <span className="block text-xs text-text-dim">
+              {t('communities.board.compose.location')}
+            </span>
             <TextInput
+              className="w-full"
               value={location}
               maxLength={MAX_LOCATION_LENGTH}
               onChange={(e) => setLocation(e.target.value)}
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs text-text-dim">{t('communities.board.compose.terms')}</span>
+            <span className="block text-xs text-text-dim">
+              {t('communities.board.compose.terms')}
+            </span>
             <TextInput
+              className="w-full"
               value={terms}
               maxLength={MAX_TERMS_LENGTH}
               placeholder={t('communities.board.compose.termsPlaceholder')}
@@ -229,7 +261,9 @@ export function ComposeRequestDialog({
           </label>
         </div>
         <label className="block space-y-1">
-          <span className="text-xs text-text-dim">{t('communities.board.compose.paste')}</span>
+          <span className="block text-xs text-text-dim">
+            {t('communities.board.compose.paste')}
+          </span>
           <TextArea
             rows={4}
             value={text}
@@ -260,11 +294,11 @@ export function ComposeRequestDialog({
             aria-label={t('communities.board.linesLabel')}
             className="divide-y divide-line rounded-xs border border-line"
           >
-            {lines.map(({ line, quantityValid, specValid }) => {
-              const e = edits[line.typeId];
+            {lines.map(({ key, line, quantityValid, specValid, duplicate }) => {
+              const e = edits[key];
               const blueprint = isBlueprintName(line.name);
               return (
-                <li key={line.typeId} className="space-y-1.5 px-3 py-1.5">
+                <li key={key} className="space-y-1.5 px-3 py-1.5">
                   <div className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate">{line.name}</span>
                     <TextInput
@@ -274,14 +308,14 @@ export function ComposeRequestDialog({
                       aria-invalid={!quantityValid || undefined}
                       className="w-28 tabular-nums"
                       value={e?.quantity ?? String(line.quantity)}
-                      onChange={(ev) => edit(line.typeId, { quantity: ev.target.value })}
+                      onChange={(ev) => edit(key, { quantity: ev.target.value })}
                     />
                     <Button
                       size="sm"
                       variant="ghost"
                       aria-label={t('communities.board.compose.removeLine', { name: line.name })}
                       onClick={() => {
-                        setRemoved((current) => new Set(current).add(line.typeId));
+                        setRemoved((current) => new Set(current).add(key));
                         setAnnounce((a) => ({
                           text: t('communities.board.compose.removed', { name: line.name }),
                           key: a.key + 1,
@@ -294,14 +328,13 @@ export function ComposeRequestDialog({
                   </div>
                   {blueprint && (
                     <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
+                      {/* Native select: two options in a modal, where a phone gets the OS picker. */}
                       <NativeSelect
                         size="sm"
                         className="w-44"
                         aria-label={t('communities.board.compose.kindOf', { name: line.name })}
                         value={line.kind}
-                        onChange={(ev) =>
-                          edit(line.typeId, { kind: ev.target.value as RequestLineKind })
-                        }
+                        onChange={(ev) => edit(key, { kind: ev.target.value as RequestLineKind })}
                       >
                         <option value="bpc">{t('communities.board.compose.kindBpc')}</option>
                         <option value="bpo">{t('communities.board.compose.kindBpo')}</option>
@@ -324,11 +357,16 @@ export function ComposeRequestDialog({
                               value={
                                 e?.[field] ?? (line[field] === undefined ? '' : String(line[field]))
                               }
-                              onChange={(ev) => edit(line.typeId, { [field]: ev.target.value })}
+                              onChange={(ev) => edit(key, { [field]: ev.target.value })}
                             />
                           </label>
                         ))}
                     </div>
+                  )}
+                  {duplicate && (
+                    <p role="alert" className="text-xs text-danger">
+                      {t('communities.board.compose.duplicate', { name: line.name })}
+                    </p>
                   )}
                 </li>
               );

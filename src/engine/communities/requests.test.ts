@@ -1,6 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   MAX_LINES_PER_REQUEST,
+  MAX_LOCATION_LENGTH,
+  MAX_OPEN_REQUESTS_PER_MEMBER,
+  MAX_TERMS_LENGTH,
+  REQUEST_LIFETIME_DAYS,
+  lineKey,
   filterRequests,
   defaultKind,
   isBlueprintName,
@@ -187,5 +193,33 @@ describe('blueprint lines', () => {
     expect(isBlueprintName('Blueprint Copy Kit')).toBe(false);
     expect(defaultKind('Ishtar Blueprint')).toBe('bpc');
     expect(defaultKind('Tritanium')).toBe('item');
+  });
+});
+
+describe('constants shared with the callables', () => {
+  // functions/ cannot be imported from the app, so the caps are written twice: pin them.
+  const server = readFileSync('functions/src/communityRequests.ts', 'utf8');
+  const constant = (name: string) => {
+    const match = new RegExp(`export const ${name} = ([0-9_* ]+);`).exec(server);
+    if (!match) throw new Error(`${name} not found in functions/src/communityRequests.ts`);
+    return Function(`return ${match[1].replace(/_/g, '')}`)() as number;
+  };
+
+  it('matches the server caps and lifetime', () => {
+    expect(MAX_LINES_PER_REQUEST).toBe(constant('MAX_LINES_PER_REQUEST'));
+    expect(MAX_OPEN_REQUESTS_PER_MEMBER).toBe(constant('MAX_OPEN_REQUESTS_PER_MEMBER'));
+    expect(MAX_LOCATION_LENGTH).toBe(constant('MAX_LOCATION_LENGTH'));
+    expect(MAX_TERMS_LENGTH).toBe(constant('MAX_TERMS_LENGTH'));
+    expect(REQUEST_LIFETIME_DAYS * 24 * 60 * 60 * 1000).toBe(constant('REQUEST_LIFETIME_MS'));
+  });
+
+  it('matches the server line kinds', () => {
+    expect(server).toContain("['item', 'bpc', 'bpo']");
+  });
+});
+
+describe('lineKey', () => {
+  it('tells a BPC from a BPO of one blueprint', () => {
+    expect(lineKey({ typeId: 1, kind: 'bpc' })).not.toBe(lineKey({ typeId: 1, kind: 'bpo' }));
   });
 });
