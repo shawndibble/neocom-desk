@@ -42,7 +42,7 @@ import { namedLike, needleOf } from './shareLists';
 
 /**
  * What a caller may start the dialog with: Ask to copy (issue #3813) fills in
- * the line and ticks the holder on step 2, on top of the Members who share a
+ * the line and adds the holder as a Mail to chip, on top of the Members who share a
  * matching blueprint.
  */
 export interface ComposePrefill {
@@ -115,14 +115,14 @@ function resolveLine(base: RequestLine, edit: LineEdit | undefined): ResolvedLin
 }
 
 /**
- * A new Request (the mockup's compose dialog). Step 1: an optional location
+ * A new Request. An optional location
  * and terms, lines from a pasted pile (the Appraisal parser) or added by
  * search, each line's quantity editable. Below them (issue #3810) a Mail to
  * field: my own character, the Members sharing a matching blueprint and anyone
  * added by name are chips; posting sends one in-game mail to each chip covering
  * the whole list, with a result per recipient; with no chips it posts without
- * mail. The same dialog edits a Request of one's own (`editing`). The Request posts first and stands whatever happens to
- * the mails. The pasted lines are recomputed from the box on every change, so
+ * mail. The same dialog edits a Request of one's own (`editing`).
+ * The Request posts first and stands whatever happens to the mails. The pasted lines are recomputed from the box on every change, so
  * edits and removals are kept per item rather than in a list the paste would
  * overwrite.
  */
@@ -139,7 +139,7 @@ export function ComposeRequestDialog({
   characterId: number;
   communityId: string;
   myUid: string;
-  /** The roster, for step 2; null until it has loaded. */
+  /** The roster, for the Mail to field; null until it has loaded. */
   members: readonly CommunityMember[] | null;
   prefill?: ComposePrefill;
   editing?: ComposeEditing;
@@ -253,7 +253,7 @@ export function ComposeRequestDialog({
   };
 
   const invalid = lines.some((l) => !l.quantityValid || !l.specValid || l.duplicate);
-  const canNext = lines.length > 0 && !invalid && over === 0;
+  const canSubmit = lines.length > 0 && !invalid && over === 0;
   const linesLocked = editing?.linesLocked ?? false;
   const recipients = useComposeRecipients({
     characterId,
@@ -370,7 +370,7 @@ export function ComposeRequestDialog({
           className="space-y-4 text-sm"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!canNext || busy) return;
+            if (!canSubmit || busy) return;
             if (editing) void save();
             else if (recipients.ready) void post(recipients.ticked);
           }}
@@ -567,7 +567,7 @@ export function ComposeRequestDialog({
               variant="primary"
               type="submit"
               loading={busy}
-              disabled={!canNext || (!editing && !recipients.ready)}
+              disabled={!canSubmit || (!editing && !recipients.ready)}
             >
               {editing
                 ? t('communities.board.compose.save')

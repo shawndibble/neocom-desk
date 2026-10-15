@@ -343,7 +343,7 @@ const askToCopy = (communities: { id: string; name: string }[]): Story => ({
 const brass = { id: SAMPLE_ADMIN_COMMUNITY_ID, name: 'Brass Meridian Industrialists' };
 const providence = { id: SAMPLE_MEMBER_COMMUNITY_ID, name: 'Providence Mining Co-op' };
 
-/** @summary Ask to copy (BPC Sourcing): compose opens with one Rifter Blueprint line, quantity 1; step 2 has the holder ticked. */
+/** @summary Ask to copy (BPC Sourcing): compose opens with one Rifter Blueprint line, quantity 1; the holder is a Mail to chip. */
 export const AskToCopyCompose: Story = askToCopy([brass]);
 
 /** @summary Ask to copy in the phone shell. */

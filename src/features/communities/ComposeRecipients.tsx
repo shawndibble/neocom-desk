@@ -1,7 +1,8 @@
-import { useId, useMemo, useState, type KeyboardEvent } from 'react';
+import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
-import { Button, SearchInput, Spinner } from '@/components/ui';
+import { Button, IconButton, SearchInput, Spinner } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { MAX_REQUEST_MAILS_PER_DAY, type RequestRecipient } from '@/engine/communities/requests';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
@@ -27,6 +28,7 @@ export function ComposeRecipientsField({ state }: { state: ComposeRecipientsStat
   const id = useId();
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const chips = state.recipients.filter((r) => state.isTicked(r));
   const matches = useMemo(
     () =>
@@ -51,14 +53,17 @@ export function ComposeRecipientsField({ state }: { state: ComposeRecipientsStat
     if (NAV_KEYS.includes(event.key)) {
       event.preventDefault();
       setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, matches.length));
-    } else if (event.key === 'Enter') {
+    } else if (event.key === 'Enter' && query.trim() !== '') {
+      // Never submits the Request: Enter here means "add this Member".
+      event.preventDefault();
       const pick = matches[highlight ?? 0];
-      if (pick) {
-        event.preventDefault();
-        choose(pick);
-      }
-    } else if (event.key === 'Backspace' && query === '' && chips.length > 0) {
-      state.setTicked(chips[chips.length - 1].uid, false);
+      if (pick) choose(pick);
+    } else if (event.key === 'Escape' && query !== '') {
+      // Closes the suggestions, not the whole dialog.
+      event.preventDefault();
+      event.stopPropagation();
+      setQuery('');
+      setHighlight(null);
     }
   }
   const exceeds = state.ready && state.mailsLeft > 0 && state.ticked.length > state.mailsLeft;
@@ -81,34 +86,9 @@ export function ComposeRecipientsField({ state }: { state: ComposeRecipientsStat
         <Spinner size="sm" label={t('communities.loading')} />
       ) : (
         <>
-          <ul
-            aria-label={t('communities.board.compose.recipientsLabel')}
-            className="flex flex-wrap gap-1.5 empty:hidden"
-          >
-            {chips.map((r) => (
-              <li
-                key={r.uid}
-                className="inline-flex items-center gap-1 rounded-full border border-line bg-panel-2 py-0.5 pr-1 pl-2.5 text-xs"
-              >
-                <span>
-                  {r.characterName}
-                  {r.self && (
-                    <span className="text-text-dim"> {t('communities.board.compose.you')}</span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  aria-label={t('communities.board.compose.unmail', { name: r.characterName })}
-                  className="grid size-5 place-items-center rounded-full text-text-dim hover:bg-panel hover:text-text touch:size-8"
-                  onClick={() => state.setTicked(r.uid, false)}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
           <div className="relative">
             <SearchInput
+              ref={inputRef}
               id={`${id}-input`}
               value={query}
               disabled={state.lacksScope}
@@ -118,8 +98,8 @@ export function ComposeRecipientsField({ state }: { state: ComposeRecipientsStat
                 setHighlight(null);
               }}
               onKeyDown={onKeyDown}
-              aria-controls={`${id}-list`}
-              aria-activedescendant={highlight === null ? undefined : `${id}-${highlight}`}
+              aria-controls={matches.length > 0 ? `${id}-list` : undefined}
+              aria-activedescendant={matches.length > 0 ? `${id}-${highlight ?? 0}` : undefined}
               role="combobox"
               aria-expanded={matches.length > 0}
               aria-autocomplete="list"
@@ -136,10 +116,10 @@ export function ComposeRecipientsField({ state }: { state: ComposeRecipientsStat
                     key={r.uid}
                     id={`${id}-${index}`}
                     role="option"
-                    aria-selected={index === highlight}
+                    aria-selected={index === (highlight ?? 0)}
                     className={cx(
                       'flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1 hover:bg-panel-2 touch:min-h-11',
-                      index === highlight && `bg-panel-2 ${activeOptionClassName}`
+                      index === (highlight ?? 0) && `bg-panel-2 ${activeOptionClassName}`
                     )}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => choose(r)}
@@ -155,6 +135,32 @@ export function ComposeRecipientsField({ state }: { state: ComposeRecipientsStat
               </ul>
             )}
           </div>
+          <ul
+            aria-label={t('communities.board.compose.recipientsLabel')}
+            className="flex flex-wrap gap-1.5 empty:hidden"
+          >
+            {chips.map((r) => (
+              <li
+                key={r.uid}
+                className="flex items-center gap-1 rounded-xs border border-line bg-panel-2 py-1 pr-1 pl-2 text-xs text-text"
+              >
+                <span>
+                  {r.characterName}
+                  {r.self && ` ${t('communities.board.compose.you')}`}
+                </span>
+                <IconButton
+                  icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
+                  label={t('communities.board.compose.unmail', { name: r.characterName })}
+                  size="sm"
+                  variant="plain"
+                  onClick={() => {
+                    state.setTicked(r.uid, false);
+                    inputRef.current?.focus();
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
         </>
       )}
       <p className="text-xs text-text-dim">

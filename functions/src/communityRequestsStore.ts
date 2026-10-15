@@ -48,7 +48,7 @@ function failRequestDecision(decision: OwnerActionDecision): never {
     case 'lines-locked':
       throw new HttpsError(
         'failed-precondition',
-        'Members have Pledged on this Request, so its lines can only change quantity',
+        'Members have Pledged on this Request, so its items cannot change, only their quantities and specs',
         { reason: 'lines-locked' }
       );
     case 'too-many-open-requests':

@@ -8441,9 +8441,6 @@
       "noneCanFill": "No open Requests you can fill",
       "distance": {
         "label": "Distance",
-        "any": "Any distance",
-        "within_one": "Within {{count}} jump",
-        "within_other": "Within {{count}} jumps",
         "needPermission": "Distance needs your pilot's location.",
         "noLocation": "Your pilot's location isn't known right now. Pick a system with From to measure distance.",
         "failed": "Couldn't load the map, so Requests aren't narrowed by distance.",

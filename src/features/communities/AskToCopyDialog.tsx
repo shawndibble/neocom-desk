@@ -10,7 +10,7 @@ import { loadCommunityMembers, type CommunityMember } from './communityStore';
  * "Ask <name> to copy" from a Community Offer row of BPC Sourcing (issue
  * #3813): the Requests tab's own compose dialog, opened in place with one BPC
  * line of that blueprint (quantity 1, no runs/ME/TE ask) and the holder
- * ticked on step 2. Posting is the dialog's own: same callable, caps, mail and
+ * added as a Mail to chip. Posting is the dialog's own: same callable, caps, mail and
  * results as the Requests tab. A Member who shares the blueprint in several
  * Communities picks which one it is posted to first; the Offer's one
  * Community goes straight to compose. The Request lands on that Community's
@@ -82,7 +82,7 @@ export function AskToCopyDialog({
   );
 }
 
-/** Reads the chosen Community's roster (compose step 2 needs it), then opens compose. */
+/** Reads the chosen Community's roster (the Mail to field needs it), then opens compose. */
 function AskToCopyCompose({
   characterId,
   communityId,

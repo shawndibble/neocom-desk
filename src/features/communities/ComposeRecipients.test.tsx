@@ -136,6 +136,20 @@ describe('Compose: who to mail', () => {
     expect(chipNames(list)).toContain('Dana Reyes');
   });
 
+  it('never posts on Enter in the Mail to field, and Escape closes only the suggestions', async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderDialog();
+    await chips();
+    await user.type(await mailField(), 'zzz{Enter}');
+    expect(store.postRequest).not.toHaveBeenCalled();
+    await user.clear(await mailField());
+    await user.type(await mailField(), 'cael');
+    await screen.findByRole('option', { name: 'Cael Ito' });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull());
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('posts first, then sends one mail covering every line to each chip, me included', async () => {
     const user = userEvent.setup();
     const { onPosted, onClose } = renderDialog();

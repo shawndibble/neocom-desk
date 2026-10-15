@@ -102,7 +102,7 @@ export function RequestsTab({
   pledgesFailed: boolean;
   failed: boolean;
   now: number;
-  /** The roster, for compose step 2; null until it has loaded. */
+  /** The roster, for compose's Mail to field; null until it has loaded. */
   members: readonly CommunityMember[] | null;
   onReload: () => void;
   /** Re-reads one Request's Pledges after a Pledge write. */
@@ -125,6 +125,8 @@ export function RequestsTab({
   // A limit that can no longer be measured (Permission revoked, location lost) is no limit:
   // the select then reads "Any distance", never a limit the list is not applying.
   const limit = distance.status === 'unavailable' ? null : maxJumps;
+  // What the funnel shows: a range that cannot be measured reads "Any distance", never a limit the list is not applying.
+  const shownJumps: JumpRange = limit === null ? 'any' : jumps;
 
   const { rows, unmeasured } = useMemo(() => {
     const filtered = filterRequests(requests ?? [], { filter, query, myUid, now, sharedItems });
@@ -337,12 +339,12 @@ export function RequestsTab({
       <Panel>
         <FilterBar
           className="mb-3"
-          value={{ filter, jumps }}
+          value={{ filter, jumps: shownJumps }}
           onChange={(next) => {
             setFilter(next.filter);
             setJumps(next.jumps);
           }}
-          activeCount={(filter !== 'open' ? 1 : 0) + (jumps !== 'any' ? 1 : 0)}
+          activeCount={(filter !== 'open' ? 1 : 0) + (shownJumps !== 'any' ? 1 : 0)}
           search={
             <SearchInput
               className="min-w-48 flex-1"
