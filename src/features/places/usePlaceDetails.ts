@@ -81,7 +81,13 @@ export function usePlaceDetails(
   const refsKey = refs.map((r) => `${placeKey(r)}:${placeKindOf(r) ?? ''}`).join(',');
   const [stable, setStable] = useState({ key: refsKey, refs });
   if (stable.key !== refsKey) setStable({ key: refsKey, refs });
-  const stableRefs = stable.refs;
+  // A ref with no Character asks as the scope Character, so a page's refs
+  // never hold one that went stale across a switch.
+  const stableRefs = useMemo(
+    () =>
+      stable.refs.map((r) => (r.characterId === undefined ? { ...r, characterId: scopeId } : r)),
+    [stable.refs, scopeId]
+  );
 
   const [store, setStore] = useState<Store>(() => emptyStore(scopeId));
   const requested = useRef<Requested>(emptyRequested(scopeId));
@@ -103,6 +109,8 @@ export function usePlaceDetails(
   const originId = origin?.systemId ?? null;
   const originResolved = origin?.resolved ?? false;
   const jumpsSuffix = basis ? `${basis.key}:${originId ?? ''}` : '';
+  // A count is only valid under the basis and origin it was made for.
+  const jumpsKeyOf = (key: string) => `${key}:${jumpsSuffix}`;
 
   useEffect(() => {
     if (!enabled) return;
@@ -115,10 +123,7 @@ export function usePlaceDetails(
     for (const r of missing) req.systems.add(placeKey(r));
     const scope = scopeId;
     void mapWithConcurrencyLimit(missing, ESI_FANOUT_CONCURRENCY, async (r) => {
-      const place = await resolvePlace(r, source, { name: wantNames }).catch(() => ({
-        name: null,
-        systemId: null,
-      }));
+      const place = await resolvePlace(r, source, { name: wantNames, settle: true });
       const key = placeKey(r);
       write(scope, (base) => ({
         ...base,
@@ -126,7 +131,7 @@ export function usePlaceDetails(
         names: wantNames ? new Map(base.names).set(key, place.name) : base.names,
       }));
     });
-    // `claim`/`write` close over refs and `scopeId`, both listed.
+    // `claim`/`write` are per-render closures over `scopeId` (listed), not deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, scopeId, stableRefs, current.systems, source, wantNames]);
 
@@ -134,12 +139,12 @@ export function usePlaceDetails(
     if (!enabled || !basis || !basis.hydrated || !originResolved) return;
     const req = claim();
     const pending = stableRefs.filter((r) => {
-      const key = `${placeKey(r)}:${jumpsSuffix}`;
+      const key = jumpsKeyOf(placeKey(r));
       if (current.jumps.has(key) || req.jumps.has(key)) return false;
       return originId === null || current.systems.has(placeKey(r));
     });
     if (pending.length === 0) return;
-    for (const r of pending) req.jumps.add(`${placeKey(r)}:${jumpsSuffix}`);
+    for (const r of pending) req.jumps.add(jumpsKeyOf(placeKey(r)));
     const scope = scopeId;
     void mapWithConcurrencyLimit(pending, ESI_FANOUT_CONCURRENCY, async (r) => {
       const key = placeKey(r);
@@ -150,7 +155,7 @@ export function usePlaceDetails(
       else result = await jumpsBetween(originId, systemId, basis).catch(() => NO_ROUTE);
       write(scope, (base) => ({
         ...base,
-        jumps: new Map(base.jumps).set(`${key}:${jumpsSuffix}`, result),
+        jumps: new Map(base.jumps).set(jumpsKeyOf(key), result),
       }));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,6 +191,7 @@ export function usePlaceDetails(
         security: new Map(base.security).set(systemId, security),
       }));
     });
+    // `claim`/`write` are per-render closures over `scopeId` (listed), not deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, scopeId, stableRefs, current.systems, current.security, source]);
 
@@ -199,9 +205,9 @@ export function usePlaceDetails(
         systemId,
         // No system (pending or none) passes straight through.
         security: systemId == null ? systemId : current.security.get(systemId),
-        jumps: basis ? current.jumps.get(`${key}:${jumpsSuffix}`) : undefined,
+        jumps: basis ? current.jumps.get(jumpsKeyOf(key)) : undefined,
       });
     }
     return details;
-  }, [stableRefs, current, basis, jumpsSuffix]);
+  }, [stableRefs, current, basis, jumpsSuffix]); // eslint-disable-line react-hooks/exhaustive-deps -- jumpsKeyOf derives from jumpsSuffix
 }

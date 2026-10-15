@@ -237,4 +237,24 @@ describe('usePlaceDetails', () => {
     await act(async () => {});
     expect(source.calls).toEqual([]);
   });
+
+  it('refs without a Character ask as the scope Character, and follow it on a switch with the same Places', async () => {
+    const source = memoryPlaceSource({
+      structures: {
+        [`1:${STRUCTURE}`]: { systemId: 30002187 },
+        [`2:${STRUCTURE}`]: { systemId: 30000142 },
+      },
+      systems: { 30000142: { security: 0.95 }, 30002187: { security: 0.3 } },
+    });
+    const refs = [{ locationId: STRUCTURE, kind: 'structure' as const }];
+    const { result, rerender } = renderHook(
+      ({ scopeId }) => usePlaceDetails(refs, { scopeId, origin: null, basis: null, source }),
+      { initialProps: { scopeId: 1 } }
+    );
+    const key = (characterId: number) => placeKey({ locationId: STRUCTURE, characterId });
+    await waitFor(() => expect(result.current.get(key(1))?.security).toBe(0.3));
+    rerender({ scopeId: 2 });
+    await waitFor(() => expect(result.current.get(key(2))?.security).toBe(0.95));
+    expect(result.current.get(key(1))).toBeUndefined();
+  });
 });

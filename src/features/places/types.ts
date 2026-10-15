@@ -8,10 +8,12 @@ export type PlaceKind = 'solar_system' | 'station' | 'structure';
  * `location_type`, a clone's); leave it off and the id's own block decides.
  * `characterId` is who asks: a structure's name and system are ACL-checked per
  * Character, so the same structure id can resolve for one and not another.
+ * Left off, `usePlaceDetails` asks as its own scope Character, so a page's
+ * refs never carry a Character that can go stale across a switch.
  */
 export interface PlaceRef {
   locationId: number;
-  characterId: number | null;
+  characterId?: number | null;
   kind?: PlaceKind;
 }
 

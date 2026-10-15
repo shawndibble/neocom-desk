@@ -28,28 +28,34 @@ export interface ResolvedPlace {
 export async function resolvePlace(
   ref: PlaceRef,
   source: PlaceSource = productionPlaceSource,
-  opts: { name?: boolean } = {}
+  opts: { name?: boolean; settle?: boolean } = {}
 ): Promise<ResolvedPlace> {
   const wantName = opts.name !== false;
-  const { locationId, characterId } = ref;
+  // `settle`: a read that throws is `null` for its own field only, so a failed
+  // name never costs the system (and the reverse). Without it a throw
+  // propagates, for a caller that must surface it.
+  const read = <T>(p: Promise<T | null> | null): Promise<T | null> =>
+    p === null ? Promise.resolve(null) : opts.settle ? p.catch(() => null) : p;
+  const { locationId } = ref;
+  const characterId = ref.characterId ?? null;
   switch (placeKindOf(ref)) {
     case 'solar_system':
       return {
-        name: wantName ? await source.systemName(locationId) : null,
+        name: await read(wantName ? source.systemName(locationId) : null),
         systemId: locationId,
       };
     case 'station': {
       const [name, systemId] = await Promise.all([
-        wantName ? source.stationName(locationId) : null,
-        source.stationSystemId(locationId),
+        read(wantName ? source.stationName(locationId) : null),
+        read(source.stationSystemId(locationId)),
       ]);
       return { name, systemId };
     }
     case 'structure': {
       if (characterId === null) return { name: null, systemId: null };
       const [name, systemId] = await Promise.all([
-        wantName ? source.structureName(characterId, locationId) : null,
-        source.structureSystemId(characterId, locationId),
+        read(wantName ? source.structureName(characterId, locationId) : null),
+        read(source.structureSystemId(characterId, locationId)),
       ]);
       return { name, systemId };
     }

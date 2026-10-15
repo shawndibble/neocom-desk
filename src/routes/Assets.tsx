@@ -75,7 +75,7 @@ import { loadStructureName } from '@/features/character/structures';
 import { loadSystemName } from '@/features/character/systemSecurity';
 import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
-import { placeKey, usePlaceDetails } from '@/features/places';
+import { placeKey, usePlaceDetails, type PlaceRef } from '@/features/places';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
@@ -652,8 +652,6 @@ function baseRowHeight(row: BrowseRow): number {
   }
 }
 
-type PlaceRefs = Parameters<typeof usePlaceDetails>[0];
-
 /** An asset group's `location_type` as the kind a Place resolves under. */
 function placeKindForStation(
   locationType: AssetTreeStation['locationType']
@@ -1042,7 +1040,7 @@ export function Assets() {
   // adjust-state-during-render below for which stations. The refs live in state
   // up here because the station sort reads the jumps, and the scoped set is
   // itself derived from that sort.
-  const [scopedPlaceRefs, setScopedPlaceRefs] = useState<PlaceRefs>([]);
+  const [scopedPlaceRefs, setScopedPlaceRefs] = useState<readonly PlaceRef[]>([]);
   const placeDetails = usePlaceDetails(scopedPlaceRefs, {
     scopeId: activeCharacterId,
     enabled: activeCharacterId !== null,
@@ -1379,13 +1377,12 @@ export function Assets() {
   // seen so far, so it resolves through the same call that named it.
   const scopedPlaceRefsNext = jumpsAwayScopedStations.map((station) => ({
     locationId: station.locationId,
-    characterId: activeCharacterId,
     kind: placeKindForStation(station.locationType),
   }));
   const scopedPlaceRefsKey = scopedPlaceRefsNext
     .map((r) => `${r.locationId}:${r.kind ?? ''}`)
     .join(',');
-  const [stablePlaceRefsKey, setStablePlaceRefsKey] = useState(scopedPlaceRefsKey);
+  const [stablePlaceRefsKey, setStablePlaceRefsKey] = useState<string | null>(null);
   if (scopedPlaceRefsKey !== stablePlaceRefsKey) {
     setStablePlaceRefsKey(scopedPlaceRefsKey);
     setScopedPlaceRefs(scopedPlaceRefsNext);
