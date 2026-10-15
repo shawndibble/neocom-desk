@@ -2,7 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { BuybackRateInput, PriceBasisOptions, ShowRefiningToggle } from './OverviewSettings';
+import { MINING_YIELD_RANGES } from '@/engine/miningTax/yieldRange';
+import {
+  BuybackRateInput,
+  MobileSettings,
+  PriceBasisOptions,
+  ShowRefiningToggle,
+  ValueMenu,
+} from './OverviewSettings';
+import { controlHeightClassName } from '@/components/ui/controlStyles';
 
 describe('PriceBasisOptions', () => {
   it('checks the choice matching the basis', () => {
@@ -66,5 +74,29 @@ describe('ShowRefiningToggle (issue #1281)', () => {
     await userEvent.click(toggle);
 
     expect(onChange).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('Value menu triggers (issue #3816)', () => {
+  const heightTokens = (el: HTMLElement) =>
+    el.className.split(/\s+/).filter((token) => /(^|:)h-\d/.test(token));
+  const mdTier = controlHeightClassName.md.split(/\s+/).sort();
+
+  it('ValueMenu trigger sizes from the md control tier, not a bare height', () => {
+    render(
+      <ValueMenu basis="now-sell" buybackRate={100}>
+        <div />
+      </ValueMenu>
+    );
+    expect(heightTokens(screen.getByRole('button')).sort()).toEqual(mdTier);
+  });
+
+  it('MobileSettings trigger sizes from the md control tier, not a bare height', () => {
+    render(
+      <MobileSettings range={MINING_YIELD_RANGES[0]} basis="now-sell" buybackRate={100}>
+        <div />
+      </MobileSettings>
+    );
+    expect(heightTokens(screen.getByRole('button')).sort()).toEqual(mdTier);
   });
 });
