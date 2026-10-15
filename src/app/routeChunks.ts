@@ -22,7 +22,7 @@
  */
 import type { ComponentType } from 'react';
 import type { AppRoutePath } from './routeScopes';
-import { isRecoveringFromStaleBuild } from './staleBuildRecovery';
+import { staleBuildRecoveryOutcome } from './staleBuildRecovery';
 
 type RouteModule = { default: ComponentType };
 
@@ -35,8 +35,8 @@ type RouteModule = { default: ComponentType };
  * `vite:preloadError` handler cancelled the failure to reload the page — Vite's
  * preload helper then resolves `undefined` instead of rejecting. Stay pending
  * while that recovery runs, so the route's Suspense fallback holds until the
- * reload lands; with none running (the handler only cancels a failure it will
- * recover from) `guarded` rejects into the route's error boundary instead.
+ * reload lands; if that recovery gives up, or none is running, `guarded` rejects
+ * into the route's error boundary instead.
  */
 export function named<K extends string>(
   importer: () => Promise<Record<K, ComponentType>>,
@@ -55,10 +55,14 @@ export function guarded<M>(importer: () => Promise<M | undefined>): Promise<M> {
     if (m) return m;
     // Vite resolves `undefined` only for a failure `main.tsx` cancelled. While
     // the stale-build recovery runs the page is about to reload, so wait for
-    // it; otherwise nothing will ever settle this, and Suspense would stay
-    // pending forever — reject into the route's error boundary instead.
-    if (isRecoveringFromStaleBuild()) return new Promise<never>(() => {});
-    throw new Error('Route chunk unavailable');
+    // it; if it gives up (the network probe failed) or none is running,
+    // nothing will ever settle this and Suspense would stay pending forever —
+    // reject into the route's error boundary instead.
+    const recovery = staleBuildRecoveryOutcome();
+    return (recovery ?? Promise.resolve(false)).then((reloading) => {
+      if (reloading) return new Promise<never>(() => {});
+      throw new Error('Route chunk unavailable');
+    });
   });
 }
 

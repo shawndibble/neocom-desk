@@ -30,28 +30,43 @@ describe('guarded', () => {
     await expect(guarded(() => Promise.resolve(undefined))).rejects.toThrow(/unavailable/i);
   });
 
-  it('waits for the reload while a stale-build recovery is running', async () => {
-    vi.resetModules();
-    const recovery = await import('./staleBuildRecovery');
-    const fresh = await import('./routeChunks');
-    void recovery.recoverFromStaleBuild({
-      now: () => 1_000_000,
-      online: () => true,
-      readLast: () => 0,
-      writeLast: () => {},
-      purge: () => new Promise<void>(() => {}),
-      reload: () => {},
+  describe('while a stale-build recovery is running', () => {
+    async function withRecovery(overrides: Record<string, unknown>) {
+      vi.resetModules();
+      const recovery = await import('./staleBuildRecovery');
+      const fresh = await import('./routeChunks');
+      const attempt = recovery.recoverFromStaleBuild({
+        now: () => 1_000_000,
+        online: () => true,
+        readLast: () => 0,
+        writeLast: () => {},
+        probe: async () => true,
+        purge: () => new Promise<void>(() => {}),
+        reload: () => {},
+        ...overrides,
+      });
+      return { fresh, attempt };
+    }
+
+    it('waits for the reload', async () => {
+      const { fresh } = await withRecovery({});
+      const outcome = await Promise.race([
+        fresh
+          .guarded(() => Promise.resolve(undefined))
+          .then(
+            () => 'settled',
+            () => 'settled'
+          ),
+        new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
+      ]);
+      expect(outcome).toBe('pending');
     });
-    const outcome = await Promise.race([
-      fresh
-        .guarded(() => Promise.resolve(undefined))
-        .then(
-          () => 'settled',
-          () => 'settled'
-        ),
-      new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
-    ]);
-    expect(outcome).toBe('pending');
+
+    it('rejects into the boundary once the recovery gives up (network probe failed)', async () => {
+      const { fresh, attempt } = await withRecovery({ probe: async () => false });
+      await expect(fresh.guarded(() => Promise.resolve(undefined))).rejects.toThrow(/unavailable/i);
+      await expect(attempt).resolves.toBe(false);
+    });
   });
 });
 

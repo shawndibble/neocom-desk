@@ -1,10 +1,13 @@
-import { describe, it, expect, vi } from 'vitest';
-import {
-  canRecoverFromStaleBuild,
-  purgeStaleBuildCaches,
-  recoverFromStaleBuild,
-  type StaleBuildEnv,
-} from './staleBuildRecovery';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import type { StaleBuildEnv } from './staleBuildRecovery';
+
+// Recovery state is module-level (a reloading page never clears it), so every
+// test gets a fresh copy of the module.
+let mod: typeof import('./staleBuildRecovery');
+beforeEach(async () => {
+  vi.resetModules();
+  mod = await import('./staleBuildRecovery');
+});
 
 function makeEnv(overrides: Partial<StaleBuildEnv> = {}) {
   return {
@@ -12,6 +15,7 @@ function makeEnv(overrides: Partial<StaleBuildEnv> = {}) {
     online: () => true,
     readLast: vi.fn().mockReturnValue(0),
     writeLast: vi.fn(),
+    probe: vi.fn().mockResolvedValue(true),
     purge: vi.fn().mockResolvedValue(undefined),
     reload: vi.fn(),
     ...overrides,
@@ -19,9 +23,10 @@ function makeEnv(overrides: Partial<StaleBuildEnv> = {}) {
 }
 
 describe('recoverFromStaleBuild', () => {
-  it('purges the worker and caches, then reloads', async () => {
+  it('probes the network, purges the worker and caches, then reloads', async () => {
     const env = makeEnv();
-    expect(await recoverFromStaleBuild(env)).toBe(true);
+    expect(await mod.recoverFromStaleBuild(env)).toBe(true);
+    expect(env.probe).toHaveBeenCalledOnce();
     expect(env.writeLast).toHaveBeenCalledWith(1_000_000);
     expect(env.purge).toHaveBeenCalledOnce();
     expect(env.reload).toHaveBeenCalledOnce();
@@ -29,14 +34,14 @@ describe('recoverFromStaleBuild', () => {
 
   it('declines a second purge inside the window, so it cannot loop', async () => {
     const env = makeEnv({ readLast: vi.fn().mockReturnValue(1_000_000 - 30_000) });
-    expect(await recoverFromStaleBuild(env)).toBe(false);
+    expect(await mod.recoverFromStaleBuild(env)).toBe(false);
     expect(env.purge).not.toHaveBeenCalled();
     expect(env.reload).not.toHaveBeenCalled();
   });
 
   it('purges again once the window has passed', async () => {
     const env = makeEnv({ readLast: vi.fn().mockReturnValue(1_000_000 - 61_000) });
-    expect(await recoverFromStaleBuild(env)).toBe(true);
+    expect(await mod.recoverFromStaleBuild(env)).toBe(true);
   });
 
   it('declines when storage is unavailable', async () => {
@@ -45,32 +50,95 @@ describe('recoverFromStaleBuild', () => {
         throw new Error('denied');
       }),
     });
-    expect(await recoverFromStaleBuild(env)).toBe(false);
+    expect(await mod.recoverFromStaleBuild(env)).toBe(false);
     expect(env.reload).not.toHaveBeenCalled();
   });
 
   it('reloads even when the purge throws', async () => {
     const env = makeEnv({ purge: vi.fn().mockRejectedValue(new Error('boom')) });
-    expect(await recoverFromStaleBuild(env)).toBe(true);
+    expect(await mod.recoverFromStaleBuild(env)).toBe(true);
     expect(env.reload).toHaveBeenCalledOnce();
+  });
+
+  it('declines offline without probing, purging or reloading', async () => {
+    const env = makeEnv({ online: () => false });
+    expect(await mod.recoverFromStaleBuild(env)).toBe(false);
+    expect(env.probe).not.toHaveBeenCalled();
+    expect(env.writeLast).not.toHaveBeenCalled();
+    expect(env.purge).not.toHaveBeenCalled();
+    expect(env.reload).not.toHaveBeenCalled();
+  });
+
+  describe('when the network probe fails (online, but nothing reachable)', () => {
+    it('purges nothing, reloads nothing, and does not spend the purge window', async () => {
+      const env = makeEnv({ probe: vi.fn().mockResolvedValue(false) });
+      expect(await mod.recoverFromStaleBuild(env)).toBe(false);
+      expect(env.purge).not.toHaveBeenCalled();
+      expect(env.reload).not.toHaveBeenCalled();
+      expect(env.writeLast).not.toHaveBeenCalled();
+    });
+
+    it('treats a throwing probe the same way', async () => {
+      const env = makeEnv({ probe: vi.fn().mockRejectedValue(new Error('boom')) });
+      expect(await mod.recoverFromStaleBuild(env)).toBe(false);
+      expect(env.purge).not.toHaveBeenCalled();
+      expect(env.reload).not.toHaveBeenCalled();
+    });
+
+    it('stops reporting a recovery in flight, so a later failure can try again', async () => {
+      const env = makeEnv({ probe: vi.fn().mockResolvedValue(false) });
+      await mod.recoverFromStaleBuild(env);
+      expect(mod.isRecoveringFromStaleBuild()).toBe(false);
+      expect(mod.staleBuildRecoveryOutcome()).toBeNull();
+    });
+  });
+});
+
+describe('a recovery already in flight', () => {
+  it('is reported from the moment it starts, before any await settles', () => {
+    expect(mod.isRecoveringFromStaleBuild()).toBe(false);
+    void mod.recoverFromStaleBuild(makeEnv({ probe: () => new Promise<boolean>(() => {}) }));
+    expect(mod.isRecoveringFromStaleBuild()).toBe(true);
+  });
+
+  it('is shared by a second call in the same tick: one probe, one purge, one reload', async () => {
+    const env = makeEnv();
+    const [first, second] = await Promise.all([
+      mod.recoverFromStaleBuild(env),
+      mod.recoverFromStaleBuild(env),
+    ]);
+    expect([first, second]).toEqual([true, true]);
+    expect(env.probe).toHaveBeenCalledOnce();
+    expect(env.purge).toHaveBeenCalledOnce();
+    expect(env.reload).toHaveBeenCalledOnce();
+  });
+
+  it('stays reported once reloading: the page is going away, not coming back', async () => {
+    await mod.recoverFromStaleBuild(makeEnv());
+    expect(mod.isRecoveringFromStaleBuild()).toBe(true);
+  });
+
+  it('stays false when the recovery declined', async () => {
+    await mod.recoverFromStaleBuild(makeEnv({ online: () => false }));
+    expect(mod.isRecoveringFromStaleBuild()).toBe(false);
   });
 });
 
 describe('canRecoverFromStaleBuild', () => {
   it('says yes when online and not purged inside the window', () => {
     const env = makeEnv();
-    expect(canRecoverFromStaleBuild(env)).toBe(true);
+    expect(mod.canRecoverFromStaleBuild(env)).toBe(true);
     // A check, not a claim: nothing is written until a recovery starts.
     expect(env.writeLast).not.toHaveBeenCalled();
   });
 
   it('says no offline: a purge would delete the precache and nothing could refill it', () => {
-    expect(canRecoverFromStaleBuild(makeEnv({ online: () => false }))).toBe(false);
+    expect(mod.canRecoverFromStaleBuild(makeEnv({ online: () => false }))).toBe(false);
   });
 
   it('says no inside the window', () => {
     const env = makeEnv({ readLast: vi.fn().mockReturnValue(1_000_000 - 30_000) });
-    expect(canRecoverFromStaleBuild(env)).toBe(false);
+    expect(mod.canRecoverFromStaleBuild(env)).toBe(false);
   });
 
   it('says no when storage is unavailable', () => {
@@ -79,17 +147,7 @@ describe('canRecoverFromStaleBuild', () => {
         throw new Error('denied');
       }),
     });
-    expect(canRecoverFromStaleBuild(env)).toBe(false);
-  });
-});
-
-describe('recoverFromStaleBuild offline', () => {
-  it('declines without purging or reloading', async () => {
-    const env = makeEnv({ online: () => false });
-    expect(await recoverFromStaleBuild(env)).toBe(false);
-    expect(env.writeLast).not.toHaveBeenCalled();
-    expect(env.purge).not.toHaveBeenCalled();
-    expect(env.reload).not.toHaveBeenCalled();
+    expect(mod.canRecoverFromStaleBuild(env)).toBe(false);
   });
 });
 
@@ -98,7 +156,7 @@ describe('purgeStaleBuildCaches', () => {
     const names = [
       'workbox-precache-v2-https://neocom.example/',
       'sde-data',
-      'dogma-engine-v1',
+      'dogma-engine-assets-1.2.3+4.5.6',
       'eve-type-images',
     ];
     const deleted: string[] = [];
@@ -114,29 +172,11 @@ describe('purgeStaleBuildCaches', () => {
       serviceWorker: { getRegistrations: async () => [{ unregister }] },
     });
     try {
-      await purgeStaleBuildCaches();
+      await mod.purgeStaleBuildCaches();
     } finally {
       vi.unstubAllGlobals();
     }
     expect(deleted).toEqual(['workbox-precache-v2-https://neocom.example/']);
     expect(unregister).toHaveBeenCalledOnce();
-  });
-});
-
-describe('isRecoveringFromStaleBuild', () => {
-  it('turns true once a recovery has started, so a cancelled import can wait for the reload', async () => {
-    vi.resetModules();
-    const fresh = await import('./staleBuildRecovery');
-    expect(fresh.isRecoveringFromStaleBuild()).toBe(false);
-    const env = makeEnv({ purge: vi.fn(() => new Promise<void>(() => {})) });
-    void fresh.recoverFromStaleBuild(env);
-    expect(fresh.isRecoveringFromStaleBuild()).toBe(true);
-  });
-
-  it('stays false when the recovery declined', async () => {
-    vi.resetModules();
-    const fresh = await import('./staleBuildRecovery');
-    await fresh.recoverFromStaleBuild(makeEnv({ online: () => false }));
-    expect(fresh.isRecoveringFromStaleBuild()).toBe(false);
   });
 });

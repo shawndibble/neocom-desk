@@ -20,6 +20,8 @@ const RELOAD_KEY = 'neocom:stale-build-purge-at';
 /** One purge per window, so an unreachable chunk (offline) cannot loop. */
 const PURGE_WINDOW_MS = 60_000;
 const STEP_TIMEOUT_MS = 3000;
+/** How long the pre-purge network probe may take before the recovery is abandoned. */
+const PROBE_TIMEOUT_MS = 5000;
 
 /** The precache cache names Workbox creates (`workbox-precache-v2-<scope>`). */
 const PRECACHE_PREFIX = 'workbox-precache';
@@ -30,6 +32,8 @@ export interface StaleBuildEnv {
   /** Throws when storage is unavailable. */
   readLast: () => number;
   writeLast: (at: number) => void;
+  /** Whether the network can serve a fresh shell right now (bounded, never throws). */
+  probe: () => Promise<boolean>;
   purge: () => Promise<void>;
   reload: () => void;
 }
@@ -60,26 +64,61 @@ export async function purgeStaleBuildCaches(): Promise<void> {
   await bounded(Promise.all([unregister, clear]));
 }
 
+/**
+ * A `no-store` HEAD of the worker script: it is not in the precache, so the
+ * service worker passes it to the network. (`/` or `index.html` would be
+ * answered from the very precache about to be deleted and prove nothing.)
+ */
+async function probeNetwork(): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}sw.js`, {
+      method: 'HEAD',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function defaultStaleBuildEnv(): StaleBuildEnv {
   return {
     now: () => Date.now(),
     online: () => navigator.onLine !== false,
     readLast: () => Number(sessionStorage.getItem(RELOAD_KEY) ?? 0),
     writeLast: (at) => sessionStorage.setItem(RELOAD_KEY, String(at)),
+    probe: probeNetwork,
     purge: purgeStaleBuildCaches,
     reload: () => window.location.reload(),
   };
 }
 
-let recovering = false;
+/** The recovery in flight (or finished and reloading); null when none has started or one aborted. */
+let inFlight: Promise<boolean> | null = null;
 
 /**
- * True once a recovery has committed to purging and reloading. A route import
- * the handler cancelled resolves `undefined` meanwhile (Vite's preload helper);
- * `guarded` waits for the reload only then, and rejects otherwise.
+ * True while a recovery is running or has committed to reloading. Vite fires
+ * `vite:preloadError` once per failed dependency (each CSS file, then the
+ * module itself), so the handler must keep cancelling those follow-ups rather
+ * than let them reject into the error boundary mid-recovery.
  */
 export function isRecoveringFromStaleBuild(): boolean {
-  return recovering;
+  return inFlight !== null;
+}
+
+/**
+ * Settles with whether the page is reloading (`true`) or the recovery gave up
+ * (`false`); null with none in flight. A route import the handler cancelled
+ * resolves `undefined` meanwhile (Vite's preload helper), and `guarded` waits
+ * on this: a reload means stay pending, an abort means reject into the boundary.
+ */
+export function staleBuildRecoveryOutcome(): Promise<boolean> | null {
+  return inFlight;
 }
 
 /**
@@ -98,17 +137,15 @@ export function canRecoverFromStaleBuild(env: StaleBuildEnv = defaultStaleBuildE
   }
 }
 
-/** Resolves `false` when it declined (offline, purged this minute, no storage). */
-export async function recoverFromStaleBuild(
-  env: StaleBuildEnv = defaultStaleBuildEnv()
-): Promise<boolean> {
-  if (!canRecoverFromStaleBuild(env)) return false;
+async function run(env: StaleBuildEnv): Promise<boolean> {
+  // Prove the network can serve the fresh shell before deleting the only copy
+  // that runs: `onLine` is true on a captive portal or a LAN with no internet.
+  if (!(await env.probe().catch(() => false))) return false;
   try {
     env.writeLast(env.now());
   } catch {
     return false;
   }
-  recovering = true;
   try {
     await env.purge();
   } catch {
@@ -116,4 +153,24 @@ export async function recoverFromStaleBuild(
   }
   env.reload();
   return true;
+}
+
+/**
+ * Resolves `false` when it declined or gave up (offline, purged this minute,
+ * no storage, the network probe failed); nothing is purged or reloaded then.
+ * A second call while one is in flight shares its outcome.
+ */
+export function recoverFromStaleBuild(
+  env: StaleBuildEnv = defaultStaleBuildEnv()
+): Promise<boolean> {
+  if (inFlight) return inFlight;
+  if (!canRecoverFromStaleBuild(env)) return Promise.resolve(false);
+  const attempt = run(env).then((reloading) => {
+    // An aborted attempt frees the next failure to try again; a reloading one
+    // stays set until the page is gone.
+    if (!reloading) inFlight = null;
+    return reloading;
+  });
+  inFlight = attempt;
+  return attempt;
 }

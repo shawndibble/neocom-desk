@@ -17,6 +17,7 @@ import { installTranslateGuard } from './app/translateGuard';
 import {
   canRecoverFromStaleBuild,
   defaultStaleBuildEnv,
+  isRecoveringFromStaleBuild,
   recoverFromStaleBuild,
 } from './app/staleBuildRecovery';
 import './i18n';
@@ -27,12 +28,20 @@ import './styles/index.css';
 // ran the old entry, or the service worker's precache still serves the old
 // `index.html`. Vite announces that as `vite:preloadError`. A plain reload
 // cannot cure the second case, so drop the worker and its precache first
-// (`app/staleBuildRecovery.ts`). The decision is made here, synchronously:
-// cancelling the failure (`preventDefault`) is only safe when a recovery will
-// follow. Offline (a purge would leave nothing to reload into) or once per
-// minute (a genuinely unreachable chunk, a broken deploy) the failure is left
-// alone, the import rejects, and the route's error boundary renders.
+// (`app/staleBuildRecovery.ts`). Whether to cancel the failure
+// (`preventDefault`) is decided here, synchronously, and only when a recovery
+// will follow: offline, or once per minute (a genuinely unreachable chunk, a
+// broken deploy), the failure is left alone, the import rejects, and the
+// route's error boundary renders. A recovery whose network probe then fails
+// (online, but no route to the host) purges nothing, and `guarded` rejects the
+// cancelled import into the same boundary.
 window.addEventListener('vite:preloadError', (event) => {
+  // Vite fires this once per failed dependency; follow-ups to a recovery
+  // already running are cancelled too, not rejected into the error boundary.
+  if (isRecoveringFromStaleBuild()) {
+    event.preventDefault();
+    return;
+  }
   const env = defaultStaleBuildEnv();
   if (!canRecoverFromStaleBuild(env)) return;
   event.preventDefault();

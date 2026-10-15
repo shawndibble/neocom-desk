@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { LAZY_SDE_FILES, lazySdeGlobIgnores } from './lazySdeFiles';
-import { LAZY_SDE_FILES as WARMED } from './warmLazySde';
 
 const dataDir = join(process.cwd(), 'public', 'data');
 const viteConfig = readFileSync(join(process.cwd(), 'vite.config.ts'), 'utf-8');
@@ -16,10 +15,6 @@ describe('LAZY_SDE_FILES', () => {
 
   it('has no duplicates', () => {
     expect(new Set(LAZY_SDE_FILES).size).toBe(LAZY_SDE_FILES.length);
-  });
-
-  it('is exactly what the background warm fetches', () => {
-    expect(WARMED).toBe(LAZY_SDE_FILES);
   });
 
   it('is what vite.config.ts ignores for the precache, and nothing under data/ beyond it', () => {

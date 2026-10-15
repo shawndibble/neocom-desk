@@ -4,7 +4,9 @@ import { LAZY_SDE_FILES, warmLazySde } from './warmLazySde';
 const warmDogma = vi.fn(async () => {});
 vi.mock('@/features/fittings/dogmaFittingEngine', () => ({ warmDogmaEngineAssets: warmDogma }));
 
-const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+const fetchMock = vi.fn<(url: string) => Promise<Response>>(
+  async () => new Response('{}', { status: 200 })
+);
 
 function env(opts: { controller?: boolean; online?: boolean; connection?: object }) {
   vi.stubGlobal('navigator', {
@@ -27,6 +29,8 @@ describe('warmLazySde', () => {
     env({});
     await warmLazySde({ cancelled: false });
     expect(fetchMock).toHaveBeenCalledTimes(LAZY_SDE_FILES.length);
+    const fetched = fetchMock.mock.calls.map(([url]) => String(url));
+    LAZY_SDE_FILES.forEach((file, i) => expect(fetched[i]).toContain(`data/${file}`));
     expect(LAZY_SDE_FILES.length).toBeLessThanOrEqual(64);
     expect(warmDogma).toHaveBeenCalledOnce();
   });
