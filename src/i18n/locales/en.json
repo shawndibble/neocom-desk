@@ -10177,10 +10177,21 @@
     "deviceDeleteUnpurged_one": "The synced data for {{names}} could not be deleted from the sync server (offline, or the login has expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "faq": {
-      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device.",
+      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device. The exceptions are listed below: alerts you have seen, push and Alerts when closed if you turn them on, and anything you choose to share with a Community.",
+      "groups": {
+        "using": "Using Neocom Desk",
+        "data": "Your data"
+      },
       "q": {
+        "permissions": "Why does login ask for so many permissions?",
+        "dataLag": "Why do my numbers differ from, or lag behind, the game?",
+        "alerts": "What are Alerts, and how do I get them when the app is closed?",
+        "characters": "Can I use several Characters?",
+        "phone": "Does it work on a phone?",
+        "communities": "What is a Community, and what do Members see?",
         "synced": "What syncs between my devices?",
         "local": "What stays on this device?",
+        "communityData": "What do Communities share?",
         "retention": "How long is my data stored?",
         "writes": "Does Neocom Desk change anything in EVE?",
         "delete": "How do I delete my data?",
@@ -10191,10 +10202,16 @@
         "backups": "How do backups work?"
       },
       "a": {
-        "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Another device still logged in keeps its own copy and can sync it back. Log out of all characters clears this device only.",
+        "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Another device still logged in keeps its own copy and can sync it back. Log out of all characters clears this device only. Communities are separate: Delete all data does not remove a Character from a Community or delete what it shared there. Leave each Community first, which deletes your shared data and your Requests and Pledges there right away. A Character no device has synced in 90 days is removed from its Communities automatically. A Community's admin can't leave: hand the Community to someone else, or delete it, which deletes it for every Member.",
         "install": "<link>Settings › Data & storage › Install this app</link> shows the steps for your browser, or an Install button where your browser offers one. On iPhone and iPad this is also what makes notifications work.",
         "update": "The app updates itself in the background. To get a new version now, open Settings › Data & storage and press Update now: it checks and reloads.",
-        "pushKinds": "Only alerts whose time is known ahead: a skill level finishing, training stopping or a queue ending, an industry job finishing, a courier delivery due, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Everything else needs the app open. Turn them on in Settings › Notifications."
+        "pushKinds": "Alerts whose time is known ahead: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract about to expire, market orders about to lapse, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Turn them on in Settings › Notifications.",
+        "permissions": "Plain login asks for everything the pages read from EVE, because EVE grants permissions only at login and a page can't read what you haven't granted. You don't have to accept the lot: <custom>Log in with custom permissions</custom> on the login page lets you pick, and only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions. To take one away, revoke it on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in grant, and Alerts when closed is a further, notifications-only grant per Character.",
+        "dataLag": "Neocom Desk reads EVE's ESI, not the game client, and ESI is not live. For a Character's own data it reuses what it fetched in the last 10 minutes (a day for game constants such as item names), or until EVE says the data may change if that is later, so moving between pages doesn't ask again. EVE itself caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows how old the data is: amber after an hour, red after a day. It is hidden on a narrow screen, so <data>Settings › Data & storage</data> lists the last update of every source. Where a page has a Refresh button, it asks EVE again straight away.",
+        "alerts": "Alerts are the bell panel (press A). While the app is open it checks each Character and raises an Alert for the events you switched on in Settings › Notifications. With the app closed you get two things. Alerts whose time is known ahead, such as a skill finishing, are scheduled up to 72 hours in advance and pushed to a device that has notifications on. And Alerts when closed, which is off until you turn it on per Character: you authorize that Character a second time for notifications only, and our server then checks EVE's notifications about every 15 minutes and pushes the types you enabled. Turn off deletes that token. On iPhone and iPad, install the app first.",
+        "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C to open Characters). Pick which Character you are looking at from the switcher, and sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character, and some pages, such as Contacts, can show all your Characters together.",
+        "phone": "Yes. In a phone browser, or installed to the home screen, the same pages use a narrower layout with a bottom navigation. Neocom Desk is designed first for a desktop beside the game, so dense tables and editors are easier on a larger screen, and the age badge is hidden on a phone. On iPhone and iPad, notifications only work once the app is installed.",
+        "communities": "A Community is a named group of Characters under one admin, up to 100 Members, with each Character in up to 10 Communities. You create one or join with an invite link, and the admin can require approval first. Each Character joins on its own and shares only what you pick: blueprints, Fittings and Skill Plans. Members can also post Requests for items and Pledge to fill each other's. Every Member sees the roster of Character names, and what each Member shared, Requests and Pledges, as listed under What do Communities share? The admin also sees who is waiting to join, can remove Members, Requests and Pledges, and can delete the Community. Leaving deletes what you shared there right away."
       },
       "store": {
         "synced": {
@@ -10227,7 +10244,7 @@
         },
         "local": {
           "title": "Kept on this device only",
-          "description": "Everything read from EVE is cached here and never uploaded.",
+          "description": "Everything read from EVE is cached here and is not uploaded, apart from what you choose to share with a Community or turn on for alerts.",
           "esi": "Your characters' EVE data: assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
           "corp": "Corporation data: wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and LP stores.",
@@ -10238,11 +10255,22 @@
           "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers.",
           "ansiblex": "Route Safety's Ansiblex jump gate list, and whether Route Safety uses it. Structure access is private alliance information, so it never leaves this device."
         },
+        "communities": {
+          "title": "Shared with a Community you join",
+          "description": "Only if you create or join a Community, and only the parts you pick. Every Member of that Community can read it, and it sits on our server (Google Firebase), filed under your Character's EVE ID.",
+          "membership": "Your Character's name and EVE ID, and which Communities it is in. The admin also sees a Character waiting to join and the mail invites they sent.",
+          "blueprints": "Blueprints you share: type, ME/TE, runs, and the station or structure and system each one sits in. Never containers, hangars or item IDs. Read from your assets on this device and kept current automatically while the app is open.",
+          "fittings": "Fittings you share: name, hull and share code. Never notes or your skills.",
+          "plans": "Skill Plans you share, one at a time: name and ordered skill targets. Never milestones, implants or your trained skills.",
+          "requests": "Requests you post: the items and quantities, a location, a one-line note, whether you want to hear about Pledges in the app or by mail, and your Character's name.",
+          "pledges": "Pledges you make: quantities, what you marked delivered, and the IDs of the contracts behind it. The contract IDs and delivered amounts come from your finished contracts, read on this device and uploaded while the app is open. Nothing else about the contracts is.",
+          "mail": "Mail about invites and Pledges is sent from your own Character, so its text goes to EVE and not to us. Our server records only who was mailed and when, to enforce a daily limit."
+        },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
           "crashes": "Crash reports: the error and the page it happened on. No IP addresses; request and response bodies are never captured; EVE tokens are stripped first.",
           "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
-          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account, saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
+          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
           "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
@@ -10280,7 +10308,11 @@
           "push": "Push notification text, if on:",
           "pushKept": "the next 72 hours of alerts, plus alerts already sent for 30 days.",
           "idle": "An account no device has synced in:",
-          "idleKept": "90 days, then all of its synced data is deleted."
+          "idleKept": "90 days, then all of its synced data is deleted and the Character is removed from its Communities. A Community it administers is deleted.",
+          "community": "What you shared in a Community:",
+          "communityKept": "until you leave, an admin removes you, or the Community is deleted. Then it is deleted right away.",
+          "communityRequests": "Community Requests, with their Pledges:",
+          "communityRequestsKept": "30 days after posting or your last Extend, then 7 more days before they are deleted. A closed Request is deleted 7 days after it closes."
         }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."
@@ -10300,8 +10332,8 @@
       "skillsTitle": "Finding skills to train",
       "skillsIntro": "Every Add button puts the skill in your target Skill Plan. Ways to start:",
       "skillsQueue": "Copy your in-game queue: Skills > Plans > a plan > Import > From skill queue.",
-      "skillsCertified": "Follow a CCP career path: Skills > Plans > From a Certified Plan.",
-      "skillsShip": "Fly a hull: Ship Tree > a ship > Skills & Mastery.",
+      "skillsCertified": "Follow a CCP career path: Skills > Plans > the arrow beside New plan > From a Certified Plan.",
+      "skillsShip": "Fly a hull: Ships > Tree > a ship > Skills & Mastery.",
       "skillsFit": "Improve a fit: the Missing skills chip and What to train panel in Fittings.",
       "skillsSearch": "Know the name: search in the plan editor, or browse Skills > Trained and add the next level.",
       "skillsPaste": "Bring a plan from elsewhere: Import > From text or file (skill lists, .emp, .xml, EFT fits).",

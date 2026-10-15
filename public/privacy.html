@@ -44,7 +44,7 @@
   <body>
     <main>
       <h1>Privacy Policy — Neocom Desk</h1>
-      <p class="updated">Last updated: October 10, 2026</p>
+      <p class="updated">Last updated: October 15, 2026</p>
 
       <p>
         Neocom Desk is an independent, unofficial companion tool for the game
@@ -63,10 +63,11 @@
       <p>
         Most of this access is read-only. Five actions in the app write back to your EVE account on
         your behalf, only when you take them: marking a mail as read, sending a mail you composed in
-        the app, responding (accept/decline/tentative) to a calendar event invite, saving a fitting
-        to your in-game fittings, and setting your autopilot waypoints. The login screen's
-        &ldquo;Log in with custom permissions&rdquo; lets you grant less, and EVE's own consent
-        screen lists every permission before you approve it.
+        the app (including a Community invite or Pledge mail, below), responding
+        (accept/decline/tentative) to a calendar event invite, saving a fitting to your in-game
+        fittings, and setting your autopilot waypoints. The login screen's &ldquo;Log in with custom
+        permissions&rdquo; lets you grant less, and EVE's own consent screen lists every permission
+        before you approve it.
       </p>
 
       <h2>Where your data lives</h2>
@@ -92,7 +93,49 @@
         name, email, or any real-world identity. Removing a character from the app only clears it
         from that device. Its synced data is deleted from Firebase automatically once no device has
         synced that character for 90 days, or right away with <strong>Delete all data</strong> in
-        the app's Settings.
+        the app's Settings. Community data, below, is separate.
+      </p>
+
+      <h2>Communities (optional)</h2>
+      <p>
+        Communities are the other exception to &ldquo;what the app reads stays on your
+        device&rdquo;, and they exist only if you create or join one. Each character joins on its
+        own, by invite link or invite mail, and nothing is shared until you pick it. A Community is
+        stored on Google Firebase, and every Member of that Community (a Member is one character,
+        not a person) can read what is in it. That is:
+      </p>
+      <ul>
+        <li>
+          your character's name and EVE character ID, and which Communities it is in. The
+          Community's admin also sees characters waiting to join and the mail invites they sent;
+        </li>
+        <li>
+          the blueprints you choose to share: type, ME/TE, runs and the station or structure and
+          system each is in (read from your assets on your device; never containers, hangars or item
+          IDs);
+        </li>
+        <li>
+          the Fittings you share (name, hull and share code) and Skill Plans you share (name and
+          skill targets);
+        </li>
+        <li>
+          the Requests you post (items, quantities, location, a short note, how you want to hear
+          about Pledges, and your character's name);
+        </li>
+        <li>
+          the Pledges you make: quantities, what you marked delivered, and the IDs of the contracts
+          behind it, taken from your finished contracts on your device.
+        </li>
+      </ul>
+      <p>
+        Invite and Pledge mails are sent from your own character through EVE, so their text goes to
+        EVE and not to the app's server, which only records who was mailed and when to enforce a
+        daily limit. Everything you shared is deleted right away when you leave, are removed, or the
+        Community is deleted. Requests expire 30 days after they are posted or last extended, and
+        are deleted, with their Pledges, 7 days after they expire or close. If no device has synced
+        a character for 90 days it is removed from its Communities, and a Community it administers
+        is deleted. <strong>Delete all data</strong> does not remove you from a Community: leave it
+        first.
       </p>
 
       <h2>Crash and error reporting</h2>

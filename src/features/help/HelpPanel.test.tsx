@@ -33,7 +33,7 @@ describe('HelpPanel', () => {
     expect(screen.getByRole('heading', { name: /finding skills to train/i })).toBeInTheDocument();
     expect(screen.getByText(/From skill queue/i)).toBeInTheDocument();
     expect(screen.getByText(/Certified Plan/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ship Tree/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ships > Tree/)).toBeInTheDocument();
   });
 
   it('names the pilot to thank', () => {
