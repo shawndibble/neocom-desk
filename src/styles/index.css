@@ -1,17 +1,13 @@
 @import 'tailwindcss' source(none);
 
 /*
- * Opts every same-origin navigation — including the reload
- * ReloadPrompt.tsx triggers to apply a waiting service-worker update — into
- * the browser's native cross-document View Transition, where supported
- * (Chromium). The browser cross-fades the outgoing and incoming documents
- * itself, which reads far smoother than ReloadPrompt's cover-div fallback;
- * that fallback still runs underneath for browsers without support, since
- * this rule is a no-op there. Requires the outgoing page to have already
- * shipped this rule too — the very next deploy after this one is the first
- * to get the native transition; until then ReloadPrompt's own fade covers
- * it. Gated on prefers-reduced-motion since @view-transition offers no
- * built-in opt-out.
+ * Opts every same-origin navigation — including the reload that applies a
+ * waiting service-worker update at boot (bootUpdate.ts) or from Settings →
+ * Update now — into the browser's native cross-document View Transition,
+ * where supported (Chromium). The browser cross-fades the outgoing and
+ * incoming documents itself; the boot screen (BootCoverHost) is already on
+ * screen underneath. This rule is a no-op in browsers without support. Gated on
+ * prefers-reduced-motion since @view-transition offers no built-in opt-out.
  */
 @media (prefers-reduced-motion: no-preference) {
   @view-transition {
@@ -1459,5 +1455,195 @@
   ::selection {
     background-color: var(--color-selection);
     color: var(--color-text);
+  }
+}
+
+/*
+ * Landing page: the sticky header's anchor links scroll smoothly (motion only
+ * for people who have not asked for less), and the small login button slides
+ * in when the hero's large one scrolls out of view.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.landing-root) {
+    scroll-behavior: smooth;
+  }
+}
+
+/*
+ * Landing page motion (scroll reveal, hero entry, CTA glow, demo float and
+ * alert pulse). Everything that moves is inside `no-preference`; without it,
+ * or without JS, the page is simply static and fully visible. `Reveal` only
+ * sets data-reveal="hidden" on below-the-fold elements when motion is allowed.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .lp-reveal {
+    transition:
+      opacity 500ms ease-out var(--lp-delay, 0ms),
+      transform 500ms ease-out var(--lp-delay, 0ms);
+  }
+  .lp-reveal[data-reveal='hidden'] {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  @keyframes lp-hero-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+  .lp-hero-in {
+    animation: lp-hero-in 600ms ease-out both;
+  }
+  .lp-hero-in-0 {
+    animation-delay: 0ms;
+  }
+  .lp-hero-in-1 {
+    animation-delay: 90ms;
+  }
+  .lp-hero-in-2 {
+    animation-delay: 180ms;
+  }
+  .lp-hero-in-3 {
+    animation-delay: 270ms;
+  }
+
+  /* Accent glow behind the hero login button. Static: an infinite animation on a large gradient layer made scrolling choppy. */
+  .lp-cta-glow {
+    position: relative;
+    isolation: isolate;
+  }
+  .lp-cta-glow::before {
+    content: '';
+    position: absolute;
+    inset: -1.5rem -3rem;
+    z-index: -1;
+    border-radius: 9999px;
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--color-accent) 22%, transparent),
+      transparent
+    );
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  /* The demo frame drifts up to 12px as the page scrolls (--lp-float set by OverviewDemo). */
+  .lp-float {
+    transform: translateY(var(--lp-float, 0px));
+    will-change: transform;
+  }
+
+  @keyframes lp-badge-pulse {
+    40% {
+      transform: scale(1.5);
+      box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 35%, transparent);
+    }
+  }
+  .lp-badge-pulse {
+    animation: lp-badge-pulse 700ms ease-out;
+  }
+}
+
+/*
+ * Landing page backdrops (LandingSection / LandingBackdrop). Every band keeps
+ * the page background; a tone layer sits behind the content and fades out at
+ * its top and bottom edge, so bands blend into one another instead of being
+ * cut by a rule. Stars are tiled radial-gradients and the nebula is a few
+ * blurred accent/violet washes: no image is downloaded for either. Ship
+ * renders (public/landing, CCP imagery) are decorative, dimmed and masked so
+ * body text stays above AA contrast. Nothing here animates: an infinite
+ * animation on these full-bleed layers made scrolling choppy.
+ */
+.lp-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 5rem,
+    #000 calc(100% - 5rem),
+    transparent
+  );
+}
+.lp-layer-panel {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--color-panel) 70%, var(--color-bg)),
+    color-mix(in oklab, var(--color-panel) 80%, var(--color-panel-2))
+  );
+}
+.lp-layer-space {
+  background:
+    radial-gradient(
+      60rem 28rem at 85% 0%,
+      color-mix(in oklab, #6b4bd6 22%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      50rem 26rem at 10% 100%,
+      color-mix(in oklab, var(--color-accent-dim) 30%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      30rem 16rem at 50% 50%,
+      color-mix(in oklab, #6b4bd6 10%, transparent),
+      transparent 70%
+    ),
+    #06090e;
+}
+.lp-layer-space::before,
+.lp-layer-space::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.lp-layer-space::before {
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, rgb(255 255 255 / 0.8), transparent),
+    radial-gradient(1px 1px at 110px 140px, rgb(255 255 255 / 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 170px 60px, rgb(190 233 255 / 0.8), transparent),
+    radial-gradient(1px 1px at 60px 190px, rgb(255 255 255 / 0.5), transparent);
+  background-size: 210px 210px;
+}
+.lp-layer-space::after {
+  background-image:
+    radial-gradient(1px 1px at 40px 90px, rgb(255 255 255 / 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 250px 40px, rgb(255 226 190 / 0.7), transparent),
+    radial-gradient(1px 1px at 180px 260px, rgb(255 255 255 / 0.6), transparent);
+  background-size: 337px 313px;
+}
+.lp-ship {
+  position: absolute;
+  top: 0.5rem;
+  z-index: -1;
+  width: 20rem;
+  height: 20rem;
+  max-width: none;
+  opacity: 0.3;
+  pointer-events: none;
+  user-select: none;
+  mask-image: linear-gradient(to bottom, #000 25%, transparent 85%);
+}
+.lp-ship-right {
+  right: -7rem;
+}
+.lp-ship-left {
+  left: -7rem;
+  transform: scaleX(-1);
+}
+@media (min-width: 64rem) {
+  .lp-ship {
+    width: 30rem;
+    height: 30rem;
+    opacity: 0.4;
+  }
+  .lp-ship-right {
+    right: -4rem;
+  }
+  .lp-ship-left {
+    left: -4rem;
   }
 }

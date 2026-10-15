@@ -2,24 +2,24 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  IconButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   StatChip,
-  StatChips,
+  Tooltip,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { routeExposure } from '@/features/route/routeExposure';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { useJumpBasis } from '@/features/route/jumpBasis';
-import { HintText } from '@/components/ui/HintText';
-import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
-import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
-import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
-import { useMediaQuery } from '@/lib/useMediaQuery';
 import { useNow } from '@/lib/useNow';
 import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { eveClock } from './colonies/coloniesFormat';
@@ -67,9 +67,11 @@ interface Home {
 }
 
 /**
- * The strip under the PI tabs, shared by all three: where the pilot's colonies
- * are (with none, where the pilot is), how many, the way to the sell market,
- * which market that is, and (on Colonies) EVE time. Only what there is data
+ * The strip under the PI tabs, shared by all three: one slim row with the sell
+ * market, the nearest-hub nudge, an Est. chip and an "i" popover holding where
+ * the pilot's colonies are (with none, where the pilot is), how many, the way
+ * to the sell market and (on Colonies) EVE time. Settings live behind the page
+ * header's gear, not here. Only what there is data
  * for today: a field with no source is left out.
  */
 export function PiHeaderStrip({
@@ -81,8 +83,6 @@ export function PiHeaderStrip({
 }: Props) {
   const { t } = useTranslation();
   const { hub, buybackPct, hubChosen, setHub, setBuyback, keepHub } = useSellHub();
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const mdUp = useMediaQuery('(min-width: 48rem)');
   const basis = useJumpBasis();
   const colonyHome = homeSystemId(colonySystemIds);
   const [located, setLocated] = useState<{
@@ -163,36 +163,59 @@ export function PiHeaderStrip({
   const shownHome = home?.systemId === homeId ? home : null;
   const figures = buybackPct === null && route?.key === routeKey ? route.figures : null;
 
+  const homeChip = homeId !== null && shownHome?.name && (
+    <StatChip
+      label={t(`piPlan.strip.${label.home}`)}
+      value={
+        <>
+          {shownHome.name}
+          {shownHome.security !== null && (
+            <>
+              {' '}
+              <span style={{ color: securityStatusColor(shownHome.security) }}>
+                {shownSecurityText(shownHome.security)}
+              </span>
+            </>
+          )}
+        </>
+      }
+    />
+  );
+  const routeChip =
+    buybackPct !== null && homeId !== null ? (
+      <StatChip
+        label={t(`piPlan.strip.${label.route}`)}
+        value={t(`piPlan.strip.${label.dropOff}`)}
+      />
+    ) : figures ? (
+      <StatChip
+        label={t(`piPlan.strip.${label.route}`)}
+        value={
+          <>
+            {t('piPlan.strip.jumps', { count: figures.jumps, hub: hub.systemName })}
+            {figures.lowsecJumps > 0 && (
+              <span className="text-warning">
+                {' · '}
+                {t('piPlan.strip.lowsecJumps', { count: figures.lowsecJumps })}
+              </span>
+            )}
+            {figures.nullsecJumps > 0 && (
+              <span className="text-danger">
+                {' · '}
+                {t('piPlan.strip.nullsecJumps', { count: figures.nullsecJumps })}
+              </span>
+            )}
+          </>
+        }
+      />
+    ) : null;
+
+  // One slim row: the sell market first, the facts about home behind an "i".
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="pi-header-strip">
-      <StatChips>
-        {homeId !== null && shownHome?.name && (
-          <StatChip
-            label={t(`piPlan.strip.${label.home}`)}
-            value={
-              <>
-                {shownHome.name}
-                {shownHome.security !== null && (
-                  <>
-                    {' '}
-                    <span style={{ color: securityStatusColor(shownHome.security) }}>
-                      {shownSecurityText(shownHome.security)}
-                    </span>
-                  </>
-                )}
-              </>
-            }
-          />
-        )}
-        <StatChip
-          label={t('piPlan.strip.colonies')}
-          value={colonyCountUnknown ? '—' : colonySystemIds.length}
-        />
-        {eveTime && <EveTimeChip />}
-      </StatChips>
-      <label className="flex flex-wrap items-center gap-x-2 gap-y-1 max-md:flex-col max-md:items-start">
-        <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('piPlan.strip.sellAt')}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="pi-header-strip">
+      <div className="flex items-center gap-2">
+        <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase max-md:sr-only">
+          {t('piPlan.strip.sellAtShort')}
         </span>
         <Select
           value={buybackPct === null ? hub.id : BUYBACK}
@@ -201,7 +224,7 @@ export function PiHeaderStrip({
           }
         >
           <SelectTrigger
-            size={mdUp ? 'sm' : 'md'}
+            size="sm"
             className="w-auto min-w-40"
             aria-label={t('piPlan.strip.sellAt')}
           >
@@ -219,7 +242,7 @@ export function PiHeaderStrip({
         {buybackPct !== null && (
           <Select value={String(buybackPct)} onValueChange={(pct) => setBuyback(Number(pct))}>
             <SelectTrigger
-              size={mdUp ? 'sm' : 'md'}
+              size="sm"
               className="w-auto min-w-40"
               aria-label={t('piPlan.strip.buybackRate')}
             >
@@ -236,7 +259,7 @@ export function PiHeaderStrip({
             </SelectContent>
           </Select>
         )}
-      </label>
+      </div>
       {nearest && nearestOption && buybackPct === null && (
         <div
           className="flex flex-wrap items-center gap-2 text-sm"
@@ -257,61 +280,56 @@ export function PiHeaderStrip({
           </Button>
         </div>
       )}
-      {buybackPct !== null && homeId !== null && (
-        <StatChips>
-          <StatChip
-            label={t(`piPlan.strip.${label.route}`)}
-            value={t(`piPlan.strip.${label.dropOff}`)}
-          />
-        </StatChips>
-      )}
-      {figures && (
-        <StatChips>
-          <StatChip
-            label={t(`piPlan.strip.${label.route}`)}
-            value={
-              <>
-                {t('piPlan.strip.jumps', { count: figures.jumps, hub: hub.systemName })}
-                {figures.lowsecJumps > 0 && (
-                  <span className="text-warning">
-                    {' · '}
-                    {t('piPlan.strip.lowsecJumps', { count: figures.lowsecJumps })}
-                  </span>
-                )}
-                {figures.nullsecJumps > 0 && (
-                  <span className="text-danger">
-                    {' · '}
-                    {t('piPlan.strip.nullsecJumps', { count: figures.nullsecJumps })}
-                  </span>
-                )}
-              </>
-            }
-          />
-        </StatChips>
-      )}
-      <button
-        type="button"
-        className={`${inlineLinkClassName} ${tappableRowClassName} text-xs`}
-        onClick={() => setSettingsOpen(true)}
-      >
-        {t('piPlan.strip.settings')}
-      </button>
-      {estimate && (
-        <span className="inline-flex items-center gap-2 text-xs text-text-dim">
-          <EstimateBadge />
-          <HintText content={t('piPlan.strip.priceNoteHint')}>
-            {t('piPlan.strip.priceNote')}
-          </HintText>
+      {figures && (figures.lowsecJumps > 0 || figures.nullsecJumps > 0) && (
+        <span className="flex items-center gap-1.5">
+          {figures.lowsecJumps > 0 && (
+            <StatChip
+              label={t('piPlan.make.lowsecChip')}
+              tone="warning"
+              value={t('piPlan.make.jumps', { count: figures.lowsecJumps })}
+            />
+          )}
+          {figures.nullsecJumps > 0 && (
+            <StatChip
+              label={t('piPlan.make.nullsecChip')}
+              tone="danger"
+              value={t('piPlan.make.jumps', { count: figures.nullsecJumps })}
+            />
+          )}
         </span>
       )}
-      <PageSettingsModal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        pageName={t('pi.title')}
-        section="industry"
-      >
-        <PiSettingsForm />
-      </PageSettingsModal>
+      <div className="ml-auto flex items-center gap-1.5">
+        {estimate && (
+          <Tooltip content={t('piPlan.strip.priceNoteHint')} openOnTap>
+            <button
+              type="button"
+              aria-label={t('piPlan.strip.priceNote')}
+              className="inline-flex min-h-6 items-center rounded-xs focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <EstimateBadge />
+            </button>
+          </Tooltip>
+        )}
+        <Popover>
+          <PopoverTrigger asChild>
+            <IconButton icon={<Icon.Info />} label={t('piPlan.strip.facts')} size="sm" />
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            aria-label={t('piPlan.strip.facts')}
+            className="flex w-[min(20rem,calc(100vw-1rem))] flex-col gap-1 p-3"
+            data-testid="pi-strip-facts"
+          >
+            {homeChip}
+            <StatChip
+              label={t('piPlan.strip.colonies')}
+              value={colonyCountUnknown ? '—' : colonySystemIds.length}
+            />
+            {routeChip}
+            {eveTime && <EveTimeChip />}
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }

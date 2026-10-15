@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { forceUpdate } from './forceUpdate';
+import { hideBootCover, useBootCover } from './bootCover';
+import { renderHook } from '@testing-library/react';
 
 const reload = vi.fn();
 const realServiceWorker = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
@@ -14,6 +16,7 @@ function stubServiceWorker(registration: unknown) {
       addEventListener: (type: string, fn: () => void) => {
         listeners[type] = fn;
       },
+      removeEventListener: vi.fn(),
     },
   });
   return listeners;
@@ -27,6 +30,7 @@ describe('forceUpdate', () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     reload.mockReset();
+    hideBootCover();
     if (realServiceWorker) Object.defineProperty(navigator, 'serviceWorker', realServiceWorker);
     else Reflect.deleteProperty(navigator, 'serviceWorker');
   });
@@ -116,5 +120,33 @@ describe('forceUpdate', () => {
     });
     await expect(forceUpdate()).resolves.toBe('failed');
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('covers the page with the boot screen while swapping, and keeps it up for the reload', async () => {
+    const { result } = renderHook(() => useBootCover());
+    stubServiceWorker(undefined);
+    await forceUpdate();
+    expect(result.current).toBe(true);
+  });
+
+  it('gives up and takes the cover down when the check never settles', async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useBootCover());
+    stubServiceWorker({ update: vi.fn(() => new Promise<void>(() => {})), installing: null });
+    const done = forceUpdate();
+    await vi.advanceTimersByTimeAsync(30_000);
+    await expect(done).resolves.toBe('failed');
+    expect(reload).not.toHaveBeenCalled();
+    expect(result.current).toBe(false);
+  });
+
+  it('takes the cover down again when the check fails', async () => {
+    const { result } = renderHook(() => useBootCover());
+    stubServiceWorker({
+      update: vi.fn().mockRejectedValue(new Error('offline')),
+      installing: null,
+    });
+    await forceUpdate();
+    expect(result.current).toBe(false);
   });
 });

@@ -6,7 +6,6 @@ import { hrefWithout, MAP_ONLY_PARAMS } from '@/features/pi/piPlanLink';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import {
-  Button,
   DataAgeBadge,
   IconButton,
   PageHeader,
@@ -171,9 +170,12 @@ export function PlanetaryIndustry() {
           meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
           actions={
             <>
-              <Button size="md" onClick={() => setExplainerOpen(true)}>
-                {t('piPlan.newToPi')}
-              </Button>
+              <IconButton
+                icon={<Icon.Tip />}
+                label={t('piPlan.newToPi')}
+                visibleLabel={t('piPlan.newToPi')}
+                onClick={() => setExplainerOpen(true)}
+              />
               <PageSettingsButton pageName={t('pi.title')} section="industry">
                 <PiSettingsForm />
               </PageSettingsButton>

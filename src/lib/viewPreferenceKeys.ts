@@ -19,7 +19,7 @@
 //   classifications, which have their own undo on the ledger). Clearing any of
 //   these throws away work the pilot did on purpose.
 // - Anything with its own control on the Settings page — `fontScale`,
-//   `timeFormat`, and every Defaults/Corporation panel preference, which now
+//   `timeFormat`, `analyticsEnabled`, and every Defaults/Corporation panel preference, which now
 //   live under `sync.` keys (`sync.marketHub`, `sync.marketPricePercent`,
 //   `sync.industryAssumedMe`, `sync.industryAssumedTe`,
 //   `sync.industryFacilityDefaults`, `sync.piExpiringSoonHours`,

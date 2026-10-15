@@ -117,7 +117,7 @@ Host: `src/routes/Industry.tsx` (Plans branch `Industry.tsx:653`). Chrome above 
 
 ### 3.3 Blueprint picker (create)
 
-`BlueprintPicker.tsx`: `SearchInput` (placeholder "Search and add…", aria "Add build plan"), `searchByProductName` = lower-case substring on product name over `catalog.entries` (`blueprintCatalog.ts:124`), first 20 (`MAX_RESULTS`), no "N more" hint, no arrow-key navigation (buttons), "Owned" tag if `findOwnedBlueprint` hits. Pick: `createPlan(entry)` then clears query, stays on index (`Industry.tsx:666`). Reaction formulas are in the same catalog (activity from SDE). Search is by product name only, not blueprint name.
+`BlueprintPicker.tsx`: `SearchInput` (placeholder "Search and add…", aria "Add Build Plan"), `searchByProductName` = lower-case substring on product name over `catalog.entries` (`blueprintCatalog.ts:124`), first 20 (`MAX_RESULTS`), no "N more" hint, no arrow-key navigation (buttons), "Owned" tag if `findOwnedBlueprint` hits. Pick: `createPlan(entry)` then clears query, stays on index (`Industry.tsx:666`). Reaction formulas are in the same catalog (activity from SDE). Search is by product name only, not blueprint name.
 
 `createPlan` (`Industry.tsx:174`, `newBuildPlan.ts`): ME from owned copy else assumed ME, TE from owned else assumed TE; location from Remembered Location for the plan's activity, else most recently updated plan's location when its facility hosts the activity, else NPC station / Athanor fallback; hub + material price basis from the most recently updated plan (#456). Seeds override ME/TE/runs/name.
 

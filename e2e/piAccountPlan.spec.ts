@@ -49,7 +49,7 @@ for (const [label, viewport] of VIEWPORTS) {
     await expectNoPageOverflow(page);
 
     // Buying a tier at the hub plans too, and says what buying adds.
-    await page.getByRole('button', { name: /PI settings/i }).click();
+    await page.getByRole('button', { name: /Planetary Industry settings/i }).click();
     await page.getByRole('button', { name: 'P1', exact: true }).click();
     await expect(page.getByText('Buying at the hub')).toBeVisible({ timeout: 90_000 });
     await expect(page.getByText('Planning your planets…')).toHaveCount(0, { timeout: 90_000 });

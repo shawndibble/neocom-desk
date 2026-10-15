@@ -35,7 +35,11 @@ function option(typeId: number, iskPerDay: number, m3PerDay: number): RebuildOpt
   };
 }
 
-const win = (planetId: number, kind: 'restart' | 'storage', gain: number | null): QuickWin => ({
+export const win = (
+  planetId: number,
+  kind: 'restart' | 'storage',
+  gain: number | null
+): QuickWin => ({
   id: `${planetId}:${kind}`,
   planetId,
   detail:

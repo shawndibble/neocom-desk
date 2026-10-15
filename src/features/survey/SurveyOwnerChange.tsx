@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput, textActionClassName } from '@/components/ui';
+import { Button, Modal, SearchInput, textActionClassName } from '@/components/ui';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import {
@@ -89,7 +89,7 @@ export function SurveyOwnerChange({
       <Modal open={open} onClose={close} title={t('survey.changeOwner.title')}>
         {chosen === null ? (
           <div className="flex flex-col gap-2">
-            <TextInput
+            <SearchInput
               autoFocus
               aria-label={t('survey.changeOwner.search')}
               placeholder={t('survey.changeOwner.searchPlaceholder')}

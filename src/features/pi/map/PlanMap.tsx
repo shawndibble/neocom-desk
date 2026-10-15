@@ -62,7 +62,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
 import { clickOnSpace } from '@/lib/clickOnSpace';
-import { Button, Panel, Spinner, Tooltip, TypeIcon } from '@/components/ui';
+import { Button, InfoTooltip, Panel, Spinner, Tooltip, TypeIcon } from '@/components/ui';
 import {
   focusRingClassName,
   interactiveClassName,
@@ -779,6 +779,20 @@ export function PlanMap({
       </div>
     );
 
+  const legendTip =
+    !marks.verdict && !marks.estimate ? null : (
+      <InfoTooltip
+        label={t('piMap.legend.label')}
+        content={[
+          marks.verdict &&
+            `${t('piMap.legend.figure')} · ▲ ${t('piMap.legend.better')} · ≈ ${t('piMap.legend.same')} · ▼ ${t('piMap.legend.worse')}`,
+          marks.estimate && `${t('piMap.legend.estimate')}`,
+        ]
+          .filter(Boolean)
+          .join('\n')}
+      />
+    );
+
   const picksStrip = (
     <div
       role="group"
@@ -835,15 +849,18 @@ export function PlanMap({
               {pick.needsCcLevel && <CcLevelTag level={pick.needsCcLevel} />}
             </span>
           ))}
-          <span className="text-[0.6875rem] text-text-dim">
-            {picks.kind === 'rebuild'
-              ? t('piMap.picksNoteRebuild', {
-                  preference: t(
-                    preference === 'haul' ? 'piMap.preferenceHaul' : 'piMap.preferenceIsk'
-                  ),
-                })
-              : t('piMap.picksNoteRecipes')}
-          </span>
+          <InfoTooltip
+            label={t('piMap.picksNoteLabel')}
+            content={
+              picks.kind === 'rebuild'
+                ? t('piMap.picksNoteRebuild', {
+                    preference: t(
+                      preference === 'haul' ? 'piMap.preferenceHaul' : 'piMap.preferenceIsk'
+                    ),
+                  })
+                : t('piMap.picksNoteRecipes')
+            }
+          />
         </>
       )}
       {traced && (
@@ -916,16 +933,23 @@ export function PlanMap({
         >
           {/* The one line that says what each click does: filter, trace, what-if. */}
           <span className="text-text">{t('piMap.hint', { context })}</span>
-          <span>
-            {noColonies
-              ? t(coloniesUnknown ? 'piMap.whatIfUnknownColonies' : 'piMap.whatIfNoColonies')
-              : missingTypes.length > 0
-                ? t('piMap.whatIfHint', {
-                    types: missingTypes.map((type) => planetName(t, type)).join(', '),
-                    context,
-                  })
-                : t('piMap.whatIfAll')}
-          </span>
+          {noColonies ? (
+            <span>
+              {t(coloniesUnknown ? 'piMap.whatIfUnknownColonies' : 'piMap.whatIfNoColonies')}
+            </span>
+          ) : (
+            <InfoTooltip
+              label={t('piMap.whatIfHintLabel')}
+              content={
+                missingTypes.length > 0
+                  ? t('piMap.whatIfHint', {
+                      types: missingTypes.map((type) => planetName(t, type)).join(', '),
+                      context,
+                    })
+                  : t('piMap.whatIfAll')
+              }
+            />
+          )}
         </div>
         {active && unlock ? preview(active, unlock, previewed === null ? best : '') : null}
         {sizingUnlocks.map((g) => (
@@ -974,16 +998,19 @@ export function PlanMap({
           meta={phone ? undefined : legend}
           padded={false}
           actions={
-            <Button
-              size={phone ? 'md' : 'sm'}
-              aria-haspopup="dialog"
-              onClick={() => {
-                remember();
-                setHelpOpen(true);
-              }}
-            >
-              {t('piMap.helpButton')}
-            </Button>
+            <span className="inline-flex items-center gap-2">
+              {phone && legendTip}
+              <Button
+                size={phone ? 'md' : 'sm'}
+                aria-haspopup="dialog"
+                onClick={() => {
+                  remember();
+                  setHelpOpen(true);
+                }}
+              >
+                {t(phone ? 'piMap.helpShort' : 'piMap.helpButton')}
+              </Button>
+            </span>
           }
         >
           <AssumedCustomsNote
@@ -992,7 +1019,6 @@ export function PlanMap({
           />
           {picksStrip}
           {phone ? null : whatIfLine}
-          {phone && legend}
           {phone ? (
             <MapPhone
               graph={graph}

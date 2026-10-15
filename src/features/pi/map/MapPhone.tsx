@@ -148,8 +148,8 @@ export function MapPhone(props: MapPhoneProps) {
                     types: product.hosts.map((type) => planetName(t, type)).join(', '),
                   })
                 : comparisonSentence(t, figure),
-              figureSentence(t, figure),
             ].filter(Boolean);
+            const exact = figureSentence(t, figure);
             return (
               <li key={product.typeId}>
                 <Link
@@ -183,6 +183,7 @@ export function MapPhone(props: MapPhoneProps) {
                       <span className="text-accent">{product.name}</span>
                     </span>
                     <span className="block text-xs text-text-dim">{sentence.join(' · ')}</span>
+                    {exact && <span className="sr-only">{exact}</span>}
                   </span>
                   {chainIsk !== null && (
                     <ChainTileFigure iskPerDay={chainIsk} className="shrink-0 text-xs" />

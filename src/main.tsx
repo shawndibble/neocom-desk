@@ -9,6 +9,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { reactErrorHandler } from '@sentry/react';
 import { App } from './app/App';
+import { BootCoverHost } from './app/BootCoverHost';
+import { BootUpdateGate } from './app/BootUpdateGate';
+import { hideBootCover, showBootCover } from './app/bootCover';
 import { installInputModality } from './app/inputModality';
 import { installTranslateGuard } from './app/translateGuard';
 import { recoverFromStaleBuild } from './app/staleBuildRecovery';
@@ -25,7 +28,11 @@ import './styles/index.css';
 // route's error boundary instead of looping.
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
-  void recoverFromStaleBuild();
+  // Cover the page so the purge-and-reload reads as a boot; uncover if it declined.
+  showBootCover();
+  void recoverFromStaleBuild().then((reloading) => {
+    if (!reloading) hideBootCover();
+  });
 });
 
 installTranslateGuard();
@@ -43,6 +50,9 @@ createRoot(document.getElementById('root')!, {
   onRecoverableError: reactErrorHandler(),
 }).render(
   <StrictMode>
-    <App />
+    <BootUpdateGate>
+      <App />
+    </BootUpdateGate>
+    <BootCoverHost />
   </StrictMode>
 );

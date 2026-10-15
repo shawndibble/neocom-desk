@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { forceUpdate } from '@/app/forceUpdate';
 
-/** Settings → Data & storage → App updates. Skips ReloadPrompt's wait for a quiet moment. */
+/** Settings → Data & storage → App updates. Explicit "Update now": applies a waiting build through the same boot-screen cover as a boot-time update instead of waiting for the next cold start or reload. */
 export function UpdatePanel() {
   const { t } = useTranslation();
   const [updating, setUpdating] = useState(false);

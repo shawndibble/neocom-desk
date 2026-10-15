@@ -262,10 +262,11 @@ function FaultTags({ tags, planetName }: { tags: readonly FaultTag[]; planetName
 
 /**
  * The row grid from `lg`: colony, extractors, storage, next step, ⋮. The ⋮
- * column has a fixed width so `ColonyListHeader`'s labels sit over the cells.
+ * column has a fixed width so `ColonyListHeader`'s labels sit over the cells. At 1024
+ * Colony gets the width Next step (a button and a note) doesn't need.
  */
 const ROW_GRID =
-  'lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)_12rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
+  'lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)_9rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
 
 /**
  * A column's label and help. In a row (`inRow`) the list header shows both from `lg`,
@@ -282,7 +283,7 @@ function ColumnLabel({
 }) {
   const { t } = useTranslation();
   return (
-    <span className={`flex items-center gap-1 ${MICRO}`}>
+    <span className={`flex items-center gap-1 whitespace-nowrap ${MICRO}`}>
       <span className={inRow ? 'lg:sr-only' : undefined}>{label}</span>
       <span className={inRow ? 'lg:hidden' : undefined}>
         <InfoTooltip label={t('common.aboutLabel', { label })} content={help} />
@@ -413,7 +414,12 @@ export function ColonyRowView(props: ColonyRowViewProps) {
   const exactGain =
     labelGain === null ? null : t('common.iskExact', { amount: formatIsk(labelGain, 0) });
   const actionButton = (
-    <Button size="md" variant={variant} className="w-full" onClick={props.onExpand}>
+    <Button
+      size="md"
+      variant={variant}
+      className="lg:w-full max-lg:self-start"
+      onClick={props.onExpand}
+    >
       {label}
       {exactGain && <span className="sr-only"> {exactGain}</span>}
     </Button>
@@ -468,7 +474,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               return;
             props.onToggle();
           }}
-          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 lg:items-start ${ROW_GRID}`}
+          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-2 hover:bg-panel-2 lg:py-3 lg:items-start ${ROW_GRID}`}
         >
           {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
@@ -539,7 +545,13 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               {extractor.expiryMs !== null && (
                 <Meter fraction={stopped ? 1 : extractor.remainingFraction} tone={extractorTone} />
               )}
-              {extractorNote && <p className="text-[0.6875rem] text-text-dim">{extractorNote}</p>}
+              {extractorNote && (
+                <p
+                  className={`text-[0.6875rem] text-text-dim ${row.slowedToFraction === null ? 'max-lg:sr-only' : ''}`}
+                >
+                  {extractorNote}
+                </p>
+              )}
             </div>
 
             <div className="min-w-0 space-y-1">
@@ -566,7 +578,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                 />
               )}
               <p
-                className={`text-[0.6875rem] ${storage.fillsBeforeHaul ? 'text-warning' : 'text-text-dim'}`}
+                className={`text-[0.6875rem] ${storage.fillsBeforeHaul ? 'text-warning' : 'text-text-dim max-lg:sr-only'}`}
               >
                 {storageNote}
               </p>
@@ -574,7 +586,9 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
             <div className="flex min-w-0 flex-col gap-1 lg:items-stretch">
               {actionWithExact}
-              <p className="text-center text-[0.6875rem] text-text-dim">{note}</p>
+              <p className="text-[0.6875rem] text-text-dim max-lg:text-left lg:text-center">
+                {note}
+              </p>
             </div>
 
             <div className="flex justify-end max-lg:absolute max-lg:top-1 max-lg:right-1 lg:items-start">
@@ -582,7 +596,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
             </div>
 
             {row.tags.length > 0 && (
-              <div className="lg:col-span-full lg:pl-[4.6rem]">
+              <div className="lg:pl-24">
                 <FaultTags tags={row.tags} planetName={planetName} />
               </div>
             )}

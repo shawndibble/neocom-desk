@@ -202,7 +202,7 @@ beforeAll(async () => {
   await routeChunks.loadIndustry();
   await resetSession();
   const { unmount } = render(<App />);
-  await screen.findByRole('searchbox', { name: 'Add build plan' }, { timeout: 25_000 });
+  await screen.findByRole('searchbox', { name: 'Add Build Plan' }, { timeout: 25_000 });
   unmount();
   server.resetHandlers();
   clearMarketPriceCache();
@@ -232,7 +232,7 @@ describe('Industry: tabs are paths (issue #1300)', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('searchbox', { name: 'Add build plan' });
+    await screen.findByRole('searchbox', { name: 'Add Build Plan' });
     expect(window.location.pathname).toBe('/industry/plans');
 
     await user.click(screen.getByRole('tab', { name: 'Logs' }));
@@ -255,7 +255,7 @@ describe('Industry: tabs are paths (issue #1300)', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByRole('searchbox', { name: 'Add build plan' });
+    await screen.findByRole('searchbox', { name: 'Add Build Plan' });
     await user.click(screen.getByRole('button', { name: 'Industry settings' }));
     expect(
       within(screen.getByRole('dialog', { name: 'Industry settings' })).getByRole('spinbutton', {
@@ -272,7 +272,7 @@ describe('Industry: tabs are paths (issue #1300)', () => {
   it('hides the Logs tab until a Production Run is logged', async () => {
     render(<App />);
 
-    await screen.findByRole('searchbox', { name: 'Add build plan' });
+    await screen.findByRole('searchbox', { name: 'Add Build Plan' });
     expect(screen.queryByRole('tab', { name: 'Logs' })).not.toBeInTheDocument();
     await seedRun();
     expect(await screen.findByRole('tab', { name: 'Logs' })).toBeInTheDocument();
@@ -303,7 +303,7 @@ describe('Industry: Build Plan CRUD', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
+    const search = await screen.findByRole('searchbox', { name: 'Add Build Plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 
@@ -350,30 +350,30 @@ describe('Industry: Build Plan CRUD', () => {
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
     // Nothing is deleted until the confirm modal (which names the plan) is accepted.
-    let confirm = await screen.findByRole('dialog', { name: 'Delete build plan' });
+    let confirm = await screen.findByRole('dialog', { name: 'Delete Build Plan' });
     expect(within(confirm).getByText(/"Rifter run"/)).toBeInTheDocument();
     await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
     await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Delete build plan' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Delete Build Plan' })).not.toBeInTheDocument()
     );
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
     await user.click(
       within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
-    const escDialog = await screen.findByRole('dialog', { name: 'Delete build plan' });
+    const escDialog = await screen.findByRole('dialog', { name: 'Delete Build Plan' });
     // The menu's close can leave focus outside the dialog; Escape needs it inside.
     within(escDialog).getByRole('button', { name: 'Cancel' }).focus();
     await user.keyboard('{Escape}');
     await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Delete build plan' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Delete Build Plan' })).not.toBeInTheDocument()
     );
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
     await user.click(
       within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
-    confirm = await screen.findByRole('dialog', { name: 'Delete build plan' });
+    confirm = await screen.findByRole('dialog', { name: 'Delete Build Plan' });
     await user.click(within(confirm).getByRole('button', { name: 'Delete' }));
     // handleDelete is fire-and-forget from the click handler (Industry.tsx),
     // so wait for the live-query-driven UI to drop the row before reading
@@ -438,7 +438,7 @@ describe('Industry: Build Plan CRUD', () => {
     render(<App />);
 
     await screen.findByRole('button', { name: 'Parts run' });
-    const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
+    const search = await screen.findByRole('searchbox', { name: 'Add Build Plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 
@@ -695,7 +695,7 @@ describe('Industry: owned-blueprint reauth', () => {
 
     expect(await screen.findByText('Log in again to see owned blueprints')).toBeInTheDocument();
     // The Build Plan list and Active Jobs panel still render.
-    expect(await screen.findByRole('searchbox', { name: 'Add build plan' })).toBeInTheDocument();
+    expect(await screen.findByRole('searchbox', { name: 'Add Build Plan' })).toBeInTheDocument();
     expect(screen.getByText('Jobs')).toBeInTheDocument();
   });
 });
@@ -804,7 +804,7 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
     const compareBar = screen.getByRole('region', { name: 'Compare selected blueprints' });
     await user.click(within(compareBar).getByRole('button', { name: 'Compare' }));
 
-    expect(await screen.findByRole('table', { name: 'Build plan comparison' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Build Plan comparison' })).toBeInTheDocument();
     expect(screen.queryByText('Select at least 2 plans')).not.toBeInTheDocument();
 
     const seeded = await db.buildPlans.toArray();

@@ -319,9 +319,10 @@ export function buildPlanView(
     planetId: colony.planetId,
     name: nameOf(colony),
     planetType: colony.planetType,
-    quickWinGainPerDay: colony.quickWins.some((win) => !isSaving(win.detail))
-      ? colony.quickWinGainPerDay
-      : null,
+    quickWinGainPerDay:
+      colony.quickWins.some((win) => !isSaving(win.detail)) && colony.quickWinGainPerDay > 0
+        ? colony.quickWinGainPerDay
+        : null,
     rebuild:
       colony.rebuild.status === 'change'
         ? { kind: 'change', gainPerDay: colony.rebuild.gainPerDay }

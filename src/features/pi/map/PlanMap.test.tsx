@@ -776,23 +776,31 @@ describe('PlanMap: starting state follows the data until the pilot acts', () => 
 });
 
 describe('PlanMap: how-to line', () => {
-  it('says what a click does on the one line above the board, with no dismiss button', () => {
+  it('says what a click does on the one line above the board, with no dismiss button', async () => {
+    const user = userEvent.setup();
     renderMap();
     const line = screen.getByTestId('map-whatif');
     expect(
       within(line).getByText('Click a planet type to filter, or a product to trace it.')
     ).toBeInTheDocument();
-    expect(within(line).getByText(/^Hover or focus a type you don't have \(/)).toBeInTheDocument();
+    await user.hover(
+      within(line).getByRole('button', { name: 'About planet types you do not have' })
+    );
+    expect(
+      (await screen.findAllByText(/^Hover or focus a type you don't have \(/)).length
+    ).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
   });
 
-  it('says Tap, not Click or Hover, on a coarse pointer', () => {
+  it('says Tap, not Click or Hover, on a coarse pointer', async () => {
+    const user = userEvent.setup();
     stubCoarse();
     renderMap();
     expect(
       screen.getByText('Tap a planet type to filter, or a product to trace it.')
     ).toBeInTheDocument();
-    expect(screen.getByText(/^Tap a type you don't have \(/)).toBeInTheDocument();
+    await user.hover(screen.getByRole('button', { name: 'About planet types you do not have' }));
+    expect((await screen.findAllByText(/^Tap a type you don't have \(/)).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Hover|Click/)).toBeNull();
   });
 
@@ -840,14 +848,18 @@ describe('PlanMap: the picks note says what is shared with Plan', () => {
     ['isk', 'ranked by most ISK'],
     ['haul', 'ranked by least hauling'],
   ] as const)('names the %s preference', async (preference, text) => {
+    const user = userEvent.setup();
     await usePlanPreference.getState().setValue(preference);
     renderMap();
-    expect(await screen.findByText(new RegExp(text))).toBeInTheDocument();
+    await user.hover(await screen.findByRole('button', { name: 'About these picks' }));
+    expect((await screen.findAllByText(new RegExp(text))).length).toBeGreaterThan(0);
   });
 
-  it('says the recipe list is shown before the Plan tab filters', () => {
+  it('says the recipe list is shown before the Plan tab filters', async () => {
+    const user = userEvent.setup();
     renderMap({ advice: adviceNone, colonies: [], adviceWithWhatIf: withWhatIf('none') });
-    expect(screen.getByText(/before the Plan tab's filters/)).toBeInTheDocument();
+    await user.hover(screen.getByRole('button', { name: 'About these picks' }));
+    expect((await screen.findAllByText(/before the Plan tab's filters/)).length).toBeGreaterThan(0);
   });
 });
 

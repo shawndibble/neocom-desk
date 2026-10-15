@@ -14,6 +14,7 @@ import {
   type SettingsSectionId,
 } from '@/features/settings/sections';
 import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/settings/SettingsNav';
+import { AnalyticsPanel } from '@/features/settings/AnalyticsPanel';
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
@@ -1142,6 +1143,7 @@ export function Settings() {
                 <ExportPanel />
                 <ImportPanel />
               </div>
+              <AnalyticsPanel />
               <DevicePanel />
               <DataAgePanel />
             </>

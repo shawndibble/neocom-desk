@@ -5,6 +5,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   DATABASE_DELETE_TIMEOUT_MS,
   deleteAllLocalData,
+  leaveAllCommunities,
+  loadAllCommunities,
   purgeAllRemoteCharacterData,
 } from './deleteAllCharacterData';
 
@@ -16,6 +18,15 @@ const syncMock = vi.hoisted(() => ({
   haltSync: vi.fn(async () => {}),
 }));
 vi.mock('@/sync', () => syncMock);
+const communityMock = vi.hoisted(() => ({
+  loadMyCommunities: vi.fn<(characterId: number) => Promise<unknown[]>>(async () => []),
+  leaveCommunity: vi.fn<(characterId: number, communityId: string) => Promise<void>>(
+    async () => {}
+  ),
+  isCommunityAdmin: (community: { adminUid: string }, characterId: number) =>
+    community.adminUid === `admin-${characterId}`,
+}));
+vi.mock('@/features/communities/communityStore', () => communityMock);
 const pushMock = vi.hoisted(() => ({
   scheduleProjectionRebuild: Object.assign(vi.fn(), { cancel: vi.fn() }),
   unregisterProjectionRegistration: vi.fn(async () => {}),
@@ -252,5 +263,65 @@ describe('deleteAllLocalData', () => {
 
     expect(syncMock.signOutOfSync).not.toHaveBeenCalled();
     expect(syncMock.haltSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('Communities on Delete all data', () => {
+  const community = (id: string, adminUid = 'someone') => ({ id, name: `Com ${id}`, adminUid });
+
+  beforeEach(() => {
+    communityMock.loadMyCommunities.mockReset();
+    communityMock.leaveCommunity.mockReset();
+    communityMock.leaveCommunity.mockImplementation(async () => {});
+  });
+
+  it('lists every Community of every Character, flagging the ones it administers', async () => {
+    await seedCharacter(1);
+    await seedCharacter(2);
+    communityMock.loadMyCommunities.mockImplementation(async (id) =>
+      id === 1 ? [community('a'), community('b', 'admin-1')] : [community('a')]
+    );
+    expect(await loadAllCommunities()).toEqual([
+      { characterId: 1, communityId: 'a', name: 'Com a', administered: false },
+      { characterId: 1, communityId: 'b', name: 'Com b', administered: true },
+      { characterId: 2, communityId: 'a', name: 'Com a', administered: false },
+    ]);
+  });
+
+  it('treats a Character whose Communities cannot be read as having none', async () => {
+    await seedCharacter(1);
+    communityMock.loadMyCommunities.mockRejectedValue(new Error('offline'));
+    expect(await loadAllCommunities()).toEqual([]);
+  });
+
+  it('leaves each non-admin Community once per Character while its token is still here', async () => {
+    await seedCharacter(1);
+    await seedCharacter(2);
+    communityMock.leaveCommunity.mockImplementation(async (id) => {
+      expect(await db.tokens.get(id)).toBeDefined();
+    });
+    const failed = await leaveAllCommunities([
+      { characterId: 1, communityId: 'a', name: 'A', administered: false },
+      { characterId: 1, communityId: 'b', name: 'B', administered: true },
+      { characterId: 2, communityId: 'a', name: 'A', administered: false },
+    ]);
+    expect(failed).toEqual([]);
+    expect(communityMock.leaveCommunity.mock.calls).toEqual([
+      [1, 'a'],
+      [2, 'a'],
+    ]);
+  });
+
+  it('keeps going past a failed leave and reports its Character once', async () => {
+    communityMock.leaveCommunity.mockImplementation(async (id) => {
+      if (id === 1) throw new Error('offline');
+    });
+    const failed = await leaveAllCommunities([
+      { characterId: 1, communityId: 'a', name: 'A', administered: false },
+      { characterId: 1, communityId: 'b', name: 'B', administered: false },
+      { characterId: 2, communityId: 'a', name: 'A', administered: false },
+    ]);
+    expect(failed).toEqual([1]);
+    expect(communityMock.leaveCommunity).toHaveBeenCalledWith(2, 'a');
   });
 });

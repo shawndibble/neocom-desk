@@ -82,6 +82,9 @@ here — they go one per file in `docs/context/decisions/`.
   shows stale. Ranking: an owned BPO beats a Community Offer, which beats any
   priced contract offer. A reaction-activity node only ever considers a BPO,
   and a **Member**'s reaction formula is never a source.
+- **Boot Update**: A new app build (a waiting service worker) applied behind
+  the boot screen on a cold start or browser reload, never mid-session: no
+  route-change reload, and no "update ready" indicator.
 - **Booster**: Cerebral accelerator; user adds it manually, entering the time
   left as EVE's tooltip shows it, for training-time math. A Skill Plan holds
   an ordered list of Boosters run one after another, since EVE has a single

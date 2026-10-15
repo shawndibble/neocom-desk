@@ -7,6 +7,7 @@ import {
   colony,
   fixtureAdvice as advice,
   fixturePi as pi,
+  win,
 } from './planViewFixture';
 
 const view = buildPlanView(advice, pi, (id) => `Planet ${id}`);
@@ -28,6 +29,24 @@ describe('buildPlanView', () => {
       ['Hek VI', 300, 'change'],
       ['Uttindar II', null, 'keep'],
     ]);
+  });
+
+  it('draws no gain on a strip whose only adding win has no ISK figure', () => {
+    const unpriced = buildPlanView(
+      {
+        ...advice,
+        colonies: [
+          colony({
+            planetId: 7,
+            quickWins: [win(7, 'restart', null)],
+            quickWinGainPerDay: 0,
+          }),
+        ],
+      },
+      pi,
+      (id) => `Planet ${id}`
+    );
+    expect(unpriced.strips.map((s) => s.quickWinGainPerDay)).toEqual([null]);
   });
 
   it('keeps the model order of quick wins and marks storage as "saves"', () => {
