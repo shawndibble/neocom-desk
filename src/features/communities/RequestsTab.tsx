@@ -118,14 +118,14 @@ export function RequestsTab({
   const [pledgesOpen, setPledgesOpen] = useState(false);
   const [maxJumps, setMaxJumps] = useState<number | null>(null);
   const shared = useSharedBlueprintTypes(characterId, communityId, myUid, requests !== null);
-  const sharedTypeIds = shared.status === 'ready' ? shared.typeIds : undefined;
+  const sharedItems = shared.status === 'ready' ? shared.items : undefined;
   const distance = useRequestDistance(characterId, maxJumps !== null);
   // A limit that can no longer be measured (Permission revoked, location lost) is no limit:
   // the select then reads "Any distance", never a limit the list is not applying.
   const limit = distance.status === 'unavailable' ? null : maxJumps;
 
   const { rows, unmeasured } = useMemo(() => {
-    const filtered = filterRequests(requests ?? [], { filter, query, myUid, now, sharedTypeIds });
+    const filtered = filterRequests(requests ?? [], { filter, query, myUid, now, sharedItems });
     const { within, unmeasured: left } =
       distance.status === 'ready'
         ? withinJumps(filtered, limit, (request) => distance.jumpsOf(request.location))
@@ -142,7 +142,7 @@ export function RequestsTab({
         };
       }),
     };
-  }, [requests, pledges, filter, query, myUid, now, sharedTypeIds, distance, limit]);
+  }, [requests, pledges, filter, query, myUid, now, sharedItems, distance, limit]);
 
   const statusLabels: Record<RequestStatus, string> = {
     open: t('communities.board.status.open'),
@@ -277,7 +277,7 @@ export function RequestsTab({
     query: '',
     myUid,
     now,
-    sharedTypeIds,
+    sharedItems,
   }).length;
   const panelRequest = requests.find((r) => r.id === openId) ?? null;
   const distanceOff = distance.status === 'unavailable';
