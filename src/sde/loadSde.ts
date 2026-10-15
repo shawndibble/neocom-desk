@@ -14,16 +14,10 @@ import type {
   TypeMap,
 } from './types';
 import { sdeDataUrl } from './sdeDataUrl';
-import { fetchWithTimeout, SDE_FETCH_TIMEOUT_MS } from '@/lib/fetchWithTimeout';
+import { fetchJsonWithIdleTimeout } from '@/lib/idleTimeout';
 
-async function fetchJson<T>(file: string): Promise<T> {
-  const res = await fetchWithTimeout(
-    sdeDataUrl(import.meta.env.BASE_URL, file),
-    undefined,
-    SDE_FETCH_TIMEOUT_MS
-  );
-  if (!res.ok) throw new Error(`Failed to load ${file}: HTTP ${res.status}`);
-  return res.json() as Promise<T>;
+function fetchJson<T>(file: string): Promise<T> {
+  return fetchJsonWithIdleTimeout<T>(sdeDataUrl(import.meta.env.BASE_URL, file), file);
 }
 
 function cached<T>(file: string): () => Promise<T> {

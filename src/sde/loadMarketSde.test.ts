@@ -37,7 +37,7 @@ describe('a market SDE file that never answers', () => {
       const { loadLpCorporations } = await import('./loadMarketSde');
 
       const hung = expect(loadLpCorporations()).rejects.toMatchObject({ name: 'TimeoutError' });
-      await vi.advanceTimersByTimeAsync(45_000);
+      await vi.advanceTimersByTimeAsync(20_000);
       await hung;
 
       expect(await loadLpCorporations()).toEqual(CORPS);

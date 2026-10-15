@@ -7,6 +7,7 @@ import wasmInit, {
   type Projection,
   type Violation,
 } from '@eveshipfit/dogma-engine';
+import { createIdleGuard, readBodyWithGuard } from '@/lib/idleTimeout';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import type { PlanEntry } from '@/engine/types';
 import { racksWithSlots } from '@/engine/fittings/hullFitKey';
@@ -103,9 +104,6 @@ function isEngineAsset(response: Response): boolean {
   return response.ok && !(response.headers.get('content-type') ?? '').includes('text/html');
 }
 
-/** How long a download may go without receiving a byte before it is given up on. */
-export const DOGMA_STALL_TIMEOUT_MS = 20_000;
-
 async function fetchWithProgress(
   url: string,
   onProgress: (loadedBytes: number, totalBytes: number | null) => void
@@ -115,61 +113,34 @@ async function fetchWithProgress(
   // An HTML page cached by an earlier load is refetched, not served forever.
   const usable = cached && isEngineAsset(cached) ? cached : undefined;
 
-  // Stall detection: a download that receives nothing for DOGMA_STALL_TIMEOUT_MS
-  // is aborted, so a hung connection rejects into the caller's failure path
+  // Stall detection: a download that receives nothing for IDLE_TIMEOUT_MS is
+  // aborted, so a hung connection rejects into the caller's failure path
   // instead of leaving "Downloading ship data…" up forever. An idle timer, not
   // a total one: a big file on a slow link keeps going while bytes arrive.
-  const controller = new AbortController();
-  let stallTimer: ReturnType<typeof setTimeout> | undefined;
-  const armStallTimer = () => {
-    clearTimeout(stallTimer);
-    stallTimer = setTimeout(() => {
-      controller.abort(new DOMException('The download stalled.', 'TimeoutError'));
-    }, DOGMA_STALL_TIMEOUT_MS);
-  };
+  const guard = createIdleGuard();
   try {
-    if (!usable) armStallTimer();
-    const response = usable ?? (await fetch(url, { signal: controller.signal }));
+    if (!usable) guard.arm();
+    const response = usable ?? (await fetch(url, { signal: guard.signal }));
     if (!isEngineAsset(response)) {
       throw new Error(
         `${url}: not the engine asset (${response.status}, ${response.headers.get('content-type') ?? 'no type'})`
       );
     }
     // Not awaited until the body has been read: the put settles only once its
-    // copy of the body is consumed, which would starve the stall timer of chunks.
+    // copy of the body is consumed, which would starve the idle timer of chunks.
     const stored = usable ? undefined : cache.put(url, response.clone());
     stored?.catch(() => undefined);
 
     const totalHeader = response.headers.get('content-length');
     const totalBytes = totalHeader ? Number(totalHeader) : null;
-    const reader = response.body?.getReader();
-    if (!reader) {
-      const buffer = await response.arrayBuffer();
-      await stored;
-      onProgress(buffer.byteLength, totalBytes ?? buffer.byteLength);
-      return buffer;
-    }
-
-    const chunks: Uint8Array[] = [];
-    let loadedBytes = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!usable) armStallTimer();
-      chunks.push(value);
-      loadedBytes += value.byteLength;
-      onProgress(loadedBytes, totalBytes);
-    }
+    const bytes = await readBodyWithGuard(response, guard, (loaded) =>
+      onProgress(loaded, totalBytes)
+    );
     await stored;
-    const merged = new Uint8Array(loadedBytes);
-    let offset = 0;
-    for (const chunk of chunks) {
-      merged.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return merged.buffer;
+    if (!response.body) onProgress(bytes.byteLength, totalBytes ?? bytes.byteLength);
+    return bytes.buffer as ArrayBuffer;
   } finally {
-    clearTimeout(stallTimer);
+    guard.clear();
   }
 }
 
@@ -177,7 +148,8 @@ async function fetchWithProgress(
  * Background warm: puts the WASM + SDE snapshot into this module's own Cache
  * Storage bucket without initialising the engine (no WASM compile, nothing
  * held in memory), so the first Fittings open offline finds them. Same
- * bucket and URLs `loadDogmaEngine` reads. Resolves quietly on any failure.
+ * bucket and URLs `loadDogmaEngine` reads. Resolves quietly on any failure,
+ * a stalled download included.
  */
 export async function warmDogmaEngineAssets(): Promise<void> {
   try {
@@ -185,9 +157,17 @@ export async function warmDogmaEngineAssets(): Promise<void> {
     for (const url of [WASM_URL, SDE_URL]) {
       const hit = await cache.match(url);
       if (hit && isEngineAsset(hit)) continue;
-      const response = await fetch(url);
-      if (!isEngineAsset(response)) return;
-      await cache.put(url, response);
+      const guard = createIdleGuard();
+      try {
+        guard.arm();
+        const response = await fetch(url, { signal: guard.signal });
+        if (!isEngineAsset(response)) return;
+        // The put consumes the body but can't re-arm the guard; a clone read
+        // alongside it can.
+        await Promise.all([cache.put(url, response.clone()), readBodyWithGuard(response, guard)]);
+      } finally {
+        guard.clear();
+      }
     }
   } catch {
     // Offline, quota, Cache Storage unavailable — the real load retries on use.

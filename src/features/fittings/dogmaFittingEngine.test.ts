@@ -299,6 +299,29 @@ describe('loadDogmaEngine stall detection', () => {
   });
 });
 
+describe('warmDogmaEngineAssets stall detection', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('gives up quietly on a request that never answers', async () => {
+    const { fetchMock } = stubNetwork();
+    fetchMock.mockImplementation(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        })
+    );
+    const { warmDogmaEngineAssets } = await freshModule();
+
+    const warming = warmDogmaEngineAssets();
+    await vi.advanceTimersByTimeAsync(20_000);
+    await expect(warming).resolves.toBeUndefined();
+  });
+});
+
 describe('computeFittingStats', () => {
   afterEach(() => vi.unstubAllGlobals());
 

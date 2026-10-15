@@ -6,33 +6,22 @@
  *
  * The deadline covers the whole exchange, body included, as
  * `AbortSignal.timeout` does. It is a plain timer rather than that API so
- * fake timers can drive it in tests. A caller's own `signal` still aborts it.
+ * fake timers can drive it in tests. For downloads that may legitimately take
+ * long (the SDE data files), see `idleTimeout.ts`.
  */
 
 /** Default window for a small JSON API call. */
 export const DEFAULT_FETCH_TIMEOUT_MS = 15_000;
 
-/** Window for the app's own static data files (up to ~3 MB), which a slow link needs longer for. */
-export const SDE_FETCH_TIMEOUT_MS = 45_000;
-
 export function fetchWithTimeout(
   input: RequestInfo | URL,
-  init: RequestInit = {},
+  init: Omit<RequestInit, 'signal'> = {},
   timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort(new DOMException('The request timed out.', 'TimeoutError'));
   }, timeoutMs);
-  const { signal: callerSignal } = init;
-  if (callerSignal) {
-    if (callerSignal.aborted) controller.abort(callerSignal.reason);
-    else {
-      callerSignal.addEventListener('abort', () => controller.abort(callerSignal.reason), {
-        once: true,
-      });
-    }
-  }
   // A response that arrives leaves its body to the caller, so the deadline keeps
   // running for it; only a request that already failed has nothing left to time.
   return fetch(input, { ...init, signal: controller.signal }).catch((error: unknown) => {

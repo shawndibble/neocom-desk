@@ -27,7 +27,7 @@ describe('an SDE file that never answers', () => {
     const { loadSkills } = await import('./loadSde');
 
     const hung = expect(loadSkills()).rejects.toMatchObject({ name: 'TimeoutError' });
-    await vi.advanceTimersByTimeAsync(45_000);
+    await vi.advanceTimersByTimeAsync(20_000);
     await hung;
 
     expect(await loadSkills()).toEqual([]);
