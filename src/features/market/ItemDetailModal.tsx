@@ -51,7 +51,8 @@ import {
   type ModifyingSkillEffect,
 } from '@/engine/market/skillAttributeEffects';
 import type { TrainedSkill } from '@/engine/types';
-import { getUniverseType, type UniverseType } from '@/esi/endpoints';
+import type { UniverseType } from '@/esi/endpoints';
+import { loadUniverseTypeOnce } from '@/features/skills/data';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
 import type { PiData, SkillAttributeModifierMap } from '@/sde/types';
@@ -190,22 +191,21 @@ export function ItemDetailModal({
       setData(null);
       setError(false);
       try {
-        const [{ data: type }, dictionary, pi, skillAttributeModifiers, skills] = await Promise.all(
-          [
-            getUniverseType(typeId),
-            loadAttributeDictionary(),
-            // Caught here, not by the shared handler below: only planetary
-            // commodities have anything to lose if this payload is missing, and
-            // a rejection inside the Promise.all would blank the whole modal.
-            loadPi().catch(() => null),
-            // Same reasoning: the attribute-modifier popover is a bonus, not
-            // core item detail, so its data failing to load degrades to no
-            // popovers rather than blanking the modal.
-            loadSkillAttributeModifiers().catch(() => ({})),
-            loadSkills().catch(() => []),
-          ]
-        );
+        const [typeResult, dictionary, pi, skillAttributeModifiers, skills] = await Promise.all([
+          loadUniverseTypeOnce(typeId),
+          loadAttributeDictionary(),
+          // Caught here, not by the shared handler below: only planetary
+          // commodities have anything to lose if this payload is missing, and
+          // a rejection inside the Promise.all would blank the whole modal.
+          loadPi().catch(() => null),
+          // Same reasoning: the attribute-modifier popover is a bonus, not
+          // core item detail, so its data failing to load degrades to no
+          // popovers rather than blanking the modal.
+          loadSkillAttributeModifiers().catch(() => ({})),
+          loadSkills().catch(() => []),
+        ]);
         if (cancelled) return;
+        const type = typeResult?.data;
         if (!type) throw new Error(`No type data for ${typeId}`);
         // Needs the dictionary to know which values are ids, so it can't join
         // the fetch above; it never rejects, so it can't blank the modal.

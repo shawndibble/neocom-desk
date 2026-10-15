@@ -5,6 +5,9 @@
  * source Fit Check reads); levels are the Character's Effective Skill Levels,
  * so it follows the active Character and Alpha/Omega like the stats do.
  * `null` while loading, and with no Character (nothing to compare against).
+ * `unknown` is set when some fitted type's requirements could be neither
+ * read from cache nor fetched: `missing` is then only what is confirmed, and
+ * an empty one must not be read as "can fly".
  */
 import { useEffect, useState } from 'react';
 import {
@@ -13,19 +16,21 @@ import {
   type SkillGaps,
 } from '@/engine/fittings/skillGaps';
 import type { Fitting } from '@/engine/fittings/types';
-import type { RequiredSkill } from '@/engine/import/fitToSkills';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadActivePilotProfile } from './fittingPilotProfile';
-import { loadRequirements } from './skillRequirements';
+import { loadRequirementsForTypes } from './skillRequirements';
+
+export interface FittingSkillGaps extends SkillGaps {
+  unknown: boolean;
+}
 
 export function useFittingSkillGaps(
   fitting: Fitting | null,
   characterId: number | null
-): SkillGaps | null {
+): FittingSkillGaps | null {
   const [result, setResult] = useState<{
     fitting: Fitting;
     characterId: number;
-    gaps: SkillGaps;
+    gaps: FittingSkillGaps;
   } | null>(null);
 
   useEffect(() => {
@@ -34,25 +39,21 @@ export function useFittingSkillGaps(
     void (async () => {
       try {
         const typeIds = fittingRequirementTypeIds(fitting);
-        const byType = new Map<number, readonly RequiredSkill[]>();
-        const [profile] = await Promise.all([
+        // Bounded fan-out (Sentry: "N+1 API Call" on /fittings/edit): an open
+        // Fitting can carry a dozen distinct types and ESI has no batch
+        // endpoint for dogma attributes.
+        const [profile, { byType, unknownTypeIds }] = await Promise.all([
           loadActivePilotProfile(characterId),
-          // Bounded, not `Promise.all(typeIds.map(...))`: each type's
-          // requirements are their own uncached ESI round trip, and an open
-          // Fitting can carry a dozen distinct types — ESI has no batch
-          // endpoint for dogma attributes (Sentry: "N+1 API Call" on
-          // /fittings/edit), so the fan-out is unavoidable, but it must not
-          // exceed the same per-call-site cap every other ESI fan-out in the
-          // app respects.
-          mapWithConcurrencyLimit(typeIds, ESI_FANOUT_CONCURRENCY, async (typeId) => {
-            byType.set(typeId, await loadRequirements(typeId));
-          }),
+          loadRequirementsForTypes(typeIds),
         ]);
         if (cancelled) return;
         setResult({
           fitting,
           characterId,
-          gaps: computeSkillGaps(fitting, byType, profile.skillLevels),
+          gaps: {
+            ...computeSkillGaps(fitting, byType, profile.skillLevels),
+            unknown: unknownTypeIds.length > 0,
+          },
         });
       } catch {
         // Leaves the previous result's guard below to hide stale gaps.

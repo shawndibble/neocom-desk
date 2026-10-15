@@ -242,7 +242,12 @@ export function SkillsPanel({
     return <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>;
   }
   if (gaps.missing.length === 0) {
-    return <p className="text-sm text-success">{t('fittings.start.preview.canFly')}</p>;
+    // "Nothing missing" only counts when every requirement was actually read.
+    return gaps.unknown ? (
+      <p className="text-xs text-text-dim">{t('fittings.start.preview.skillsUnknown')}</p>
+    ) : (
+      <p className="text-sm text-success">{t('fittings.start.preview.canFly')}</p>
+    );
   }
   return (
     <div className="space-y-2">
@@ -252,6 +257,9 @@ export function SkillsPanel({
         characterId={characterId}
         fittingName={fitting.name}
       />
+      {gaps.unknown && (
+        <p className="text-xs text-text-dim">{t('fittings.start.preview.skillsUnknown')}</p>
+      )}
     </div>
   );
 }

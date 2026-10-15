@@ -628,6 +628,9 @@ function FittingsPage() {
               fittingName={fitting.name}
             />
           )}
+          {gaps?.unknown && activeCharacterId !== null && (
+            <p className="text-xs text-text-dim">{t('fittings.start.preview.skillsUnknown')}</p>
+          )}
         </div>
       }
       heading={

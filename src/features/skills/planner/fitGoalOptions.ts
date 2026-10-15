@@ -9,6 +9,7 @@ import type { FitGoalNeed } from './useFitGoalNeeds';
 
 export type FitGoalOption =
   | { id: string; name: string; state: 'loading' }
+  | { id: string; name: string; state: 'unknown' }
   | { id: string; name: string; state: 'flyable-now' }
   | { id: string; name: string; state: 'on-date'; date: Date }
   | { id: string; name: string; state: 'missing'; missingLevels: number; toAdd: PlanEntry[] };
@@ -19,10 +20,12 @@ export function fitGoalOptions(
   trainedLevels: ReadonlyMap<number, number>,
   scheduled: readonly ScheduledStep[],
   stepByKey: ReadonlyMap<StepKey, ScheduledStep>,
-  startDate: Date
+  startDate: Date,
+  unknownIds: ReadonlySet<string> = new Set()
 ): FitGoalOption[] {
   return records.map(({ id, name }): FitGoalOption => {
     const need = needs.get(id);
+    if (!need && unknownIds.has(id)) return { id, name, state: 'unknown' };
     if (!need) return { id, name, state: 'loading' };
     const goal = evaluateFitGoal(need.needed, trainedLevels, scheduled);
     if (goal.state === 'flyable-now') return { id, name, state: 'flyable-now' };
