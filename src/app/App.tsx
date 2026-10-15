@@ -17,6 +17,7 @@ import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
 import { useBackgroundSync } from './backgroundSync';
 import { scheduleBootPrefetch, scheduleCachePrune, scheduleLazySdeWarm } from './bootPrefetch';
+import { startReconnectRecovery } from './reconnectRecovery';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import * as routeChunks from './routeChunks';
@@ -301,6 +302,8 @@ export function App() {
   useEffect(() => reloadOnDatabaseWipe(), []);
   useEffect(() => scheduleCachePrune(), []);
   useEffect(() => scheduleLazySdeWarm(), []);
+  // Back online: drop held failures, re-read, sync, warm what was skipped.
+  useEffect(() => startReconnectRecovery(), []);
 
   // Fire-and-forget, on app start (once hydration resolves an active character)
   // and every character switch. Errors (offline, no Firebase config) are

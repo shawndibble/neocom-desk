@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { db } from '@/db';
 import type { CommunityRequest } from '@/engine/communities/requests';
@@ -17,9 +17,12 @@ import {
   refreshRequestBadge,
   rememberCommunityWatch,
   resetRequestBadge,
+  REQUEST_BADGE_POLL_MS,
   useNewRequestCount,
+  useRequestBadgePoll,
   watchRequestsViewed,
 } from './requestBadge';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 
 const DAY = 86_400_000;
 const NOW = 100 * DAY;
@@ -150,5 +153,35 @@ describe('Communities nav badge', () => {
     // Only c2 (still unseen) counts.
     expect(result.current).toBe(1);
     unwatch();
+  });
+});
+
+describe('request badge poll while offline', () => {
+  function setOnLine(value: boolean) {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => value });
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'onLine');
+    vi.useRealTimers();
+  });
+
+  it('skips its tick while offline, reads again once back, and reads on reconnect', async () => {
+    await rememberCommunityWatch(1, [community('c1')]);
+    useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    setOnLine(false);
+    renderHook(() => useRequestBadgePoll());
+
+    await act(async () => {
+      vi.advanceTimersByTime(REQUEST_BADGE_POLL_MS);
+    });
+    expect(store.loadMyCommunities).not.toHaveBeenCalled();
+
+    setOnLine(true);
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await vi.waitFor(() => expect(store.loadMyCommunities).toHaveBeenCalledTimes(1));
   });
 });

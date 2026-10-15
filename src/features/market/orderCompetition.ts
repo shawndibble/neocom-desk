@@ -38,8 +38,7 @@ import { fetchAggregates, type HubAggregate } from '@/market/fuzzwork';
 import { getOrderBook } from './orderBook';
 import { getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
 import { conditionalPagedFetch, loadPaginatedWithCache } from '@/esi/cache';
-import { AuthError } from '@/auth/sso';
-import { EsiError } from '@/esi/client';
+import { isCredentialFailure } from '@/esi/client';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { stationPriceKey } from './stationPriceKey';
@@ -163,8 +162,7 @@ export async function loadStructureCompetition(
     {
       conditional,
       staleAfterMs: STRUCTURE_MARKET_STALE_AFTER_MS,
-      detectAuthFailure: (err) =>
-        err instanceof AuthError || (err instanceof EsiError && err.status === 401),
+      detectAuthFailure: isCredentialFailure,
     }
   );
   if (!result) return null;

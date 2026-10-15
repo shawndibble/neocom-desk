@@ -1957,6 +1957,17 @@ describe('sync orchestration', () => {
     expect(states[states.length - 1].error).toMatch(/Unknown character/);
   });
 
+  it('marks a failure recorded while the browser was offline, and only that one', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    await expect(triggerSync(999)).rejects.toThrow(/Unknown character/);
+    expect(getSyncStatus(999)).toMatchObject({ state: 'error', offline: true });
+
+    vi.stubGlobal('navigator', { onLine: true });
+    await expect(triggerSync(999)).rejects.toThrow(/Unknown character/);
+    expect(getSyncStatus(999)).toMatchObject({ state: 'error', offline: false });
+    vi.unstubAllGlobals();
+  });
+
   it("keeps status per character: B's success does not mask A's error", async () => {
     await expect(triggerSync(999)).rejects.toThrow(/Unknown character/);
     await triggerSync(1);

@@ -743,6 +743,17 @@ async function readStaleRow<T>(
  * `beforeEach` that only clears Dexie.
  */
 export function resetRevalidationState(): void {
+  clearRevalidationFailures();
+}
+
+/**
+ * Forgets every held revalidation failure, so the next read of each key goes to
+ * the network again instead of being answered from the stored row. Called when
+ * the connection returns (`app/reconnectRecovery.ts`): a failure recorded
+ * offline says nothing about ESI now, and would otherwise hold the key until
+ * its window lapsed.
+ */
+export function clearRevalidationFailures(): void {
   revalidationFailures.clear();
 }
 

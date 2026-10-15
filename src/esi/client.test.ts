@@ -6,6 +6,8 @@ import {
   configureEsi,
   EsiError,
   isAuthFailure,
+  isCredentialFailure,
+  EsiOfflineError,
   ESI_BASE_URL,
   COMPATIBILITY_DATE,
   USER_AGENT,
@@ -810,5 +812,95 @@ describe('isAuthFailure (BUG #3)', () => {
   it('is false for a plain network error', () => {
     expect(isAuthFailure(new TypeError('Failed to fetch'))).toBe(false);
     expect(isAuthFailure(new Error('boom'))).toBe(false);
+  });
+
+  it('is false for an AuthError that never got an answer (offline or timed out): that is the network, not the grant', () => {
+    expect(isAuthFailure(new AuthError('network_error', 'offline', 0))).toBe(false);
+    expect(isAuthFailure(new AuthError('timeout', 'slow', 0))).toBe(false);
+  });
+
+  it('is still true for an AuthError SSO answered with a failure status', () => {
+    expect(isAuthFailure(new AuthError('unknown_error', 'bad gateway', 502))).toBe(true);
+  });
+
+  it('is false for the offline error', () => {
+    expect(isAuthFailure(new EsiOfflineError())).toBe(false);
+  });
+});
+
+describe('isCredentialFailure', () => {
+  it('is true for a 401 and for a refresh SSO refused, false for a 403', () => {
+    expect(isCredentialFailure(new EsiError(401, 'bad token'))).toBe(true);
+    expect(isCredentialFailure(new AuthError('invalid_grant', 'revoked', 400))).toBe(true);
+    expect(isCredentialFailure(new EsiError(403, 'no access'))).toBe(false);
+  });
+
+  it('is false for an AuthError that never got an answer', () => {
+    expect(isCredentialFailure(new AuthError('network_error', 'offline', 0))).toBe(false);
+    expect(isCredentialFailure(new AuthError('timeout', 'slow', 0))).toBe(false);
+  });
+});
+
+describe('esiFetch — token refresh that cannot reach SSO', () => {
+  it('throws EsiOfflineError instead of the status-0 AuthError, without sending a request', async () => {
+    configureEsi({
+      getToken: async () => {
+        throw new AuthError('network_error', 'offline', 0);
+      },
+    });
+    const handler = vi.fn(() => HttpResponse.json({}));
+    server.use(http.get(`${ESI_BASE_URL}/characters/123/wallet`, handler));
+
+    const failure = await esiFetch('/characters/123/wallet', {
+      characterId: 123,
+      endpointId: 'getCharacterWallet',
+    }).catch((err: unknown) => err);
+
+    expect(failure).toBeInstanceOf(EsiOfflineError);
+    expect(failure).toBeInstanceOf(EsiError);
+    expect((failure as EsiError).status).toBe(0);
+    expect(isAuthFailure(failure)).toBe(false);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('logs no activity and spends none of the error budget', async () => {
+    configureEsi({
+      getToken: async () => {
+        throw new AuthError('timeout', 'slow', 0);
+      },
+    });
+    const events: ActivityEvent[] = [];
+    const unsubscribe = onEsiActivity((event) => events.push(event));
+    const before = esiBudgetSnapshot();
+
+    await expect(
+      esiFetch('/characters/123/wallet', { characterId: 123, endpointId: 'getCharacterWallet' })
+    ).rejects.toBeInstanceOf(EsiOfflineError);
+    unsubscribe();
+
+    expect(events).toEqual([]);
+    expect(esiBudgetSnapshot()).toEqual(before);
+  });
+
+  it('leaves a refresh SSO refused as the AuthError it is', async () => {
+    configureEsi({
+      getToken: async () => {
+        throw new AuthError('invalid_grant', 'revoked', 400);
+      },
+    });
+
+    await expect(esiFetch('/characters/123/wallet', { characterId: 123 })).rejects.toBeInstanceOf(
+      AuthError
+    );
+  });
+
+  it('does not consult navigator.onLine: a browser that reads offline still sends', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    server.use(http.get(`${ESI_BASE_URL}/alliances/99000001`, () => HttpResponse.json({ ok: 1 })));
+
+    const result = await esiFetch('/alliances/99000001');
+    vi.unstubAllGlobals();
+
+    expect(result.data).toEqual({ ok: 1 });
   });
 });

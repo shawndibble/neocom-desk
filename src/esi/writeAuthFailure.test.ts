@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type TokenRecord } from '@/db';
 import { AuthError } from '@/auth/sso';
-import { EsiError } from './client';
+import { EsiError, EsiOfflineError } from './client';
 import { onEsiAuthFailure } from './authFailureSignal';
 import { reportWriteAuthFailure } from './writeAuthFailure';
 
@@ -32,6 +32,20 @@ function listen() {
 }
 
 describe('reportWriteAuthFailure', () => {
+  it.each([
+    ['network_error', new AuthError('network_error', 'offline', 0)],
+    ['timeout', new AuthError('timeout', 'slow', 0)],
+    ['EsiOfflineError', new EsiOfflineError()],
+  ])('ignores %s: a send that never reached ESI is not a refused credential', async (_n, err) => {
+    const { reported, unsubscribe } = listen();
+
+    const outcome = await reportWriteAuthFailure(CHAR_ID, err, 'postCharacterMail');
+    unsubscribe();
+
+    expect(outcome).toBe('ignored');
+    expect(reported).not.toHaveBeenCalled();
+  });
+
   it("asks for the endpoint's Permission when the stored grant lacks its scope", async () => {
     await seedGrant(['esi-skills.read_skills.v1']);
     const { reported, unsubscribe } = listen();

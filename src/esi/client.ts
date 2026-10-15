@@ -14,7 +14,7 @@
 import { AuthError } from '@/auth/sso';
 import { emitEsiActivity } from './activityLog';
 import { passEsiGate, observeEsiResponse } from './budget';
-import { EsiError, EsiBudgetError, EsiTimeoutError } from './errors';
+import { EsiError, EsiBudgetError, EsiOfflineError, EsiTimeoutError } from './errors';
 import { currentEsiLane, gateLane, type EsiLane } from './lane';
 import type { EsiEndpointId } from './registry';
 import { COMPATIBILITY_DATE } from './compatibilityDate';
@@ -22,7 +22,13 @@ import { USER_AGENT } from './userAgent';
 
 // `EsiError` lives in `./errors` so the budget can throw one without importing
 // the client back (issue #655), but this stays its canonical import path.
-export { EsiError, EsiBudgetError, EsiTimeoutError, attachEndpointId } from './errors';
+export {
+  EsiError,
+  EsiBudgetError,
+  EsiOfflineError,
+  EsiTimeoutError,
+  attachEndpointId,
+} from './errors';
 
 export const ESI_BASE_URL = 'https://esi.evetech.net';
 export { COMPATIBILITY_DATE };
@@ -117,10 +123,47 @@ export interface EsiResult<T> {
  *  - AuthError (src/auth/sso): getValidAccessToken's own refresh call fails
  *    (e.g. a revoked/expired refresh token) *before* esiFetch ever makes a
  *    request, so it never becomes an EsiError at all.
+ *
+ * An `AuthError` with status 0 (`network_error`, `timeout`) is neither: SSO
+ * never answered, so nothing says the grant is bad. It is a network failure
+ * like any other, and reading it as an auth failure had an offline pilot with
+ * an expired access token shown a re-login prompt and, on `skipCacheOnAuthFailure`
+ * loaders, an emptied view.
  */
 export function isAuthFailure(err: unknown): boolean {
   if (err instanceof EsiError) return err.status === 401 || err.status === 403;
-  return err instanceof AuthError;
+  return err instanceof AuthError && err.status !== 0;
+}
+
+/**
+ * The narrower question a few loaders ask: was the credential itself refused,
+ * as opposed to a 403 (which for a structure market or a citadel name is an
+ * ACL no re-login can fix)? A 401, or a refresh SSO answered with a failure.
+ * Offline and timeouts are not.
+ */
+export function isCredentialFailure(err: unknown): boolean {
+  if (err instanceof EsiError) return err.status === 401;
+  return isAuthFailure(err);
+}
+
+/**
+ * The token, with a refresh that never reached SSO (`AuthError` status 0:
+ * offline, DNS, timeout) rethrown as `EsiOfflineError`. Nothing says the grant
+ * is bad, so callers see an ordinary network failure. It happens before the
+ * request scope and the gate, so it is neither logged as activity nor counted
+ * against the error budget.
+ *
+ * `navigator.onLine` is deliberately not consulted: it reads false on some VPNs
+ * and virtual adapters while ESI is reachable, and a truly offline fetch fails
+ * fast anyway.
+ */
+async function accessTokenOrOffline(getToken: GetToken, characterId: number): Promise<string> {
+  try {
+    return await getToken(characterId);
+  } catch (err) {
+    if (err instanceof AuthError && err.status === 0) throw new EsiOfflineError(err);
+    throw err;
+  }
 }
 
 function buildUrl(path: string, query?: EsiFetchOptions['query'], page?: number): URL {
@@ -273,7 +316,7 @@ export async function esiFetch<T>(
     if (!tokenProvider) {
       throw new Error('esiFetch: authenticated call without a configured getToken (configureEsi)');
     }
-    headers.Authorization = `Bearer ${await tokenProvider(characterId)}`;
+    headers.Authorization = `Bearer ${await accessTokenOrOffline(tokenProvider, characterId)}`;
   }
 
   const scope = openRequestScope(signal);

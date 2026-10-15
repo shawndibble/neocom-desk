@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import { AuthError } from '@/auth/sso';
-import { EsiError, EsiTimeoutError, REQUEST_TIMEOUT_MS } from './client';
+import { EsiError, EsiOfflineError, EsiTimeoutError, REQUEST_TIMEOUT_MS } from './client';
 import {
   invalidateFreshness,
   onCacheRevalidated,
@@ -210,6 +210,62 @@ describe('loadWithCacheStatus — shell auth-failure signal (issue #1521)', () =
     unsubscribe();
 
     expect(onFailure).toHaveBeenCalledWith(CHAR_ID, 'getCharacterClones');
+  });
+
+  it.each([
+    ['network_error', new AuthError('network_error', 'offline', 0)],
+    ['timeout', new AuthError('timeout', 'slow', 0)],
+    ['EsiOfflineError', new EsiOfflineError()],
+  ])(
+    'serves the stored row and stays quiet when the token refresh failed with %s (offline is not an auth failure)',
+    async (_name, failure) => {
+      await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1234 });
+      const onFailure = vi.fn();
+      const unsubscribe = onEsiAuthFailure(onFailure);
+
+      const result = await loadWithCacheStatus(CHAR_ID, KEY, async () => {
+        throw failure;
+      });
+      unsubscribe();
+
+      expect(result.needsReauth).toBe(false);
+      expect(result.cached).toMatchObject({ data: 'stale', fromCache: true });
+      expect(onFailure).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does the same on the paginated path', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: ['row'], fetchedAt: 1234 });
+    const onFailure = vi.fn();
+    const unsubscribe = onEsiAuthFailure(onFailure);
+
+    const result = await loadPaginatedWithCacheStatus(CHAR_ID, KEY, async () => {
+      throw new AuthError('network_error', 'offline', 0);
+    });
+    unsubscribe();
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toMatchObject({ data: ['row'], fromCache: true });
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it('keeps the cached row for a skipCacheOnAuthFailure loader that only counts a 403', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1234 });
+
+    const result = await loadWithCacheStatus(
+      CHAR_ID,
+      KEY,
+      async () => {
+        throw new AuthError('network_error', 'offline', 0);
+      },
+      {
+        detectAuthFailure: (err) => err instanceof EsiError && err.status === 403,
+        skipCacheOnAuthFailure: true,
+      }
+    );
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toMatchObject({ data: 'stale', fromCache: true });
   });
 
   it('still emits for a refresh failure (AuthError), which has no single endpoint to check', async () => {
