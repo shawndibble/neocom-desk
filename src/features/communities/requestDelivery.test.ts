@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   items: vi.fn(),
   /** The status of the failure `items` returned null for. */
   failure: { status: 0 },
+  /** Skip the stored rows: every read goes to the network. */
+  noCache: false,
   detailed: vi.fn(),
   requests: vi.fn(),
   pledges: vi.fn(),
@@ -77,11 +79,12 @@ const contract = (id: number, over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.failure.status = 0;
+  mocks.noCache = false;
   // Like production: a first read goes to the network and is stored; a repeat is a fresh row
   // (fromCache false, no network); a failure carries the status ESI answered with.
   const rows = new Map<number, unknown>();
   mocks.detailed.mockImplementation(async (characterId: number, contractId: number) => {
-    if (rows.has(contractId)) {
+    if (!mocks.noCache && rows.has(contractId)) {
       return {
         result: { data: rows.get(contractId), fromCache: false, fetchedAt: new Date() },
         networkRead: false,
@@ -381,6 +384,45 @@ describe('syncRequestDeliveries', () => {
     await syncRequestDeliveries(ME, 'c1', NOW + 7 * MIN);
     expect(stored[0]?.auto).toBe(30);
     expect(mocks.items.mock.calls.filter((c) => c[1] === 51)).toHaveLength(2);
+  });
+
+  it('treats a 403 as a missing Permission: it gives up on nothing and asks for the grant', async () => {
+    mocks.contracts.mockResolvedValue({
+      cached: { data: [contract(61), contract(62)], truncated: false },
+      needsReauth: false,
+    });
+    mocks.failure.status = 403;
+    mocks.items.mockResolvedValue(null);
+    const MIN = 60_000;
+    expect((await syncRequestDeliveries(ME, 'c1', NOW)).status).toBe('needs-scope');
+    expect((await syncRequestDeliveries(ME, 'c1', NOW + 6 * MIN)).status).toBe('needs-scope');
+    expect(mocks.update).not.toHaveBeenCalled();
+    // Still tried each run: nothing was given up.
+    mocks.failure.status = 0;
+    mocks.items.mockClear();
+    await syncRequestDeliveries(ME, 'c1', NOW + 12 * MIN);
+    expect(mocks.items.mock.calls[0]?.[1]).toBe(61);
+  });
+
+  it('forgets earlier failures of a contract once it reads', async () => {
+    mocks.contracts.mockResolvedValue({
+      cached: { data: [contract(71)], truncated: false },
+      needsReauth: false,
+    });
+    mocks.noCache = true;
+    mocks.failure.status = 404;
+    const other = {
+      data: [{ record_id: 1, type_id: 999, quantity: 5, is_included: true, is_singleton: false }],
+    };
+    const MIN = 60_000;
+    mocks.items
+      .mockResolvedValueOnce(null) // fails once
+      .mockResolvedValueOnce(other) // reads
+      .mockResolvedValueOnce(null) // fails once more, much later
+      .mockResolvedValue(null);
+    for (const at of [0, 1, 7, 8]) await syncRequestDeliveries(ME, 'c1', NOW + at * MIN);
+    // One failure since the read: not given up, so the fourth run still tries it.
+    expect(mocks.items).toHaveBeenCalledTimes(4);
   });
 
   it('reads only what could still change a result: 45 contracts take three runs, the second reads just the 5 left', async () => {

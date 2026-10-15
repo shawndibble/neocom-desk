@@ -139,7 +139,7 @@ function buildSlots(planned: readonly Planned[]): DeliverySlot[] {
 }
 
 /**
- * Contracts ESI answered a definite no for (404, 403), by this session: when
+ * Contracts ESI answered a definite no for (404), by this session: when
  * first and how often. One that keeps failing so, over a few minutes, is given
  * up on, so a few bad ones cannot hold the rest back or use up every run's read
  * cap. Anything else (offline, a rate limit, a 5xx) is transient: it holds the
@@ -150,7 +150,9 @@ const GIVE_UP_AFTER = 2;
 /** The failures must span at least this long: one burst on a flaky network is not a verdict. */
 export const GIVE_UP_SPAN_MS = 5 * 60_000;
 
-const isDefiniteNo = (status: number | undefined) => status === 404 || status === 403;
+// Only a 404 is an answer about this contract alone. A 403 is the Permission itself (a revoke the
+// local scope check cannot see): it would give up on every contract, so it is never a give-up.
+const isDefiniteNo = (status: number | undefined) => status === 404;
 
 const givenUp = (contractId: number, now: number) => {
   const failure = itemReadFailures.get(contractId);
@@ -227,6 +229,8 @@ async function readContracts(
     // Only a read that went to ESI counts against the run's cap.
     if (outcome.networkRead) reads += 1;
     if (!outcome.result) {
+      // The Permission is gone (or never was): stop, count nothing, and let the panel ask for the grant.
+      if (outcome.failureStatus === 403) return { status: 'needs-scope' };
       degraded = true;
       hold(contract);
       if (isDefiniteNo(outcome.failureStatus)) {
@@ -249,6 +253,8 @@ async function readContracts(
       }
       break;
     }
+    // It read: earlier failures of this contract were not a verdict.
+    itemReadFailures.delete(contract.contract_id);
     contracts.push({
       ...header,
       items: outcome.result.data
