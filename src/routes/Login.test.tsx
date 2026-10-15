@@ -154,6 +154,7 @@ describe('Login', () => {
     // One capture per tile, and one tile per heading.
     expect(images).toHaveLength(grid.getAllByRole('heading', { level: 3 }).length);
     expect(images).toHaveLength(9);
+    expect(new Set(images.map((image) => image.getAttribute('src'))).size).toBe(9);
     for (const image of images) {
       expect(image.getAttribute('alt')).toBeTruthy();
       expect(image).toHaveAttribute('loading', 'lazy');
@@ -193,15 +194,16 @@ describe('Login', () => {
     );
     const user = userEvent.setup();
 
-    // Each feature is named in the panel of the tab that covers it.
+    // Each feature is a tab's own name or an "Also includes" chip in that tab's panel.
+    // A chip that only repeats its tab's name (Industry, Corporation, Alerts) is not shown.
     const covered: Record<string, string[]> = {
-      Industry: ['Industry'],
+      Industry: [],
       'Market & orders': ['Market', 'Open Orders', 'Wallet', 'Assets'],
       'Ships & travel': ['Ships', 'Skills', 'Clones', 'Travel'],
       'Planetary & mining': ['Planetary Industry', 'Mining'],
-      Corporation: ['Corporation'],
+      Corporation: [],
       Mail: ['Mail & Calendar', 'Contracts', 'Contacts & Standings'],
-      Alerts: ['Alerts', 'Notifications'],
+      Alerts: ['Notifications'],
     };
     const seen: string[] = [];
     for (const [tab, features] of Object.entries(covered)) {
@@ -211,21 +213,26 @@ describe('Login', () => {
         expect(panel.getByText(feature)).toBeInTheDocument();
         seen.push(feature);
       }
+      if (features.length === 0) expect(panel.queryByText('Also includes')).toBeNull();
+      else expect(panel.getByText('Also includes')).toBeInTheDocument();
+      // The tab's own name is never repeated as a chip.
+      expect(panel.queryByRole('listitem', { name: tab })).toBeNull();
+      seen.push(tab);
     }
-    // The 17 catalog rows, none dropped when the chips became tabs.
-    expect(seen).toHaveLength(17);
+    // 14 chips; the other 3 catalog rows (Industry, Corporation, Alerts) are named by their tab.
+    expect(seen.filter((name) => !(name in covered))).toHaveLength(14);
+    for (const row of ['Industry', 'Corporation', 'Alerts']) expect(seen).toContain(row);
   });
 
-  it('puts "How it works" before the trust section, with its own header link', async () => {
+  it('has no How it works section or header link any more', async () => {
     renderLogin();
-    const how = await screen.findByRole('region', { name: /how it works/i });
-    const trust = screen.getByRole('region', { name: /it reads\. it writes only when you act/i });
-    expect(how.compareDocumentPosition(trust) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await screen.findByRole('region', { name: /the questions it exists to answer/i });
+    expect(screen.queryByRole('region', { name: /how it works/i })).toBeNull();
     expect(
-      within(screen.getByRole('navigation', { name: /page sections/i })).getByRole('link', {
+      within(screen.getByRole('navigation', { name: /page sections/i })).queryByRole('link', {
         name: 'How it works',
       })
-    ).toHaveAttribute('href', '#login-how');
+    ).toBeNull();
   });
 
   /*

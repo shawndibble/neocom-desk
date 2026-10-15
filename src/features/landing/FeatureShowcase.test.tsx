@@ -10,9 +10,9 @@ describe('FeatureShowcase', () => {
     render(<FeatureShowcase />);
     expect(screen.getByRole('tab', { name: 'Industry', selected: true })).toBeInTheDocument();
     const panel = within(screen.getByRole('tabpanel'));
-    expect(panel.getByRole('img', { name: /a build plan for an orca/i })).toHaveAttribute(
+    expect(panel.getByRole('img', { name: /running and finished jobs/i })).toHaveAttribute(
       'src',
-      '/screenshots/desktop-build-plan.webp'
+      '/screenshots/desktop-industry-jobs.webp'
     );
     expect(panel.getByText(/costs materials, job cost and taxes/i)).toBeInTheDocument();
   });
@@ -27,29 +27,28 @@ describe('FeatureShowcase', () => {
       '/screenshots/desktop-corporation.webp'
     );
     expect(panel.getByText(/merges fuel, structure timers/i)).toBeInTheDocument();
-    expect(panel.queryByRole('img', { name: /a build plan for an orca/i })).toBeNull();
+    expect(panel.queryByRole('img', { name: /running and finished jobs/i })).toBeNull();
     expect(panel.queryByText(/costs materials, job cost and taxes/i)).toBeNull();
   });
 
-  it('overlays the phone capture on the areas that have one, and only there', async () => {
+  it('lists only what a tab adds under "Also includes", never its own name', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
-    expect(screen.queryByRole('img', { name: /on a phone/i })).toBeNull();
-    await user.click(screen.getByRole('tab', { name: 'Market & orders' }));
-    expect(
-      within(screen.getByRole('tabpanel')).getByRole('img', {
-        name: /market order book on a phone/i,
-      })
-    ).toHaveAttribute('src', '/screenshots/phone-market-jumps.webp');
+    expect(screen.queryByText('Also includes')).toBeNull();
+    await user.click(screen.getByRole('tab', { name: 'Alerts' }));
+    const panel = within(screen.getByRole('tabpanel'));
+    expect(panel.getByText('Also includes')).toBeInTheDocument();
+    expect(panel.getByText('Notifications')).toBeInTheDocument();
+    expect(panel.queryByText('Alerts')).toBeNull();
   });
 
   it('enlarges a screenshot in a dialog and closes it again', async () => {
     render(<FeatureShowcase />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /enlarge: a build plan for an orca/i }));
+    await user.click(screen.getByRole('button', { name: /enlarge: the industry page/i }));
     const dialog = await screen.findByRole('dialog');
     expect(
-      within(dialog).getByRole('img', { name: /a build plan for an orca/i })
+      within(dialog).getByRole('img', { name: /running and finished jobs/i })
     ).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();

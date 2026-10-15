@@ -9,7 +9,6 @@ import { db } from '@/db';
 import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
 import { CommunitySection } from '@/features/landing/CommunitySection';
 import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
-import { HowItWorks } from '@/features/landing/HowItWorks';
 import { LandingFaq } from '@/features/landing/LandingFaq';
 import { TrustSection } from '@/features/landing/TrustSection';
 import { LandingHeader } from '@/features/landing/LandingHeader';
@@ -110,9 +109,6 @@ export function Login() {
         </LandingSection>
         <LandingSection id="login-features" heading={t('login.featuresHeading')}>
           <FeatureShowcase />
-        </LandingSection>
-        <LandingSection id="login-how" heading={t('login.how.heading')}>
-          <HowItWorks onCustomize={() => setCustomizing(true)} />
         </LandingSection>
         <LandingSection id="login-trust" heading={t('login.trustHeading')}>
           <TrustSection />
