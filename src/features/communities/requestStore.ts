@@ -162,6 +162,7 @@ function readPledge(uid: string, d: Record<string, unknown>): RequestPledge | nu
       contractIds: Array.isArray(e.contractIds)
         ? e.contractIds.filter((id): id is number => typeof id === 'number')
         : [],
+      ...(typeof e.manual === 'number' && e.manual > 0 ? { manual: e.manual } : {}),
     };
   }
   const stamp = d.updatedAt as { toMillis?: () => number } | undefined;
@@ -255,12 +256,16 @@ export async function updateMyPledge(
     await deleteDoc(ref);
     return null;
   }
-  const lines: Record<string, { quantity: number; delivered: number; contractIds: number[] }> = {};
+  const lines: Record<
+    string,
+    { quantity: number; delivered: number; contractIds: number[]; manual?: number }
+  > = {};
   for (const [index, entry] of Object.entries(next)) {
     lines[index] = {
       quantity: entry.quantity,
       delivered: entry.delivered,
       contractIds: [...(entry.contractIds ?? [])],
+      ...(entry.manual !== undefined ? { manual: entry.manual } : {}),
     };
   }
   await setDoc(ref, { ownerHash, communityId, lines, updatedAt: serverTimestamp() });

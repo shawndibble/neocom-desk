@@ -47,7 +47,7 @@ The I can fill chip, the Distance select and the Message button are built (`page
 
 Built: Pledge / Update pledge / Withdraw with the inline quantity field per line, the over-pledge note, stacked bars and board progress and status from real Pledges, the strip's "and 1 Pledge in progress" half with **My pledges**, and the My pledges slide-out. Panel and board match the pictures at 1440 and 390 (the 390 row keeps Update pledge, wrapped to two lines, and Withdraw on one row as pictured). Where they differ:
 
-- **Delivery note** is not built (#3809); the Message button is #3811's. The panel's note reads only "Nothing is reserved; agree the terms yourselves."; #3809 adds the "Delivery is marked from your finished contracts" sentence.
+- **Delivery note** is built by #3809 (see its section below); the Message button is #3811's. The panel's note reads only "Nothing is reserved; agree the terms yourselves."; #3809 adds the "Delivery is marked from your finished contracts" sentence.
 - **Stale Pledge** (not pictured): after 14 days with nothing delivered the line is greyed (60% opacity) and says "No delivery in 14 days, so this Pledge is greyed out. Update it or withdraw it." in words, so it never rests on colour alone. The clock is the Pledge document's last write.
 - **Withdraw** is hidden once something is delivered on that Pledge (the record of delivery would be lost); the picture's sample has none delivered by the viewer.
 - **My pledges slide-out** is not pictured. Each row names the item and the requester, prints "N pledged · N delivered", and has an Open request button that closes the slide-out and opens the Request's panel; stale rows are greyed with the same wording. Open request is the one control, so a row click does nothing extra.
@@ -81,5 +81,16 @@ Compose opens as pictured (`compose-lines`, `compose-recipients`), as stories `p
 - **Community choice (not pictured):** when the holder shares the blueprint in several Communities, a small dialog (select and Continue) comes first. One Community goes straight to compose.
 - **Roster failure (not pictured):** a dialog with the failure in words and Close.
 - **Ask to copy row** (`ask-to-copy-row-1440.png`, `-390.png`; story `bpccontracts-communityoffercell--rows`): the Item cell of a Community Offer row, "ask <name> to copy…" as an accent inline link beside the community chip (ask, a copy's "from <name>", a reaction formula's plain text, a stale library). The cell is its own component (`CommunityOfferCell`) so it can be pictured: a whole BPC Sourcing page story needs the contracts snapshot (Firestore), the SDE and an ESI character, which is too large a fixture. The mockup itself has no BPC Sourcing screen.
+
+## Deviations in the delivery build (issue #3809)
+
+Built: the delivery sentence in the Member's panel (as pictured: "Delivery is marked from your finished contracts to <name>, in game. Nothing is reserved; agree the terms yourselves."), the delivered segment of the bar fed by real deliveries, the BPC attribute flag and the manual marker (`pages-communities--requests-panel-delivery`, `-delivery-phone`, `-no-contracts-grant`). Where they differ from the pictures:
+
+- **Replaces #3808's note:** the panel's single note is now the delivery sentence; the old "Nothing is reserved…" line alone is gone.
+- **Your own delivered figure** (not pictured): a Pledged line with a delivery prints "You delivered 40,000 of 175,000" under the bar, with "(manual)" after it when the figure is a typed amount.
+- **BPC flag** (not pictured): under that line, in words and the warning tone, "Counted, but not as asked: runs 5, asked 10." Shown to the Pledger only: contract contents never reach Firestore, so the requester's panel cannot show it (the requester opens the contract in game). The ticket's example "ME 8, asked 10" is not possible: ESI's personal contract items carry runs and the copy marker but no ME or TE, so only runs is compared.
+- **Delivered amount** (not pictured): each Pledged line gets a small number field and **Save delivered** under its Pledge controls, always (a direct trade or any hand-over outside a contract can be recorded). Without the Contracts Permission, a line after the sentence also says delivery can't be marked, with the usual Grant link (not an error). The field is a bare `TextInput` with the placeholder "Delivered…" and a screen-reader label naming the item. Saving 0 clears it.
+- **Quiet notes** (not pictured): unreadable contracts, an unsaved delivery and a Request closed or expired since the Pledge each get one dim line, never an error banner.
+- **Board:** no new control; the bar and the line counts read the stored deliveries.
 
 Delete this folder and the story when the last ticket that links it closes.

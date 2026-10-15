@@ -54,6 +54,12 @@ export interface PledgeEntry {
   delivered: number;
   /** The contracts behind `delivered` (#3809); absent on a Pledge read from before that. */
   contractIds?: readonly number[];
+  /**
+   * An amount the Member typed because their app cannot read contracts (#3809).
+   * `delivered` is the larger of this and what contracts show, so it survives
+   * every automatic recompute and is never added to it.
+   */
+  manual?: number;
 }
 
 /** One Member's Pledges on a Request, keyed by line index. */
@@ -264,15 +270,17 @@ export function parsePledgeQuantity(text: string): number | null {
 
 type PledgeLines = Readonly<Record<number, PledgeEntry>>;
 
-/** The lines with `quantity` Pledged on `index`; a repeat keeps what was delivered and its contracts. */
+/** The lines with `quantity` Pledged on `index`; a repeat keeps what was delivered (up to the new quantity) and its contracts. */
 export function withPledgeLine(lines: PledgeLines, index: number, quantity: number): PledgeLines {
   const before = lines[index];
   return {
     ...lines,
     [index]: {
       quantity,
-      delivered: before?.delivered ?? 0,
+      // The rules bound both by the quantity, so lowering a Pledge lowers them too.
+      delivered: Math.min(before?.delivered ?? 0, quantity),
       contractIds: [...(before?.contractIds ?? [])],
+      ...(before?.manual !== undefined ? { manual: Math.min(before.manual, quantity) } : {}),
     },
   };
 }

@@ -1335,6 +1335,8 @@ export interface ContractItem {
   /** True when the issuer hands this over; false means the acceptor must supply it. */
   is_included: boolean;
   is_singleton: boolean;
+  /** -1 is a singleton and, on a blueprint, an original; -2 is a blueprint copy. */
+  raw_quantity?: number;
   /** Present on blueprint copies only. */
   runs?: number;
 }

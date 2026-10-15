@@ -12,6 +12,7 @@ import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
 import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedPlan } from '@/engine/communities/sharedPlans';
+import type { DeliverySyncResult } from './requestDelivery';
 import type { CommunityMember, CommunitySummary, JoinRequest } from './communityStore';
 
 export interface CommunityBackendOverride {
@@ -38,6 +39,8 @@ export interface CommunityBackendOverride {
   ) => void;
   /** Request mails already sent today, for the compose dialog's count. */
   loadRequestMailsToday?: () => number;
+  /** What marking deliveries from contracts found, for the panel's flags and notes. */
+  syncDeliveries?: (communityId: string) => DeliverySyncResult;
   /** Every Skill Plan shared into the Community, by anyone. */
   loadPlans?: (communityId: string) => SharedPlan[];
 }

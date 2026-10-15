@@ -12,6 +12,7 @@ import { configureEsi } from '@/esi/client';
 import { configureActiveCharacter } from '@/esi/lane';
 import { triggerSync } from '@/sync';
 import { usePublishSharedLibraries } from '@/features/communities/usePublishSharedLibraries';
+import { useSyncRequestDeliveries } from '@/features/communities/useSyncRequestDeliveries';
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
 import { useBackgroundSync } from './backgroundSync';
@@ -316,6 +317,8 @@ export function App() {
   useBackgroundSync(characterIds, activeCharacterId);
   // Keeps what Characters share with their Communities current (issue #3600).
   usePublishSharedLibraries(characterIds, activeCharacterId);
+  // Marks Request Pledges delivered from finished contracts (issue #3809).
+  useSyncRequestDeliveries(characterIds, activeCharacterId);
 
   // Keeps `bootShellPreload.ts`'s hint in step with Dexie, so the next cold
   // load knows to fetch the signed-in shell early. No default on the query:

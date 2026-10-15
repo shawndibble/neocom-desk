@@ -8309,7 +8309,21 @@
       "pledgeQuantity": "Quantity you can provide of {{name}}",
       "pledgeInvalid": "Enter a whole number above 0.",
       "overPledged": "Over-pledged by {{amount}}: Pledges don't reserve anything.",
-      "pledgeNote": "Nothing is reserved; agree the terms yourselves.",
+      "deliveryNote": "Delivery is marked from your finished contracts to {{name}}, in game. Nothing is reserved; agree the terms yourselves.",
+      "deliveryNeedsPermission": "Delivery can't be marked without the Contracts Permission, so type what you delivered under each line.",
+      "deliveryReadFailed": "Couldn't read all your contracts, so some deliveries may not be marked yet.",
+      "deliveryWriteFailed": "Couldn't save the deliveries marked from your contracts. They will be tried again.",
+      "deliveryClosed": "This Request is closed or expired, so deliveries are no longer marked.",
+      "yourDelivered": "You delivered {{delivered}} of {{quantity}}",
+      "manualMarker": "manual",
+      "deliveredQuantity": "Quantity you delivered of {{name}}",
+      "deliveredPlaceholder": "Delivered…",
+      "saveDelivered": "Save delivered",
+      "deliveredInvalid": "Enter a whole number from 0 up to {{max}}.",
+      "deliveryFlag": "Counted, but not as asked: {{details}}.",
+      "deliveryFlagDetail": {
+        "runs": "runs {{got}}, asked {{asked}}"
+      },
       "admin": {
         "removeRequest": "Remove request…",
         "removeRequestTitle": "Remove this request?",

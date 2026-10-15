@@ -538,9 +538,10 @@ service cloud.firestore {
           }
           function pledgeEntryOk(e) {
             return e is map
-              && e.keys().hasOnly(['quantity', 'delivered', 'contractIds'])
+              && e.keys().hasOnly(['quantity', 'delivered', 'contractIds', 'manual'])
+              && (!('manual' in e) || (e.manual is int && e.manual >= 1 && e.manual <= e.quantity))
               && e.quantity is int && e.quantity >= 1 && e.quantity <= 1000000000000
-              && e.delivered is int && e.delivered >= 0 && e.delivered <= 1000000000000
+              && e.delivered is int && e.delivered >= 0 && e.delivered <= e.quantity
               && e.contractIds is list && e.contractIds.size() <= 20
               && (e.contractIds.size() <= 0 || ((e.contractIds[0] is int && e.contractIds[0] > 0) && (e.contractIds.size() <= 1 || ((e.contractIds[1] is int && e.contractIds[1] > 0) && (e.contractIds.size() <= 2 || ((e.contractIds[2] is int && e.contractIds[2] > 0) && (e.contractIds.size() <= 3 || ((e.contractIds[3] is int && e.contractIds[3] > 0) && (e.contractIds.size() <= 4 || ((e.contractIds[4] is int && e.contractIds[4] > 0) && (e.contractIds.size() <= 5 || ((e.contractIds[5] is int && e.contractIds[5] > 0) && (e.contractIds.size() <= 6 || ((e.contractIds[6] is int && e.contractIds[6] > 0) && (e.contractIds.size() <= 7 || ((e.contractIds[7] is int && e.contractIds[7] > 0) && (e.contractIds.size() <= 8 || ((e.contractIds[8] is int && e.contractIds[8] > 0) && (e.contractIds.size() <= 9 || ((e.contractIds[9] is int && e.contractIds[9] > 0) && (e.contractIds.size() <= 10 || ((e.contractIds[10] is int && e.contractIds[10] > 0) && (e.contractIds.size() <= 11 || ((e.contractIds[11] is int && e.contractIds[11] > 0) && (e.contractIds.size() <= 12 || ((e.contractIds[12] is int && e.contractIds[12] > 0) && (e.contractIds.size() <= 13 || ((e.contractIds[13] is int && e.contractIds[13] > 0) && (e.contractIds.size() <= 14 || ((e.contractIds[14] is int && e.contractIds[14] > 0) && (e.contractIds.size() <= 15 || ((e.contractIds[15] is int && e.contractIds[15] > 0) && (e.contractIds.size() <= 16 || ((e.contractIds[16] is int && e.contractIds[16] > 0) && (e.contractIds.size() <= 17 || ((e.contractIds[17] is int && e.contractIds[17] > 0) && (e.contractIds.size() <= 18 || ((e.contractIds[18] is int && e.contractIds[18] > 0) && (e.contractIds.size() <= 19 || (e.contractIds[19] is int && e.contractIds[19] > 0))))))))))))))))))))))))))))))))))))))));
           }

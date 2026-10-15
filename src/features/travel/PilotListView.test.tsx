@@ -215,7 +215,10 @@ describe('PilotListView (Local list)', () => {
     // Pilot, Your standing, Highsec, Lowsec, Nullsec, Flew on kills.
     expect(cells[4].textContent).toBe('22h ago');
     expect(cells[2].textContent).toBe('0—');
-    expect(cells[5].textContent).toBe('Drake');
+    // The ship name resolves after the table first paints.
+    await waitFor(() =>
+      expect(within(elsewhere).getAllByRole('row')[1]).toHaveTextContent('Drake')
+    );
   });
 
   it('shows the contact standing and where it came from', async () => {

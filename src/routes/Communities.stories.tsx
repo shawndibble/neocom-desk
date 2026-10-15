@@ -14,17 +14,23 @@ import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
 import { Communities } from './Communities';
 
 /** Sample Communities answer in place of the backend, fresh per story so a change never leaks into the next. */
-function SampleCommunities({ children }: { children: ReactNode }) {
+function SampleCommunities({
+  children,
+  deliveryDemo,
+}: {
+  children: ReactNode;
+  deliveryDemo: boolean;
+}) {
   // A layout effect, so the override is in place before the page's own load effects run.
   useLayoutEffect(() => {
-    setCommunityBackendOverride(createCommunitiesFixture());
+    setCommunityBackendOverride(createCommunitiesFixture(Date.now(), { deliveryDemo }));
     return () => setCommunityBackendOverride(null);
-  }, []);
+  }, [deliveryDemo]);
   return children;
 }
 
-const withSampleCommunities: Decorator = (Story) => (
-  <SampleCommunities>
+const withSampleCommunities: Decorator = (Story, context) => (
+  <SampleCommunities deliveryDemo={context.parameters.deliveryDemo === true}>
     <Story />
   </SampleCommunities>
 );
@@ -131,6 +137,7 @@ const requestsRoutes = (): FixtureRoute[] => [
   },
 ];
 const requestsScopes = [
+  'esi-contracts.read_character_contracts.v1',
   'esi-wallet.read_character_wallet.v1',
   'esi-characters.read_loyalty.v1',
   'esi-location.read_location.v1',
@@ -197,6 +204,35 @@ export const RequestsPanelAsMember: Story = {
 
 /** @summary A Member's panel in the phone shell. */
 export const RequestsPanelAsMemberPhone: Story = { ...RequestsPanelAsMember, globals: phone };
+
+/** @summary Delivery marked from contracts: a copy counted but flagged ("runs 5, asked 10") and a typed amount marked manual, under the delivery sentence. */
+export const RequestsPanelDelivery: Story = {
+  parameters: { shell: requestsShell(SAMPLE_ADMIN_COMMUNITY_ID), deliveryDemo: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByText(/^Scan Acquisition Array/));
+    await canvas.findByText(/runs 5, asked 10/);
+  },
+};
+
+/** @summary The delivery panel in the phone shell. */
+export const RequestsPanelDeliveryPhone: Story = { ...RequestsPanelDelivery, globals: phone };
+
+/** @summary Without the Contracts Permission: the grant prompt (not an error) and a delivered-amount field per Pledged line. */
+export const RequestsPanelNoContractsGrant: Story = {
+  parameters: {
+    shell: {
+      ...requestsShell(SAMPLE_ADMIN_COMMUNITY_ID),
+      scopes: requestsScopes.filter((scope) => !scope.includes('contracts')),
+    },
+    deliveryDemo: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByText(/^Reactive Metals/));
+    await canvas.findByText(/Delivery can't be marked without the Contracts Permission/);
+  },
+};
 
 /** @summary Your own Request: Extend 30 days and Close request. */
 export const RequestsPanelAsRequester: Story = {
