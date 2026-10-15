@@ -192,11 +192,34 @@ describe('planetary', () => {
     expect(visibleColumns(view.table!.columns, 'S').map((c) => c.key)).toEqual(['colony', 'ends']);
   });
 
-  it('charts each running colony on its own bar, short-fused ones in warning colour', () => {
+  it('charts each colony on its own bar, short-fused ones in warning colour, idle with an empty bar', () => {
     const view = buildView('planetary', feeds(base()), ctx());
     if (view.chart?.kind !== 'hbars') throw new Error('hbars');
-    expect(view.chart.rows.map((r) => r.label)).toEqual(['Efa I', 'Efa III', 'Efa IX']);
-    expect(view.chart.rows.map((r) => r.color)).toEqual(['warning', 'warning', 'accent']);
+    expect(view.chart.rows.map((r) => r.label)).toEqual(['Efa I', 'Efa III', 'Efa IX', 'Efa XI']);
+    expect(view.chart.rows.map((r) => r.color)).toEqual([
+      'warning',
+      'warning',
+      'accent',
+      undefined,
+    ]);
+    expect(view.chart.rows[3]).toMatchObject({ share: 0 });
+  });
+
+  it('keeps the chart when every colony has stopped, as empty bars saying so', () => {
+    const view = buildView(
+      'planetary',
+      feeds([batch('expired', 'critical', [colony(5, 'Efa V', NOW - HOUR)])]),
+      ctx()
+    );
+    if (view.chart?.kind !== 'hbars') throw new Error('hbars');
+    expect(view.chart.rows).toEqual([
+      expect.objectContaining({
+        label: 'Efa V',
+        share: 0,
+        color: 'warning',
+        text: 'overview.widgets.planetary.state.stopped',
+      }),
+    ]);
   });
 
   it('names what has stopped before anything else, and leads with the count when nothing runs', () => {
