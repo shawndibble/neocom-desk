@@ -263,7 +263,6 @@ describe('communityOffersForRows', () => {
       price: 0,
       memberUid: 'u1',
       memberName: 'Alice',
-      communityNames: ['A'],
       stale: false,
       asOf: 1,
       locationName: 'Jita IV',

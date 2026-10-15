@@ -8,6 +8,7 @@ import { isLibraryStale, type SharedBlueprint } from './sharedLibrary';
 
 /** One Community's Members, each with their library and its "as of" stamp. */
 export interface CommunityOfferSource {
+  communityId: string;
   communityName: string;
   members: readonly {
     uid: string;
@@ -23,8 +24,8 @@ export interface CommunityOffer extends SharedBlueprint {
   memberName: string;
   /** Identical copies the sharer holds (the most any one Community lists). */
   quantity: number;
-  /** Every Community that shows this instance, sorted by name. */
-  communityNames: string[];
+  /** Every Community that shows this instance (id and name), sorted by name; "ask to copy" posts to one. */
+  communities: { id: string; name: string }[];
   asOf: number | null;
   stale: boolean;
 }
@@ -54,7 +55,7 @@ export function buildCommunityOffers(
   excludeUids: ReadonlySet<string> = new Set()
 ): CommunityOffer[] {
   const byKey = new Map<string, CommunityOffer>();
-  for (const { communityName, members } of sources) {
+  for (const { communityId, communityName, members } of sources) {
     for (const member of members) {
       if (excludeUids.has(member.uid)) continue;
       const counts = new Map<string, { item: SharedBlueprint; count: number }>();
@@ -73,15 +74,15 @@ export function buildCommunityOffers(
             uid: member.uid,
             memberName: member.characterName,
             quantity: count,
-            communityNames: [communityName],
+            communities: [{ id: communityId, name: communityName }],
             asOf: member.asOf,
             stale: isLibraryStale(member.asOf, now),
           });
           continue;
         }
         existing.quantity = Math.max(existing.quantity, count);
-        if (!existing.communityNames.includes(communityName)) {
-          existing.communityNames.push(communityName);
+        if (!existing.communities.some((c) => c.id === communityId)) {
+          existing.communities.push({ id: communityId, name: communityName });
         }
         // The freshest stamp across Communities decides: one fresh view means it is current.
         if (member.asOf !== null && (existing.asOf === null || member.asOf > existing.asOf)) {
@@ -92,7 +93,9 @@ export function buildCommunityOffers(
     }
   }
   const offers = [...byKey.values()];
-  for (const offer of offers) offer.communityNames.sort((a, b) => a.localeCompare(b));
+  for (const offer of offers) {
+    offer.communities.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  }
   return offers.sort(
     (a, b) =>
       a.typeId - b.typeId ||

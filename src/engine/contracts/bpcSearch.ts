@@ -227,7 +227,8 @@ export type BpcSearchRow =
       price: 0;
       memberUid: string;
       memberName: string;
-      communityNames: string[];
+      /** The Communities by id (same order): the one "ask to copy" posts to. */
+      communities: { id: string; name: string }[];
       stale: boolean;
       asOf: number | null;
       /** The Member's station or structure, by name; its system is in `systemName`. No ids are shared, so the client places the row by that name: unplaced, a Region, Space or Jump Range filter drops it. */
@@ -327,7 +328,7 @@ export function communityOfferToSearchRow(
     te: number;
     runs: number;
     quantity: number;
-    communityNames: string[];
+    communities: { id: string; name: string }[];
     stale: boolean;
     asOf: number | null;
     locationName: string;
@@ -345,7 +346,7 @@ export function communityOfferToSearchRow(
     price: 0,
     memberUid: offer.uid,
     memberName: offer.memberName,
-    communityNames: offer.communityNames,
+    communities: offer.communities,
     stale: offer.stale,
     asOf: offer.asOf,
     locationName: offer.locationName,

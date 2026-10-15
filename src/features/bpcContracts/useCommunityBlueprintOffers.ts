@@ -34,6 +34,7 @@ async function loadCommunityOfferRows(characterId: number): Promise<readonly Bpc
         );
         const itemsByUid = new Map(libraries.map((library) => [library.uid, library.items]));
         return {
+          communityId: community.id,
           communityName: community.name,
           members: members.map((member) => ({
             uid: member.uid,
@@ -44,7 +45,7 @@ async function loadCommunityOfferRows(characterId: number): Promise<readonly Bpc
         };
       } catch {
         // One unreadable Community must not blank the others.
-        return { communityName: community.name, members: [] };
+        return { communityId: community.id, communityName: community.name, members: [] };
       }
     })
   );

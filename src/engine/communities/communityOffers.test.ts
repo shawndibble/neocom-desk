@@ -13,6 +13,7 @@ const bp = (over: Partial<SharedBlueprint> = {}): SharedBlueprint => ({
   ...over,
 });
 const source = (name: string, members: CommunityOfferSource['members']): CommunityOfferSource => ({
+  communityId: `id-${name}`,
   communityName: name,
   members,
 });
@@ -31,7 +32,6 @@ describe('buildCommunityOffers', () => {
       te: 20,
       runs: 5,
       quantity: 1,
-      communityNames: ['Alpha'],
       stale: false,
     });
   });
@@ -40,7 +40,10 @@ describe('buildCommunityOffers', () => {
     const member = { uid: 'u1', characterName: 'Ann', asOf: NOW, items: [bp()] };
     const offers = buildCommunityOffers([source('Zed', [member]), source('Alpha', [member])], NOW);
     expect(offers).toHaveLength(1);
-    expect(offers[0].communityNames).toEqual(['Alpha', 'Zed']);
+    expect(offers[0].communities).toEqual([
+      { id: 'id-Alpha', name: 'Alpha' },
+      { id: 'id-Zed', name: 'Zed' },
+    ]);
     expect(offers[0].quantity).toBe(1);
   });
 

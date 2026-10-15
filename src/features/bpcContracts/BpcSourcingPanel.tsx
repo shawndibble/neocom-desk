@@ -65,6 +65,9 @@ import {
   loadPublicBpcContracts,
   type PublicBpcContractsSnapshot,
 } from '@/features/bpcContracts/syncedContracts';
+import { CommunityOfferCell } from '@/features/bpcContracts/CommunityOfferCell';
+import { AskToCopyDialog } from '@/features/communities/AskToCopyDialog';
+import { canAskToCopy } from '@/engine/communities/askToCopy';
 import { bpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import {
   bpcMarketLookup,
@@ -159,6 +162,8 @@ interface Snapshot {
   contractsResult: CachedResult<PublicBpcContractsSnapshot> | null;
   syncConfigured: boolean;
   blueprintNames: Map<number, string>;
+  /** Reaction formulas: they cannot be copied, so never "ask to copy" (GLOSSARY Community Offer). */
+  reactionFormulaTypeIds: ReadonlySet<number> | null;
   regionNames: Map<number, string>;
   /** A 401/403 fetching these just resolves empty — Industry's own top-level banner (same `loadCharacterBlueprints` call) already covers re-login on every tab. */
   ownedBlueprints: CharacterBlueprint[];
@@ -177,6 +182,7 @@ async function loadBpcContractsSnapshot(
       contractsResult: null,
       syncConfigured: false,
       blueprintNames: new Map(),
+      reactionFormulaTypeIds: null,
       regionNames: new Map(),
       ownedBlueprints: [],
       contractLocations: new Map(),
@@ -193,6 +199,12 @@ async function loadBpcContractsSnapshot(
   ]);
   const blueprintNames = new Map(
     Object.entries(blueprintMap).map(([typeId, bp]) => [Number(typeId), bp.name])
+  );
+
+  const reactionFormulaTypeIds = new Set(
+    Object.entries(blueprintMap)
+      .filter(([, bp]) => bp.activity === 'reaction')
+      .map(([typeId]) => Number(typeId))
   );
 
   // Already superseded: skip the region-name fan-out, its result would be discarded.
@@ -234,6 +246,7 @@ async function loadBpcContractsSnapshot(
     contractsResult,
     syncConfigured: true,
     blueprintNames,
+    reactionFormulaTypeIds,
     regionNames,
     ownedBlueprints,
     contractLocations,
@@ -582,6 +595,7 @@ export function BpcSourcingPanel({
   const contractsResult = data?.contractsResult ?? null;
   const syncConfigured = data?.syncConfigured ?? true;
   const blueprintNames = data?.blueprintNames ?? EMPTY_MAP;
+  const reactionFormulaTypeIds = data?.reactionFormulaTypeIds ?? null;
   const regionNames = data?.regionNames ?? EMPTY_MAP;
   const ownedBlueprints = data?.ownedBlueprints ?? EMPTY_OWNED_BLUEPRINTS;
   const contractLocations = data?.contractLocations ?? EMPTY_CONTRACT_LOCATIONS;
@@ -685,6 +699,8 @@ export function BpcSourcingPanel({
   const selectedTypeId = params['sourcing.type'];
   /** The row whose contract detail is open, if any. */
   const [openRow, setOpenRow] = useState<BpcContractRow | null>(null);
+  // The Community Offer whose "ask to copy…" dialog is open.
+  const [askRow, setAskRow] = useState<Extract<BpcSearchRow, { source: 'community' }> | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -1555,29 +1571,12 @@ export function BpcSourcingPanel({
             );
           if (row.source === 'community') {
             return (
-              <span
-                className={cx(
-                  'flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-col sm:flex-nowrap sm:items-start sm:gap-1',
-                  row.stale && 'opacity-60'
-                )}
-              >
-                <span className="min-w-0 max-w-full">{title}</span>
-                <span className="inline-flex flex-wrap items-center gap-1.5 text-[0.6875rem] font-normal text-text-dim">
-                  <span>
-                    {row.runs === -1
-                      ? t('bpcContracts.communityAskToCopy', { name: row.memberName })
-                      : t('bpcContracts.communityFrom', { name: row.memberName })}
-                  </span>
-                  <span className="text-[0.625rem] font-semibold tracking-widest uppercase">
-                    {t('bpcContracts.communityChip', { names: row.communityNames.join(', ') })}
-                  </span>
-                  {row.stale && (
-                    <span className="rounded bg-surface-2 px-1.5 py-0.5">
-                      {t('communities.staleBadge')}
-                    </span>
-                  )}
-                </span>
-              </span>
+              <CommunityOfferCell
+                row={row}
+                title={title}
+                canAsk={canAskToCopy(row, reactionFormulaTypeIds)}
+                onAsk={() => setAskRow(row)}
+              />
             );
           }
           if (!bpo && !owned) return title;
@@ -1618,6 +1617,7 @@ export function BpcSourcingPanel({
     regionLabel,
     blueprintPicked,
     isPhone,
+    reactionFormulaTypeIds,
   ]);
   // Item plus the visible columns, like the table itself.
   const csvColumns = useMemo(
@@ -2104,6 +2104,16 @@ export function BpcSourcingPanel({
               </>
             )}
           </>
+        )}
+
+        {askRow !== null && activeCharacterId !== null && (
+          <AskToCopyDialog
+            characterId={activeCharacterId}
+            offer={askRow}
+            blueprintName={blueprintNames.get(askRow.typeId) ?? `#${askRow.typeId}`}
+            holderName={askRow.memberName}
+            onClose={() => setAskRow(null)}
+          />
         )}
 
         {openRow !== null && (

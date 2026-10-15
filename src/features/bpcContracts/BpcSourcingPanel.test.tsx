@@ -19,7 +19,11 @@ import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
 import { useLpValue } from '@/features/loyalty/lpValue';
-import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
+import {
+  communityOfferToSearchRow,
+  type BpcContractRow,
+  type BpcSearchRow,
+} from '@/engine/contracts/bpcSearch';
 import type { SpaceKind } from '@/engine/space';
 import type { PublicBpcContractsSnapshot } from '@/features/bpcContracts/syncedContracts';
 import type { CachedResult, StatusResult } from '@/esi/cache';
@@ -27,6 +31,7 @@ import type { CharacterBlueprint, RegionOrder } from '@/esi/endpoints';
 import type { BlueprintMap } from '@/sde/types';
 import type { GlobalMarketEntry } from '@/sde/marketTypes';
 import type { LocalJumpDistances } from '@/features/route/localRoute';
+import { loadBlueprints } from '@/sde/loadSde';
 import { usePickedSystems } from '@/features/route/currentSystem';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -176,6 +181,29 @@ vi.mock('@/sde/loadMarketSde', async (importOriginal) => {
   return { ...actual, loadGlobalMarkets: () => loadGlobalMarkets() };
 });
 
+// Community source: the Shared Blueprints other Members hold. None unless a test says so.
+const communityRows = vi.hoisted(() => ({ value: [] as BpcSearchRow[] }));
+vi.mock('@/features/bpcContracts/useCommunityBlueprintOffers', () => ({
+  useCommunityBlueprintOffers: () => ({ rows: communityRows.value, loading: false }),
+}));
+// "Ask to copy…" opens the Requests compose dialog; its own test covers the roster load.
+vi.mock('@/features/communities/AskToCopyDialog', () => ({
+  AskToCopyDialog: ({
+    offer,
+    blueprintName,
+    onClose,
+  }: {
+    offer: { communities: { id: string }[] };
+    blueprintName: string;
+    onClose: () => void;
+  }) => (
+    <div role="dialog" aria-label="ask to copy dialog">
+      {blueprintName} in {offer.communities.map((c) => c.id).join(',')}
+      <button onClick={onClose}>close ask</button>
+    </div>
+  ),
+}));
+
 function sellOrder(overrides: Partial<RegionOrder> = {}): RegionOrder {
   return {
     duration: 365,
@@ -300,6 +328,7 @@ async function resetSession() {
   getOrderBook.mockReset();
   getOrderBook.mockResolvedValue({ orders: [], truncated: false, fetchedAt: 0 });
   loadGlobalMarkets.mockReset();
+  communityRows.value = [];
   loadGlobalMarkets.mockResolvedValue([]);
   loadCharacterSolarSystemId.mockReset();
   loadCharacterSolarSystemId.mockResolvedValue(null);
@@ -2004,5 +2033,71 @@ describe('BpcSourcingPanel Jump Range', () => {
     ).toBeInTheDocument();
     expect(within(table).getAllByText('Caracal Blueprint')).toHaveLength(2);
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+  });
+});
+
+describe('Ask to copy on a Community Offer row', () => {
+  const FORMULA = '777001';
+  const offerRow = (over: { typeId: number; runs: number; memberName?: string }) =>
+    communityOfferToSearchRow({
+      uid: 'u-ann',
+      memberName: 'Ann',
+      me: 10,
+      te: 20,
+      quantity: 1,
+      communities: [{ id: 'c1', name: 'Alpha' }],
+      stale: false,
+      asOf: 1,
+      locationName: 'Jita IV - Moon 4',
+      systemName: 'Jita',
+      ...over,
+    });
+  // A contract row keeps the table up (the page lists what contracts offer first).
+  const openCommunity = () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 870, price: 5_000_000 })])
+    );
+    window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,community');
+  };
+
+  it('turns a Shared BPO into a button that opens the dialog for that Community', async () => {
+    communityRows.value = [offerRow({ typeId: 638, runs: -1 })];
+    openCommunity();
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await user.click(await within(table).findByRole('button', { name: 'ask Ann to copy…' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'ask to copy dialog' });
+    expect(dialog).toHaveTextContent('Rifter Blueprint in c1');
+  });
+
+  it('keeps "from <name>" as plain text on a copy row', async () => {
+    communityRows.value = [offerRow({ typeId: 638, runs: 10 })];
+    openCommunity();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    expect(await within(table).findByText('from Ann')).toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: /to copy/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps plain "ask <name> to copy" on a reaction formula, which cannot be copied', async () => {
+    vi.mocked(loadBlueprints).mockResolvedValue({
+      ...BLUEPRINTS,
+      [FORMULA]: { ...BLUEPRINTS['638'], name: 'Test Formula', activity: 'reaction' },
+    });
+    try {
+      communityRows.value = [offerRow({ typeId: Number(FORMULA), runs: -1 })];
+      openCommunity();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+      expect(await within(table).findByText('ask Ann to copy')).toBeInTheDocument();
+      expect(within(table).queryByRole('button', { name: /to copy/ })).not.toBeInTheDocument();
+    } finally {
+      vi.mocked(loadBlueprints).mockResolvedValue(BLUEPRINTS);
+    }
   });
 });

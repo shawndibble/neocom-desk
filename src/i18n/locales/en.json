@@ -7854,6 +7854,7 @@
     "sourceCommunitySingular": "Community",
     "communityFrom": "from {{name}}",
     "communityAskToCopy": "ask {{name}} to copy",
+    "communityAskToCopyAction": "ask {{name}} to copy…",
     "communityChip": "Community: {{names}}",
     "lpOfferCost": "{{isk}} ISK + {{lp}} LP",
     "bpoOnMarket": "BPO on market: {{price}} · {{where}}",
@@ -7890,6 +7891,14 @@
     "columnsMenuTitle": "Columns"
   },
   "communities": {
+    "askToCopy": {
+      "title": "Ask {{name}} to copy",
+      "pickHint": "{{name}} shares {{blueprint}} in more than one of your Communities. Pick the one to post your Request in.",
+      "community": "Community",
+      "continue": "Continue",
+      "close": "Close",
+      "membersFailed": "Could not load that Community's Members. Try again from the Community's Requests tab."
+    },
     "title": "Communities",
     "intro": "Pool blueprints, Fittings and Skill plans with the people you play with. Each Character joins on its own, and shares only what it picks.",
     "yourCommunities": "Your Communities",
