@@ -75,6 +75,13 @@ describe('runBootUpdate', () => {
     expect(env.reload).not.toHaveBeenCalled();
   });
 
+  it('on /callback does not wait for the registration lookup', async () => {
+    const env = makeEnv(reg({}), { pathname: '/callback' });
+    env.getRegistration = vi.fn(() => never()) as unknown as typeof env.getRegistration;
+    await expect(runBootUpdate(env)).resolves.toBe('skipped');
+    expect(env.reload).not.toHaveBeenCalled();
+  });
+
   it('is current at once with no registration', async () => {
     const env = makeEnv(undefined);
     await expect(runBootUpdate(env)).resolves.toBe('current');

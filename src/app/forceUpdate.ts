@@ -1,5 +1,17 @@
 import { showBootCover, hideBootCover } from './bootCover';
-import { activateWaitingWorker, waitForInstall } from './swUpdate';
+import { activateWaitingWorker, timeout, waitForInstall } from './swUpdate';
+
+// A check that never settles must not leave the cover up with no way out.
+const FORCE_UPDATE_CHECK_CAP_MS = 30_000;
+
+async function checkAndActivate() {
+  const registration = await navigator.serviceWorker?.getRegistration();
+  if (!registration) return;
+  // update() already bypasses the HTTP cache for the SW script.
+  await registration.update();
+  await waitForInstall(registration);
+  await activateWaitingWorker(registration);
+}
 
 /**
  * Settings → "Update now". Checks for a new build immediately, activates it if
@@ -15,13 +27,12 @@ import { activateWaitingWorker, waitForInstall } from './swUpdate';
 export async function forceUpdate(): Promise<'failed' | undefined> {
   showBootCover();
   try {
-    const registration = await navigator.serviceWorker?.getRegistration();
-    if (registration) {
-      // update() already bypasses the HTTP cache for the SW script.
-      await registration.update();
-      await waitForInstall(registration);
-      await activateWaitingWorker(registration);
-    }
+    await Promise.race([
+      checkAndActivate(),
+      timeout(FORCE_UPDATE_CHECK_CAP_MS).then(() => {
+        throw new Error('update check timed out');
+      }),
+    ]);
   } catch {
     hideBootCover();
     return 'failed';

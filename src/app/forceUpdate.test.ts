@@ -129,6 +129,17 @@ describe('forceUpdate', () => {
     expect(result.current).toBe(true);
   });
 
+  it('gives up and takes the cover down when the check never settles', async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useBootCover());
+    stubServiceWorker({ update: vi.fn(() => new Promise<void>(() => {})), installing: null });
+    const done = forceUpdate();
+    await vi.advanceTimersByTimeAsync(30_000);
+    await expect(done).resolves.toBe('failed');
+    expect(reload).not.toHaveBeenCalled();
+    expect(result.current).toBe(false);
+  });
+
   it('takes the cover down again when the check fails', async () => {
     const { result } = renderHook(() => useBootCover());
     stubServiceWorker({

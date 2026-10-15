@@ -17,8 +17,6 @@
       "backup": "Settings › Data & storage exports a password-protected backup of every character on this device.",
       "timeFormat": "Settings › Display switches timers between your local time and EVE time.",
       "textSize": "Settings › Display changes the text size on this device.",
-      "offlineCache": "Offline, pages keep showing the data they last loaded.",
-      "shareLinks": "An appraisal or a fitting can be shared as a link that anyone can open.",
       "selfUpdate": "Neocom Desk updates itself when you open it or reload the page."
     }
   },

@@ -14,7 +14,7 @@ _Recorded 2026-10-15._
 
 - **The `vite:preloadError` reload stays as a safety net.** A stale lazy chunk (for example an old tab claimed by a new worker through `clientsClaim` after another tab swapped) reloads, now shown through the boot screen.
 
-- **Loop guard: a failed swap does not reload on every load.** If the update cannot be applied, the current build renders and the next load tries again; boot never reloads repeatedly in a row.
+- **Loop guard: a failed swap does not reload on every load.** At most one boot swap per 30 s per tab (a `sessionStorage` marker), and no swap at all when storage is unavailable, so a swap that does not take cannot reload on every load. Inside the window the current build renders and the update stays waiting.
 
 - **The boot screen shows one random plain-fact tip after about 400 ms**, rotating only if boot is still up after 5 s. A fast boot never flashes one.
 

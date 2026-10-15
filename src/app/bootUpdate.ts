@@ -76,16 +76,20 @@ export async function runBootUpdate(
   try {
     if (!env.online) return 'skipped';
 
+    // A reload there replays the OAuth code, already spent: look (unawaited, so
+    // the page never waits on it), never swap.
+    if (isOnRoute(env.pathname, '/callback')) {
+      void env
+        .getRegistration()
+        .then((registration) => registration?.update())
+        .catch(() => undefined);
+      return 'skipped';
+    }
+
     const registration = await Promise.race([
       env.getRegistration(),
       env.wait(BOOT_UPDATE_CHECK_CAP_MS).then(() => undefined),
     ]);
-
-    // A reload there replays the OAuth code, already spent: look, never swap.
-    if (isOnRoute(env.pathname, '/callback')) {
-      registration?.update().catch(() => undefined);
-      return 'skipped';
-    }
 
     // Dev, a blocked worker, or the very first install: nothing to swap.
     if (!registration || !env.hasController) return 'current';
