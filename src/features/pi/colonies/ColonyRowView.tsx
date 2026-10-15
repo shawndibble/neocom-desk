@@ -262,7 +262,8 @@ function FaultTags({ tags, planetName }: { tags: readonly FaultTag[]; planetName
 
 /**
  * The row grid from `lg`: colony, extractors, storage, next step, ⋮. The ⋮
- * column has a fixed width so `ColonyListHeader`'s labels sit over the cells.
+ * column has a fixed width so `ColonyListHeader`'s labels sit over the cells. At 1024
+ * Colony gets the width Next step (a button and a note) doesn't need.
  */
 const ROW_GRID =
   'lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)_9rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
@@ -595,7 +596,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
             </div>
 
             {row.tags.length > 0 && (
-              <div className="lg:col-span-full lg:pl-[4.6rem]">
+              <div className="lg:pl-24">
                 <FaultTags tags={row.tags} planetName={planetName} />
               </div>
             )}
