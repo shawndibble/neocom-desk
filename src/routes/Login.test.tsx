@@ -162,9 +162,11 @@ describe('Login', () => {
   it('enlarges a screenshot in a dialog when it is clicked', async () => {
     const user = userEvent.setup();
     renderLogin();
-    await user.click(
-      await screen.findByRole('button', { name: /enlarge: a build plan for an orca/i })
+    // The features showcase opens on the same capture, so scope to the questions grid.
+    const grid = within(
+      await screen.findByRole('region', { name: /the questions it exists to answer/i })
     );
+    await user.click(grid.getByRole('button', { name: /enlarge: a build plan for an orca/i }));
     const dialog = await screen.findByRole('dialog', { name: /build plans with profit/i });
     expect(within(dialog).getByRole('img')).toHaveAttribute(
       'src',
@@ -180,38 +182,48 @@ describe('Login', () => {
   // rot — a new route shipping with no row here still fails nothing, because
   // nothing enumerates the app's routes and not every route earns a row. The
   // consent list below is the half that *can* be derived, and is.
-  it('groups the feature catalog and names the surfaces that ship today', async () => {
+  it('tabs the feature catalog by area and names every surface that ships today', async () => {
     renderLogin();
-    // Scoped to the catalog: "Clones" and "Market" also appear in the hero's
+    // Scoped to the section: "Clones" and "Market" also appear in the hero's
     // preview panel, so an unscoped query matches two nodes.
-    const catalog = within(
+    const section = within(
       await screen.findByRole('region', { name: /everything outside the client/i })
     );
+    const user = userEvent.setup();
 
-    // Layout.tsx's nav groups, plus "Command" for its unlabelled head.
-    for (const group of ['Command', 'Progression', 'Economy', 'Social']) {
-      expect(catalog.getByRole('heading', { name: group })).toBeInTheDocument();
+    // Each feature is named in the panel of the tab that covers it.
+    const covered: Record<string, string[]> = {
+      Industry: ['Industry'],
+      'Market & orders': ['Market', 'Open Orders', 'Wallet', 'Assets'],
+      'Ships & travel': ['Ships', 'Skills', 'Clones', 'Travel'],
+      'Planetary & mining': ['Planetary Industry', 'Mining'],
+      Corporation: ['Corporation'],
+      'Mail & contracts': ['Mail & Calendar', 'Contracts', 'Contacts & Standings'],
+      Alerts: ['Alerts', 'Notifications'],
+    };
+    const seen: string[] = [];
+    for (const [tab, features] of Object.entries(covered)) {
+      await user.click(section.getByRole('tab', { name: tab }));
+      const panel = within(section.getByRole('tabpanel'));
+      for (const feature of features) {
+        expect(panel.getByText(feature)).toBeInTheDocument();
+        seen.push(feature);
+      }
     }
-    for (const feature of [
-      'Skills',
-      'Clones',
-      'Industry',
-      'Market',
-      'Open Orders',
-      'Wallet',
-      'Travel',
-      'Assets',
-      'Planetary Industry',
-      'Mining',
-      'Corporation',
-      'Alerts',
-      'Notifications',
-      'Contracts',
-      'Mail & Calendar',
-      'Contacts & Standings',
-    ]) {
-      expect(catalog.getByText(feature)).toBeInTheDocument();
-    }
+    // The 17 catalog rows, none dropped when the chips became tabs.
+    expect(seen).toHaveLength(17);
+  });
+
+  it('puts "How it works" before the trust section, with its own header link', async () => {
+    renderLogin();
+    const how = await screen.findByRole('region', { name: /how it works/i });
+    const trust = screen.getByRole('region', { name: /it reads\. it writes only when you act/i });
+    expect(how.compareDocumentPosition(trust) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      within(screen.getByRole('navigation', { name: /page sections/i })).getByRole('link', {
+        name: 'How it works',
+      })
+    ).toHaveAttribute('href', '#login-how');
   });
 
   /*

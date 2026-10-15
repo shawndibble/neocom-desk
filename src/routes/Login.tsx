@@ -7,6 +7,8 @@ import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
 import { EveSsoButton, LogoMark, Panel, plainTextActionClassName } from '@/components/ui';
+import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
+import { HowItWorks } from '@/features/landing/HowItWorks';
 import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
@@ -18,28 +20,11 @@ import {
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import {
-  Clones,
-  Container,
-  Contracts,
-  Corporation,
   ICON_SIZE,
-  Industry,
-  MailInbox,
-  Market,
-  MoonMining,
-  NavTravel,
-  Notifications,
   Offline,
   OpenSource,
-  Orders,
-  Planetary,
   ReadOnly,
-  ScheduledPush,
-  Ships,
-  Skills,
-  Social,
   TokenPrivacy,
-  Wallet,
   type IconProps,
 } from '@/components/ui/icons';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
@@ -54,59 +39,6 @@ interface LandingRow {
   icon: ComponentType<IconProps>;
   key: string;
 }
-
-/**
- * The feature catalog under the question tiles, shown as name chips, grouped the way the app's own nav
- * groups its routes (`Layout.tsx`: Progression / Economy / Social) so the page
- * and the signed-in shell describe the same product in the same order. The
- * nav's ungrouped head — Alerts and Corporation beside Overview — has no label
- * there; here it is "Command", with Notifications riding along as Alerts'
- * delivery path. Clones sits under Progression rather than the character
- * sub-nav it lives in, because it is pitched as what training runs on.
- */
-const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
-  {
-    group: 'command',
-    items: [
-      { icon: Corporation, key: 'corp' },
-      // Alerts is the record of what fired; Notifications is how it gets to
-      // you. Two rows because the app splits them too — Alerts is a nav route,
-      // Notifications is a Settings panel plus the push path — and the bell
-      // belongs to the feed you read rather than to the delivery mechanism.
-      { icon: Notifications, key: 'alerts' },
-      { icon: ScheduledPush, key: 'notifications' },
-    ],
-  },
-  {
-    group: 'progression',
-    items: [
-      { icon: Skills, key: 'skills' },
-      { icon: Clones, key: 'clones' },
-      { icon: Industry, key: 'industry' },
-      { icon: Ships, key: 'ships' },
-      { icon: MoonMining, key: 'miningTax' },
-      { icon: Planetary, key: 'planetary' },
-      { icon: NavTravel, key: 'travel' },
-    ],
-  },
-  {
-    group: 'economy',
-    items: [
-      { icon: Market, key: 'market' },
-      { icon: Orders, key: 'orders' },
-      { icon: Wallet, key: 'walletOrders' },
-      { icon: Container, key: 'assets' },
-      { icon: Contracts, key: 'contracts' },
-    ],
-  },
-  {
-    group: 'social',
-    items: [
-      { icon: MailInbox, key: 'social' },
-      { icon: Social, key: 'contacts' },
-    ],
-  },
-];
 
 /**
  * The objections a pilot weighs before handing an EVE SSO grant to a
@@ -202,24 +134,10 @@ export function Login() {
           <QuestionGrid />
         </LandingSection>
         <LandingSection id="login-features" heading={t('login.featuresHeading')}>
-          {FEATURE_GROUPS.map(({ group, items }) => (
-            <div key={group} className="mt-6">
-              <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t(`login.featureGroups.${group}`)}
-              </h3>
-              <ul className="mt-2 flex flex-wrap gap-2">
-                {items.map(({ icon: Icon, key }) => (
-                  <li
-                    key={key}
-                    className="flex items-center gap-2 rounded-xs border border-line bg-panel px-3 py-1.5 text-sm"
-                  >
-                    <Icon size={ICON_SIZE.md} aria-hidden="true" className="shrink-0 text-accent" />
-                    {t(`login.features.${key}.name`)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <FeatureShowcase />
+        </LandingSection>
+        <LandingSection id="login-how" heading={t('login.how.heading')}>
+          <HowItWorks onCustomize={() => setCustomizing(true)} />
         </LandingSection>
         <LandingSection id="login-trust" heading={t('login.trustHeading')}>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
