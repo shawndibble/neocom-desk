@@ -258,23 +258,23 @@ describe('Login', () => {
     expect(preview.getByText('Customize')).toBeInTheDocument();
     expect(preview.getByRole('button', { name: /alerts, 5 waiting/i })).toBeInTheDocument();
 
-    // The grid: one Widget per tile, each titled as the real Widget is.
+    // The grid: the app's own Widgets, loaded as a chunk of their own, each titled as the real one is.
     for (const title of [
       'Mining tax',
-      'Training',
       'Contracts',
+      'Mail',
       'Location and ship',
       'Coming up',
       'Wallet',
-      'Planetary',
-      'Mail',
+      'Mining survey',
       'Wallet flow',
+      'Training',
       'Open orders',
     ]) {
-      expect(preview.getByRole('region', { name: title })).toBeInTheDocument();
+      expect(await preview.findByRole('region', { name: title })).toBeInTheDocument();
     }
-    expect(preview.getByText('Mining Exploitation 5')).toBeInTheDocument();
     expect(preview.getByText('Nothing due')).toBeInTheDocument();
+    expect(preview.getByRole('button', { name: /data updated/i })).toBeInTheDocument();
 
     // The fixed board is gone: no summary strip cells, no folded alerts row.
     expect(preview.queryByText('Training now')).not.toBeInTheDocument();

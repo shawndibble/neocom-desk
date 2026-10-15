@@ -63,6 +63,11 @@ export interface WidgetProps {
   previewView?: KindView;
   /** The Gallery's preview already sits under the kind's name: draw the body alone, no header. */
   hideHeader?: boolean;
+  /**
+   * Draw the title as the link would look (with its caret) but as plain text: the
+   * signed-out landing page's demo, where every destination is a route the visitor cannot reach.
+   */
+  inertTitle?: boolean;
   /** The empty state's Remove widget. */
   onRemove: (id: string) => void;
 }
@@ -255,6 +260,7 @@ function WidgetFrame({
   editControls,
   view,
   hideHeader = false,
+  inertTitle = false,
   onRemove,
 }: Omit<WidgetProps, 'previewView'> & { view: KindView }) {
   const { t } = useTranslation();
@@ -389,7 +395,12 @@ function WidgetFrame({
         >
           {headerStart}
           <h2 className="min-w-0 text-[0.6875rem] font-semibold tracking-widest uppercase">
-            {view.to !== null ? (
+            {view.to !== null && inertTitle ? (
+              <span className="flex min-w-0 items-center gap-0.5 text-text">
+                <span className="min-w-0 truncate">{title}</span>
+                <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+              </span>
+            ) : view.to !== null ? (
               <Tooltip content={t('overview.widgets.opensPage', { title })}>
                 <Link
                   to={view.to}
