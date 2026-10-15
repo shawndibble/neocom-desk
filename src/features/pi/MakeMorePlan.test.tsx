@@ -322,7 +322,8 @@ describe('MakeMorePlan', () => {
     const onFindBest = vi.fn();
     const user = userEvent.setup();
     renderPlan('/', onFindBest);
-    expect(screen.getByText(/You can run up to 4 planets and you're using 2/)).toBeInTheDocument();
+    await user.hover(screen.getByRole('button', { name: 'About planet slots' }));
+    expect(await screen.findByText(/You can run up to 4 planets and you're using 2/)).toBeVisible();
     expect(screen.getByRole('link', { name: 'Interplanetary Consolidation' })).toHaveAttribute(
       'href',
       expect.stringContaining('info=skill-2495')
@@ -331,24 +332,28 @@ describe('MakeMorePlan', () => {
     expect(onFindBest).toHaveBeenCalled();
   });
 
-  it('says "1 planet", not "1 planets", for a one-planet cap', () => {
+  it('says "1 planet", not "1 planets", for a one-planet cap', async () => {
     mockState = ready({
       ...fixtureAdvice,
       slots: { ...fixtureAdvice.slots, used: 0, allowed: 1, free: 1 },
     });
     renderPlan();
-    expect(screen.getByText(/You can run up to 1 planet and you're using 0/)).toBeInTheDocument();
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'About planet slots' }));
+    expect(
+      await screen.findByText(/You can run up to 1 planet and you're using 0/)
+    ).toBeInTheDocument();
     expect(screen.getByRole('img', { name: '0 of 1 planet slot used' })).toBeInTheDocument();
   });
 
-  it('says "1 planet" without a gain figure too', () => {
+  it('says "1 planet" without a gain figure too', async () => {
     mockState = ready({
       ...fixtureAdvice,
       slots: { ...fixtureAdvice.slots, used: 0, allowed: 1, free: 1, gainPerPlanetPerDay: null },
     });
     renderPlan();
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'About planet slots' }));
     expect(
-      screen.getByText(/You can run up to 1 planet and you're using 0\. Each level/)
+      await screen.findByText(/You can run up to 1 planet and you're using 0\. Each level/)
     ).toBeInTheDocument();
   });
 
@@ -437,7 +442,11 @@ describe('MakeMorePlan', () => {
 
   it('names a hauling problem for the route, in the pilot units', () => {
     renderPlan();
-    const haul = screen.getByRole('heading', { name: 'Hauling and upkeep' }).closest('section')!;
+    const toggle = screen.getByRole('button', { name: /Hauling and upkeep/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent('700 m³/trip · 1 trips/wk');
+    fireEvent.click(toggle);
+    const haul = toggle.closest('section')!;
     expect(haul).toHaveTextContent('Collected at home');
     expect(haul).toHaveTextContent(/Fits in one trip with an industrial hauler/);
     expect(haul).toHaveTextContent('Frigate cargo ~400 m³');
@@ -445,25 +454,29 @@ describe('MakeMorePlan', () => {
 
   it('labels the hauling route as the worst colony, not the home route', () => {
     renderPlan();
-    const hauling = screen.getByRole('heading', { name: /Hauling and upkeep/ }).closest('section')!;
+    const toggle = screen.getByRole('button', { name: /Hauling and upkeep/ });
+    fireEvent.click(toggle);
+    const hauling = toggle.closest('section')!;
     expect(within(hauling).getByText('Worst colony')).toBeInTheDocument();
     expect(within(hauling).queryByText('Route')).not.toBeInTheDocument();
   });
 
-  it('prices at the chosen hub, never a hardcoded Jita', () => {
+  it('prices at the chosen hub, never a hardcoded Jita', async () => {
     mockState = ready(fixtureAdvice, 'Amarr');
     renderPlan();
-    expect(screen.getByText(/at Amarr prices\. Estimates\./)).toBeInTheDocument();
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'About these figures' }));
+    expect(await screen.findByText(/at Amarr prices\. Estimates\./)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/Jita/);
   });
 
-  it('prices at the corp buyback once that is the market, with no hub named', () => {
+  it('prices at the corp buyback once that is the market, with no hub named', async () => {
     usePiSettings.setState({
       value: { ...DEFAULT_PI_SETTINGS, buybackPct: 85 },
       hydrated: true,
     });
     renderPlan();
-    expect(screen.getByText(/at your corp buyback rate\. Estimates\./)).toBeInTheDocument();
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'About these figures' }));
+    expect(await screen.findByText(/at your corp buyback rate\. Estimates\./)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/Jita/);
   });
 
@@ -485,7 +498,8 @@ describe('MakeMorePlan', () => {
     expect(screen.queryByRole('heading', { name: /Bigger chains/ })).not.toBeInTheDocument();
     const optIn = screen.getByRole('checkbox', { name: 'I will haul between my planets' });
     expect(optIn).not.toBeChecked();
-    expect(optIn).toHaveAccessibleDescription(/Adds a Bigger chains section/);
+    await user.hover(screen.getByRole('button', { name: 'About hauling between planets' }));
+    expect(await screen.findByText(/Adds a Bigger chains section/)).toBeInTheDocument();
     await user.click(optIn);
     await waitFor(() => expect(usePiSettings.getState().value.haulBetweenPlanets).toBe(true));
     expect(await screen.findByRole('heading', { name: /Bigger chains/ })).toBeInTheDocument();

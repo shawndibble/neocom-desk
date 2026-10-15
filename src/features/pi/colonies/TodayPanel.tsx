@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
+  InfoTooltip,
   IskAmount,
   Panel,
   Select,
@@ -146,26 +147,34 @@ function CountChips({
   const tone = (n: number, on: StatChipTone): StatChipTone => (n > 0 ? on : 'default');
   return (
     <StatChips dense>
-      <StatChip
-        label={t('piColonies.chip.stopped')}
-        value={counts.stopped}
-        tone={tone(counts.stopped, 'danger')}
-      />
-      <StatChip
-        label={t('piColonies.chip.expiringToday')}
-        value={counts.expiringToday}
-        tone={tone(counts.expiringToday, 'warning')}
-      />
-      <StatChip
-        label={t('piColonies.chip.fullBeforeHaul')}
-        value={counts.fullBeforeHaul}
-        tone={tone(counts.fullBeforeHaul, 'warning')}
-      />
-      <StatChip
-        label={t('piColonies.chip.needsLook')}
-        value={counts.needsLook}
-        tone={tone(counts.needsLook, 'warning')}
-      />
+      {counts.stopped > 0 && (
+        <StatChip
+          label={t('piColonies.chip.stopped')}
+          value={counts.stopped}
+          tone={tone(counts.stopped, 'danger')}
+        />
+      )}
+      {counts.expiringToday > 0 && (
+        <StatChip
+          label={t('piColonies.chip.expiringToday')}
+          value={counts.expiringToday}
+          tone={tone(counts.expiringToday, 'warning')}
+        />
+      )}
+      {counts.fullBeforeHaul > 0 && (
+        <StatChip
+          label={t('piColonies.chip.fullBeforeHaul')}
+          value={counts.fullBeforeHaul}
+          tone={tone(counts.fullBeforeHaul, 'warning')}
+        />
+      )}
+      {counts.needsLook > 0 && (
+        <StatChip
+          label={t('piColonies.chip.needsLook')}
+          value={counts.needsLook}
+          tone={tone(counts.needsLook, 'warning')}
+        />
+      )}
       {fixCount > 0 && (
         <StatChip
           label={t('piColonies.chip.fixes')}
@@ -182,11 +191,13 @@ function CountChips({
           }
         />
       )}
-      <StatChip
-        label={t('piColonies.chip.healthy')}
-        value={counts.healthy}
-        tone={tone(counts.healthy, 'success')}
-      />
+      {counts.healthy > 0 && (
+        <StatChip
+          label={t('piColonies.chip.healthy')}
+          value={counts.healthy}
+          tone={tone(counts.healthy, 'success')}
+        />
+      )}
     </StatChips>
   );
 }
@@ -211,14 +222,30 @@ function LoginNext({
 
   return (
     <div className="p-3">
-      <div className={MICRO}>{t('piColonies.login.label')}</div>
+      <div className={`flex items-center gap-1.5 ${MICRO}`}>
+        {t('piColonies.login.label')}
+        {loginAtMs !== null && (
+          <InfoTooltip
+            label={t('piColonies.login.aboutLabel')}
+            content={
+              multi
+                ? t('piColonies.login.noteMany', {
+                    count: check.tripCharacterIds.length,
+                    minutes: check.tripMinutes,
+                    names: check.tripCharacterIds.map(characterNameOf).join(', '),
+                  })
+                : t('piColonies.login.noteOne', { minutes: check.tripMinutes })
+            }
+          />
+        )}
+      </div>
       {loginAtMs === null || hoursAway === null ? (
         <p className="mt-1 text-sm text-text-dim">{t('piColonies.login.nothing')}</p>
       ) : (
         <>
-          <p className="mt-1 flex items-baseline gap-2">
+          <p className="mt-0.5 flex items-baseline gap-2">
             <span
-              className={`text-3xl font-semibold tabular-nums ${now ? 'text-danger' : 'text-warning'}`}
+              className={`text-2xl font-semibold tabular-nums ${now ? 'text-danger' : 'text-warning'}`}
             >
               {now
                 ? t('piColonies.today.nowCap')
@@ -230,14 +257,14 @@ function LoginNext({
                 : t('piColonies.login.clock', { clock: eveClock(loginAtMs) })}
             </span>
           </p>
-          <ul className="mt-2 divide-y divide-line">
+          <ul className="mt-1 divide-y divide-line">
             {check.trip.map((item) => {
               const row = rows.find((r) => r.key === item.key);
               if (!row) return null;
               return (
                 <li
                   key={`${item.key}:${item.kind}`}
-                  className="flex items-center gap-2 py-1.5 text-xs"
+                  className="flex items-center gap-2 py-1 text-xs"
                 >
                   <PlanetImage type={row.planetType} size={20} />
                   <span
@@ -263,24 +290,15 @@ function LoginNext({
               );
             })}
           </ul>
-          <p className="mt-2 text-xs text-text-dim">
-            {multi
-              ? t('piColonies.login.noteMany', {
-                  count: check.tripCharacterIds.length,
-                  minutes: check.tripMinutes,
-                  names: check.tripCharacterIds.map(characterNameOf).join(', '),
-                })
-              : t('piColonies.login.noteOne', { minutes: check.tripMinutes })}
-          </p>
         </>
       )}
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-text-dim">
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-dim">
         <span id="pi-haul-cadence-label">{t('piColonies.login.youHaul')}</span>
         <Select
           value={String(cadence.haulDays)}
           onValueChange={(value) => onHaulDaysChange(Number(value) as PiCadenceDays)}
         >
-          <SelectTrigger size="sm" className="w-40" aria-labelledby="pi-haul-cadence-label">
+          <SelectTrigger size="sm" className="w-36" aria-labelledby="pi-haul-cadence-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -291,7 +309,10 @@ function LoginNext({
             ))}
           </SelectContent>
         </Select>
-        <span>{t('piColonies.login.restartEvery', { count: cadence.restartDays })}</span>
+        <InfoTooltip
+          label={t('piColonies.login.cadenceLabel')}
+          content={t('piColonies.login.restartEvery', { count: cadence.restartDays })}
+        />
       </div>
     </div>
   );
@@ -318,7 +339,7 @@ export function TodayPanel(props: TodayPanelProps) {
         <div className="space-y-3 p-3">
           <Hero check={check} rows={rows} nowMs={nowMs} nameOf={nameOf} />
           <CountChips check={check} fixCount={props.fixCount} fixGainPerDay={props.fixGainPerDay} />
-          <p className="text-xs text-text-dim">
+          <p className="text-xs text-text-dim max-md:hidden">
             {props.todayPerDay === null ? (
               props.pricesFailed ? null : (
                 <span>{t('piColonies.today.noFigures')}</span>

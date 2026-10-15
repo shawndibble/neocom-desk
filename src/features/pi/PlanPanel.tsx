@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Panel, Spinner } from '@/components/ui';
+import { EmptyState, InfoTooltip, Panel, Spinner } from '@/components/ui';
 import {
   disabledClassName,
   focusRingInsetClassName,
@@ -145,6 +145,18 @@ export function PlanPanel(props: Props) {
   // The URL may still say make-more; the view shows Find best until the colonies can be read.
   const question = unknown && wanted === 'make-more' ? 'find-best' : wanted;
 
+  // A failed read is news the pilot must see; every other note rides a tooltip.
+  const hintVisible = unknown || esiFailed;
+  const hint =
+    picked === null && !esiFailed
+      ? t(`piPlan.picker.opened.${unknown ? 'unknown' : opening.reason}`, { count: colonyCount })
+      : t(
+          question === 'make-more' && colonyCount === 0
+            ? 'piPlan.picker.makeMoreNone'
+            : QUESTION_HINT[question],
+          { count: colonyCount }
+        );
+
   return (
     <div className="space-y-4">
       {esiFailed && (
@@ -163,42 +175,42 @@ export function PlanPanel(props: Props) {
           <h2 id={pickerHeadingId} className="sr-only">
             {t('piPlan.picker.title')}
           </h2>
-          <div
-            role="group"
-            aria-labelledby={pickerHeadingId}
-            className="grid divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0"
-          >
-            <Option
-              selected={question === 'make-more'}
-              unavailable={unknown}
-              onSelect={() => setPicked('make-more')}
-              title={t('piPlan.picker.makeMore')}
-              note={unknown ? t('piPlan.picker.makeMoreUnknown') : undefined}
-            />
-            <Option
-              selected={question === 'find-best'}
-              onSelect={() => setPicked('find-best')}
-              title={t('piPlan.picker.findBest')}
-            />
-            <Option
-              selected={question === 'product'}
-              onSelect={() => setPicked('product')}
-              title={t('piPlan.picker.product')}
-            />
+          <div className="flex items-stretch">
+            <div
+              role="group"
+              aria-labelledby={pickerHeadingId}
+              className="grid min-w-0 flex-1 divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0"
+            >
+              <Option
+                selected={question === 'make-more'}
+                unavailable={unknown}
+                onSelect={() => setPicked('make-more')}
+                title={t('piPlan.picker.makeMore')}
+                note={unknown ? t('piPlan.picker.makeMoreUnknown') : undefined}
+              />
+              <Option
+                selected={question === 'find-best'}
+                onSelect={() => setPicked('find-best')}
+                title={t('piPlan.picker.findBest')}
+              />
+              <Option
+                selected={question === 'product'}
+                onSelect={() => setPicked('product')}
+                title={t('piPlan.picker.product')}
+              />
+            </div>
+            {/* Why this question opened, then what it does: a note, not a line of its own. */}
+            {!hintVisible && (
+              <div className="flex shrink-0 items-center border-l border-line px-3">
+                <InfoTooltip label={t('piPlan.picker.hintLabel')} glyph="info" content={hint} />
+              </div>
+            )}
           </div>
-          {/* Until the pilot picks (and ESI answered): why this question opened; then what it does. */}
-          <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
-            {picked === null && !esiFailed
-              ? t(`piPlan.picker.opened.${unknown ? 'unknown' : opening.reason}`, {
-                  count: colonyCount,
-                })
-              : t(
-                  question === 'make-more' && colonyCount === 0
-                    ? 'piPlan.picker.makeMoreNone'
-                    : QUESTION_HINT[question],
-                  { count: colonyCount }
-                )}
-          </p>
+          {hintVisible && (
+            <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
+              {hint}
+            </p>
+          )}
         </Panel>
         {question === 'make-more' && (
           <MakeMorePlan

@@ -413,15 +413,33 @@ export function ColonyRowView(props: ColonyRowViewProps) {
   const exactGain =
     labelGain === null ? null : t('common.iskExact', { amount: formatIsk(labelGain, 0) });
   const actionButton = (
-    <Button size="md" variant={variant} className="w-full" onClick={props.onExpand}>
+    <Button
+      size="md"
+      variant={variant}
+      className="lg:w-full max-lg:self-start"
+      onClick={props.onExpand}
+    >
       {label}
       {exactGain && <span className="sr-only"> {exactGain}</span>}
     </Button>
   );
-  const actionWithExact = exactGain ? (
-    <Tooltip content={exactGain}>{actionButton}</Tooltip>
-  ) : (
-    actionButton
+  // The note ("~5 min", "Brings back all of its output") rides the tooltip below `lg`, where a caption costs a row per colony.
+  const actionWithExact = (
+    <Tooltip
+      content={
+        <>
+          {note}
+          {exactGain && (
+            <>
+              <br />
+              {exactGain}
+            </>
+          )}
+        </>
+      }
+    >
+      {actionButton}
+    </Tooltip>
   );
 
   const toggleLabel = t('piColonies.toggleColony', { name: planetName });
@@ -468,7 +486,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               return;
             props.onToggle();
           }}
-          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 lg:items-start ${ROW_GRID}`}
+          className={`relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-2 hover:bg-panel-2 lg:py-3 lg:items-start ${ROW_GRID}`}
         >
           {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
@@ -539,7 +557,9 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               {extractor.expiryMs !== null && (
                 <Meter fraction={stopped ? 1 : extractor.remainingFraction} tone={extractorTone} />
               )}
-              {extractorNote && <p className="text-[0.6875rem] text-text-dim">{extractorNote}</p>}
+              {extractorNote && (
+                <p className="text-[0.6875rem] text-text-dim max-lg:sr-only">{extractorNote}</p>
+              )}
             </div>
 
             <div className="min-w-0 space-y-1">
@@ -566,7 +586,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                 />
               )}
               <p
-                className={`text-[0.6875rem] ${storage.fillsBeforeHaul ? 'text-warning' : 'text-text-dim'}`}
+                className={`text-[0.6875rem] ${storage.fillsBeforeHaul ? 'text-warning' : 'text-text-dim max-lg:sr-only'}`}
               >
                 {storageNote}
               </p>
@@ -574,7 +594,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
             <div className="flex min-w-0 flex-col gap-1 lg:items-stretch">
               {actionWithExact}
-              <p className="text-center text-[0.6875rem] text-text-dim">{note}</p>
+              <p className="text-center text-[0.6875rem] text-text-dim max-lg:sr-only">{note}</p>
             </div>
 
             <div className="flex justify-end max-lg:absolute max-lg:top-1 max-lg:right-1 lg:items-start">

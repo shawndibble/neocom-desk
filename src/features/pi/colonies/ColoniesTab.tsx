@@ -687,12 +687,12 @@ export function ColoniesTab({
                   )}
                 </ul>
               )}
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-              <span>
-                <b className="font-semibold text-text">{t('piColonies.cantSee.lead')}</b>{' '}
-                {t('piColonies.cantSee.body')}
-              </span>
-              <InfoTooltip label={t('pi.stalenessLabel')} content={t('pi.stalenessTooltip')} />
+            <p className="flex items-center gap-1.5 border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
+              {t('piColonies.cantSee.lead')}
+              <InfoTooltip
+                label={t('pi.stalenessLabel')}
+                content={`${t('piColonies.cantSee.body')}\n${t('pi.stalenessTooltip')}`}
+              />
             </p>
           </Panel>
         </>

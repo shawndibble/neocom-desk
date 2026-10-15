@@ -390,9 +390,12 @@ describe('PlanetaryIndustry', () => {
   it("explains what the page can't see, in plain words", async () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
+    await userEvent
+      .setup()
+      .hover(screen.getAllByRole('button', { name: 'About colony data freshness' })[0]);
     expect(
-      screen.getByText(/the game only updates a colony's storage and extractors/)
-    ).toBeInTheDocument();
+      (await screen.findAllByText(/the game only updates a colony's storage and extractors/)).length
+    ).toBeGreaterThan(0);
   });
 
   it('reads a colony with no readable extraction program as unknown storage, never blank', async () => {
@@ -892,9 +895,11 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const option = await screen.findByRole('button', { name: /Make more from my planets/ });
     expect(option).toHaveAttribute('aria-current', 'true');
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'About this question' }));
     expect(
-      screen.getByText(/Opened “Make more from my planets” because we found 1 colony/)
-    ).toBeInTheDocument();
+      (await screen.findAllByText(/Opened “Make more from my planets” because we found 1 colony/))
+        .length
+    ).toBeGreaterThan(0);
     expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
   });
 
@@ -904,7 +909,10 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const option = await screen.findByRole('button', { name: /Find the best thing to build/ });
     expect(option).toHaveAttribute('aria-current', 'true');
-    expect(screen.getByText(/You have no colonies yet, so we opened/)).toBeInTheDocument();
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'About this question' }));
+    expect(
+      (await screen.findAllByText(/You have no colonies yet, so we opened/)).length
+    ).toBeGreaterThan(0);
   });
 
   it('restores the question from ?q= on load', async () => {
@@ -946,9 +954,14 @@ describe('PlanetaryIndustry', () => {
     window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
     render(<App />);
     await screen.findByRole('heading', { name: 'Goals' });
+    await userEvent.setup().hover(screen.getByRole('button', { name: 'About this question' }));
     expect(
-      screen.getByText('Opened “Make a specific product” because your link names a product.')
-    ).toBeInTheDocument();
+      (
+        await screen.findAllByText(
+          'Opened “Make a specific product” because your link names a product.'
+        )
+      ).length
+    ).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Make a specific product/ })).toHaveAttribute(
       'aria-current',
       'true'
@@ -1179,7 +1192,11 @@ describe('PlanetaryIndustry', () => {
     await colonyPanelFor(/Jita IV/);
     const strip = screen.getByTestId('pi-header-strip');
     expect(within(strip).getByRole('combobox', { name: 'Where do you sell?' })).toBeInTheDocument();
-    expect(within(strip).getByText('Colonies')).toBeInTheDocument();
+    // Home, the colony count and the route wait behind the strip's "i".
+    await userEvent.click(within(strip).getByRole('button', { name: 'Home, colonies and route' }));
+    expect(
+      within(await screen.findByTestId('pi-strip-facts')).getByText('Colonies')
+    ).toBeInTheDocument();
   });
 
   it('lets the Sell at picker grow past its minimum, so "My corp buyback" is not cut off', async () => {

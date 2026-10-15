@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Disclosure,
+  InfoTooltip,
   IskAmount,
   Panel,
   Spinner,
@@ -336,15 +337,26 @@ function WhatIfSection({
 
   return (
     <section aria-labelledby="pi-chains-whatif" className="border-t border-line">
-      <h3
-        id="pi-chains-whatif"
-        className="px-3 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-      >
-        {t('piPlan.chains.whatIfTitle')}
-      </h3>
-      <p className="px-3 pt-1 pb-2 text-xs text-text-dim">
-        {noSlot ? t('piPlan.chains.whatIfNoSlot') : t('piPlan.chains.whatIfIntro')}
-      </p>
+      <div className="flex items-center gap-1.5 px-3 pt-2">
+        <h3
+          id="pi-chains-whatif"
+          className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+        >
+          {t('piPlan.chains.whatIfTitle')}
+        </h3>
+        {!noSlot && (
+          <InfoTooltip
+            label={t('piPlan.chains.whatIfIntroLabel')}
+            glyph="info"
+            content={t('piPlan.chains.whatIfIntro')}
+          />
+        )}
+      </div>
+      {noSlot ? (
+        <p className="px-3 pt-1 pb-2 text-xs text-text-dim">{t('piPlan.chains.whatIfNoSlot')}</p>
+      ) : (
+        <div className="pb-1" />
+      )}
       {rows.map((row) => (
         <div key={row.key} className="border-t border-line">
           <Disclosure
@@ -425,12 +437,18 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
   return (
     <Panel
       title={t('piPlan.chains.title')}
-      meta={<span className="text-[0.6875rem] text-text-dim">{t('piPlan.chains.meta')}</span>}
+      meta={
+        <span className="flex items-center gap-1.5 text-[0.6875rem] text-text-dim">
+          {t('piPlan.chains.meta')}
+          <InfoTooltip
+            label={t('piPlan.chains.introLabel')}
+            glyph="info"
+            content={t('piPlan.chains.intro')}
+          />
+        </span>
+      }
       padded={false}
     >
-      <p className="border-b border-line px-3 py-2 text-xs text-text-dim">
-        {t('piPlan.chains.intro')}
-      </p>
       {view.recommended.length > 0 && renderCards(view.recommended)}
       {state.pending ? (
         <div className="flex items-center gap-2 px-3 py-3 text-xs text-text-dim">
