@@ -381,7 +381,10 @@ describe('Login', () => {
 
     const faq = within(screen.getByRole('region', { name: /quick answers/i }));
     await user.click(faq.getByRole('button', { name: /move isk or change anything/i }));
-    expect(faq.getByRole('link', { name: /read more/i })).toHaveAttribute('href', '/privacy.html');
+    expect(faq.getByRole('link', { name: /read more/i })).toHaveAttribute(
+      'href',
+      '/privacy.html#writes'
+    );
     for (const link of faq.queryAllByRole('link')) {
       expect(link.getAttribute('href')).not.toMatch(/^\/help/);
     }

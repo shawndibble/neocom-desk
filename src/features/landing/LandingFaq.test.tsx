@@ -19,14 +19,19 @@ describe('LandingFaq', () => {
     const user = userEvent.setup();
     render(<LandingFaq />);
     for (const { id, readMore } of LANDING_FAQ) {
-      expect(readMore === undefined || readMore.startsWith('/privacy.html'), id).toBe(true);
+      expect(
+        readMore === undefined ||
+          readMore.startsWith('/privacy.html') ||
+          readMore.startsWith('/delete-data.html'),
+        id
+      ).toBe(true);
     }
     await user.click(screen.getByRole('button', { name: /is it free/i }));
     expect(screen.getByText(/the app stays free/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /delete my data/i }));
     expect(screen.getByRole('link', { name: /read more/i })).toHaveAttribute(
       'href',
-      '/privacy.html'
+      '/delete-data.html'
     );
   });
 });

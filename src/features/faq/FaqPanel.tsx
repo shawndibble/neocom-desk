@@ -233,6 +233,11 @@ export function FaqPanel() {
       answer: <StoreGroup group={storeGroup('communities')} />,
     },
     {
+      id: 'share-links',
+      questionKey: 'settings.faq.q.shareLinks',
+      answer: <p>{t('settings.faq.store.notes.shareLinks')}</p>,
+    },
+    {
       id: 'retention',
       questionKey: 'settings.faq.q.retention',
       answer: (

@@ -14,7 +14,7 @@ import {
   WHAT_WE_STORE_GROUPS,
 } from './whatWeStore';
 
-const QUESTIONS = 17;
+const QUESTIONS = 18;
 
 /** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq(initialEntry = '/help/faq') {

@@ -200,7 +200,8 @@ export interface RetentionGroup {
  * the store groups above, a user-facing commitment: the numbers mirror the
  * code that enforces them (`engine/miningTax/ledgerHistory.ts`,
  * `esi/cachePrune.ts`, `features/notifications/feed.ts`, `sync/merge.ts`,
- * `functions/src/purgeStaleAccounts.ts`, `functions/src/communityRequests.ts`),
+ * `functions/src/purgeStaleAccounts.ts`, `functions/src/communityRequests.ts`,
+ * `features/share/shareStore.ts`),
  * so change one and change the other (`FaqPanel.test.tsx` reads the numbers out
  * of those functions files).
  */
@@ -227,12 +228,19 @@ export const RETENTION_GROUPS: readonly RetentionGroup[] = [
   {
     id: 'server',
     titleKey: 'settings.faq.retention.server.title',
-    items: ['synced', 'deleted', 'alerts', 'push', 'community', 'communityRequests', 'idle'].map(
-      (id) => ({
-        id,
-        labelKey: `settings.faq.retention.server.${id}`,
-        durationKey: `settings.faq.retention.server.${id}Kept`,
-      })
-    ),
+    items: [
+      'synced',
+      'deleted',
+      'alerts',
+      'push',
+      'community',
+      'communityRequests',
+      'shareLinks',
+      'idle',
+    ].map((id) => ({
+      id,
+      labelKey: `settings.faq.retention.server.${id}`,
+      durationKey: `settings.faq.retention.server.${id}Kept`,
+    })),
   },
 ];
