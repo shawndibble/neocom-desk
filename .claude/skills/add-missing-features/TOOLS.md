@@ -297,7 +297,12 @@ ranked (static note, no count: "no source" also covers faction/lottery BPOs).
 #3792 NARROW — Fitting Add panel previews whole-fit stat change on hover/focus,
 pointer only (generic `diffFittingStats`; touch has no path). #3793 NARROW —
 Assets select bar "Copy with quantities" (`Name xQty`), no Appraisal hand-off.
-#2390 NARROW — Skills › Certificates tab: CCP's SDE certificates,
+#3796 NARROW — Local list "new since last paste", only when the re-paste
+overlaps the previous one (a jump would mark everyone new; 18). #3797 NARROW —
+lead-time alerts for issued contracts expiring unaccepted and ONE batched
+"N orders lapse" event per Character (per-order events would burst). #3798
+NARROW — Market History "By item" rollup of the existing FIFO Margin column,
+covered items only, truncation caveat shown. #2390 NARROW — Skills › Certificates tab: CCP's SDE certificates,
 combat groups only, grade + next-grade gap + "Add to plan"; Alpha cap shown only
 on Alpha characters. #1091 NARROW — contract notifications announce completion and failure,
 not just acceptance; every status is stored but only the edge into `in_progress`
@@ -369,6 +374,13 @@ invention-planning.md`, #2848 not planned — only the Market-Wide label
   journal); hauling top-routes list (needs order books for many hub pairs, the
   shared ESI budget); quiet hours/digest (#2871 not planned); repeat "still not
   fixed" reminders and auto-resolve (noise; could erase a live fire).
+- **Assets leftovers (reviewed, killed):** CSV Value/Location-type columns (ESI
+  average price only — a number already on screen (3), exported as authoritative;
+  every table exports what the screen shows, `20260929-085650`). Showing the bay
+  in search-result trails is a label fix, not a feature. Wormhole "which of ALL my
+  ships can pass" (#2906 shipped the single-ship check). Reliability popover on
+  Market-Wide profit (Depth was hidden by default for width, #3071; the signals
+  exist).
 - **On remit, not a kill-test:** "can this character fly this fit" (EVE Empire —
   PvP/PvE; distinct from #1015); Compass and EVE-NAV capital jump planning (a
   second account plus a multi-billion hull, no ISK-pipeline leg); Eve Supply
