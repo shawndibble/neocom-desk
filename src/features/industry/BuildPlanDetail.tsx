@@ -878,17 +878,17 @@ export function BuildPlanDetail({
   // The plan's own top-level product (issue #1231) — the header this same
   // account-wide check used to explicitly skip (see the 2026-09-14 decision
   // this reverses for the top-level case).
-  // The header counts only what the plan builds: its product plus every
-  // material set to build, never one the pilot buys.
+  // The header counts only the materials set to build, never one the pilot
+  // buys. The product's own blueprint is not in it: a plan that buys every
+  // material shows nothing here.
   const topLevelSkillGate = useMemo(
     () =>
-      mergeSkillGates([
-        evaluateSkillGate(entry?.blueprint.skills ?? [], accountSkills),
-        ...visibleMaterials
+      mergeSkillGates(
+        visibleMaterials
           .filter((material) => material.subBuilds.length > 0)
-          .map((material) => skillGates.get(material.typeID)),
-      ]),
-    [entry, accountSkills, visibleMaterials, skillGates]
+          .map((material) => skillGates.get(material.typeID))
+      ),
+    [visibleMaterials, skillGates]
   );
 
   // `detection.scopedQuantityFor` is narrowed to the plan's owned-stock scope
