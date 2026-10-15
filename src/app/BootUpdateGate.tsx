@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { BootScreen } from './BootScreen';
-import type { BootUpdateOutcome } from './bootUpdate';
+import { bootUpdateMayHold, type BootUpdateOutcome } from './bootUpdate';
 import { bootUpdateOnce } from './bootUpdateOnce';
 
 /**
@@ -9,7 +9,9 @@ import { bootUpdateOnce } from './bootUpdateOnce';
  * where the page is about to reload and the boot screen stays up.
  */
 export function BootUpdateGate({ children }: { children: ReactNode }) {
-  const [outcome, setOutcome] = useState<BootUpdateOutcome | null>(null);
+  const [outcome, setOutcome] = useState<BootUpdateOutcome | null>(() =>
+    bootUpdateMayHold() ? null : 'current'
+  );
 
   useEffect(() => {
     let live = true;

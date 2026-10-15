@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BOOT_UPDATE_CHECK_CAP_MS, runBootUpdate, type BootUpdateEnv } from './bootUpdate';
+import {
+  BOOT_UPDATE_CHECK_CAP_MS,
+  bootUpdateMayHold,
+  runBootUpdate,
+  type BootUpdateEnv,
+} from './bootUpdate';
 
 const realServiceWorker = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
 let listeners: Record<string, () => void>;
@@ -194,5 +199,14 @@ describe('runBootUpdate', () => {
     });
     await expect(runBootUpdate(env)).resolves.toBe('current');
     expect(postMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('bootUpdateMayHold', () => {
+  it('holds only when online, controlled by a worker, and not on /callback', () => {
+    expect(bootUpdateMayHold(makeEnv(undefined))).toBe(true);
+    expect(bootUpdateMayHold(makeEnv(undefined, { online: false }))).toBe(false);
+    expect(bootUpdateMayHold(makeEnv(undefined, { hasController: false }))).toBe(false);
+    expect(bootUpdateMayHold(makeEnv(undefined, { pathname: '/callback' }))).toBe(false);
   });
 });

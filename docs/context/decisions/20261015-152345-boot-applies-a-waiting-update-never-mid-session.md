@@ -21,3 +21,4 @@ _Recorded 2026-10-15._
 - **Trade-off, accepted: a tab left open for days stays on its old build until it is reopened or reloaded.** No indicator, no countdown. A mid-task reload costs more than a stale build, and a stale lazy chunk is covered by the preload-error reload above.
 
 - **Multi-tab.** Another tab swapping the worker is harmless to a running tab until it needs a chunk the new build dropped; that is the preload-error case. Each tab applies the waiting build on its own next boot.
+- **No hold when there is nothing to wait for.** Offline, on `/callback`, or with no worker controlling the page (dev, a blocked worker, the first install), the app renders on the first frame with no gate delay. The Dexie open and its schema upgrade must not slip behind an await: e2e specs seed IndexedDB right after load and rely on that timing.

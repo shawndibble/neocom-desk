@@ -50,6 +50,17 @@ export function defaultBootUpdateEnv(): BootUpdateEnv {
   };
 }
 
+/**
+ * Whether a boot could have anything to wait for. When it can't — offline, on
+ * `/callback`, or no worker controlling the page (dev, a blocked worker, the
+ * first install) — the app must render on the first frame, exactly as it did
+ * before this gate existed: its Dexie open, and the schema upgrade with it,
+ * must not slip behind an await.
+ */
+export function bootUpdateMayHold(env: BootUpdateEnv = defaultBootUpdateEnv()): boolean {
+  return env.online && env.hasController && !isOnRoute(env.pathname, '/callback');
+}
+
 async function swap(
   env: BootUpdateEnv,
   registration: ServiceWorkerRegistration

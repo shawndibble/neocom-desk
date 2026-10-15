@@ -7,8 +7,11 @@ import { BootUpdateGate } from './BootUpdateGate';
 import { resetBootUpdateForTest } from './bootUpdateOnce';
 import type { BootUpdateOutcome } from './bootUpdate';
 
-const { runBootUpdate } = vi.hoisted(() => ({ runBootUpdate: vi.fn() }));
-vi.mock('./bootUpdate', () => ({ runBootUpdate }));
+const { runBootUpdate, bootUpdateMayHold } = vi.hoisted(() => ({
+  runBootUpdate: vi.fn(),
+  bootUpdateMayHold: vi.fn(() => true),
+}));
+vi.mock('./bootUpdate', () => ({ runBootUpdate, bootUpdateMayHold }));
 vi.mock('./bootRecovery', () => ({ recoverFromStalledBoot: vi.fn() }));
 vi.mock('./bootStallReport', () => ({
   reportBootStallOnce: vi.fn(),
@@ -32,6 +35,8 @@ function renderGate(strict = false) {
 
 beforeEach(() => {
   runBootUpdate.mockReset();
+  bootUpdateMayHold.mockReset();
+  bootUpdateMayHold.mockReturnValue(true);
   resetBootUpdateForTest();
 });
 
@@ -50,6 +55,13 @@ describe('BootUpdateGate', () => {
     runBootUpdate.mockResolvedValue(outcome);
     renderGate();
     expect(await screen.findByText('the app')).toBeInTheDocument();
+  });
+
+  it('renders the children on the first frame when nothing could be waited for', () => {
+    bootUpdateMayHold.mockReturnValue(false);
+    runBootUpdate.mockReturnValue(new Promise(() => {}));
+    renderGate();
+    expect(screen.getByText('the app')).toBeInTheDocument();
   });
 
   it('stays on the boot screen while applying', async () => {
