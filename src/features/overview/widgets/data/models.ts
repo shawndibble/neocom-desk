@@ -533,6 +533,23 @@ const contracts: Builder = (feeds, { t, now }) => {
     },
   ];
   const tone = contractsSeverity(data) ?? 'clear';
+  // Nothing is on a clock, so never say "Nothing due" beside a count of open offers: say when the first lapses.
+  const noClockSecondary = (): NumberSecondary => {
+    const nextOffer = summary.rows.find((row) => row.state === 'outstanding');
+    if (summary.inProgress > 0 && summary.outstanding > 0) {
+      return {
+        text: t('overview.widgets.contracts.outstandingCount', { count: summary.outstanding }),
+      };
+    }
+    if (nextOffer) {
+      return {
+        text: t('overview.widgets.contracts.outstandingExpires', {
+          duration: formatCountdown(Math.max(0, nextOffer.atMs - now) / 1000),
+        }),
+      };
+    }
+    return { text: t('overview.board.contractsNothingDue') };
+  };
   // The soonest clock leads; the hauls in flight are the one other fact. With no clock, the count itself leads.
   const number: NumberModel = soonest
     ? {
@@ -552,12 +569,7 @@ const contracts: Builder = (feeds, { t, now }) => {
           summary.inProgress === 0 && summary.outstanding > 0
             ? t('overview.widgets.contracts.outstandingUnit')
             : t('overview.widgets.contracts.unit'),
-        secondary: {
-          text:
-            summary.inProgress > 0 && summary.outstanding > 0
-              ? t('overview.widgets.contracts.outstandingCount', { count: summary.outstanding })
-              : t('overview.board.contractsNothingDue'),
-        },
+        secondary: noClockSecondary(),
         tone,
       };
   return {

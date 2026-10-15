@@ -189,7 +189,7 @@ export function comingUpTable(
 const isk = (amount: number | null): TableCell =>
   amount === null || amount <= 0 ? UNKNOWN : { text: formatIskCompact(amount), iskAmount: amount };
 
-/** Each contract on a clock: where it goes (or what it is), when it lapses, what it pays. */
+/** Each haul in progress and outstanding contract: where it goes (or what it is), when it lapses, what it pays. */
 export function contractsTable(
   t: Translate,
   items: readonly ContractTableRow[],

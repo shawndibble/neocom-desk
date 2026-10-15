@@ -674,6 +674,20 @@ describe('contracts table', () => {
     expect(view.number.value).toBe('1');
     expect(view.number.unit).toBe('overview.widgets.contracts.outstandingUnit');
     expect(view.number.secondary?.text).toBe('overview.board.contractsNothingDue');
+    const withOffer = buildView(
+      'contracts',
+      {
+        contracts: ok(
+          data({
+            inProgress: 0,
+            outstanding: 1,
+            rows: [courier({ state: 'outstanding', atMs: NOW + 3 * HOUR })],
+          })
+        ) as never,
+      },
+      ctx()
+    );
+    expect(withOffer.number.secondary?.text).toContain('outstandingExpires');
   });
 
   it('leads with the soonest deadline and counts the hauls as the secondary', () => {
