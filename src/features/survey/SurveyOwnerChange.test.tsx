@@ -38,6 +38,12 @@ describe('SurveyOwnerChange', () => {
     expect(setSurveyOwner).toHaveBeenCalledWith({ id: 'abc123', owner: 'New Pilot' });
   });
 
+  it('renders its character search as a searchbox, like every other search-then-pick dialog', () => {
+    render(<SurveyOwnerChange characterId={7} surveyId="abc123" onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Change owner' }));
+    expect(screen.getByRole('searchbox', { name: 'New owner' })).toBeTruthy();
+  });
+
   it('says so when the handover fails, and keeps the dialog open', async () => {
     setSurveyOwner.mockRejectedValue(new Error('denied'));
     const onChanged = vi.fn();
