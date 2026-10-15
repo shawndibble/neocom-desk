@@ -206,6 +206,15 @@ describe('syncRequestDeliveries', () => {
     expect((await syncRequestDeliveries(ME, 'c1', NOW)).status).toBe('write-failed');
   });
 
+  it('reports a failed save when it cannot tell whether the Request closed', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mocks.update.mockRejectedValueOnce(
+      Object.assign(new Error('x'), { code: 'permission-denied' })
+    );
+    mocks.requests.mockResolvedValueOnce([request()]).mockRejectedValueOnce(new Error('offline'));
+    expect((await syncRequestDeliveries(ME, 'c1', NOW)).status).toBe('write-failed');
+  });
+
   it('credits only the Request of the pilot the contract went to', async () => {
     const other = request({
       id: 'r2',

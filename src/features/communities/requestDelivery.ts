@@ -191,18 +191,19 @@ async function readContracts(
   return { status: 'ok', contracts, degraded };
 }
 
-/** Whether the Request is now closed or expired, read fresh; false when that cannot be told. */
+/** Whether the Request is now closed or expired, read fresh; 'unknown' when that cannot be told. */
 async function requestIsClosed(
   characterId: number,
   communityId: string,
   requestId: string,
   now: number
-): Promise<boolean> {
+): Promise<boolean | 'unknown'> {
   try {
     const request = (await loadRequests(characterId, communityId)).find((r) => r.id === requestId);
     return request === undefined || !isOpenRequest(request, now);
-  } catch {
-    return false;
+  } catch (err) {
+    console.warn('Request delivery: could not tell whether the Request closed', err);
+    return 'unknown';
   }
 }
 
@@ -257,7 +258,10 @@ async function writeDeliveries(
         // Only a Request that really closed or expired meanwhile is quiet: a
         // denial for any other reason (session, rules) is a failed save.
         const denied = (err as { code?: string } | null)?.code === 'permission-denied';
-        if (!(denied && (await requestIsClosed(characterId, communityId, request.id, now)))) {
+        // An unknown state is a failed save too: it is not quiet until it is known.
+        if (!(
+          denied && (await requestIsClosed(characterId, communityId, request.id, now)) === true
+        )) {
           console.warn('Request delivery: could not save a Pledge', err);
           writeFailed = true;
         }

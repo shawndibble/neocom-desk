@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { pledgeWritesInFlight } from './pledgeWrites';
 
 /** First run waits out boot and the shared-library publish. */
 export const DELIVERY_BOOT_DELAY_MS = 45 * 1000;
@@ -34,6 +35,11 @@ export function useSyncRequestDeliveries(
       for (const id of ordered) {
         if (cancelled) return;
         if (!(await hasDeliveryScope(id))) continue;
+        // Signing in as another Character swaps the Firebase session: not under a Pledge write.
+        if (id !== activeCharacterId && pledgeWritesInFlight() > 0) {
+          console.warn('Request delivery sweep skipped a Character while a Pledge was being saved');
+          continue;
+        }
         try {
           for (const communityId of await listCommunityIds(id)) {
             if (cancelled) return;

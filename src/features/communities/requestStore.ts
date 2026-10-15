@@ -30,6 +30,7 @@ import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
 import { callCommunity } from './communityStore';
+import { trackPledgeWrite } from './pledgeWrites';
 
 const KINDS: readonly RequestLineKind[] = ['item', 'bpc', 'bpo'];
 
@@ -237,6 +238,16 @@ export async function updateMyPledge(
     override.savePledge(communityId, requestId, Object.keys(next).length === 0 ? null : next);
     return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
   }
+  return trackPledgeWrite(() => writeMyPledge(characterId, communityId, requestId, uid, change));
+}
+
+async function writeMyPledge(
+  characterId: number,
+  communityId: string,
+  requestId: string,
+  uid: string,
+  change: (lines: PledgeLines) => PledgeLines
+): Promise<RequestPledge | null> {
   await ensureSignedIn(characterId);
   const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
   if (!ownerHash) throw new Error('This Character has no owner hash yet');

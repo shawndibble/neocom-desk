@@ -33,7 +33,10 @@ export function useDeliverySync({
     void syncRequestDeliveries(characterId, communityId).then(async (found) => {
       if (cancelled) return;
       setResult(found);
-      if (found.updated > 0) await refreshPledges(requestId).catch(() => undefined);
+      if (found.updated > 0)
+        await refreshPledges(requestId).catch((err) =>
+          console.warn('Request delivery: could not re-read the Pledges', err)
+        );
     });
     return () => {
       cancelled = true;
