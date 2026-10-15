@@ -423,23 +423,10 @@ export function ColonyRowView(props: ColonyRowViewProps) {
       {exactGain && <span className="sr-only"> {exactGain}</span>}
     </Button>
   );
-  // The note ("~5 min", "Brings back all of its output") rides the tooltip below `lg`, where a caption costs a row per colony.
-  const actionWithExact = (
-    <Tooltip
-      content={
-        <>
-          {note}
-          {exactGain && (
-            <>
-              <br />
-              {exactGain}
-            </>
-          )}
-        </>
-      }
-    >
-      {actionButton}
-    </Tooltip>
+  const actionWithExact = exactGain ? (
+    <Tooltip content={exactGain}>{actionButton}</Tooltip>
+  ) : (
+    actionButton
   );
 
   const toggleLabel = t('piColonies.toggleColony', { name: planetName });
@@ -558,7 +545,11 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                 <Meter fraction={stopped ? 1 : extractor.remainingFraction} tone={extractorTone} />
               )}
               {extractorNote && (
-                <p className="text-[0.6875rem] text-text-dim max-lg:sr-only">{extractorNote}</p>
+                <p
+                  className={`text-[0.6875rem] text-text-dim ${row.slowedToFraction === null ? 'max-lg:sr-only' : ''}`}
+                >
+                  {extractorNote}
+                </p>
               )}
             </div>
 
@@ -594,7 +585,9 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
             <div className="flex min-w-0 flex-col gap-1 lg:items-stretch">
               {actionWithExact}
-              <p className="text-center text-[0.6875rem] text-text-dim max-lg:sr-only">{note}</p>
+              <p className="text-[0.6875rem] text-text-dim max-lg:text-left lg:text-center">
+                {note}
+              </p>
             </div>
 
             <div className="flex justify-end max-lg:absolute max-lg:top-1 max-lg:right-1 lg:items-start">

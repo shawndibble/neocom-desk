@@ -7114,6 +7114,10 @@
       "quickFootLabel": "About quick wins",
       "slotsInfoLabel": "About planet slots",
       "haulSummary": "{{trip}} · {{trips}} trips/wk",
+      "haulShow": "Details",
+      "haulHide": "Hide",
+      "slotsGainEach": "per new planet",
+      "slotsAssumedShort": "assumes no skills trained",
       "stripQuickWin": "quick win",
       "stripRebuild": "Rebuild",
       "stripKeep": "Keep",
@@ -7134,7 +7138,7 @@
       "quickTitle": "Quick wins · no rebuild",
       "quickFoot": "Sorted by ISK per minute. Minutes are estimates.",
       "quickFootSaves": "A “saves” figure is income a full launchpad would lose: it is not in the quick-win total.",
-      "quickFootNoPrices": "These need no hub prices, so no gain is shown. Minutes are estimates.",
+      "quickFootNoPrices": "No hub prices needed, so no gain shown.",
       "unpriced": "No ISK figure",
       "saves": "saves ~",
       "win": {
@@ -7574,8 +7578,6 @@
       "healthy": "Healthy"
     },
     "login": {
-      "aboutLabel": "About the next login",
-      "cadenceLabel": "About your restart rhythm",
       "label": "Log in next",
       "nothing": "Nothing needs you before the next extractor program ends.",
       "today": "today",

@@ -145,8 +145,6 @@ export function PlanPanel(props: Props) {
   // The URL may still say make-more; the view shows Find best until the colonies can be read.
   const question = unknown && wanted === 'make-more' ? 'find-best' : wanted;
 
-  // A failed read is news the pilot must see; every other note rides a tooltip.
-  const hintVisible = unknown || esiFailed;
   const hint =
     picked === null && !esiFailed
       ? t(`piPlan.picker.opened.${unknown ? 'unknown' : opening.reason}`, { count: colonyCount })
@@ -156,6 +154,10 @@ export function PlanPanel(props: Props) {
             : QUESTION_HINT[question],
           { count: colonyCount }
         );
+
+  // A failed read and an empty colony list are state the pilot must see; the "opened because" and per-question notes ride a tooltip.
+  const hintVisible =
+    unknown || esiFailed || (question === 'make-more' && colonyCount === 0 && picked !== null);
 
   return (
     <div className="space-y-4">

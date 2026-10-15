@@ -82,11 +82,20 @@ export function SlotNudge({
           ))}
         </span>
         {compact ? (
-          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
             <span className="text-text-dim">
               {t('piPlan.make.slotsLabel', { used: slots.used, count: slots.allowed })}
             </span>
             <InfoTooltip label={t('piPlan.make.slotsInfoLabel')} glyph="info" content={sentence} />
+            {slots.gainPerPlanetPerDay !== null && (
+              <span className="text-isk-pos">
+                <Gain value={slots.gainPerPlanetPerDay} />{' '}
+                <span className="text-text-dim">{t('piPlan.make.slotsGainEach')}</span>
+              </span>
+            )}
+            {slots.assumed && (
+              <span className="text-text-dim">({t('piPlan.make.slotsAssumedShort')})</span>
+            )}
             <span aria-hidden="true" className="text-text-dim">
               ·
             </span>

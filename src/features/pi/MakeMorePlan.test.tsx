@@ -442,11 +442,11 @@ describe('MakeMorePlan', () => {
 
   it('names a hauling problem for the route, in the pilot units', () => {
     renderPlan();
-    const toggle = screen.getByRole('button', { name: /Hauling and upkeep/ });
+    const haul = screen.getByRole('heading', { name: 'Hauling and upkeep' }).closest('section')!;
+    const toggle = within(haul).getByRole('button', { name: 'Details' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveTextContent('700 m³/trip · 1 trips/wk');
+    expect(haul).toHaveTextContent('700 m³/trip · 1 trips/wk');
     fireEvent.click(toggle);
-    const haul = toggle.closest('section')!;
     expect(haul).toHaveTextContent('Collected at home');
     expect(haul).toHaveTextContent(/Fits in one trip with an industrial hauler/);
     expect(haul).toHaveTextContent('Frigate cargo ~400 m³');
@@ -454,9 +454,8 @@ describe('MakeMorePlan', () => {
 
   it('labels the hauling route as the worst colony, not the home route', () => {
     renderPlan();
-    const toggle = screen.getByRole('button', { name: /Hauling and upkeep/ });
-    fireEvent.click(toggle);
-    const hauling = toggle.closest('section')!;
+    const hauling = screen.getByRole('heading', { name: 'Hauling and upkeep' }).closest('section')!;
+    fireEvent.click(within(hauling).getByRole('button', { name: 'Details' }));
     expect(within(hauling).getByText('Worst colony')).toBeInTheDocument();
     expect(within(hauling).queryByText('Route')).not.toBeInTheDocument();
   });
@@ -499,7 +498,8 @@ describe('MakeMorePlan', () => {
     const optIn = screen.getByRole('checkbox', { name: 'I will haul between my planets' });
     expect(optIn).not.toBeChecked();
     await user.hover(screen.getByRole('button', { name: 'About hauling between planets' }));
-    expect(await screen.findByText(/Adds a Bigger chains section/)).toBeInTheDocument();
+    expect(optIn).toHaveAccessibleDescription(/Adds a Bigger chains section/);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Adds a Bigger chains section/);
     await user.click(optIn);
     await waitFor(() => expect(usePiSettings.getState().value.haulBetweenPlanets).toBe(true));
     expect(await screen.findByRole('heading', { name: /Bigger chains/ })).toBeInTheDocument();

@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
-  InfoTooltip,
   IskAmount,
   Panel,
   Select,
@@ -144,6 +143,8 @@ function CountChips({
 }: Pick<TodayPanelProps, 'check' | 'fixCount' | 'fixGainPerDay'>) {
   const { t } = useTranslation();
   const { counts } = check;
+  const hasAttention =
+    counts.stopped + counts.expiringToday + counts.fullBeforeHaul + counts.needsLook + fixCount > 0;
   const tone = (n: number, on: StatChipTone): StatChipTone => (n > 0 ? on : 'default');
   return (
     <StatChips dense>
@@ -191,7 +192,7 @@ function CountChips({
           }
         />
       )}
-      {counts.healthy > 0 && (
+      {(counts.healthy > 0 || !hasAttention) && (
         <StatChip
           label={t('piColonies.chip.healthy')}
           value={counts.healthy}
@@ -222,23 +223,7 @@ function LoginNext({
 
   return (
     <div className="p-3">
-      <div className={`flex items-center gap-1.5 ${MICRO}`}>
-        {t('piColonies.login.label')}
-        {loginAtMs !== null && (
-          <InfoTooltip
-            label={t('piColonies.login.aboutLabel')}
-            content={
-              multi
-                ? t('piColonies.login.noteMany', {
-                    count: check.tripCharacterIds.length,
-                    minutes: check.tripMinutes,
-                    names: check.tripCharacterIds.map(characterNameOf).join(', '),
-                  })
-                : t('piColonies.login.noteOne', { minutes: check.tripMinutes })
-            }
-          />
-        )}
-      </div>
+      <div className={MICRO}>{t('piColonies.login.label')}</div>
       {loginAtMs === null || hoursAway === null ? (
         <p className="mt-1 text-sm text-text-dim">{t('piColonies.login.nothing')}</p>
       ) : (
@@ -290,6 +275,15 @@ function LoginNext({
               );
             })}
           </ul>
+          <p className="mt-2 text-xs text-text-dim">
+            {multi
+              ? t('piColonies.login.noteMany', {
+                  count: check.tripCharacterIds.length,
+                  minutes: check.tripMinutes,
+                  names: check.tripCharacterIds.map(characterNameOf).join(', '),
+                })
+              : t('piColonies.login.noteOne', { minutes: check.tripMinutes })}
+          </p>
         </>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-dim">
@@ -309,10 +303,7 @@ function LoginNext({
             ))}
           </SelectContent>
         </Select>
-        <InfoTooltip
-          label={t('piColonies.login.cadenceLabel')}
-          content={t('piColonies.login.restartEvery', { count: cadence.restartDays })}
-        />
+        <span>{t('piColonies.login.restartEvery', { count: cadence.restartDays })}</span>
       </div>
     </div>
   );
@@ -339,7 +330,7 @@ export function TodayPanel(props: TodayPanelProps) {
         <div className="space-y-3 p-3">
           <Hero check={check} rows={rows} nowMs={nowMs} nameOf={nameOf} />
           <CountChips check={check} fixCount={props.fixCount} fixGainPerDay={props.fixGainPerDay} />
-          <p className="text-xs text-text-dim max-md:hidden">
+          <p className="text-xs text-text-dim">
             {props.todayPerDay === null ? (
               props.pricesFailed ? null : (
                 <span>{t('piColonies.today.noFigures')}</span>

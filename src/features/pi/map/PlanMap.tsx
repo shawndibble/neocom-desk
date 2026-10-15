@@ -933,19 +933,23 @@ export function PlanMap({
         >
           {/* The one line that says what each click does: filter, trace, what-if. */}
           <span className="text-text">{t('piMap.hint', { context })}</span>
-          <InfoTooltip
-            label={t('piMap.whatIfHintLabel')}
-            content={
-              noColonies
-                ? t(coloniesUnknown ? 'piMap.whatIfUnknownColonies' : 'piMap.whatIfNoColonies')
-                : missingTypes.length > 0
+          {noColonies ? (
+            <span>
+              {t(coloniesUnknown ? 'piMap.whatIfUnknownColonies' : 'piMap.whatIfNoColonies')}
+            </span>
+          ) : (
+            <InfoTooltip
+              label={t('piMap.whatIfHintLabel')}
+              content={
+                missingTypes.length > 0
                   ? t('piMap.whatIfHint', {
                       types: missingTypes.map((type) => planetName(t, type)).join(', '),
                       context,
                     })
                   : t('piMap.whatIfAll')
-            }
-          />
+              }
+            />
+          )}
         </div>
         {active && unlock ? preview(active, unlock, previewed === null ? best : '') : null}
         {sizingUnlocks.map((g) => (
@@ -998,7 +1002,6 @@ export function PlanMap({
               {phone && legendTip}
               <Button
                 size={phone ? 'md' : 'sm'}
-                aria-label={t('piMap.helpButton')}
                 aria-haspopup="dialog"
                 onClick={() => {
                   remember();

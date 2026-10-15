@@ -280,6 +280,24 @@ export function PiHeaderStrip({
           </Button>
         </div>
       )}
+      {figures && (figures.lowsecJumps > 0 || figures.nullsecJumps > 0) && (
+        <span className="flex items-center gap-1.5">
+          {figures.lowsecJumps > 0 && (
+            <StatChip
+              label={t('piPlan.make.lowsecChip')}
+              tone="warning"
+              value={t('piPlan.make.jumps', { count: figures.lowsecJumps })}
+            />
+          )}
+          {figures.nullsecJumps > 0 && (
+            <StatChip
+              label={t('piPlan.make.nullsecChip')}
+              tone="danger"
+              value={t('piPlan.make.jumps', { count: figures.nullsecJumps })}
+            />
+          )}
+        </span>
+      )}
       <div className="ml-auto flex items-center gap-1.5">
         {estimate && (
           <Tooltip content={t('piPlan.strip.priceNoteHint')} openOnTap>
@@ -294,12 +312,7 @@ export function PiHeaderStrip({
         )}
         <Popover>
           <PopoverTrigger asChild>
-            <IconButton
-              icon={<Icon.Info />}
-              label={t('piPlan.strip.facts')}
-              size="sm"
-              aria-haspopup="dialog"
-            />
+            <IconButton icon={<Icon.Info />} label={t('piPlan.strip.facts')} size="sm" />
           </PopoverTrigger>
           <PopoverContent
             align="end"

@@ -10,6 +10,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   Caret,
   Checkbox,
   Disclosure,
@@ -252,7 +253,7 @@ export function YourPlanetsPanel({
   onHaulBetween: (on: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const haulHintId = useId();
+  const optInId = useId();
   return (
     <Panel
       title={t('piPlan.make.planetsTitle')}
@@ -321,10 +322,11 @@ export function YourPlanetsPanel({
           <Checkbox
             className="mt-0.5"
             checked={haulBetween}
-            aria-labelledby={`${haulHintId}-label`}
+            aria-labelledby={`${optInId}-label`}
+            aria-describedby={`${optInId}-hint`}
             onChange={(e) => onHaulBetween(e.target.checked)}
           />
-          <span id={`${haulHintId}-label`} className="text-xs text-text">
+          <span id={`${optInId}-label`} className="text-xs text-text">
             {t('piPlan.chains.optIn')}
           </span>
         </label>
@@ -333,6 +335,9 @@ export function YourPlanetsPanel({
           glyph="info"
           content={t('piPlan.chains.optInHint')}
         />
+        <span id={`${optInId}-hint`} className="sr-only">
+          {t('piPlan.chains.optInHint')}
+        </span>
       </div>
       <SlotNudge slots={view.slots} onFindBest={onFindBest} compact />
     </Panel>
@@ -463,7 +468,7 @@ export function QuickWinsPanel({
     <Panel
       title={t('piPlan.make.quickTitle')}
       meta={
-        <span className="flex items-center gap-1.5 text-[0.6875rem] text-text-dim tabular-nums">
+        <span className="flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-text-dim tabular-nums">
           <span>
             {t('piPlan.make.minutesTotal', { count: headline.quickWinMinutes })}
             {!pricesDown && (
@@ -473,16 +478,20 @@ export function QuickWinsPanel({
               </>
             )}
           </span>
-          <InfoTooltip
-            label={t('piPlan.make.quickFootLabel')}
-            glyph="info"
-            content={
-              t(pricesDown ? 'piPlan.make.quickFootNoPrices' : 'piPlan.make.quickFoot') +
-              (!pricesDown && view.quickWins.some((win) => win.gainKind === 'saves')
-                ? ` ${t('piPlan.make.quickFootSaves')}`
-                : '')
-            }
-          />
+          {pricesDown ? (
+            <span>{t('piPlan.make.quickFootNoPrices')}</span>
+          ) : (
+            <InfoTooltip
+              label={t('piPlan.make.quickFootLabel')}
+              glyph="info"
+              content={
+                t('piPlan.make.quickFoot') +
+                (view.quickWins.some((win) => win.gainKind === 'saves')
+                  ? ` ${t('piPlan.make.quickFootSaves')}`
+                  : '')
+              }
+            />
+          )}
         </span>
       }
       padded={false}
@@ -896,7 +905,10 @@ function formatTrips(value: number): string {
 export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName: string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const detailsId = useId();
   const { route, fit } = hauling;
+  const lowsec = route.kind === 'route' ? (route.lowsec ?? 0) : 0;
+  const nullsec = route.kind === 'route' ? (route.nullsec ?? 0) : 0;
   const m3 = (value: number | null) =>
     value === null
       ? '—'
@@ -912,82 +924,114 @@ export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName:
             ? 'piPlan.make.fitEpithal'
             : 'piPlan.make.fitTooBig';
   return (
-    <Panel padded={false}>
-      <Disclosure
-        label={t('piPlan.make.haulTitle')}
-        trailing={t('piPlan.make.haulSummary', {
-          trip: m3(hauling.m3PerTrip),
-          trips: formatTrips(hauling.tripsPerWeek),
-        })}
-        expanded={open}
-        onToggle={() => setOpen(!open)}
-      >
-        <div className="space-y-2 p-3">
-          <StatChips>
-            <StatChip label={t('piPlan.make.haulChip')} value={m3(hauling.m3PerTrip)} />
-            <StatChip label={t('piPlan.make.todayChip')} value={m3(hauling.todayM3PerTrip)} />
+    <Panel
+      title={t('piPlan.make.haulTitle')}
+      wrapMeta
+      meta={
+        <span className="flex flex-wrap max-md:basis-full items-center gap-1.5 text-[0.6875rem] text-text-dim tabular-nums">
+          <span>
+            {t('piPlan.make.haulSummary', {
+              trip: m3(hauling.m3PerTrip),
+              trips: formatTrips(hauling.tripsPerWeek),
+            })}
+          </span>
+          {lowsec > 0 && (
             <StatChip
-              label={t('piPlan.make.tripsChip')}
-              value={t('piPlan.make.tripsPerWeek', { value: formatTrips(hauling.tripsPerWeek) })}
+              label={t('piPlan.make.lowsecChip')}
+              tone="warning"
+              value={t('piPlan.make.jumps', { count: lowsec })}
             />
-            <StatChip
-              label={t('piPlan.make.routeChip')}
-              value={
-                route.kind === 'local'
-                  ? t('piPlan.make.routeLocal')
-                  : route.kind === 'route'
-                    ? t('piPlan.strip.jumps', { count: route.jumps, hub: hubName })
-                    : t('piPlan.make.routeUnknown')
-              }
-            />
-            {route.kind === 'route' && route.lowsec !== null && route.lowsec > 0 && (
-              <StatChip
-                label={t('piPlan.make.lowsecChip')}
-                tone="warning"
-                value={t('piPlan.make.jumps', { count: route.lowsec })}
-              />
-            )}
-            {route.kind === 'route' && route.nullsec !== null && route.nullsec > 0 && (
-              <StatChip
-                label={t('piPlan.make.nullsecChip')}
-                tone="danger"
-                value={t('piPlan.make.jumps', { count: route.nullsec })}
-              />
-            )}
-            <StatChip
-              label={t('piPlan.make.resetChip')}
-              value={t('piPlan.make.resetEvery', { count: hauling.restartDays })}
-            />
-            {hauling.rebuildMinutes > 0 && (
-              <StatChip
-                label={t('piPlan.make.rebuildChip')}
-                value={t('piPlan.make.rebuildOnce', { count: hauling.rebuildMinutes })}
-              />
-            )}
-          </StatChips>
-          <p className="text-sm text-text">
-            {t(fitKey, { trips: fit.industrialTrips })}
-            {!hauling.complete && <> {t('piPlan.make.haulPartial')}</>}
-          </p>
-          {fit.ships.length > 0 && (
-            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem]">
-              {fit.ships.map((ship) => {
-                const spec = HAUL_SHIPS.find((s) => s.id === ship.id)!;
-                return (
-                  <li key={ship.id} className={ship.fits ? 'text-success' : 'text-text-dim'}>
-                    <span aria-hidden="true">{ship.fits ? '✓' : '✕'}</span>{' '}
-                    {t(`piPlan.make.ship.${ship.id}`, { m3: spec.m3.toLocaleString('en') })}
-                    <span className="sr-only">
-                      {' '}
-                      {ship.fits ? t('piPlan.make.shipFits') : t('piPlan.make.shipNoFit')}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
           )}
+          {nullsec > 0 && (
+            <StatChip
+              label={t('piPlan.make.nullsecChip')}
+              tone="danger"
+              value={t('piPlan.make.jumps', { count: nullsec })}
+            />
+          )}
+        </span>
+      }
+      actions={
+        <Button
+          size="sm"
+          aria-expanded={open}
+          aria-controls={detailsId}
+          onClick={() => setOpen(!open)}
+        >
+          {t(open ? 'piPlan.make.haulHide' : 'piPlan.make.haulShow')}
+        </Button>
+      }
+      padded={false}
+    >
+      {open && (
+        <div id={detailsId}>
+          <div className="space-y-2 p-3">
+            <StatChips>
+              <StatChip label={t('piPlan.make.haulChip')} value={m3(hauling.m3PerTrip)} />
+              <StatChip label={t('piPlan.make.todayChip')} value={m3(hauling.todayM3PerTrip)} />
+              <StatChip
+                label={t('piPlan.make.tripsChip')}
+                value={t('piPlan.make.tripsPerWeek', { value: formatTrips(hauling.tripsPerWeek) })}
+              />
+              <StatChip
+                label={t('piPlan.make.routeChip')}
+                value={
+                  route.kind === 'local'
+                    ? t('piPlan.make.routeLocal')
+                    : route.kind === 'route'
+                      ? t('piPlan.strip.jumps', { count: route.jumps, hub: hubName })
+                      : t('piPlan.make.routeUnknown')
+                }
+              />
+              {route.kind === 'route' && route.lowsec !== null && route.lowsec > 0 && (
+                <StatChip
+                  label={t('piPlan.make.lowsecChip')}
+                  tone="warning"
+                  value={t('piPlan.make.jumps', { count: route.lowsec })}
+                />
+              )}
+              {route.kind === 'route' && route.nullsec !== null && route.nullsec > 0 && (
+                <StatChip
+                  label={t('piPlan.make.nullsecChip')}
+                  tone="danger"
+                  value={t('piPlan.make.jumps', { count: route.nullsec })}
+                />
+              )}
+              <StatChip
+                label={t('piPlan.make.resetChip')}
+                value={t('piPlan.make.resetEvery', { count: hauling.restartDays })}
+              />
+              {hauling.rebuildMinutes > 0 && (
+                <StatChip
+                  label={t('piPlan.make.rebuildChip')}
+                  value={t('piPlan.make.rebuildOnce', { count: hauling.rebuildMinutes })}
+                />
+              )}
+            </StatChips>
+            <p className="text-sm text-text">
+              {t(fitKey, { trips: fit.industrialTrips })}
+              {!hauling.complete && <> {t('piPlan.make.haulPartial')}</>}
+            </p>
+            {fit.ships.length > 0 && (
+              <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem]">
+                {fit.ships.map((ship) => {
+                  const spec = HAUL_SHIPS.find((s) => s.id === ship.id)!;
+                  return (
+                    <li key={ship.id} className={ship.fits ? 'text-success' : 'text-text-dim'}>
+                      <span aria-hidden="true">{ship.fits ? '✓' : '✕'}</span>{' '}
+                      {t(`piPlan.make.ship.${ship.id}`, { m3: spec.m3.toLocaleString('en') })}
+                      <span className="sr-only">
+                        {' '}
+                        {ship.fits ? t('piPlan.make.shipFits') : t('piPlan.make.shipNoFit')}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
-      </Disclosure>
+      )}
     </Panel>
   );
 }

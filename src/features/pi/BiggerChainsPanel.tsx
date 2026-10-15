@@ -337,7 +337,7 @@ function WhatIfSection({
 
   return (
     <section aria-labelledby="pi-chains-whatif" className="border-t border-line">
-      <div className="flex items-center gap-1.5 px-3 pt-2">
+      <div className={`flex items-center gap-1.5 px-3 pt-2 ${noSlot ? '' : 'pb-1'}`}>
         <h3
           id="pi-chains-whatif"
           className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
@@ -354,9 +354,7 @@ function WhatIfSection({
       </div>
       {noSlot ? (
         <p className="px-3 pt-1 pb-2 text-xs text-text-dim">{t('piPlan.chains.whatIfNoSlot')}</p>
-      ) : (
-        <div className="pb-1" />
-      )}
+      ) : null}
       {rows.map((row) => (
         <div key={row.key} className="border-t border-line">
           <Disclosure
