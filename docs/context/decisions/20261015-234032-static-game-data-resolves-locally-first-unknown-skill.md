@@ -22,7 +22,6 @@ _Recorded 2026-10-15._
   window, live when online.
 
 - **An unknown skill requirement never reads as "can fly".** When a fitting's
-  type lookup fails, required skills are *unknown*, not *none*: the
+  type lookup fails, required skills are _unknown_, not _none_: the
   missing-skills panels, compare can-fly and the plan Fit Goal say they can't
   confirm it rather than showing the fit as flyable or the goal as met.
-
