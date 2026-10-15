@@ -28,7 +28,7 @@ export function CommunitySection({ quotes = LANDING_QUOTES }: { quotes?: readonl
   const { t } = useTranslation();
   return (
     <>
-      <div className="mt-6 flex flex-col items-start gap-4 border border-line bg-bg/70 px-5 py-6 backdrop-blur-sm sm:flex-row sm:items-center sm:gap-5">
+      <div className="mt-6 flex flex-col items-start gap-4 border border-line bg-bg/90 px-5 py-6 sm:flex-row sm:items-center sm:gap-5">
         <Discord size={ICON_SIZE.lg} aria-hidden="true" className="shrink-0 text-accent" />
         <p className="min-w-0 flex-1 text-sm text-text-dim">{t('login.community.body')}</p>
         <a

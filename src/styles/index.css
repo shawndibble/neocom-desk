@@ -1512,13 +1512,7 @@
     animation-delay: 270ms;
   }
 
-  /* Slow accent glow breathing behind the hero login button. */
-  @keyframes lp-cta-glow {
-    50% {
-      opacity: 1;
-      transform: scale(1.08);
-    }
-  }
+  /* Accent glow behind the hero login button. Static: an infinite animation on a large gradient layer made scrolling choppy. */
   .lp-cta-glow {
     position: relative;
     isolation: isolate;
@@ -1536,7 +1530,6 @@
     );
     opacity: 0.55;
     pointer-events: none;
-    animation: lp-cta-glow 5s ease-in-out infinite;
   }
 
   /* The demo frame drifts up to 12px as the page scrolls (--lp-float set by OverviewDemo). */
@@ -1626,17 +1619,6 @@
     radial-gradient(1px 1px at 180px 260px, rgb(255 255 255 / 0.6), transparent);
   background-size: 337px 313px;
 }
-@media (prefers-reduced-motion: no-preference) {
-  @keyframes lp-twinkle {
-    50% {
-      opacity: 0.45;
-    }
-  }
-  .lp-layer-space::after {
-    animation: lp-twinkle 9s ease-in-out infinite;
-  }
-}
-
 .lp-ship {
   position: absolute;
   top: 0.5rem;

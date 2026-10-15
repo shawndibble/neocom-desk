@@ -59,7 +59,7 @@ export function LandingHeader({
   return (
     <header
       data-cta-open={ctaOut}
-      className="group sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur supports-[backdrop-filter]:bg-bg/60"
+      className="group sticky top-0 z-30 border-b border-line bg-bg/95"
     >
       <div className="mx-auto flex max-w-[96rem] items-center gap-4 px-4 py-2 sm:px-6">
         <div className="flex items-center gap-2">
