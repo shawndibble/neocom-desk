@@ -4,7 +4,9 @@ import {
   MAX_LINES_PER_REQUEST,
   MAX_LOCATION_LENGTH,
   MAX_OPEN_REQUESTS_PER_MEMBER,
+  MAX_PLEDGE_QUANTITY,
   MAX_TERMS_LENGTH,
+  STALE_PLEDGE_DAYS,
   REQUEST_LIFETIME_DAYS,
   lineKey,
   filterRequests,
@@ -13,8 +15,16 @@ import {
   defaultKind,
   isBlueprintName,
   isOpenRequest,
+  canPledge,
+  defaultPledgeQuantity,
+  isStalePledge,
   lineProgress,
   mergeLines,
+  myPledgeRows,
+  parsePledgeQuantity,
+  pledgeOverage,
+  withdrawPledgeLine,
+  withPledgeLine,
   parseQuantity,
   requestProgress,
   requestStatus,
@@ -44,7 +54,11 @@ const request = (over: Partial<CommunityRequest> = {}): CommunityRequest => ({
   closed: false,
   ...over,
 });
-const pledge = (uid: string, lines: RequestPledge['lines']): RequestPledge => ({ uid, lines });
+const pledge = (uid: string, lines: RequestPledge['lines'], updatedAt = 0): RequestPledge => ({
+  uid,
+  lines,
+  updatedAt,
+});
 
 describe('lineProgress and requestProgress', () => {
   it('adds every Member’s Pledge and delivery on a line, and ignores other lines', () => {
@@ -305,5 +319,126 @@ describe('withinJumps', () => {
     const result = withinJumps(rows, null, jumpsOf);
     expect(ids(result.within)).toEqual(['near', 'far', 'free']);
     expect(result.unmeasured).toBe(0);
+  });
+});
+
+describe('canPledge', () => {
+  const now = 5 * DAY;
+  it('lets a Member Pledge on an open Request that is not theirs', () => {
+    expect(canPledge(request(), 'char:2', now)).toBe(true);
+  });
+  it('never lets the requester Pledge on their own Request', () => {
+    expect(canPledge(request(), 'char:1', now)).toBe(false);
+  });
+  it('stops once the Request is closed or expired', () => {
+    expect(canPledge(request({ closed: true }), 'char:2', now)).toBe(false);
+    expect(canPledge(request({ expiresAt: now }), 'char:2', now)).toBe(false);
+  });
+});
+
+describe('pledgeOverage', () => {
+  it('is the amount pledged beyond the need, else zero', () => {
+    expect(pledgeOverage({ needed: 350, pledged: 410, delivered: 120 })).toBe(60);
+    expect(pledgeOverage({ needed: 350, pledged: 350, delivered: 0 })).toBe(0);
+    expect(pledgeOverage({ needed: 350, pledged: 90, delivered: 0 })).toBe(0);
+  });
+});
+
+describe('defaultPledgeQuantity', () => {
+  it('starts at the member’s own Pledge', () => {
+    expect(defaultPledgeQuantity({ needed: 350, pledged: 410, delivered: 0 }, 150)).toBe(150);
+  });
+  it('else offers what is still uncovered', () => {
+    expect(defaultPledgeQuantity({ needed: 300, pledged: 90, delivered: 0 }, undefined)).toBe(210);
+  });
+  it('else offers the whole need once the line is covered', () => {
+    expect(defaultPledgeQuantity({ needed: 300, pledged: 400, delivered: 0 }, undefined)).toBe(300);
+  });
+});
+
+describe('parsePledgeQuantity', () => {
+  it('reads a positive whole number up to the cap', () => {
+    expect(parsePledgeQuantity('1,500')).toBe(1500);
+    expect(parsePledgeQuantity(String(MAX_PLEDGE_QUANTITY))).toBe(MAX_PLEDGE_QUANTITY);
+  });
+  it('rejects zero, junk and anything over the cap', () => {
+    expect(parsePledgeQuantity('0')).toBeNull();
+    expect(parsePledgeQuantity('x')).toBeNull();
+    expect(parsePledgeQuantity(String(MAX_PLEDGE_QUANTITY + 1))).toBeNull();
+  });
+});
+
+describe('withPledgeLine and withdrawPledgeLine', () => {
+  it('adds a line with nothing delivered and no contracts', () => {
+    expect(withPledgeLine({}, 2, 40)).toEqual({
+      2: { quantity: 40, delivered: 0, contractIds: [] },
+    });
+  });
+  it('updating keeps what was delivered and the contracts behind it', () => {
+    const before = { 0: { quantity: 10, delivered: 4, contractIds: [77] } };
+    expect(withPledgeLine(before, 0, 25)).toEqual({
+      0: { quantity: 25, delivered: 4, contractIds: [77] },
+    });
+    expect(before[0].quantity).toBe(10);
+  });
+  it('withdrawing drops one line and leaves the others', () => {
+    const before = {
+      0: { quantity: 10, delivered: 0, contractIds: [] },
+      1: { quantity: 5, delivered: 0, contractIds: [] },
+    };
+    expect(withdrawPledgeLine(before, 0)).toEqual({
+      1: { quantity: 5, delivered: 0, contractIds: [] },
+    });
+  });
+});
+
+describe('isStalePledge', () => {
+  const entry = (delivered: number) => ({ quantity: 10, delivered });
+  const stamp = 3 * DAY;
+  it('is stale after 14 days with nothing delivered', () => {
+    expect(STALE_PLEDGE_DAYS).toBe(14);
+    expect(isStalePledge(entry(0), stamp, stamp + 14 * DAY)).toBe(true);
+  });
+  it('is fresh before 14 days', () => {
+    expect(isStalePledge(entry(0), stamp, stamp + 14 * DAY - 1)).toBe(false);
+  });
+  it('is never stale once anything is delivered', () => {
+    expect(isStalePledge(entry(1), stamp, stamp + 60 * DAY)).toBe(false);
+  });
+});
+
+describe('myPledgeRows', () => {
+  const now = 20 * DAY;
+  it('lists my Pledges across Requests, newest Pledge first, with stale ones flagged', () => {
+    const a = request({ id: 'a', lines: [line(1, 100), line(2, 50)] });
+    const b = request({ id: 'b', ownerUid: 'char:3', lines: [line(3, 10)] });
+    const board = new Map([
+      [
+        'a',
+        [
+          pledge('me', { 1: { quantity: 5, delivered: 0 } }, 2 * DAY),
+          pledge('other', { 0: { quantity: 9, delivered: 0 } }, 19 * DAY),
+        ],
+      ],
+      ['b', [pledge('me', { 0: { quantity: 4, delivered: 4 } }, 19 * DAY)]],
+    ]);
+    const rows = myPledgeRows([a, b], board, 'me', now);
+    expect(rows.map((r) => [r.request.id, r.index, r.stale])).toEqual([
+      ['b', 0, false],
+      ['a', 1, true],
+    ]);
+  });
+  it('leaves out closed and expired Requests', () => {
+    const closed = request({ id: 'c', closed: true });
+    const board = new Map([['c', [pledge('me', { 0: { quantity: 1, delivered: 0 } })]]]);
+    expect(myPledgeRows([closed], board, 'me', now)).toEqual([]);
+  });
+});
+
+describe('pledge constants shared with the rules', () => {
+  const rules = readFileSync('firestore.rules', 'utf8');
+  it('pins the quantity cap and the line cap in firestore.rules', () => {
+    expect(rules).toContain(`<= ${MAX_PLEDGE_QUANTITY}`);
+    expect(rules.match(/'(\d+)'/g)).toContain(`'${MAX_LINES_PER_REQUEST - 1}'`);
   });
 });

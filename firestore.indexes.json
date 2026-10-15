@@ -245,6 +245,21 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "pledges",
+      "fieldPath": "communityId",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
       "collectionGroup": "plans",
       "fieldPath": "*",
       "ttl": false,

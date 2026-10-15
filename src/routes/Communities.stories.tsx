@@ -187,7 +187,7 @@ export const RequestsBoardNoLocationGrant: Story = {
 /** @summary The Requests board in the phone shell (dense cards). */
 export const RequestsBoardPhone: Story = { ...RequestsBoard, globals: phone };
 
-/** @summary A Request opened as a Member: terms and each line's progress, read-only. */
+/** @summary A Request opened as a Member: terms, each line's progress and its Pledge controls. */
 export const RequestsPanelAsMember: Story = {
   ...RequestsBoard,
   play: openRequest('Reactive Metals'),
@@ -201,6 +201,18 @@ export const RequestsPanelAsRequester: Story = {
   ...RequestsBoard,
   play: openRequest('Ishtar Blueprint'),
 };
+
+/** @summary My pledges: the slide-out of this Member's Pledges, opened from the strip. */
+export const RequestsMyPledges: Story = {
+  ...RequestsBoard,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole('button', { name: 'My pledges' }));
+  },
+};
+
+/** @summary My pledges in the phone shell. */
+export const RequestsMyPledgesPhone: Story = { ...RequestsMyPledges, globals: phone };
 
 /** @summary New request: location, terms, pasted list, editable lines, add an item. */
 export const RequestsCompose: Story = {

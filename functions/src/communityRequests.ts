@@ -10,7 +10,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
 
 export const REQUESTS_COLLECTION = 'itemRequests';
-/** One Member's Pledges on a Request live in `{request}/pledges/{uid}` (issue #3808). */
+/** One Member's Pledges on a Request live in `{request}/pledges/{uid}` (issue #3808, written by the Member under firestore.rules; this side only deletes them on leave). */
 export const PLEDGES_COLLECTION = 'pledges';
 
 /** Open (not closed, not expired) Requests one Member may hold in one Community. */

@@ -40,7 +40,20 @@ The I can fill chip, the Distance select and the Message button are built (`page
 - **Filter row:** chips and select are the pictured controls in the pictured order (`FilterChip` Open, Mine, I can fill with the pictured tooltip; `NativeSelect` Any distance, Within 5, 10, 20 jumps). On a phone the select sits beside Mine and I can fill on the second row where the picture wraps it to a third, because the chips are narrower in the sample (counts of one digit).
 - **Disabled and failed states** are not pictured: Distance is disabled with a line under the row saying why (the location Permission is missing, with the Grant link, or the pilot's location is unknown); I can fill is disabled with a tooltip when the Member's shared blueprints could not be read. Under a limit, a line says how many Requests with no place the app can measure from are left out.
 - **Location is picked in compose** (a suggestion list under the field, a line saying whether the text can be measured); the compose pictures have a plain field.
-- **Message button:** at the foot of the panel as pictured, with no delivery note above it (#3808) and, without the Open in EVE Permission, a line with the Grant link beside it. The label ends in an ellipsis as pictured.
+- **Message button:** at the foot of the panel as pictured, with the Pledge note above it (#3808) but no delivery sentence (#3809) and, without the Open in EVE Permission, a line with the Grant link beside it. The label ends in an ellipsis as pictured.
 - **Sample data:** the second Request's place is "Domain (region)", not the picture's "Amarr (region)", since Amarr is a system and the board reads a region by its real name. I can fill counts 1, not 2: the sample pilot shares one blueprint a Request asks for.
+
+## Deviations in the Pledges build (issue #3808)
+
+Built: Pledge / Update pledge / Withdraw with the inline quantity field per line, the over-pledge note, stacked bars and board progress and status from real Pledges, the strip's "and 1 Pledge in progress" half with **My pledges**, and the My pledges slide-out. Panel and board match the pictures at 1440 and 390 (the 390 row keeps Update pledge, wrapped to two lines, and Withdraw on one row as pictured). Where they differ:
+
+- **Delivery note** is not built (#3809); the Message button is #3811's. The panel's note reads only "Nothing is reserved; agree the terms yourselves."; #3809 adds the "Delivery is marked from your finished contracts" sentence.
+- **Stale Pledge** (not pictured): after 14 days with nothing delivered the line is greyed (60% opacity) and says "No delivery in 14 days, so this Pledge is greyed out. Update it or withdraw it." in words, so it never rests on colour alone. The clock is the Pledge document's last write.
+- **Withdraw** is hidden once something is delivered on that Pledge (the record of delivery would be lost); the picture's sample has none delivered by the viewer.
+- **My pledges slide-out** is not pictured. Each row names the item and the requester, prints "N pledged · N delivered", and has an Open request button that closes the slide-out and opens the Request's panel; stale rows are greyed with the same wording. Open request is the one control, so a row click does nothing extra.
+- **Default quantity** is the Member's own Pledge, else what is still uncovered, else (nothing uncovered) the whole `needed`; the story leaves the field empty when covered.
+- **Stale grey-out** applies to the viewer's own Pledge only (the panel shows aggregates for everyone else).
+- **Quantity field validation:** a non-whole or zero value shows "Enter a whole number above 0." and disables the button.
+- **Sample names** in the story differ from the pictures (the story's fixture names are Ilvara Nokk and friends, as in #3807).
 
 Delete this folder and the story when the last ticket that links it closes.

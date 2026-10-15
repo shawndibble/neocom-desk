@@ -508,11 +508,120 @@ service cloud.firestore {
         allow get, list: if isMember();
         allow write: if false;
 
-        // One Member's Pledges on the Request (issue #3808 opens the owner's
-        // write; until then nothing writes here).
+        // One Member's Pledges on the Request (issue #3808, ADR 0021): a map
+        // from line index to {quantity, delivered, contractIds}. The owner
+        // alone writes it, directly. `delivered` and `contractIds` are the
+        // seam for delivery marking (#3809); the Pledger's client asserts
+        // them, so they are only shape-bounded here (up to 20 positive integer
+        // contract ids a line; the elements are a nested chain that stops at the
+        // list's size, so an empty list costs almost nothing).
+        // `communityId` repeats the path so one collection-group query can read
+        // a whole Community's Pledges (see the rule at the end of the file). Not on one's own
+        // Request, only while the Request is open, only on lines it has.
+        // Rules cannot loop, so the 50 line keys (the Request line cap) are
+        // unrolled in groups of five, and only the keys this write changes are
+        // validated: a write that touches many lines at once may exceed the
+        // 1000-expression budget and is denied, while Pledging line by line,
+        // which is what the panel does, never gets near it.
         match /pledges/{pledgeUid} {
+          function pledgeRequest() {
+            return get(/databases/$(database)/documents/communities/$(communityId)/itemRequests/$(requestId)).data;
+          }
+          function pledgeEntryOk(e) {
+            return e is map
+              && e.keys().hasOnly(['quantity', 'delivered', 'contractIds'])
+              && e.quantity is int && e.quantity >= 1 && e.quantity <= 1000000000000
+              && e.delivered is int && e.delivered >= 0 && e.delivered <= 1000000000000
+              && e.contractIds is list && e.contractIds.size() <= 20
+              && (e.contractIds.size() <= 0 || ((e.contractIds[0] is int && e.contractIds[0] > 0) && (e.contractIds.size() <= 1 || ((e.contractIds[1] is int && e.contractIds[1] > 0) && (e.contractIds.size() <= 2 || ((e.contractIds[2] is int && e.contractIds[2] > 0) && (e.contractIds.size() <= 3 || ((e.contractIds[3] is int && e.contractIds[3] > 0) && (e.contractIds.size() <= 4 || ((e.contractIds[4] is int && e.contractIds[4] > 0) && (e.contractIds.size() <= 5 || ((e.contractIds[5] is int && e.contractIds[5] > 0) && (e.contractIds.size() <= 6 || ((e.contractIds[6] is int && e.contractIds[6] > 0) && (e.contractIds.size() <= 7 || ((e.contractIds[7] is int && e.contractIds[7] > 0) && (e.contractIds.size() <= 8 || ((e.contractIds[8] is int && e.contractIds[8] > 0) && (e.contractIds.size() <= 9 || ((e.contractIds[9] is int && e.contractIds[9] > 0) && (e.contractIds.size() <= 10 || ((e.contractIds[10] is int && e.contractIds[10] > 0) && (e.contractIds.size() <= 11 || ((e.contractIds[11] is int && e.contractIds[11] > 0) && (e.contractIds.size() <= 12 || ((e.contractIds[12] is int && e.contractIds[12] > 0) && (e.contractIds.size() <= 13 || ((e.contractIds[13] is int && e.contractIds[13] > 0) && (e.contractIds.size() <= 14 || ((e.contractIds[14] is int && e.contractIds[14] > 0) && (e.contractIds.size() <= 15 || ((e.contractIds[15] is int && e.contractIds[15] > 0) && (e.contractIds.size() <= 16 || ((e.contractIds[16] is int && e.contractIds[16] > 0) && (e.contractIds.size() <= 17 || ((e.contractIds[17] is int && e.contractIds[17] > 0) && (e.contractIds.size() <= 18 || ((e.contractIds[18] is int && e.contractIds[18] > 0) && (e.contractIds.size() <= 19 || (e.contractIds[19] is int && e.contractIds[19] > 0))))))))))))))))))))))))))))))))))))))));
+          }
+          function pledgeLinesOk() {
+            let lines = request.resource.data.lines;
+            let before = resource == null ? {} : resource.data.lines;
+            let changed = lines.diff(before).affectedKeys();
+            let n = pledgeRequest().lines.size();
+            return lines.keys().hasOnly(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '47', '48', '49'])
+          && (!changed.hasAny(['0', '1', '2', '3', '4']) || (true
+              && (!('0' in changed) || !('0' in lines) || (0 < n && pledgeEntryOk(lines['0'])))
+              && (!('1' in changed) || !('1' in lines) || (1 < n && pledgeEntryOk(lines['1'])))
+              && (!('2' in changed) || !('2' in lines) || (2 < n && pledgeEntryOk(lines['2'])))
+              && (!('3' in changed) || !('3' in lines) || (3 < n && pledgeEntryOk(lines['3'])))
+              && (!('4' in changed) || !('4' in lines) || (4 < n && pledgeEntryOk(lines['4'])))))
+          && (!changed.hasAny(['5', '6', '7', '8', '9']) || (true
+              && (!('5' in changed) || !('5' in lines) || (5 < n && pledgeEntryOk(lines['5'])))
+              && (!('6' in changed) || !('6' in lines) || (6 < n && pledgeEntryOk(lines['6'])))
+              && (!('7' in changed) || !('7' in lines) || (7 < n && pledgeEntryOk(lines['7'])))
+              && (!('8' in changed) || !('8' in lines) || (8 < n && pledgeEntryOk(lines['8'])))
+              && (!('9' in changed) || !('9' in lines) || (9 < n && pledgeEntryOk(lines['9'])))))
+          && (!changed.hasAny(['10', '11', '12', '13', '14']) || (true
+              && (!('10' in changed) || !('10' in lines) || (10 < n && pledgeEntryOk(lines['10'])))
+              && (!('11' in changed) || !('11' in lines) || (11 < n && pledgeEntryOk(lines['11'])))
+              && (!('12' in changed) || !('12' in lines) || (12 < n && pledgeEntryOk(lines['12'])))
+              && (!('13' in changed) || !('13' in lines) || (13 < n && pledgeEntryOk(lines['13'])))
+              && (!('14' in changed) || !('14' in lines) || (14 < n && pledgeEntryOk(lines['14'])))))
+          && (!changed.hasAny(['15', '16', '17', '18', '19']) || (true
+              && (!('15' in changed) || !('15' in lines) || (15 < n && pledgeEntryOk(lines['15'])))
+              && (!('16' in changed) || !('16' in lines) || (16 < n && pledgeEntryOk(lines['16'])))
+              && (!('17' in changed) || !('17' in lines) || (17 < n && pledgeEntryOk(lines['17'])))
+              && (!('18' in changed) || !('18' in lines) || (18 < n && pledgeEntryOk(lines['18'])))
+              && (!('19' in changed) || !('19' in lines) || (19 < n && pledgeEntryOk(lines['19'])))))
+          && (!changed.hasAny(['20', '21', '22', '23', '24']) || (true
+              && (!('20' in changed) || !('20' in lines) || (20 < n && pledgeEntryOk(lines['20'])))
+              && (!('21' in changed) || !('21' in lines) || (21 < n && pledgeEntryOk(lines['21'])))
+              && (!('22' in changed) || !('22' in lines) || (22 < n && pledgeEntryOk(lines['22'])))
+              && (!('23' in changed) || !('23' in lines) || (23 < n && pledgeEntryOk(lines['23'])))
+              && (!('24' in changed) || !('24' in lines) || (24 < n && pledgeEntryOk(lines['24'])))))
+          && (!changed.hasAny(['25', '26', '27', '28', '29']) || (true
+              && (!('25' in changed) || !('25' in lines) || (25 < n && pledgeEntryOk(lines['25'])))
+              && (!('26' in changed) || !('26' in lines) || (26 < n && pledgeEntryOk(lines['26'])))
+              && (!('27' in changed) || !('27' in lines) || (27 < n && pledgeEntryOk(lines['27'])))
+              && (!('28' in changed) || !('28' in lines) || (28 < n && pledgeEntryOk(lines['28'])))
+              && (!('29' in changed) || !('29' in lines) || (29 < n && pledgeEntryOk(lines['29'])))))
+          && (!changed.hasAny(['30', '31', '32', '33', '34']) || (true
+              && (!('30' in changed) || !('30' in lines) || (30 < n && pledgeEntryOk(lines['30'])))
+              && (!('31' in changed) || !('31' in lines) || (31 < n && pledgeEntryOk(lines['31'])))
+              && (!('32' in changed) || !('32' in lines) || (32 < n && pledgeEntryOk(lines['32'])))
+              && (!('33' in changed) || !('33' in lines) || (33 < n && pledgeEntryOk(lines['33'])))
+              && (!('34' in changed) || !('34' in lines) || (34 < n && pledgeEntryOk(lines['34'])))))
+          && (!changed.hasAny(['35', '36', '37', '38', '39']) || (true
+              && (!('35' in changed) || !('35' in lines) || (35 < n && pledgeEntryOk(lines['35'])))
+              && (!('36' in changed) || !('36' in lines) || (36 < n && pledgeEntryOk(lines['36'])))
+              && (!('37' in changed) || !('37' in lines) || (37 < n && pledgeEntryOk(lines['37'])))
+              && (!('38' in changed) || !('38' in lines) || (38 < n && pledgeEntryOk(lines['38'])))
+              && (!('39' in changed) || !('39' in lines) || (39 < n && pledgeEntryOk(lines['39'])))))
+          && (!changed.hasAny(['40', '41', '42', '43', '44']) || (true
+              && (!('40' in changed) || !('40' in lines) || (40 < n && pledgeEntryOk(lines['40'])))
+              && (!('41' in changed) || !('41' in lines) || (41 < n && pledgeEntryOk(lines['41'])))
+              && (!('42' in changed) || !('42' in lines) || (42 < n && pledgeEntryOk(lines['42'])))
+              && (!('43' in changed) || !('43' in lines) || (43 < n && pledgeEntryOk(lines['43'])))
+              && (!('44' in changed) || !('44' in lines) || (44 < n && pledgeEntryOk(lines['44'])))))
+          && (!changed.hasAny(['45', '46', '47', '48', '49']) || (true
+              && (!('45' in changed) || !('45' in lines) || (45 < n && pledgeEntryOk(lines['45'])))
+              && (!('46' in changed) || !('46' in lines) || (46 < n && pledgeEntryOk(lines['46'])))
+              && (!('47' in changed) || !('47' in lines) || (47 < n && pledgeEntryOk(lines['47'])))
+              && (!('48' in changed) || !('48' in lines) || (48 < n && pledgeEntryOk(lines['48'])))
+              && (!('49' in changed) || !('49' in lines) || (49 < n && pledgeEntryOk(lines['49'])))));
+          }
+          function pledgeWritable() {
+            let r = pledgeRequest();
+            return isMember()
+              && request.auth.uid == pledgeUid
+              && r.ownerUid != request.auth.uid
+              && r.closed == false
+              && r.expiresAt > request.time.toMillis()
+              && request.resource.data.keys().hasOnly(['ownerHash', 'communityId', 'lines', 'updatedAt'])
+              && request.resource.data.ownerHash == request.auth.token.ownerHash
+              && request.resource.data.communityId == communityId
+              && request.resource.data.lines is map
+              && request.resource.data.lines.size() >= 1
+              && request.resource.data.lines.size() <= 50
+              && request.resource.data.updatedAt == request.time
+              && pledgeLinesOk();
+          }
+
           allow get, list: if isMember();
-          allow write: if false;
+          allow create, update: if pledgeWritable();
+          allow delete: if isMember() && request.auth.uid == pledgeUid;
         }
       }
 
@@ -619,6 +728,21 @@ service cloud.firestore {
           allow delete: if isSelf();
         }
       }
+    }
+
+    // Pledges across a Community (issue #3808): the board reads every Pledge of
+    // one Community with a single collection-group query filtered by
+    // `communityId`. A write rule above binds that field to the path, so the
+    // stored value cannot be spoofed; this read rule only lets a current,
+    // hash-strict Member of the named Community through. It adds no write, and
+    // the nested rule above stays as it was. Needs the `pledges` /
+    // `communityId` collection-group index in firestore.indexes.json.
+    match /{path=**}/pledges/{pledgeUid} {
+      allow read: if request.auth != null
+        && resource.data.communityId is string
+        && exists(/databases/$(database)/documents/communities/$(resource.data.communityId)/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/communities/$(resource.data.communityId)/members/$(request.auth.uid)).data.ownerHash
+          == request.auth.token.ownerHash;
     }
 
     // Everything else: implicit deny.

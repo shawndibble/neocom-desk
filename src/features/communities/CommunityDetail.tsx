@@ -299,9 +299,12 @@ export function CommunityDetail({
               communityName={community.name}
               myUid={myUid}
               requests={board.requests}
+              pledges={board.pledges}
+              pledgesFailed={board.pledgesFailed}
               failed={board.failed}
               now={now}
               onReload={board.reload}
+              refreshPledges={board.refreshPledges}
             />
           ) : (
             <Panel>

@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
-import type { CommunityRequest } from '@/engine/communities/requests';
+import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 
 const store = vi.hoisted(() => ({
   postRequest: vi.fn(),
   extendRequest: vi.fn(),
   setRequestClosed: vi.fn(),
+  updateMyPledge: vi.fn(),
 }));
 vi.mock('./requestStore', () => store);
 
@@ -90,7 +91,14 @@ const request = (over: Partial<CommunityRequest>): CommunityRequest => ({
   ...over,
 });
 
-function renderTab(requests: CommunityRequest[] | null, onReload = vi.fn()) {
+const refreshPledges = vi.fn();
+
+function renderTab(
+  requests: CommunityRequest[] | null,
+  onReload = vi.fn(),
+  pledges: Record<string, RequestPledge[]> = {},
+  pledgesFailed = false
+) {
   render(
     <MemoryRouter>
       <RequestsTab
@@ -99,9 +107,12 @@ function renderTab(requests: CommunityRequest[] | null, onReload = vi.fn()) {
         communityName="Pals"
         myUid="char:1"
         requests={requests}
+        pledges={new Map(Object.entries(pledges))}
+        pledgesFailed={pledgesFailed}
         failed={false}
         now={NOW}
         onReload={onReload}
+        refreshPledges={refreshPledges}
       />
     </MemoryRouter>
   );
@@ -129,6 +140,8 @@ beforeEach(async () => {
   store.postRequest.mockResolvedValue({ requestId: 'new' });
   store.extendRequest.mockResolvedValue({ expiresAt: 1 });
   store.setRequestClosed.mockResolvedValue(undefined);
+  store.updateMyPledge.mockResolvedValue(null);
+  refreshPledges.mockResolvedValue([]);
 });
 
 describe('RequestsTab board', () => {
@@ -169,7 +182,7 @@ describe('RequestsTab board', () => {
 });
 
 describe('Request panel', () => {
-  it('gives a Member no Extend or Close', async () => {
+  it('gives a Member no requester controls', async () => {
     const user = userEvent.setup();
     renderTab([request({})]);
     await user.click(screen.getByText('Tritanium'));
@@ -468,5 +481,170 @@ describe('Message the requester', () => {
     renderTab([request({ ownerUid: 'char:1', ownerName: 'Me' })]);
     await user.click(screen.getByText('Tritanium'));
     expect(screen.queryByRole('button', { name: /^Message/ })).toBeNull();
+  });
+});
+
+const pledgeOf = (
+  uid: string,
+  quantity: number,
+  over: Partial<RequestPledge> = {}
+): RequestPledge => ({
+  uid,
+  lines: { 0: { quantity, delivered: 0, contractIds: [] } },
+  updatedAt: NOW - DAY,
+  ...over,
+});
+
+describe('Pledging', () => {
+  const open = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByText('Tritanium'));
+    return screen.getByRole('dialog', { name: /Aria Voss's request/ });
+  };
+
+  it('offers a quantity field starting at what is uncovered, and Pledges it', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})], vi.fn(), { r1: [pledgeOf('char:3', 400)] });
+    const panel = await open(user);
+    const field = within(panel).getByLabelText('Quantity you can provide of Tritanium');
+    expect(field).toHaveValue('600');
+    await user.clear(field);
+    await user.type(field, '250');
+    await user.click(within(panel).getByRole('button', { name: 'Pledge' }));
+    expect(store.updateMyPledge).toHaveBeenCalledTimes(1);
+    const [characterId, communityId, requestId, change] = store.updateMyPledge.mock.calls[0];
+    expect([characterId, communityId, requestId]).toEqual([1, 'c1', 'r1']);
+    expect(change({})).toEqual({ 0: { quantity: 250, delivered: 0, contractIds: [] } });
+    expect(refreshPledges).toHaveBeenCalledWith('r1');
+  });
+
+  it('shows Update pledge and Withdraw once pledged, and keeps what was delivered', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})], vi.fn(), { r1: [pledgeOf('char:1', 300)] });
+    const panel = await open(user);
+    expect(within(panel).getByLabelText(/Quantity you can provide/)).toHaveValue('300');
+    await user.click(within(panel).getByRole('button', { name: 'Withdraw' }));
+    const withdraw = store.updateMyPledge.mock.calls[0][3];
+    expect(withdraw({ 0: { quantity: 300, delivered: 0, contractIds: [] } })).toEqual({});
+    await user.click(within(panel).getByRole('button', { name: 'Update pledge' }));
+    const update = store.updateMyPledge.mock.calls[1][3];
+    expect(update({ 0: { quantity: 300, delivered: 40, contractIds: [7] } })).toEqual({
+      0: { quantity: 300, delivered: 40, contractIds: [7] },
+    });
+  });
+
+  it('prints the over-pledge note and never blocks the Pledge', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})], vi.fn(), { r1: [pledgeOf('char:3', 1400)] });
+    const panel = await open(user);
+    expect(
+      within(panel).getByText(/Over-pledged by 400: Pledges don't reserve/)
+    ).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Pledge' })).toBeEnabled();
+  });
+
+  it('refuses a quantity that is not a positive whole number', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})]);
+    const panel = await open(user);
+    const field = within(panel).getByLabelText(/Quantity you can provide/);
+    await user.clear(field);
+    await user.type(field, '1.5');
+    expect(within(panel).getByRole('button', { name: 'Pledge' })).toBeDisabled();
+    expect(within(panel).getByText('Enter a whole number above 0.')).toBeInTheDocument();
+  });
+
+  it('shows the requester no Pledge controls', async () => {
+    const user = userEvent.setup();
+    renderTab([request({ ownerUid: 'char:1', ownerName: 'Me' })]);
+    await user.click(screen.getByText('Tritanium'));
+    const panel = screen.getByRole('dialog', { name: /Your request/ });
+    expect(within(panel).queryByRole('textbox')).toBeNull();
+    expect(within(panel).queryByRole('button', { name: /Pledge|Withdraw/ })).toBeNull();
+  });
+
+  it('shows no Pledge controls on a closed Request', async () => {
+    const user = userEvent.setup();
+    renderTab([request({ closed: true, ownerUid: 'char:1' })]);
+    await user.click(screen.getByRole('button', { name: /^Mine/ }));
+    await user.click(screen.getByText('Tritanium'));
+    expect(screen.queryByLabelText(/Quantity you can provide/)).toBeNull();
+  });
+
+  it('reports a failed write', async () => {
+    const user = userEvent.setup();
+    store.updateMyPledge.mockRejectedValue(new Error('denied'));
+    renderTab([request({})]);
+    const panel = await open(user);
+    await user.click(within(panel).getByRole('button', { name: 'Pledge' }));
+    expect(await within(panel).findByRole('alert')).toHaveTextContent(/Couldn't save that Pledge/);
+  });
+
+  it('greys out a Pledge with no delivery after 14 days and says so', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})], vi.fn(), {
+      r1: [pledgeOf('char:1', 300, { updatedAt: NOW - 15 * DAY })],
+    });
+    const panel = await open(user);
+    expect(within(panel).getByText(/No delivery in 14 days/)).toBeInTheDocument();
+  });
+});
+
+describe('Board from Pledges', () => {
+  it('derives progress and status from the Pledges, not from the Request alone', () => {
+    renderTab([request({})], vi.fn(), { r1: [pledgeOf('char:3', 1000)] });
+    expect(screen.getByText('0 delivered · 1 pledged · 1 needed lines')).toBeInTheDocument();
+    expect(screen.getByText('Pledged', { selector: 'span' })).toBeInTheDocument();
+  });
+
+  it('is Part delivered, then Delivered, as deliveries are marked', () => {
+    renderTab(
+      [
+        request({}),
+        request({ id: 'r2', lines: [{ typeId: 35, name: 'Pyerite', quantity: 10, kind: 'item' }] }),
+      ],
+      vi.fn(),
+      {
+        r1: [pledgeOf('char:3', 1000, { lines: { 0: { quantity: 1000, delivered: 10 } } })],
+        r2: [pledgeOf('char:3', 10, { lines: { 0: { quantity: 10, delivered: 10 } } })],
+      }
+    );
+    expect(screen.getByText('Part delivered')).toBeInTheDocument();
+    expect(screen.getByText('Delivered')).toBeInTheDocument();
+  });
+});
+
+describe('A failed Pledge read', () => {
+  it('says so and offers a retry instead of passing Requests off as Open', async () => {
+    const user = userEvent.setup();
+    const reload = renderTab([request({})], vi.fn(), {}, true);
+    expect(screen.getByRole('alert')).toHaveTextContent(/Couldn't load some Pledges/);
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(reload).toHaveBeenCalled();
+  });
+});
+
+describe('My pledges', () => {
+  it('counts Pledges in progress in the strip and lists them in a slide-out', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})], vi.fn(), {
+      r1: [pledgeOf('char:1', 300, { updatedAt: NOW - 20 * DAY })],
+    });
+    expect(
+      screen.getByText('You have no open Requests and 1 Pledge in progress.')
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'My pledges' }));
+    const panel = screen.getByRole('dialog', { name: 'My pledges' });
+    expect(within(panel).getByText('Tritanium')).toBeInTheDocument();
+    expect(within(panel).getByText('300 pledged · 0 delivered')).toBeInTheDocument();
+    expect(within(panel).getByText(/Stale: no delivery in 14 days/)).toBeInTheDocument();
+    await user.click(within(panel).getByRole('button', { name: /Open request for Aria Voss/ }));
+    expect(screen.getByRole('dialog', { name: /Aria Voss's request/ })).toBeInTheDocument();
+  });
+
+  it('says so when there are none', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})]);
+    await user.click(screen.getByRole('button', { name: 'My pledges' }));
+    expect(screen.getByText('You have no Pledges on open Requests')).toBeInTheDocument();
   });
 });

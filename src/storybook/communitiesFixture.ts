@@ -10,7 +10,7 @@
  * tabs' Everyone views fill, and the sample Character's own share shows under
  * Mine.
  */
-import type { CommunityRequest, RequestLine } from '@/engine/communities/requests';
+import type { CommunityRequest, RequestLine, RequestPledge } from '@/engine/communities/requests';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
@@ -263,6 +263,25 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
     [SAMPLE_MEMBER_COMMUNITY_ID]: [],
   };
 
+  const pledge = (uid: string, lines: RequestPledge['lines'], ageHours = 20): RequestPledge => ({
+    uid,
+    lines,
+    updatedAt: now - ageHours * 3_600_000,
+  });
+  const entry = (quantity: number, delivered = 0) => ({ quantity, delivered, contractIds: [] });
+  // Request id to its Pledges, per Community: the board's pictured progress and statuses.
+  const pledges: Record<string, Record<string, RequestPledge[]>> = {
+    [SAMPLE_ADMIN_COMMUNITY_ID]: {
+      'req-1': [
+        pledge(ME, { 0: entry(150000) }),
+        pledge('char:2119000002', { 0: entry(260000, 120000) }),
+        pledge('char:2119000003', { 1: entry(90000) }),
+      ],
+      'req-2': [pledge('char:2119000003', { 0: entry(1) })],
+      'req-3': [pledge('char:2119000004', { 0: entry(3, 3) })],
+    },
+  };
+
   const byId = (id: string) => communities.find((community) => community.id === id);
   const patch = (id: string, change: Partial<CommunitySummary>) => {
     const community = byId(id);
@@ -276,6 +295,13 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
     loadLibraries: (id) => libraries[id] ?? [],
     loadFittings: (id) => (fittings[id] ?? []).map((entry) => ({ ...entry })),
     loadItemRequests: (id) => (itemRequests[id] ?? []).map((entry) => ({ ...entry })),
+    loadAllPledges: (id) => Object.fromEntries(Object.entries(pledges[id] ?? {})),
+    loadPledges: (id, requestId) => (pledges[id]?.[requestId] ?? []).map((entry) => ({ ...entry })),
+    savePledge: (id, requestId, lines) => {
+      const board = (pledges[id] ??= {});
+      const others = (board[requestId] ?? []).filter((p) => p.uid !== ME);
+      board[requestId] = lines ? [...others, pledge(ME, lines, 0)] : others;
+    },
     loadPlans: (id) => (plans[id] ?? []).map((entry) => ({ ...entry })),
     call: (name, data) => {
       const { communityId, memberUid, accept, requireApproval } = data as {

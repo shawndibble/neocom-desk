@@ -16,15 +16,18 @@ import { permissionsForEndpoints } from '@/esi/registry';
 import {
   filterRequests,
   isOpenRequest,
+  myPledgeRows,
   requestProgress,
   requestStatus,
   withinJumps,
   type CommunityRequest,
   type RequestFilter,
+  type PledgesByRequest,
   type RequestPledge,
   type RequestStatus,
 } from '@/engine/communities/requests';
 import { ComposeRequestDialog } from './ComposeRequestDialog';
+import { MyPledgesPanel } from './MyPledgesPanel';
 import { PledgeBar } from './PledgeBar';
 import { RequestPanel } from './RequestPanel';
 import { STATUS_TONE, formatLeft, formatShortAge } from './requestFormat';
@@ -34,13 +37,6 @@ import { useSharedBlueprintTypes } from './useSharedBlueprintTypes';
 /** The jump limits the distance select offers; "any" is no limit. */
 const DISTANCE_CHOICES = [5, 10, 20] as const;
 const LOCATION_GROUPS = permissionsForEndpoints(LOCATION_ENDPOINTS);
-
-/**
- * Pledges per Request id. Empty until Pledges exist (issue #3808): the board
- * already derives progress and status from them, so that ticket only has to
- * load them and pass them in.
- */
-const NO_PLEDGES: ReadonlyMap<string, readonly RequestPledge[]> = new Map();
 
 interface Row {
   request: CommunityRequest;
@@ -77,9 +73,12 @@ export function RequestsTab({
   communityName,
   myUid,
   requests,
+  pledges,
+  pledgesFailed,
   failed,
   now,
   onReload,
+  refreshPledges,
 }: {
   characterId: number;
   communityId: string;
@@ -87,9 +86,15 @@ export function RequestsTab({
   myUid: string;
   /** Null until the first read lands. */
   requests: CommunityRequest[] | null;
+  /** The Pledges under each open Request, from the board's read. */
+  pledges: PledgesByRequest;
+  /** The Pledge read failed: the board's progress and statuses are not to be trusted. */
+  pledgesFailed: boolean;
   failed: boolean;
   now: number;
   onReload: () => void;
+  /** Re-reads one Request's Pledges after a Pledge write. */
+  refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
 }) {
   const { t } = useTranslation();
   const distanceNoteId = useId();
@@ -97,6 +102,7 @@ export function RequestsTab({
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  const [pledgesOpen, setPledgesOpen] = useState(false);
   const [maxJumps, setMaxJumps] = useState<number | null>(null);
   const shared = useSharedBlueprintTypes(characterId, communityId, myUid, requests !== null);
   const sharedTypeIds = shared.status === 'ready' ? shared.typeIds : undefined;
@@ -114,16 +120,16 @@ export function RequestsTab({
     return {
       unmeasured: left,
       rows: within.map((request): Row => {
-        const pledges = NO_PLEDGES.get(request.id) ?? [];
+        const forRequest = pledges.get(request.id) ?? [];
         return {
           request,
-          status: requestStatus(request, pledges, now),
-          progress: requestProgress(request, pledges),
+          status: requestStatus(request, forRequest, now),
+          progress: requestProgress(request, forRequest),
           mine: request.ownerUid === myUid,
         };
       }),
     };
-  }, [requests, filter, query, myUid, now, sharedTypeIds, distance, limit]);
+  }, [requests, pledges, filter, query, myUid, now, sharedTypeIds, distance, limit]);
 
   const statusLabels: Record<RequestStatus, string> = {
     open: t('communities.board.status.open'),
@@ -261,15 +267,42 @@ export function RequestsTab({
   const panelRequest = requests.find((r) => r.id === openId) ?? null;
   const distanceOff = distance.status === 'unavailable';
   const measuring = limit !== null && distance.status === 'loading';
+  const myRows = myPledgeRows(requests, pledges, myUid, now);
+  // A Pledge counts as in progress until everything it promised is delivered.
+  const inProgress = myRows.filter((row) => row.entry.delivered < row.entry.quantity).length;
+  const requestsPart = t('communities.board.summaryRequests', { count: myOpen });
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line px-3 py-2">
         <p className="min-w-0 basis-full text-xs text-text-dim sm:basis-0 sm:flex-1">
-          {t('communities.board.summary', { count: myOpen })}
+          {inProgress > 0
+            ? t('communities.board.summaryBoth', {
+                requests: requestsPart,
+                pledges: t('communities.board.summaryPledges', { count: inProgress }),
+              })
+            : t('communities.board.summary', { count: myOpen })}
         </p>
+        <Button
+          size="sm"
+          aria-haspopup="dialog"
+          aria-expanded={pledgesOpen}
+          onClick={() => setPledgesOpen(true)}
+        >
+          {t('communities.board.myPledges.open')}
+        </Button>
         {newRequest}
       </div>
+      {pledgesFailed && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line px-3 py-2">
+          <p role="alert" className="min-w-0 flex-1 text-xs text-danger">
+            {t('communities.board.pledgesBoardFailed')}
+          </p>
+          <Button size="sm" onClick={onReload}>
+            {t('communities.retry')}
+          </Button>
+        </div>
+      )}
       <Panel>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <SearchInput
@@ -373,15 +406,27 @@ export function RequestsTab({
         <RequestPanel
           request={panelRequest}
           mine={panelRequest.ownerUid === myUid}
-          pledges={NO_PLEDGES.get(panelRequest.id) ?? []}
+          myUid={myUid}
+          pledges={pledges.get(panelRequest.id) ?? []}
           now={now}
           characterId={characterId}
           communityId={communityId}
           communityName={communityName}
           onClose={() => setOpenId(null)}
           onChanged={onReload}
+          refreshPledges={refreshPledges}
         />
       )}
+      <MyPledgesPanel
+        open={pledgesOpen}
+        rows={myRows}
+        communityName={communityName}
+        onClose={() => setPledgesOpen(false)}
+        onOpenRequest={(id) => {
+          setPledgesOpen(false);
+          setOpenId(id);
+        }}
+      />
       {compose}
     </div>
   );
