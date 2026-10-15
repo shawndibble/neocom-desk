@@ -8,13 +8,14 @@
  */
 import type { EveWorkbenchEft } from '@/engine/fittings/load';
 import { USER_AGENT } from '@/esi/userAgent';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 const API_BASE = 'https://api.eveworkbench.com/v1';
 
 export async function fetchEveWorkbenchEft(fitId: string): Promise<EveWorkbenchEft> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}/fits/${encodeURIComponent(fitId)}/eft`, {
+    response = await fetchWithTimeout(`${API_BASE}/fits/${encodeURIComponent(fitId)}/eft`, {
       headers: { 'X-User-Agent': USER_AGENT },
     });
   } catch {

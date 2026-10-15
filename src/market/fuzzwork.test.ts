@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { fetchAggregates, fetchOrderCounts, FUZZWORK_AGGREGATES_URL } from './fuzzwork';
@@ -198,5 +198,29 @@ describe('fetchOrderCounts', () => {
     // No orders and no entry at all both read as zero orders, never unknown.
     expect(result.get(35)).toEqual({ buyOrders: 0, sellOrders: 0, buyVolume: 0, sellVolume: 0 });
     expect(result.get(36)).toEqual({ buyOrders: 0, sellOrders: 0, buyVolume: 0, sellVolume: 0 });
+  });
+});
+
+describe('fetchAggregates when Fuzzwork never answers', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects after the timeout instead of waiting forever', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_input: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+          })
+      )
+    );
+    const result = fetchAggregates(60003760, [34]);
+    const settled = expect(result).rejects.toMatchObject({ name: 'TimeoutError' });
+    await vi.advanceTimersByTimeAsync(15_000);
+    await settled;
   });
 });

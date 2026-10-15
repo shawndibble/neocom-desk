@@ -28,8 +28,14 @@ export function isSyncConfigured(env: SyncEnv = import.meta.env): boolean {
 
 export type SyncDisplayState = 'idle' | 'syncing' | 'error' | 'offline';
 
-/** Browser offline always wins: a queued sync can't run regardless of its last known state. */
+/**
+ * Browser offline always wins: a queued sync can't run regardless of its last
+ * known state. A failure that was itself recorded offline stays `offline`
+ * after the browser is back, until the reconnect sync (`reconnectRecovery.ts`)
+ * replaces it.
+ */
 export function syncDisplayState(status: SyncStatus, online: boolean): SyncDisplayState {
   if (!online) return 'offline';
+  if (status.state === 'error' && status.offline === true) return 'offline';
   return status.state;
 }

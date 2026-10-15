@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin';
 import { localeSplitPlugin } from './src/i18n/localeSplitPlugin';
+import { lazySdeGlobIgnores } from './src/sde/lazySdeFiles';
 
 const { version, dependencies } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
@@ -328,33 +329,32 @@ export default defineConfig({
       // navigateFallback/navigateFallbackDenylist are generateSW-only — the
       // equivalent SPA-fallback routing is hand-written in src/sw.ts.
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json}'],
-        // The Market Browser's catalogue (~1.2 MB: market groups, market
-        // types, solar systems, NPC stations, market regions) is fetched
-        // lazily on first visit to /market instead — most installs never
-        // open it, so an install should not pay for it up front (GLOSSARY.md).
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json,webp}'],
+        // Offline-first: the install precaches what a core feature needs to
+        // open with no network — the Industry blueprint catalogue, the Ship
+        // Tree, and the small market lookups that route planning and the
+        // system/region/group/attribute pickers read (`blueprints.json`,
+        // `shipTree.json`, `market/{systems,jumps,systemPositions,groups,
+        // attributes,regions,globalMarkets,lpCorporations}.json`; ~3.5 MB raw)
+        // — see docs/context/decisions/*-core-feature-sde-files-are-precached*.
+        // Everything else under `public/data` is the lazy set,
+        // `src/sde/lazySdeFiles.ts`: one list, also what the idle background
+        // warm fetches, cached cache-first under its content-versioned URL by
+        // src/sw.ts (docs/context/decisions/*-feature-sde-files-load-on-demand-
+        // not-precached.md, amended). The market catalogue's three big files
+        // (types, stations, variations) are in it, so the Market Browser's
+        // order-book data is never paid for up front.
         // The dogma engine's WASM binary and its SDE data file (ADR 0016,
-        // ~10 MB together) are fetched lazily on first Fitting open instead —
-        // same reasoning as the market catalogue above.
-        // The large single-feature SDE files (~9 MB of the ~10.5 MB in
-        // public/data) load on demand too, cached cache-first under their
-        // content-versioned URL by src/sw.ts — see
-        // docs/context/decisions/*-feature-sde-files-load-on-demand-not-precached.md.
-        // What stays precached is what the shell and most routes need
-        // (types, skills, pi, the small id lists).
+        // ~10 MB together) are fetched lazily on first Fitting open instead.
         // The 512px install icons and the brand lockup are fetched by the
-        // OS installer / docs, never by the running app.
+        // OS installer / docs, never by the running app. Nor are the landing
+        // page's `screenshots/` (~1 MB, signed-out page only, also store
+        // listing art); the small `landing/` ship art and the how-to images
+        // under `images/` ARE shown by the app and are precached (webp).
         globIgnores: [
-          '**/data/market/**',
+          ...lazySdeGlobIgnores(),
           '**/vendor/dogma/**',
-          '**/data/masteries.json',
-          '**/data/marketWideTrees.json',
-          '**/data/reprocessing.json',
-          '**/data/pi-planet-radius.json',
-          '**/data/pi-system-planets.json',
-          '**/data/blueprints.json',
-          '**/data/shipTree.json',
-          '**/data/typeNames.json',
+          '**/screenshots/**',
           '**/icons/icon-512*.png',
           '**/brand/**',
         ],

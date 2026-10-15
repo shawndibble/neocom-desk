@@ -39,4 +39,16 @@ describe('syncDisplayState', () => {
       'error'
     );
   });
+
+  it('reports a failure recorded while offline as offline, even once the browser is back', () => {
+    expect(
+      syncDisplayState({ state: 'error', lastSyncedAt: null, error: 'x', offline: true }, true)
+    ).toBe('offline');
+  });
+
+  it('keeps an online failure as an error', () => {
+    expect(
+      syncDisplayState({ state: 'error', lastSyncedAt: null, error: 'x', offline: false }, true)
+    ).toBe('error');
+  });
 });

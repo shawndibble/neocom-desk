@@ -19,7 +19,7 @@ function sources(overrides: Partial<TextLoadSources> = {}): TextLoadSources {
       slotByTypeId: SLOTS,
     })),
     hullName: vi.fn(async (typeId: number) => (typeId === 587 ? 'Rifter' : 'Other')),
-    killmailHash: vi.fn(async () => HASH),
+    killmailHash: vi.fn(async () => ({ status: 'ok' as const, hash: HASH })),
     killmailVictim: vi.fn(async () => VICTIM),
     eveWorkbenchEft: vi.fn(async () => ({ status: 'not-found' as const })),
     ...overrides,
@@ -222,7 +222,9 @@ describe('loadText', () => {
   });
 
   it("looks up a zKillboard link's hash, and reports a killmail zKillboard doesn't know", async () => {
-    const src = sources({ killmailHash: vi.fn(async () => null) });
+    const src = sources({
+      killmailHash: vi.fn(async () => ({ status: 'not-found' as const })),
+    });
     const outcome = await loadText('https://zkillboard.com/kill/123/', src);
     expect(src.killmailHash).toHaveBeenCalledWith(123);
     expect(src.killmailVictim).not.toHaveBeenCalled();
@@ -230,6 +232,20 @@ describe('loadText', () => {
       kind: 'failed',
       source: 'text',
       error: 'killmail-not-found',
+      unresolved: [],
+    });
+  });
+
+  it("reports zKillboard being unreachable apart from a killmail it doesn't know", async () => {
+    const src = sources({
+      killmailHash: vi.fn(async () => ({ status: 'unreachable' as const })),
+    });
+    const outcome = await loadText('https://zkillboard.com/kill/123/', src);
+    expect(src.killmailVictim).not.toHaveBeenCalled();
+    expect(outcome).toEqual({
+      kind: 'failed',
+      source: 'text',
+      error: 'killmail-unreachable',
       unresolved: [],
     });
   });

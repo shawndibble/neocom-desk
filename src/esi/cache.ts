@@ -747,6 +747,23 @@ export function resetRevalidationState(): void {
 }
 
 /**
+ * Forgets the held revalidation failures that were network failures, so the
+ * next read of each key goes to the network again instead of being answered
+ * from the stored row. Called when the connection returns
+ * (`app/reconnectRecovery.ts`): a failure recorded offline says nothing about
+ * ESI now, and would otherwise hold the key until its window lapsed.
+ *
+ * A failure that carries `needsReauth` is kept: ESI answered 401/403 (or SSO
+ * refused the grant), which a reconnect does not change, and dropping it would
+ * re-fire the request and the shell notice on every flap of `online`.
+ */
+export function clearRevalidationFailures(): void {
+  for (const [dkey, failure] of revalidationFailures) {
+    if (!failure.needsReauth) revalidationFailures.delete(dkey);
+  }
+}
+
+/**
  * Like `loadWithCache`, but surfaces an auth failure (401 expired token, 403
  * missing scope, failed refresh) as `needsReauth` instead of silently falling
  * back. Any other failure (offline, 5xx, timeout) still falls through.

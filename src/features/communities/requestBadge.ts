@@ -17,6 +17,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { db } from '@/db';
 import { countNewRequests } from '@/engine/communities/requests';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { isOnline, onReconnect } from '@/stores/network';
 import { communityBackendOverride } from './backendOverride';
 import type { CommunitySummary } from './communityStore';
 
@@ -144,17 +145,22 @@ export function useRequestBadgePoll() {
   useEffect(() => {
     resetRequestBadge();
     if (characterId === null) return;
-    const refresh = () =>
+    const refresh = () => {
+      // Every board read is a Firebase round trip that cannot succeed offline.
+      if (!isOnline()) return;
       void refreshRequestBadge(characterId).catch((err) =>
         console.warn('Request badge could not be refreshed', err)
       );
+    };
     refresh();
     const timer = setInterval(refresh, REQUEST_BADGE_POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === 'visible') refresh();
     };
     document.addEventListener('visibilitychange', onVisible);
+    const offReconnect = onReconnect(refresh);
     return () => {
+      offReconnect();
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };

@@ -10,22 +10,12 @@ describe('named', () => {
     await expect(load()).resolves.toEqual({ default: Page });
   });
 
-  it('waits instead of throwing when a cancelled chunk failure resolves undefined', async () => {
-    // main.tsx's `vite:preloadError` handler cancels the failure and reloads;
-    // Vite's preload helper then resolves `undefined`. Reading a key off that
-    // would throw into the route's error boundary before the reload lands.
+  it('rejects into the boundary when the import resolves undefined and no recovery is running', async () => {
     const load = named(
       () => Promise.resolve(undefined as unknown as Record<'Page', ComponentType>),
       'Page'
     );
-    const outcome = await Promise.race([
-      load().then(
-        () => 'settled',
-        () => 'settled'
-      ),
-      new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
-    ]);
-    expect(outcome).toBe('pending');
+    await expect(load()).rejects.toThrow(/unavailable/i);
   });
 });
 
@@ -36,15 +26,47 @@ describe('guarded', () => {
     });
   });
 
-  it('waits instead of resolving when a cancelled chunk failure gives undefined', async () => {
-    const outcome = await Promise.race([
-      guarded(() => Promise.resolve(undefined)).then(
-        () => 'settled',
-        () => 'settled'
-      ),
-      new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
-    ]);
-    expect(outcome).toBe('pending');
+  it('rejects, rather than leaving Suspense pending forever, when nothing is recovering', async () => {
+    await expect(guarded(() => Promise.resolve(undefined))).rejects.toThrow(/unavailable/i);
+  });
+
+  describe('while a stale-build recovery is running', () => {
+    async function withRecovery(overrides: Record<string, unknown>) {
+      vi.resetModules();
+      const recovery = await import('./staleBuildRecovery');
+      const fresh = await import('./routeChunks');
+      const attempt = recovery.recoverFromStaleBuild({
+        now: () => 1_000_000,
+        online: () => true,
+        readLast: () => 0,
+        writeLast: () => {},
+        probe: async () => true,
+        purge: () => new Promise<void>(() => {}),
+        reload: () => {},
+        ...overrides,
+      });
+      return { fresh, attempt };
+    }
+
+    it('waits for the reload', async () => {
+      const { fresh } = await withRecovery({});
+      const outcome = await Promise.race([
+        fresh
+          .guarded(() => Promise.resolve(undefined))
+          .then(
+            () => 'settled',
+            () => 'settled'
+          ),
+        new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
+      ]);
+      expect(outcome).toBe('pending');
+    });
+
+    it('rejects into the boundary once the recovery gives up (network probe failed)', async () => {
+      const { fresh, attempt } = await withRecovery({ probe: async () => false });
+      await expect(fresh.guarded(() => Promise.resolve(undefined))).rejects.toThrow(/unavailable/i);
+      await expect(attempt).resolves.toBe(false);
+    });
   });
 });
 

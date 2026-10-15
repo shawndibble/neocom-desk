@@ -23,6 +23,31 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('a market SDE file that never answers', () => {
+  it('rejects after the timeout, and a later call retries', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementationOnce(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+          })
+      );
+      fetchMock.mockResolvedValueOnce(jsonResponse(CORPS));
+      const { loadLpCorporations } = await import('./loadMarketSde');
+
+      const hung = expect(loadLpCorporations()).rejects.toMatchObject({ name: 'TimeoutError' });
+      await vi.advanceTimersByTimeAsync(20_000);
+      await hung;
+
+      expect(await loadLpCorporations()).toEqual(CORPS);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('loadLpCorporations', () => {
   it('reads the LP Store corporation snapshot from market/lpCorporations.json', async () => {
     fetchMock.mockResolvedValue(jsonResponse(CORPS));

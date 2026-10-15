@@ -6,6 +6,7 @@
  * orders on a side still gets a key back, but with orderCount 0 — that side's
  * price is reported as null, never coerced to 0.
  */
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 export const FUZZWORK_AGGREGATES_URL = 'https://market.fuzzwork.co.uk/aggregates/';
 
@@ -76,7 +77,7 @@ async function fetchBatch(
   url.searchParams.set(scope, String(locationId));
   url.searchParams.set('types', typeIds.join(','));
 
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   if (!response.ok) {
     throw new Error(`Fuzzwork aggregates request failed with status ${response.status}`);
   }

@@ -189,6 +189,9 @@ describe('startup import graph', () => {
       '/src/app/routeChunks.ts',
       '/src/app/routerPath.ts',
       '/src/app/signedInShellHint.ts',
+      // Import-free state `routeChunks` reads (a cancelled import waits for a
+      // running stale-build recovery); the recovery code itself stays out.
+      '/src/app/staleBuildState.ts',
     ]);
   });
 

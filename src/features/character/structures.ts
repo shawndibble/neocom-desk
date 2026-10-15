@@ -46,9 +46,8 @@
  * (Issue #655.)
  */
 import { db } from '@/db';
-import { AuthError } from '@/auth/sso';
 import { getUniverseStructure, type UniverseStructure } from '@/esi/endpoints';
-import { EsiError } from '@/esi/client';
+import { EsiError, isCredentialFailure } from '@/esi/client';
 import {
   conditionalFetch,
   loadWithCache,
@@ -186,8 +185,7 @@ async function loadOwnStructure(
   });
   const result = await loadWithCache(characterId, cacheKey(structureId), fetchLive, {
     conditional,
-    detectAuthFailure: (err) =>
-      err instanceof AuthError || (err instanceof EsiError && err.status === 401),
+    detectAuthFailure: isCredentialFailure,
     // A structure can be renamed, but rarely, and the Assets tree resolves
     // one per distinct location — refetching them on the 10-minute cadence
     // would make every Assets visit a fan-out for names that did not move.
