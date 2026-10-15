@@ -2,6 +2,10 @@
 
 Source: `src/mockups/CommunityRequests.stories.tsx` (`mockups-communityrequests--*`). Sample data. **The ticket's Agent Brief wins over the picture where they differ**, but a ticket that builds any of these screens implements them as shown: same layout, same primitives, same wording of controls. Scope: `docs/context/decisions/20261014-221403-community-requests-a-non-locking-board-of-requests.md`, ADR 0021.
 
+## Current state
+
+Shipped as pictured, across tickets #3807-#3813: the board with Open, Mine and I can fill chips and a distance select; the side panel with Pledge / Update pledge / Withdraw per line, the over-pledge note, the delivery sentence, a typed delivered amount (always offered, "manual" while it is the shown figure), the BPC "not as asked" flag for the Pledger, Message, and for the Community admin Remove request… and per-Pledger Remove…; compose step 1 and step 2 (who to mail, the day's mail count); the My pledges slide-out; stale Pledge grey-out; the Expired status; and "ask <name> to copy…" on a Community Offer row opening compose. Details and the small differences from the pictures are in the history sections at the end. `ask-to-copy-row-*.png` show the Offer row cell.
+
 New components (dashed, labelled in the pictures): `RequestsTab`, `PledgeBar` (delivered / pledged / needed as one stacked bar with the figures printed beside it, never colour alone), `RequestPanel`, `PledgeRow` (a line with its inline quantity field and Pledge button), `ComposeRequestDialog`. Everything else is an existing `src/components/ui` primitive: `Tabs`, `FilterChip`, `SearchInput`, `NativeSelect`, `DataTable` (dense phone cards), `SlideOver`, `Modal`, `TextInput`, `TextArea`, `Checkbox`, `EmptyState`.
 
 The board counts **lines** ("1 delivered · 2 pledged · 3 needed lines"), never summed units: ore and BPC copies do not add. Units appear per line in the side panel.
@@ -9,15 +13,19 @@ The board counts **lines** ("1 delivered · 2 pledged · 3 needed lines"), never
 | Screen | 1440 | 390 |
 |---|---|---|
 | Board: Requests tab, filters, table | ![](board-1440.png) | ![](board-390.png) |
-| Side panel, as a Member: inline quantity + Pledge, over-pledge note, Message | ![](panel-member-1440.png) | ![](panel-member-390.png) |
-| Side panel, as the requester: Extend, Close request, no Pledge controls | ![](panel-requester-1440.png) | |
-| Compose, step 1: location, terms, pasted list, lines, add an item | ![](compose-lines-1440.png) | ![](compose-lines-390.png) |
+| Side panel, as a Member: inline quantity + Pledge, over-pledge note, Message (shipped also has the delivery sentence and a delivered-amount field under each Pledged line) | ![](panel-member-1440.png) | ![](panel-member-390.png) |
+| Side panel, as the requester: Extend, Close request, no Pledge controls (still right; the admin's removal controls are not pictured) | ![](panel-requester-1440.png) | |
+| Compose, step 1: location, terms, pasted list, lines, add an item (shipped puts labels above the fields and adds a location picker and blueprint copy/original, runs, ME, TE per line) | ![](compose-lines-1440.png) | ![](compose-lines-390.png) |
 | Compose, step 2: who to mail, day's mail count | ![](compose-recipients-1440.png) | |
 | Empty state | ![](empty-1440.png) | |
 
 Not shown, specified in the ticket text: My pledges slide-out (the same shape as My sharing), the loading and failed states (as the other Community tabs), and the Message button's behaviour (opens an in-game mail).
 
-## Deviations in the first build (issue #3807)
+## History: per-ticket deviations from the pictures
+
+These sections record how each ticket's build differed from the pictures **at the time**. "Not built" bullets in them were built by a later ticket in this list; they are not the current state (read "Current state" above).
+
+### Deviations in the first build (issue #3807)
 
 The Requests tab, board, read-only side panel, compose step 1 and the empty state are built (`pages-communities--requests-*` stories). Where they differ from the pictures:
 
@@ -33,17 +41,7 @@ The Requests tab, board, read-only side panel, compose step 1 and the empty stat
 - **Search placeholder** ends in "…" (the i18n convention test requires it).
 - **Column header** Age has no default sort (rows arrive newest first); Request, Status and Age sort.
 
-## Deviations in the Request filters build (issue #3811)
-
-The I can fill chip, the Distance select and the Message button are built (`pages-communities--requests-board`, `-can-fill`, `-nearby`, `-no-location-grant`, `-panel-as-member`). Where they differ from the pictures:
-
-- **Filter row:** chips and select are the pictured controls in the pictured order (`FilterChip` Open, Mine, I can fill with the pictured tooltip; `NativeSelect` Any distance, Within 5, 10, 20 jumps). On a phone the select sits beside Mine and I can fill on the second row where the picture wraps it to a third, because the chips are narrower in the sample (counts of one digit).
-- **Disabled and failed states** are not pictured: Distance is disabled with a line under the row saying why (the location Permission is missing, with the Grant link, or the pilot's location is unknown); I can fill is disabled with a tooltip when the Member's shared blueprints could not be read. Under a limit, a line says how many Requests with no place the app can measure from are left out.
-- **Location is picked in compose** (a suggestion list under the field, a line saying whether the text can be measured); the compose pictures have a plain field.
-- **Message button:** at the foot of the panel as pictured, with the Pledge note above it (#3808) but no delivery sentence (#3809) and, without the Open in EVE Permission, a line with the Grant link beside it. The label ends in an ellipsis as pictured.
-- **Sample data:** the second Request's place is "Domain (region)", not the picture's "Amarr (region)", since Amarr is a system and the board reads a region by its real name. I can fill counts 1, not 2: the sample pilot shares one blueprint a Request asks for.
-
-## Deviations in the Pledges build (issue #3808)
+### Deviations in the Pledges build (issue #3808)
 
 Built: Pledge / Update pledge / Withdraw with the inline quantity field per line, the over-pledge note, stacked bars and board progress and status from real Pledges, the strip's "and 1 Pledge in progress" half with **My pledges**, and the My pledges slide-out. Panel and board match the pictures at 1440 and 390 (the 390 row keeps Update pledge, wrapped to two lines, and Withdraw on one row as pictured). Where they differ:
 
@@ -55,34 +53,8 @@ Built: Pledge / Update pledge / Withdraw with the inline quantity field per line
 - **Stale grey-out** applies to the viewer's own Pledge only (the panel shows aggregates for everyone else).
 - **Quantity field validation:** a non-whole or zero value shows "Enter a whole number above 0." and disables the button.
 - **Sample names** in the story differ from the pictures (the story's fixture names are Ilvara Nokk and friends, as in #3807).
-## Deviations in compose step 2 (issue #3810)
 
-Built as `pages-communities--requests-compose-recipients` (and `-phone`); the shape is the picture's: intro line with the day's count, a bordered list of label rows (checkbox, name, "Shares N of these blueprints" at the right, 44px touch rows), Back on the left, "Post request and mail N Members" on the right. Where it differs:
-
-- **Sample data:** the story shows the sample Community's eight other Members, not four; the two sharing a matching blueprint are pre-ticked.
-- **Matching:** "Shares N of these blueprints" counts the Request's blueprint lines the Member shares (a copy line is met by a copy or an original; an original line only by a shared original). Plain item lines match nobody, so a Request of only items pre-ticks nobody. Sharers come first, then the rest by name.
-- **Nobody ticked:** the button reads "Post request" and posts without mail (the picture only shows the ticked case).
-- **Not pictured, added:** a permission note (Grant permission) with the boxes disabled while the Character lacks the send-mail permission; a one-line note when more are ticked than the day has mails left, or none are left; a warning when what Members share could not be read.
-- **After posting with mail:** the dialog stays open and lists each recipient with a text result (Mailed, refused, not confirmed, daily limit), then Done. Not pictured.
-- **Nav badge:** the Communities item carries a count of new Requests (the rail's existing badge, `NavItem`); it has no picture.
-
-## Deviations in the cleanup build (issue #3812): the admin's removal
-
-Not pictured; added to the panel screen for the Community admin only (decision `20261015-005522-community-request-admin-removal-and-expiry-grace.md`, story `pages-communities--requests-panel-as-admin`, with a `-phone` twin).
-
-- **Side panel:** below the Message button, a **Pledges on this request** list (name, "N lines", **Remove…** with the Pledger's name in its accessible label), then **Remove request…** as a danger button, each behind a `ConfirmDialog` naming what goes. Names come from the Members list; a Pledger who has since left reads "Former Member". A failed removal keeps the dialog open with the shared "That did not work. Try again." line. The panel for the requester and for a plain Member, and the whole board, are as pictured: there is no row menu (one action does not earn a ⋮, DESIGN.md §6c).
-
-## Deviations in Ask to copy (issue #3813)
-
-Compose opens as pictured (`compose-lines`, `compose-recipients`), as stories `pages-communities--ask-to-copy-compose`, `-compose-phone`, `-recipients` and `-pick-community`, where the page behind is the Communities page (the real thing opens over BPC Sourcing). Where it differs from the pictures:
-
-- **Pre-filled line:** one line, "Rifter Blueprint" as a Blueprint copy, quantity 1, Runs/ME/TE empty; location and terms empty. The pictures show a pasted pile.
-- **Step 2:** the holder is ticked, with any Member sharing a matching blueprint, as in the picture.
-- **Community choice (not pictured):** when the holder shares the blueprint in several Communities, a small dialog (select and Continue) comes first. One Community goes straight to compose.
-- **Roster failure (not pictured):** a dialog with the failure in words and Close.
-- **Ask to copy row** (`ask-to-copy-row-1440.png`, `-390.png`; story `bpccontracts-communityoffercell--rows`): the Item cell of a Community Offer row, "ask <name> to copy…" as an accent inline link beside the community chip (ask, a copy's "from <name>", a reaction formula's plain text, a stale library). The cell is its own component (`CommunityOfferCell`) so it can be pictured: a whole BPC Sourcing page story needs the contracts snapshot (Firestore), the SDE and an ESI character, which is too large a fixture. The mockup itself has no BPC Sourcing screen.
-
-## Deviations in the delivery build (issue #3809)
+### Deviations in the delivery build (issue #3809)
 
 Built: the delivery sentence in the Member's panel (as pictured: "Delivery is marked from your finished contracts to <name>, in game. Nothing is reserved; agree the terms yourselves."), the delivered segment of the bar fed by real deliveries, the BPC attribute flag and the manual marker (`pages-communities--requests-panel-delivery`, `-delivery-phone`, `-no-contracts-grant`). Where they differ from the pictures:
 
@@ -93,4 +65,41 @@ Built: the delivery sentence in the Member's panel (as pictured: "Delivery is ma
 - **Quiet notes** (not pictured): unreadable contracts, an unsaved delivery and a Request closed or expired since the Pledge each get one dim line, never an error banner.
 - **Board:** no new control; the bar and the line counts read the stored deliveries.
 
-Delete this folder and the story when the last ticket that links it closes.
+### Deviations in compose step 2 (issue #3810)
+
+Built as `pages-communities--requests-compose-recipients` (and `-phone`); the shape is the picture's: intro line with the day's count, a bordered list of label rows (checkbox, name, "Shares N of these blueprints" at the right, 44px touch rows), Back on the left, "Post request and mail N Members" on the right. Where it differs:
+
+- **Sample data:** the story shows the sample Community's eight other Members, not four; the two sharing a matching blueprint are pre-ticked.
+- **Matching:** "Shares N of these blueprints" counts the Request's blueprint lines the Member shares (a copy line is met by a copy or an original; an original line only by a shared original). Plain item lines match nobody, so a Request of only items pre-ticks nobody. Sharers come first, then the rest by name.
+- **Nobody ticked:** the button reads "Post request" and posts without mail (the picture only shows the ticked case).
+- **Not pictured, added:** a permission note (Grant permission) with the boxes disabled while the Character lacks the send-mail permission; a one-line note when more are ticked than the day has mails left, or none are left; a warning when what Members share could not be read.
+- **After posting with mail:** the dialog stays open and lists each recipient with a text result (Mailed, refused, not confirmed, daily limit), then Done. Not pictured.
+- **Nav badge:** the Communities item carries a count of new Requests (the rail's existing badge, `NavItem`); it has no picture.
+
+### Deviations in the Request filters build (issue #3811)
+
+The I can fill chip, the Distance select and the Message button are built (`pages-communities--requests-board`, `-can-fill`, `-nearby`, `-no-location-grant`, `-panel-as-member`). Where they differ from the pictures:
+
+- **Filter row:** chips and select are the pictured controls in the pictured order (`FilterChip` Open, Mine, I can fill with the pictured tooltip; `NativeSelect` Any distance, Within 5, 10, 20 jumps). On a phone the select sits beside Mine and I can fill on the second row where the picture wraps it to a third, because the chips are narrower in the sample (counts of one digit).
+- **Disabled and failed states** are not pictured: Distance is disabled with a line under the row saying why (the location Permission is missing, with the Grant link, or the pilot's location is unknown); I can fill is disabled with a tooltip when the Member's shared blueprints could not be read. Under a limit, a line says how many Requests with no place the app can measure from are left out.
+- **Location is picked in compose** (a suggestion list under the field, a line saying whether the text can be measured); the compose pictures have a plain field.
+- **Message button:** at the foot of the panel as pictured, with the Pledge note above it (#3808) but no delivery sentence (#3809) and, without the Open in EVE Permission, a line with the Grant link beside it. The label ends in an ellipsis as pictured.
+- **Sample data:** the second Request's place is "Domain (region)", not the picture's "Amarr (region)", since Amarr is a system and the board reads a region by its real name. I can fill counts 1, not 2: the sample pilot shares one blueprint a Request asks for.
+
+### Deviations in the cleanup build (issue #3812): the admin's removal
+
+Not pictured; added to the panel screen for the Community admin only (decision `20261015-005522-community-request-admin-removal-and-expiry-grace.md`, story `pages-communities--requests-panel-as-admin`, with a `-phone` twin).
+
+- **Side panel:** below the Message button, a **Pledges on this request** list (name, "N lines", **Remove…** with the Pledger's name in its accessible label), then **Remove request…** as a danger button, each behind a `ConfirmDialog` naming what goes. Names come from the Members list; a Pledger who has since left reads "Former Member". A failed removal keeps the dialog open with the shared "That did not work. Try again." line. The panel for the requester and for a plain Member, and the whole board, are as pictured: there is no row menu (one action does not earn a ⋮, DESIGN.md §6c).
+
+### Deviations in Ask to copy (issue #3813)
+
+Compose opens as pictured (`compose-lines`, `compose-recipients`), as stories `pages-communities--ask-to-copy-compose`, `-compose-phone`, `-recipients` and `-pick-community`, where the page behind is the Communities page (the real thing opens over BPC Sourcing). Where it differs from the pictures:
+
+- **Pre-filled line:** one line, "Rifter Blueprint" as a Blueprint copy, quantity 1, Runs/ME/TE empty; location and terms empty. The pictures show a pasted pile.
+- **Step 2:** the holder is ticked, with any Member sharing a matching blueprint, as in the picture.
+- **Community choice (not pictured):** when the holder shares the blueprint in several Communities, a small dialog (select and Continue) comes first. One Community goes straight to compose.
+- **Roster failure (not pictured):** a dialog with the failure in words and Close.
+- **Ask to copy row** (`ask-to-copy-row-1440.png`, `-390.png`; story `bpccontracts-communityoffercell--rows`): the Item cell of a Community Offer row, "ask <name> to copy…" as an accent inline link beside the community chip (ask, a copy's "from <name>", a reaction formula's plain text, a stale library). The cell is its own component (`CommunityOfferCell`) so it can be pictured: a whole BPC Sourcing page story needs the contracts snapshot (Firestore), the SDE and an ESI character, which is too large a fixture. The mockup itself has no BPC Sourcing screen.
+
+Kept after the tickets closed at the owner's request; delete per docs/design/mockups/README.md step 9 when no longer needed.
