@@ -31,7 +31,7 @@ import { CommunitySharedPlans } from './CommunitySharedPlans';
 import { isOpenRequest } from '@/engine/communities/requests';
 import { isContentTab, type CommunityTab, type ContentTab } from './communityTabs';
 import { RequestsTab } from './RequestsTab';
-import { markRequestsSeen } from './requestBadge';
+import { markRequestsSeen, watchRequestsViewed } from './requestBadge';
 import { useCommunityRequests } from './useCommunityRequests';
 import { CommunityMemberList } from './CommunityMemberList';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -122,9 +122,19 @@ export function CommunityDetail({
   const openRequests = board.requests?.filter((r) => isOpenRequest(r, now)).length;
   // Looking at the Requests tab is what makes them not new for the Communities nav badge.
   const requestsShown = tab === 'requests' && board.requests !== null;
+  // Again whenever the board changes while shown: a Request that arrives under the viewer is seen.
+  const shownRequests = requestsShown ? board.requests : null;
   useEffect(() => {
-    if (requestsShown) void markRequestsSeen(characterId, community.id).catch(() => undefined);
-  }, [requestsShown, characterId, community.id]);
+    if (!requestsShown) return;
+    const unwatch = watchRequestsViewed(community.id);
+    return unwatch;
+  }, [requestsShown, community.id]);
+  useEffect(() => {
+    if (shownRequests === null) return;
+    markRequestsSeen(characterId, community.id).catch((err) =>
+      console.warn('Requests could not be marked seen', err)
+    );
+  }, [shownRequests, characterId, community.id]);
   const manageMenu = useOpenAfterMenu();
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
 

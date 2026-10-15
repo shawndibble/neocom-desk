@@ -61,8 +61,30 @@ export const useNewRequestCount = () =>
     () => 0
   );
 
+/**
+ * Counts the resets: a refresh that began before a change of Character must
+ * not publish that Character's count over the new one.
+ */
+let generation = 0;
+
 /** Forgets the count, for a change of active Character. */
-export const resetRequestBadge = () => publish(new Map());
+export function resetRequestBadge() {
+  generation += 1;
+  publish(new Map());
+}
+
+/** Communities whose Requests tab is on screen right now: what arrives there is seen, not new. */
+const viewed = new Map<string, number>();
+
+/** The Requests tab of a Community is shown until the returned function is called. */
+export function watchRequestsViewed(communityId: string): () => void {
+  viewed.set(communityId, (viewed.get(communityId) ?? 0) + 1);
+  return () => {
+    const left = (viewed.get(communityId) ?? 1) - 1;
+    if (left <= 0) viewed.delete(communityId);
+    else viewed.set(communityId, left);
+  };
+}
 
 /** The pilot is looking at this Community's Requests: nothing in it is new any more. */
 export async function markRequestsSeen(
@@ -75,7 +97,7 @@ export async function markRequestsSeen(
   if (counts.get(communityId)) publish(new Map(counts).set(communityId, 0));
 }
 
-/** Rereads every Community's board and republishes the count. Quietly does nothing it cannot do. */
+/** Rereads every Community's board and republishes the count. Does nothing it cannot do. */
 export async function refreshRequestBadge(characterId: number, now = Date.now()): Promise<void> {
   if (communityBackendOverride()) return;
   if ((await db.settings.get(watchKey(characterId)))?.value !== true) return;
@@ -87,8 +109,14 @@ export async function refreshRequestBadge(characterId: number, now = Date.now())
   ]);
   const myUid = uidForCharacter(characterId);
   if (getSyncAuth().currentUser?.uid !== myUid) return;
+  const started = generation;
   const next = new Map<string, number>();
   for (const community of await store.loadMyCommunities(characterId)) {
+    if (viewed.has(community.id)) {
+      // Being looked at: Requests that arrive now are seen, not new.
+      await db.settings.put({ key: seenKey(characterId, community.id), value: now });
+      continue;
+    }
     const seen = (await db.settings.get(seenKey(characterId, community.id)))?.value;
     if (typeof seen !== 'number') {
       await db.settings.put({ key: seenKey(characterId, community.id), value: now });
@@ -98,7 +126,8 @@ export async function refreshRequestBadge(characterId: number, now = Date.now())
     const fresh = countNewRequests(board, myUid, seen, now);
     if (fresh > 0) next.set(community.id, fresh);
   }
-  publish(next);
+  // The Character changed while this read was in flight: its count is not the new one's.
+  if (started === generation) publish(next);
 }
 
 /** Mounted once in the shell: reads at start, then on an interval and when the tab is shown again. */
@@ -107,7 +136,10 @@ export function useRequestBadgePoll() {
   useEffect(() => {
     resetRequestBadge();
     if (characterId === null) return;
-    const refresh = () => void refreshRequestBadge(characterId).catch(() => undefined);
+    const refresh = () =>
+      void refreshRequestBadge(characterId).catch((err) =>
+        console.warn('Request badge could not be refreshed', err)
+      );
     refresh();
     const timer = setInterval(refresh, REQUEST_BADGE_POLL_MS);
     const onVisible = () => {

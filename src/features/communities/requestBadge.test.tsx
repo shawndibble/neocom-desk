@@ -18,6 +18,7 @@ import {
   rememberCommunityWatch,
   resetRequestBadge,
   useNewRequestCount,
+  watchRequestsViewed,
 } from './requestBadge';
 
 const DAY = 86_400_000;
@@ -97,5 +98,35 @@ describe('Communities nav badge', () => {
     auth.uid = 'char:77';
     await refreshRequestBadge(1, NOW);
     expect(store.loadMyCommunities).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a refresh that began before a change of Character', async () => {
+    await rememberCommunityWatch(1, [community('c1')]);
+    const { result } = renderHook(() => useNewRequestCount());
+    await refreshRequestBadge(1, NOW);
+    let release: () => void = () => undefined;
+    requestStore.loadRequests.mockReturnValue(
+      new Promise((resolve) => {
+        release = () => resolve([request('c', { createdAt: NOW + 5 })]);
+      })
+    );
+    const pending = refreshRequestBadge(1, NOW + 10);
+    // Switch Character while that read is in flight.
+    await vi.waitFor(() => expect(requestStore.loadRequests).toHaveBeenCalledTimes(1));
+    act(() => resetRequestBadge());
+    release();
+    await act(() => pending);
+    expect(result.current).toBe(0);
+  });
+
+  it('counts nothing new in a Community whose Requests tab is on screen', async () => {
+    await rememberCommunityWatch(1, [community('c1'), community('c2')]);
+    const { result } = renderHook(() => useNewRequestCount());
+    await refreshRequestBadge(1, NOW);
+    const unwatch = watchRequestsViewed('c1');
+    requestStore.loadRequests.mockResolvedValue([request('c', { createdAt: NOW + 5 })]);
+    await act(() => refreshRequestBadge(1, NOW + 10));
+    expect(result.current).toBe(1);
+    unwatch();
   });
 });
