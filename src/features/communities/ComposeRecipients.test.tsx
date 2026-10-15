@@ -54,7 +54,7 @@ function renderDialog(over: Partial<React.ComponentProps<typeof ComposeRequestDi
       communityId="c1"
       myUid="char:1"
       members={MEMBERS}
-      prefill={{ lines: LINES, location: 'Efa' }}
+      prefill={{ lines: LINES }}
       onClose={onClose}
       onPosted={onPosted}
       {...over}
@@ -120,6 +120,7 @@ describe('Compose step 2: who to mail', () => {
   it('posts first, then sends one mail covering every line to each ticked Member', async () => {
     const user = userEvent.setup();
     const { onPosted, onClose } = renderDialog();
+    await user.type(screen.getByLabelText('Location (optional)'), 'Efa');
     const list = await toStep2(user);
     await user.click(within(list).getByRole('checkbox', { name: /Cael Ito/ }));
     await user.click(screen.getByRole('button', { name: 'Post request and mail 2 Members' }));

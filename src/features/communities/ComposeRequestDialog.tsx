@@ -39,15 +39,13 @@ import { postRequest } from './requestStore';
 import { namedLike, needleOf } from './shareLists';
 
 /**
- * What a caller may start the dialog with (issue #3810; the Library's "Request
- * this" of #3813 uses it): lines and text already filled in, and Members
+ * What a caller may start the dialog with (issue #3810; Ask to copy of #3813
+ * uses it): lines already filled in, and Members
  * (by uid) already ticked on step 2 on top of the ones who share a matching
  * blueprint.
  */
 export interface ComposePrefill {
   lines?: readonly RequestLine[];
-  location?: string;
-  terms?: string;
   tickedUids?: readonly string[];
 }
 
@@ -136,8 +134,8 @@ export function ComposeRequestDialog({
 }) {
   const { t } = useTranslation();
   const id = useId();
-  const [location, setLocation] = useState(prefill?.location ?? '');
-  const [terms, setTerms] = useState(prefill?.terms ?? '');
+  const [location, setLocation] = useState('');
+  const [terms, setTerms] = useState('');
   const [text, setText] = useState('');
   const [added, setAdded] = useState<RequestLine[]>(
     () => mergeLines([], prefill?.lines ?? []).lines
