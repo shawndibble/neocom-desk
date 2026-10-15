@@ -205,7 +205,16 @@ const feedsAt = (now: number): Feeds => {
       missingCharacterNames: [],
     }),
     contracts: ok({
-      summary: { inProgress: 1, exchanges: 1, dueSoon: 0, overdue: 0, soonest: null, items: [] },
+      summary: {
+        inProgress: 1,
+        exchanges: 1,
+        outstanding: 1,
+        dueSoon: 0,
+        overdue: 0,
+        soonest: null,
+        items: [],
+        rows: [],
+      },
       route: null,
       needsReauth: false,
       fetchedAt: fetched(9),

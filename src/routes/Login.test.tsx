@@ -273,7 +273,7 @@ describe('Login', () => {
     ]) {
       expect(await preview.findByRole('region', { name: title })).toBeInTheDocument();
     }
-    expect(preview.getByText('Nothing due')).toBeInTheDocument();
+    expect(preview.getByText('1 outstanding')).toBeInTheDocument();
     expect(preview.getByRole('button', { name: /data updated/i })).toBeInTheDocument();
 
     // The fixed board is gone: no summary strip cells, no folded alerts row.
