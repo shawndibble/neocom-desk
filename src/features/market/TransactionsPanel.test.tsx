@@ -302,6 +302,24 @@ describe('TransactionsPanel — margin', () => {
     const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
     expect(marginCell(row)).toHaveTextContent('—');
   });
+
+  it('rolls the margin up by item, leaving an uncovered item unranked, and a click sets only the search', async () => {
+    load([taxFor(2, -49_766.4), taxFor(3, -100)]);
+    renderPanel();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /By item/ }));
+    const table = screen.getByRole('table', { name: 'By item' });
+    const dcu = within(table).getByRole('row', { name: /Damage Control II/ });
+    expect(dcu).toHaveTextContent('+132,634');
+    expect(within(table).getByRole('row', { name: /Tritanium/ })).toHaveTextContent('—');
+
+    await user.click(dcu);
+    expect(screen.getByPlaceholderText(/Search item/)).toHaveValue('Damage Control II');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search').textContent).toMatch(/^\?txn\.q=Damage/)
+    );
+    expect(screen.getByTestId('location-search').textContent).not.toMatch(/txn\.(side|start|end)/);
+  });
 });
 
 describe('TransactionsPanel — phone', () => {
