@@ -32,7 +32,7 @@ import { rowVolume } from '@/engine/industry/materialVolume';
 import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
 import { formatVolume } from './format';
@@ -591,7 +591,7 @@ function SwapButton({
       </Tooltip>
       {savings !== null && (
         <span className="text-[0.6875rem] text-success tabular-nums">
-          {t('industry.errands.saves', { amount: formatIsk(savings) })}
+          {t('industry.errands.saves', { amount: formatIskCompact(savings) })}
         </span>
       )}
       {kind === 'build' && skillGate?.gated && nameForCharacter && nameForSkill && (
@@ -856,7 +856,7 @@ export function MaterialsTable({
           {/* What this build is worth, in the same green its heading uses. */}
           {savings !== null && (
             <span className="text-[0.6875rem] text-success tabular-nums">
-              {t('industry.errands.savesVsBuying', { amount: formatIsk(savings) })}
+              {t('industry.errands.savesVsBuying', { amount: formatIskCompact(savings) })}
             </span>
           )}
           {onShowRecipe && (
@@ -1233,7 +1233,7 @@ export function MaterialsTable({
         {extra}
         {saved > 0 && (
           <span className="text-[0.6875rem] font-semibold text-success tabular-nums">
-            {t('industry.errands.saves', { amount: formatIsk(saved) })}
+            {t('industry.errands.saves', { amount: formatIskCompact(saved) })}
           </span>
         )}
         {errand === 'have' && !haveOpen ? (
@@ -1315,7 +1315,7 @@ export function MaterialsTable({
           {building ? (
             savings !== null ? (
               <span className="ml-auto text-xs text-success tabular-nums">
-                {t('industry.errands.saves', { amount: formatIsk(savings) })}
+                {t('industry.errands.saves', { amount: formatIskCompact(savings) })}
               </span>
             ) : (
               material.unpriced && renderPrice(material)
