@@ -58,6 +58,11 @@ export const liveSources: SnapshotSources = {
     ]);
     // A permission revoked since the grant check: the cached copy is not today's number.
     if (wallet.needsReauth || assets.needsReauth || orders.needsReauth) return null;
+    // A stale copy (the live call failed, e.g. offline) is not today's number, and a
+    // complete row is final for the day — it would freeze days-old figures and sync them.
+    if (wallet.cached?.fromCache || assets.cached?.fromCache || orders.cached?.fromCache) {
+      return null;
+    }
     const hubId = await hubIdSetting();
     const assetList = assets.cached?.data ?? null;
     const typeIds = [...new Set((assetList ?? []).map((a) => a.type_id))].filter(
@@ -67,6 +72,11 @@ export const liveSources: SnapshotSources = {
       getHubPrices(getTradeHub(hubId) ?? DEFAULT_TRADE_HUB, typeIds),
       getAveragePriceByType(),
     ]);
+    // The hub answered with no sell price for any asset: its prices are down, and
+    // the averages alone would freeze a different valuation into the day.
+    if (typeIds.length > 0 && typeIds.every((id) => hubPrices.get(id)?.sellMin == null)) {
+      return null;
+    }
     // Hub sell price where the hub trades the item, the average otherwise.
     const priceByTypeId = new Map<number, number>();
     for (const id of typeIds) {

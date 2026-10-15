@@ -349,9 +349,49 @@ describe('Settings', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
+    // Asks first: nothing is cleared until the dialog is confirmed.
+    const dialog = await screen.findByRole('dialog', { name: /clear cached esi data\?/i });
+    expect(await db.esiCache.count()).toBe(1);
+    expect(within(dialog).queryByText(/only copy you have/i)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Clear cache' }));
 
     expect(await screen.findByText(/cache cleared/i)).toBeInTheDocument();
     expect(await db.esiCache.count()).toBe(0);
+  });
+
+  it('keeps cached ESI data when the clear is cancelled', async () => {
+    const user = userEvent.setup();
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'skills',
+      value: { total_sp: 1 },
+      fetchedAt: 1,
+    });
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
+    const dialog = await screen.findByRole('dialog', { name: /clear cached esi data\?/i });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(await db.esiCache.count()).toBe(1);
+  });
+
+  it('warns that the cache is the only copy when clearing it offline', async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    onTestFinished(() => {
+      Reflect.deleteProperty(navigator, 'onLine');
+    });
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
+    const dialog = await screen.findByRole('dialog', { name: /clear cached esi data\?/i });
+
+    expect(within(dialog).getByText(/only copy you have/i)).toBeInTheDocument();
   });
 
   it('Data Age tab shows an empty state when nothing has succeeded yet', async () => {

@@ -2,12 +2,28 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import {
+  liveSources,
   recordAllNetWorthSnapshots,
   recordNetWorthSnapshot,
   type SnapshotSources,
 } from './recordSnapshots';
 
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn() }));
+
+const mocks = vi.hoisted(() => ({
+  wallet: vi.fn(),
+  assets: vi.fn(),
+  orders: vi.fn(),
+  hubPrices: vi.fn(),
+  averages: vi.fn(),
+}));
+vi.mock('@/features/character/wallet', () => ({ loadWalletBalanceWithStatus: mocks.wallet }));
+vi.mock('@/features/character/assets', () => ({ loadCharacterAssets: mocks.assets }));
+vi.mock('@/features/character/orders', () => ({ loadOrders: mocks.orders }));
+vi.mock('@/market/prices', () => ({
+  getHubPrices: mocks.hubPrices,
+  getAveragePriceByType: mocks.averages,
+}));
 
 const DAY1 = Date.UTC(2026, 9, 7, 8);
 const DAY1_LATER = Date.UTC(2026, 9, 7, 22);
@@ -140,5 +156,49 @@ describe('recordAllNetWorthSnapshots', () => {
     ] as never);
     await recordAllNetWorthSnapshots(sourcesWith().sources, DAY1);
     expect((await db.netWorthSnapshots.toArray()).map((r) => r.characterId).sort()).toEqual([1, 2]);
+  });
+});
+
+describe('liveSources.fetch', () => {
+  const fresh = <T>(data: T) => ({
+    cached: { data, fetchedAt: new Date(DAY1), fromCache: false, truncated: false },
+    needsReauth: false,
+  });
+  const stale = <T>(data: T) => ({
+    cached: { data, fetchedAt: new Date(DAY1 - 3 * 86_400_000), fromCache: true, truncated: false },
+    needsReauth: false,
+  });
+
+  beforeEach(async () => {
+    const { REQUIRED_SCOPES } = await import('./recordSnapshots');
+    await db.tokens.clear();
+    await db.tokens.put({ characterId: 1, scopes: REQUIRED_SCOPES } as never);
+    mocks.wallet.mockResolvedValue(fresh(100));
+    mocks.assets.mockResolvedValue(fresh([{ item_id: 1, type_id: 34, quantity: 2 }]));
+    mocks.orders.mockResolvedValue(fresh([]));
+    mocks.hubPrices.mockResolvedValue(new Map([[34, { sellMin: 5 }]]));
+    mocks.averages.mockResolvedValue(new Map());
+  });
+
+  it('returns the figures when every source answered live', async () => {
+    expect(await liveSources.fetch(1)).toMatchObject({ wallet: 100 });
+  });
+
+  it.each([
+    ['wallet', () => mocks.wallet.mockResolvedValue(stale(100))],
+    [
+      'assets',
+      () => mocks.assets.mockResolvedValue(stale([{ item_id: 1, type_id: 34, quantity: 2 }])),
+    ],
+    ['orders', () => mocks.orders.mockResolvedValue(stale([]))],
+  ])('records nothing when the %s came from the cache', async (_name, degrade) => {
+    degrade();
+    expect(await liveSources.fetch(1)).toBeNull();
+  });
+
+  it('records nothing when no hub price came back, even with average prices on hand', async () => {
+    mocks.hubPrices.mockResolvedValue(new Map([[34, { sellMin: null }]]));
+    mocks.averages.mockResolvedValue(new Map([[34, 4]]));
+    expect(await liveSources.fetch(1)).toBeNull();
   });
 });

@@ -98,6 +98,8 @@ import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
 import { PermissionsPanel } from '@/features/permissions/PermissionsPanel';
 import { db } from '@/db';
+import { ConfirmDialog } from '@/features/communities/ConfirmDialog';
+import { useOnline } from '@/stores/network';
 import { exportBackupToFile, importBackup, type ImportSummary } from '@/backup/io';
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
@@ -549,6 +551,8 @@ function ImportPanel() {
 function DataPanel() {
   const { t } = useTranslation();
   const [clearedConfirm, setClearedConfirm] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const online = useOnline();
 
   async function handleClearCache() {
     // Blunt on purpose, matching `esi/cachePurge.ts`'s own tier-2 fallback:
@@ -563,9 +567,17 @@ function DataPanel() {
     <Panel title={t('settings.dataTitle')}>
       <div className="space-y-2">
         <p className="max-w-2xl text-xs text-text-dim">{t('settings.dataHint')}</p>
-        <Button size="sm" onClick={() => void handleClearCache()}>
+        <Button size="sm" onClick={() => setConfirmingClear(true)}>
           {t('settings.clearCache')}
         </Button>
+        <ConfirmDialog
+          open={confirmingClear}
+          title={t('settings.clearCacheTitle')}
+          body={`${t('settings.clearCacheBody')}${online ? '' : ` ${t('settings.clearCacheOfflineBody')}`}`}
+          actionLabel={t('settings.clearCacheAction')}
+          onConfirm={handleClearCache}
+          onClose={() => setConfirmingClear(false)}
+        />
         {clearedConfirm && <ActionConfirmation message={t('settings.clearCacheConfirm')} />}
         <ResetViewPreferences />
       </div>
