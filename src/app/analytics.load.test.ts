@@ -114,6 +114,15 @@ describe('trackPageView privacy', () => {
     expect(params.page_location).toBe('https://neocomdesk.com/market/browser');
   });
 
+  it('reports the route pattern, not a Share Link id', async () => {
+    stubLocation('https://neocomdesk.com', '/s/abc234', 'https://neocomdesk.com/s/abc234');
+    const { trackPageView } = await import('./analytics');
+    await trackPageView('/*');
+    const params = firebaseAnalytics.logEvent.mock.calls[0][2] as Record<string, unknown>;
+    expect(params.page_location).toBe('https://neocomdesk.com/*');
+    expect(JSON.stringify(Object.values(params))).not.toContain('abc234');
+  });
+
   it('keeps the root path', async () => {
     const params = await pageLocationFor(
       'https://neocomdesk.com',

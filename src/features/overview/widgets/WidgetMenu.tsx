@@ -7,6 +7,9 @@
  * menu has closed (a text field inside a Radix menu loses keystrokes to its
  * typeahead, and docs/DESIGN.md §6c "Menu item that opens a dialog" fixes the
  * focus order). Esc, outside click and focus return come from the primitive.
+ *
+ * `inert` is the signed-out landing page's demo: the same menu over a layout
+ * whose actions do nothing, where Rename must not open its dialog either.
  */
 import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -100,7 +103,7 @@ function RenameDialog({
   );
 }
 
-export function WidgetMenu({ widget }: { widget: Widget }) {
+export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: boolean }) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
@@ -116,7 +119,8 @@ export function WidgetMenu({ widget }: { widget: Widget }) {
 
   return (
     <>
-      <DropdownMenu>
+      {/* The demo scrolls the whole document, so a modal menu's scroll lock would hide the page scrollbar and shift the page. */}
+      <DropdownMenu modal={!inert}>
         <DropdownMenuTrigger asChild>
           <IconButton
             size="row"
@@ -175,7 +179,7 @@ export function WidgetMenu({ widget }: { widget: Widget }) {
             </>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => run(() => setRenaming(true))}>
+          <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>
             {t('overview.menu.rename')}
           </DropdownMenuItem>
           <DropdownMenuItem

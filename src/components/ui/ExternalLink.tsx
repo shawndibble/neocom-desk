@@ -25,10 +25,15 @@ export function ExternalMark({ className }: { className?: string }) {
   );
 }
 
-/** `inline` sits in a sentence (solid underline); `quiet` is a footer link (text colour, underline on hover). */
-export type ExternalLinkVariant = 'inline' | 'quiet';
+/**
+ * `inline` sits in a sentence (solid underline); `quiet` is a footer link (text
+ * colour, underline on hover); `bare` brings no look of its own, for a link
+ * dressed as a button or icon button by the caller's `className`.
+ */
+export type ExternalLinkVariant = 'inline' | 'quiet' | 'bare';
 
 const VARIANT_CLASS: Record<ExternalLinkVariant, string> = {
+  bare: '',
   inline: inlineLinkClassName,
   quiet: cx(
     'rounded-xs hover:text-text hover:underline underline-offset-2',
@@ -43,6 +48,12 @@ interface ExternalLinkProps extends Omit<
 > {
   href: string;
   variant?: ExternalLinkVariant;
+  /**
+   * `glyph` (default) ends with the external mark. `text` keeps only the
+   * screen-reader "(opens in a new tab)", for an icon-only link whose own icon
+   * is the whole visible label.
+   */
+  mark?: 'glyph' | 'text';
   children?: ReactNode;
 }
 
@@ -55,10 +66,12 @@ interface ExternalLinkProps extends Omit<
 export function ExternalLink({
   href,
   variant = 'inline',
+  mark = 'glyph',
   className,
   children,
   ...anchorProps
 }: ExternalLinkProps) {
+  const { t } = useTranslation();
   return (
     <a
       {...anchorProps}
@@ -68,7 +81,11 @@ export function ExternalLink({
       className={cx(VARIANT_CLASS[variant], className)}
     >
       {children}
-      <ExternalMark />
+      {mark === 'glyph' ? (
+        <ExternalMark />
+      ) : (
+        <span className="sr-only">{t('common.opensInNewTab')}</span>
+      )}
     </a>
   );
 }

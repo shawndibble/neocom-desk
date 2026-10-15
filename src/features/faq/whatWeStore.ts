@@ -15,6 +15,13 @@
  * it is added here too. See the scope decision recorded alongside this
  * feature.
  *
+ * Shared Community data is a third group: it lives in its own Firestore
+ * collections under `communities/{id}` (ADR 0018, 0021), not in the per-
+ * Character registry, so it has its own typed map
+ * ({@link COMMUNITY_COLLECTION_FAQ_ITEM}) and `FaqPanel.test.tsx` checks it
+ * against `firestore.rules`: a collection added there fails the test until it
+ * is mapped to a line here.
+ *
  * Deliberately honest about the four places where something EVE-derived, or
  * anything at all, does leave the device, because a section that overclaimed
  * would be worth less than one that did not exist: Notification Feed rows
@@ -58,15 +65,54 @@ export interface WhatWeStoreGroup {
   items: readonly WhatWeStoreItem[];
 }
 
+/** A line in the Communities group: the Firestore collections below point at these. */
+export type CommunityFaqItemId =
+  'membership' | 'blueprints' | 'fittings' | 'plans' | 'requests' | 'pledges' | 'mail';
+
 /**
- * Two groups, in the order that answers the question a reader actually
- * arrives with: what leaves this device, and what does not.
+ * Every collection Communities keep on the server, and the "What do Communities
+ * share?" line that tells the pilot about it. `members`, `library`, `requests`
+ * (Join Requests), `mailInvites`, `itemRequests`, `pledges`, `pledgeMails`,
+ * `fittings` and `skillPlans` sit under `communities/{id}`; the last three sit
+ * under `characters/{uid}` and are bookkeeping (which Communities a Character is
+ * in, and the day's mail counts). Exhaustive on purpose.
+ */
+export const COMMUNITY_COLLECTION_FAQ_ITEM = {
+  members: 'membership',
+  library: 'blueprints',
+  requests: 'membership',
+  mailInvites: 'membership',
+  itemRequests: 'requests',
+  pledges: 'pledges',
+  pledgeMails: 'mail',
+  fittings: 'fittings',
+  skillPlans: 'plans',
+  communities: 'membership',
+  mailInviteQuota: 'mail',
+  requestMailQuota: 'mail',
+} as const satisfies Record<string, CommunityFaqItemId>;
+
+/** The Community lines, as the panel lists them. */
+const COMMUNITY_ITEMS: readonly (WhatWeStoreItem & { id: CommunityFaqItemId })[] = [
+  'membership',
+  'blueprints',
+  'fittings',
+  'plans',
+  'requests',
+  'pledges',
+  'mail',
+].map((id) => ({ id: id as CommunityFaqItemId, labelKey: `settings.faq.store.communities.${id}` }));
+
+/**
+ * Three groups, in the order that answers the question a reader actually
+ * arrives with: what leaves this device, what does not, and what other
+ * players can read once you join a Community.
  *
- * There is deliberately no third "never collected at all" group. A list of
+ * There is deliberately no "never collected at all" group. A list of
  * things we don't hold is unfalsifiable by the reader and unbounded by
  * nature — it invites padding, and it reads as protesting rather than
- * answering. What the two groups above account for is the whole of what
- * exists; anything absent from both is absent because it is not stored.
+ * answering. What the groups above account for is the whole of what
+ * exists; anything absent from all is absent because it is not stored.
  */
 export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
   {
@@ -128,6 +174,12 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
       { id: 'ansiblex', labelKey: 'settings.faq.store.local.ansiblex' },
     ],
   },
+  {
+    id: 'communities',
+    titleKey: 'settings.faq.store.communities.title',
+    descriptionKey: 'settings.faq.store.communities.description',
+    items: COMMUNITY_ITEMS,
+  },
 ];
 
 /** One line of the retention answer: what is kept, and for how long. */
@@ -148,7 +200,10 @@ export interface RetentionGroup {
  * the store groups above, a user-facing commitment: the numbers mirror the
  * code that enforces them (`engine/miningTax/ledgerHistory.ts`,
  * `esi/cachePrune.ts`, `features/notifications/feed.ts`, `sync/merge.ts`,
- * `functions/src/purgeStaleAccounts.ts`), so change one and change the other.
+ * `functions/src/purgeStaleAccounts.ts`, `functions/src/communityRequests.ts`,
+ * `features/share/shareStore.ts`),
+ * so change one and change the other (`FaqPanel.test.tsx` reads the numbers out
+ * of those functions files).
  */
 export const RETENTION_GROUPS: readonly RetentionGroup[] = [
   {
@@ -173,7 +228,16 @@ export const RETENTION_GROUPS: readonly RetentionGroup[] = [
   {
     id: 'server',
     titleKey: 'settings.faq.retention.server.title',
-    items: ['synced', 'deleted', 'alerts', 'push', 'idle'].map((id) => ({
+    items: [
+      'synced',
+      'deleted',
+      'alerts',
+      'push',
+      'community',
+      'communityRequests',
+      'shareLinks',
+      'idle',
+    ].map((id) => ({
       id,
       labelKey: `settings.faq.retention.server.${id}`,
       durationKey: `settings.faq.retention.server.${id}Kept`,
