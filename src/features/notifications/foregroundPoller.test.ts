@@ -108,7 +108,7 @@ function calendarEvent(overrides: Partial<CalendarEventSummary> = {}): CalendarE
 }
 
 /**
- * `walletDomain.load` (`pollDomains.ts`) now bakes the Character's threshold
+ * `walletDomain.load` (`pollDomains/`) now bakes the Character's threshold
  * onto each entry it returns, since `toSnapshot` is a pure passthrough for
  * this domain (the wallet-balance-threshold feature) — so this harness's fake
  * loader, which bypasses `load` entirely, must hand back entries already in
@@ -266,7 +266,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     eveNotification: loadEveNotifications,
     // Corp domains (issue #299) and spExtraction (grilling session,
     // 2026-09-09): no dedicated overrides here — their load/diff behaviour is
-    // covered in pollDomains.test.ts and notificationDiffs.test.ts, so a bare
+    // covered in pollDomains/index.test.ts and notificationDiffs.test.ts, so a bare
     // "nothing to fetch" default is enough to keep the generic delivery-loop
     // cases above from tripping over a later registry entry they know
     // nothing about. marketOrderUndercut (issue #1423) gets its own
@@ -974,7 +974,7 @@ describe('runForegroundPoll', () => {
 
   it('leaves the contract baseline untouched and fires nothing when the load is truncated', async () => {
     // The truncation guard itself (loadContracts returning null on a short
-    // page set) is pollDomains.test.ts's job; this is the other half of
+    // page set) is pollDomains/index.test.ts's job; this is the other half of
     // AC4 — that a null load actually skips the poll end to end, the same
     // property the skill-queue "ESI fetch fails" case above proves for its
     // own domain.

@@ -22,7 +22,7 @@ import {
 } from '@/engine/industry/autoMakeOrBuy';
 import { craftScope, reactionCraftEligible } from '@/engine/industry/craftScope';
 import type { MakeMethod, MaterialRecipe } from '@/engine/industry/makeOrBuy';
-import type { IndustryBlueprint } from '@/engine/industry/types';
+import type { IndustryBlueprint, SkillLevels } from '@/engine/industry/types';
 import { industryActivityOf } from '@/engine/industry/types';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
@@ -179,7 +179,13 @@ export async function applyGroupAutoBuild(
   /** BPC Sourcing rows (all regions) — narrowed to each member's own Trade Hub region. */
   bpcRows: readonly BpcContractRow[] = [],
   /** Community Offers (issue #3603): free Shared Blueprints, region-agnostic. */
-  communityRows: readonly BpcSearchRow[] = []
+  communityRows: readonly BpcSearchRow[] = [],
+  /**
+   * Account-wide trained skill levels: a material no listed character can
+   * install is forced to buy, the same gate a member's own page applies
+   * (`BuildPlanDetail`'s Auto Build). Absent = purely cost-based.
+   */
+  accountSkills?: ReadonlyMap<number, SkillLevels>
 ): Promise<Map<string, Set<number>>> {
   const members = plans.flatMap((plan) => {
     const member = resolveMember(plan, catalog);
@@ -218,7 +224,8 @@ export async function applyGroupAutoBuild(
         member.plan.id,
         autoBuildHere(blueprint, me, {
           recipeFor,
-          ctx,
+          // Same gate a member's own page applies (BuildPlanDetail applyAutoBuild).
+          ctx: { ...ctx, accountSkills },
           depth: options.depth,
           runs: member.plan.runs,
           scope: craftScope(industryActivityOf(blueprint), member.plan.includeReactions ?? false),

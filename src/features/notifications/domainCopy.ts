@@ -1,6 +1,6 @@
 /**
  * How each polled domain's Notification Events read (issue #1249): one copy
- * table per `pollDomains.ts` domain, carrying its live (poll) wording, its
+ * table per `pollDomains/` domain, carrying its live (poll) wording, its
  * hedged Scheduled Push wording where it projects any, and the row a fire is
  * about for click routing. Each event's Event Entry (`eventEntries.ts`, issue
  * #1285) names the table it reads and, if it projects, the push renderer; the
@@ -65,7 +65,7 @@ import {
 import { formatIsk } from '@/lib/isk';
 import { eveNotificationText, type EveNotificationNames } from './eveNotificationText';
 
-/** A domain's copy as `pollDomains.ts` consumes it; `push` is passed to its own `project*`. */
+/** A domain's copy as `pollDomains/` consumes it; `push` is passed to its own `project*`. */
 export interface DomainCopy<TFire, TNames> {
   /** Live wording for a fire the Foreground Poller observed. */
   readonly poll: (fire: TFire, characterName: string, names: TNames) => NotificationCopy;

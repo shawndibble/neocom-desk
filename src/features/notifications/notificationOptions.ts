@@ -177,7 +177,7 @@ const highlightRow: SubjectUrl = (base, subjectId) =>
  * (`domainCopy.ts`'s `subjectOf`, issue #1249); only the URL shape is here,
  * because the Service Worker (`pushHandler.ts`) and the bell panel build
  * URLs from a stored event id and must not import the poll registry.
- * `pollDomains.test.ts` pins the two to the same set of events.
+ * `pollDomains/index.test.ts` pins the two to the same set of events.
  */
 const SUBJECT_URLS: Partial<Record<NotificationEventId, SubjectUrl>> = {
   marketOrderFilled: highlightRow,

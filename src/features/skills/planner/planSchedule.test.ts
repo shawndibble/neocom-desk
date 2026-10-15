@@ -3,7 +3,8 @@ import { computeSkillPlanSchedule } from '@/engine/skillPlanSchedule';
 import type { Attributes, EngineSkill, PlanEntry } from '@/engine/types';
 import type { SkillCatalog } from '@/features/skills/skillMap';
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import { schedulePlan, type PlanScheduleInputs } from './planSchedule';
+import { schedulePlan, schedulePlanWith, type PlanScheduleInputs } from './planSchedule';
+import { DEFAULT_WHAT_IF_SELECTION } from './whatIfImplants';
 
 const A: EngineSkill = {
   typeID: 10,
@@ -121,5 +122,68 @@ describe('schedulePlan', () => {
     expect(s.totalSeconds).toBeGreaterThan(0);
     expect(s.scheduled).toHaveLength(1);
     expect(s.scheduled[0]).toMatchObject({ skillTypeID: 10, level: 2 });
+  });
+});
+
+describe('schedulePlanWith', () => {
+  // The schedule carries non-structural members; compare what the UI reads.
+  const view = (s: ReturnType<typeof schedulePlan>) =>
+    JSON.parse(
+      JSON.stringify({
+        totalSeconds: s.totalSeconds,
+        finish: s.finish,
+        scheduled: s.scheduled,
+        markersResult: s.markersResult,
+      })
+    );
+  const plan = {
+    entries: [entry(10, 2), entry(20, 2)],
+    markers: [1],
+    markerAttributes: [{ ...ATTRIBUTES, intelligence: 27 }],
+  };
+
+  it('with no override equals schedulePlan for the same inputs', () => {
+    expect(view(schedulePlanWith(plan, inputs(), NOW))).toEqual(
+      view(schedulePlan(plan, inputs(), NOW))
+    );
+    expect(view(schedulePlanWith(plan, inputs(), NOW, {}))).toEqual(
+      view(schedulePlan(plan, inputs(), NOW))
+    );
+  });
+
+  it("costs overridden entries and markers instead of the plan's own", () => {
+    const entries = [entry(20, 2), entry(10, 2)];
+    expect(view(schedulePlanWith(plan, inputs(), NOW, { entries, markers: [] }))).toEqual(
+      view(schedulePlan({ ...plan, entries, markers: [] }, inputs(), NOW))
+    );
+    expect(schedulePlanWith(plan, inputs(), NOW, { markers: [] }).totalSeconds).not.toBe(
+      schedulePlanWith(plan, inputs(), NOW).totalSeconds
+    );
+  });
+
+  it("does not carry the plan's markerAttributes when overridden to []", () => {
+    const cleared = schedulePlanWith(plan, inputs(), NOW, { markerAttributes: [] });
+    expect(view(cleared)).toEqual(
+      view(schedulePlan({ ...plan, markerAttributes: [] }, inputs(), NOW))
+    );
+    expect(cleared.totalSeconds).not.toBe(schedulePlanWith(plan, inputs(), NOW).totalSeconds);
+  });
+
+  it('overrides the what-if implants without touching the plan', () => {
+    const withImplants = {
+      ...plan,
+      whatIfImplants: {
+        kind: 'custom' as const,
+        bonuses: { intelligence: 0, memory: 0, perception: 0, willpower: 0, charisma: 0 },
+      },
+    };
+    const base = inputs({ implants: { intelligence: 4, memory: 4 } });
+    const got = schedulePlanWith(withImplants, base, NOW, {
+      whatIfImplants: DEFAULT_WHAT_IF_SELECTION,
+    });
+    expect(view(got)).toEqual(
+      view(schedulePlan({ ...withImplants, whatIfImplants: DEFAULT_WHAT_IF_SELECTION }, base, NOW))
+    );
+    expect(got.totalSeconds).not.toBe(schedulePlanWith(withImplants, base, NOW).totalSeconds);
   });
 });

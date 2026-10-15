@@ -5,7 +5,7 @@
  *
  * Opt-in and off by default: nobody who hasn't turned this on should get an
  * alert or a column for it, and the poller must not fetch skills data for
- * this reason alone when it's off (`pollDomains.ts`'s `spExtractionDomain`
+ * this reason alone when it's off (`pollDomains/`'s `spExtractionDomain`
  * checks the enabled flag inside its own `load`).
  *
  * Both synced, not device-local: "alert me at 500k spare SP" and "yes, do

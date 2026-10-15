@@ -8,7 +8,7 @@ import { localJumpDistances } from '@/features/route/localRoute';
 import { loadConstellationNames, loadIncursions } from '@/features/travel/incursionsData';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { notificationUrlForSubject } from './notificationOptions';
-import { incursionDomain } from './pollDomains';
+import { incursionDomain } from './pollDomains/incursions';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   useNotificationPreferences,

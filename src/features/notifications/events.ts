@@ -96,7 +96,7 @@ const CATALOG = [
   {
     // Opt-in behind sync.spExtractionMonitoringEnabled — the scope below
     // just gates whether the event can fire at all once a pilot turns
-    // monitoring on; `pollDomains.ts`'s spExtractionDomain checks the
+    // monitoring on; `pollDomains/`'s spExtractionDomain checks the
     // setting itself before ever fetching skills for this reason.
     id: 'spExtractionReady',
     labelKey: 'settings.notifications.event.spExtractionReady',

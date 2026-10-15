@@ -311,7 +311,7 @@ export function projectSkillQueue(
     // `characterNotTraining` above: this one still has queue behind it to
     // point to (`skillId`/`level`), and fires at `finishMs - endingLeadMs`
     // rather than at `finishMs` itself. `endingLeadMs` is absent when the
-    // Character has none baked onto this entry (`pollDomains.ts`'s
+    // Character has none baked onto this entry (`pollDomains/`'s
     // `skillQueueDomain.projection` always bakes the current one in before
     // calling this, so absence here only ever means "not yet observed").
     if (last.endingLeadMs !== undefined) {
@@ -482,7 +482,7 @@ export function projectColonies(
 /**
  * `courierDeliveryDue` (issue #1713): one row per accepted courier the
  * Character holds, at `deliveryDeadlineMs - dueLeadMs`. Both are already
- * baked into the entry (`pollDomains.ts`'s `contractDomain`), so this is pure
+ * baked into the entry (`pollDomains/`'s `contractDomain`), so this is pure
  * snapshot arithmetic. A contract without a derivable deadline projects
  * nothing — `courierDeliveryDeadlineMs` returned `null` for it upstream.
  */
@@ -540,7 +540,7 @@ export function projectContracts(
  * `ordersLapsing` (issue #3797): one batched row per batch of open orders
  * lapsing within `ORDER_BATCH_WINDOW_MS` of each other, at the batch's
  * soonest expiry minus the lead. Pure snapshot arithmetic: expiry and lead
- * are baked into the entries by `pollDomains.ts`'s `orderExpiryDomain`.
+ * are baked into the entries by `pollDomains/`'s `orderExpiryDomain`.
  */
 export function projectOrdersLapsing(
   characterId: number,
@@ -577,7 +577,7 @@ export function projectOrdersLapsing(
 
 /**
  * `cloneJumpReady` (issue #2316): one row at the jump-clone cooldown's end,
- * already baked into the entry (`pollDomains.ts`'s `cloneJumpDomain`). A
+ * already baked into the entry (`pollDomains/`'s `cloneJumpDomain`). A
  * Character who has never jumped has no entry, so projects nothing.
  */
 export function projectCloneJump(
@@ -636,7 +636,7 @@ export function projectCalendar(
 }
 
 /**
- * `entry.thresholdMs` is already baked in per entry at `pollDomains.ts`'s
+ * `entry.thresholdMs` is already baked in per entry at `pollDomains/`'s
  * `load()` time (the Character's current fuel lead time, read fresh every
  * poll) — pure snapshot arithmetic here, no preference lookup needed.
  */
@@ -688,7 +688,7 @@ export function projectStructureFuel(
 /**
  * The structure ids `projectEveNotificationReinforcementExit` will actually
  * put in a row's text, for a caller that has to resolve display names first
- * (`features/notifications/pollDomains.ts`'s `eveNotificationDomain`
+ * (`features/notifications/pollDomains/`'s `eveNotificationDomain`
  * projection — `src/engine` stays free of the ESI call that resolves a name,
  * per this module's own header). Runs the identical `reinforcementExitMs` +
  * `inHorizon` gate `projectEveNotificationReinforcementExit` runs, so an

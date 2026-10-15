@@ -86,7 +86,7 @@ import type {
   Translate,
 } from './types';
 
-/** The Contracts History table, unfiltered: the widget counts hauls and item exchanges, which no one status covers. */
+/** The Contracts History table, unfiltered: the widget counts hauls and outstanding contracts, which no one status covers. */
 export const CONTRACTS_HREF = '/contracts/history';
 
 // --- Which reads a kind needs ------------------------------------------------
@@ -514,10 +514,10 @@ const contracts: Builder = (feeds, { t, now }) => {
       tone: summary.inProgress > 0 ? 'watch' : 'clear',
     },
     {
-      key: 'exchanges',
-      title: t('overview.board.contractsExchangesTile'),
-      value: count(summary.exchanges),
-      tone: summary.exchanges > 0 ? 'watch' : 'clear',
+      key: 'outstanding',
+      title: t('overview.board.contractsOutstandingTile'),
+      value: count(summary.outstanding),
+      tone: summary.outstanding > 0 ? 'watch' : 'clear',
     },
     {
       key: 'dueSoon',
@@ -533,6 +533,23 @@ const contracts: Builder = (feeds, { t, now }) => {
     },
   ];
   const tone = contractsSeverity(data) ?? 'clear';
+  // Nothing is on a clock, so never say "Nothing due" beside a count of open offers: say when the first lapses.
+  const noClockSecondary = (): NumberSecondary => {
+    const nextOffer = summary.rows.find((row) => row.state === 'outstanding');
+    if (summary.inProgress > 0 && summary.outstanding > 0) {
+      return {
+        text: t('overview.widgets.contracts.outstandingCount', { count: summary.outstanding }),
+      };
+    }
+    if (nextOffer) {
+      return {
+        text: t('overview.widgets.contracts.outstandingExpires', {
+          duration: formatCountdown(Math.max(0, nextOffer.atMs - now) / 1000),
+        }),
+      };
+    }
+    return { text: t('overview.board.contractsNothingDue') };
+  };
   // The soonest clock leads; the hauls in flight are the one other fact. With no clock, the count itself leads.
   const number: NumberModel = soonest
     ? {
@@ -546,9 +563,13 @@ const contracts: Builder = (feeds, { t, now }) => {
         tone,
       }
     : {
-        value: count(summary.inProgress),
-        unit: t('overview.widgets.contracts.unit'),
-        secondary: { text: t('overview.board.contractsNothingDue') },
+        // Hauls lead; with none in flight, outstanding contracts are the fact worth a number, not a 0.
+        value: count(summary.inProgress === 0 ? summary.outstanding : summary.inProgress),
+        unit:
+          summary.inProgress === 0 && summary.outstanding > 0
+            ? t('overview.widgets.contracts.outstandingUnit')
+            : t('overview.widgets.contracts.unit'),
+        secondary: noClockSecondary(),
         tone,
       };
   return {
@@ -556,7 +577,7 @@ const contracts: Builder = (feeds, { t, now }) => {
     fetchedAt: data.fetchedAt,
     number,
     rows: list,
-    table: contractsTable(t, summary.items, data.routes, now),
+    table: contractsTable(t, summary.rows, data.routes, now),
     deadlines:
       soonest && note !== null
         ? [

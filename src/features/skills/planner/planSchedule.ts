@@ -91,6 +91,20 @@ export function schedulePlan(
   });
 }
 
+/**
+ * `schedulePlan` for a variant of `plan`: `override` replaces only the named
+ * plan fields (candidate entries/markers, a forced What-If lens), so callers
+ * costing a hypothetical share one inputs object and cannot drift from it.
+ */
+export function schedulePlanWith(
+  plan: SchedulablePlan,
+  inputs: PlanScheduleInputs,
+  nowMs: number,
+  override: Partial<SchedulablePlan> = {}
+): SkillPlanSchedule {
+  return schedulePlan({ ...plan, ...override }, inputs, nowMs);
+}
+
 /** Everything `schedulePlan` needs for one Character, read from ESI's cache and Dexie. */
 export async function loadPlanScheduleInputs(
   characterId: number,

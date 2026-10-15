@@ -1848,7 +1848,7 @@ function undercutEntry(
 }
 
 /**
- * One poll's stored snapshot, built the same way `pollDomains.ts`'s
+ * One poll's stored snapshot, built the same way `pollDomains/`'s
  * `marketOrderUndercutDomain.toSnapshot` builds it — every entry threaded
  * through `buildOrderUndercutEntry` against the PREVIOUS poll's own stored
  * snapshot. Chaining this across several calls (poll1 -> poll2, then poll2's

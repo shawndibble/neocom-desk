@@ -26,16 +26,13 @@ import type { ShipAssetItem } from '@/engine/fittings/assetShipMapper';
 import { findShips, type OwnedAsset, type ShipRow } from '@/engine/myShips';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { loadOtherCharactersAssets } from './assets';
 import { loadCharacterSolarSystemId } from './location';
-import { loadStationName, loadStationSystemId } from './stations';
-import { loadStructureName, loadStructureSystemId } from './structures';
-import { loadSystemName, loadSystemSecurity } from './systemSecurity';
+import { placeKey, usePlaceDetails } from '@/features/places';
 import { loadGroupNames } from '@/features/market/groupNames';
 import { JumpsAwayText, SecurityValue } from './assetBrowserRows';
-import { jumpsBetween, type JumpBasis } from '@/features/route/jumpBasis';
+import type { JumpBasis } from '@/features/route/jumpBasis';
 
 /** SDE category 6. */
 const SHIP_CATEGORY_ID = 6;
@@ -105,101 +102,48 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
   };
 }
 
-interface ResolvedPlace {
-  name: string | null;
-  systemId: number | null;
-}
-
-async function resolvePlace(row: ShipRow): Promise<ResolvedPlace> {
-  const { locationId, locationType, characterId } = row;
-  if (locationType === 'station') {
-    return {
-      name: await loadStationName(locationId),
-      systemId: await loadStationSystemId(locationId),
-    };
-  }
-  if (locationType === 'solar_system') {
-    return { name: await loadSystemName(locationId), systemId: locationId };
-  }
-  // A structure: `other`, or the parent of an item ESI never returned as an asset.
+/** The kind a ship's location resolves under: a station, a system, else a structure (`other`, or the parent of an item ESI never returned as an asset). */
+function placeRefOf(row: ShipRow) {
   return {
-    name: await loadStructureName(characterId, locationId),
-    systemId: await loadStructureSystemId(characterId, locationId),
+    locationId: row.locationId,
+    characterId: row.characterId,
+    kind:
+      row.locationType === 'station' || row.locationType === 'solar_system'
+        ? row.locationType
+        : ('structure' as const),
   };
 }
-
-interface Places {
-  names: ReadonlyMap<string, string | null>;
-  security: ReadonlyMap<number, number | null>;
-  jumps: ReadonlyMap<string, JumpsAwayResult>;
-}
-
-const NO_PLACES: Places = { names: new Map(), security: new Map(), jumps: new Map() };
-
-const placeKey = (row: Pick<ShipRow, 'characterId' | 'locationId'>) =>
-  `${row.characterId}:${row.locationId}`;
 
 /**
  * Names, security and jumps for every distinct place the ships sit in. Best
  * effort: each lands as it resolves and the list never waits on them.
  */
-function usePlaces(
-  rows: readonly ShipRow[],
-  activeCharacterId: number | null,
-  route: JumpBasis
-): { places: Places; systemOf: ReadonlyMap<string, number | null> } {
-  const [places, setPlaces] = useState<Places>(NO_PLACES);
-  const [systemOf, setSystemOf] = useState<ReadonlyMap<string, number | null>>(new Map());
-  const routeKey = route.key;
+function usePlaces(rows: readonly ShipRow[], activeCharacterId: number | null, route: JumpBasis) {
+  const [origin, setOrigin] = useState<{ forCharacterId: number; systemId: number | null } | null>(
+    null
+  );
   useEffect(() => {
-    if (rows.length === 0 || !route.hydrated) return;
+    if (activeCharacterId === null) return;
     let cancelled = false;
-    // A new basis or origin restarts the counts: no mixing old and new jumps.
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setPlaces(NO_PLACES);
-    setSystemOf(new Map());
-    /* eslint-enable react-hooks/set-state-in-effect */
-    const distinct = [...new Map(rows.map((r) => [placeKey(r), r])).values()];
-    void (async () => {
-      const originSystemId =
-        activeCharacterId === null
-          ? null
-          : await loadCharacterSolarSystemId(activeCharacterId).catch(() => null);
-      await mapWithConcurrencyLimit(distinct, ESI_FANOUT_CONCURRENCY, async (row) => {
-        const key = placeKey(row);
-        let place: ResolvedPlace = { name: null, systemId: null };
-        let security: number | null = null;
-        let jumps: JumpsAwayResult = { kind: 'unknown', reason: 'noRoute' };
-        try {
-          place = await resolvePlace(row);
-          if (cancelled) return;
-          if (place.systemId !== null) security = await loadSystemSecurity(place.systemId);
-          if (originSystemId === null) jumps = { kind: 'unknown', reason: 'noLocation' };
-          else if (place.systemId !== null) {
-            jumps = await jumpsBetween(originSystemId, place.systemId, route);
-          }
-        } catch {
-          // Best effort: the row keeps its fallback label and an unknown count.
-        }
-        if (cancelled) return;
-        setSystemOf((prev) => new Map(prev).set(key, place.systemId));
-        setPlaces((prev) => ({
-          names: new Map(prev.names).set(key, place.name),
-          security:
-            place.systemId === null
-              ? prev.security
-              : new Map(prev.security).set(place.systemId, security),
-          jumps: new Map(prev.jumps).set(key, jumps),
-        }));
+    void loadCharacterSolarSystemId(activeCharacterId)
+      .catch(() => null)
+      .then((systemId) => {
+        if (!cancelled) setOrigin({ forCharacterId: activeCharacterId, systemId });
       });
-    })().catch(() => {});
     return () => {
       cancelled = true;
     };
-    // `route` itself changes identity with its settings; `key` names the basis.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, activeCharacterId, routeKey, route.hydrated]);
-  return { places, systemOf };
+  }, [activeCharacterId]);
+  const originKnown = activeCharacterId === null || origin?.forCharacterId === activeCharacterId;
+  const refs = useMemo(() => rows.map(placeRefOf), [rows]);
+  return usePlaceDetails(refs, {
+    scopeId: activeCharacterId,
+    origin: {
+      systemId: activeCharacterId === null ? null : (origin?.systemId ?? null),
+      resolved: originKnown,
+    },
+    basis: route,
+  });
 }
 
 interface MyShipsViewProps {
@@ -412,7 +356,7 @@ export function MyShipsView({
   }, [idsKey]);
 
   const rows = useMemo(() => (state.status === 'ready' ? state.data.rows : []), [state]);
-  const { places, systemOf } = usePlaces(rows, activeCharacterId, route);
+  const places = usePlaces(rows, activeCharacterId, route);
   const groupIds = useMemo(
     () =>
       state.status === 'ready'
@@ -433,16 +377,15 @@ export function MyShipsView({
     if (state.status !== 'ready') return [];
     const { data } = state;
     const describe = (row: ShipRow): SortKeys & { shipClass: string; trail: string } => {
-      const key = placeKey(row);
-      const jumps = places.jumps.get(key);
-      const systemId = systemOf.get(key);
+      const place = places.get(placeKey(row));
+      const jumps = place?.jumps;
       return {
         ship: data.typeNames.get(row.typeId) ?? '',
         shipClass: shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
         character: data.characterNames.get(row.characterId) ?? '',
-        location: places.names.get(key) ?? '',
+        location: place?.name ?? '',
         trail: row.trail.map((id) => data.holderNames.get(id) ?? '').join(' '),
-        security: typeof systemId === 'number' ? (places.security.get(systemId) ?? null) : null,
+        security: typeof place?.systemId === 'number' ? (place.security ?? null) : null,
         jumps: jumps?.kind === 'known' ? jumps.jumps : null,
       };
     };
@@ -467,7 +410,7 @@ export function MyShipsView({
       return cmp * sign;
     });
     return items.map((item) => item.row);
-  }, [state, rows, places, systemOf, shipClasses, query, sort]);
+  }, [state, rows, places, shipClasses, query, sort]);
   // One Character's ships need no Character column.
   const showCharacter = characterIds.length > 1;
   const columns = (
@@ -557,8 +500,7 @@ export function MyShipsView({
               <span />
             </div>
             {sorted.map((row) => {
-              const key = placeKey(row);
-              const systemId = systemOf.get(key);
+              const place = places.get(placeKey(row));
               return (
                 <ShipRowView
                   key={row.itemId}
@@ -566,10 +508,10 @@ export function MyShipsView({
                   data={state.data}
                   rowGrid={rowGrid}
                   showCharacter={showCharacter}
-                  placeName={places.names.get(key)}
-                  systemId={typeof systemId === 'number' ? systemId : null}
-                  security={typeof systemId === 'number' ? places.security.get(systemId) : null}
-                  jumps={places.jumps.get(key)}
+                  placeName={place?.name}
+                  systemId={typeof place?.systemId === 'number' ? place.systemId : null}
+                  security={typeof place?.systemId === 'number' ? place.security : null}
+                  jumps={place?.jumps}
                   shipClass={shipClasses.get(state.data.groupIdByType.get(row.typeId) ?? -1)}
                   locationHref={hrefFor(row.locationId)}
                   preference={route.rules.preference}

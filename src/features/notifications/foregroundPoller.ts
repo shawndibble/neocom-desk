@@ -10,7 +10,7 @@
  * One poll per character does at most one fetch per data domain and runs every
  * diff driven by that domain against it — not one fetch-and-compare loop per
  * event (AC2). Which domains exist, what each fetches and which diffs it
- * drives all live in `pollDomains.ts`; this file names none of them (#273).
+ * drives all live in `pollDomains/`; this file names none of them (#273).
  */
 import { db } from '@/db';
 import { inBackgroundLane } from '@/esi/lane';
@@ -85,7 +85,7 @@ export interface PollDependencies {
    * Fetches one registry domain for one character, or null to skip it this
    * poll. The single seam that replaced the eight `load*` members: the live
    * loader (truncation guards included) is the registry entry's own
-   * `pollDomains.ts` `load`.
+   * `pollDomains/` `load`.
    */
   loadDomain: (domain: PollDomain, characterId: number) => Promise<readonly unknown[] | null>;
   /** Reads and writes one domain's baseline — replaces the eight `prev*`/`save*` pairs. */
@@ -125,7 +125,7 @@ export interface PollDependencies {
   markDelivered: (occurrenceKeys: readonly string[]) => Promise<void>;
   /**
    * Clears Notification Feed rows for occurrences this poll proved never
-   * happened (`pollDomains.ts`'s `disproven`). A Scheduled Push fires
+   * happened (`pollDomains/`'s `disproven`). A Scheduled Push fires
    * without a re-check (ADR 0010), so a pilot who restarts an extractor
    * program in game with the app closed is told it expired; the row that
    * push wrote is keyed on the dead program's expiry, so no later poll ever
