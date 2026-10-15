@@ -113,7 +113,7 @@ describe('BuildPlanList', () => {
 
   it('always shows the blueprint picker, with no separate "new plan" button', () => {
     renderList();
-    expect(screen.getByRole('searchbox', { name: 'Add build plan' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Add Build Plan' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'New plan' })).not.toBeInTheDocument();
   });
 
@@ -121,7 +121,7 @@ describe('BuildPlanList', () => {
     const onCreate = vi.fn();
     renderList(onCreate);
 
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Add build plan' }), 'Rift');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add Build Plan' }), 'Rift');
     await userEvent.click(await screen.findByRole('button', { name: /Rifter/ }));
 
     expect(onCreate).toHaveBeenCalledWith(RIFTER_ENTRY);
@@ -886,7 +886,7 @@ describe('BuildPlanList sort and owned tag', () => {
         location_flag: 'Hangar',
       },
     ]);
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Add build plan' }), 'Rift');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add Build Plan' }), 'Rift');
     const result = await screen.findByRole('button', { name: /Rifter/ });
     expect(within(result).getByText('Owned')).toBeInTheDocument();
     expect(result).not.toHaveTextContent('#638');
@@ -894,7 +894,7 @@ describe('BuildPlanList sort and owned tag', () => {
 
   it('shows no tag on a blueprint the pilot does not own', async () => {
     renderSortable();
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Add build plan' }), 'Rift');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add Build Plan' }), 'Rift');
     const result = await screen.findByRole('button', { name: /Rifter/ });
     expect(within(result).queryByText('Owned')).not.toBeInTheDocument();
   });
