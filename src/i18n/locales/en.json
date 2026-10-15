@@ -8400,6 +8400,7 @@
         "recipientsIntro": "Everyone in the Community can see the Request. Mail goes only to the Members you tick, one mail each, covering the whole list. {{used}} of {{max}} mails sent today.",
         "recipientsLabel": "Members to mail",
         "recipientsNone": "There are no other Members to mail.",
+        "postTimedOut": "This is taking too long. The Request may still have been posted: check the board before trying again.",
         "recipientsIntroUnknown": "Everyone in the Community can see the Request. Mail goes only to the Members you tick, one mail each, covering the whole list. Couldn't read how many mails you have sent today; the daily limit still applies.",
         "recipientsFailed": "Couldn't read what Members share, so nobody is pre-ticked.",
         "shares_one": "Shares {{count}} of these blueprints",

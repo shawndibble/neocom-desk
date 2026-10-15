@@ -17,7 +17,8 @@ import {
   type RequestPledge,
 } from '@/engine/communities/requests';
 import { formatAge } from '@/lib/age';
-import { itemsSummary, mailSafe, mailSubject } from '@/engine/communities/requestMail';
+import { itemsSummary, mailSubject } from '@/engine/communities/requestMail';
+import { mailSafe } from '@/lib/mailSafe';
 import { characterIdForUid } from '@/sync/uid';
 import { ConfirmDialog } from './ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';

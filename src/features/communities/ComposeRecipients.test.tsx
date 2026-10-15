@@ -27,7 +27,7 @@ vi.mock('@/features/market/appraisalData', () => ({
 }));
 vi.mock('@/app/grantAction', () => ({ beginGrant: vi.fn() }));
 
-import { ComposeRequestDialog } from './ComposeRequestDialog';
+import { ComposeRequestDialog, POST_TIMEOUT_MS } from './ComposeRequestDialog';
 
 const member = (id: number, name: string): CommunityMember => ({
   uid: `char:${id}`,
@@ -273,5 +273,25 @@ describe('Compose step 2: who to mail', () => {
     await toStep2(user);
     expect(screen.getByText(/You can send 1 more mail today/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Post request and mail 3 Members' })).toBeEnabled();
+  });
+
+  it('lets go when the post never answers, and warns it may still have gone through', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      store.postRequest.mockReturnValue(new Promise(() => undefined));
+      const { onClose } = renderDialog();
+      await toStep2(user);
+      await user.click(screen.getByRole('button', { name: 'Post request and mail 1 Member' }));
+      await user.keyboard('{Escape}');
+      expect(onClose).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(POST_TIMEOUT_MS + 100);
+      expect(await screen.findByRole('alert')).toHaveTextContent(/may still have been posted/);
+      expect(mail.sendMail).not.toHaveBeenCalled();
+      await user.keyboard('{Escape}');
+      expect(onClose).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

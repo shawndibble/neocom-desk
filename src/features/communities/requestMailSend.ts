@@ -8,7 +8,7 @@
  * Request: each recipient gets a result of their own.
  */
 import { sendMail } from '@/features/character/mail';
-import { mailSafe } from '@/engine/communities/requestMail';
+import { mailSafe } from '@/lib/mailSafe';
 import type { RequestLine } from '@/engine/communities/requests';
 import { callableErrorReason } from './callableError';
 import { sendAndSettle } from './mailSettle';

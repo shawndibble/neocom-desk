@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type CommunityRequest,
   type PledgesByRequest,
@@ -22,6 +22,8 @@ export function useCommunityRequests(characterId: number, communityId: string, e
   const [failed, setFailed] = useState(false);
   const [pledgesFailed, setPledgesFailed] = useState(false);
   const [version, setVersion] = useState(0);
+  // Whose Pledges `pledges` holds: a failed re-read keeps them only for the same board.
+  const pledgesFor = useRef('');
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
@@ -37,7 +39,10 @@ export function useCommunityRequests(characterId: number, communityId: string, e
       ([loaded, found]) => {
         if (cancelled) return;
         setRequests(loaded);
-        setPledges(found ?? NO_PLEDGES);
+        const board = `${characterId}:${communityId}`;
+        // A Pledge read that fails on a reload keeps the Pledges already shown (the banner says so).
+        setPledges((before) => found ?? (pledgesFor.current === board ? before : NO_PLEDGES));
+        if (found) pledgesFor.current = board;
         setPledgesFailed(found === null);
         setFailed(false);
       },

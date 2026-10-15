@@ -5,7 +5,7 @@ import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button, Field, Fields, TextInput } from '@/components/ui';
 import { sendMail } from '@/features/character/mail';
 import { resolvePilotByName } from '@/features/travel/pilotLookup';
-import { mailSafe } from '@/engine/communities/requestMail';
+import { mailSafe } from '@/lib/mailSafe';
 import { callableErrorReason } from './callableError';
 import { sendAndSettle } from './mailSettle';
 import {

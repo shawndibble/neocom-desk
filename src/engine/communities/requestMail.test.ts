@@ -1,17 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  MAX_MAIL_SUBJECT,
-  clipToCodePoints,
-  itemsSummary,
-  mailSafe,
-  mailSubject,
-} from './requestMail';
+import { MAX_MAIL_SUBJECT, clipToCodePoints, itemsSummary, mailSubject } from './requestMail';
 
 describe('request mail text', () => {
-  it('strips angle brackets', () => {
-    expect(mailSafe('Pals <font color="red">')).toBe('Pals font color="red"');
-  });
-
   it('summarises the lines as first name plus how many more', () => {
     const more = (n: number) => `+ ${n} more`;
     expect(itemsSummary(['A'], more)).toBe('A');

@@ -39,10 +39,9 @@ import { postRequest } from './requestStore';
 import { namedLike, needleOf } from './shareLists';
 
 /**
- * What a caller may start the dialog with (issue #3810; Ask to copy of #3813
- * uses it): lines already filled in, and Members
- * (by uid) already ticked on step 2 on top of the ones who share a matching
- * blueprint.
+ * What a caller may start the dialog with: Ask to copy (issue #3813) fills in
+ * the line and ticks the holder on step 2, on top of the Members who share a
+ * matching blueprint.
  */
 export interface ComposePrefill {
   lines?: readonly RequestLine[];
@@ -59,6 +58,10 @@ interface LineEdit {
   me?: string;
   te?: string;
 }
+
+/** A post that has not answered by then stops blocking the dialog (sign-in or the network may hang). */
+export const POST_TIMEOUT_MS = 75_000;
+const TIMED_OUT = Symbol('post timed out');
 
 const SEARCH_RESULTS = 8;
 const MIN_SEARCH_CHARS = 2;
@@ -250,19 +253,29 @@ export function ComposeRequestDialog({
       lines: lines.map((l) => l.line),
     };
     let requestId: string;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      ({ requestId } = await postRequest(characterId, communityId, draft));
+      ({ requestId } = await Promise.race([
+        postRequest(characterId, communityId, draft),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(TIMED_OUT), POST_TIMEOUT_MS);
+        }),
+      ]));
     } catch (err) {
-      const reason = callableErrorReason(err);
+      const reason = err === TIMED_OUT ? null : callableErrorReason(err);
       setError(
-        reason === 'too-many-open-requests'
-          ? t('communities.board.tooManyOpen')
-          : reason === 'too-many-lines'
-            ? t('communities.board.compose.tooManyLines', { count: MAX_LINES_PER_REQUEST })
-            : t('communities.board.compose.failed')
+        err === TIMED_OUT
+          ? t('communities.board.compose.postTimedOut')
+          : reason === 'too-many-open-requests'
+            ? t('communities.board.tooManyOpen')
+            : reason === 'too-many-lines'
+              ? t('communities.board.compose.tooManyLines', { count: MAX_LINES_PER_REQUEST })
+              : t('communities.board.compose.failed')
       );
       setBusy(false);
       return;
+    } finally {
+      clearTimeout(timer);
     }
     // The Request stands from here on, whatever happens to the mails.
     onPosted();

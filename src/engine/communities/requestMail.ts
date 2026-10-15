@@ -5,11 +5,10 @@
  * translated by the caller and passed in.
  */
 
+import { mailSafe } from '@/lib/mailSafe';
+
 /** The game's subject field holds this many characters. */
 export const MAX_MAIL_SUBJECT = 100;
-
-/** A name with angle brackets must not become markup in the mail. */
-export const mailSafe = (text: string) => text.replace(/[<>]/g, '');
 
 /** At most `max` characters, counted as code points so a surrogate pair is never cut in half. */
 export function clipToCodePoints(text: string, max: number): string {

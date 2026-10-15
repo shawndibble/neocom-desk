@@ -127,7 +127,10 @@ export async function refreshRequestBadge(characterId: number, now = Date.now())
     if (fresh > 0) next.set(community.id, fresh);
   }
   // The Character changed while this read was in flight: its count is not the new one's.
-  if (started === generation) publish(next);
+  if (started !== generation) return;
+  // A tab opened during the read marked its Community seen: that count is not new either.
+  for (const communityId of viewed.keys()) next.delete(communityId);
+  publish(next);
 }
 
 /** Mounted once in the shell: reads at start, then on an interval and when the tab is shown again. */

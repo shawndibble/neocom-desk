@@ -41,4 +41,15 @@ describe('useCommunityRequests', () => {
     act(() => result.current.reload());
     await waitFor(() => expect(result.current.failed).toBe(false));
   });
+
+  it('keeps the Pledges already shown when a reload fails to read them', async () => {
+    const pledge = { uid: 'char:2', lines: {}, updatedAt: 1 };
+    store.loadCommunityPledges.mockResolvedValue(new Map([['r1', [pledge]]]));
+    const { result } = renderHook(() => useCommunityRequests(1, 'c1', true));
+    await waitFor(() => expect(result.current.pledges.get('r1')).toEqual([pledge]));
+    store.loadCommunityPledges.mockRejectedValue(new Error('offline'));
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.pledgesFailed).toBe(true));
+    expect(result.current.pledges.get('r1')).toEqual([pledge]);
+  });
 });

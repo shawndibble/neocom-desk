@@ -129,4 +129,25 @@ describe('Communities nav badge', () => {
     expect(result.current).toBe(1);
     unwatch();
   });
+
+  it('drops a Community whose tab was opened while the read was in flight', async () => {
+    await rememberCommunityWatch(1, [community('c1'), community('c2')]);
+    const { result } = renderHook(() => useNewRequestCount());
+    await refreshRequestBadge(1, NOW);
+    let release: () => void = () => undefined;
+    requestStore.loadRequests.mockReturnValue(
+      new Promise((resolve) => {
+        release = () => resolve([request('c', { createdAt: NOW + 5 })]);
+      })
+    );
+    const pending = refreshRequestBadge(1, NOW + 10);
+    await vi.waitFor(() => expect(requestStore.loadRequests).toHaveBeenCalledTimes(1));
+    // c1 was already read as new; the viewer opens it before the read finishes.
+    const unwatch = watchRequestsViewed('c1');
+    release();
+    await act(() => pending);
+    // Only c2 (still unseen) counts.
+    expect(result.current).toBe(1);
+    unwatch();
+  });
 });

@@ -17,7 +17,9 @@ import { formatQuantity } from './requestFormat';
 
 /** A delivered amount typed in: a whole number from 0 (clears it) up to the Pledge. */
 function parseDelivered(text: string, max: number): number | null {
-  const value = text.replace(/,/g, '').trim() === '0' ? 0 : parseQuantity(text);
+  const digits = text.replace(/,/g, '').trim();
+  // 0 clears it, and so do "00" and "000": parseQuantity wants a positive number.
+  const value = /^\d+$/.test(digits) && Number(digits) === 0 ? 0 : parseQuantity(text);
   return value !== null && value <= max ? value : null;
 }
 
