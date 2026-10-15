@@ -64,6 +64,10 @@ export interface PostRequestInput {
   lines: RequestLine[];
 }
 
+export interface EditRequestInput extends PostRequestInput {
+  requestId: string;
+}
+
 export interface RequestIdInput {
   communityId: string;
   requestId: string;
@@ -158,6 +162,13 @@ export function parsePostRequestInput(data: unknown): PostRequestInput {
   };
 }
 
+export function parseEditRequestInput(data: unknown): EditRequestInput {
+  return {
+    ...parsePostRequestInput(data),
+    requestId: docId(record(data).requestId, 'requestId'),
+  };
+}
+
 export function parseRequestIdInput(data: unknown): RequestIdInput {
   const d = record(data);
   return {
@@ -194,7 +205,47 @@ export function decidePost(openCount: number): PostDecision {
 }
 
 export type OwnerActionDecision =
-  'ok' | 'not-found' | 'not-owner' | 'closed' | 'not-closed' | 'too-many-open-requests';
+  | 'ok'
+  | 'not-found'
+  | 'not-owner'
+  | 'closed'
+  | 'not-closed'
+  | 'too-many-open-requests'
+  | 'lines-locked';
+
+/**
+ * Whether an edit leaves the lines' identity alone: the same items, kinds and
+ * order, with only quantity, runs, ME and TE free to change. Pledges are keyed
+ * by line index, so once any exist the lines may not be added, removed,
+ * reordered or swapped.
+ */
+export function sameLineSlots(
+  before: readonly { typeId: number; kind: string }[],
+  after: readonly { typeId: number; kind: string }[]
+): boolean {
+  return (
+    before.length === after.length &&
+    before.every((line, i) => line.typeId === after[i].typeId && line.kind === after[i].kind)
+  );
+}
+
+/**
+ * Edit: the owner's own, unclosed Request. Location and terms always change;
+ * the lines only keep their slots once a Pledge exists on the Request.
+ */
+export function decideEdit(state: {
+  exists: boolean;
+  ownerUid: string | null;
+  callerUid: string;
+  closed: boolean;
+  hasPledges: boolean;
+  slotsKept: boolean;
+}): OwnerActionDecision {
+  if (!state.exists) return 'not-found';
+  if (state.ownerUid !== state.callerUid) return 'not-owner';
+  if (state.closed) return 'closed';
+  return state.hasPledges && !state.slotsKept ? 'lines-locked' : 'ok';
+}
 
 /**
  * Extend: the owner's own, unclosed Request (a closed one is reopened first).

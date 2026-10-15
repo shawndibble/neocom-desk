@@ -26,7 +26,8 @@ import { matchAppraisalEntries, type AppraisalCatalogue } from '@/engine/market/
 import { loadAppraisalCatalogue } from '@/features/market/appraisalData';
 import { LocationPicker } from './LocationPicker';
 import { callableErrorReason } from './callableError';
-import { ComposeMailResults, ComposeRecipientsStep } from './ComposeRecipientsStep';
+import { ComposeMailResults, ComposeRecipientsField } from './ComposeRecipients';
+import { useComposeRecipients } from './useComposeRecipients';
 import { communityRequestsUrl, type CommunityMember } from './communityStore';
 import {
   buildRequestMail,
@@ -35,7 +36,8 @@ import {
   type RequestMailRecipient,
   type RequestMailResult,
 } from './requestMailSend';
-import { postRequest } from './requestStore';
+import { editRequest, postRequest } from './requestStore';
+import type { CommunityRequest } from '@/engine/communities/requests';
 import { namedLike, needleOf } from './shareLists';
 
 /**
@@ -46,6 +48,13 @@ import { namedLike, needleOf } from './shareLists';
 export interface ComposePrefill {
   lines?: readonly RequestLine[];
   tickedUids?: readonly string[];
+}
+
+/** Editing a Request of one's own (instead of posting a new one). */
+export interface ComposeEditing {
+  request: CommunityRequest;
+  /** Members have Pledged: the lines keep their items and kinds, only quantities and specs change. */
+  linesLocked: boolean;
 }
 
 type Phase = 'compose' | 'mailing' | 'done';
@@ -108,10 +117,11 @@ function resolveLine(base: RequestLine, edit: LineEdit | undefined): ResolvedLin
 /**
  * A new Request (the mockup's compose dialog). Step 1: an optional location
  * and terms, lines from a pasted pile (the Appraisal parser) or added by
- * search, each line's quantity editable. Step 2 (issue #3810): who to mail,
- * the Members sharing a matching blueprint pre-ticked, then one in-game mail
- * each covering the whole list, with a result per recipient; ticking nobody
- * posts without mail. The Request posts first and stands whatever happens to
+ * search, each line's quantity editable. Below them (issue #3810) a Mail to
+ * field: my own character, the Members sharing a matching blueprint and anyone
+ * added by name are chips; posting sends one in-game mail to each chip covering
+ * the whole list, with a result per recipient; with no chips it posts without
+ * mail. The same dialog edits a Request of one's own (`editing`). The Request posts first and stands whatever happens to
  * the mails. The pasted lines are recomputed from the box on every change, so
  * edits and removals are kept per item rather than in a list the paste would
  * overwrite.
@@ -122,6 +132,7 @@ export function ComposeRequestDialog({
   myUid,
   members,
   prefill,
+  editing,
   onClose,
   onPosted,
 }: {
@@ -131,17 +142,18 @@ export function ComposeRequestDialog({
   /** The roster, for step 2; null until it has loaded. */
   members: readonly CommunityMember[] | null;
   prefill?: ComposePrefill;
+  editing?: ComposeEditing;
   onClose: () => void;
   /** The Request is posted (before any mail goes out): refetch the board. */
   onPosted: () => void;
 }) {
   const { t } = useTranslation();
   const id = useId();
-  const [location, setLocation] = useState('');
-  const [terms, setTerms] = useState('');
+  const [location, setLocation] = useState(editing?.request.location ?? '');
+  const [terms, setTerms] = useState(editing?.request.terms ?? '');
   const [text, setText] = useState('');
   const [added, setAdded] = useState<RequestLine[]>(
-    () => mergeLines([], prefill?.lines ?? []).lines
+    () => mergeLines([], editing?.request.lines ?? prefill?.lines ?? []).lines
   );
   const [edits, setEdits] = useState<Record<string, LineEdit>>({});
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
@@ -151,7 +163,6 @@ export function ComposeRequestDialog({
   const [catalogueFailed, setCatalogueFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<'lines' | 'recipients'>('lines');
   const [phase, setPhase] = useState<Phase>('compose');
   const [mailResults, setMailResults] = useState<RequestMailResult[]>([]);
   const [mailed, setMailed] = useState<RequestMailRecipient[]>([]);
@@ -243,6 +254,40 @@ export function ComposeRequestDialog({
 
   const invalid = lines.some((l) => !l.quantityValid || !l.specValid || l.duplicate);
   const canNext = lines.length > 0 && !invalid && over === 0;
+  const linesLocked = editing?.linesLocked ?? false;
+  const recipients = useComposeRecipients({
+    characterId,
+    communityId,
+    myUid,
+    members,
+    lines: lines.map((l) => l.line),
+    tickedUids: prefill?.tickedUids,
+    enabled: !editing,
+  });
+
+  const save = async () => {
+    if (!editing) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await editRequest(characterId, communityId, editing.request.id, {
+        location: location.trim(),
+        terms: terms.trim(),
+        lines: lines.map((l) => l.line),
+      });
+    } catch (err) {
+      const reason = callableErrorReason(err);
+      setError(
+        reason === 'lines-locked'
+          ? t('communities.board.compose.linesLocked')
+          : t('communities.board.compose.saveFailed')
+      );
+      setBusy(false);
+      return;
+    }
+    onPosted();
+    onClose();
+  };
 
   const post = async (tickedRecipients: RequestMailRecipient[]) => {
     setBusy(true);
@@ -317,15 +362,17 @@ export function ComposeRequestDialog({
       // The post is in flight, or the mails are going out under this dialog: it
       // stays until each has a result, or the mails would send invisibly.
       onClose={phase === 'mailing' || busy ? () => undefined : onClose}
-      title={t('communities.board.compose.title')}
+      title={t(editing ? 'communities.board.compose.editTitle' : 'communities.board.compose.title')}
       placement="wide"
     >
-      {step === 'lines' ? (
+      {phase === 'compose' ? (
         <form
           className="space-y-4 text-sm"
           onSubmit={(e) => {
             e.preventDefault();
-            if (canNext) setStep('recipients');
+            if (!canNext || busy) return;
+            if (editing) void save();
+            else if (recipients.ready) void post(recipients.ticked);
           }}
         >
           <div className="grid gap-3 md:grid-cols-2">
@@ -347,17 +394,24 @@ export function ComposeRequestDialog({
               />
             </label>
           </div>
-          <label className="block space-y-1">
-            <span className="block text-xs text-text-dim">
-              {t('communities.board.compose.paste')}
-            </span>
-            <TextArea
-              rows={4}
-              value={text}
-              aria-describedby={unmatched > 0 ? `${id}-unmatched` : undefined}
-              onChange={(e) => setText(e.target.value)}
-            />
-          </label>
+          {linesLocked && (
+            <p role="status" className="text-xs text-text-dim">
+              {t('communities.board.compose.linesLockedNote')}
+            </p>
+          )}
+          {!linesLocked && (
+            <label className="block space-y-1">
+              <span className="block text-xs text-text-dim">
+                {t('communities.board.compose.paste')}
+              </span>
+              <TextArea
+                rows={4}
+                value={text}
+                aria-describedby={unmatched > 0 ? `${id}-unmatched` : undefined}
+                onChange={(e) => setText(e.target.value)}
+              />
+            </label>
+          )}
           {unmatched > 0 && (
             <p id={`${id}-unmatched`} className="text-xs text-warning">
               {t('communities.board.compose.unmatched', {
@@ -399,23 +453,25 @@ export function ComposeRequestDialog({
                         value={e?.quantity ?? String(line.quantity)}
                         onChange={(ev) => edit(key, { quantity: ev.target.value })}
                       />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label={t('communities.board.compose.removeLine', {
-                          name: line.name,
-                        })}
-                        onClick={() => {
-                          setRemoved((current) => new Set(current).add(key));
-                          setAnnounce((a) => ({
-                            text: t('communities.board.compose.removed', { name: line.name }),
-                            key: a.key + 1,
-                          }));
-                          searchRef.current?.focus();
-                        }}
-                      >
-                        {t('communities.board.compose.remove')}
-                      </Button>
+                      {!linesLocked && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={t('communities.board.compose.removeLine', {
+                            name: line.name,
+                          })}
+                          onClick={() => {
+                            setRemoved((current) => new Set(current).add(key));
+                            setAnnounce((a) => ({
+                              text: t('communities.board.compose.removed', { name: line.name }),
+                              key: a.key + 1,
+                            }));
+                            searchRef.current?.focus();
+                          }}
+                        >
+                          {t('communities.board.compose.remove')}
+                        </Button>
+                      )}
                     </div>
                     {blueprint && (
                       <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
@@ -425,6 +481,7 @@ export function ComposeRequestDialog({
                           className="w-44"
                           aria-label={t('communities.board.compose.kindOf', { name: line.name })}
                           value={line.kind}
+                          disabled={linesLocked}
                           onChange={(ev) => edit(key, { kind: ev.target.value as RequestLineKind })}
                         >
                           <option value="bpc">{t('communities.board.compose.kindBpc')}</option>
@@ -465,56 +522,61 @@ export function ComposeRequestDialog({
               })}
             </ul>
           )}
-          <div className="space-y-1">
-            <SearchInput
-              ref={searchRef}
-              aria-label={t('communities.board.compose.addLabel')}
-              placeholder={t('communities.board.compose.addPlaceholder')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {results.length > 0 && (
-              <ul
-                aria-label={t('communities.board.compose.results')}
-                className="divide-y divide-line rounded-xs border border-line"
-              >
-                {results.map((item) => (
-                  <li key={item.typeId}>
-                    <button
-                      type="button"
-                      className="block w-full px-3 py-1.5 text-left hover:bg-panel-2 focus-visible:bg-panel-2"
-                      onClick={() => addItem(item)}
-                    >
-                      {item.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {!linesLocked && (
+            <div className="space-y-1">
+              <SearchInput
+                ref={searchRef}
+                aria-label={t('communities.board.compose.addLabel')}
+                placeholder={t('communities.board.compose.addPlaceholder')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {results.length > 0 && (
+                <ul
+                  aria-label={t('communities.board.compose.results')}
+                  className="divide-y divide-line rounded-xs border border-line"
+                >
+                  {results.map((item) => (
+                    <li key={item.typeId}>
+                      <button
+                        type="button"
+                        className="block w-full px-3 py-1.5 text-left hover:bg-panel-2 focus-visible:bg-panel-2"
+                        onClick={() => addItem(item)}
+                      >
+                        {item.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          {!editing && <ComposeRecipientsField state={recipients} />}
+          {error && (
+            <p role="alert" className="text-xs text-danger">
+              {error}
+            </p>
+          )}
           <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="ghost" onClick={onClose}>
               {t('common.cancel')}
             </Button>
-            <Button size="sm" variant="primary" type="submit" disabled={!canNext}>
-              {t('communities.board.compose.next')}
+            <Button
+              size="sm"
+              variant="primary"
+              type="submit"
+              loading={busy}
+              disabled={!canNext || (!editing && !recipients.ready)}
+            >
+              {editing
+                ? t('communities.board.compose.save')
+                : recipients.ticked.length > 0
+                  ? t('communities.board.compose.postAndMail', { count: recipients.ticked.length })
+                  : t('communities.board.compose.post')}
             </Button>
           </div>
         </form>
-      ) : phase === 'compose' ? (
-        <ComposeRecipientsStep
-          characterId={characterId}
-          communityId={communityId}
-          myUid={myUid}
-          members={members}
-          lines={lines.map((l) => l.line)}
-          tickedUids={prefill?.tickedUids}
-          busy={busy}
-          error={error}
-          onBack={() => setStep('lines')}
-          onPost={(recipients) => void post(recipients)}
-        />
       ) : (
         <ComposeMailResults
           phase={phase}

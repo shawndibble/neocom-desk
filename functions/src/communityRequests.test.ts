@@ -12,7 +12,10 @@ import {
   REQUEST_LIFETIME_MS,
   CLOSED_RETENTION_MS,
   EXPIRED_RETENTION_MS,
+  decideEdit,
   decideExtend,
+  parseEditRequestInput,
+  sameLineSlots,
   decideRequestMail,
   decideRequestSweep,
   parseRemovePledgeInput,
@@ -320,5 +323,38 @@ describe('parseRemovePledgeInput', () => {
       parseRemovePledgeInput({ communityId: 'c1', requestId: 'r1', pledgeUid: 'char:7' })
     ).toEqual({ communityId: 'c1', requestId: 'r1', pledgeUid: 'char:7' });
     expect(() => parseRemovePledgeInput({ communityId: 'c1', requestId: 'r1' })).toThrow();
+  });
+});
+
+describe('editing a Request', () => {
+  it('parses a post plus the Request id', () => {
+    expect(parseEditRequestInput(post({ requestId: 'r1' })).requestId).toBe('r1');
+    expect(() => parseEditRequestInput(post())).toThrow();
+  });
+
+  it('keeps line slots when only quantities change', () => {
+    const a = { typeId: 1, kind: 'item' };
+    const b = { typeId: 2, kind: 'bpc' };
+    expect(sameLineSlots([a, b], [a, b])).toBe(true);
+    expect(sameLineSlots([a, b], [b, a])).toBe(false);
+    expect(sameLineSlots([a, b], [a])).toBe(false);
+    expect(sameLineSlots([a, b], [a, { typeId: 2, kind: 'bpo' }])).toBe(false);
+  });
+
+  it('lets only the owner edit an unclosed Request, and locks the lines once pledged', () => {
+    const base = {
+      exists: true,
+      ownerUid: 'char:1',
+      callerUid: 'char:1',
+      closed: false,
+      hasPledges: false,
+      slotsKept: false,
+    };
+    expect(decideEdit(base)).toBe('ok');
+    expect(decideEdit({ ...base, exists: false })).toBe('not-found');
+    expect(decideEdit({ ...base, callerUid: 'char:2' })).toBe('not-owner');
+    expect(decideEdit({ ...base, closed: true })).toBe('closed');
+    expect(decideEdit({ ...base, hasPledges: true })).toBe('lines-locked');
+    expect(decideEdit({ ...base, hasPledges: true, slotsKept: true })).toBe('ok');
   });
 });

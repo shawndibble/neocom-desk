@@ -3,7 +3,7 @@ import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { jumpsToPlace, resolvePlace } from '@/engine/communities/requestPlaces';
 import { jumpDistancesFrom } from '@/engine/route/jumpRoute';
 import type { EsiEndpointId } from '@/esi/registry';
-import { loadCharacterSolarSystemId } from '@/features/character/location';
+import type { CurrentSystemState } from '@/features/route/currentSystem';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import { usePlaceIndex } from './usePlaceIndex';
 
@@ -29,13 +29,13 @@ export type RequestDistance =
  * pays for neither. Every way of not knowing is its own state, because the
  * board must say why distance is off, never quietly ignore it.
  */
-export function useRequestDistance(characterId: number, wanted: boolean): RequestDistance {
+export function useRequestDistance(
+  characterId: number,
+  current: CurrentSystemState,
+  wanted: boolean
+): RequestDistance {
   const places = usePlaceIndex(wanted);
   const lacksScope = useCharacterLacksEndpoints(characterId, LOCATION_ENDPOINTS);
-  const [origin, setOrigin] = useState<{
-    characterId: number;
-    systemId: number | null;
-  } | null>(null);
   const [map, setMap] = useState<
     | { characterId: number; systemId: number; failed: true }
     | {
@@ -47,19 +47,9 @@ export function useRequestDistance(characterId: number, wanted: boolean): Reques
     | null
   >(null);
 
-  useEffect(() => {
-    if (lacksScope) return;
-    let cancelled = false;
-    loadCharacterSolarSystemId(characterId).then(
-      (systemId) => !cancelled && setOrigin({ characterId, systemId }),
-      () => !cancelled && setOrigin({ characterId, systemId: null })
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, lacksScope]);
-
-  const systemId = origin?.characterId === characterId ? origin.systemId : undefined;
+  // Where to measure from: the pilot's pick, else the game's location (the
+  // shared Current System, as every Jump Range filter reads it).
+  const systemId = current.loaded ? current.systemId : undefined;
 
   useEffect(() => {
     if (!wanted || systemId === undefined || systemId === null) return;
@@ -86,9 +76,10 @@ export function useRequestDistance(characterId: number, wanted: boolean): Reques
 
   const ready = map?.characterId === characterId && map.systemId === systemId ? map : null;
   return useMemo<RequestDistance>(() => {
-    if (lacksScope) return { status: 'unavailable', reason: 'permission' };
     if (systemId === undefined) return { status: 'loading' };
-    if (systemId === null) return { status: 'unavailable', reason: 'location' };
+    if (systemId === null) {
+      return { status: 'unavailable', reason: lacksScope ? 'permission' : 'location' };
+    }
     if (!wanted) return { status: 'idle' };
     if (!ready) return { status: 'loading' };
     if (ready.failed || places.status === 'failed') return { status: 'failed' };

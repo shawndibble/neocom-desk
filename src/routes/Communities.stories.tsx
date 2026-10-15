@@ -1,6 +1,6 @@
 import { useLayoutEffect, type ReactNode } from 'react';
 import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { userEvent, within } from 'storybook/test';
 import { walletFixtureRoutes } from '@/storybook/esiFixtureRoutes';
 import type { FixtureRoute } from '@/storybook/fixtureFetch';
 import { setCommunityBackendOverride } from '@/features/communities/communityStore';
@@ -167,6 +167,7 @@ export const RequestsBoardCanFill: Story = {
   ...RequestsBoard,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole('button', { name: /^Filters/ }));
     await userEvent.click(await canvas.findByRole('button', { name: /^I can fill/ }));
   },
 };
@@ -176,14 +177,16 @@ export const RequestsBoardNearby: Story = {
   ...RequestsBoard,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const select = await canvas.findByRole('combobox', { name: 'Distance' });
-    await waitFor(() => expect(select).toBeEnabled());
-    await userEvent.selectOptions(select, 'Within 5 jumps');
+    await userEvent.click(await canvas.findByRole('button', { name: /^Filters/ }));
+    await userEvent.click(await canvas.findByRole('combobox', { name: 'Distance' }));
+    await userEvent.click(
+      await within(document.body).findByRole('option', { name: 'Within 5 jumps' })
+    );
     await canvas.findByText(/no place to measure from/, undefined, { timeout: 8000 });
   },
 };
 
-/** @summary Distance with no location Permission: the select is disabled and says why, with the Grant link. */
+/** @summary Distance with no location Permission: the board says why distance can't be used, with the Grant link. */
 export const RequestsBoardNoLocationGrant: Story = {
   parameters: {
     shell: {
@@ -280,14 +283,14 @@ export const RequestsCompose: Story = {
 /** @summary New request in the phone shell. */
 export const RequestsComposePhone: Story = { ...RequestsCompose, globals: phone };
 
-/** The sample Characters plus permission to send mail, which step 2 needs to tick anyone. */
+/** The sample Characters plus permission to send mail, which the Mail to field needs. */
 const MAIL_SCOPES = [
   'esi-wallet.read_character_wallet.v1',
   'esi-characters.read_loyalty.v1',
   'esi-mail.send_mail.v1',
 ];
 
-/** Fills step 1 with two blueprints some Members share, then goes on to who to mail. */
+/** Fills step 1 with two blueprints some Members share, then waits for who gets mailed. */
 const composeRecipients: Story['play'] = async ({ canvasElement }) => {
   const canvas = within(canvasElement);
   await userEvent.click(await canvas.findByRole('button', { name: /new request/i }));
@@ -297,18 +300,17 @@ const composeRecipients: Story['play'] = async ({ canvasElement }) => {
     await userEvent.type(search, name);
     await userEvent.click(await dialog.findByRole('button', { name }));
   }
-  await userEvent.click(dialog.getByRole('button', { name: 'Next: who to mail' }));
   await dialog.findByText('Ilvara Nokk');
   await dialog.findByText('Dax Orrelin');
 };
 
-/** @summary New request, step 2: who to mail, Members sharing a matching blueprint ticked, the day's mail count. */
+/** @summary New request with the Mail to field: my character and the Members sharing a matching blueprint as chips, the day's mail count. */
 export const RequestsComposeRecipients: Story = {
   parameters: { shell: { path: requestsPath(SAMPLE_ADMIN_COMMUNITY_ID), scopes: MAIL_SCOPES } },
   play: composeRecipients,
 };
 
-/** @summary Step 2 in the phone shell. */
+/** @summary The Mail to field in the phone shell. */
 export const RequestsComposeRecipientsPhone: Story = {
   ...RequestsComposeRecipients,
   globals: phone,
@@ -347,13 +349,12 @@ export const AskToCopyCompose: Story = askToCopy([brass]);
 /** @summary Ask to copy in the phone shell. */
 export const AskToCopyComposePhone: Story = { ...AskToCopyCompose, globals: phone };
 
-/** @summary Ask to copy, step 2: Ilvara Nokk, who holds it, ticked. */
+/** @summary Ask to copy: Ilvara Nokk, who holds it, is already a Mail to chip. */
 export const AskToCopyRecipients: Story = {
   ...askToCopy([brass]),
   parameters: { shell: { path: '/communities', scopes: MAIL_SCOPES } },
   play: async () => {
     const dialog = within(document.body);
-    await userEvent.click(await dialog.findByRole('button', { name: 'Next: who to mail' }));
     await dialog.findByText('Ilvara Nokk');
   },
 };

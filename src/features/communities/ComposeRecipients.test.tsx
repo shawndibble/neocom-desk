@@ -8,6 +8,7 @@ import type { CommunityMember } from './communityStore';
 
 const store = vi.hoisted(() => ({
   postRequest: vi.fn(),
+  editRequest: vi.fn(),
   loadRequestMailsToday: vi.fn(),
   reserveRequestMail: vi.fn(),
   confirmRequestMail: vi.fn(),
@@ -64,10 +65,15 @@ function renderDialog(over: Partial<React.ComponentProps<typeof ComposeRequestDi
   return { onClose, onPosted };
 }
 
-async function toStep2(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Next: who to mail' }));
-  return screen.findByRole('list', { name: 'Members to mail' });
+/** The chips of who will be mailed, once the day's count and the libraries are read. */
+async function chips() {
+  return screen.findByRole('list', { name: 'Characters to mail' });
 }
+const chipNames = (list: HTMLElement) =>
+  within(list)
+    .getAllByRole('listitem')
+    .map((li) => li.textContent?.replace('×', ''));
+const mailField = () => screen.findByRole('combobox', { name: 'Mail to (optional)' });
 
 async function seedToken(scopes: string[]) {
   await db.tokens.clear();
@@ -99,40 +105,53 @@ beforeEach(async () => {
   ]);
 });
 
-describe('Compose step 2: who to mail', () => {
-  it('pre-ticks Members sharing a matching blueprint, with the day’s mail count', async () => {
-    const user = userEvent.setup();
+describe('Compose: who to mail', () => {
+  it('starts with my own character and the Members sharing a matching blueprint as chips', async () => {
     renderDialog();
-    const list = await toStep2(user);
+    const list = await chips();
     expect(screen.getByText(/3 of 100 mails sent today/)).toBeInTheDocument();
-    const rows = within(list).getAllByRole('listitem');
-    expect(rows.map((r) => r.textContent)).toEqual([
-      'Bo TannerShares 1 of these blueprints',
-      'Cael Ito',
-      'Dana Reyes',
-    ]);
-    expect(within(list).getByRole('checkbox', { name: /Bo Tanner/ })).toBeChecked();
-    expect(within(list).getByRole('checkbox', { name: /Cael Ito/ })).not.toBeChecked();
-    expect(screen.getByRole('button', { name: 'Post request and mail 1 Member' })).toBeEnabled();
-    // The requester is not offered.
-    expect(within(list).queryByText('Kestrel Vane')).not.toBeInTheDocument();
+    expect(chipNames(list)).toEqual(['Kestrel Vane (you)', 'Bo Tanner']);
+    expect(screen.getByRole('button', { name: 'Post request and mail 2 Members' })).toBeEnabled();
   });
 
-  it('posts first, then sends one mail covering every line to each ticked Member', async () => {
+  it('adds another Member by typing their name, and removes a chip with its ×', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    const list = await chips();
+    await user.type(await mailField(), 'cael');
+    await user.click(await screen.findByRole('option', { name: 'Cael Ito' }));
+    expect(chipNames(list)).toEqual(['Kestrel Vane (you)', 'Bo Tanner', 'Cael Ito']);
+    // Already-chosen Members are not offered again.
+    await user.type(await mailField(), 'Bo Tanner');
+    expect(screen.queryByRole('option', { name: /Bo Tanner/ })).not.toBeInTheDocument();
+    await user.click(within(list).getByRole('button', { name: "Don't mail Bo Tanner" }));
+    expect(chipNames(list)).toEqual(['Kestrel Vane (you)', 'Cael Ito']);
+  });
+
+  it('adds the highlighted Member on Enter', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    const list = await chips();
+    await user.type(await mailField(), 'dana{Enter}');
+    expect(chipNames(list)).toContain('Dana Reyes');
+  });
+
+  it('posts first, then sends one mail covering every line to each chip, me included', async () => {
     const user = userEvent.setup();
     const { onPosted, onClose } = renderDialog();
     await user.type(screen.getByLabelText('Location (optional)'), 'Efa');
-    const list = await toStep2(user);
-    await user.click(within(list).getByRole('checkbox', { name: /Cael Ito/ }));
-    await user.click(screen.getByRole('button', { name: 'Post request and mail 2 Members' }));
-    await screen.findByText('Request posted. Mailed 2 of 2 Members.');
+    await chips();
+    await user.type(await mailField(), 'cael{Enter}');
+    await user.click(screen.getByRole('button', { name: 'Post request and mail 3 Members' }));
+    await screen.findByText('Request posted. Mailed 3 of 3 Members.');
     expect(store.postRequest).toHaveBeenCalledTimes(1);
     expect(onPosted).toHaveBeenCalledTimes(1);
-    expect(store.reserveRequestMail).toHaveBeenCalledTimes(2);
-    expect(mail.sendMail).toHaveBeenCalledTimes(2);
-    const [characterId, recipients, subject, body] = mail.sendMail.mock.calls[0];
+    expect(store.reserveRequestMail).toHaveBeenCalledTimes(3);
+    expect(mail.sendMail).toHaveBeenCalledTimes(3);
+    const sent = mail.sendMail.mock.calls.map((c) => c[1][0].recipient_id).sort();
+    expect(sent).toEqual([1, 2, 3]);
+    const [characterId, , subject, body] = mail.sendMail.mock.calls[0];
     expect(characterId).toBe(1);
-    expect(recipients).toEqual([{ recipient_id: 2, recipient_type: 'character' }]);
     expect(subject).toContain('Kestrel Vane');
     expect(body).toContain('1,000 × Tritanium');
     expect(body).toContain('2 × Ishtar Blueprint (blueprint copy, runs 10)');
@@ -143,11 +162,13 @@ describe('Compose step 2: who to mail', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('posts with nobody ticked and sends no mail', async () => {
+  it('posts without mail once every chip is removed', async () => {
     const user = userEvent.setup();
-    communities.loadMemberLibraries.mockResolvedValue([]);
     const { onPosted, onClose } = renderDialog();
-    await toStep2(user);
+    const list = await chips();
+    for (const name of ['Kestrel Vane', 'Bo Tanner']) {
+      await user.click(within(list).getByRole('button', { name: `Don't mail ${name}` }));
+    }
     await user.click(screen.getByRole('button', { name: 'Post request' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(onPosted).toHaveBeenCalledTimes(1);
@@ -159,65 +180,57 @@ describe('Compose step 2: who to mail', () => {
     const user = userEvent.setup();
     mail.sendMail.mockRejectedValue(new EsiError(403, 'no'));
     const { onPosted } = renderDialog();
-    await toStep2(user);
-    await user.click(screen.getByRole('button', { name: 'Post request and mail 1 Member' }));
+    await chips();
+    await user.click(screen.getByRole('button', { name: 'Post request and mail 2 Members' }));
     const results = await screen.findByRole('list', { name: 'Mail results' });
     await waitFor(() =>
-      expect(within(results).getByText(/EVE refused the mail/)).toBeInTheDocument()
+      expect(within(results).getAllByText(/EVE refused the mail/)).toHaveLength(2)
     );
     expect(onPosted).toHaveBeenCalledTimes(1);
-    expect(store.releaseRequestMail).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Request posted. Mailed 0 of 1 Members.')).toBeInTheDocument();
+    expect(store.releaseRequestMail).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('Request posted. Mailed 0 of 2 Members.')).toBeInTheDocument();
   });
 
-  it('reports the daily cap per Member and warns before posting when ticks exceed what is left', async () => {
+  it('reports the daily cap per Member and warns before posting when chips exceed what is left', async () => {
     const user = userEvent.setup();
     store.loadRequestMailsToday.mockResolvedValue(99);
     store.reserveRequestMail
       .mockResolvedValueOnce({ communityName: 'Pals', requesterName: 'Kestrel Vane', remaining: 0 })
       .mockRejectedValueOnce({ details: { reason: 'daily-cap' } });
     renderDialog();
-    const list = await toStep2(user);
-    await user.click(within(list).getByRole('checkbox', { name: /Cael Ito/ }));
+    await chips();
     expect(screen.getByText(/You can send 1 more mail today/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Post request and mail 2 Members' }));
     await screen.findByText('Request posted. Mailed 1 of 2 Members.');
-    expect(
-      screen.getByText(/You have used today’s Request mails|Not mailed. You have used/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Not mailed. You have used/)).toBeInTheDocument();
     expect(mail.sendMail).toHaveBeenCalledTimes(1);
   });
 
-  it('ticks the Members a caller names, on top of the matches', async () => {
-    const user = userEvent.setup();
+  it('adds the Members a caller names, on top of the matches', async () => {
     renderDialog({ prefill: { lines: LINES, tickedUids: ['char:4'] } });
-    const list = await toStep2(user);
-    expect(within(list).getByRole('checkbox', { name: /Dana Reyes/ })).toBeChecked();
-    expect(screen.getByRole('button', { name: 'Post request and mail 2 Members' })).toBeEnabled();
+    const list = await chips();
+    expect(chipNames(list)).toContain('Dana Reyes');
+    expect(screen.getByRole('button', { name: 'Post request and mail 3 Members' })).toBeEnabled();
   });
 
-  it('goes back to the lines without losing them, and stays on step 2 when the post fails', async () => {
+  it('stays on the one page, lines intact, when the post fails', async () => {
     const user = userEvent.setup();
     store.postRequest.mockRejectedValue(new Error('down'));
     renderDialog();
-    await toStep2(user);
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    expect(screen.getByLabelText('Tritanium quantity')).toHaveValue('1000');
-    await toStep2(user);
+    await chips();
     await user.click(screen.getByRole('button', { name: /Post request and mail/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn't post/);
+    expect(screen.getByLabelText('Tritanium quantity')).toHaveValue('1000');
     expect(mail.sendMail).not.toHaveBeenCalled();
   });
 
   it('turns mailing off, and says why, while the Character cannot send mail', async () => {
-    const user = userEvent.setup();
     await seedToken([]);
     renderDialog();
-    const list = await toStep2(user);
-    await waitFor(() =>
-      expect(within(list).getByRole('checkbox', { name: /Bo Tanner/ })).toBeDisabled()
-    );
     expect(await screen.findByText('Permission to send mail')).toBeInTheDocument();
+    const none = await chips();
+    await waitFor(() => expect(within(none).queryAllByRole('listitem')).toHaveLength(0));
+    expect(await mailField()).toBeDisabled();
     // Posting without mail is still possible.
     expect(screen.getByRole('button', { name: 'Post request' })).toBeEnabled();
   });
@@ -227,31 +240,28 @@ describe('Compose step 2: who to mail', () => {
     let finish: (value: { requestId: string }) => void = () => undefined;
     store.postRequest.mockReturnValue(new Promise((resolve) => (finish = resolve)));
     const { onClose } = renderDialog();
-    await toStep2(user);
-    await user.click(screen.getByRole('button', { name: 'Post request and mail 1 Member' }));
+    await chips();
+    await user.click(screen.getByRole('button', { name: 'Post request and mail 2 Members' }));
     await user.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();
     finish({ requestId: 'r1' });
-    await screen.findByText('Request posted. Mailed 1 of 1 Members.');
+    await screen.findByText('Request posted. Mailed 2 of 2 Members.');
   });
 
-  it('says so, and pre-ticks nobody, when the shared libraries cannot be read', async () => {
-    const user = userEvent.setup();
+  it('says so, and adds only me, when the shared libraries cannot be read', async () => {
     communities.loadMemberLibraries.mockRejectedValue(new Error('offline'));
     renderDialog();
-    const list = await toStep2(user);
+    const list = await chips();
     expect(communities.loadMemberLibraries).toHaveBeenCalledWith(1, 'c1', expect.any(Array), {
       strict: true,
     });
     expect(await screen.findByText(/Couldn't read what Members share/)).toBeInTheDocument();
-    expect(within(list).getByRole('checkbox', { name: /Bo Tanner/ })).not.toBeChecked();
+    expect(chipNames(list)).toEqual(['Kestrel Vane (you)']);
   });
 
   it('shows the mail count as unknown, not zero, when it cannot be read', async () => {
-    const user = userEvent.setup();
     store.loadRequestMailsToday.mockRejectedValue(new Error('offline'));
     renderDialog();
-    await toStep2(user);
     expect(
       await screen.findByText(/Couldn't read how many mails you have sent/)
     ).toBeInTheDocument();
@@ -259,20 +269,9 @@ describe('Compose step 2: who to mail', () => {
   });
 
   it('says nothing can be mailed when the day’s mails are used up', async () => {
-    const user = userEvent.setup();
     store.loadRequestMailsToday.mockResolvedValue(100);
     renderDialog();
-    await toStep2(user);
     expect(await screen.findByText(/You have sent today's mails/)).toBeInTheDocument();
-  });
-
-  it('warns and offers the full count when more are ticked than are left', async () => {
-    const user = userEvent.setup();
-    store.loadRequestMailsToday.mockResolvedValue(99);
-    renderDialog({ prefill: { lines: LINES, tickedUids: ['char:3', 'char:4'] } });
-    await toStep2(user);
-    expect(screen.getByText(/You can send 1 more mail today/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Post request and mail 3 Members' })).toBeEnabled();
   });
 
   it('lets go when the post never answers, and warns it may still have gone through', async () => {
@@ -281,8 +280,8 @@ describe('Compose step 2: who to mail', () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       store.postRequest.mockReturnValue(new Promise(() => undefined));
       const { onClose } = renderDialog();
-      await toStep2(user);
-      await user.click(screen.getByRole('button', { name: 'Post request and mail 1 Member' }));
+      await chips();
+      await user.click(screen.getByRole('button', { name: 'Post request and mail 2 Members' }));
       await user.keyboard('{Escape}');
       expect(onClose).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(POST_TIMEOUT_MS + 100);
@@ -293,5 +292,61 @@ describe('Compose step 2: who to mail', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('Compose: editing a Request', () => {
+  const existing = {
+    id: 'r9',
+    ownerUid: 'char:1',
+    ownerName: 'Kestrel Vane',
+    location: 'Efa',
+    terms: '90% JBV',
+    lines: LINES,
+    createdAt: 1,
+    lastActivityAt: 1,
+    expiresAt: 9e12,
+    closed: false,
+  };
+
+  it('prefills the Request, has no mail field, and saves the changes', async () => {
+    const user = userEvent.setup();
+    store.editRequest.mockResolvedValue(undefined);
+    const { onPosted, onClose } = renderDialog({
+      prefill: undefined,
+      editing: { request: existing, linesLocked: false },
+    });
+    expect(screen.getByRole('dialog', { name: 'Edit request' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Location (optional)')).toHaveValue('Efa');
+    expect(screen.queryByRole('combobox', { name: 'Mail to (optional)' })).toBeNull();
+    const quantity = screen.getByLabelText('Tritanium quantity');
+    await user.clear(quantity);
+    await user.type(quantity, '2500');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(store.editRequest).toHaveBeenCalledWith(1, 'c1', 'r9', {
+      location: 'Efa',
+      terms: '90% JBV',
+      lines: [{ ...LINES[0], quantity: 2500 }, LINES[1]],
+    });
+    expect(onPosted).toHaveBeenCalled();
+    expect(store.reserveRequestMail).not.toHaveBeenCalled();
+  });
+
+  it('keeps the items fixed once Members have Pledged, but quantities stay editable', () => {
+    renderDialog({ prefill: undefined, editing: { request: existing, linesLocked: true } });
+    expect(screen.getByText(/Members have Pledged on this Request/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Remove / })).toBeNull();
+    expect(screen.queryByLabelText(/Paste a list/)).toBeNull();
+    expect(screen.queryByRole('searchbox', { name: 'Add an item' })).toBeNull();
+    expect(screen.getByLabelText('Tritanium quantity')).toBeEnabled();
+  });
+
+  it('says so when the server refuses an edit', async () => {
+    const user = userEvent.setup();
+    store.editRequest.mockRejectedValue({ details: { reason: 'lines-locked' } });
+    renderDialog({ prefill: undefined, editing: { request: existing, linesLocked: false } });
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Members have Pledged/);
   });
 });

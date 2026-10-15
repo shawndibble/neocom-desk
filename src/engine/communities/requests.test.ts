@@ -487,7 +487,7 @@ describe('requestRecipients', () => {
     items: items.map((i) => ({ runs: 10, ...i })),
   });
 
-  it('leaves the requester out and lists everyone else, sharers first', () => {
+  it('lists the requester first, then everyone else, sharers first', () => {
     const out = requestRecipients(
       [bpc(10), bpc(11)],
       members,
@@ -495,6 +495,7 @@ describe('requestRecipients', () => {
       'char:1'
     );
     expect(out.map((r) => [r.uid, r.shared])).toEqual([
+      ['char:1', 0],
       ['char:3', 2],
       ['char:4', 1],
       ['char:2', 0],
@@ -518,6 +519,7 @@ describe('requestRecipients', () => {
     ];
     const out = requestRecipients([bpo(10)], members, libraries, 'char:1');
     expect(out.map((r) => [r.uid, r.shared])).toEqual([
+      ['char:1', 0],
       ['char:3', 1],
       ['char:4', 0],
       ['char:2', 0],
@@ -528,6 +530,11 @@ describe('requestRecipients', () => {
     ).toHaveLength(2);
   });
 
+  it('never counts the requester’s own blueprints as shared', () => {
+    const out = requestRecipients([bpc(10)], members, [share('char:1', { typeId: 10 })], 'char:1');
+    expect(out[0]).toMatchObject({ uid: 'char:1', self: true, shared: 0 });
+  });
+
   it('does not match plain item lines, and orders ties by name', () => {
     const out = requestRecipients(
       [line(10, 5)],
@@ -536,6 +543,7 @@ describe('requestRecipients', () => {
       'char:1'
     );
     expect(out.map((r) => [r.characterName, r.shared])).toEqual([
+      ['Me', 0],
       ['Bo Tanner', 0],
       ['Cael Ito', 0],
       ['Eli Park', 0],

@@ -75,6 +75,7 @@ export function RequestPanel({
   memberNames,
   onClose,
   onChanged,
+  onEdit,
   onRemoved,
   refreshPledges,
 }: {
@@ -93,6 +94,8 @@ export function RequestPanel({
   onClose: () => void;
   /** The Request changed on the server: refetch the board. */
   onChanged: () => void;
+  /** The requester opens the edit dialog for this Request. */
+  onEdit: () => void;
   /** The admin removed this Request: close the panel and refetch the board. */
   onRemoved: () => void;
   /** Re-reads this Request's Pledges into the board after a Pledge write. */
@@ -323,6 +326,9 @@ export function RequestPanel({
               </Button>
             ) : (
               <>
+                <Button size="sm" onClick={onEdit}>
+                  {t('communities.board.edit')}
+                </Button>
                 <Button
                   size="sm"
                   loading={busy === 'extend'}

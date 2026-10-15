@@ -76,6 +76,7 @@ import {
   type CallerCharacter,
 } from './communitiesStore.js';
 import {
+  parseEditRequestInput,
   parsePostRequestInput,
   parseRemovePledgeInput,
   parseRequestIdInput,
@@ -84,6 +85,7 @@ import {
 } from './communityRequests.js';
 import {
   confirmRequestMail,
+  editRequest,
   extendRequest,
   postRequest,
   releaseRequestMail,
@@ -625,6 +627,10 @@ export const deleteCommunityCallable = onCall<unknown>(
 // Requests, so it is a callable; extend and close/reopen are the requester's own.
 export const postCommunityRequestCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
   postRequest(getFirestore(), callerOf(request), parsePostRequestInput(request.data))
+);
+
+export const editCommunityRequestCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
+  editRequest(getFirestore(), callerOf(request), parseEditRequestInput(request.data))
 );
 
 export const extendCommunityRequestCallable = onCall<unknown>(
