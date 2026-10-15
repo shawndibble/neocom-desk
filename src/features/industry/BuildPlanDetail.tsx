@@ -1404,7 +1404,6 @@ export function BuildPlanDetail({
           bpcCoverage={bpcCoverage}
           blueprintName={nameForType(catalog, plan.blueprintTypeID)}
           onSetRuns={(runs) => update({ runs })}
-          ownedSale={ownedSale}
           breakdown={breakdownContext}
           breakdownOpen={breakdownOpen}
           onBreakdownOpenChange={setBreakdownOpen}

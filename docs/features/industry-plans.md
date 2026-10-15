@@ -21,7 +21,7 @@ Prior docs this expands: ADR 0006 (`docs/adr/0006-build-plan-dual-verdict-and-pr
 | Fit Import                                           | toolbar icon, `FitImportDialog.tsx`, `fitImport.ts`                       | Paste EFT, preview, create group + plans; also opened by Fittings "Manufacture Plan"                  |
 | Blueprint paste                                      | paste anywhere, `blueprintPaste.ts`                                       | Pasted blueprint list -> Build Group, one plan per buildable blueprint; repeat paste reuses the group |
 | Compare mode                                         | toolbar icon, `BuildPlanCompare.tsx`                                      | Check 2+ plans (or whole groups); table, CSV                                                          |
-| Plan page: verdict hero                              | `PlanVerdictHero.tsx`                                                     | Net profit big number, qualifiers, Acquisition Verdict pill, Use-or-sell pill, Log Production         |
+| Plan page: verdict hero                              | `PlanVerdictHero.tsx`                                                     | Net profit big number, qualifiers, Acquisition Verdict pill, Log Production                           |
 | Setup panel (fold)                                   | `BuildPlanDetail.tsx:1243`                                                | Read-only fact summary; "Edit" unfolds inputs                                                         |
 | Runs input + Break-even runs                         | Setup > Blueprint                                                         | Break-even only when profit < 0                                                                       |
 | Build Location picker + Override                     | `BuildLocationPicker.tsx`                                                 | ESI structure/station search; fills facility, system, band                                            |
@@ -209,7 +209,7 @@ Modal "Import a fit" (`industry.fitImportTitle`) opened from toolbar icon or rou
 - Big figure = Sale Profitability: net profit after sales tax + broker (ADR 0006), tone-coded, `IskAmount` (tap shows exact). "Unknown" when unpriced; spinner while prices load; "No price data yet" hint.
 - Qualifier line: margin %, ISK/h, duration, break-even price (net, always).
 - `PlanSlotLine`: "<Character>: uses 1 <pool> slot - N free - done by <EVE time> if started now" (hidden without slot data).
-- Pills: Acquisition Verdict ("BUILD saves X ISK" / "BUY is cheaper by X ISK" / Unknown; no fees, ADR 0006), Use-or-sell verdict pill (only when owned stock > 0, instant-sell basis).
+- Pills: Acquisition Verdict ("BUILD saves X ISK" / "BUY is cheaper by X ISK" / Unknown; no fees, ADR 0006). The use-or-sell verdict is not in the hero; it lives in the Costs panel.
 - `BpcCoverageWarning` when profit unknown because an owned BPC's runs < plan runs; one-click "Set runs to N".
 - Log Production button (primary; disabled if blueprint has no product) opens the Production Runs form.
 - No Breakdown button here; it lives on the Costs panel header.

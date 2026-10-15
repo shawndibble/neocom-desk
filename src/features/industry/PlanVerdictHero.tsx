@@ -4,7 +4,6 @@ import { Button, IskAmount, Panel, Spinner } from '@/components/ui';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import * as Icon from '@/components/ui/icons';
 import type { BuildResult } from '@/engine/industry/types';
-import { compareUseOrSell, type OwnedStockSale } from '@/engine/industry/ownedStockSale';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { formatDuration } from '@/lib/duration';
 import { cx } from '@/lib/cx';
@@ -24,9 +23,9 @@ const PILL_TONE: Record<PillTone, string> = {
 };
 
 /**
- * One verdict as a pill. The heading (Acquisition Verdict, Sale
- * Profitability, Use-or-Sell) stays in the accessible name so the three read
- * as the separately-labelled statements ADR 0006 asks for, while the eye gets
+ * One verdict as a pill. The heading (Acquisition Verdict, Use-or-Sell)
+ * stays in the accessible name so each reads as a separately-labelled
+ * statement, as ADR 0006 asks, while the eye gets
  * the tone and the glyph — never colour alone (docs/DESIGN.md §7).
  */
 export function VerdictPill({
@@ -106,8 +105,6 @@ interface PlanVerdictHeroProps {
   bpcCoverage?: { coveredRuns: number; neededRuns: number } | null;
   blueprintName?: string;
   onSetRuns?: (runs: number) => void;
-  /** Both liquidation bases; the hero states the sell-now one. Null with no owned stock priced. */
-  ownedSale: { instant: OwnedStockSale; order: OwnedStockSale } | null;
   breakdown: BreakdownContext;
   breakdownOpen: boolean;
   onBreakdownOpenChange: (open: boolean) => void;
@@ -154,7 +151,6 @@ export function PlanVerdictHero({
   bpcCoverage,
   blueprintName,
   onSetRuns,
-  ownedSale,
   breakdown,
   breakdownOpen,
   onBreakdownOpenChange,
@@ -180,11 +176,6 @@ export function PlanVerdictHero({
           t('industry.heroBreakEven', { value: formatIsk(result.breakEvenPrice) }),
       ].filter((part): part is string => typeof part === 'string')
     : [formatDuration(result.seconds)];
-
-  const useOrSell =
-    pricesReady && ownedSale && ownedSale.instant.ownedUnits > 0
-      ? { verdict: compareUseOrSell(result.profit, ownedSale.instant) }
-      : null;
 
   const hasItemActions = itemActionsFor !== undefined && productTypeID != null;
 
@@ -311,25 +302,6 @@ export function PlanVerdictHero({
                   {t('industry.verdictUnknown')}
                 </VerdictPill>
               )}
-
-              {useOrSell &&
-                (useOrSell.verdict === null ? (
-                  <VerdictPill label={t('industry.useOrSell.label')} tone="muted">
-                    {t('industry.useOrSell.unknown')}
-                  </VerdictPill>
-                ) : useOrSell.verdict.verdict === 'build' ? (
-                  <VerdictPill label={t('industry.useOrSell.label')} tone="success">
-                    {t('industry.useOrSell.verdictBuild', {
-                      amount: formatIsk(useOrSell.verdict.advantage),
-                    })}
-                  </VerdictPill>
-                ) : (
-                  <VerdictPill label={t('industry.useOrSell.label')} tone="warning">
-                    {t('industry.useOrSell.verdictSell', {
-                      amount: formatIsk(Math.abs(useOrSell.verdict.advantage)),
-                    })}
-                  </VerdictPill>
-                ))}
             </div>
           )}
         </div>

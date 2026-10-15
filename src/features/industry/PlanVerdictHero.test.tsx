@@ -8,29 +8,8 @@ import type { BuildResult } from '@/engine/industry/types';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { PlanVerdictHero } from './PlanVerdictHero';
 import type { BreakdownContext } from './CalculationBreakdown';
-import { ownedStockSale } from '@/engine/industry/ownedStockSale';
-import type { MaterialCostLine } from '@/engine/industry/types';
 import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
-
-/** One material the plan needs 100 of and the player already holds all 100 of. */
-const OWNED_MATERIALS: MaterialCostLine[] = [
-  {
-    typeID: 34,
-    baseQuantity: 100,
-    quantity: 100,
-    ownedQuantity: 100,
-    remainingQuantity: 0,
-    unitPrice: 1_000,
-    lineCost: 0,
-    unpriced: false,
-  },
-];
-
-const OWNED_SALE = {
-  instant: ownedStockSale(OWNED_MATERIALS, { 34: 1_000 }, 'instant', {}),
-  order: ownedStockSale(OWNED_MATERIALS, { 34: 1_200 }, 'order', {}),
-};
 
 const BREAKDOWN: BreakdownContext = {
   hubName: 'Jita',
@@ -91,7 +70,6 @@ function Harness({
       pricesLoading={false}
       productName="Rifter"
       runs={10}
-      ownedSale={null}
       breakdown={BREAKDOWN}
       onLogProduction={vi.fn()}
       {...overrides}
@@ -193,16 +171,6 @@ describe('PlanVerdictHero: the big profit figure and qualifier line', () => {
   it('states the margin in the qualifier line', () => {
     renderHero();
     expect(screen.getByText(/77\.0% margin/)).toBeInTheDocument();
-  });
-});
-
-describe('PlanVerdictHero: use-or-sell pill', () => {
-  it('appears only when owned units are held', () => {
-    renderHero();
-    expect(screen.queryByText(/use or sell your materials/i)).not.toBeInTheDocument();
-
-    renderHero({ ownedSale: OWNED_SALE });
-    expect(screen.getByText('Use or sell your materials?')).toBeInTheDocument();
   });
 });
 
