@@ -51,31 +51,40 @@ function renderStrip(props: Parameters<typeof PiHeaderStrip>[0]) {
   );
 }
 
+/** The facts popover behind the strip's "i" (home, colonies, route, EVE time). */
+async function openFacts() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Home, colonies and route' }));
+  return screen.findByTestId('pi-strip-facts');
+}
+
 describe('PiHeaderStrip', () => {
-  it('labels the route measure the home route, so it is not read as the Hauling figure', () => {
+  it('labels the route measure the home route, so it is not read as the Hauling figure', async () => {
     usePiSettings.setState({ value: { ...DEFAULT_PI_SETTINGS, buybackPct: 85 }, hydrated: true });
     renderStrip({ colonySystemIds: [30000142], estimate: false });
-    const strip = screen.getByTestId('pi-header-strip');
-    expect(within(strip).getByText('Home route')).toBeInTheDocument();
-    expect(within(strip).queryByText('Route')).not.toBeInTheDocument();
+    const facts = await openFacts();
+    expect(within(facts).getByText('Home route')).toBeInTheDocument();
+    expect(within(facts).queryByText('Route')).not.toBeInTheDocument();
   });
 
-  it('has exactly one Sell at control with its settings modal open', async () => {
-    const user = userEvent.setup();
-    renderStrip({ colonySystemIds: [], estimate: true });
-    await user.click(await screen.findByRole('button', { name: 'PI settings' }));
-    const dialog = await screen.findByRole('dialog');
-    await within(dialog).findByRole('group', { name: 'Buy at the hub when short' });
+  it('keeps one slim row: no PI settings link (the page gear is the only entry), facts behind an i', async () => {
+    renderStrip({ colonySystemIds: [30000142], estimate: true });
+    const strip = await screen.findByTestId('pi-header-strip');
+    expect(screen.queryByRole('button', { name: /PI settings/i })).not.toBeInTheDocument();
     expect(screen.getAllByRole('combobox', { name: 'Where do you sell?' })).toHaveLength(1);
+    // Home and the colony count are not at a glance: they wait behind the "i".
+    expect(within(strip).queryByText('Colonies')).not.toBeInTheDocument();
+    const facts = await openFacts();
+    expect(within(facts).getByText('Colonies')).toBeInTheDocument();
+    expect(await within(facts).findByText('Jita')).toBeInTheDocument();
   });
 
-  it('puts the Est. badge on a price note with a hint, not after the drop-off line', async () => {
-    usePiSettings.setState({ value: { ...DEFAULT_PI_SETTINGS, buybackPct: 85 }, hydrated: false });
+  it('shows the Est. badge as a chip whose tooltip explains the estimate', async () => {
     renderStrip({ colonySystemIds: [], estimate: true });
     const strip = await screen.findByTestId('pi-header-strip');
-    const note = within(strip).getByText('Estimated prices');
-    expect(note).toHaveAttribute('tabindex', '0');
-    expect(note.parentElement).toHaveTextContent(/est\.\s*estimated prices/i);
+    const chip = within(strip).getByRole('button', { name: 'Estimated prices' });
+    expect(chip).toHaveTextContent(/est\./i);
+    await userEvent.hover(chip);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/projection from current market/i);
   });
 
   it('shows EVE time where asked (Colonies), and only there', async () => {
@@ -83,11 +92,12 @@ describe('PiHeaderStrip', () => {
     vi.setSystemTime(new Date('2026-10-06T12:00:00Z'));
     try {
       const { unmount } = renderStrip({ colonySystemIds: [], estimate: false, eveTime: true });
-      const strip = await screen.findByTestId('pi-header-strip');
-      expect(within(strip).getByText('EVE time')).toBeInTheDocument();
-      expect(within(strip).getByText('Tue 12:00')).toBeInTheDocument();
+      const facts = await openFacts();
+      expect(within(facts).getByText('EVE time')).toBeInTheDocument();
+      expect(within(facts).getByText('Tue 12:00')).toBeInTheDocument();
       unmount();
       renderStrip({ colonySystemIds: [], estimate: false });
+      await openFacts();
       expect(screen.queryByText('EVE time')).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -97,7 +107,7 @@ describe('PiHeaderStrip', () => {
   it('shows no estimate note on tabs without projections', async () => {
     renderStrip({ colonySystemIds: [], estimate: false });
     await screen.findByTestId('pi-header-strip');
-    expect(screen.queryByText('Estimated prices')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Estimated prices' })).not.toBeInTheDocument();
   });
 
   describe('nearest hub suggestion', () => {
@@ -161,14 +171,14 @@ describe('PiHeaderStrip', () => {
       located.systemId = NULLSEC;
       routes.jumps = { [JITA]: 40, [HEK]: 22 };
       renderStrip({ colonySystemIds: [], locationCharacterId: 91, estimate: false });
-      const strip = await screen.findByTestId('pi-header-strip');
-      expect(await within(strip).findByText('1DQ1-A')).toBeInTheDocument();
-      expect(within(strip).getByText('Location')).toBeInTheDocument();
-      expect(within(strip).queryByText('Home')).not.toBeInTheDocument();
+      const facts = await openFacts();
+      expect(await within(facts).findByText('1DQ1-A')).toBeInTheDocument();
+      expect(within(facts).getByText('Location')).toBeInTheDocument();
+      expect(within(facts).queryByText('Home')).not.toBeInTheDocument();
       expect(await screen.findByTestId('pi-nearest-hub')).toHaveTextContent(
         'Nearest hub: Hek, 22 jumps'
       );
-      expect(within(strip).getByText('Route from here')).toBeInTheDocument();
+      expect(within(facts).getByText('Route from here')).toBeInTheDocument();
       expect(located.calls).toEqual([91]);
     });
 
@@ -178,18 +188,18 @@ describe('PiHeaderStrip', () => {
       await screen.findByTestId('pi-header-strip');
       unmount();
       renderStrip({ colonySystemIds: [JITA], locationCharacterId: 91, estimate: false });
-      const strip = await screen.findByTestId('pi-header-strip');
-      expect(await within(strip).findByText('Home')).toBeInTheDocument();
+      const facts = await openFacts();
+      expect(await within(facts).findByText('Home')).toBeInTheDocument();
       expect(located.calls).toEqual([]);
     });
 
     it('shows no home, and never assumes a hub, when the location is unknown', async () => {
       renderStrip({ colonySystemIds: [], locationCharacterId: 91, estimate: false });
-      const strip = await screen.findByTestId('pi-header-strip');
       await waitFor(() => expect(located.calls).toEqual([91]));
       await new Promise((r) => setTimeout(r, 20));
-      expect(within(strip).queryByText('Location')).not.toBeInTheDocument();
-      expect(within(strip).queryByText('Home')).not.toBeInTheDocument();
+      const facts = await openFacts();
+      expect(within(facts).queryByText('Location')).not.toBeInTheDocument();
+      expect(within(facts).queryByText('Home')).not.toBeInTheDocument();
       expect(screen.queryByTestId('pi-nearest-hub')).not.toBeInTheDocument();
     });
   });

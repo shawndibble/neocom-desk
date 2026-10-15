@@ -4,10 +4,11 @@
  * cards use.
  */
 import { useTranslation } from 'react-i18next';
-import { IskAmount, textActionClassName } from '@/components/ui';
+import { InfoTooltip, IskAmount, textActionClassName } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SkillLink } from '@/features/entities';
 import { cx } from '@/lib/cx';
+import { formatIskCompact } from '@/lib/isk';
 import { INTERPLANETARY_CONSOLIDATION_SKILL_ID } from './planetSlots';
 import type { PlanAdvice } from './planAdviceModel';
 import { Sentence } from './sentence';
@@ -27,10 +28,13 @@ export function Gain({ value, className }: { value: number; className?: string }
 export function SlotNudge({
   slots,
   onFindBest,
+  compact = false,
 }: {
   slots: PlanAdvice['slots'];
   /** Absent where the pilot is already looking at the next planet. */
   onFindBest?: () => void;
+  /** The slot line shortens to its count; the full sentence rides an info tooltip. */
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   if (slots.free <= 0) return null;
@@ -42,6 +46,18 @@ export function SlotNudge({
     skill: '{skill}',
     context: slots.gainPerPlanetPerDay === null ? 'nogain' : undefined,
   });
+  const sentence = [
+    t('piPlan.make.slots', {
+      count: slots.allowed,
+      used: slots.used,
+      gain: slots.gainPerPlanetPerDay === null ? '' : formatIskCompact(slots.gainPerPlanetPerDay),
+      skill: t('piPlan.make.slotsSkill'),
+      context: slots.gainPerPlanetPerDay === null ? 'nogain' : undefined,
+    }),
+    slots.assumed ? t('piPlan.make.slotsAssumed') : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   return (
     <div className="space-y-1.5 border-t border-line px-3 py-3 text-xs text-text">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -65,23 +81,47 @@ export function SlotNudge({
             />
           ))}
         </span>
-        <span className="min-w-0 flex-1 max-md:basis-full">
-          <Sentence
-            text={text}
-            slots={{
-              gain:
-                slots.gainPerPlanetPerDay === null ? null : (
-                  <Gain value={slots.gainPerPlanetPerDay} />
+        {compact ? (
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
+            <span className="text-text-dim">
+              {t('piPlan.make.slotsLabel', { used: slots.used, count: slots.allowed })}
+            </span>
+            <InfoTooltip label={t('piPlan.make.slotsInfoLabel')} glyph="info" content={sentence} />
+            {slots.gainPerPlanetPerDay !== null && (
+              <span className="text-isk-pos">
+                <Gain value={slots.gainPerPlanetPerDay} />{' '}
+                <span className="text-text-dim">{t('piPlan.make.slotsGainEach')}</span>
+              </span>
+            )}
+            {slots.assumed && (
+              <span className="text-text-dim">({t('piPlan.make.slotsAssumedShort')})</span>
+            )}
+            <span aria-hidden="true" className="text-text-dim">
+              ·
+            </span>
+            <SkillLink typeId={INTERPLANETARY_CONSOLIDATION_SKILL_ID}>
+              {t('piPlan.make.slotsSkill')}
+            </SkillLink>
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 max-md:basis-full">
+            <Sentence
+              text={text}
+              slots={{
+                gain:
+                  slots.gainPerPlanetPerDay === null ? null : (
+                    <Gain value={slots.gainPerPlanetPerDay} />
+                  ),
+                skill: (
+                  <SkillLink typeId={INTERPLANETARY_CONSOLIDATION_SKILL_ID}>
+                    {t('piPlan.make.slotsSkill')}
+                  </SkillLink>
                 ),
-              skill: (
-                <SkillLink typeId={INTERPLANETARY_CONSOLIDATION_SKILL_ID}>
-                  {t('piPlan.make.slotsSkill')}
-                </SkillLink>
-              ),
-            }}
-          />
-          {slots.assumed && ` ${t('piPlan.make.slotsAssumed')}`}
-        </span>
+              }}
+            />
+            {slots.assumed && ` ${t('piPlan.make.slotsAssumed')}`}
+          </span>
+        )}
       </div>
       {onFindBest && (
         <button type="button" className={textActionClassName('gap-1')} onClick={onFindBest}>

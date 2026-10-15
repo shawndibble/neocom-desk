@@ -1,6 +1,6 @@
 /**
  * PI with the planets read refused (403, #2762): the colony count is unknown,
- * not zero, so the strip shows "—", Plan and Map never say "no colonies", and
+ * not zero, so the strip's facts popover shows "—", Plan and Map never say "no colonies", and
  * one login banner shows (the shell's "EVE access was refused" stays quiet on
  * PI). `PI_SHOTS=<dir>` also writes screenshots.
  */
@@ -38,7 +38,10 @@ for (const [label, viewport] of VIEWPORTS) {
       });
       await expect(page.getByText('EVE access was refused')).toHaveCount(0);
       await expect(page.getByRole('button', { name: /Log in again/ })).toHaveCount(1);
-      await expect(page.getByTestId('pi-header-strip')).toContainText('—');
+      await page.getByRole('button', { name: 'Home, colonies and route' }).click();
+      await expect(page.getByRole('dialog', { name: 'Home, colonies and route' })).toContainText(
+        '—'
+      );
       await expect(page.getByText(/no colonies/i)).toHaveCount(0);
       await expect(page.getByText(/colonies yet/i)).toHaveCount(0);
       const dir = process.env.PI_SHOTS;
