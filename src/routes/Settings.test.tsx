@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, onTestFinished, vi } from 'vitest';
 import { enableWebPush } from '@/features/notifications/webPush';
 import { clearPushFailure, usePushFailure } from '@/features/notifications/pushFailure';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -24,6 +24,7 @@ import { isEventEnabledFor } from '@/features/notifications/eventSelection';
 import { rebuildProjection } from '@/features/notifications/projectionRebuild';
 import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projectionRebuildScheduler';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { PLAY_STORE_PACKAGE, androidNotificationSettingsUrl } from '@/lib/playStoreApp';
 import { assignLocation } from '@/app/navigation';
 import { consumeStaleStores } from '@/app/staleStoresReload';
@@ -134,6 +135,21 @@ async function openTab(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
   await user.click(within(settingsNav()).getByRole('link', { name }));
 }
 
+beforeAll(async () => {
+  // One throwaway render, so no test pays for the worker's first `App` render
+  // (compiling the lazy Settings chunk, warming jsdom and React): it landed on
+  // whichever test ran first and tipped its 1 s `findBy`. Under the hook's own budget.
+  await routeChunks.loadSettings();
+  // Signed out, the app shows the landing page instead of Settings.
+  await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
+  await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
+  window.history.pushState({}, '', '/settings/display');
+  const { unmount } = render(<App />);
+  await screen.findByRole('heading', { level: 1, name: /settings/i }, { timeout: 25_000 });
+  unmount();
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+}, 30_000);
+
 // Rendered through <App /> rather than in isolation: /settings has a nav
 // entry now, so routing to it through the shell is part of what's asserted.
 // Settings makes no requests, hence no msw server.
@@ -183,10 +199,7 @@ afterEach(() => {
 describe('Settings', () => {
   it('renders the page heading and the font-scale control, defaulting to 100%', async () => {
     render(<App />);
-    // First render of the file: the lazy Settings chunk compiles cold, which can exceed 1 s.
-    expect(
-      await screen.findByRole('heading', { level: 1, name: /settings/i }, { timeout: 6000 })
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /settings/i })).toBeInTheDocument();
 
     const group = screen.getByRole('group', { name: /text size/i });
     expect(group.querySelector('[aria-pressed="true"]')).toHaveTextContent(/default/i);
