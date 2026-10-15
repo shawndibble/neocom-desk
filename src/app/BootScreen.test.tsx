@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { BootScreen, BOOT_STALL_MS } from './BootScreen';
 import { RequireCharacter } from './RequireCharacter';
+import { BOOT_TIP_DELAY_MS, BOOT_TIP_ROTATE_MS, resetBootTip } from './bootTips';
 
 const { recoverFromStalledBoot, reportBootStallOnce, reportBootStallResolved, useLiveQuery } =
   vi.hoisted(() => ({
@@ -133,5 +134,58 @@ describe('a gate whose Dexie read never settles', () => {
       vi.advanceTimersByTime(BOOT_STALL_MS);
     });
     expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+  });
+});
+
+describe('BootScreen tips', () => {
+  const tipText = (container: HTMLElement) =>
+    container.querySelector('p[aria-hidden="true"]')?.textContent ?? '';
+
+  beforeEach(() => {
+    resetBootTip();
+  });
+
+  it('shows no tip before the delay and one after it, hidden from assistive tech', () => {
+    const { container } = render(<BootScreen gate="root" />);
+    act(() => {
+      vi.advanceTimersByTime(BOOT_TIP_DELAY_MS - 1);
+    });
+    expect(tipText(container)).toBe('');
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(tipText(container)).not.toBe('');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('shows the same tip when the screen is remounted', () => {
+    const first = render(<BootScreen gate="root" />);
+    act(() => {
+      vi.advanceTimersByTime(BOOT_TIP_DELAY_MS);
+    });
+    const shown = tipText(first.container);
+    first.unmount();
+    const second = render(<BootScreen gate="require-character" />);
+    act(() => {
+      vi.advanceTimersByTime(BOOT_TIP_DELAY_MS);
+    });
+    expect(tipText(second.container)).toBe(shown);
+  });
+
+  it('rotates to a different tip only once the same screen stays up past the rotate delay', () => {
+    const { container } = render(<BootScreen gate="root" />);
+    act(() => {
+      vi.advanceTimersByTime(BOOT_TIP_DELAY_MS);
+    });
+    const first = tipText(container);
+    act(() => {
+      vi.advanceTimersByTime(BOOT_TIP_ROTATE_MS - BOOT_TIP_DELAY_MS - 1);
+    });
+    expect(tipText(container)).toBe(first);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(tipText(container)).not.toBe(first);
+    expect(tipText(container)).not.toBe('');
   });
 });
