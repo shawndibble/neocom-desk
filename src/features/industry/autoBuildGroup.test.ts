@@ -268,6 +268,37 @@ describe('applyGroupAutoBuild', () => {
       expect(picks.get('solo')).toEqual(new Set());
     });
 
+    it('forces a material nobody on the account can build to buy, like its own page', async () => {
+      mockedSnapshots.mockImplementation((requests) => requests.map(() => Promise.resolve(prices)));
+      const gatedCatalog = catalogWith([
+        entry({ blueprintTypeID: 100, blueprint: p600Blueprint, productTypeID: 600 }),
+        entry({
+          blueprintTypeID: 101,
+          blueprint: { ...p601x100, skills: [{ typeID: 3380, level: 5 }] },
+          productTypeID: 601,
+        }),
+      ]);
+      const plans = [plan({ id: 'a', blueprintTypeID: 100, includeCorpAssets: true })];
+      const run = (accountSkills?: ReadonlyMap<number, Record<number, number>>) =>
+        applyGroupAutoBuild(
+          plans,
+          gatedCatalog,
+          null,
+          [],
+          NO_CHARACTER_MODIFIERS,
+          0,
+          { strategy: 'cost-effective', depth: 1 },
+          CORP,
+          [],
+          [],
+          accountSkills
+        );
+
+      expect((await run()).get('a')).toEqual(new Set([601]));
+      expect((await run(new Map([[1, { 3380: 4 }]]))).get('a')).toEqual(new Set());
+      expect((await run(new Map([[1, { 3380: 5 }]]))).get('a')).toEqual(new Set([601]));
+    });
+
     it("prices a member's reaction nodes at its own Reaction Location, in the same batched fetch", async () => {
       const plans = [
         plan({
