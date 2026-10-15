@@ -380,11 +380,15 @@ describe('Login', () => {
   it('adds a header login button, wired like the hero one, once the hero button scrolls away', async () => {
     const user = userEvent.setup();
     let report: (entries: { isIntersecting: boolean }[]) => void = () => {};
+    let captured = false;
     vi.stubGlobal(
       'IntersectionObserver',
       class {
         constructor(cb: typeof report) {
-          report = cb;
+          // The header's observer is the first one built; the reveal and demo
+          // observers constructed after it must not replace it.
+          if (!captured) report = cb;
+          captured = true;
         }
         observe() {}
         disconnect() {}

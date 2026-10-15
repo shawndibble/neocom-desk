@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -25,6 +25,7 @@ import type { DeadlineSeverity } from '@/engine/severity';
 import { MINUTE_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
+import { canAnimate } from './motion';
 
 /**
  * The signed-out landing page's working mock of the Overview: the same header,
@@ -121,17 +122,87 @@ const ALERTS: { key: string; severity: DeadlineSeverity; minutes: number }[] = [
   { key: 'mail', severity: 'clear', minutes: 310 },
 ];
 
+/** How long the demo must be on screen before the newest sample alert arrives. */
+const ARRIVAL_DELAY_MS = 3000;
+/** Largest drift of the frame while scrolling, in px. */
+const FLOAT_MAX_PX = 12;
+
+/**
+ * Drives the bell's one-time auto-play. `static`: motion is off or unavailable,
+ * so every alert is already there. `pending`: the newest alert is withheld until
+ * the demo has been in view for a while (timer pauses when it scrolls away or
+ * the tab is hidden). `arrived`: done, never repeats.
+ */
+function useAlertArrival(frameRef: RefObject<HTMLElement | null>) {
+  const [phase, setPhase] = useState<'static' | 'pending' | 'arrived'>(() =>
+    canAnimate() ? 'pending' : 'static'
+  );
+  useEffect(() => {
+    const el = frameRef.current;
+    if (phase !== 'pending' || !el) return;
+    let inView = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const sync = () => {
+      clearTimeout(timer);
+      if (inView && !document.hidden) {
+        timer = setTimeout(() => setPhase('arrived'), ARRIVAL_DELAY_MS);
+      }
+    };
+    const observer = new IntersectionObserver((entries) => {
+      inView = entries[entries.length - 1]?.isIntersecting ?? false;
+      sync();
+    });
+    observer.observe(el);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, [phase, frameRef]);
+  return phase;
+}
+
+/** Sets `--lp-float` (0 to -12px) on the frame as the page scrolls; rAF-throttled, off on touch. */
+function useFloat(frameRef: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el || !canAnimate()) return;
+    if (window.matchMedia?.('(pointer: coarse)').matches) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const drift = Math.min(FLOAT_MAX_PX, window.scrollY * 0.03);
+      el.style.setProperty('--lp-float', `${-drift}px`);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [frameRef]);
+}
+
 export function OverviewDemo() {
   const { t } = useTranslation();
   // Wall-clock read for the illustrative "Updated" badge; lazy so it runs once.
   const [fetchedAt] = useState(() => new Date(Date.now() - 2 * MINUTE_MS));
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const phase = useAlertArrival(frameRef);
+  useFloat(frameRef);
+  // Newest first: while `pending`, the head of the list has not arrived yet.
+  const alerts = phase === 'pending' ? ALERTS.slice(1) : ALERTS;
 
   return (
     <div
+      ref={frameRef}
       role="group"
       aria-labelledby="login-preview-label"
-      className="relative w-full rounded-xs border border-line bg-panel/85 p-4 text-left shadow-[0_0_60px_-20px_rgba(87,199,244,0.25)] backdrop-blur-sm sm:p-6"
+      className="lp-float relative w-full rounded-xs border border-line bg-panel/85 p-4 text-left shadow-[0_0_60px_-20px_rgba(87,199,244,0.25)] backdrop-blur-sm sm:p-6"
     >
       <span
         id="login-preview-label"
@@ -169,7 +240,7 @@ export function OverviewDemo() {
           <PopoverTrigger asChild>
             <button
               type="button"
-              aria-label={t('nav.alertsWithCount', { count: ALERTS.length })}
+              aria-label={t('nav.alertsWithCount', { count: alerts.length })}
               className={cx(
                 'relative inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xs border border-line text-text-dim hover:text-text',
                 focusRingClassName
@@ -178,9 +249,12 @@ export function OverviewDemo() {
               <NavAlerts aria-hidden="true" />
               <span
                 aria-hidden="true"
-                className="absolute -top-1 -right-1 min-w-4 rounded-xs bg-accent px-1 text-center text-[0.625rem] leading-4 font-semibold text-bg tabular-nums"
+                className={cx(
+                  'absolute -top-1 -right-1 min-w-4 rounded-xs bg-accent px-1 text-center text-[0.625rem] leading-4 font-semibold text-bg tabular-nums',
+                  phase === 'arrived' && 'lp-badge-pulse'
+                )}
               >
-                {ALERTS.length}
+                {alerts.length}
               </span>
             </button>
           </PopoverTrigger>
@@ -189,7 +263,7 @@ export function OverviewDemo() {
               {t('nav.alerts')}
             </p>
             <ul className="max-h-80 overflow-y-auto">
-              {ALERTS.map((alert) => (
+              {alerts.map((alert) => (
                 <li
                   key={alert.key}
                   className="flex gap-2 border-b border-line px-3 py-2 last:border-b-0"

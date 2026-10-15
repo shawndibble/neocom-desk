@@ -1481,3 +1481,79 @@
     animation: landing-header-cta-in 200ms ease-out;
   }
 }
+
+/*
+ * Landing page motion (scroll reveal, hero entry, CTA glow, demo float and
+ * alert pulse). Everything that moves is inside `no-preference`; without it,
+ * or without JS, the page is simply static and fully visible. `Reveal` only
+ * sets data-reveal="hidden" on below-the-fold elements when motion is allowed.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .lp-reveal {
+    transition:
+      opacity 500ms ease-out var(--lp-delay, 0ms),
+      transform 500ms ease-out var(--lp-delay, 0ms);
+  }
+  .lp-reveal[data-reveal='hidden'] {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  @keyframes lp-hero-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+  .lp-hero-in {
+    animation: lp-hero-in 600ms ease-out both;
+  }
+  .lp-hero-in-1 {
+    animation-delay: 90ms;
+  }
+  .lp-hero-in-2 {
+    animation-delay: 180ms;
+  }
+  .lp-hero-in-3 {
+    animation-delay: 270ms;
+  }
+
+  /* Slow accent glow breathing behind the hero login button. */
+  @keyframes lp-cta-glow {
+    50% {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+  }
+  .lp-cta-glow {
+    position: relative;
+    isolation: isolate;
+  }
+  .lp-cta-glow::before {
+    content: '';
+    position: absolute;
+    inset: -1.5rem -3rem;
+    z-index: -1;
+    border-radius: 9999px;
+    background: radial-gradient(closest-side, rgba(87, 199, 244, 0.22), transparent);
+    opacity: 0.55;
+    pointer-events: none;
+    animation: lp-cta-glow 5s ease-in-out infinite;
+  }
+
+  /* The demo frame drifts up to 12px as the page scrolls (--lp-float set by OverviewDemo). */
+  .lp-float {
+    transform: translateY(var(--lp-float, 0px));
+    will-change: transform;
+  }
+
+  @keyframes lp-badge-pulse {
+    40% {
+      transform: scale(1.5);
+      box-shadow: 0 0 0 6px rgba(87, 199, 244, 0.35);
+    }
+  }
+  .lp-badge-pulse {
+    animation: lp-badge-pulse 700ms ease-out;
+  }
+}

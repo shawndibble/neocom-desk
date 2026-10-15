@@ -9,6 +9,7 @@ import { db } from '@/db';
 import { EveSsoButton, LogoMark, Panel, plainTextActionClassName } from '@/components/ui';
 import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
+import { Reveal } from '@/features/landing/Reveal';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import {
@@ -176,14 +177,20 @@ export function Login() {
         */}
         <section className="mx-auto flex max-w-[96rem] flex-col items-center gap-12 px-4 py-16 text-center sm:px-6">
           <div className="flex flex-col items-center">
-            <p className="text-[0.6875rem] font-bold tracking-[0.14em] text-accent uppercase">
+            <p className="lp-hero-in lp-hero-in-0 text-[0.6875rem] font-bold tracking-[0.14em] text-accent uppercase">
               {t('login.eyebrow')}
             </p>
-            <h1 className="mt-3 max-w-3xl text-4xl leading-tight font-semibold text-balance sm:text-5xl">
+            <h1 className="lp-hero-in lp-hero-in-1 mt-3 max-w-3xl text-4xl leading-tight font-semibold text-balance sm:text-5xl">
               {t('login.heading')}
             </h1>
-            <p className="mt-4 max-w-xl text-text-dim text-balance">{t('app.tagline')}</p>
-            <div ref={heroCtaRef} className="mt-7 flex flex-col items-center gap-3">
+            <p className="lp-hero-in lp-hero-in-2 mt-4 max-w-xl text-text-dim text-balance">
+              {t('app.tagline')}
+            </p>
+            <div
+              ref={heroCtaRef}
+
+              className="lp-hero-in lp-hero-in-3 lp-cta-glow mt-7 flex flex-col items-center gap-3"
+            >
               <EveSsoButton
                 size="large"
                 pending={pending}
@@ -246,18 +253,22 @@ export function Login() {
           </p>
         </LandingSection>
 
-        <section className="border-t border-line px-6 py-14 text-center">
-          <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
-          <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">{t('login.bottomCtaBody')}</p>
-          <div className="mt-6 flex flex-col items-center gap-3">
-            <EveSsoButton
-              size="large"
-              pending={pending}
-              onClick={onLogin}
-              label={t('login.button')}
-            />
-            <CustomizeLink onClick={() => setCustomizing(true)} />
-          </div>
+        <section className="border-t border-line">
+          <Reveal className="px-6 py-14 text-center">
+            <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
+            <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">
+              {t('login.bottomCtaBody')}
+            </p>
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <EveSsoButton
+                size="large"
+                pending={pending}
+                onClick={onLogin}
+                label={t('login.button')}
+              />
+              <CustomizeLink onClick={() => setCustomizing(true)} />
+            </div>
+          </Reveal>
         </section>
 
         <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
@@ -303,12 +314,12 @@ function LandingSection({
       aria-labelledby={`${id}-heading`}
       className="scroll-mt-16 border-t border-line"
     >
-      <div className="mx-auto max-w-6xl px-6 py-14">
+      <Reveal className="mx-auto max-w-6xl px-6 py-14">
         <h2 id={`${id}-heading`} className="text-xl font-semibold">
           {heading}
         </h2>
         {children}
-      </div>
+      </Reveal>
     </section>
   );
 }
