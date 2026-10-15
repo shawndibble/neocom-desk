@@ -268,11 +268,12 @@ export function YourPlanetsPanel({
       padded={false}
     >
       {/* auto-fit: the columns stretch to the card, so a few planets never leave blank space. */}
-      <ul className="grid grid-cols-2 gap-px bg-line max-sm:[&>li:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]">
+      {/* Dividers are tile borders, not a gap over a bg-line backdrop, so a trailing empty track stays panel-coloured. */}
+      <ul className="-mr-px -mb-px grid grid-cols-2 max-sm:[&>li:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]">
         {view.strips.map((strip) => (
           <li
             key={strip.planetId}
-            className="flex min-w-0 flex-col items-center gap-1.5 bg-panel p-3 text-center sm:flex-row sm:gap-3 sm:text-left"
+            className="flex min-w-0 flex-col items-center gap-1.5 border-r border-b border-line p-3 text-center sm:flex-row sm:gap-3 sm:text-left"
           >
             <PlanetImage type={strip.planetType} size={48} />
             <div className="min-w-0 flex-1 text-xs">

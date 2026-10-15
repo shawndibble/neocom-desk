@@ -262,10 +262,11 @@ function FaultTags({ tags, planetName }: { tags: readonly FaultTag[]; planetName
 
 /**
  * The row grid from `lg`: colony, extractors, storage, next step, ⋮. The ⋮
- * column has a fixed width so `ColonyListHeader`'s labels sit over the cells.
+ * column has a fixed width so `ColonyListHeader`'s labels sit over the cells. At 1024
+ * Colony gets the width Next step (a button and a note) doesn't need.
  */
 const ROW_GRID =
-  'lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)_12rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
+  'lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)_9rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
 
 /**
  * A column's label and help. In a row (`inRow`) the list header shows both from `lg`,
@@ -282,7 +283,7 @@ function ColumnLabel({
 }) {
   const { t } = useTranslation();
   return (
-    <span className={`flex items-center gap-1 ${MICRO}`}>
+    <span className={`flex items-center gap-1 whitespace-nowrap ${MICRO}`}>
       <span className={inRow ? 'lg:sr-only' : undefined}>{label}</span>
       <span className={inRow ? 'lg:hidden' : undefined}>
         <InfoTooltip label={t('common.aboutLabel', { label })} content={help} />
@@ -595,7 +596,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
             </div>
 
             {row.tags.length > 0 && (
-              <div className="lg:col-span-full lg:pl-[4.6rem]">
+              <div className="lg:pl-24">
                 <FaultTags tags={row.tags} planetName={planetName} />
               </div>
             )}
