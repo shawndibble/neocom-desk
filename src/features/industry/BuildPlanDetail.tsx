@@ -777,10 +777,13 @@ export function BuildPlanDetail({
 
   // Blueprint prices are provisional until the market/LP offers land, so the
   // page doesn't offer to "find" a blueprint the next render prices.
+  // An unreachable price source reads as "not ready", never as free materials.
+  const pricesUnreachable = snapshot?.pricesUnreachable === true;
   const pricesReady =
     snapshot !== null &&
     snapshot.adjustedPrices !== null &&
     snapshot.systemCostIndex !== null &&
+    !pricesUnreachable &&
     blueprintOffersReady;
 
   /**
@@ -2158,7 +2161,7 @@ export function BuildPlanDetail({
              * of profit lives in `PlanVerdictHero` above.
              */
             collapsedSummary={
-              pricesReady && (
+              pricesReady ? (
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
                   <dt className="text-text-dim">{t('industry.totalCost')}</dt>
                   <dd className="text-right tabular-nums">{formatIsk(result.totalCost)}</dd>
@@ -2197,7 +2200,9 @@ export function BuildPlanDetail({
                     </>
                   )}
                 </dl>
-              )
+              ) : pricesUnreachable ? (
+                <p className="text-xs text-text-dim">{t('common.pricesUnavailableOffline')}</p>
+              ) : null
             }
             expanded={costsExpanded}
             onToggle={() => setCostsOpen(!costsExpanded)}
@@ -2214,6 +2219,7 @@ export function BuildPlanDetail({
             <ResultsSummary
               result={result}
               pricesReady={pricesReady}
+              pricesUnreachable={pricesUnreachable}
               pricesLoading={pricesLoading}
               systemCostIndex={snapshot?.systemCostIndex ?? null}
               productName={entry.productName}

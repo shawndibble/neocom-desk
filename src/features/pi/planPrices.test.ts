@@ -55,6 +55,20 @@ describe('loadPlanPrices', () => {
     expect(result.unpriced).toEqual([2867]);
   });
 
+  it('reads a snapshot flagged pricesUnreachable as failed even when some prices were still cached', async () => {
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: { 2867: 1_900_000 },
+      hubBuyPrices: {},
+      adjustedPrices: null,
+      systemCostIndex: null,
+      pricesUnreachable: true,
+    });
+
+    const result = await loadPlanPrices(TRADE_HUBS[0], [2867]);
+
+    expect(result.failed).toBe(true);
+  });
+
   it('reads an unreachable Fuzzwork that answers with no quotes at all as failed, not as unpriced', async () => {
     loadMarketSnapshot.mockResolvedValue({
       hubPrices: {},

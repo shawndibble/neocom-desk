@@ -102,6 +102,11 @@ interface ResultsSummaryProps {
   /** False when adjusted prices / cost index couldn't be fetched live (no local cache — offline). */
   pricesReady: boolean;
   /**
+   * True when the price source could not be reached (offline): the empty state
+   * then says so instead of "try again shortly".
+   */
+  pricesUnreachable?: boolean;
+  /**
    * True while the market snapshot's initial fetch for this plan is still in
    * flight. Distinct from `!pricesReady`: without this, "just opened, nothing
    * back yet" and "the live ESI call genuinely failed" read as the same
@@ -162,6 +167,7 @@ const NO_SALE_LINES: readonly OwnedStockSaleLine[] = [];
 export function ResultsSummary({
   result,
   pricesReady,
+  pricesUnreachable = false,
   pricesLoading,
   systemCostIndex,
   productName,
@@ -268,8 +274,16 @@ export function ResultsSummary({
   if (!pricesReady) {
     return (
       <EmptyState
-        title={t('industry.pricesUnavailableTitle')}
-        hint={t('industry.pricesUnavailableHint')}
+        title={
+          pricesUnreachable
+            ? t('common.pricesUnavailableOffline')
+            : t('industry.pricesUnavailableTitle')
+        }
+        hint={
+          pricesUnreachable
+            ? t('industry.pricesUnavailableOfflineHint')
+            : t('industry.pricesUnavailableHint')
+        }
         className="py-6"
       />
     );

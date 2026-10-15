@@ -378,6 +378,16 @@ describe('ResultsSummary: fetching vs. unavailable prices (#409)', () => {
   });
 });
 
+describe('ResultsSummary: unreachable price source (offline)', () => {
+  it('says prices are unavailable offline, not "try again shortly"', () => {
+    renderSummary({ pricesReady: false, pricesLoading: false, pricesUnreachable: true });
+    expect(screen.getByText('Prices unavailable offline')).toBeInTheDocument();
+    expect(screen.getByText(/Recipes, materials and times are still shown/)).toBeInTheDocument();
+    expect(screen.queryByText(/Try again shortly/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Price data unavailable')).not.toBeInTheDocument();
+  });
+});
+
 describe('ResultsSummary: unpriced-product Market link (#409)', () => {
   it('links the unpriced-product warning to Market for that product', async () => {
     renderSummary({

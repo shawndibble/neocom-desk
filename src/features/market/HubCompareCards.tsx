@@ -157,6 +157,11 @@ export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] })
                 onCopied={() => announceCopied(`${row.hub.id}:buy`)}
               />
             </dl>
+            {row.unreachable && (
+              <p className="mt-2 text-[0.6875rem] text-text-dim">
+                {t('common.pricesUnavailableOffline')}
+              </p>
+            )}
           </li>
         ))}
       </ul>

@@ -2666,6 +2666,7 @@
     "pricesLoading": "Fetching prices…",
     "pricesUnavailableTitle": "Price data unavailable",
     "pricesUnavailableHint": "Couldn't load total job cost, profit, and the build-vs-buy verdict yet. Try again shortly. Materials and time above don't need it.",
+    "pricesUnavailableOfflineHint": "Recipes, materials and times are still shown; costs and profit need live market prices.",
     "unpricedMaterialsWarning": "{{count}} material(s) have no price on the chosen side of the market; totals below are underestimated.",
     "productUnpriced": "{{name}} has no hub sell price; no build-vs-buy verdict.",
     "acquisitionVerdictLabel": "Acquisition Verdict",
@@ -4917,6 +4918,7 @@
   },
   "common": {
     "opensInNewTab": "(opens in a new tab)",
+    "pricesUnavailableOffline": "Prices unavailable offline",
     "iskAmountHint": "= {{amount}} ISK",
     "iskInvalid": "Not an ISK amount. Try 1.5b, 500m or 1,000,000.",
     "unknownType": "Type {{id}}",
@@ -7441,6 +7443,7 @@
     "esiRetry": "Retry",
     "pricesFailedTitle": "Hub prices could not be fetched",
     "pricesFailedHint": "Figures that need them, ISK and haul volume, are hidden until they load. Check your connection, then refresh.",
+    "pricesFailedOfflineHint": "Figures that need them, ISK and haul volume, are hidden until you're back online.",
     "loadFailedTitle": "The planner could not load",
     "loadFailedHint": "Your colonies or planetary schematics failed to load. Refresh to try again.",
     "planFailedTitle": "No plan for these goals",

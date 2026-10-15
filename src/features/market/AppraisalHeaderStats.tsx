@@ -17,6 +17,11 @@ interface AppraisalHeaderStatsProps {
   showRefine: boolean;
   showCheapest: boolean;
   implantBonusPct: number;
+  /**
+   * The price source could not be reached: the price-derived groups show a
+   * placeholder instead of 0 ISK totals. Volume and item count need no price.
+   */
+  pricesUnavailable?: boolean;
 }
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -44,8 +49,22 @@ export function AppraisalHeaderStats({
   showRefine,
   showCheapest,
   implantBonusPct,
+  pricesUnavailable = false,
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
+  if (pricesUnavailable) {
+    return (
+      <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
+        <Group title={t('market.appraisal.groupWorth')}>
+          <p className="text-sm text-text-dim">{t('common.pricesUnavailableOffline')}</p>
+        </Group>
+        <Group title={t('market.appraisal.groupCargo')}>
+          <AppraisalVolumeChip totals={totals} emphasis />
+          <StatChip label={t('market.appraisal.items')} value={itemCount} />
+        </Group>
+      </div>
+    );
+  }
   return (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
       {net && (

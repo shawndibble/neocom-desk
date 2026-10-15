@@ -1370,6 +1370,26 @@ describe('BuildPlanDetail remembers the location it sets', () => {
   });
 });
 
+describe('BuildPlanDetail with an unreachable price source (offline)', () => {
+  it('keeps the materials and says prices are unavailable offline, instead of pricing them as missing', async () => {
+    const user = userEvent.setup();
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: {},
+      hubBuyPrices: {},
+      adjustedPrices: {},
+      systemCostIndex: 0.05,
+      pricesUnreachable: true,
+    });
+    render(<Harness />);
+    await openSetup(user);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(await screen.findByText('Prices unavailable offline')).toBeInTheDocument();
+    expect(screen.queryByText(/have no price on the chosen side/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Try again shortly/)).not.toBeInTheDocument();
+  });
+});
+
 describe('BuildPlanDetail material price basis', () => {
   /** Tritanium at 5 sell / 4 buy, so the two bases are told apart by the price cell. */
   function pricedSnapshot() {
