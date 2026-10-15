@@ -9,13 +9,12 @@
 import {
   collection,
   collectionGroup,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
-  setDoc,
   where,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
@@ -218,10 +217,11 @@ export async function loadCommunityPledges(
 }
 
 /**
- * Rewrites this Character's Pledge on one Request: reads the stored document
- * first (so a delivery marked from another device is kept), applies `change`,
- * then writes it, or deletes it when no line is left. Returns the new Pledge,
- * null when withdrawn.
+ * Rewrites this Character's Pledge on one Request: inside a transaction, reads
+ * the stored document (so a delivery marked from another device, or a typed
+ * amount saved a moment ago, is kept; a concurrent write makes it retry on the
+ * fresh document), applies `change`, then writes it, or deletes it when no
+ * line is left. Returns the new Pledge, null when withdrawn.
  */
 export async function updateMyPledge(
   characterId: number,
@@ -249,26 +249,30 @@ export async function updateMyPledge(
     'pledges',
     uid
   );
-  const stored = await getDoc(ref);
-  const before = stored.exists() ? readPledge(uid, stored.data()) : null;
-  const next = change(before?.lines ?? {});
-  if (Object.keys(next).length === 0) {
-    await deleteDoc(ref);
-    return null;
-  }
-  const lines: Record<
-    string,
-    { quantity: number; delivered: number; contractIds: number[]; manual?: number }
-  > = {};
-  for (const [index, entry] of Object.entries(next)) {
-    lines[index] = {
-      quantity: entry.quantity,
-      delivered: entry.delivered,
-      contractIds: [...(entry.contractIds ?? [])],
-      ...(entry.manual !== undefined ? { manual: entry.manual } : {}),
-    };
-  }
-  await setDoc(ref, { ownerHash, communityId, lines, updatedAt: serverTimestamp() });
+  const withdrawn = await runTransaction(getSyncFirestore(), async (tx) => {
+    const stored = await tx.get(ref);
+    const before = stored.exists() ? readPledge(uid, stored.data()) : null;
+    const next = change(before?.lines ?? {});
+    if (Object.keys(next).length === 0) {
+      tx.delete(ref);
+      return true;
+    }
+    const lines: Record<
+      string,
+      { quantity: number; delivered: number; contractIds: number[]; manual?: number }
+    > = {};
+    for (const [index, entry] of Object.entries(next)) {
+      lines[index] = {
+        quantity: entry.quantity,
+        delivered: entry.delivered,
+        contractIds: [...(entry.contractIds ?? [])],
+        ...(entry.manual !== undefined ? { manual: entry.manual } : {}),
+      };
+    }
+    tx.set(ref, { ownerHash, communityId, lines, updatedAt: serverTimestamp() });
+    return false;
+  });
+  if (withdrawn) return null;
   return readPledge(uid, (await getDoc(ref)).data() ?? {});
 }
 
