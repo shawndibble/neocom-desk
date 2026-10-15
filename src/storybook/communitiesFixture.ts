@@ -229,6 +229,7 @@ export function createCommunitiesFixture(
     lastActivityAt: now - ageHours * 3_600_000,
     expiresAt: now - ageHours * 3_600_000 + 30 * DAY,
     closed: false,
+    notify: { app: true, mail: false },
   });
   const item = (typeId: number, name: string, quantity: number): RequestLine => ({
     typeId,
@@ -329,7 +330,6 @@ export function createCommunitiesFixture(
     loadRequests: (id) => (requests[id] ?? []).map((entry) => ({ ...entry })),
     loadLibraries: (id) => libraries[id] ?? [],
     loadFittings: (id) => (fittings[id] ?? []).map((entry) => ({ ...entry })),
-    loadRequestMailsToday: () => 3,
     loadItemRequests: (id) => (itemRequests[id] ?? []).map((entry) => ({ ...entry })),
     loadAllPledges: (id) => Object.fromEntries(Object.entries(pledges[id] ?? {})),
     loadPledges: (id, requestId) => (pledges[id]?.[requestId] ?? []).map((entry) => ({ ...entry })),
@@ -357,7 +357,12 @@ export function createCommunitiesFixture(
       };
       switch (name) {
         case 'postCommunityRequestCallable': {
-          const draft = data as { location: string; terms: string; lines: RequestLine[] };
+          const draft = data as {
+            location: string;
+            terms: string;
+            lines: RequestLine[];
+            notify?: CommunityRequest['notify'];
+          };
           const posted = wanted(
             `req-${Math.random().toString(36).slice(2, 8)}`,
             ME,
@@ -367,17 +372,20 @@ export function createCommunitiesFixture(
             0,
             draft.lines
           );
+          if (draft.notify) posted.notify = draft.notify;
           itemRequests[communityId] = [posted, ...(itemRequests[communityId] ?? [])];
           return { requestId: posted.id };
         }
-        case 'reserveCommunityRequestMailCallable':
+        case 'reserveCommunityPledgeMailCallable':
           return {
             communityName: communities.find((c) => c.id === communityId)?.name ?? '',
+            pledgerName: SAMPLE_ACTIVE_CHARACTER.name,
             requesterName: SAMPLE_ACTIVE_CHARACTER.name,
+            requesterCharacterId: 1,
             remaining: 96,
           };
-        case 'confirmCommunityRequestMailCallable':
-        case 'releaseCommunityRequestMailCallable':
+        case 'confirmCommunityPledgeMailCallable':
+        case 'releaseCommunityPledgeMailCallable':
           return {};
         case 'extendCommunityRequestCallable': {
           const { requestId } = data as { requestId: string };

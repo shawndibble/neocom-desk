@@ -80,16 +80,15 @@ import {
   parsePostRequestInput,
   parseRemovePledgeInput,
   parseRequestIdInput,
-  parseRequestMailInput,
   parseSetClosedInput,
 } from './communityRequests.js';
 import {
-  confirmRequestMail,
+  confirmPledgeMail,
   editRequest,
   extendRequest,
   postRequest,
-  releaseRequestMail,
-  reserveRequestMail,
+  releasePledgeMail,
+  reservePledgeMail,
   setRequestClosed,
 } from './communityRequestsStore.js';
 import { removePledge, removeRequest, sweepRequests } from './communityRequestsCleanup.js';
@@ -649,50 +648,30 @@ export const setCommunityRequestClosedCallable = onCall<unknown>(
   }
 );
 
-// Request mail (issue #3810): the client sends the EVE mail with its own token;
-// the 100-a-day cap and the one-per-recipient rule live in these three.
-export const reserveCommunityRequestMailCallable = onCall<unknown>(
+// Pledge mail: the Pledger's client sends the EVE mail with its own token; the
+// 100-a-day cap and the once-per-Pledger-per-Request rule live in these three.
+// The recipient is the Request's owner, read server-side, never sent by a client.
+export const reserveCommunityPledgeMailCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   (request) => {
-    const { communityId, requestId, targetCharacterId, targetName } = parseRequestMailInput(
-      request.data
-    );
-    return reserveRequestMail(
-      getFirestore(),
-      callerOf(request),
-      communityId,
-      requestId,
-      targetCharacterId,
-      targetName
-    );
+    const { communityId, requestId } = parseRequestIdInput(request.data);
+    return reservePledgeMail(getFirestore(), callerOf(request), communityId, requestId);
   }
 );
 
-export const confirmCommunityRequestMailCallable = onCall<unknown>(
+export const confirmCommunityPledgeMailCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
-    const { communityId, requestId, targetCharacterId } = parseRequestMailInput(request.data);
-    await confirmRequestMail(
-      getFirestore(),
-      callerOf(request),
-      communityId,
-      requestId,
-      targetCharacterId
-    );
+    const { communityId, requestId } = parseRequestIdInput(request.data);
+    await confirmPledgeMail(getFirestore(), callerOf(request), communityId, requestId);
   }
 );
 
-export const releaseCommunityRequestMailCallable = onCall<unknown>(
+export const releaseCommunityPledgeMailCallable = onCall<unknown>(
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
-    const { communityId, requestId, targetCharacterId } = parseRequestMailInput(request.data);
-    await releaseRequestMail(
-      getFirestore(),
-      callerOf(request),
-      communityId,
-      requestId,
-      targetCharacterId
-    );
+    const { communityId, requestId } = parseRequestIdInput(request.data);
+    await releasePledgeMail(getFirestore(), callerOf(request), communityId, requestId);
   }
 );
 

@@ -37,10 +37,9 @@ describe('canAskToCopy', () => {
 });
 
 describe('askToCopyPrefill', () => {
-  it('is one BPC line of that blueprint, quantity 1, runs/ME/TE left empty, holder ticked', () => {
+  it('is one BPC line of that blueprint, quantity 1, runs/ME/TE left empty', () => {
     expect(askToCopyPrefill(offer(), 'Rifter Blueprint')).toEqual({
       lines: [{ typeId: 33078, name: 'Rifter Blueprint', quantity: 1, kind: 'bpc' }],
-      tickedUids: ['u-ann'],
     });
   });
 });

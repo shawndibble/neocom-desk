@@ -264,7 +264,7 @@ export const RequestsMyPledges: Story = {
 /** @summary My pledges in the phone shell. */
 export const RequestsMyPledgesPhone: Story = { ...RequestsMyPledges, globals: phone };
 
-/** @summary New request: location, terms, pasted list, editable lines, add an item. */
+/** @summary New request: location, terms, pasted list, editable lines, add an item, and how to hear about a Pledge (in the app / by in-game mail). */
 export const RequestsCompose: Story = {
   ...RequestsBoard,
   play: async ({ canvasElement }) => {
@@ -282,39 +282,6 @@ export const RequestsCompose: Story = {
 
 /** @summary New request in the phone shell. */
 export const RequestsComposePhone: Story = { ...RequestsCompose, globals: phone };
-
-/** The sample Characters plus permission to send mail, which the Mail to field needs. */
-const MAIL_SCOPES = [
-  'esi-wallet.read_character_wallet.v1',
-  'esi-characters.read_loyalty.v1',
-  'esi-mail.send_mail.v1',
-];
-
-/** Fills step 1 with two blueprints some Members share, then waits for who gets mailed. */
-const composeRecipients: Story['play'] = async ({ canvasElement }) => {
-  const canvas = within(canvasElement);
-  await userEvent.click(await canvas.findByRole('button', { name: /new request/i }));
-  const dialog = within(document.body);
-  for (const name of ['Rifter Blueprint', 'Venture Blueprint']) {
-    const search = await dialog.findByRole('searchbox', { name: 'Add an item' });
-    await userEvent.type(search, name);
-    await userEvent.click(await dialog.findByRole('button', { name }));
-  }
-  await dialog.findByText('Ilvara Nokk');
-  await dialog.findByText('Dax Orrelin');
-};
-
-/** @summary New request with the Mail to field: my character and the Members sharing a matching blueprint as chips, the day's mail count. */
-export const RequestsComposeRecipients: Story = {
-  parameters: { shell: { path: requestsPath(SAMPLE_ADMIN_COMMUNITY_ID), scopes: MAIL_SCOPES } },
-  play: composeRecipients,
-};
-
-/** @summary The Mail to field in the phone shell. */
-export const RequestsComposeRecipientsPhone: Story = {
-  ...RequestsComposeRecipients,
-  globals: phone,
-};
 
 /** @summary A Community with no Requests yet. */
 export const RequestsEmpty: Story = {
@@ -343,21 +310,11 @@ const askToCopy = (communities: { id: string; name: string }[]): Story => ({
 const brass = { id: SAMPLE_ADMIN_COMMUNITY_ID, name: 'Brass Meridian Industrialists' };
 const providence = { id: SAMPLE_MEMBER_COMMUNITY_ID, name: 'Providence Mining Co-op' };
 
-/** @summary Ask to copy (BPC Sourcing): compose opens with one Rifter Blueprint line, quantity 1; the holder is a Mail to chip. */
+/** @summary Ask to copy (BPC Sourcing): compose opens with one Rifter Blueprint line, quantity 1. */
 export const AskToCopyCompose: Story = askToCopy([brass]);
 
 /** @summary Ask to copy in the phone shell. */
 export const AskToCopyComposePhone: Story = { ...AskToCopyCompose, globals: phone };
-
-/** @summary Ask to copy: Ilvara Nokk, who holds it, is already a Mail to chip. */
-export const AskToCopyRecipients: Story = {
-  ...askToCopy([brass]),
-  parameters: { shell: { path: '/communities', scopes: MAIL_SCOPES } },
-  play: async () => {
-    const dialog = within(document.body);
-    await dialog.findByText('Ilvara Nokk');
-  },
-};
 
 /** @summary Ask to copy when the holder shares it in two Communities: pick which one first. */
 export const AskToCopyPickCommunity: Story = askToCopy([brass, providence]);

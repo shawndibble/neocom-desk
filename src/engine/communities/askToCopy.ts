@@ -1,7 +1,6 @@
 /**
  * "Ask <name> to copy" (issue #3813): a Shared BPO on a Community Offer row of
- * BPC Sourcing becomes a Request for one copy of that blueprint, the holder
- * added to compose's Mail to field. Pure: the dialog is `AskToCopyDialog`.
+ * BPC Sourcing becomes a Request for one copy of that blueprint. Pure: the dialog is `AskToCopyDialog`.
  */
 import type { RequestLine } from './requests';
 
@@ -34,13 +33,12 @@ export function canAskToCopy(
   );
 }
 
-/** What compose starts with: one BPC line, quantity 1, no runs/ME/TE ask, the holder ticked. */
+/** What compose starts with: one BPC line, quantity 1, no runs/ME/TE ask. */
 export function askToCopyPrefill(
   offer: AskToCopyOffer,
   blueprintName: string
-): { lines: RequestLine[]; tickedUids: string[] } {
+): { lines: RequestLine[] } {
   return {
     lines: [{ typeId: offer.typeId, name: blueprintName, quantity: 1, kind: 'bpc' }],
-    tickedUids: offer.memberUid ? [offer.memberUid] : [],
   };
 }

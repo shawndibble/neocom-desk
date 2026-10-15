@@ -295,6 +295,14 @@ const CATALOG = [
     labelKey: 'settings.notifications.event.communityMemberJoined',
     defaultChannels: 'feedOnly',
   },
+  // A Member Pledged on one of the pilot's own open Requests (and the Request
+  // asked for the app). Read from the sync backend, so no ESI scope. In the
+  // bell only: it is good news, not an interruption.
+  {
+    id: 'communityRequestPledged',
+    labelKey: 'settings.notifications.event.communityRequestPledged',
+    defaultChannels: 'feedOnly',
+  },
 ] as const satisfies readonly CatalogRow[];
 
 export type NotificationEventId = (typeof CATALOG)[number]['id'];

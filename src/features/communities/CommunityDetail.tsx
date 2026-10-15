@@ -322,7 +322,6 @@ export function CommunityDetail({
               pledgesFailed={board.pledgesFailed}
               failed={board.failed}
               now={now}
-              members={members}
               onReload={board.reload}
               refreshPledges={board.refreshPledges}
             />

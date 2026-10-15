@@ -512,7 +512,10 @@ describe('Requests', () => {
         lines: { 0: entry(1) },
         updatedAt: new Date(),
       });
-      await setDoc(doc(db, `${REQ}/mails/42`), { senderUid: 'char:1', day: '2026-10-12' });
+      await setDoc(doc(db, `${REQ}/pledgeMails/char:42`), {
+        senderUid: 'char:1',
+        day: '2026-10-12',
+      });
       await setDoc(doc(db, 'characters/char:1/requestMailQuota/2026-10-12'), {
         count: 3,
         ownerHash: 'hash-1',
@@ -969,12 +972,12 @@ describe('Requests', () => {
     );
   });
 
-  it('keeps the per-recipient mail records to the callables', async () => {
+  it('keeps the per-Pledger mail records to the callables', async () => {
     for (const n of [1, 2]) {
       const db = characterAuth(env, n, `hash-${n}`).firestore();
-      await assertFails(getDoc(doc(db, `${REQ}/mails/42`)));
-      await assertFails(getDocs(collection(db, `${REQ}/mails`)));
-      await assertFails(setDoc(doc(db, `${REQ}/mails/42`), { sentAt: 1 }));
+      await assertFails(getDoc(doc(db, `${REQ}/pledgeMails/char:42`)));
+      await assertFails(getDocs(collection(db, `${REQ}/pledgeMails`)));
+      await assertFails(setDoc(doc(db, `${REQ}/pledgeMails/char:42`), { sentAt: 1 }));
     }
   });
 });

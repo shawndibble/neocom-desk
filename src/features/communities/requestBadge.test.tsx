@@ -34,6 +34,7 @@ const request = (id: string, over: Partial<CommunityRequest> = {}): CommunityReq
   lastActivityAt: NOW - 1000,
   expiresAt: NOW + DAY,
   closed: false,
+  notify: { app: true, mail: false },
   ...over,
 });
 const community = (id: string) => ({

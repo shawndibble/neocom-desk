@@ -37,8 +37,6 @@ export interface CommunityBackendOverride {
     requestId: string,
     lines: RequestPledge['lines'] | null
   ) => void;
-  /** Request mails already sent today, for the compose dialog's count. */
-  loadRequestMailsToday?: () => number;
   /** What marking deliveries from contracts found, for the panel's flags and notes. */
   syncDeliveries?: (communityId: string) => DeliverySyncResult;
   /** Every Skill Plan shared into the Community, by anyone. */

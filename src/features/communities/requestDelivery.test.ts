@@ -51,6 +51,7 @@ const request = (over: Partial<CommunityRequest> = {}): CommunityRequest => ({
   lastActivityAt: NOW,
   expiresAt: NOW + 20 * 86_400_000,
   closed: false,
+  notify: { app: true, mail: false },
   ...over,
 });
 

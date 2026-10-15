@@ -23,8 +23,10 @@ import type {
   PledgeEntry,
   RequestLine,
   RequestLineKind,
+  RequestNotify,
   RequestPledge,
 } from '@/engine/communities/requests';
+import { readNotify } from '@/engine/communities/requests';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
@@ -80,6 +82,7 @@ export async function loadRequests(
         lastActivityAt: Number(d.lastActivityAt ?? 0),
         expiresAt: Number(d.expiresAt ?? 0),
         closed: d.closed === true,
+        notify: readNotify(d.notify),
       };
     })
     .filter((request): request is CommunityRequest => request !== null)
@@ -90,6 +93,7 @@ export interface PostRequestDraft {
   location: string;
   terms: string;
   lines: RequestLine[];
+  notify: RequestNotify;
 }
 
 export function postRequest(characterId: number, communityId: string, draft: PostRequestDraft) {

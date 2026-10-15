@@ -17,6 +17,7 @@ const row = (over: Partial<MyPledgeRow> = {}): MyPledgeRow => ({
     lastActivityAt: 1,
     expiresAt: 2,
     closed: false,
+    notify: { app: true, mail: false },
   },
   index: 0,
   line: { typeId: 34, name: 'Tritanium', quantity: 1000, kind: 'item' },

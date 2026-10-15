@@ -38,6 +38,11 @@ export async function rememberCommunityWatch(
   else await db.settings.delete(watchKey(characterId));
 }
 
+/** Whether the Communities page has listed a Community for this Character (`rememberCommunityWatch`). */
+export async function isWatchingCommunities(characterId: number): Promise<boolean> {
+  return (await db.settings.get(watchKey(characterId)))?.value === true;
+}
+
 let counts = new Map<string, number>();
 let total = 0;
 const listeners = new Set<() => void>();
@@ -100,7 +105,7 @@ export async function markRequestsSeen(
 /** Rereads every Community's board and republishes the count. Does nothing it cannot do. */
 export async function refreshRequestBadge(characterId: number, now = Date.now()): Promise<void> {
   if (communityBackendOverride()) return;
-  if ((await db.settings.get(watchKey(characterId)))?.value !== true) return;
+  if (!(await isWatchingCommunities(characterId))) return;
   const [{ getSyncAuth }, { uidForCharacter }, store, requests] = await Promise.all([
     import('@/sync/firebaseApp'),
     import('@/sync/uid'),

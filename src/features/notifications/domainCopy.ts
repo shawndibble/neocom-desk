@@ -26,6 +26,7 @@
 import type {
   CommunityJoinRequestFire,
   CommunityMemberJoinedFire,
+  CommunityRequestPledgedFire,
 } from '@/engine/communities/communityAlert';
 import type { StockBelowTargetFire } from '@/engine/stockTargets/stockAlert';
 import type { IncursionNearbyFire } from '@/engine/incursions/incursionAlert';
@@ -586,6 +587,21 @@ export const communityMemberJoinedCopy: DomainCopy<CommunityMemberJoinedFire, No
       community: fire.communityName,
     }),
   }),
+};
+
+export const communityRequestPledgedCopy: DomainCopy<CommunityRequestPledgedFire, NoNames> = {
+  poll: (fire) => {
+    const name = fire.characterName || fired('communityRequestPledged', 'someone');
+    return {
+      title: fired('communityRequestPledged', 'title', { community: fire.communityName }),
+      body: fired('communityRequestPledged', 'body', {
+        count: fire.count,
+        name,
+        community: fire.communityName,
+        request: fire.requestLabel,
+      }),
+    };
+  },
 };
 
 /* Incursions -------------------------------------------------------------- */

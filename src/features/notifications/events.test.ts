@@ -43,6 +43,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'incursionNearby',
       'communityJoinRequest',
       'communityMemberJoined',
+      'communityRequestPledged',
     ]);
   });
 
@@ -163,6 +164,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'contractFailed',
       'walletBalanceChanged',
       'communityMemberJoined',
+      'communityRequestPledged',
     ]);
   });
 });

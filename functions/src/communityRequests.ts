@@ -10,7 +10,6 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import {
   MAIL_MAX_ATTEMPTS_PER_TARGET,
   MAIL_RESERVATION_STALE_MS,
-  MAX_CHARACTER_NAME_LENGTH,
   boundedString,
   docId,
   record,
@@ -25,7 +24,7 @@ export const PLEDGES_COLLECTION = 'pledges';
 export const MAX_OPEN_REQUESTS_PER_MEMBER = 10;
 /**
  * Mails one Member may send about Requests per UTC day (issue #3810): a mail
- * is one recipient, however many lines the Request has. Counted apart from
+ * is a Pledge mail to one requester, however many lines it lists. Counted apart from
  * the 20 mail invites an admin sends (`MAX_MAIL_INVITES_PER_DAY`).
  */
 export const MAX_REQUEST_MAILS_PER_DAY = 100;
@@ -57,11 +56,24 @@ export interface RequestLine {
   te?: number;
 }
 
+/**
+ * How the requester wants to hear that someone Pledged: in the app (the bell),
+ * by in-game mail from the Pledger, both or neither (the board alone). A
+ * Request stored before this existed has no field and reads as the default.
+ */
+export interface RequestNotify {
+  app: boolean;
+  mail: boolean;
+}
+
+export const DEFAULT_NOTIFY: RequestNotify = { app: true, mail: false };
+
 export interface PostRequestInput {
   communityId: string;
   location: string;
   terms: string;
   lines: RequestLine[];
+  notify: RequestNotify;
 }
 
 export interface EditRequestInput extends PostRequestInput {
@@ -136,6 +148,20 @@ function parseLine(raw: unknown): RequestLine {
   return line;
 }
 
+/** A notification choice: two booleans and nothing else; absent means the default. */
+export function parseNotify(raw: unknown): RequestNotify {
+  if (raw === undefined || raw === null) return { ...DEFAULT_NOTIFY };
+  const d = record(raw);
+  if (
+    typeof d.app !== 'boolean' ||
+    typeof d.mail !== 'boolean' ||
+    Object.keys(d).some((key) => key !== 'app' && key !== 'mail')
+  ) {
+    throw new HttpsError('invalid-argument', 'notify must be { app, mail } booleans');
+  }
+  return { app: d.app, mail: d.mail };
+}
+
 export function parsePostRequestInput(data: unknown): PostRequestInput {
   const d = record(data);
   if (!Array.isArray(d.lines) || d.lines.length === 0) {
@@ -159,6 +185,7 @@ export function parsePostRequestInput(data: unknown): PostRequestInput {
     location: optionalText(d.location, 'location', MAX_LOCATION_LENGTH),
     terms: optionalText(d.terms, 'terms', MAX_TERMS_LENGTH),
     lines,
+    notify: parseNotify(d.notify),
   };
 }
 
@@ -296,23 +323,46 @@ export function nextExpiry(now: number, current: number): number {
   return Math.max(current, now + REQUEST_LIFETIME_MS);
 }
 
-export interface RequestMailInput extends RequestIdInput {
-  targetCharacterId: number;
-  /** Display only: the Member's name as listed. */
-  targetName: string;
+/** The Character id behind a `char:<id>` uid, or null for anything else. */
+export function characterIdOfUid(uid: string): number | null {
+  const match = /^char:(\d+)$/.exec(uid);
+  const id = match ? Number(match[1]) : NaN;
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-export function parseRequestMailInput(data: unknown): RequestMailInput {
-  const d = record(data);
-  const id = d.targetCharacterId;
-  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0) {
-    throw new HttpsError('invalid-argument', 'targetCharacterId must be a Character id');
-  }
-  return {
-    ...parseRequestIdInput(data),
-    targetCharacterId: id,
-    targetName: boundedString(d.targetName, 'targetName', MAX_CHARACTER_NAME_LENGTH),
-  };
+/** How many lines a Pledge document's `lines` map has a quantity on. */
+export function pledgedLineCount(lines: unknown): number {
+  if (typeof lines !== 'object' || lines === null) return 0;
+  return Object.values(lines).filter(
+    (entry) =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      Number((entry as { quantity?: unknown }).quantity) > 0
+  ).length;
+}
+
+export type PledgeMailEligibility =
+  'ok' | 'not-found' | 'own-request' | 'closed' | 'mail-off' | 'no-pledge';
+
+/**
+ * Whether a Pledger may mail the requester (the Pledge mail): the Request is
+ * there and open, it is somebody else's, it asked for mail, and the caller has
+ * a Pledge on it with a quantity. The recipient is the Request's owner, never
+ * anything the client says.
+ */
+export function decidePledgeMail(state: {
+  exists: boolean;
+  ownerUid: string | null;
+  callerUid: string;
+  isOpen: boolean;
+  notifyMail: boolean;
+  pledgedLines: number;
+}): PledgeMailEligibility {
+  if (!state.exists) return 'not-found';
+  if (state.ownerUid === state.callerUid) return 'own-request';
+  if (!state.isOpen) return 'closed';
+  if (!state.notifyMail) return 'mail-off';
+  return state.pledgedLines > 0 ? 'ok' : 'no-pledge';
 }
 
 /**

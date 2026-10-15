@@ -12,22 +12,29 @@ const store = vi.hoisted(() => ({
   extendRequest: vi.fn(),
   setRequestClosed: vi.fn(),
   updateMyPledge: vi.fn(),
-  loadRequestMailsToday: vi.fn(),
-  reserveRequestMail: vi.fn(),
-  confirmRequestMail: vi.fn(),
-  releaseRequestMail: vi.fn(),
+  editRequest: vi.fn(),
   removeRequest: vi.fn(),
   removePledge: vi.fn(),
 }));
 vi.mock('./requestStore', () => store);
-vi.mock('./requestMailStore', () => store);
+const mail = vi.hoisted(() => ({
+  reservePledgeMail: vi.fn(),
+  confirmPledgeMail: vi.fn(),
+  releasePledgeMail: vi.fn(),
+  sendMail: vi.fn(),
+}));
+vi.mock('./pledgeMailStore', () => mail);
+vi.mock('@/features/character/mail', () => ({ sendMail: mail.sendMail }));
 
 const world = vi.hoisted(() => ({
   library: vi.fn(),
   location: vi.fn(),
   newMail: vi.fn(),
 }));
-vi.mock('./communityStore', () => ({ loadMemberLibraries: world.library }));
+vi.mock('./communityStore', () => ({
+  loadMemberLibraries: world.library,
+  communityRequestsUrl: (id: string) => `https://app.test/communities?community=${id}&tab=requests`,
+}));
 vi.mock('@/features/character/location', () => ({ loadCharacterSolarSystemId: world.location }));
 vi.mock('@/esi/endpoints', () => ({ postOpenWindowNewMail: world.newMail }));
 // A chain of stargates 1-2-...-8; system 9 has no gate. Perimeter is one jump
@@ -95,6 +102,7 @@ const request = (over: Partial<CommunityRequest>): CommunityRequest => ({
   lastActivityAt: NOW - DAY,
   expiresAt: NOW + 29 * DAY,
   closed: false,
+  notify: { app: true, mail: false },
   ...over,
 });
 
@@ -122,7 +130,6 @@ function renderTab(
         pledgesFailed={pledgesFailed}
         failed={failed}
         now={NOW}
-        members={[]}
         onReload={onReload}
         refreshPledges={refreshPledges}
       />
@@ -167,7 +174,17 @@ beforeEach(async () => {
   store.removeRequest.mockResolvedValue(undefined);
   store.removePledge.mockResolvedValue(undefined);
   refreshPledges.mockResolvedValue([]);
-  store.loadRequestMailsToday.mockResolvedValue(0);
+  store.editRequest.mockResolvedValue(undefined);
+  mail.reservePledgeMail.mockResolvedValue({
+    communityName: 'Pals',
+    pledgerName: 'Me',
+    requesterName: 'Aria Voss',
+    requesterCharacterId: 2,
+    remaining: 99,
+  });
+  mail.confirmPledgeMail.mockResolvedValue(undefined);
+  mail.releasePledgeMail.mockResolvedValue(undefined);
+  mail.sendMail.mockResolvedValue(1);
 });
 
 describe('RequestsTab board', () => {
@@ -302,6 +319,7 @@ describe('New request dialog', () => {
       location: 'Efa',
       terms: '90% JBV',
       lines: [{ typeId: 35, name: 'Pyerite', quantity: 75, kind: 'item' }],
+      notify: { app: true, mail: false },
     });
     expect(reload).toHaveBeenCalled();
   });
@@ -775,5 +793,173 @@ describe('Admin removal', () => {
     const confirm = await screen.findByRole('dialog', { name: 'Remove this request?' });
     await user.click(within(confirm).getByRole('button', { name: 'Remove request' }));
     expect(await within(confirm).findByRole('alert')).toBeInTheDocument();
+  });
+});
+
+describe('Telling the requester about a Pledge', () => {
+  const SEND_MAIL_SCOPE = 'esi-mail.send_mail.v1';
+  const open = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByText('Tritanium'));
+    return screen.getByRole('dialog', { name: /Aria Voss's request/ });
+  };
+  const wantsMail = () => request({ notify: { app: true, mail: true } });
+  const pledge = async (user: ReturnType<typeof userEvent.setup>, panel: HTMLElement) =>
+    user.click(within(panel).getByRole('button', { name: /^(Pledge|Update pledge)$/ }));
+
+  it('is a pair of checkboxes in compose, app on and mail off to begin with', async () => {
+    const user = userEvent.setup();
+    renderTab([]);
+    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    const group = await screen.findByRole('group', { name: 'Tell me when someone Pledges' });
+    expect(within(group).getByRole('checkbox', { name: 'In the app' })).toBeChecked();
+    expect(within(group).getByRole('checkbox', { name: 'By in-game mail' })).not.toBeChecked();
+    expect(group).toHaveAccessibleDescription(/Send mail Permission/);
+    expect(screen.queryByText('Mail to (optional)')).toBeNull();
+  });
+
+  it('posts the choice made, both off included', async () => {
+    const user = userEvent.setup();
+    renderTab([]);
+    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'By in-game mail' }));
+    await user.click(screen.getByRole('checkbox', { name: 'In the app' }));
+    await user.click(screen.getByLabelText(/Paste a list/));
+    await user.paste('Tritanium 5');
+    await postFromDialog(user);
+    expect(store.postRequest.mock.calls[0][2].notify).toEqual({ app: false, mail: true });
+  });
+
+  it('shows the Request’s choice when editing, and saves a change to it', async () => {
+    const user = userEvent.setup();
+    renderTab([request({ ownerUid: 'char:1', notify: { app: false, mail: true } })]);
+    await user.click(screen.getByText('Tritanium'));
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit request' });
+    expect(within(dialog).getByRole('checkbox', { name: 'In the app' })).not.toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: 'By in-game mail' })).toBeChecked();
+    await user.click(within(dialog).getByRole('checkbox', { name: 'In the app' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    expect(store.editRequest.mock.calls[0][3].notify).toEqual({ app: true, mail: true });
+  });
+
+  it('mails the requester once the Pledge is saved, naming what was Pledged', async () => {
+    const user = userEvent.setup();
+    await grant(SEND_MAIL_SCOPE);
+    store.updateMyPledge.mockResolvedValue({
+      uid: 'char:1',
+      lines: { 0: { quantity: 600, delivered: 0, contractIds: [] } },
+      updatedAt: 1,
+    });
+    renderTab([wantsMail()]);
+    await pledge(user, await open(user));
+    await waitFor(() => expect(mail.sendMail).toHaveBeenCalledTimes(1));
+    const [characterId, recipients, subject, body] = mail.sendMail.mock.calls[0];
+    expect(characterId).toBe(1);
+    expect(recipients).toEqual([{ recipient_id: 2, recipient_type: 'character' }]);
+    expect(subject).toBe('Me Pledged on your Request in Pals');
+    expect(body).toContain('600 × Tritanium');
+    expect(body).toContain('community=c1&tab=requests');
+    expect(mail.confirmPledgeMail).toHaveBeenCalledWith(1, { communityId: 'c1', requestId: 'r1' });
+    expect(await screen.findByText('Mailed Aria Voss about your Pledge.')).toBeInTheDocument();
+    // The Pledge was saved before any mail went out.
+    expect(store.updateMyPledge.mock.invocationCallOrder[0]).toBeLessThan(
+      mail.reservePledgeMail.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('does not mail when the Request did not ask for it', async () => {
+    const user = userEvent.setup();
+    await grant(SEND_MAIL_SCOPE);
+    store.updateMyPledge.mockResolvedValue({
+      uid: 'char:1',
+      lines: { 0: { quantity: 600, delivered: 0, contractIds: [] } },
+      updatedAt: 1,
+    });
+    renderTab([request({})]);
+    await pledge(user, await open(user));
+    await waitFor(() => expect(store.updateMyPledge).toHaveBeenCalled());
+    expect(mail.reservePledgeMail).not.toHaveBeenCalled();
+  });
+
+  it('asks the server only once a mail is settled, not again on an update', async () => {
+    const user = userEvent.setup();
+    await grant(SEND_MAIL_SCOPE);
+    store.updateMyPledge.mockResolvedValue({
+      uid: 'char:1',
+      lines: { 0: { quantity: 600, delivered: 0, contractIds: [] } },
+      updatedAt: 1,
+    });
+    renderTab([wantsMail()], vi.fn(), { r1: [pledgeOf('char:1', 600)] });
+    const panel = await open(user);
+    await pledge(user, panel);
+    await screen.findByText('Mailed Aria Voss about your Pledge.');
+    await pledge(user, panel);
+    await waitFor(() => expect(store.updateMyPledge).toHaveBeenCalledTimes(2));
+    expect(mail.reservePledgeMail).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the Pledge and says why the mail did not go: ESI refused it', async () => {
+    const user = userEvent.setup();
+    await grant(SEND_MAIL_SCOPE);
+    const { EsiError } = await import('@/esi/errors');
+    mail.sendMail.mockRejectedValue(new EsiError(403, 'no'));
+    store.updateMyPledge.mockResolvedValue({
+      uid: 'char:1',
+      lines: { 0: { quantity: 600, delivered: 0, contractIds: [] } },
+      updatedAt: 1,
+    });
+    renderTab([wantsMail()]);
+    await pledge(user, await open(user));
+    expect(await screen.findByText('Not mailed: the game refused the mail.')).toBeInTheDocument();
+    expect(mail.releasePledgeMail).toHaveBeenCalled();
+    expect(screen.queryByText(/couldn't save/i)).toBeNull();
+  });
+
+  it('says the daily mails are used, and says nothing when the server had already mailed', async () => {
+    const user = userEvent.setup();
+    await grant(SEND_MAIL_SCOPE);
+    store.updateMyPledge.mockResolvedValue({
+      uid: 'char:1',
+      lines: { 0: { quantity: 600, delivered: 0, contractIds: [] } },
+      updatedAt: 1,
+    });
+    mail.reservePledgeMail.mockRejectedValueOnce(
+      Object.assign(new Error('cap'), { details: { reason: 'daily-cap' } })
+    );
+    renderTab([wantsMail()]);
+    const panel = await open(user);
+    await pledge(user, panel);
+    expect(await screen.findByText(/used today's 100 Request mails/)).toBeInTheDocument();
+    mail.reservePledgeMail.mockRejectedValueOnce(
+      Object.assign(new Error('again'), { details: { reason: 'already-mailed' } })
+    );
+    await pledge(user, panel);
+    await waitFor(() => expect(mail.reservePledgeMail).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText(/Request mails/)).toBeNull());
+    expect(mail.sendMail).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing and offers the Grant link when the mail Permission is missing', async () => {
+    const user = userEvent.setup();
+    store.updateMyPledge.mockResolvedValue({
+      uid: 'char:1',
+      lines: { 0: { quantity: 600, delivered: 0, contractIds: [] } },
+      updatedAt: 1,
+    });
+    renderTab([wantsMail()]);
+    const panel = await open(user);
+    expect(
+      within(panel).getByText(/Sending it needs the Send mail Permission/)
+    ).toBeInTheDocument();
+    await pledge(user, panel);
+    await waitFor(() => expect(store.updateMyPledge).toHaveBeenCalled());
+    expect(mail.reservePledgeMail).not.toHaveBeenCalled();
+  });
+
+  it('is not offered to the requester on their own Request', async () => {
+    const user = userEvent.setup();
+    renderTab([request({ ownerUid: 'char:1', notify: { app: true, mail: true } })]);
+    await user.click(screen.getByText('Tritanium'));
+    expect(screen.queryByText(/Send mail Permission/)).toBeNull();
   });
 });

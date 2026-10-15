@@ -1,7 +1,8 @@
 /**
  * What the Community alerts poll reads for one Character: the waiting list and
- * the roster of every Community it administers (`engine/communities/communityAlert.ts`
- * diffs two reads).
+ * the roster of every Community it administers, and the Pledges other Members
+ * made on its own open Requests (`engine/communities/communityAlert.ts` diffs
+ * two reads).
  *
  * Cost is kept off everyone who never runs a Community. A Character is only
  * read once the Communities page has seen it administer one (`rememberCommunityAdmin`),
@@ -13,11 +14,20 @@
  *
  * The roster is the expensive read (a document per Member), so it is refetched
  * only when the Community's Member count moves.
+ *
+ * Pledges are read only for a Character the Communities page has listed a
+ * Community for (`rememberCommunityWatch`, the same flag the Requests badge
+ * uses), and per Community only when one of its own open Requests asked for
+ * the app: the board is read, then the Community's Pledges in one query. A
+ * Pledger's name is read from the roster only when a Pledger has not been seen
+ * before; without it the alert says "A Member".
  */
 import { db } from '@/db';
 import type { CommunityAlertEntry } from '@/engine/communities/communityAlert';
+import { isOpenRequest } from '@/engine/communities/requests';
 import { communityBackendOverride } from './backendOverride';
 import { isCommunityAdmin, type CommunitySummary } from './communityStore';
+import { isWatchingCommunities } from './requestBadge';
 
 const adminKey = (characterId: number) => `communityAdmin:${characterId}`;
 
@@ -35,47 +45,123 @@ export async function rememberCommunityAdmin(
 
 const rosters = new Map<string, { count: number; entries: CommunityAlertEntry[] }>();
 
+/** Pledger names by Community, kept for the session: the roster is only read for a Pledger not seen yet. */
+const pledgerNames = new Map<string, Map<string, string>>();
+
+async function loadPledgeEntries(
+  characterId: number,
+  myUid: string,
+  community: CommunitySummary,
+  store: typeof import('./communityStore'),
+  requests: typeof import('./requestStore')
+): Promise<CommunityAlertEntry[]> {
+  const now = Date.now();
+  const mine = (await requests.loadRequests(characterId, community.id)).filter(
+    (request) => request.ownerUid === myUid && request.notify.app && isOpenRequest(request, now)
+  );
+  if (mine.length === 0) return [];
+  const base = { communityId: community.id, communityName: community.name };
+  const label = (lines: readonly { name: string }[]) => lines[0]?.name ?? '';
+  const pledges = await requests.loadCommunityPledges(characterId, community.id);
+  const names = pledgerNames.get(community.id) ?? new Map<string, string>();
+  pledgerNames.set(community.id, names);
+  const others = mine.flatMap((request) =>
+    (pledges.get(request.id) ?? []).filter((pledge) => pledge.uid !== myUid)
+  );
+  if (others.some((pledge) => !names.has(pledge.uid))) {
+    try {
+      for (const member of await store.loadCommunityMembers(characterId, community.id)) {
+        names.set(member.uid, member.characterName);
+      }
+    } catch {
+      // No names this time: the alert says "A Member", and the next poll tries again.
+    }
+  }
+  const entries: CommunityAlertEntry[] = [];
+  for (const request of mine) {
+    const requestRef = { requestId: request.id, requestLabel: label(request.lines) };
+    entries.push({
+      ...base,
+      ...requestRef,
+      kind: 'pledgeRequest',
+      uid: myUid,
+      characterName: '',
+      at: request.createdAt,
+    });
+    for (const pledge of pledges.get(request.id) ?? []) {
+      if (pledge.uid === myUid) continue;
+      entries.push({
+        ...base,
+        ...requestRef,
+        kind: 'pledge',
+        uid: pledge.uid,
+        characterName: names.get(pledge.uid) ?? '',
+        at: pledge.updatedAt,
+      });
+    }
+  }
+  return entries;
+}
+
 export async function loadCommunityAlertEntries(
   characterId: number
 ): Promise<CommunityAlertEntry[] | null> {
-  if ((await db.settings.get(adminKey(characterId)))?.value !== true) return [];
-  const [{ getSyncAuth }, { uidForCharacter }, store] = await Promise.all([
+  const admin = (await db.settings.get(adminKey(characterId)))?.value === true;
+  const watching = await isWatchingCommunities(characterId);
+  if (!admin && !watching) return [];
+  const [{ getSyncAuth }, { uidForCharacter }, store, requests] = await Promise.all([
     import('@/sync/firebaseApp'),
     import('@/sync/uid'),
     import('./communityStore'),
+    import('./requestStore'),
   ]);
-  if (getSyncAuth().currentUser?.uid !== uidForCharacter(characterId)) return null;
+  const myUid = uidForCharacter(characterId);
+  if (getSyncAuth().currentUser?.uid !== myUid) return null;
   const mine = await store.loadMyCommunities(characterId);
-  await rememberCommunityAdmin(characterId, mine);
-  const administered = mine.filter((community) => store.isCommunityAdmin(community, characterId));
+  if (admin) await rememberCommunityAdmin(characterId, mine);
   const entries: CommunityAlertEntry[] = [];
-  for (const community of administered) {
-    const base = { communityId: community.id, communityName: community.name };
-    for (const request of await store.loadJoinRequests(characterId, community.id)) {
-      entries.push({
-        ...base,
-        kind: 'request',
-        uid: request.uid,
-        characterName: request.characterName,
-        at: request.requestedAt,
-      });
+  for (const community of mine) {
+    if (admin && store.isCommunityAdmin(community, characterId)) {
+      entries.push(...(await loadAdminEntries(characterId, community, store)));
     }
-    let roster = rosters.get(community.id);
-    if (roster?.count !== community.memberCount) {
-      const members = await store.loadCommunityMembers(characterId, community.id);
-      roster = {
-        count: community.memberCount,
-        entries: members.map((member) => ({
-          ...base,
-          kind: 'member' as const,
-          uid: member.uid,
-          characterName: member.characterName,
-          at: member.joinedAt,
-        })),
-      };
-      rosters.set(community.id, roster);
+    if (watching) {
+      entries.push(...(await loadPledgeEntries(characterId, myUid, community, store, requests)));
     }
-    entries.push(...roster.entries);
   }
+  return entries;
+}
+
+async function loadAdminEntries(
+  characterId: number,
+  community: CommunitySummary,
+  store: typeof import('./communityStore')
+): Promise<CommunityAlertEntry[]> {
+  const entries: CommunityAlertEntry[] = [];
+  const base = { communityId: community.id, communityName: community.name };
+  for (const request of await store.loadJoinRequests(characterId, community.id)) {
+    entries.push({
+      ...base,
+      kind: 'request',
+      uid: request.uid,
+      characterName: request.characterName,
+      at: request.requestedAt,
+    });
+  }
+  let roster = rosters.get(community.id);
+  if (roster?.count !== community.memberCount) {
+    const members = await store.loadCommunityMembers(characterId, community.id);
+    roster = {
+      count: community.memberCount,
+      entries: members.map((member) => ({
+        ...base,
+        kind: 'member' as const,
+        uid: member.uid,
+        characterName: member.characterName,
+        at: member.joinedAt,
+      })),
+    };
+    rosters.set(community.id, roster);
+  }
+  entries.push(...roster.entries);
   return entries;
 }

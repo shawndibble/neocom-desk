@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
@@ -10,6 +10,7 @@ import {
   isStalePledge,
   lineKey,
   lineProgress,
+  pledgedRequestLines,
   withPledgeLine,
   withdrawPledgeLine,
   type CommunityRequest,
@@ -20,10 +21,18 @@ import { formatAge } from '@/lib/age';
 import { itemsSummary, mailSubject } from '@/engine/communities/requestMail';
 import { mailSafe } from '@/lib/mailSafe';
 import { characterIdForUid } from '@/sync/uid';
+import { communityRequestsUrl } from './communityStore';
 import { ConfirmDialog } from './ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
 import { callableErrorReason } from './callableError';
+import {
+  buildPledgeMail,
+  pledgeMailDeps,
+  sendPledgeMail,
+  type PledgeMailOutcome,
+} from './pledgeMail';
+import { MAX_REQUEST_MAILS_PER_DAY } from '@/engine/communities/requests';
 import { notePledgeEdit } from './pledgeWrites';
 import { DELIVERY_ENDPOINTS, slotKey } from './requestDelivery';
 import { useDeliverySync } from './useDeliverySync';
@@ -37,6 +46,8 @@ import {
 } from './requestStore';
 
 const DELIVERY_GROUPS = permissionsForEndpoints(DELIVERY_ENDPOINTS);
+const SEND_MAIL = ['postCharacterMail'] as const;
+const SEND_MAIL_GROUPS = permissionsForEndpoints(SEND_MAIL);
 
 /** "BPC, runs 10, ME 10": what the requester asked of a blueprint line, empty for a plain item. */
 function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unknown>) => string) {
@@ -107,6 +118,10 @@ export function RequestPanel({
   const [pledgeBusy, setPledgeBusy] = useState<string | null>(null);
   const [pledgeError, setPledgeError] = useState<string | null>(null);
   const [syncTick, setSyncTick] = useState(0);
+  /** What the Pledge mail to the requester came to, for the quiet line under the lines. */
+  const [mailOutcome, setMailOutcome] = useState<PledgeMailOutcome | null>(null);
+  /** Pledge mails settled this session (sent, or already on the server): not asked again on an update. */
+  const mailSettled = useRef(false);
   const [removing, setRemoving] = useState<
     { kind: 'request' } | { kind: 'pledge'; uid: string; name: string } | null
   >(null);
@@ -121,6 +136,8 @@ export function RequestPanel({
   const myPledge = pledges.find((p) => p.uid === myUid);
   const mayPledge = canPledge(request, myUid, now);
   const lacksContracts = useCharacterLacksEndpoints(characterId, DELIVERY_ENDPOINTS);
+  const lacksSendMail = useCharacterLacksEndpoints(characterId, SEND_MAIL);
+  const wantsMail = mayPledge && request.notify.mail;
   const delivery = useDeliverySync({
     characterId,
     communityId,
@@ -130,14 +147,49 @@ export function RequestPanel({
     refreshPledges,
   });
 
-  const changePledge = async (key: string, change: Parameters<typeof updateMyPledge>[3]) => {
+  /** One in-game mail to the requester about a Pledge already saved; a failure never touches the Pledge. */
+  const mailRequester = async (saved: RequestPledge) => {
+    const lines = pledgedRequestLines(request, saved.lines);
+    if (lines.length === 0) return;
+    const outcome = await sendPledgeMail(
+      {
+        compose: (reservation) =>
+          buildPledgeMail(t, {
+            communityName: reservation.communityName,
+            pledgerName: reservation.pledgerName,
+            requesterName: reservation.requesterName,
+            lines,
+            link: communityRequestsUrl(communityId),
+          }),
+      },
+      pledgeMailDeps(characterId, communityId, request.id)
+    );
+    // Sent, or sent before: a later update does not ask again. A failure may be tried on the next one.
+    if (outcome === 'sent' || outcome === 'alreadyMailed' || outcome === 'unsure') {
+      mailSettled.current = true;
+    }
+    setMailOutcome(outcome === 'alreadyMailed' ? null : outcome);
+  };
+
+  const changePledge = async (
+    key: string,
+    change: Parameters<typeof updateMyPledge>[3],
+    options: { mail?: boolean } = {}
+  ) => {
     setPledgeBusy(key);
     setPledgeError(null);
     // A delivery run that began before this edit read the Pledge as it was: it must not write over it.
     notePledgeEdit(characterId, communityId);
     try {
-      await updateMyPledge(characterId, communityId, request.id, change);
+      const saved = await updateMyPledge(characterId, communityId, request.id, change);
       await refreshPledges(request.id);
+      if (options.mail && saved && wantsMail && !lacksSendMail && !mailSettled.current) {
+        setMailOutcome(null);
+        await mailRequester(saved).catch((err) => {
+          console.warn('Pledge mail could not be sent', err);
+          setMailOutcome('failed');
+        });
+      }
     } catch (err) {
       console.warn('Pledge could not be saved', err);
       setPledgeError(t('communities.board.pledgeFailed'));
@@ -212,7 +264,9 @@ export function RequestPanel({
                 canPledge={mayPledge}
                 busy={pledgeBusy === key}
                 onPledge={(quantity) =>
-                  void changePledge(key, (lines) => withPledgeLine(lines, index, quantity))
+                  void changePledge(key, (lines) => withPledgeLine(lines, index, quantity), {
+                    mail: true,
+                  })
                 }
                 onWithdraw={() =>
                   void changePledge(key, (lines) => withdrawPledgeLine(lines, index))
@@ -254,6 +308,20 @@ export function RequestPanel({
         {delivery?.status === 'write-failed' && (
           <p role="alert" className="text-xs text-text-dim">
             {t('communities.board.deliveryWriteFailed')}
+          </p>
+        )}
+        {wantsMail && lacksSendMail && (
+          <p className="text-xs text-text-dim">
+            {t('communities.board.pledgeMail.needsPermission', { name: request.ownerName })}{' '}
+            <GrantMissingLink groups={SEND_MAIL_GROUPS} />
+          </p>
+        )}
+        {mailOutcome && (
+          <p role={mailOutcome === 'sent' ? 'status' : 'alert'} className="text-xs text-text-dim">
+            {t(`communities.board.pledgeMail.${mailOutcome}`, {
+              name: request.ownerName,
+              max: MAX_REQUEST_MAILS_PER_DAY,
+            })}
           </p>
         )}
         {pledgeError && (

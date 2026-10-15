@@ -57,6 +57,7 @@ import type {
 import type {
   CommunityJoinRequestFire,
   CommunityMemberJoinedFire,
+  CommunityRequestPledgedFire,
 } from './communities/communityAlert';
 import type { StockBelowTargetFire } from './stockTargets/stockAlert';
 import type { IncursionNearbyFire } from './incursions/incursionAlert';
@@ -94,6 +95,7 @@ export type OccurrenceFire =
   | StockBelowTargetFire
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
+  | CommunityRequestPledgedFire
   | IncursionNearbyFire;
 
 const DAY_MS = 86_400_000;
@@ -203,6 +205,12 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     case 'communityJoinRequest':
     case 'communityMemberJoined':
       return [characterId, fire.eventId, fire.communityId, fire.uid, fire.at].join(':');
+    // The latest new Pledge in the Community: a Pledger who withdraws and
+    // Pledges again writes a later `at`, so it is its own occurrence.
+    case 'communityRequestPledged':
+      return [characterId, fire.eventId, fire.communityId, fire.requestId, fire.uid, fire.at].join(
+        ':'
+      );
     // The diff only fires on a drop into Low or Out, so the drop itself —
     // per list, item, Stock Target and status, bucketed by day — is the
     // identity: the same drop seen twice in a day is one occurrence.
@@ -316,6 +324,7 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     // falls through
     case 'communityJoinRequest':
     case 'communityMemberJoined':
+    case 'communityRequestPledged':
       return nowMs;
     default: {
       const exhaustive: never = fire;

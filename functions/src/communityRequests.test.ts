@@ -24,7 +24,10 @@ import {
   isOpenRequest,
   nextExpiry,
   parsePostRequestInput,
-  parseRequestMailInput,
+  parseNotify,
+  decidePledgeMail,
+  pledgedLineCount,
+  characterIdOfUid,
   parseRequestIdInput,
   parseSetClosedInput,
 } from './communityRequests.js';
@@ -43,6 +46,7 @@ describe('parsePostRequestInput', () => {
       location: 'Badivefi',
       terms: '90% JBV',
       lines: [{ ...line, kind: 'item' }],
+      notify: { app: true, mail: false },
     });
     expect(parsePostRequestInput(post()).location).toBe('');
   });
@@ -61,6 +65,27 @@ describe('parsePostRequestInput', () => {
     const parsed = parsePostRequestInput(post({ lines: [bpc, bpo] }));
     expect(parsed.lines[0]).toMatchObject({ runs: 5, me: 8, te: 2 });
     expect(parsed.lines[1]).not.toHaveProperty('runs');
+  });
+
+  it('defaults the notification choice to the app only and keeps one that is given', () => {
+    expect(parsePostRequestInput(post()).notify).toEqual({ app: true, mail: false });
+    expect(parsePostRequestInput(post({ notify: { app: false, mail: true } })).notify).toEqual({
+      app: false,
+      mail: true,
+    });
+    expect(parsePostRequestInput(post({ notify: { app: false, mail: false } })).notify).toEqual({
+      app: false,
+      mail: false,
+    });
+  });
+
+  it.each([
+    ['not an object', 'mail'],
+    ['a string flag', { app: 'yes', mail: false }],
+    ['a missing flag', { app: true }],
+    ['an extra key', { app: true, mail: false, sms: true }],
+  ])('rejects a notify that is %s', (_label, notify) => {
+    expect(() => parsePostRequestInput(post({ notify }))).toThrow();
   });
 
   it.each([
@@ -179,7 +204,7 @@ describe('decisions', () => {
   });
 });
 
-describe('Request mail', () => {
+describe('Pledge mail', () => {
   const NOW = 1_000_000;
   const DAY = '2026-10-14';
   const reserved = (
@@ -197,31 +222,37 @@ describe('Request mail', () => {
     expect(MAX_MAIL_INVITES_PER_DAY).toBe(20);
   });
 
-  it('parses a reservation request', () => {
-    expect(
-      parseRequestMailInput({
-        communityId: 'c1',
-        requestId: 'r1',
-        targetCharacterId: 42,
-        targetName: 'Bo Tanner',
-      })
-    ).toEqual({
-      communityId: 'c1',
-      requestId: 'r1',
-      targetCharacterId: 42,
-      targetName: 'Bo Tanner',
-    });
-    expect(() =>
-      parseRequestMailInput({
-        communityId: 'c1',
-        requestId: 'r1',
-        targetCharacterId: 0,
-        targetName: 'x',
-      })
-    ).toThrow();
-    expect(() =>
-      parseRequestMailInput({ communityId: 'c1', targetCharacterId: 4, targetName: 'x' })
-    ).toThrow();
+  it('reads a stored notify, a legacy Request without one meaning the app only', () => {
+    expect(parseNotify(undefined)).toEqual({ app: true, mail: false });
+    expect(parseNotify({ app: false, mail: true })).toEqual({ app: false, mail: true });
+  });
+
+  it('counts the lines a Pledge document has quantity on', () => {
+    expect(pledgedLineCount(undefined)).toBe(0);
+    expect(pledgedLineCount({ 0: { quantity: 3 }, 2: { quantity: 0 }, 3: {} })).toBe(1);
+  });
+
+  it('reads a Character id from a uid', () => {
+    expect(characterIdOfUid('char:93000001')).toBe(93000001);
+    expect(characterIdOfUid('char:')).toBeNull();
+    expect(characterIdOfUid('abc')).toBeNull();
+  });
+
+  it('lets a Member mail only the owner of an open Request that asked for mail, after Pledging', () => {
+    const ok = {
+      exists: true,
+      ownerUid: 'char:1',
+      callerUid: 'char:2',
+      isOpen: true,
+      notifyMail: true,
+      pledgedLines: 1,
+    };
+    expect(decidePledgeMail(ok)).toBe('ok');
+    expect(decidePledgeMail({ ...ok, exists: false })).toBe('not-found');
+    expect(decidePledgeMail({ ...ok, callerUid: 'char:1' })).toBe('own-request');
+    expect(decidePledgeMail({ ...ok, isOpen: false })).toBe('closed');
+    expect(decidePledgeMail({ ...ok, notifyMail: false })).toBe('mail-off');
+    expect(decidePledgeMail({ ...ok, pledgedLines: 0 })).toBe('no-pledge');
   });
 
   it('allows up to the daily cap, counting mails', () => {

@@ -27,8 +27,9 @@ import {
   withdrawPledgeLine,
   withPledgeLine,
   countNewRequests,
-  requestMailsLeft,
-  requestRecipients,
+  DEFAULT_NOTIFY,
+  pledgedRequestLines,
+  readNotify,
   parseQuantity,
   requestProgress,
   requestStatus,
@@ -57,6 +58,7 @@ const request = (over: Partial<CommunityRequest> = {}): CommunityRequest => ({
   lastActivityAt: 0,
   expiresAt: 30 * DAY,
   closed: false,
+  notify: { app: true, mail: false },
   ...over,
 });
 const pledge = (uid: string, lines: RequestPledge['lines'], updatedAt = 0): RequestPledge => ({
@@ -473,88 +475,18 @@ describe('pledge constants shared with the rules', () => {
   });
 });
 
-describe('requestRecipients', () => {
-  const members = [
-    { uid: 'char:1', characterName: 'Me' },
-    { uid: 'char:2', characterName: 'Eli Park' },
-    { uid: 'char:3', characterName: 'Bo Tanner' },
-    { uid: 'char:4', characterName: 'Cael Ito' },
-  ];
-  const bpc = (typeId: number) => line(typeId, 1, { kind: 'bpc', name: `BP ${typeId} Blueprint` });
-  const bpo = (typeId: number) => line(typeId, 1, { kind: 'bpo', name: `BP ${typeId} Blueprint` });
-  const share = (uid: string, ...items: { typeId: number; runs?: number }[]) => ({
-    uid,
-    items: items.map((i) => ({ runs: 10, ...i })),
+describe('request notification choice', () => {
+  it('reads a stored choice, and a legacy Request without one as the app only', () => {
+    expect(DEFAULT_NOTIFY).toEqual({ app: true, mail: false });
+    expect(readNotify(undefined)).toEqual({ app: true, mail: false });
+    expect(readNotify(null)).toEqual({ app: true, mail: false });
+    expect(readNotify({ app: false, mail: true })).toEqual({ app: false, mail: true });
+    expect(readNotify({ app: false, mail: false })).toEqual({ app: false, mail: false });
   });
 
-  it('lists the requester first, then everyone else, sharers first', () => {
-    const out = requestRecipients(
-      [bpc(10), bpc(11)],
-      members,
-      [share('char:3', { typeId: 10 }, { typeId: 11 }), share('char:4', { typeId: 11 })],
-      'char:1'
-    );
-    expect(out.map((r) => [r.uid, r.shared])).toEqual([
-      ['char:1', 0],
-      ['char:3', 2],
-      ['char:4', 1],
-      ['char:2', 0],
-    ]);
-  });
-
-  it('counts a line once however many copies the Member shares', () => {
-    const out = requestRecipients(
-      [bpc(10)],
-      members,
-      [share('char:2', { typeId: 10 }, { typeId: 10 }, { typeId: 10 })],
-      'char:1'
-    );
-    expect(out.find((r) => r.uid === 'char:2')?.shared).toBe(1);
-  });
-
-  it('matches an original request only to a Member sharing an original', () => {
-    const libraries = [
-      share('char:2', { typeId: 10, runs: 5 }),
-      share('char:3', { typeId: 10, runs: -1 }),
-    ];
-    const out = requestRecipients([bpo(10)], members, libraries, 'char:1');
-    expect(out.map((r) => [r.uid, r.shared])).toEqual([
-      ['char:1', 0],
-      ['char:3', 1],
-      ['char:4', 0],
-      ['char:2', 0],
-    ]);
-    // A copy request is met by an original too: it can be copied.
-    expect(
-      requestRecipients([bpc(10)], members, libraries, 'char:1').filter((r) => r.shared > 0)
-    ).toHaveLength(2);
-  });
-
-  it('never counts the requester’s own blueprints as shared', () => {
-    const out = requestRecipients([bpc(10)], members, [share('char:1', { typeId: 10 })], 'char:1');
-    expect(out[0]).toMatchObject({ uid: 'char:1', self: true, shared: 0 });
-  });
-
-  it('does not match plain item lines, and orders ties by name', () => {
-    const out = requestRecipients(
-      [line(10, 5)],
-      members,
-      [share('char:2', { typeId: 10 })],
-      'char:1'
-    );
-    expect(out.map((r) => [r.characterName, r.shared])).toEqual([
-      ['Me', 0],
-      ['Bo Tanner', 0],
-      ['Cael Ito', 0],
-      ['Eli Park', 0],
-    ]);
-  });
-});
-
-describe('requestMailsLeft', () => {
-  it('is the day’s allowance less what is used, never negative', () => {
-    expect(requestMailsLeft(3)).toBe(MAX_REQUEST_MAILS_PER_DAY - 3);
-    expect(requestMailsLeft(MAX_REQUEST_MAILS_PER_DAY + 5)).toBe(0);
+  it('falls back per flag when a stored one is not a boolean', () => {
+    expect(readNotify({ app: 'x', mail: 1 })).toEqual({ app: true, mail: false });
+    expect(readNotify('mail')).toEqual({ app: true, mail: false });
   });
 });
 
@@ -571,6 +503,7 @@ describe('countNewRequests', () => {
     lastActivityAt: 9 * DAY,
     expiresAt: now + DAY,
     closed: false,
+    notify: { app: true, mail: false },
     ...over,
   });
 
@@ -585,5 +518,27 @@ describe('countNewRequests', () => {
     expect(countNewRequests(requests, 'char:1', 8 * DAY, now)).toBe(1);
     expect(countNewRequests(requests, 'char:1', 0, now)).toBe(2);
     expect(countNewRequests([], 'char:1', 0, now)).toBe(0);
+  });
+});
+
+describe('pledgedRequestLines', () => {
+  const request = { lines: [line(1, 100), line(2, 5, { kind: 'bpc' }), line(3, 7)] };
+
+  it('lists the lines a Pledge covers with the Pledged quantity, in line order', () => {
+    expect(
+      pledgedRequestLines(request, { 2: { quantity: 4 }, 0: { quantity: 60 } }).map((l) => [
+        l.typeId,
+        l.quantity,
+        l.kind,
+      ])
+    ).toEqual([
+      [1, 60, 'item'],
+      [3, 4, 'item'],
+    ]);
+  });
+
+  it('skips lines with no Pledge and a Pledge past the Request’s lines', () => {
+    expect(pledgedRequestLines(request, { 9: { quantity: 1 } })).toEqual([]);
+    expect(pledgedRequestLines(request, { 1: { quantity: 0 } })).toEqual([]);
   });
 });

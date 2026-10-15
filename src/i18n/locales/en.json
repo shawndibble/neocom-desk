@@ -7897,8 +7897,7 @@
       "pickHint": "{{name}} shares {{blueprint}} in more than one of your Communities. Pick the one to post your Request in.",
       "community": "Community",
       "continue": "Continue",
-      "close": "Close",
-      "membersFailed": "Could not load that Community's Members. Try again from the Community's Requests tab."
+      "close": "Close"
     },
     "title": "Communities",
     "intro": "Pool blueprints, Fittings and Skill plans with the people you play with. Each Character joins on its own, and shares only what it picks.",
@@ -8397,43 +8396,12 @@
         "locationMeasurable": "Others can filter this Request by distance.",
         "locationFree": "Not a system or region, so distance filters can't place this Request. Pick one from the list to fix that.",
         "locationNoList": "Couldn't load the list of systems and regions, so there are no suggestions. The text posts as typed and distance filters can't place it.",
-        "mailTo": "Mail to (optional)",
-        "mailToPlaceholder": "Add a character to mail…",
-        "mailToResults": "Matching Members",
-        "you": "(you)",
-        "unmail": "Don't mail {{name}}",
         "editTitle": "Edit request",
         "save": "Save changes",
         "saveFailed": "Couldn't save the changes. Try again.",
         "linesLocked": "Members have Pledged on this Request, so its items can't change. Quantities can.",
         "linesLockedNote": "Members have Pledged on this Request, so its items stay as they are. You can change quantities, the location and the terms.",
-        "recipientsIntro": "Everyone in the Community can see the Request. Mail goes only to the characters listed above, one mail each, covering the whole list. {{used}} of {{max}} mails sent today.",
-        "recipientsLabel": "Characters to mail",
-        "postTimedOut": "This is taking too long. The Request may still have been posted: check the board before trying again.",
-        "recipientsIntroUnknown": "Everyone in the Community can see the Request. Mail goes only to the characters listed above, one mail each, covering the whole list. Couldn't read how many mails you have sent today; the daily limit still applies.",
-        "recipientsFailed": "Couldn't read what Members share, so no one is added for you.",
-        "shares_one": "Shares {{count}} of these blueprints",
-        "shares_other": "Shares {{count}} of these blueprints",
-        "capNote_one": "You can send {{count}} more mail today. Members past that are not mailed.",
-        "capNote_other": "You can send {{count}} more mails today. Members past that are not mailed.",
-        "capNone": "You have sent today's mails. The Request will post without mailing anyone.",
-        "grantTitle": "Permission to send mail",
-        "grantHint": "Mailing Members sends an in-game mail from this Character. Grant that permission to mail anyone.",
-        "grantAction": "Grant permission",
-        "postAndMail_one": "Post request and mail {{count}} Member",
-        "postAndMail_other": "Post request and mail {{count}} Members",
-        "mailing": "Mailing {{done}} of {{count}}…",
-        "resultsLabel": "Mail results",
-        "resultsSummary": "Request posted. Mailed {{sent}} of {{count}} Members.",
-        "done": "Done",
-        "result": {
-          "sent": "Mailed",
-          "unsure": "Not confirmed. EVE may have delivered it, so it still counts. Check your Sent folder before mailing again.",
-          "refused": "EVE refused the mail. Nothing was sent or counted.",
-          "dailyCap": "Not mailed. You have used today's Request mails.",
-          "alreadyMailed": "Not mailed. This Member was already mailed about this Request.",
-          "failed": "Not mailed. The mail could not be set up."
-        }
+        "postTimedOut": "This is taking too long. The Request may still have been posted: check the board before trying again."
       },
       "edit": "Edit",
       "canFillHint": "Requests with a line for a blueprint you share with this Community.",
@@ -8456,15 +8424,25 @@
         "subject": "Your Request: {{items}}",
         "body": "Hi {{name}}, about your Request in {{community}} for {{items}}: "
       },
-      "requestMail": {
-        "subject": "{{requester}} is looking for items",
-        "intro": "{{requester}} posted a Request in the Community \"{{community}}\" on Neocom Desk. Looking for:",
+      "notify": {
+        "legend": "Tell me when someone Pledges",
+        "app": "In the app",
+        "mail": "By in-game mail",
+        "hint": "A mail is one of the Pledger's own daily mails, and only arrives if they grant the Send mail Permission. Leave both off to rely on the board."
+      },
+      "pledgeMail": {
+        "subject": "{{pledger}} Pledged on your Request in {{community}}",
+        "intro": "Hi {{requester}}, {{pledger}} Pledged on your Request in the Community \"{{community}}\" on Neocom Desk. They can provide:",
         "line": "{{quantity}} × {{name}}{{spec}}",
         "copy": "blueprint copy",
         "original": "original (loan)",
-        "location": "Location: {{location}}",
-        "terms": "Terms: {{terms}}",
-        "outro": "See the Request on the board:\n<a href=\"{{link}}\">{{link}}</a>"
+        "outro": "See the Request on the board:\n<a href=\"{{link}}\">{{link}}</a>",
+        "sent": "Mailed {{name}} about your Pledge.",
+        "unsure": "Mailing {{name}} may not have worked. The game gave no answer.",
+        "refused": "Not mailed: the game refused the mail.",
+        "dailyCap": "Not mailed: you have used today's {{max}} Request mails.",
+        "failed": "Not mailed: couldn't reach the server.",
+        "needsPermission": "{{name}} asked for a mail when you Pledge. Sending it needs the Send mail Permission."
       }
     }
   },
@@ -8828,6 +8806,12 @@
       "communityMemberJoined": {
         "title": "New member in {{community}}",
         "body": "{{name}} joined {{community}}."
+      },
+      "communityRequestPledged": {
+        "title": "New Pledge in {{community}}",
+        "someone": "A Member",
+        "body_one": "{{name}} Pledged on your Request for {{request}} in {{community}}.",
+        "body_other": "{{count}} new Pledges on your Requests in {{community}}, the latest from {{name}} on {{request}}."
       },
       "stockBelowTarget": {
         "lowTitle": "{{item}} is running low",
@@ -10397,6 +10381,7 @@
         "incursionNearby": "Incursion nearby",
         "communityJoinRequest": "Community join request",
         "communityMemberJoined": "Community member joined",
+        "communityRequestPledged": "Pledge on your Request",
         "priceAlertTriggered": "Quickbar Price Alert"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",

@@ -26,6 +26,7 @@ import {
   corpRosterCopy,
   corpWalletCopy,
   priceAlertCopy,
+  communityRequestPledgedCopy,
 } from './domainCopy';
 
 const C = 1;
@@ -713,5 +714,36 @@ describe('subject routes', () => {
         memberCharacterId: 12,
       })
     ).toBeUndefined();
+  });
+});
+
+describe('communityRequestPledgedCopy', () => {
+  const fire = {
+    eventId: 'communityRequestPledged' as const,
+    characterId: 1,
+    communityId: 'c1',
+    communityName: 'Efa Miners',
+    uid: 'u2',
+    characterName: 'Bob',
+    requestId: 'r1',
+    requestLabel: 'Tritanium',
+    count: 1,
+    at: 5,
+  };
+
+  it('names the Pledger and the Request for one new Pledge', () => {
+    expect(communityRequestPledgedCopy.poll(fire, 'Me', {})).toEqual({
+      title: 'New Pledge in Efa Miners',
+      body: 'Bob Pledged on your Request for Tritanium in Efa Miners.',
+    });
+  });
+
+  it('counts several and names the latest, and says "A Member" when the name is unknown', () => {
+    expect(communityRequestPledgedCopy.poll({ ...fire, count: 3 }, 'Me', {}).body).toBe(
+      '3 new Pledges on your Requests in Efa Miners, the latest from Bob on Tritanium.'
+    );
+    expect(communityRequestPledgedCopy.poll({ ...fire, characterName: '' }, 'Me', {}).body).toBe(
+      'A Member Pledged on your Request for Tritanium in Efa Miners.'
+    );
   });
 });

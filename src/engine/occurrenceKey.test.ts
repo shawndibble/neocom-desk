@@ -603,3 +603,28 @@ describe('occurrenceFiredAt', () => {
     expect(occurrenceFiredAt(fire, T0)).toBe(T0);
   });
 });
+
+describe('occurrenceKey: communityRequestPledged', () => {
+  const fire = {
+    eventId: 'communityRequestPledged' as const,
+    characterId: 1,
+    communityId: 'c1',
+    communityName: 'Efa Miners',
+    uid: 'u2',
+    characterName: 'Bob',
+    requestId: 'r1',
+    requestLabel: 'Tritanium',
+    count: 1,
+    at: 5,
+  };
+
+  it('is the same for the same Pledge seen twice, and new for a later Pledge by the same Member', () => {
+    expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0 + 60_000));
+    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, at: 6 }, T0));
+    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, requestId: 'r2' }, T0));
+  });
+
+  it('is fired when the poll saw it', () => {
+    expect(occurrenceFiredAt(fire, T0)).toBe(T0);
+  });
+});
