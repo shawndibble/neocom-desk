@@ -40,7 +40,7 @@ Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh
 tokens never leave the device. Market prices come from Fuzzwork aggregates,
 ESI as fallback (ADR 0002). The item/skill/blueprint catalog (SDE) is
 snapshotted at build time into `public/data/*.json` by `scripts/build-sde.mjs`
-— no SDE calls at runtime. The large single-feature files are not precached: they are fetched on first use or by an idle, connection-gated background warm (`src/sde/warmLazySde.ts`, also the dogma engine assets), cached by the service worker's `sde-data` route.
+— no SDE calls at runtime. Core-feature files are precached for offline-first use (`blueprints`, `shipTree` and the small `market/` lookups). The large single-feature files (`src/sde/lazySdeFiles.ts`, the one list `vite.config.ts` ignores and `src/sde/warmLazySde.ts` fetches) are not: they are fetched on first use or by an idle, connection-gated background warm (also the dogma engine assets), cached by the service worker's `sde-data` route.
 
 External dependencies: `esi.evetech.net`, `login.eveonline.com`,
 `market.fuzzwork.co.uk`, `data.everef.net` (public BPC contract search, ADR
@@ -277,7 +277,7 @@ per open for any contract at a structure — a 404 counts against ESI's
 100-errors-per-minute budget like any other non-2xx. `lookupNpcStation`
 answers with three values, not two, so "loaded and absent" (a structure) is
 never confused with "snapshot unreadable" (conclude nothing, fall back).
-The file stays outside the install precache (GLOSSARY.md round 10), so a first
+The file stays outside the install precache (`src/sde/lazySdeFiles.ts`), so a first
 offline visit still has no snapshot and station names come from `esiCache`
 exactly as before.
 
@@ -354,8 +354,9 @@ build-vs-buy verdict). Never throws — computation errors surface as
 `dgmTypeAttributes`, `industryActivity*`, `mapRegions`, `mapSolarSystems`,
 `staStations`, ...) into a gitignored repo-local cache, emits slim
 `public/data/{skills,blueprints,types,reprocessing,pi,...}.json` plus the
-lazily fetched `public/data/market/*.json` catalogue (market groups/types,
-solar systems, NPC stations, market regions, attributes, variations). Runtime
+`public/data/market/*.json` catalogue (market groups/types,
+solar systems, NPC stations, market regions, attributes, variations; the small
+lookups are precached, `types`/`stations`/`variations` are lazily fetched). Runtime
 never fetches CSVs — `src/sde/loadSde.ts` and `src/sde/loadMarketSde.ts`
 fetch+memoize the built JSON once per session.
 
