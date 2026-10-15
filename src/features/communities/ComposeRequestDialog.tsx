@@ -24,6 +24,7 @@ import {
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import { matchAppraisalEntries, type AppraisalCatalogue } from '@/engine/market/appraisalMatch';
 import { loadAppraisalCatalogue } from '@/features/market/appraisalData';
+import { LocationPicker } from './LocationPicker';
 import { callableErrorReason } from './callableError';
 import { postRequest } from './requestStore';
 import { namedLike, needleOf } from './shareLists';
@@ -236,17 +237,7 @@ export function ComposeRequestDialog({
         }}
       >
         <div className="grid gap-3 md:grid-cols-2">
-          <label className="block space-y-1">
-            <span className="block text-xs text-text-dim">
-              {t('communities.board.compose.location')}
-            </span>
-            <TextInput
-              className="w-full"
-              value={location}
-              maxLength={MAX_LOCATION_LENGTH}
-              onChange={(e) => setLocation(e.target.value)}
-            />
-          </label>
+          <LocationPicker value={location} maxLength={MAX_LOCATION_LENGTH} onChange={setLocation} />
           <label className="block space-y-1">
             <span className="block text-xs text-text-dim">
               {t('communities.board.compose.terms')}

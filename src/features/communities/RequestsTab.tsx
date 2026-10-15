@@ -1,20 +1,24 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
 import {
   Button,
   DataTable,
   EmptyState,
   FilterChip,
+  NativeSelect,
   Panel,
   SearchInput,
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
+import { permissionsForEndpoints } from '@/esi/registry';
 import {
   filterRequests,
   isOpenRequest,
   requestProgress,
   requestStatus,
+  withinJumps,
   type CommunityRequest,
   type RequestFilter,
   type RequestPledge,
@@ -24,6 +28,12 @@ import { ComposeRequestDialog } from './ComposeRequestDialog';
 import { PledgeBar } from './PledgeBar';
 import { RequestPanel } from './RequestPanel';
 import { STATUS_TONE, formatLeft, formatShortAge } from './requestFormat';
+import { LOCATION_ENDPOINTS, useRequestDistance } from './useRequestDistance';
+import { useSharedBlueprintTypes } from './useSharedBlueprintTypes';
+
+/** The jump limits the distance select offers; "any" is no limit. */
+const DISTANCE_CHOICES = [5, 10, 20] as const;
+const LOCATION_GROUPS = permissionsForEndpoints(LOCATION_ENDPOINTS);
 
 /**
  * Pledges per Request id. Empty until Pledges exist (issue #3808): the board
@@ -50,14 +60,21 @@ const STATUS_ORDER: Record<RequestStatus, number> = {
 
 /**
  * The Requests tab body (scope decision `20261014-221403-community-requests-...`,
- * ADR 0021): a board of the Community's Requests with Open and Mine, a search
- * box and the table; a row opens its side panel. Any Member posts a Request
- * from New request…. Which Requests fit this Member's blueprints and how near
- * they are come in later tickets.
+ * ADR 0021): a board of the Community's Requests with Open, Mine and I can fill
+ * (a line for a blueprint this Member shares), a distance limit in jumps from
+ * the pilot, a search box and the table; a row opens its side panel. Any
+ * Member posts a Request from New request….
+ *
+ * A filter that cannot work says why instead of doing nothing: I can fill is
+ * disabled when the shared blueprints could not be read, and the distance
+ * select when the pilot's location is not known (no Permission, or ESI gave
+ * none). Under a distance limit, Requests whose place cannot be measured (older
+ * free text, a place off the stargate map) are left out and counted.
  */
 export function RequestsTab({
   characterId,
   communityId,
+  communityName,
   myUid,
   requests,
   failed,
@@ -66,6 +83,7 @@ export function RequestsTab({
 }: {
   characterId: number;
   communityId: string;
+  communityName: string;
   myUid: string;
   /** Null until the first read lands. */
   requests: CommunityRequest[] | null;
@@ -74,14 +92,25 @@ export function RequestsTab({
   onReload: () => void;
 }) {
   const { t } = useTranslation();
+  const distanceNoteId = useId();
   const [filter, setFilter] = useState<RequestFilter>('open');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  const [maxJumps, setMaxJumps] = useState<number | null>(null);
+  const shared = useSharedBlueprintTypes(characterId, communityId, myUid, requests !== null);
+  const sharedTypeIds = shared.status === 'ready' ? shared.typeIds : undefined;
+  const distance = useRequestDistance(characterId, maxJumps !== null);
 
-  const rows = useMemo<Row[]>(
-    () =>
-      filterRequests(requests ?? [], { filter, query, myUid, now }).map((request) => {
+  const { rows, unmeasured } = useMemo(() => {
+    const filtered = filterRequests(requests ?? [], { filter, query, myUid, now, sharedTypeIds });
+    const { within, unmeasured: left } =
+      distance.status === 'ready'
+        ? withinJumps(filtered, maxJumps, (request) => distance.jumpsOf(request.location))
+        : { within: filtered, unmeasured: 0 };
+    return {
+      unmeasured: left,
+      rows: within.map((request): Row => {
         const pledges = NO_PLEDGES.get(request.id) ?? [];
         return {
           request,
@@ -90,8 +119,8 @@ export function RequestsTab({
           mine: request.ownerUid === myUid,
         };
       }),
-    [requests, filter, query, myUid, now]
-  );
+    };
+  }, [requests, filter, query, myUid, now, sharedTypeIds, distance, maxJumps]);
 
   const statusLabels: Record<RequestStatus, string> = {
     open: t('communities.board.status.open'),
@@ -219,7 +248,16 @@ export function RequestsTab({
   const open = requests.filter((r) => isOpenRequest(r, now));
   const mineCount = requests.filter((r) => r.ownerUid === myUid).length;
   const myOpen = open.filter((r) => r.ownerUid === myUid).length;
+  const fillCount = filterRequests(requests, {
+    filter: 'canFill',
+    query: '',
+    myUid,
+    now,
+    sharedTypeIds,
+  }).length;
   const panelRequest = requests.find((r) => r.id === openId) ?? null;
+  const distanceOff = distance.status === 'unavailable';
+  const measuring = maxJumps !== null && distance.status === 'loading';
 
   return (
     <div className="space-y-3">
@@ -250,15 +288,70 @@ export function RequestsTab({
             count={mineCount}
             onToggle={() => setFilter('mine')}
           />
+          <FilterChip
+            label={t('communities.board.filters.canFill')}
+            selected={filter === 'canFill'}
+            count={shared.status === 'ready' ? fillCount : undefined}
+            tooltip={
+              shared.status === 'failed'
+                ? t('communities.board.canFillFailed')
+                : t('communities.board.canFillHint')
+            }
+            disabled={shared.status === 'failed'}
+            onToggle={() => setFilter('canFill')}
+          />
+          {/* A native select, as the mockup draws it: four fixed choices, where a phone gets the OS picker. */}
+          <NativeSelect
+            aria-label={t('communities.board.distance.label')}
+            aria-describedby={distanceOff ? `${distanceNoteId}` : undefined}
+            disabled={distanceOff}
+            value={maxJumps === null ? 'any' : String(maxJumps)}
+            onChange={(e) => setMaxJumps(e.target.value === 'any' ? null : Number(e.target.value))}
+          >
+            <option value="any">{t('communities.board.distance.any')}</option>
+            {DISTANCE_CHOICES.map((jumps) => (
+              <option key={jumps} value={jumps}>
+                {t('communities.board.distance.within', { count: jumps })}
+              </option>
+            ))}
+          </NativeSelect>
         </div>
-        {rows.length === 0 ? (
+        {distanceOff && (
+          <p id={distanceNoteId} className="mb-3 text-xs text-text-dim">
+            {distance.reason === 'permission' ? (
+              <>
+                {t('communities.board.distance.needPermission')}{' '}
+                <GrantMissingLink groups={LOCATION_GROUPS} />
+              </>
+            ) : (
+              t('communities.board.distance.noLocation')
+            )}
+          </p>
+        )}
+        {distance.status === 'failed' && maxJumps !== null && (
+          <p role="alert" className="mb-3 text-xs text-danger">
+            {t('communities.board.distance.failed')}
+          </p>
+        )}
+        {distance.status === 'ready' && maxJumps !== null && unmeasured > 0 && (
+          <p role="status" className="mb-3 text-xs text-text-dim">
+            {t('communities.board.distance.unmeasured', { count: unmeasured })}
+          </p>
+        )}
+        {measuring ? (
+          <Spinner size="sm" label={t('communities.board.distance.measuring')} />
+        ) : rows.length === 0 ? (
           <EmptyState
             title={
               query.trim()
                 ? t('communities.board.noMatch')
-                : filter === 'mine'
-                  ? t('communities.board.noneMine')
-                  : t('communities.board.noneOpen')
+                : distance.status === 'ready' && maxJumps !== null
+                  ? t('communities.board.distance.none', { count: maxJumps })
+                  : filter === 'mine'
+                    ? t('communities.board.noneMine')
+                    : filter === 'canFill'
+                      ? t('communities.board.noneCanFill')
+                      : t('communities.board.noneOpen')
             }
           />
         ) : (
@@ -281,6 +374,7 @@ export function RequestsTab({
           now={now}
           characterId={characterId}
           communityId={communityId}
+          communityName={communityName}
           onClose={() => setOpenId(null)}
           onChanged={onReload}
         />

@@ -8232,7 +8232,8 @@
       "searchPlaceholder": "Search item, requester or place…",
       "filters": {
         "open": "Open",
-        "mine": "Mine"
+        "mine": "Mine",
+        "canFill": "I can fill"
       },
       "tableLabel": "Requests",
       "columns": {
@@ -8318,7 +8319,34 @@
         "added": "{{name}} added",
         "tooManyLines": "A Request holds at most {{count}} lines.",
         "failed": "Couldn't post the Request. Try again.",
-        "post": "Post request"
+        "post": "Post request",
+        "places": "Matching systems and regions",
+        "locationHint": "A system or region lets others filter Requests by distance.",
+        "locationMeasurable": "Others can filter this Request by distance.",
+        "locationFree": "Not a system or region, so distance filters can't place this Request. Pick one from the list to fix that."
+      },
+      "canFillHint": "Requests with a line for a blueprint you share with this Community.",
+      "canFillFailed": "Couldn't read what you share with this Community, so this filter can't run.",
+      "noneCanFill": "No open Requests you can fill",
+      "distance": {
+        "label": "Distance",
+        "any": "Any distance",
+        "within_one": "Within {{count}} jump",
+        "within_other": "Within {{count}} jumps",
+        "needPermission": "Distance needs your pilot's location.",
+        "noLocation": "Your pilot's location isn't known right now, so distance can't be used.",
+        "failed": "Couldn't load the map, so Requests aren't narrowed by distance.",
+        "measuring": "Measuring jumps",
+        "unmeasured_one": "{{count}} Request with no place to measure from isn't listed.",
+        "unmeasured_other": "{{count}} Requests with no place to measure from aren't listed.",
+        "none_one": "No Requests within {{count}} jump",
+        "none_other": "No Requests within {{count}} jumps"
+      },
+      "message": "Message {{name}}…",
+      "messageNeedsPermission": "Messaging opens a window in your EVE client, which needs the Open in EVE Permission.",
+      "mail": {
+        "subject": "Your Request: {{items}}",
+        "body": "Hi {{name}}, about your Request in {{community}} for {{items}}: "
       }
     }
   },
@@ -9858,7 +9886,7 @@
     },
     "openWindow": {
       "label": "Open in EVE",
-      "caption": "Open an item, pilot, corporation, contract or market in your EVE client from a Show info window, a row menu or a contract."
+      "caption": "Open an item, pilot, corporation, contract or market in your EVE client from a Show info window, a row menu or a contract, or open a new mail to a Community member from a Request."
     },
     "autopilot": {
       "label": "Autopilot waypoints",

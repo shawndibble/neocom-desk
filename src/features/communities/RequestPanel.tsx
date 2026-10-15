@@ -8,10 +8,17 @@ import {
   type RequestPledge,
 } from '@/engine/communities/requests';
 import { formatAge } from '@/lib/age';
+import { characterIdForUid } from '@/sync/uid';
+import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeBar } from './PledgeBar';
 import { callableErrorReason } from './callableError';
 import { daysLeft } from './requestFormat';
 import { extendRequest, setRequestClosed } from './requestStore';
+
+/** The in-game mail field takes no markup from us: a name with angle brackets must not become one. */
+const plain = (text: string) => text.replace(/[<>]/g, '');
+/** The game's subject field holds this many characters. */
+const MAX_MAIL_SUBJECT = 100;
 
 /** "BPC, runs 10, ME 10": what the requester asked of a blueprint line, empty for a plain item. */
 function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unknown>) => string) {
@@ -29,8 +36,9 @@ function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unkn
 /**
  * A Request's side panel, read-only: its terms and each line's progress. The
  * requester also gets Extend 30 days and Close request (Reopen once closed);
- * everyone else has nothing to press yet, since Pledging is a later ticket.
- * `pledges` is empty until then, and a line shows 0 pledged.
+ * everyone else gets Message <requester>…, which opens an in-game mail to them
+ * (Pledging is a later ticket). `pledges` is empty until then, and a line shows
+ * 0 pledged.
  */
 export function RequestPanel({
   request,
@@ -39,6 +47,7 @@ export function RequestPanel({
   now,
   characterId,
   communityId,
+  communityName,
   onClose,
   onChanged,
 }: {
@@ -48,6 +57,7 @@ export function RequestPanel({
   now: number;
   characterId: number;
   communityId: string;
+  communityName: string;
   onClose: () => void;
   /** The Request changed on the server: refetch the board. */
   onChanged: () => void;
@@ -72,6 +82,13 @@ export function RequestPanel({
       setBusy(null);
     }
   };
+
+  const requesterId = mine ? null : characterIdForUid(request.ownerUid);
+  const items = `${request.lines[0].name}${
+    request.lines.length > 1
+      ? ` ${t('communities.board.more', { count: request.lines.length - 1 })}`
+      : ''
+  }`;
 
   const left = daysLeft(request.expiresAt, now);
   const place = request.location;
@@ -116,6 +133,22 @@ export function RequestPanel({
             );
           })}
         </ul>
+        {requesterId !== null && (
+          <MessageRequesterButton
+            characterId={characterId}
+            recipientId={requesterId}
+            name={request.ownerName}
+            subject={t('communities.board.mail.subject', { items: plain(items) }).slice(
+              0,
+              MAX_MAIL_SUBJECT
+            )}
+            body={t('communities.board.mail.body', {
+              name: plain(request.ownerName),
+              community: plain(communityName),
+              items: plain(items),
+            })}
+          />
+        )}
         {mine && (
           <div className="flex flex-wrap gap-2">
             {request.closed ? (

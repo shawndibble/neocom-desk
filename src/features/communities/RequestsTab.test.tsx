@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { db } from '@/db';
 import type { CommunityRequest } from '@/engine/communities/requests';
 
 const store = vi.hoisted(() => ({
@@ -10,6 +12,51 @@ const store = vi.hoisted(() => ({
   setRequestClosed: vi.fn(),
 }));
 vi.mock('./requestStore', () => store);
+
+const world = vi.hoisted(() => ({
+  library: vi.fn(),
+  location: vi.fn(),
+  newMail: vi.fn(),
+}));
+vi.mock('./communityStore', () => ({ loadMemberLibraries: world.library }));
+vi.mock('@/features/character/location', () => ({ loadCharacterSolarSystemId: world.location }));
+vi.mock('@/esi/endpoints', () => ({ postOpenWindowNewMail: world.newMail }));
+// A chain of stargates 1-2-...-8; system 9 has no gate. Perimeter is one jump
+// from Jita, Badivefi seven, Efa unreachable.
+vi.mock('@/sde/jumpGraph', () => ({
+  loadJumpGraph: () =>
+    Promise.resolve(
+      new Map<number, number[]>([
+        [1, [2]],
+        [2, [1, 3]],
+        [3, [2, 4]],
+        [4, [3, 5]],
+        [5, [4, 6]],
+        [6, [5, 7]],
+        [7, [6, 8]],
+        [8, [7]],
+        [9, []],
+      ])
+    ),
+}));
+vi.mock('@/sde/solarSystems', () => ({
+  loadSolarSystemsById: () =>
+    Promise.resolve(
+      new Map([
+        [1, { id: 1, name: 'Jita', security: 0.9, regionId: 100 }],
+        [2, { id: 2, name: 'Perimeter', security: 0.9, regionId: 100 }],
+        [8, { id: 8, name: 'Badivefi', security: 0.6, regionId: 200 }],
+        [9, { id: 9, name: 'Efa', security: 0.4, regionId: 200 }],
+      ])
+    ),
+}));
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadMarketRegions: () =>
+    Promise.resolve([
+      { id: 100, name: 'The Forge' },
+      { id: 200, name: 'Khanid' },
+    ]),
+}));
 vi.mock('@/features/market/appraisalData', () => ({
   loadAppraisalCatalogue: () =>
     Promise.resolve(
@@ -45,21 +92,40 @@ const request = (over: Partial<CommunityRequest>): CommunityRequest => ({
 
 function renderTab(requests: CommunityRequest[] | null, onReload = vi.fn()) {
   render(
-    <RequestsTab
-      characterId={1}
-      communityId="c1"
-      myUid="char:1"
-      requests={requests}
-      failed={false}
-      now={NOW}
-      onReload={onReload}
-    />
+    <MemoryRouter>
+      <RequestsTab
+        characterId={1}
+        communityId="c1"
+        communityName="Pals"
+        myUid="char:1"
+        requests={requests}
+        failed={false}
+        now={NOW}
+        onReload={onReload}
+      />
+    </MemoryRouter>
   );
   return onReload;
 }
 
-beforeEach(() => {
+const LOCATION_SCOPE = 'esi-location.read_location.v1';
+const WINDOW_SCOPE = 'esi-ui.open_window.v1';
+async function grant(...scopes: string[]) {
+  await db.tokens.put({
+    characterId: 1,
+    accessToken: 'a',
+    refreshToken: 'r',
+    expiresAt: Date.now() + 3_600_000,
+    scopes,
+  });
+}
+
+beforeEach(async () => {
   vi.clearAllMocks();
+  await db.tokens.clear();
+  world.library.mockResolvedValue([{ uid: 'char:1', items: [] }]);
+  world.location.mockResolvedValue(1);
+  world.newMail.mockResolvedValue({ data: null });
   store.postRequest.mockResolvedValue({ requestId: 'new' });
   store.extendRequest.mockResolvedValue({ expiresAt: 1 });
   store.setRequestClosed.mockResolvedValue(undefined);
@@ -103,7 +169,7 @@ describe('RequestsTab board', () => {
 });
 
 describe('Request panel', () => {
-  it('gives a Member nothing to press', async () => {
+  it('gives a Member no Extend or Close', async () => {
     const user = userEvent.setup();
     renderTab([request({})]);
     await user.click(screen.getByText('Tritanium'));
@@ -165,6 +231,21 @@ describe('New request dialog', () => {
       lines: [{ typeId: 35, name: 'Pyerite', quantity: 75, kind: 'item' }],
     });
     expect(reload).toHaveBeenCalled();
+  });
+
+  it('offers systems and regions for the location and says whether it can be measured', async () => {
+    const user = userEvent.setup();
+    renderTab([]);
+    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    const field = await screen.findByLabelText(/^Location/);
+    await user.type(field, 'my hangar');
+    expect(screen.getByText(/Not a system or region/)).toBeInTheDocument();
+    await user.clear(field);
+    await user.type(field, 'badi');
+    await user.click(await screen.findByRole('button', { name: 'Badivefi, Khanid' }));
+    expect(field).toHaveValue('Badivefi, Khanid');
+    expect(screen.getByText('Others can filter this Request by distance.')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Matching systems and regions' })).toBeNull();
   });
 
   it('adds an item by search and offers copy/original on a blueprint line', async () => {
@@ -234,5 +315,142 @@ describe('New request dialog', () => {
       'bpc',
       'bpo',
     ]);
+  });
+});
+
+const blueprintLine = (typeId: number, name: string) => ({
+  typeId,
+  name,
+  quantity: 2,
+  kind: 'bpc' as const,
+});
+const rowNames = () =>
+  screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => row.textContent ?? '');
+
+describe('I can fill', () => {
+  it('counts and lists open Requests of others with a blueprint line the Member shares', async () => {
+    const user = userEvent.setup();
+    world.library.mockResolvedValue([
+      { uid: 'char:1', items: [{ typeId: 99, me: 10, te: 20, runs: -1 }] },
+    ]);
+    renderTab([
+      request({ id: 'fit', lines: [blueprintLine(99, 'Ishtar Blueprint')] }),
+      request({ id: 'no', ownerName: 'Bo Tanner', lines: [blueprintLine(98, 'Other Blueprint')] }),
+      request({
+        id: 'own',
+        ownerUid: 'char:1',
+        ownerName: 'Me',
+        lines: [blueprintLine(99, 'Ishtar Blueprint')],
+      }),
+    ]);
+    const chip = screen.getByRole('button', { name: /^I can fill/ });
+    await waitFor(() => expect(chip).toHaveTextContent('I can fill1'));
+    await user.click(chip);
+    expect(rowNames()).toHaveLength(1);
+    expect(screen.getByText('Aria Voss · Khanid')).toBeInTheDocument();
+  });
+
+  it('is disabled with its reason when the shared blueprints cannot be read', async () => {
+    world.library.mockRejectedValue(new Error('offline'));
+    renderTab([request({})]);
+    const chip = await screen.findByRole('button', { name: /^I can fill/ });
+    await waitFor(() => expect(chip).toHaveAttribute('aria-disabled', 'true'));
+  });
+});
+
+describe('distance', () => {
+  const near = request({ id: 'near', location: 'Perimeter, The Forge', terms: 'near one' });
+  const far = request({ id: 'far', location: 'Badivefi, Khanid', terms: 'far one' });
+  const free = request({ id: 'free', location: 'my hangar', terms: 'free one' });
+  const select = () => screen.getByRole('combobox', { name: 'Distance' });
+
+  it('limits the list to Requests within N jumps and says how many it cannot place', async () => {
+    const user = userEvent.setup();
+    await grant(LOCATION_SCOPE);
+    renderTab([near, far, free]);
+    await waitFor(() => expect(select()).toBeEnabled());
+    expect(rowNames()).toHaveLength(3);
+    await user.selectOptions(select(), 'Within 5 jumps');
+    expect(
+      await screen.findByText(
+        '1 Request with no place to measure from isn’t listed.'.replace('’', "'")
+      )
+    ).toBeInTheDocument();
+    expect(rowNames()).toHaveLength(1);
+    expect(rowNames()[0]).toContain('near one');
+    await user.selectOptions(select(), 'Within 10 jumps');
+    await waitFor(() => expect(rowNames()).toHaveLength(2));
+    await user.selectOptions(select(), 'Any distance');
+    await waitFor(() => expect(rowNames()).toHaveLength(3));
+    expect(screen.queryByText(/no place to measure from/)).not.toBeInTheDocument();
+  });
+
+  it('is disabled with the Grant link when the location Permission is missing', async () => {
+    await grant();
+    renderTab([near]);
+    await waitFor(() => expect(select()).toBeDisabled());
+    expect(screen.getByText(/Distance needs your pilot's location/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Grant missing Permissions' })).toBeInTheDocument();
+  });
+
+  it('is disabled with a reason when the pilot location is not known', async () => {
+    await grant(LOCATION_SCOPE);
+    world.location.mockResolvedValue(null);
+    renderTab([near]);
+    expect(await screen.findByText(/location isn't known right now/)).toBeInTheDocument();
+    expect(select()).toBeDisabled();
+  });
+});
+
+describe('Message the requester', () => {
+  it('opens a new mail to the requester with a subject and body filled in', async () => {
+    const user = userEvent.setup();
+    await grant(WINDOW_SCOPE);
+    renderTab([request({ ownerUid: 'char:2119000001' })]);
+    await user.click(screen.getByText('Tritanium'));
+    const button = await screen.findByRole('button', { name: 'Message Aria Voss…' });
+    await user.click(button);
+    expect(world.newMail).toHaveBeenCalledWith(1, {
+      recipientId: 2119000001,
+      subject: 'Your Request: Tritanium',
+      body: 'Hi Aria Voss, about your Request in Pals for Tritanium: ',
+    });
+    expect(await screen.findByText('Opened in your EVE client.')).toBeInTheDocument();
+  });
+
+  it('explains the missing Permission with the Grant link instead of failing', async () => {
+    const user = userEvent.setup();
+    await grant();
+    renderTab([request({ ownerUid: 'char:2119000001' })]);
+    await user.click(screen.getByText('Tritanium'));
+    const button = await screen.findByRole('button', { name: 'Message Aria Voss…' });
+    await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
+    await user.click(button);
+    expect(world.newMail).not.toHaveBeenCalled();
+    const panel = screen.getByRole('dialog');
+    expect(within(panel).getByText(/needs the Open in EVE Permission/)).toBeInTheDocument();
+    expect(
+      within(panel).getByRole('link', { name: 'Grant missing Permissions' })
+    ).toBeInTheDocument();
+  });
+
+  it('says so when the game refuses, and offers no Message on my own Request', async () => {
+    const user = userEvent.setup();
+    await grant(WINDOW_SCOPE);
+    world.newMail.mockRejectedValue(new Error('boom'));
+    renderTab([request({ ownerUid: 'char:2119000001' })]);
+    await user.click(screen.getByText('Tritanium'));
+    await user.click(await screen.findByRole('button', { name: 'Message Aria Voss…' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn't open it in EVE/);
+  });
+
+  it('is not offered to the requester', async () => {
+    const user = userEvent.setup();
+    renderTab([request({ ownerUid: 'char:1', ownerName: 'Me' })]);
+    await user.click(screen.getByText('Tritanium'));
+    expect(screen.queryByRole('button', { name: /^Message/ })).toBeNull();
   });
 });

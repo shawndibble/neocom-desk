@@ -532,6 +532,11 @@ export const ESI_REGISTRY = {
     scope: 'esi-ui.open_window.v1',
     group: 'openWindow',
   },
+  postOpenWindowNewMail: {
+    route: '/ui/openwindow/newmail',
+    scope: 'esi-ui.open_window.v1',
+    group: 'openWindow',
+  },
   getAlliancePublicInfo: {
     route: '/alliances/{alliance_id}',
     scope: PUBLIC,

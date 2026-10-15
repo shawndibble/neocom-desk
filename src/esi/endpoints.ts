@@ -2054,6 +2054,28 @@ export function postOpenWindowContract(
   });
 }
 
+// --- POST /ui/openwindow/newmail (esi-ui.open_window.v1) ---
+
+/**
+ * Opens the EVE client's new-mail window addressed to one character, with the
+ * subject and body filled in; nothing is sent until the pilot presses Send in
+ * game. The same scope as the other open-window calls, not the mail scopes,
+ * and it is not a send, so it counts against no mail cap.
+ */
+export function postOpenWindowNewMail(
+  characterId: number,
+  draft: { recipientId: number; subject: string; body: string },
+  { signal }: { signal?: AbortSignal } = {}
+): Promise<EsiResult<null>> {
+  return esiFetch<null>('/ui/openwindow/newmail', {
+    signal,
+    characterId,
+    method: 'POST',
+    body: { recipients: [draft.recipientId], subject: draft.subject, body: draft.body },
+    endpointId: 'postOpenWindowNewMail',
+  });
+}
+
 // ---------------------------------------------------------------------------
 // The `corp` scope group (issue #295).
 //
