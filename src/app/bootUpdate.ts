@@ -4,7 +4,8 @@ import { activateWaitingWorker, waitForInstall } from './swUpdate';
 
 /**
  * Applies a waiting service-worker build, but only here: on a cold start or a
- * browser reload, behind the boot screen. Never on a route change, and a
+ * browser reload, behind the boot screen (a page no worker controls just brings
+ * the worker up to date, quietly). Never on a route change, and a
  * running tab never reloads for an update (ReloadPrompt only looks).
  *
  * The check is capped so a slow network never holds the boot; a build that
@@ -82,20 +83,35 @@ async function swap(
 }
 
 /**
+ * Asks for a newer build and waits for it to install, up to the cap. Resolves
+ * `'cap'` when the cap passes first; a check that fails or lands late is
+ * simply left to finish on its own.
+ */
+async function checkWithinCap(
+  env: BootUpdateEnv,
+  registration: ServiceWorkerRegistration
+): Promise<'checked' | 'cap'> {
+  const found = (async () => {
+    await registration.update();
+    await waitForInstall(registration, BOOT_UPDATE_CHECK_CAP_MS);
+    return 'checked' as const;
+  })();
+  // A rejection after the cap has won must not surface unhandled.
+  found.catch(() => undefined);
+  return Promise.race([found, env.wait(BOOT_UPDATE_CHECK_CAP_MS).then(() => 'cap' as const)]);
+}
+
+/**
  * A page no worker controls (a hard reload, which bypasses the worker) already
  * runs the latest build from the network, so there is nothing to reload into:
  * only bring the worker up to date, so the next normal load serves the new
- * precache instead of swapping on it. Never reloads, never holds the page.
+ * precache instead of swapping on it. Always checks first: a worker already
+ * waiting may be older than the build this page just fetched, and activating it
+ * would make a stale precache control the live page. Never reloads, never holds
+ * the page.
  */
 async function settleWorker(env: BootUpdateEnv, registration: ServiceWorkerRegistration) {
-  if (!registration.waiting) {
-    const found = (async () => {
-      await registration.update();
-      await waitForInstall(registration, BOOT_UPDATE_CHECK_CAP_MS);
-    })();
-    found.catch(() => undefined);
-    await Promise.race([found, env.wait(BOOT_UPDATE_CHECK_CAP_MS)]);
-  }
+  await checkWithinCap(env, registration);
   if (registration.waiting) await activateWaitingWorker(registration);
 }
 
@@ -130,17 +146,7 @@ export async function runBootUpdate(
 
     if (registration.waiting) return await swap(env, registration);
 
-    const found = (async () => {
-      await registration.update();
-      await waitForInstall(registration, BOOT_UPDATE_CHECK_CAP_MS);
-      return 'checked' as const;
-    })();
-    // A rejection after the cap has won must not surface unhandled.
-    found.catch(() => undefined);
-    const raced = await Promise.race([
-      found,
-      env.wait(BOOT_UPDATE_CHECK_CAP_MS).then(() => 'cap' as const),
-    ]);
+    const raced = await checkWithinCap(env, registration);
     if (raced === 'cap') return 'timed-out';
     return registration.waiting ? await swap(env, registration) : 'current';
   } catch {
