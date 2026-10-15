@@ -10281,6 +10281,9 @@
     "updateAction": "Update now",
     "updateWorking": "Updating…",
     "updateFailed": "Could not check for a new version. Check your connection and try again.",
+    "analyticsTitle": "Analytics",
+    "analyticsLabel": "Send page views",
+    "analyticsHint": "Sends only the name of the page you are on to Google Analytics, never character, corporation or other IDs. Stored on this device only.",
     "deviceTitle": "Log out and delete",
     "deviceCharacters_one": "{{count}} character is logged in on this device.",
     "deviceCharacters_other": "{{count}} characters are logged in on this device.",
@@ -10401,7 +10404,7 @@
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
-          "crashes": "Crash reports: the error, the page it happened on and the addresses of recent requests, which can include EVE character or item IDs. The app doesn't attach your IP address; request and response bodies are never captured; EVE tokens are stripped first. Usage statistics: each page you open is counted in Google Analytics by the page's name only, never an ID or a search, and not tied to your character. There is no switch in the app to turn this off.",
+          "crashes": "Crash reports: the error, the page it happened on and the addresses of recent requests, which can include EVE character or item IDs. The app doesn't attach your IP address; request and response bodies are never captured; EVE tokens are stripped first. Usage statistics: each page you open is counted in Google Analytics by the page's name only, never an ID or a search, and not tied to your character. Turn this off in Settings › Data & storage › Analytics.",
           "shareLinks": "Share Links: the appraisal, Fitting, D-Scan or Survey you shared (items, scan text, a Survey's location and notes, and the Character names of whoever started it or pasted a scan), under a random link ID with no account or Character ID. Anyone with the link can read it, and anyone with a Survey link can add scans. It stops working after 7 days and is then deleted automatically, up to a day later. It can't be deleted sooner.",
           "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
           "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
