@@ -10068,6 +10068,7 @@
   "error": {
     "title": "Something went wrong",
     "hint": "Reloading usually fixes this. Your Skill Plans and Build Plans are stored locally and are not affected.",
+    "offlineHint": "This page can't load while you're offline. It will try again when your connection returns. Your Skill Plans and Build Plans are stored locally and are not affected.",
     "reload": "Reload"
   },
   "appraisalShare": {

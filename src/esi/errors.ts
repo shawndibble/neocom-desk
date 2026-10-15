@@ -8,7 +8,7 @@
  * its temporal dead zone — an import-order-dependent crash. This file imports
  * nothing, so there is no order to depend on.
  *
- * `client.ts` re-exports all three, which stays their canonical import path for
+ * `client.ts` re-exports all of them, which stays their canonical import path for
  * the rest of the app.
  */
 
@@ -130,5 +130,26 @@ export class EsiTimeoutError extends EsiError {
     this.name = 'EsiTimeoutError';
     this.timeoutMs = timeoutMs;
     this.sent = sent;
+  }
+}
+
+/**
+ * An authenticated request that could not start because the access token could
+ * not be refreshed over the network (`AuthError` with status 0: offline, DNS,
+ * timeout). Thrown by `esiFetch` in place of that `AuthError`, which says
+ * nothing about the grant.
+ *
+ * Status 0 for the usual reason: ESI said nothing. It is a plain network
+ * failure to every caller. Never 401/403, so `isAuthFailure` is false and
+ * `esi/cache.ts` serves the stored row without `needsReauth`. `esiFetch`
+ * throws it before the request scope opens, so it is not written to the
+ * activity log, and it never reaches the budget gate, so it costs no error
+ * budget. `navigator.onLine` plays no part: it is advisory only.
+ */
+export class EsiOfflineError extends EsiError {
+  constructor(cause?: unknown) {
+    super(0, 'The access token could not be refreshed: no network');
+    this.name = 'EsiOfflineError';
+    if (cause !== undefined) this.cause = cause;
   }
 }

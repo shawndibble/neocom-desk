@@ -1,8 +1,9 @@
 /**
  * One captured screen on the landing page: the file under `public/screenshots/`
  * and the `login.screenshots.*` key its alt text and enlarged-view caption live
- * under. Real captures filled with sample data, not mockups. WebP sits outside
- * the PWA precache glob, so a signed-in user never downloads them.
+ * under. Real captures filled with sample data, not mockups. `screenshots/` is
+ * excluded from the PWA precache (vite.config.ts), so a signed-in user never
+ * downloads them.
  */
 export interface Screenshot {
   file: string;

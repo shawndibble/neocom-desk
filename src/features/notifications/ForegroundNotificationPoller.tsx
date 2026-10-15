@@ -8,6 +8,7 @@ import {
 import { refreshAppBadge } from './appBadge';
 import { joinTabElection, runUnlessRunningElsewhere } from '@/lib/tabLeader';
 import { ignoreIdbTeardown } from '@/db/teardown';
+import { isOnline, onReconnect } from '@/stores/network';
 
 /**
  * Mounts the Foreground Poller (GLOSSARY.md round 20): renders nothing, just
@@ -41,7 +42,9 @@ export function ForegroundNotificationPoller() {
     });
 
     function poll() {
-      if (cancelled || document.hidden || !seat.isLeader()) return;
+      // Offline, every domain would just fail into its cached row: nothing new
+      // can be found. The reconnect catch-up below makes up for the missed ticks.
+      if (cancelled || document.hidden || !isOnline() || !seat.isLeader()) return;
       // A new leader's catch-up must not overlap the old leader's poll still
       // in flight: both would fire, and feed, the same occurrences. A poll cut
       // short by iOS aborting its IndexedDB transactions (the tab went to the
@@ -62,7 +65,13 @@ export function ForegroundNotificationPoller() {
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
 
+    // Back online: catch up now rather than at the next interval tick.
+    const offReconnect = onReconnect(() => {
+      if (firstPollDue) poll();
+    });
+
     return () => {
+      offReconnect();
       seat.leave();
       cancelled = true;
       clearTimeout(firstPoll);

@@ -133,6 +133,13 @@ describe('scheduleLazySdeWarm', () => {
     expect(warmLazySde).toHaveBeenCalledOnce();
   });
 
+  it('takes a shorter delay from a caller already past boot, still waiting for an idle slot', async () => {
+    scheduleLazySdeWarm(0);
+    await vi.advanceTimersByTimeAsync(BOOT_PREFETCH_IDLE_TIMEOUT_MS);
+    await flush();
+    expect(warmLazySde).toHaveBeenCalledOnce();
+  });
+
   it('never starts once cancelled', async () => {
     const cancel = scheduleLazySdeWarm();
     cancel();

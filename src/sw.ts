@@ -78,11 +78,12 @@ const DAY_SECONDS = 24 * 60 * 60;
 // opaque, and an error (e.g. a blueprint's 400 on /icon) is never cached.
 const cacheOnly200 = new CacheableResponsePlugin({ statuses: [200] });
 
-// SDE files not in the precache (vite.config.ts globIgnores): cache-first
-// under their content-versioned URL. A changed file is a new `?v=`, i.e. a
-// cache miss, so this never serves stale SDE; unchanged files survive any
-// number of deploys. maxEntries ~2x the file count and a 90-day age cap so
-// superseded versions get evicted rather than accumulating.
+// SDE files not in the precache (vite.config.ts globIgnores, built from
+// src/sde/lazySdeFiles.ts): cache-first under their content-versioned URL. A
+// changed file is a new `?v=`, i.e. a cache miss, so this never serves stale
+// SDE; unchanged files survive any number of deploys. maxEntries 64: the lazy
+// set is ~9 files, and each deploy that changes one leaves its old `?v=` entry
+// behind; the 90-day age cap evicts those rather than letting them accumulate.
 // The base path comes from the registration scope (= Vite's `base`), not
 // `import.meta`, which would break sw.js as a classic script (check-sw.mjs).
 const scopePath = new URL(self.registration.scope).pathname;
@@ -93,7 +94,7 @@ registerRoute(
     plugins: [
       cacheOnly200,
       new ExpirationPlugin({
-        maxEntries: 32,
+        maxEntries: 64,
         maxAgeSeconds: 90 * DAY_SECONDS,
         purgeOnQuotaError: true,
       }),

@@ -10,6 +10,12 @@ export interface SyncStatus {
   /** Epoch ms of the last successful sync this session, or null. */
   lastSyncedAt: number | null;
   error: string | null;
+  /**
+   * The failure in `error` was recorded while the browser was offline, so it
+   * says nothing about the sync itself: the UI shows it as offline, not as an
+   * error (`app/syncStatus.ts`). Only meaningful with `state: 'error'`.
+   */
+  offline?: boolean;
   /** Character this status refers to; absent only before the first sync. */
   characterId?: number;
 }

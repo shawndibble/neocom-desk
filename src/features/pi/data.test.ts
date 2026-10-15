@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
+import { AuthError } from '@/auth/sso';
 import { loadCharacterPlanets, loadPlanetDetail, loadAllColonyDetails } from './data';
 
 const CHAR_ID = 91;
@@ -50,6 +51,21 @@ describe('loadCharacterPlanets', () => {
     const result = await loadCharacterPlanets(CHAR_ID);
     expect(result.needsReauth).toBe(true);
     expect(result.cached).toBeNull();
+  });
+
+  it('serves the cached colonies, with no reauth, when the token refresh cannot reach SSO', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: 'planets', value: [PLANET], fetchedAt: 1 });
+    configureEsi({
+      getToken: async () => {
+        throw new AuthError('timeout', 'slow', 0);
+      },
+    });
+
+    const result = await loadCharacterPlanets(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.fromCache).toBe(true);
+    expect(result.cached?.data).toEqual([PLANET]);
   });
 
   it('does not treat a non-403 failure as needing reauth', async () => {

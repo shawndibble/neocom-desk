@@ -9,9 +9,8 @@
  * for what is only a secondary enhancement to the page. Only a 401 (or a
  * failed token refresh) counts.
  */
-import { AuthError } from '@/auth/sso';
 import { getCharacterLocation } from '@/esi/endpoints';
-import { EsiError } from '@/esi/client';
+import { isCredentialFailure } from '@/esi/client';
 import { loadWithCache } from '@/esi/cache';
 
 function cacheKey(): string {
@@ -25,8 +24,7 @@ export async function loadCharacterSolarSystemId(characterId: number): Promise<n
     cacheKey(),
     async () => (await getCharacterLocation(characterId)).data?.solar_system_id ?? null,
     {
-      detectAuthFailure: (err) =>
-        err instanceof AuthError || (err instanceof EsiError && err.status === 401),
+      detectAuthFailure: isCredentialFailure,
     }
   );
   return result?.data ?? null;
