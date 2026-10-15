@@ -204,6 +204,7 @@ function ItemRow({
 }: ItemRowProps) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
+  const touched = useRef(false);
   const row = (
     <li
       draggable={draggable}
@@ -221,7 +222,12 @@ function ItemRow({
           : undefined
       }
       onPointerLeave={onPreview ? () => onPreview(null) : undefined}
-      onFocus={onPreview ? () => onPreview(entry.typeId) : undefined}
+      onPointerDown={
+        onPreview ? (event) => (touched.current = event.pointerType === 'touch') : undefined
+      }
+      onKeyDown={onPreview ? () => (touched.current = false) : undefined}
+      // A tap focuses the row too, and touch gets no preview.
+      onFocus={onPreview ? () => !touched.current && onPreview(entry.typeId) : undefined}
       onBlur={onPreview ? () => onPreview(null) : undefined}
       className={`flex items-center ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
