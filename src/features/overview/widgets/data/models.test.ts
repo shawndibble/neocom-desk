@@ -651,6 +651,16 @@ describe('contracts table', () => {
     expect(view.table?.rows).toEqual([]);
   });
 
+  it('with no hauls but outstanding item exchanges, headlines the exchanges rather than 0', () => {
+    const view = buildView(
+      'contracts',
+      { contracts: ok(data({ inProgress: 0, exchanges: 1 })) as never },
+      ctx()
+    );
+    expect(view.number.value).toBe('1');
+    expect(view.number.unit).toBe('overview.widgets.contracts.exchangesUnit');
+  });
+
   it('leads with the soonest deadline and counts the hauls as the secondary', () => {
     const soonest = courier();
     const feeds = { contracts: ok(data({ soonest, items: [soonest] })) };
