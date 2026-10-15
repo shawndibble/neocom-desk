@@ -8,6 +8,7 @@
  * entry also reserves `delivered` and `contractIds` for delivery marking
  * (#3809), which this ticket never writes beyond preserving them.
  */
+import { DAY_MS } from '@/lib/age';
 
 /** Mirrors `functions/src/communityRequests.ts`, which enforces them. */
 export const MAX_LINES_PER_REQUEST = 50;
@@ -254,8 +255,6 @@ export const isBlueprintName = (name: string) => / Blueprint$/.test(name);
 /** The kind a line starts as: a copy for a blueprint (what a requester usually wants), else an item. */
 export const defaultKind = (name: string): RequestLineKind =>
   isBlueprintName(name) ? 'bpc' : 'item';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Pledges per Request id, as the board and My pledges read them. */
 export type PledgesByRequest = ReadonlyMap<string, readonly RequestPledge[]>;

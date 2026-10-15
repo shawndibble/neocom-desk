@@ -22,14 +22,27 @@ export function daysLeft(expiresAt: number, now: number): number {
   return Math.max(0, Math.floor((expiresAt - now) / DAY_MS));
 }
 
-/** `29d left`, `<1d left`, or `expired`: the board's remaining-time text. */
-export function formatLeft(expiresAt: number, now: number, t: Translate): string {
+/**
+ * How long a Request has left, in the wording of the surface asking: `expired`
+ * once past, the `underDay` key under a day, else the `days` key with the count.
+ */
+export function describeExpiry(
+  expiresAt: number,
+  now: number,
+  t: Translate,
+  keys: { underDay: string; days: string }
+): string {
   if (expiresAt <= now) return t('communities.board.status.expired');
   const days = daysLeft(expiresAt, now);
-  return days === 0
-    ? t('communities.board.leftUnderDay')
-    : t('communities.board.left', { count: days });
+  return days === 0 ? t(keys.underDay) : t(keys.days, { count: days });
 }
+
+/** `29d left`, `<1d left`, or `expired`: the board's remaining-time text. */
+export const formatLeft = (expiresAt: number, now: number, t: Translate): string =>
+  describeExpiry(expiresAt, now, t, {
+    underDay: 'communities.board.leftUnderDay',
+    days: 'communities.board.left',
+  });
 
 export const STATUS_TONE: Record<RequestStatus, string> = {
   open: 'text-text-dim',

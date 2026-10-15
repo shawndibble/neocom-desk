@@ -8,6 +8,7 @@ import { pledgeEntryAfterManual } from '@/engine/communities/delivery';
 import {
   canPledge,
   isStalePledge,
+  lineKey,
   lineProgress,
   withPledgeLine,
   withdrawPledgeLine,
@@ -24,7 +25,7 @@ import { PledgeRow } from './PledgeRow';
 import { callableErrorReason } from './callableError';
 import { DELIVERY_ENDPOINTS, slotKey } from './requestDelivery';
 import { useDeliverySync } from './useDeliverySync';
-import { daysLeft } from './requestFormat';
+import { describeExpiry } from './requestFormat';
 import {
   extendRequest,
   removePledge,
@@ -160,16 +161,14 @@ export function RequestPanel({
     (count) => t('communities.board.more', { count })
   );
 
-  const left = daysLeft(request.expiresAt, now);
   const place = request.location;
   const posted = t('communities.board.posted', { age: formatAge(now - request.createdAt, t) });
   const closes = request.closed
     ? t('communities.board.closedNote')
-    : request.expiresAt <= now
-      ? t('communities.board.status.expired')
-      : left === 0
-        ? t('communities.board.closesUnderDay')
-        : t('communities.board.closesIn', { count: left });
+    : describeExpiry(request.expiresAt, now, t, {
+        underDay: 'communities.board.closesUnderDay',
+        days: 'communities.board.closesIn',
+      });
 
   return (
     <SlideOver
@@ -192,7 +191,7 @@ export function RequestPanel({
         <ul className="divide-y divide-line" aria-label={t('communities.board.linesLabel')}>
           {request.lines.map((line, index) => {
             const own = myPledge?.lines[index];
-            const key = `${line.typeId}:${line.kind}`;
+            const key = lineKey(line);
             return (
               <PledgeRow
                 key={key}
