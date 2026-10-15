@@ -55,6 +55,7 @@ export function ComposeRecipientsStep({
   > | null>(null);
   const [librariesFailed, setLibrariesFailed] = useState(false);
   const [mailsToday, setMailsToday] = useState<number | null>(null);
+  const [mailsUnknown, setMailsUnknown] = useState(false);
   const lacksScope = useCharacterLacksEndpoints(characterId, SEND_MAIL);
 
   const needsLibraries = lines.some((line) => line.kind !== 'item');
@@ -64,7 +65,9 @@ export function ComposeRecipientsStep({
     loadMemberLibraries(
       characterId,
       communityId,
-      members.map((member) => member.uid)
+      members.map((member) => member.uid),
+      // A failed read must say so, not read as "nobody shares anything".
+      { strict: true }
     ).then(
       (loaded) => !cancelled && setLibraries(loaded),
       () => !cancelled && setLibrariesFailed(true)
@@ -78,7 +81,11 @@ export function ComposeRecipientsStep({
     // The count is a convenience: the server holds the cap either way.
     loadRequestMailsToday(characterId).then(
       (used) => !cancelled && setMailsToday(used),
-      () => !cancelled && setMailsToday(0)
+      (err) => {
+        if (cancelled) return;
+        console.warn('Request mails today could not be read', err);
+        setMailsUnknown(true);
+      }
     );
     return () => {
       cancelled = true;
@@ -99,7 +106,9 @@ export function ComposeRecipientsStep({
   });
   const mailsLeft = mailsToday === null ? MAX_REQUEST_MAILS_PER_DAY : requestMailsLeft(mailsToday);
   const recipientsReady =
-    members !== null && mailsToday !== null && (!needsLibraries || libraries || librariesFailed);
+    members !== null &&
+    (mailsToday !== null || mailsUnknown) &&
+    (!needsLibraries || libraries || librariesFailed);
 
   return (
     <form
@@ -110,10 +119,12 @@ export function ComposeRecipientsStep({
       }}
     >
       <p className="text-xs text-text-dim">
-        {t('communities.board.compose.recipientsIntro', {
-          used: mailsToday ?? 0,
-          max: MAX_REQUEST_MAILS_PER_DAY,
-        })}
+        {mailsUnknown
+          ? t('communities.board.compose.recipientsIntroUnknown')
+          : t('communities.board.compose.recipientsIntro', {
+              used: mailsToday ?? 0,
+              max: MAX_REQUEST_MAILS_PER_DAY,
+            })}
       </p>
       {lacksScope && (
         <GrantNote

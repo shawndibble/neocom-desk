@@ -303,8 +303,9 @@ export function ComposeRequestDialog({
   return (
     <Modal
       open
-      // The mails are going out under this dialog: it stays until each has a result.
-      onClose={phase === 'mailing' ? () => undefined : onClose}
+      // The post is in flight, or the mails are going out under this dialog: it
+      // stays until each has a result, or the mails would send invisibly.
+      onClose={phase === 'mailing' || busy ? () => undefined : onClose}
       title={t('communities.board.compose.title')}
       placement="wide"
     >

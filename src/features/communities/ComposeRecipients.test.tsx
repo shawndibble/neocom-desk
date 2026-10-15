@@ -219,4 +219,57 @@ describe('Compose step 2: who to mail', () => {
     // Posting without mail is still possible.
     expect(screen.getByRole('button', { name: 'Post request' })).toBeEnabled();
   });
+
+  it('stays open while the post is in flight, so the mails cannot send invisibly', async () => {
+    const user = userEvent.setup();
+    let finish: (value: { requestId: string }) => void = () => undefined;
+    store.postRequest.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const { onClose } = renderDialog();
+    await toStep2(user);
+    await user.click(screen.getByRole('button', { name: 'Post request and mail 1 Member' }));
+    await user.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+    finish({ requestId: 'r1' });
+    await screen.findByText('Request posted. Mailed 1 of 1 Members.');
+  });
+
+  it('says so, and pre-ticks nobody, when the shared libraries cannot be read', async () => {
+    const user = userEvent.setup();
+    communities.loadMemberLibraries.mockRejectedValue(new Error('offline'));
+    renderDialog();
+    const list = await toStep2(user);
+    expect(communities.loadMemberLibraries).toHaveBeenCalledWith(1, 'c1', expect.any(Array), {
+      strict: true,
+    });
+    expect(await screen.findByText(/Couldn't read what Members share/)).toBeInTheDocument();
+    expect(within(list).getByRole('checkbox', { name: /Bo Tanner/ })).not.toBeChecked();
+  });
+
+  it('shows the mail count as unknown, not zero, when it cannot be read', async () => {
+    const user = userEvent.setup();
+    store.loadRequestMailsToday.mockRejectedValue(new Error('offline'));
+    renderDialog();
+    await toStep2(user);
+    expect(
+      await screen.findByText(/Couldn't read how many mails you have sent/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/0 of 100 mails sent today/)).not.toBeInTheDocument();
+  });
+
+  it('says nothing can be mailed when the day’s mails are used up', async () => {
+    const user = userEvent.setup();
+    store.loadRequestMailsToday.mockResolvedValue(100);
+    renderDialog();
+    await toStep2(user);
+    expect(await screen.findByText(/You have sent today's mails/)).toBeInTheDocument();
+  });
+
+  it('warns and offers the full count when more are ticked than are left', async () => {
+    const user = userEvent.setup();
+    store.loadRequestMailsToday.mockResolvedValue(99);
+    renderDialog({ prefill: { lines: LINES, tickedUids: ['char:3', 'char:4'] } });
+    await toStep2(user);
+    expect(screen.getByText(/You can send 1 more mail today/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Post request and mail 3 Members' })).toBeEnabled();
+  });
 });
