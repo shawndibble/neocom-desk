@@ -164,9 +164,10 @@ describe('request badge poll while offline', () => {
   afterEach(() => {
     Reflect.deleteProperty(navigator, 'onLine');
     vi.useRealTimers();
+    useActiveCharacter.setState({ activeCharacterId: null });
   });
 
-  it('skips its tick while offline, reads again once back, and reads on reconnect', async () => {
+  it('skips its tick while offline, then reads when the connection returns', async () => {
     await rememberCommunityWatch(1, [community('c1')]);
     useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });

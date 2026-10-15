@@ -36,19 +36,32 @@ function notify(listeners: ReadonlySet<Listener>): void {
   }
 }
 
+function onOnlineEvent(): void {
+  notify(changeListeners);
+  notify(reconnectListeners);
+}
+
+function onOfflineEvent(): void {
+  notify(changeListeners);
+}
+
 function attach(): void {
   if (attached || typeof window === 'undefined') return;
   attached = true;
-  window.addEventListener('online', () => {
-    notify(changeListeners);
-    notify(reconnectListeners);
-  });
-  window.addEventListener('offline', () => notify(changeListeners));
+  window.addEventListener('online', onOnlineEvent);
+  window.addEventListener('offline', onOfflineEvent);
 }
 
 // Attached at load, so a transition that happens before anything subscribes is
 // still seen by `onReconnect` callers that subscribe afterwards.
 attach();
+
+// A hot-reloaded copy of this module attaches its own pair; without this the
+// old one would keep firing beside it.
+import.meta.hot?.dispose(() => {
+  window.removeEventListener('online', onOnlineEvent);
+  window.removeEventListener('offline', onOfflineEvent);
+});
 
 function subscribe(listener: Listener): () => void {
   changeListeners.add(listener);

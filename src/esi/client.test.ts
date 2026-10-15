@@ -7,7 +7,9 @@ import {
   EsiError,
   isAuthFailure,
   isCredentialFailure,
+  isOfflineFailure,
   EsiOfflineError,
+  EsiTimeoutError,
   ESI_BASE_URL,
   COMPATIBILITY_DATE,
   USER_AGENT,
@@ -841,7 +843,32 @@ describe('isCredentialFailure', () => {
   });
 });
 
+describe('isOfflineFailure', () => {
+  it('is true for every way of not reaching the network', () => {
+    expect(isOfflineFailure(new EsiOfflineError())).toBe(true);
+    expect(isOfflineFailure(new TypeError('Failed to fetch'))).toBe(true);
+    expect(isOfflineFailure(new AuthError('network_error', 'offline', 0))).toBe(true);
+    expect(isOfflineFailure(new AuthError('timeout', 'slow', 0))).toBe(true);
+    expect(isOfflineFailure(new EsiTimeoutError(30_000))).toBe(true);
+    expect(isOfflineFailure(new DOMException('timed out', 'TimeoutError'))).toBe(true);
+  });
+
+  it('is false when ESI or SSO answered, or the app declined to ask', () => {
+    expect(isOfflineFailure(new EsiError(500, 'boom'))).toBe(false);
+    expect(isOfflineFailure(new EsiError(401, 'bad token'))).toBe(false);
+    expect(isOfflineFailure(new AuthError('invalid_grant', 'revoked', 400))).toBe(false);
+    expect(isOfflineFailure(new EsiBudgetError('rateLimit', 1000))).toBe(false);
+    expect(isOfflineFailure(new DOMException('Aborted', 'AbortError'))).toBe(false);
+    expect(isOfflineFailure(new Error('boom'))).toBe(false);
+    expect(isOfflineFailure(undefined)).toBe(false);
+  });
+});
+
 describe('esiFetch — token refresh that cannot reach SSO', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('throws EsiOfflineError instead of the status-0 AuthError, without sending a request', async () => {
     configureEsi({
       getToken: async () => {
@@ -899,7 +926,6 @@ describe('esiFetch — token refresh that cannot reach SSO', () => {
     server.use(http.get(`${ESI_BASE_URL}/alliances/99000001`, () => HttpResponse.json({ ok: 1 })));
 
     const result = await esiFetch('/alliances/99000001');
-    vi.unstubAllGlobals();
 
     expect(result.data).toEqual({ ok: 1 });
   });

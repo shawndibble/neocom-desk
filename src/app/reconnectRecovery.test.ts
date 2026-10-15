@@ -8,7 +8,7 @@ function deps(overrides: Partial<ReconnectRecoveryDeps> = {}): ReconnectRecovery
     activeCharacterId: () => 7,
     syncConfigured: () => true,
     triggerSync: vi.fn(async () => {}),
-    warmLazySde: vi.fn(async () => {}),
+    scheduleSdeWarm: vi.fn(),
     ...overrides,
   };
 }
@@ -42,19 +42,16 @@ describe('recoverFromReconnect', () => {
     expect(unconfigured.triggerSync).not.toHaveBeenCalled();
   });
 
-  it('re-runs the lazy SDE warm', () => {
+  it('queues the lazy SDE warm for an idle slot rather than running it inline', () => {
     const d = deps();
     recoverFromReconnect(d);
-    expect(d.warmLazySde).toHaveBeenCalledTimes(1);
+    expect(d.scheduleSdeWarm).toHaveBeenCalledTimes(1);
   });
 
-  it('swallows a failing sync or warm: recovery is best effort', async () => {
+  it('swallows a failing sync: recovery is best effort', async () => {
     const d = deps({
       triggerSync: vi.fn(async () => {
         throw new Error('still down');
-      }),
-      warmLazySde: vi.fn(async () => {
-        throw new Error('chunk failed');
       }),
     });
 

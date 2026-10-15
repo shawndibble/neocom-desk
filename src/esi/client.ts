@@ -136,6 +136,24 @@ export function isAuthFailure(err: unknown): boolean {
 }
 
 /**
+ * Did the call fail for want of a network, rather than because of anything
+ * ESI or SSO said? True for the offline refresh failure (`EsiOfflineError`),
+ * a `fetch` that rejected with a `TypeError` (offline, DNS, TLS), an
+ * `AuthError` SSO never answered (status 0), and a timeout (`EsiTimeoutError`,
+ * or the `TimeoutError` an `AbortSignal.timeout` raises).
+ *
+ * Advisory, like `navigator.onLine`: the answer is for copy ("you're offline")
+ * and never gates a request. A budget refusal (`EsiBudgetError`) is not one:
+ * ESI was reachable, the app declined to ask.
+ */
+export function isOfflineFailure(err: unknown): boolean {
+  if (err instanceof EsiOfflineError || err instanceof EsiTimeoutError) return true;
+  if (err instanceof AuthError) return err.status === 0;
+  if (err instanceof DOMException) return err.name === 'TimeoutError';
+  return err instanceof TypeError;
+}
+
+/**
  * The narrower question a few loaders ask: was the credential itself refused,
  * as opposed to a 403 (which for a structure market or a citadel name is an
  * ACL no re-login can fix)? A 401, or a refresh SSO answered with a failure.

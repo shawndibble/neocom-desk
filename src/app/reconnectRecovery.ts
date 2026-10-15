@@ -15,6 +15,7 @@ import { clearRevalidationFailures, emitCacheRevalidated } from '@/esi/cache';
 import { triggerSync } from '@/sync';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { onReconnect } from '@/stores/network';
+import { scheduleLazySdeWarm } from './bootPrefetch';
 import { isSyncConfigured } from './syncStatus';
 
 export interface ReconnectRecoveryDeps {
@@ -23,7 +24,21 @@ export interface ReconnectRecoveryDeps {
   activeCharacterId: () => number | null;
   syncConfigured: () => boolean;
   triggerSync: (characterId: number) => Promise<void>;
-  warmLazySde: () => Promise<void>;
+  /** Queues the lazy SDE warm for an idle slot; a later call replaces an earlier, unstarted one. */
+  scheduleSdeWarm: () => void;
+}
+
+let cancelSdeWarm = () => {};
+
+/**
+ * The warm waits for an idle slot (`scheduleLazySdeWarm`) so it does not race
+ * the re-reads the cache reset just set off, and it checks the connection gate
+ * itself, so a metered or Save-Data connection still skips the large files.
+ * A flapping connection replaces the pending warm rather than stacking them.
+ */
+function scheduleSdeWarmOnce(): void {
+  cancelSdeWarm();
+  cancelSdeWarm = scheduleLazySdeWarm(0);
 }
 
 const liveDeps: ReconnectRecoveryDeps = {
@@ -32,12 +47,7 @@ const liveDeps: ReconnectRecoveryDeps = {
   activeCharacterId: () => useActiveCharacter.getState().activeCharacterId,
   syncConfigured: () => isSyncConfigured(),
   triggerSync,
-  // The warm checks the connection gate itself (`warmLazySde`), so a metered
-  // or Save-Data connection still skips the large files.
-  warmLazySde: async () => {
-    const { warmLazySde } = await import('@/sde/warmLazySde');
-    await warmLazySde({ cancelled: false });
-  },
+  scheduleSdeWarm: scheduleSdeWarmOnce,
 };
 
 /** One recovery pass. Everything after the cache reset is best effort. */
@@ -52,7 +62,7 @@ export function recoverFromReconnect(deps: ReconnectRecoveryDeps = liveDeps): vo
     // A failure is already published through `subscribeSyncStatus`.
     void deps.triggerSync(characterId).catch(() => {});
   }
-  void deps.warmLazySde().catch(() => {});
+  deps.scheduleSdeWarm();
 }
 
 /** Runs the recovery on every reconnect. Returns the unsubscribe. */

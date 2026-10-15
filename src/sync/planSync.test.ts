@@ -1936,6 +1936,10 @@ describe('triggerSync: settings', () => {
 });
 
 describe('sync orchestration', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('reports syncing -> idle with lastSyncedAt via subscribeSyncStatus', async () => {
     const states: SyncStatus[] = [];
     const unsubscribe = subscribeSyncStatus((s) => states.push(s));
@@ -1965,7 +1969,6 @@ describe('sync orchestration', () => {
     vi.stubGlobal('navigator', { onLine: true });
     await expect(triggerSync(999)).rejects.toThrow(/Unknown character/);
     expect(getSyncStatus(999)).toMatchObject({ state: 'error', offline: false });
-    vi.unstubAllGlobals();
   });
 
   it("keeps status per character: B's success does not mask A's error", async () => {

@@ -6,6 +6,7 @@ import {
   invalidateFreshness,
   onCacheRevalidated,
   resetRevalidationState,
+  clearRevalidationFailures,
   REFRESH_BYPASS_MS,
   STALE_AFTER,
   STALE_GRACE_MS,
@@ -1193,6 +1194,42 @@ describe('grace period past the freshness window', () => {
       expect(reread.cached?.data).toBe('fresh');
       expect(reread.cached?.fromCache).toBe(false);
     });
+  });
+
+  it('clearRevalidationFailures lets a key held by a network failure go to the network again', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('never-arrives');
+    const signalled = nextRevalidation();
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await expireGrace();
+    await pending;
+    settle(false);
+    await signalled;
+
+    clearRevalidationFailures();
+
+    const fresh = vi.fn(async () => 'fresh');
+    const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fresh);
+    expect(fresh).toHaveBeenCalledTimes(1);
+    expect(reread.cached?.data).toBe('fresh');
+  });
+
+  it('clearRevalidationFailures keeps a key held by a 401/403, which a reconnect does not fix', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('never-arrives', new EsiError(401, 'expired'));
+    const signalled = nextRevalidation();
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await expireGrace();
+    await pending;
+    settle(false);
+    await signalled;
+
+    clearRevalidationFailures();
+
+    const fresh = vi.fn(async () => 'fresh');
+    const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fresh);
+    expect(fresh).not.toHaveBeenCalled();
+    expect(reread.needsReauth).toBe(true);
   });
 
   it('does not start another slow call after a late failure, so the signal cannot loop', async () => {

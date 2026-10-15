@@ -11,7 +11,15 @@ function go(value: boolean): void {
   window.dispatchEvent(new Event(value ? 'online' : 'offline'));
 }
 
+/** Unsubscribes collected by a test, run after it so a failure cannot leak a listener. */
+const cleanups: Array<() => void> = [];
+function track(off: () => void): () => void {
+  cleanups.push(off);
+  return off;
+}
+
 afterEach(() => {
+  for (const off of cleanups.splice(0)) off();
   // Drops the own property, leaving the environment's prototype getter.
   Reflect.deleteProperty(navigator, 'onLine');
   vi.restoreAllMocks();
@@ -49,19 +57,18 @@ describe('useOnline', () => {
 describe('onReconnect', () => {
   it('fires on the offline to online transition, not on going offline', () => {
     const cb = vi.fn();
-    const off = onReconnect(cb);
+    track(onReconnect(cb));
 
     go(false);
     expect(cb).not.toHaveBeenCalled();
 
     go(true);
     expect(cb).toHaveBeenCalledTimes(1);
-    off();
   });
 
   it('stops firing once unsubscribed', () => {
     const cb = vi.fn();
-    const off = onReconnect(cb);
+    const off = track(onReconnect(cb));
     off();
 
     go(true);
@@ -73,12 +80,41 @@ describe('onReconnect', () => {
       throw new Error('boom');
     });
     const good = vi.fn();
-    const offBad = onReconnect(bad);
-    const offGood = onReconnect(good);
+    track(onReconnect(bad));
+    track(onReconnect(good));
 
     go(true);
     expect(good).toHaveBeenCalledTimes(1);
-    offBad();
-    offGood();
+  });
+
+  it('does not skip a neighbour when a callback unsubscribes itself while being notified', () => {
+    const second = vi.fn();
+    const offFirst = track(
+      onReconnect(() => {
+        offFirst();
+      })
+    );
+    track(onReconnect(second));
+
+    go(true);
+
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useOnline subscription', () => {
+  it('stops listening on unmount', () => {
+    setNavigatorOnline(true);
+    let renders = 0;
+    const { unmount } = renderHook(() => {
+      renders += 1;
+      return useOnline();
+    });
+    const rendersWhileMounted = renders;
+
+    unmount();
+    go(false);
+
+    expect(renders).toBe(rendersWhileMounted);
   });
 });
