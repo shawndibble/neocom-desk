@@ -4,7 +4,7 @@ import { IskAmount } from '@/components/ui';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { getHubPrices, type HubAggregate } from '@/market/prices';
+import { getHubPricesWithStatus, type HubAggregate } from '@/market/prices';
 import { LARGE_SKILL_INJECTOR_TYPE_ID } from '@/engine/spExtraction';
 import { ALPHA_SP_CAP } from '@/engine/skillInjectors';
 import type { CloneState } from '@/engine/types';
@@ -44,14 +44,20 @@ export function InjectorFactsPanel({
   // without this, the fetch's own in-flight window renders that same
   // (wrong) claim before the hub has actually answered.
   const [priceLoaded, setPriceLoaded] = useState(false);
+  // The price source could not be reached: a null aggregate then means
+  // "unknown", not "no sell orders".
+  const [unreachable, setUnreachable] = useState(false);
   useEffect(() => {
     if (!hubHydrated) return;
     let cancelled = false;
-    void getHubPrices(hub, [LARGE_SKILL_INJECTOR_TYPE_ID]).then((prices) => {
-      if (cancelled) return;
-      setAggregate(prices.get(LARGE_SKILL_INJECTOR_TYPE_ID) ?? null);
-      setPriceLoaded(true);
-    });
+    void getHubPricesWithStatus(hub, [LARGE_SKILL_INJECTOR_TYPE_ID]).then(
+      ({ prices, unreachable }) => {
+        if (cancelled) return;
+        setAggregate(prices.get(LARGE_SKILL_INJECTOR_TYPE_ID) ?? null);
+        setUnreachable(unreachable);
+        setPriceLoaded(true);
+      }
+    );
     return () => {
       cancelled = true;
     };
@@ -69,6 +75,7 @@ export function InjectorFactsPanel({
 
   const priceCell = (value: number | null) => {
     if (!priceLoaded) return t('common.loading');
+    if (value === null && unreachable) return t('common.pricesUnavailableOffline');
     return value === null ? (
       t('plans.injectors.noSellOrders', { hub: hub.name })
     ) : (

@@ -7,7 +7,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskCompact } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { getHubPrices, getRegionSellPrices } from '@/market/prices';
+import { getHubPricesWithStatus, getRegionSellPrices } from '@/market/prices';
 import { buildSkillsToBuy, skillsToBuyTypeIds } from './skillsToBuy';
 
 interface SkillsToBuyPanelProps {
@@ -54,21 +54,26 @@ export function SkillsToBuyPanel({
     key: string;
     hub: Map<number, number | null>;
     region: Map<number, number | null>;
+    /** The hub lookup could not reach the price source, so "no price" means unknown. */
+    unreachable: boolean;
   } | null>(null);
   useEffect(() => {
     if (!hubHydrated || typeIds.length === 0) return;
     let cancelled = false;
     const key = `${hub.id}:${typeKey}`;
-    void Promise.all([getHubPrices(hub, typeIds), getRegionSellPrices(hub.regionId, typeIds)])
-      .then(([hubAgg, region]) => {
+    void Promise.all([
+      getHubPricesWithStatus(hub, typeIds),
+      getRegionSellPrices(hub.regionId, typeIds),
+    ])
+      .then(([{ prices: hubAgg, unreachable }, region]) => {
         if (cancelled) return;
         const hubMap = new Map<number, number | null>();
         for (const [id, agg] of hubAgg) hubMap.set(id, agg?.sellMin ?? null);
-        setPrices({ key, hub: hubMap, region });
+        setPrices({ key, hub: hubMap, region, unreachable });
       })
       .catch(() => {
         // A failed fetch reads as "no sell orders", never as an endless "Loading".
-        if (!cancelled) setPrices({ key, hub: new Map(), region: new Map() });
+        if (!cancelled) setPrices({ key, hub: new Map(), region: new Map(), unreachable: true });
       });
     return () => {
       cancelled = true;
@@ -83,6 +88,7 @@ export function SkillsToBuyPanel({
   const [expanded, setExpanded] = useState(false);
 
   const loaded = prices !== null && prices.key === `${hub.id}:${typeKey}`;
+  const unreachable = loaded && prices.unreachable;
   const facts =
     trainedSkillsKnown && typeIds.length > 0
       ? buildSkillsToBuy(
@@ -121,7 +127,9 @@ export function SkillsToBuyPanel({
                   t('common.loading')
                 ) : row.price === null ? (
                   <span className="text-text-dim">
-                    {t('plans.skillsToBuy.noSellOrders', { hub: hub.name })}
+                    {unreachable
+                      ? t('common.pricesUnavailableOffline')
+                      : t('plans.skillsToBuy.noSellOrders', { hub: hub.name })}
                   </span>
                 ) : (
                   <IskAmount value={row.price} />
@@ -130,13 +138,13 @@ export function SkillsToBuyPanel({
             </li>
           ))}
         </ul>
-        {loaded && (
+        {loaded && !unreachable && (
           <div className="flex items-center justify-between gap-2 border-t border-border pt-1">
             <span className="text-text-dim">{t('plans.skillsToBuy.total')}</span>
             <IskAmount value={facts.total} />
           </div>
         )}
-        {loaded && facts.unpricedCount > 0 && (
+        {loaded && !unreachable && facts.unpricedCount > 0 && (
           <p className="text-[0.6875rem] text-text-dim">
             {t('plans.skillsToBuy.unpriced', { count: facts.unpricedCount })}
           </p>
@@ -167,7 +175,9 @@ export function SkillsToBuyPanel({
         label={t('plans.skillsToBuy.title')}
         // Plain text, not `IskAmount`: its tooltip trigger is a tab stop, and a
         // second one inside the toggle button is nested interactive content.
-        trailing={loaded && facts ? `${formatIskCompact(facts.total)} ISK` : undefined}
+        trailing={
+          loaded && !unreachable && facts ? `${formatIskCompact(facts.total)} ISK` : undefined
+        }
         expanded={expanded}
         onToggle={() => setExpanded((open) => !open)}
       >

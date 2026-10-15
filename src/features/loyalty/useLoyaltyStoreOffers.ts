@@ -48,6 +48,8 @@ export interface LoyaltyStoreResult {
   hubHydrated: boolean;
   /** True once offers, the catalog and a market snapshot have all loaded at least once. */
   ready: boolean;
+  /** The price source could not be reached, so ISK/LP and profit are unknown, not zero. */
+  pricesUnreachable: boolean;
   useOwnMaterialsFor: ReadonlySet<number>;
   toggleUseOwnMaterials: (offerId: number) => void;
 }
@@ -242,6 +244,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     hub,
     hubHydrated,
     ready: offers !== null && catalog !== null && snapshot !== null,
+    pricesUnreachable: snapshot?.pricesUnreachable === true,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
   };

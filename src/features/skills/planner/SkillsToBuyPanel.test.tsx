@@ -6,10 +6,14 @@ import '@/i18n';
 import { configureClipboard } from '@/lib/clipboard';
 import { SkillsToBuyPanel } from './SkillsToBuyPanel';
 
-vi.mock('@/market/prices', () => ({
-  getHubPrices: vi.fn(async () => new Map([[1, { sellMin: 1000 }]])),
+const pricesMock = vi.hoisted(() => ({
+  getHubPricesWithStatus: vi.fn(async () => ({
+    prices: new Map([[1, { sellMin: 1000 }]]),
+    unreachable: false,
+  })),
   getRegionSellPrices: vi.fn(async () => new Map([[2, 500]])),
 }));
+vi.mock('@/market/prices', () => pricesMock);
 
 const nameFor = (id: number) => `Skill ${id}`;
 const entries = [{ skillTypeID: 1 }, { skillTypeID: 1 }, { skillTypeID: 2 }, { skillTypeID: 3 }];
@@ -61,6 +65,22 @@ describe('SkillsToBuyPanel', () => {
     expect(screen.getByText('Skill 1')).toBeInTheDocument();
     expect(screen.getByText(/Total cost/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /copy multibuy/i })).toBeInTheDocument();
+  });
+});
+
+describe('SkillsToBuyPanel with an unreachable price source (offline)', () => {
+  it('says prices are unavailable offline instead of "No sell orders", and shows no total', async () => {
+    pricesMock.getHubPricesWithStatus.mockResolvedValueOnce({
+      prices: new Map(),
+      unreachable: true,
+    });
+    pricesMock.getRegionSellPrices.mockResolvedValueOnce(new Map());
+    renderPanel();
+
+    expect(await screen.findAllByText('Prices unavailable offline')).toHaveLength(2);
+    expect(screen.queryByText(/No sell orders/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Total cost/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/without a price/)).not.toBeInTheDocument();
   });
 });
 

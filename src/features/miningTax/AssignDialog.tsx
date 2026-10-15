@@ -42,6 +42,12 @@ interface AssignDialogProps {
    * never re-fetches.
    */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
+  /**
+   * The price source could not be reached (offline). A line with no price is
+   * then valued at 0 ISK because the fetch failed, not because the ore is
+   * worthless, so the dialog warns before that 0 ISK is saved and synced.
+   */
+  pricesUnreachable?: boolean;
   /** True while a sibling action (Mark as paid / Resolve / Undo) is in flight, so this form's own submit can't race it. */
   busy: boolean;
   onAssigned: () => void;
@@ -136,6 +142,7 @@ export function AssignDialog({
   systemName,
   typeNames,
   pricesFor,
+  pricesUnreachable = false,
   busy,
   onAssigned,
   onCancel,
@@ -192,6 +199,13 @@ export function AssignDialog({
     prices,
     Number.isFinite(pctValue) ? pctValue : 0
   );
+
+  // Lines valued at 0 only because the price fetch failed, while the estimate
+  // still tracks that computed default (a typed override is the pilot's own).
+  const unpricedOffline = pricesUnreachable
+    ? selectedLines.filter((line) => (prices.get(line.typeId) ?? 0) <= 0)
+    : [];
+  const warnUnpricedOffline = unpricedOffline.length > 0 && estimatedValueOverride.trim() === '';
 
   const estimatedValue =
     estimatedValueOverride.trim() === ''
@@ -431,6 +445,15 @@ export function AssignDialog({
         {t('miningTax.markPaidLabel')}
       </label>
 
+      {warnUnpricedOffline && (
+        <p role="status" className="text-xs text-warning">
+          {t('miningTax.assignUnpricedOfflineWarning', {
+            types: unpricedOffline
+              .map((line) => typeNames.get(line.typeId) ?? `#${line.typeId}`)
+              .join(', '),
+          })}
+        </p>
+      )}
       <LedgerActionError error={saveError} />
       <div className="flex flex-wrap gap-2 pt-1">
         <Button
@@ -439,12 +462,14 @@ export function AssignDialog({
           disabled={!canAssign || saving || busy}
           onClick={() => void handleAssign()}
         >
-          {selectedPayee && Number.isFinite(taxOwed)
-            ? t('miningTax.assignToAction', {
-                payee: selectedPayee.name,
-                amount: maskIsk(Math.round(taxOwed)),
-              })
-            : t('miningTax.assignAction')}
+          {warnUnpricedOffline
+            ? t('miningTax.assignAnywayAction')
+            : selectedPayee && Number.isFinite(taxOwed)
+              ? t('miningTax.assignToAction', {
+                  payee: selectedPayee.name,
+                  amount: maskIsk(Math.round(taxOwed)),
+                })
+              : t('miningTax.assignAction')}
         </Button>
         {extraActions}
         <Button size="sm" onClick={onCancel}>

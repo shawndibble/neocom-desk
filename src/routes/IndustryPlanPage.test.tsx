@@ -399,7 +399,11 @@ describe('IndustryPlanPage: results panel', () => {
 
     // findByText: the results panel now shows a distinct "fetching" state
     // (#409) until the (mocked-to-fail) price fetch settles.
-    expect(await screen.findByText('Price data unavailable')).toBeInTheDocument();
+    // An unreachable price source reads as "unavailable offline", not "try
+    // again shortly" — the folded summary and the panel body both say it.
+    expect((await screen.findAllByText('Prices unavailable offline')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Price data unavailable')).toBeNull();
+    expect(screen.queryByText(/Try again shortly/)).toBeNull();
     expect(screen.queryByText('Not enough price data for a build-vs-buy verdict.')).toBeNull();
   });
 });
@@ -628,7 +632,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
     );
     await db.buildPlans.add(seedPlan());
     render(<App />);
-    expect(await screen.findByText('Price data unavailable')).toBeInTheDocument();
+    expect((await screen.findAllByText('Prices unavailable offline')).length).toBeGreaterThan(0);
 
     // The control itself still needs no prices to offer building; only the
     // suggestion does, and that never arrives here. The bubble is then just

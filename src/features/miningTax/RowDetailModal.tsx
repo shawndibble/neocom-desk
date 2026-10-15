@@ -59,6 +59,8 @@ interface RowDetailModalProps {
    * — the default hub, at the day this ore was actually mined.
    */
   pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
+  /** The ledger's price source could not be reached — see `AssignDialog.pricesUnreachable`. */
+  pricesUnreachable?: boolean;
   busy: boolean;
   /** Why the last row action wrote nothing, shown until the next one — `useLedgerAction`'s message. */
   saveError?: string | null;
@@ -135,6 +137,7 @@ export function RowDetailModal({
   priceSourcesFor,
   payees,
   pricesFor,
+  pricesUnreachable,
   busy,
   saveError,
   onAssigned,
@@ -426,6 +429,7 @@ export function RowDetailModal({
             systemName={systemName}
             typeNames={typeNames}
             pricesFor={pricesFor}
+            pricesUnreachable={pricesUnreachable}
             busy={busy}
             onAssigned={onAssigned}
             onCancel={onClose}

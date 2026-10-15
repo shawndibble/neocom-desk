@@ -570,6 +570,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     playerLp,
     hub,
     ready,
+    pricesUnreachable,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
   } = useLoyaltyStoreOffers(corporationId);
@@ -825,6 +826,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         />
       ) : (
         <>
+          {pricesUnreachable && (
+            <p
+              role="status"
+              className="border-b border-line px-3 py-1.5 text-[0.6875rem] text-text-dim"
+            >
+              {t('common.pricesUnavailableOffline')}
+            </p>
+          )}
           {lpBasis === 'concord' && !concordPending && (
             <p className="border-b border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
               {concord

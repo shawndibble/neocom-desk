@@ -14,7 +14,18 @@ const VELDSPAR = 1230; // no compressed pairing seeded — prices as itself
 const CHARACTER_ID = 91;
 const DATE = '2026-09-04';
 
-const pricesMock = vi.hoisted(() => ({ getHubPrices: vi.fn() }));
+const pricesMock = vi.hoisted(() => {
+  const getHubPrices = vi.fn();
+  const status = { unreachable: false };
+  return {
+    getHubPrices,
+    status,
+    getHubPricesWithStatus: vi.fn(async (...args: unknown[]) => ({
+      prices: (await getHubPrices(...args)) as Map<number, unknown>,
+      unreachable: status.unreachable,
+    })),
+  };
+});
 vi.mock('@/market/prices', () => pricesMock);
 
 const sdeMock = vi.hoisted(() => ({ loadCompressedOreTypeIds: vi.fn() }));
@@ -30,6 +41,7 @@ const EMPTY_HUB_SNAPSHOT = { saved: new Map(), historical: new Map() };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  pricesMock.status.unreachable = false;
   sdeMock.loadCompressedOreTypeIds.mockResolvedValue({ [ZEOLITES]: COMPRESSED_ZEOLITES });
   hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue(EMPTY_HUB_SNAPSHOT);
   priceSnapshotsMock.loadPriceSnapshots.mockResolvedValue(new Map());
@@ -288,6 +300,36 @@ describe('loadUnitPricesOnDate', () => {
     // Server (50) wins over Dexie (20) for VELDSPAR; Dexie alone fills ZEOLITES.
     expect(prices.get(VELDSPAR)).toBe(50);
     expect(prices.get(ZEOLITES)).toBe(5);
+  });
+});
+
+describe('unreachable price source', () => {
+  it('flags the live lookup as unreachable on an unpriced type, so the UI can say why', async () => {
+    pricesMock.status.unreachable = true;
+    pricesMock.getHubPrices.mockResolvedValue(new Map());
+
+    const prices = await loadUnitPricesOnDate(CHARACTER_ID, [ZEOLITES], getTradeHub('jita')!, DATE);
+
+    expect(prices.unpriced.has(ZEOLITES)).toBe(true);
+    expect(prices.liveUnreachable).toBe(true);
+  });
+
+  it('reports pricesUnreachable for the whole ledger when any hub could not be reached', async () => {
+    pricesMock.status.unreachable = true;
+    pricesMock.getHubPrices.mockResolvedValue(new Map());
+
+    const data = await loadDatedUnitPricesByHub(CHARACTER_ID, [ZEOLITES], [undefined], [DATE]);
+
+    expect(data.pricesUnreachable).toBe(true);
+    expect(data.unpriced.has(ZEOLITES)).toBe(true);
+  });
+
+  it('does not report it when the hub answered, even with no buy orders', async () => {
+    pricesMock.getHubPrices.mockResolvedValue(new Map());
+
+    const data = await loadDatedUnitPricesByHub(CHARACTER_ID, [ZEOLITES], [undefined], [DATE]);
+
+    expect(data.pricesUnreachable).toBe(false);
   });
 });
 
