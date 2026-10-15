@@ -31,6 +31,9 @@ import {
 } from '@/engine/fittings/candidates';
 import type { AddTarget } from './addTarget';
 import type { Fitting, FittingModuleResult, FittingSlotKind } from '@/engine/fittings/types';
+import type { VariantEvaluator } from './useFittingEvaluation';
+import { useModuleAddPreview } from './useModuleAddPreview';
+import { AddPreviewReadout } from './AddPreviewReadout';
 import type { CandidateCheck } from './dogmaFittingEngine';
 import { CapBoosterGuide } from './CapBoosterGuide';
 import { MiningCrystalGuide } from './MiningCrystalGuide';
@@ -69,6 +72,16 @@ interface FittingAddPanelProps {
   droneRoomFor?: (typeId: number) => number;
   /** Whether the rack has a slot a click would fill (a chosen slot counts); absent before the ship data. */
   slotFreeFor?: (rack: FittingSlotKind) => boolean;
+  /**
+   * Hover/focus a Modules row to preview the whole-Fitting change of adding
+   * it. Absent (no evaluator yet, or a touch device — nothing about the
+   * editor changes there) turns the preview off.
+   */
+  preview?: {
+    variants: VariantEvaluator | null;
+    /** The Fitting with the module added where a click would put it; null when a click adds nothing. */
+    build: (fitting: Fitting, typeId: number, rack: CandidateRack) => Fitting | null;
+  };
 }
 
 const RACK_LABEL_KEY: Record<CandidateRack, string> = {
@@ -175,11 +188,23 @@ interface ItemRowProps {
   blocked: boolean;
   draggable: boolean;
   onAdd: (typeId: number, rack: CandidateRack) => void;
+  /** Hover or focus on the row sets it; leaving or blurring clears (null). */
+  onPreview?: (typeId: number | null) => void;
 }
 
-function ItemRow({ entry, rack, placeable, problems, blocked, draggable, onAdd }: ItemRowProps) {
+function ItemRow({
+  entry,
+  rack,
+  placeable,
+  problems,
+  blocked,
+  draggable,
+  onAdd,
+  onPreview,
+}: ItemRowProps) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
+  const touched = useRef(false);
   const row = (
     <li
       draggable={draggable}
@@ -189,6 +214,21 @@ function ItemRow({ entry, rack, placeable, problems, blocked, draggable, onAdd }
           : undefined
       }
       onDragEnd={draggable ? endFittingDrag : undefined}
+      onPointerEnter={
+        onPreview
+          ? (event) => {
+              if (event.pointerType !== 'touch') onPreview(entry.typeId);
+            }
+          : undefined
+      }
+      onPointerLeave={onPreview ? () => onPreview(null) : undefined}
+      onPointerDown={
+        onPreview ? (event) => (touched.current = event.pointerType === 'touch') : undefined
+      }
+      onKeyDown={onPreview ? () => (touched.current = false) : undefined}
+      // A tap focuses the row too, and touch gets no preview.
+      onFocus={onPreview ? () => !touched.current && onPreview(entry.typeId) : undefined}
+      onBlur={onPreview ? () => onPreview(null) : undefined}
       className={`flex items-center ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       <button
@@ -257,6 +297,7 @@ export function FittingAddPanel({
   showDrones = true,
   droneRoomFor,
   slotFreeFor,
+  preview,
 }: FittingAddPanelProps) {
   const { t } = useTranslation();
   const tabsId = useTabsId();
@@ -289,6 +330,16 @@ export function FittingAddPanel({
   }
 
   const hullFit = useHullFit(context, fitting.shipTypeId);
+  const [previewTypeId, setPreviewTypeId] = useState<number | null>(null);
+  const addPreview = useModuleAddPreview({
+    variants: preview?.variants ?? null,
+    typeId: tab === 'modules' ? previewTypeId : null,
+    build: (f, typeId) => {
+      const rack = catalogue?.rackOf[String(typeId)];
+      return rack ? (preview?.build(f, typeId, rack as CandidateRack) ?? null) : null;
+    },
+    checkFor: (typeId) => hullFit?.get(typeId) ?? null,
+  });
   const slotRack = target?.kind === 'slot' && fitsSlot ? target.slot : null;
   const slotIcon = target?.kind === 'slot' ? SLOT_ICONS[target.slot] : undefined;
   const toggleFitsSlot = () => setFitsSlot((on) => !on);
@@ -437,6 +488,7 @@ export function FittingAddPanel({
         blocked={noRoom}
         draggable={fitsHull && dragToRing && context !== null}
         onAdd={onAdd}
+        onPreview={preview && tab === 'modules' ? setPreviewTypeId : undefined}
       />
     );
   }
@@ -581,6 +633,12 @@ export function FittingAddPanel({
                 <ul>{top.map((node) => branch(node, 0))}</ul>
                 {hiddenNote}
               </>
+            )}
+            {addPreview && (
+              <AddPreviewReadout
+                preview={addPreview}
+                name={catalogue?.types[String(addPreview.typeId)]?.name ?? `#${addPreview.typeId}`}
+              />
             )}
           </>
         )}
