@@ -16,6 +16,14 @@
  * leave the user on the broken page, and `try`/`catch` would not catch it.
  */
 
+import {
+  isRecoveringFromStaleBuild,
+  setStaleBuildRecovery,
+  staleBuildRecoveryOutcome,
+} from './staleBuildState';
+
+export { isRecoveringFromStaleBuild, staleBuildRecoveryOutcome };
+
 const RELOAD_KEY = 'neocom:stale-build-purge-at';
 /** One purge per window, so an unreachable chunk (offline) cannot loop. */
 const PURGE_WINDOW_MS = 60_000;
@@ -98,29 +106,6 @@ export function defaultStaleBuildEnv(): StaleBuildEnv {
   };
 }
 
-/** The recovery in flight (or finished and reloading); null when none has started or one aborted. */
-let inFlight: Promise<boolean> | null = null;
-
-/**
- * True while a recovery is running or has committed to reloading. Vite fires
- * `vite:preloadError` once per failed dependency (each CSS file, then the
- * module itself), so the handler must keep cancelling those follow-ups rather
- * than let them reject into the error boundary mid-recovery.
- */
-export function isRecoveringFromStaleBuild(): boolean {
-  return inFlight !== null;
-}
-
-/**
- * Settles with whether the page is reloading (`true`) or the recovery gave up
- * (`false`); null with none in flight. A route import the handler cancelled
- * resolves `undefined` meanwhile (Vite's preload helper), and `guarded` waits
- * on this: a reload means stay pending, an abort means reject into the boundary.
- */
-export function staleBuildRecoveryOutcome(): Promise<boolean> | null {
-  return inFlight;
-}
-
 /**
  * Whether a recovery would run right now: online, and not already purged
  * inside the window (or storage blocked, so the window cannot be recorded).
@@ -163,14 +148,15 @@ async function run(env: StaleBuildEnv): Promise<boolean> {
 export function recoverFromStaleBuild(
   env: StaleBuildEnv = defaultStaleBuildEnv()
 ): Promise<boolean> {
-  if (inFlight) return inFlight;
+  const running = staleBuildRecoveryOutcome();
+  if (running) return running;
   if (!canRecoverFromStaleBuild(env)) return Promise.resolve(false);
   const attempt = run(env).then((reloading) => {
     // An aborted attempt frees the next failure to try again; a reloading one
     // stays set until the page is gone.
-    if (!reloading) inFlight = null;
+    if (!reloading) setStaleBuildRecovery(null);
     return reloading;
   });
-  inFlight = attempt;
+  setStaleBuildRecovery(attempt);
   return attempt;
 }

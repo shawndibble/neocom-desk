@@ -22,7 +22,7 @@
  */
 import type { ComponentType } from 'react';
 import type { AppRoutePath } from './routeScopes';
-import { staleBuildRecoveryOutcome } from './staleBuildRecovery';
+import { staleBuildRecoveryOutcome } from './staleBuildState';
 
 type RouteModule = { default: ComponentType };
 
