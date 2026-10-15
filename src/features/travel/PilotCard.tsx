@@ -16,6 +16,7 @@ import type { PilotListRow } from './pilotListData';
 import { PilotAffiliation } from './PilotAffiliation';
 import { PilotStandingTag } from './PilotStandingTag';
 import { SPACE_TEXT } from './pilotListStyles';
+import { NewArrivalTag } from './NewArrivalTag';
 import { ThreatBadge } from './ThreatBadge';
 import { DANGEROUS_MIN_KILLS } from '@/engine/pilotList/threatVerdict';
 import {
@@ -39,12 +40,15 @@ export function PilotCard({
   threat,
   spaces,
   flew,
+  isNew = false,
 }: {
   row: PilotListRow;
   threat: ThreatLevel | 'pending' | null;
   spaces: readonly KillSpace[];
   /** Hull names already joined for display; null when there are none to show. */
   flew: string | null;
+  /** Not in the previous Local paste. */
+  isNew?: boolean;
 }) {
   const { t } = useTranslation();
   const tone = threat === null ? null : THREAT_LEVEL_TONE[threat];
@@ -81,6 +85,12 @@ export function PilotCard({
               row.name
             ) : (
               <CharacterLink id={row.characterId}>{row.name}</CharacterLink>
+            )}
+            {isNew && (
+              <>
+                {' '}
+                <NewArrivalTag threat={threat} />
+              </>
             )}
           </div>
           <PilotAffiliation row={row} className="text-xs text-text-dim" />
