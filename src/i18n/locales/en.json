@@ -467,6 +467,11 @@
       "noSlotRoom": "No free {{rack}} left",
       "noResources": "Too much CPU, powergrid or calibration for this hull",
       "cantAdd": "Can't add: {{reasons}}",
+      "preview": {
+        "title": "Adding {{name}}",
+        "more_one": "and {{count}} more change",
+        "more_other": "and {{count}} more changes"
+      },
       "openButton": "Add module",
       "tab": {
         "modules": "Modules",
