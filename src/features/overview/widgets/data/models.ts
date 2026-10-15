@@ -86,7 +86,7 @@ import type {
   Translate,
 } from './types';
 
-/** The Contracts History table, unfiltered: the widget counts hauls and item exchanges, which no one status covers. */
+/** The Contracts History table, unfiltered: the widget counts hauls and outstanding contracts, which no one status covers. */
 export const CONTRACTS_HREF = '/contracts/history';
 
 // --- Which reads a kind needs ------------------------------------------------
@@ -514,10 +514,10 @@ const contracts: Builder = (feeds, { t, now }) => {
       tone: summary.inProgress > 0 ? 'watch' : 'clear',
     },
     {
-      key: 'exchanges',
-      title: t('overview.board.contractsExchangesTile'),
-      value: count(summary.exchanges),
-      tone: summary.exchanges > 0 ? 'watch' : 'clear',
+      key: 'outstanding',
+      title: t('overview.board.contractsOutstandingTile'),
+      value: count(summary.outstanding),
+      tone: summary.outstanding > 0 ? 'watch' : 'clear',
     },
     {
       key: 'dueSoon',
@@ -546,13 +546,18 @@ const contracts: Builder = (feeds, { t, now }) => {
         tone,
       }
     : {
-        // Hauls lead; with none in flight, open item exchanges are the fact worth a number, not a 0.
-        value: count(summary.inProgress === 0 ? summary.exchanges : summary.inProgress),
+        // Hauls lead; with none in flight, outstanding contracts are the fact worth a number, not a 0.
+        value: count(summary.inProgress === 0 ? summary.outstanding : summary.inProgress),
         unit:
-          summary.inProgress === 0 && summary.exchanges > 0
-            ? t('overview.widgets.contracts.exchangesUnit')
+          summary.inProgress === 0 && summary.outstanding > 0
+            ? t('overview.widgets.contracts.outstandingUnit')
             : t('overview.widgets.contracts.unit'),
-        secondary: { text: t('overview.board.contractsNothingDue') },
+        secondary: {
+          text:
+            summary.inProgress > 0 && summary.outstanding > 0
+              ? t('overview.widgets.contracts.outstandingCount', { count: summary.outstanding })
+              : t('overview.board.contractsNothingDue'),
+        },
         tone,
       };
   return {
@@ -560,7 +565,7 @@ const contracts: Builder = (feeds, { t, now }) => {
     fetchedAt: data.fetchedAt,
     number,
     rows: list,
-    table: contractsTable(t, summary.items, data.routes, now),
+    table: contractsTable(t, summary.rows, data.routes, now),
     deadlines:
       soonest && note !== null
         ? [

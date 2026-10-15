@@ -618,7 +618,16 @@ describe('mail table', () => {
 });
 
 describe('contracts table', () => {
-  const noItems = { inProgress: 2, exchanges: 0, dueSoon: 0, overdue: 0, soonest: null, items: [] };
+  const noItems = {
+    inProgress: 2,
+    exchanges: 0,
+    outstanding: 0,
+    dueSoon: 0,
+    overdue: 0,
+    soonest: null,
+    items: [],
+    rows: [],
+  };
   const data = (over: Record<string, unknown> = {}) => ({
     summary: { ...noItems, ...over },
     route: null,
@@ -628,6 +637,7 @@ describe('contracts table', () => {
   const courier = (over: Record<string, unknown> = {}) => ({
     contractId: 1,
     kind: 'courier' as const,
+    state: 'in_progress' as const,
     atMs: NOW + 3 * HOUR,
     overdue: false,
     title: null,
@@ -637,9 +647,13 @@ describe('contracts table', () => {
     ...over,
   });
 
-  it('lists the outstanding item exchanges as their own tile', () => {
-    const view = buildView('contracts', { contracts: ok(data({ exchanges: 3 })) as never }, ctx());
-    const tile = view.rows.find((row) => row.key === 'exchanges');
+  it('lists the outstanding contracts as their own tile', () => {
+    const view = buildView(
+      'contracts',
+      { contracts: ok(data({ outstanding: 3 })) as never },
+      ctx()
+    );
+    const tile = view.rows.find((row) => row.key === 'outstanding');
     expect(tile?.value).toBe('3');
     expect(tile?.tone).toBe('watch');
   });
@@ -651,14 +665,15 @@ describe('contracts table', () => {
     expect(view.table?.rows).toEqual([]);
   });
 
-  it('with no hauls but outstanding item exchanges, headlines the exchanges rather than 0', () => {
+  it('with no hauls but outstanding contracts, headlines them rather than 0', () => {
     const view = buildView(
       'contracts',
-      { contracts: ok(data({ inProgress: 0, exchanges: 1 })) as never },
+      { contracts: ok(data({ inProgress: 0, outstanding: 1 })) as never },
       ctx()
     );
     expect(view.number.value).toBe('1');
-    expect(view.number.unit).toBe('overview.widgets.contracts.exchangesUnit');
+    expect(view.number.unit).toBe('overview.widgets.contracts.outstandingUnit');
+    expect(view.number.secondary?.text).toBe('overview.board.contractsNothingDue');
   });
 
   it('leads with the soonest deadline and counts the hauls as the secondary', () => {
@@ -684,6 +699,7 @@ describe('contracts table', () => {
     const listing = courier({
       contractId: 3,
       kind: 'listing',
+      state: 'outstanding',
       atMs: NOW + 20 * HOUR,
       title: 'Spare hulls',
       reward: null,
@@ -692,7 +708,7 @@ describe('contracts table', () => {
     });
     const feeds = {
       contracts: ok({
-        ...data({ soonest: late, items: [late, hauls, listing] }),
+        ...data({ soonest: late, items: [late, hauls, listing], rows: [late, hauls, listing] }),
         routes: {
           1: ['Jita IV - Moon 4 - Caldari Navy Assembly Plant', 'Amarr VIII (Oris) - Emperor'],
         },
@@ -714,7 +730,7 @@ describe('contracts table', () => {
     expect(table?.rows[0]?.cells[1]).toBe('overview.widgets.contracts.overdue');
     expect(table?.rows[0]?.tone).toBe('critical');
     expect(table?.rows[1]?.cells[3]).toMatchObject({ iskAmount: 2_000_000 });
-    expect(table?.rows[2]?.cells[2]).toBe('overview.widgets.contracts.statusListed');
+    expect(table?.rows[2]?.cells[2]).toBe('overview.widgets.contracts.statusOutstanding');
     expect(table?.rows[2]?.cells[3]).toMatchObject({ iskAmount: 5_000_000 });
   });
 });

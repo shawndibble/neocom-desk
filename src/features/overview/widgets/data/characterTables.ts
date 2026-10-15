@@ -8,7 +8,7 @@
 import type { DeadlineSeverity } from '@/engine/severity';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import type { ContractDeadlineItem } from '@/engine/contractsBoard';
+import type { ContractTableRow } from '@/engine/contractsBoard';
 import type { CommittedCalendarEvent } from '@/engine/calendarDeadline';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { DAY_MS } from '@/lib/age';
@@ -192,7 +192,7 @@ const isk = (amount: number | null): TableCell =>
 /** Each contract on a clock: where it goes (or what it is), when it lapses, what it pays. */
 export function contractsTable(
   t: Translate,
-  items: readonly ContractDeadlineItem[],
+  items: readonly ContractTableRow[],
   routes: Readonly<Record<number, readonly [string, string]>> | undefined,
   now: number
 ): TableModel {
@@ -210,14 +210,18 @@ export function contractsTable(
       cells: [
         name,
         item.overdue ? t(`${W}.contracts.overdue`) : formatCountdown(left / 1000),
-        courier
-          ? t(`${W}.contracts.${item.overdue ? 'statusOverdue' : 'statusTransit'}`)
-          : t(`${W}.contracts.statusListed`),
+        item.state === 'outstanding'
+          ? t(`${W}.contracts.statusOutstanding`)
+          : t(`${W}.contracts.${item.overdue ? 'statusOverdue' : 'statusTransit'}`),
         isk(courier ? item.reward : item.price),
         isk(courier ? item.collateral : null),
       ],
       // Overdue is the only red; anything due within a day is an amber heads-up.
-      tone: item.overdue ? 'critical' : left <= DAY_MS ? 'warning' : 'clear',
+      tone: item.overdue
+        ? 'critical'
+        : item.state === 'in_progress' && left <= DAY_MS
+          ? 'warning'
+          : 'clear',
     };
   });
   return {

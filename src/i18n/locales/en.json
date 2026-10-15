@@ -3774,7 +3774,7 @@
       "contractsCourierOverdue": "Courier overdue",
       "contractsListingExpires": "Listing expires",
       "contractsInProgressTile": "In progress",
-      "contractsExchangesTile": "Item exchanges",
+      "contractsOutstandingTile": "Outstanding",
       "contractsDueTile": "Due < 24h"
     },
     "widgets": {
@@ -4346,17 +4346,18 @@
       },
       "contracts": {
         "title": "Contracts",
-        "description": "Couriers in progress and listings about to lapse",
+        "description": "Hauls in progress and your outstanding contracts",
         "empty": "No contracts are on a clock.",
         "overdue": "Overdue",
         "unit": "in progress",
-        "exchangesUnit": "item exchanges",
+        "outstandingUnit": "outstanding",
+        "outstandingCount": "{{count}} outstanding",
         "inProgress": "{{count}} in progress",
         "courier": "Courier",
-        "listing": "Listing",
+        "listing": "Contract",
         "statusTransit": "In transit",
         "statusOverdue": "Overdue",
-        "statusListed": "Listed",
+        "statusOutstanding": "Outstanding",
         "col": {
           "contract": "Contract",
           "expires": "Due in",

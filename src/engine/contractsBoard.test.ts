@@ -51,14 +51,37 @@ describe('summarizeContractsBoard', () => {
     expect(summary.exchanges).toBe(2);
   });
 
+  it('rows list hauls in progress first, then outstanding contracts of any type, none expired', () => {
+    const s = summarizeContractsBoard(
+      [
+        contract({ contract_id: 1, date_expired: iso(NOW + 9 * 24 * H) }),
+        courier({ contract_id: 2, days_to_complete: 7 }),
+        contract({ contract_id: 3, type: 'courier', date_expired: iso(NOW + 2 * H) }),
+        contract({ contract_id: 4, date_expired: iso(NOW - H) }),
+        contract({ contract_id: 5, issuer_id: 42 }),
+      ],
+      ME,
+      NOW
+    );
+    expect(s.outstanding).toBe(2);
+    expect(s.rows.map((r) => [r.contractId, r.state])).toEqual([
+      [2, 'in_progress'],
+      [3, 'outstanding'],
+      [1, 'outstanding'],
+    ]);
+    expect(s.rows[1]?.kind).toBe('courier');
+  });
+
   it('is empty with nothing qualifying', () => {
     expect(summarizeContractsBoard([], ME, NOW)).toEqual({
       inProgress: 0,
       exchanges: 0,
+      outstanding: 0,
       dueSoon: 0,
       overdue: 0,
       soonest: null,
       items: [],
+      rows: [],
     });
   });
 
