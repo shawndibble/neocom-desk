@@ -1556,8 +1556,8 @@
  * cut by a rule. Stars are tiled radial-gradients and the nebula is a few
  * blurred accent/violet washes: no image is downloaded for either. Ship
  * renders (public/landing, CCP imagery) are decorative, dimmed and masked so
- * body text stays above AA contrast. Only the star twinkle moves, and only
- * under no-preference.
+ * body text stays above AA contrast. Nothing here animates: an infinite
+ * animation on these full-bleed layers made scrolling choppy.
  */
 .lp-layer {
   position: absolute;
