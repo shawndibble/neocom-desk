@@ -54,7 +54,7 @@ import {
   nextMilestone,
   type MilestoneStatus,
 } from '@/engine/skillPlanMilestones';
-import { schedulePlan } from './planSchedule';
+import { schedulePlanWith, type PlanScheduleInputs, type SchedulablePlan } from './planSchedule';
 import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
@@ -611,30 +611,19 @@ export function PlanEditor({
     () => pinnedInProgressEntry(plan.entries, queueProjection, loadedAtMs),
     [plan.entries, queueProjection, loadedAtMs]
   );
-  // Costed by `schedulePlan`, the same call the Calendar makes, so the two
-  // can never quote different dates for one plan.
-  const schedule = useMemo(
-    () =>
-      schedulePlan(
-        {
-          entries: plan.entries,
-          markers: plan.markers,
-          markerAttributes: plan.markerAttributes,
-          whatIfImplants: plan.whatIfImplants,
-          booster: plan.booster,
-          boosters: plan.boosters,
-        },
-        {
-          catalog,
-          trained: trainedSkills,
-          queueEntries,
-          attributes,
-          attributeBaseline,
-          implants,
-          cloneState,
-        },
-        loadedAtMs
-      ),
+  // The one inputs literal every costing below shares (the schedule, the
+  // what-if "vs current" pass, Optimize remaps / Optimize for me re-prices), so
+  // a new field cannot be wired at one site and missed at another. Implants go
+  // in raw: `schedulePlan` applies the What-If lens itself.
+  const schedulablePlan = useMemo<SchedulablePlan>(
+    () => ({
+      entries: plan.entries,
+      markers: plan.markers,
+      markerAttributes: plan.markerAttributes,
+      whatIfImplants: plan.whatIfImplants,
+      booster: plan.booster,
+      boosters: plan.boosters,
+    }),
     [
       plan.entries,
       plan.markers,
@@ -642,15 +631,25 @@ export function PlanEditor({
       plan.whatIfImplants,
       plan.booster,
       plan.boosters,
+    ]
+  );
+  const scheduleInputs = useMemo<PlanScheduleInputs>(
+    () => ({
       catalog,
-      trainedSkills,
+      trained: trainedSkills,
       queueEntries,
       attributes,
       attributeBaseline,
       implants,
       cloneState,
-      loadedAtMs,
-    ]
+    }),
+    [catalog, trainedSkills, queueEntries, attributes, attributeBaseline, implants, cloneState]
+  );
+  // Costed by `schedulePlanWith`, the same costing the Calendar makes, so the
+  // two can never quote different dates for one plan.
+  const schedule = useMemo(
+    () => schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs),
+    [schedulablePlan, scheduleInputs, loadedAtMs]
   );
   // The what-if chip's "vs current" figure: one more pass of the same costing
   // against the clone's real implants, run only while the lens is hypothetical.
@@ -658,43 +657,12 @@ export function PlanEditor({
   const currentLensSchedule = useMemo(
     () =>
       hypotheticalLens
-        ? schedulePlan(
-            {
-              entries: plan.entries,
-              markers: plan.markers,
-              markerAttributes: plan.markerAttributes,
-              whatIfImplants: DEFAULT_WHAT_IF_SELECTION,
-              booster: plan.booster,
-              boosters: plan.boosters,
-            },
-            {
-              catalog,
-              trained: trainedSkills,
-              queueEntries,
-              attributes,
-              attributeBaseline,
-              implants,
-              cloneState,
-            },
-            loadedAtMs
-          )
+        ? // Override: force the default (real-implants) lens, ignoring the plan's stored What-If.
+          schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs, {
+            whatIfImplants: DEFAULT_WHAT_IF_SELECTION,
+          })
         : null,
-    [
-      hypotheticalLens,
-      plan.entries,
-      plan.markers,
-      plan.markerAttributes,
-      plan.booster,
-      plan.boosters,
-      catalog,
-      trainedSkills,
-      queueEntries,
-      attributes,
-      attributeBaseline,
-      implants,
-      cloneState,
-      loadedAtMs,
-    ]
+    [hypotheticalLens, schedulablePlan, scheduleInputs, loadedAtMs]
   );
   const currentLensTotalSeconds = currentLensSchedule?.totalSeconds ?? null;
   const {
@@ -1137,26 +1105,14 @@ export function PlanEditor({
     finalEntries: readonly PlanEntry[],
     finalMarkers: readonly number[]
   ): { order: PlanStep[]; remaps: PlaceRemapsResult } {
-    const finalSchedule = schedulePlan(
-      {
-        entries: [...finalEntries],
-        markers: [...finalMarkers],
-        markerAttributes: [],
-        whatIfImplants: plan.whatIfImplants,
-        booster: plan.booster,
-        boosters: plan.boosters,
-      },
-      {
-        catalog,
-        trained: trainedSkills,
-        queueEntries,
-        attributes,
-        attributeBaseline,
-        implants,
-        cloneState,
-      },
-      loadedAtMs
-    );
+    // Override: candidate entries/markers, and `markerAttributes: []` on purpose —
+    // it matches what `applyOptimizerRemapSegments` writes (skillPlanEdit.ts), so the
+    // preview costs exactly what Accept will leave behind.
+    const finalSchedule = schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs, {
+      entries: [...finalEntries],
+      markers: [...finalMarkers],
+      markerAttributes: [],
+    });
     const remaps: PlaceRemapsResult = finalSchedule.markersResult ?? {
       segments:
         finalSchedule.scheduled.length > 0
@@ -1253,26 +1209,11 @@ export function PlanEditor({
     if (scheduled.length === 0) return;
     const suggested = suggestReorder(scheduled, catalog.engineSkills, priorityMap, plan.milestones);
     const reorderedEntries = applyReorderSuggestion(editable.entries, suggested);
-    const reorderedSchedule = schedulePlan(
-      {
-        entries: reorderedEntries,
-        markers: plan.markers,
-        markerAttributes: plan.markerAttributes,
-        whatIfImplants: plan.whatIfImplants,
-        booster: plan.booster,
-        boosters: plan.boosters,
-      },
-      {
-        catalog,
-        trained: trainedSkills,
-        queueEntries,
-        attributes,
-        attributeBaseline,
-        implants,
-        cloneState,
-      },
-      loadedAtMs
-    );
+    // Override: only the reordered entries; the plan's own markers and marker
+    // attributes stay, since the new order is re-expanded before remaps are searched.
+    const reorderedSchedule = schedulePlanWith(schedulablePlan, scheduleInputs, loadedAtMs, {
+      entries: reorderedEntries,
+    });
     const order = reorderedSchedule.scheduled;
     const searched = placeRemaps(order, catalog.engineSkills, buildRemapOptions());
     const patch = applyOptimizeForMe(
