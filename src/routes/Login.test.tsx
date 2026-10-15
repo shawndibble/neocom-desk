@@ -1,19 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { SCOPES } from '@/esi/scopes';
 import { assignLocation } from '@/app/navigation';
+import { AUTHORIZED_APPS_URL, DISCORD_URL, REPO_URL } from '@/lib/links';
 import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
 import { Login } from './Login';
 
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
 
 /**
- * Every read scope in the Base Grant, against the words `login.permissionsHint`
- * discloses it with. Hand-maintained on purpose: only a person can decide how
+ * Every read scope in the Base Grant, against the words that disclose it.
+ * The scopes accordion's own coverage is pinned in `scopeGroups.test.ts`; this
+ * map stays hand-maintained on purpose: only a person can decide how
  * a new scope should be described to someone deciding whether to grant it.
  * Two scopes may share a phrase where the disclosure honestly is the same
  * (`read_clones`/`read_implants`), but a scope may never be absent.
@@ -136,10 +138,10 @@ describe('Login', () => {
       await screen.findByRole('heading', { name: /the questions it exists to answer/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /which of my orders is quietly losing isk/i })
+      screen.getByRole('heading', { name: /which order is quietly losing isk/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /is this blueprint worth building today/i })
+      screen.getByRole('heading', { name: /is this blueprint worth building/i })
     ).toBeInTheDocument();
   });
 
@@ -152,6 +154,7 @@ describe('Login', () => {
     // One capture per tile, and one tile per heading.
     expect(images).toHaveLength(grid.getAllByRole('heading', { level: 3 }).length);
     expect(images).toHaveLength(9);
+    expect(new Set(images.map((image) => image.getAttribute('src'))).size).toBe(9);
     for (const image of images) {
       expect(image.getAttribute('alt')).toBeTruthy();
       expect(image).toHaveAttribute('loading', 'lazy');
@@ -162,9 +165,11 @@ describe('Login', () => {
   it('enlarges a screenshot in a dialog when it is clicked', async () => {
     const user = userEvent.setup();
     renderLogin();
-    await user.click(
-      await screen.findByRole('button', { name: /enlarge: a build plan for an orca/i })
+    // The features showcase opens on the same capture, so scope to the questions grid.
+    const grid = within(
+      await screen.findByRole('region', { name: /the questions it exists to answer/i })
     );
+    await user.click(grid.getByRole('button', { name: /enlarge: a build plan for an orca/i }));
     const dialog = await screen.findByRole('dialog', { name: /build plans with profit/i });
     expect(within(dialog).getByRole('img')).toHaveAttribute(
       'src',
@@ -180,38 +185,54 @@ describe('Login', () => {
   // rot — a new route shipping with no row here still fails nothing, because
   // nothing enumerates the app's routes and not every route earns a row. The
   // consent list below is the half that *can* be derived, and is.
-  it('groups the feature catalog and names the surfaces that ship today', async () => {
+  it('tabs the feature catalog by area and names every surface that ships today', async () => {
     renderLogin();
-    // Scoped to the catalog: "Clones" and "Market" also appear in the hero's
+    // Scoped to the section: "Clones" and "Market" also appear in the hero's
     // preview panel, so an unscoped query matches two nodes.
-    const catalog = within(
+    const section = within(
       await screen.findByRole('region', { name: /everything outside the client/i })
     );
+    const user = userEvent.setup();
 
-    // Layout.tsx's nav groups, plus "Command" for its unlabelled head.
-    for (const group of ['Command', 'Progression', 'Economy', 'Social']) {
-      expect(catalog.getByRole('heading', { name: group })).toBeInTheDocument();
+    // Each feature is a tab's own name or an "Also includes" chip in that tab's panel.
+    // A chip that only repeats its tab's name (Industry, Corporation, Alerts) is not shown.
+    const covered: Record<string, string[]> = {
+      Industry: [],
+      'Market & orders': ['Market', 'Open Orders', 'Wallet', 'Assets'],
+      Skills: ['Ships', 'Clones', 'Travel'],
+      'Planetary & mining': ['Planetary Industry', 'Mining'],
+      Corporation: [],
+      Mail: ['Mail & Calendar', 'Contracts', 'Contacts & Standings'],
+      Alerts: ['Notifications'],
+    };
+    const seen: string[] = [];
+    for (const [tab, features] of Object.entries(covered)) {
+      await user.click(section.getByRole('tab', { name: tab }));
+      const panel = within(section.getByRole('tabpanel'));
+      for (const feature of features) {
+        expect(panel.getByText(feature)).toBeInTheDocument();
+        seen.push(feature);
+      }
+      if (features.length === 0) expect(panel.queryByText('Also includes')).toBeNull();
+      else expect(panel.getByText('Also includes')).toBeInTheDocument();
+      // The tab's own name is never repeated as a chip.
+      expect(panel.queryByRole('listitem', { name: tab })).toBeNull();
+      seen.push(tab);
     }
-    for (const feature of [
-      'Skills',
-      'Clones',
-      'Industry',
-      'Market',
-      'Open Orders',
-      'Wallet',
-      'Travel',
-      'Assets',
-      'Planetary Industry',
-      'Mining',
-      'Corporation',
-      'Alerts',
-      'Notifications',
-      'Contracts',
-      'Mail & Calendar',
-      'Contacts & Standings',
-    ]) {
-      expect(catalog.getByText(feature)).toBeInTheDocument();
-    }
+    // 13 chips; the other 4 catalog rows (Industry, Corporation, Alerts, Skills) are named by their tab.
+    expect(seen.filter((name) => !(name in covered))).toHaveLength(13);
+    for (const row of ['Industry', 'Corporation', 'Alerts', 'Skills']) expect(seen).toContain(row);
+  });
+
+  it('has no How it works section or header link any more', async () => {
+    renderLogin();
+    await screen.findByRole('region', { name: /the questions it exists to answer/i });
+    expect(screen.queryByRole('region', { name: /how it works/i })).toBeNull();
+    expect(
+      within(screen.getByRole('navigation', { name: /page sections/i })).queryByRole('link', {
+        name: 'How it works',
+      })
+    ).toBeNull();
   });
 
   /*
@@ -237,23 +258,23 @@ describe('Login', () => {
     expect(preview.getByText('Customize')).toBeInTheDocument();
     expect(preview.getByRole('button', { name: /alerts, 5 waiting/i })).toBeInTheDocument();
 
-    // The grid: one Widget per tile, each titled as the real Widget is.
+    // The grid: the app's own Widgets, loaded as a chunk of their own, each titled as the real one is.
     for (const title of [
       'Mining tax',
-      'Training',
       'Contracts',
+      'Mail',
       'Location and ship',
       'Coming up',
       'Wallet',
-      'Planetary',
-      'Mail',
+      'Mining survey',
       'Wallet flow',
+      'Training',
       'Open orders',
     ]) {
-      expect(preview.getByRole('region', { name: title })).toBeInTheDocument();
+      expect(await preview.findByRole('region', { name: title })).toBeInTheDocument();
     }
-    expect(preview.getByText('Mining Exploitation 5')).toBeInTheDocument();
-    expect(preview.getByText('Nothing due')).toBeInTheDocument();
+    expect(preview.getByText('1 outstanding')).toBeInTheDocument();
+    expect(preview.getByRole('button', { name: /data updated/i })).toBeInTheDocument();
 
     // The fixed board is gone: no summary strip cells, no folded alerts row.
     expect(preview.queryByText('Training now')).not.toBeInTheDocument();
@@ -304,9 +325,65 @@ describe('Login', () => {
       screen.getByRole('heading', { name: /your login stays on this device/i })
     ).toBeInTheDocument();
 
-    const permissions = screen.getByText(/logging in lets it read/i);
-    for (const phrase of new Set(Object.values(READ_ONLY_PHRASES))) {
-      expect(permissions).toHaveTextContent(phrase);
+    const trust = within(screen.getByRole('region', { name: /it writes only when you act/i }));
+    expect(trust.getByText(/logging in lets it read/i)).toBeInTheDocument();
+    for (const name of [
+      /skills & clones/i,
+      /money & market/i,
+      /industry & planets/i,
+      /social & calendar/i,
+      /location & ships/i,
+      /^structures/i,
+    ]) {
+      expect(trust.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+    }
+    expect(trust.getByRole('button', { name: /money & market/i })).toHaveTextContent(
+      '4 permissions'
+    );
+  });
+
+  it('opens an area to list its permissions with their captions', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    await user.click(await screen.findByRole('button', { name: /industry & planets/i }));
+    expect(screen.getByText('Your mining ledger.')).toBeInTheDocument();
+    expect(screen.getByText('Your planetary colonies.')).toBeInTheDocument();
+  });
+
+  it('keeps the planetary-scope note, the separate-grants note and the revoke link', async () => {
+    renderLogin();
+    const trust = within(
+      await screen.findByRole('region', { name: /it writes only when you act/i })
+    );
+    expect(trust.getByText(/manage your planetary installations/i)).toHaveTextContent(
+      /only reads that data and never writes/i
+    );
+    expect(trust.getByText(/player-structure markets are separate grants/i)).toBeInTheDocument();
+    expect(trust.getByRole('link', { name: /authorized apps page/i })).toHaveAttribute(
+      'href',
+      AUTHORIZED_APPS_URL
+    );
+    expect(trust.getByRole('link', { name: /view the source on github/i })).toHaveAttribute(
+      'href',
+      REPO_URL
+    );
+  });
+
+  it('puts a Discord section and a FAQ after trust, with FAQ links to public pages only', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    const community = within(await screen.findByRole('region', { name: /bugs, ideas and chat/i }));
+    expect(community.getByRole('link', { name: /join discord/i })).toHaveAttribute(
+      'href',
+      DISCORD_URL
+    );
+    expect(community.queryByRole('figure')).not.toBeInTheDocument();
+
+    const faq = within(screen.getByRole('region', { name: /quick answers/i }));
+    await user.click(faq.getByRole('button', { name: /move isk or change anything/i }));
+    expect(faq.getByRole('link', { name: /read more/i })).toHaveAttribute('href', '/privacy.html');
+    for (const link of faq.queryAllByRole('link')) {
+      expect(link.getAttribute('href')).not.toMatch(/^\/help/);
     }
   });
 
@@ -375,6 +452,46 @@ describe('Login', () => {
     // inside the test that made it — this was the intermittent
     // "expected 1, got 2" in `builds a PKCE authorize URL` below.
     await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
+  });
+
+  it('adds a header login button, wired like the hero one, once the hero login button is out of view', async () => {
+    const user = userEvent.setup();
+    type Entry = { target: Element; isIntersecting: boolean };
+    let report: (entries: Entry[]) => void = () => {};
+    const observed: Element[] = [];
+    let captured = false;
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(cb: typeof report) {
+          // The header's observer is the first one built; the reveal and demo
+          // observers constructed after it must not replace it.
+          if (!captured) report = cb;
+          captured = true;
+          this.mine = report === cb;
+        }
+        mine = false;
+        observe(el: Element) {
+          if (this.mine) observed.push(el);
+        }
+        disconnect() {}
+      }
+    );
+    try {
+      renderLogin();
+      const name = { name: /log in with eve online/i };
+      const before = (await screen.findAllByRole('button', name)).length;
+      // Only the hero's wrapper is watched: the closing call to action does not hide the header's button.
+      expect(observed).toHaveLength(1);
+      expect(within(screen.getByRole('banner')).queryByRole('button', name)).toBeNull();
+      act(() => report([{ target: observed[0], isIntersecting: false }]));
+      const header = within(screen.getByRole('banner'));
+      await user.click(header.getByRole('button', name));
+      expect(screen.getAllByRole('button', name)).toHaveLength(before + 1);
+      await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('opens the custom permissions dialog from the link under the login button (#1522)', async () => {

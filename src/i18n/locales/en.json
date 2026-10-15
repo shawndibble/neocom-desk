@@ -3292,7 +3292,17 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, the ship you are flying, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
+    "permissionsHint": "Logging in lets it read the data below, grouped by area. Open an area to see each permission and what it is used for.",
+    "header": {
+      "nav": "Page sections",
+      "answers": "Answers",
+      "features": "Features",
+      "trust": "Trust",
+      "community": "Community",
+      "faq": "FAQ",
+      "discord": "Join the Discord",
+      "github": "View the source on GitHub"
+    },
     "eyebrow": "Free · Open source · Runs on your device",
     "heading": "Answers, not API dumps.",
     "previewLabel": "Example — logged-in view",
@@ -3323,17 +3333,21 @@
       }
     },
     "answersHeading": "The questions it exists to answer",
+    "answersPhoneEyebrow": "On your phone",
     "answersLead": "Each of these is a screen from the app, filled with sample data. Select a picture to enlarge it.",
     "answers": {
       "orders": {
-        "question": "Which of my orders is quietly losing ISK?",
-        "answer": "Open Orders files each order under the worst thing wrong with it, worst first, across every character. Open one to see what holding, undercutting, dumping into a buy order or reprocessing would net after fees."
+        "eyebrow": "Orders",
+        "question": "Which order is quietly losing ISK?",
+        "answer": "Open Orders files each order under the worst thing wrong with it, worst first, across every character. Open one to see what each exit would net after fees."
       },
       "build": {
-        "question": "Is this blueprint worth building today?",
-        "answer": "A Build Plan costs materials, job cost and taxes at live hub prices, then says whether building beats buying and whether it still profits after sales tax and broker fees."
+        "eyebrow": "Industry",
+        "question": "Is this blueprint worth building?",
+        "answer": "A Build Plan costs materials, job cost and taxes at live hub prices, then says whether building beats buying and still profits."
       },
       "journal": {
+        "eyebrow": "Wallet",
         "question": "Where did this ISK come from?",
         "answer": "Each Wallet journal line links to the contract or item behind it, so a payment can be followed back to its source."
       },
@@ -3350,15 +3364,18 @@
         "answer": "Pilot Lookup reads a character’s killboard history: a threat rating, kill and loss ratios, and kills per month."
       },
       "flyNext": {
+        "eyebrow": "Ships",
         "question": "Which ship can I fly next?",
-        "answer": "The Ship Tree maps every hull by faction and marks each one “can fly” or the training time it still needs. Open a hull to see its Mastery tiers and the skills you are missing."
+        "answer": "The Ship Tree marks every hull “can fly” or the training time it still needs, with its Mastery tiers and what you still need to train."
       },
       "fitting": {
+        "eyebrow": "Fitting",
         "question": "Will this fit hold up?",
         "answer": "Build a fit on the ring and see its DPS against a target profile."
       },
       "survey": {
-        "question": "How long until this belt is mined out?",
+        "eyebrow": "Mining",
+        "question": "When is this belt mined out?",
         "answer": "Survey tracks a belt’s scans: how much is mined, a chart of it, and when it will finish."
       }
     },
@@ -3399,14 +3416,89 @@
       "phonePilotLookup": {
         "alt": "Pilot Lookup on a phone: a pilot’s corporation, threat reading, danger and fleet-size ratios and kills per month by kind of space.",
         "caption": "Pilot lookup"
+      },
+      "planetaryColonies": {
+        "alt": "Planetary Industry’s Colonies tab: the next thing to do and when to log in next, then every colony ranked by what needs attention first, with its extractor timer and a next step.",
+        "caption": "Colonies ranked by what needs you first"
+      },
+      "overviewAlerts": {
+        "alt": "The Overview with the alerts bell open: an undercut order, a finished skill, an industry job ready, an extractor about to run out and a new mail, each with View and Dismiss.",
+        "caption": "Alerts for everything that needs you"
+      },
+      "corporation": {
+        "alt": "The Corporation overview: standing and runway, deadlines per day for the next 14 days, and fuel and moon chunk lists that put what runs out soonest first.",
+        "caption": "One deadline-ranked board for the corp"
+      },
+      "industryJobs": {
+        "alt": "The Industry page: a table of running and finished jobs with progress and time left, above a list of Build Plans ranked by profit, margin and a build or buy verdict.",
+        "caption": "Jobs and Build Plans on one page"
+      },
+      "market": {
+        "alt": "The Market page with Tritanium open: the best sell and buy prices, the spread and the sell order book with each station, quantity, jumps and expiry.",
+        "caption": "A live order book with jumps from you"
+      },
+      "skills": {
+        "alt": "The Skills page: the skill in training with its time left, the queue grouped by this week and the next three weeks, and the character\u2019s attributes.",
+        "caption": "A training queue you can read at a glance"
+      },
+      "mail": {
+        "alt": "Mail in two panes: the inbox on the left with unread mail in bold, the open mail on the right with reply and forward buttons.",
+        "caption": "A two-pane mail client"
       }
     },
     "featuresHeading": "Everything outside the client",
-    "featureGroups": {
-      "command": "Command",
-      "progression": "Progression",
-      "economy": "Economy",
-      "social": "Social"
+    "showcase": {
+      "label": "Areas of the app",
+      "covers": "Also includes",
+      "industry": {
+        "tab": "Industry",
+        "costs": "A Build Plan costs materials, job cost and taxes at live hub prices.",
+        "verdict": "It says whether building beats buying, and whether it still profits after fees.",
+        "setup": "Blueprint search and facility presets set the assumptions; sub-builds roll up into the plan.",
+        "jobs": "Your active industry jobs sit on the same page."
+      },
+      "market": {
+        "tab": "Market & orders",
+        "orders": "Open Orders files each order under the worst thing wrong with it, worst first, across every character.",
+        "market": "Market shows every order for an item with its jump count from the system you pick, on a phone too.",
+        "wallet": "Each Wallet journal line links to the contract or item behind it.",
+        "assets": "Assets finds a thing and drills into stations, ships and containers."
+      },
+      "skills": {
+        "tab": "Skills",
+        "queue": "Your skill queue shows what finishes when, and when it runs dry.",
+        "plans": "Skill Plans work out when a plan finishes and how to get there faster.",
+        "tree": "The Ship Tree marks every hull “can fly” or the training time it still needs, with its Mastery tiers.",
+        "clones": "Clones shows where each jump clone is and when the next jump is allowed."
+      },
+      "planetary": {
+        "tab": "Planetary & mining",
+        "colonies": "Colonies leads with the next thing to do and ranks every colony by what needs you first.",
+        "logIn": "Log in next says when you need to be back, so one login covers everything due.",
+        "plan": "Plan sets goals per day over your colonies and lists the shortfalls and the changes that close them.",
+        "mining": "Mining tracks what you mined and what it is worth; the Tax ledger shows who you owe rent to and what is paid, and Survey says when a belt will be mined out."
+      },
+      "corp": {
+        "tab": "Corporation",
+        "board": "The Corporation overview merges fuel, structure timers, moon extractions, finished jobs and offline services into one deadline-ranked board.",
+        "deadlines": "A strip shows the deadlines per day for the next 14 days, beside the fuel list, soonest first.",
+        "tables": "Members, Wallet and Assets are the tables behind it.",
+        "access": "It appears only when a character holds a Corp Role in game, and corporation data is a separate grant, requested only when you open those pages."
+      },
+      "comms": {
+        "tab": "Mail",
+        "mail": "Mail is a two-pane client: read what came in, then reply or forward.",
+        "calendar": "Calendar lists every clock a character can read in one deadline-ordered list beside a map of days, and sends your response to an invite.",
+        "contracts": "Contracts searches public offers for an item, lists courier jobs and keeps your history.",
+        "contacts": "Contacts mirrors your in-game contact list, compares your characters’ standings, and shows the NPC standings that set broker fees."
+      },
+      "alerts": {
+        "tab": "Alerts",
+        "bell": "The bell collects what fired: undercut orders, finished jobs and skills, extractors running out, new mail.",
+        "record": "Alerts keeps the record of everything that fired, for every character, grouped by type.",
+        "choose": "Notifications lets you pick which events fire, for which character, as a device pop-up or in the in-app list.",
+        "closed": "Alerts when closed is opt-in per character, and is how an alert reaches you with the app shut."
+      }
     },
     "features": {
       "corp": {
@@ -3478,6 +3570,56 @@
       "openSource": {
         "name": "Free, and open to read",
         "desc": "No account to create, no ads, no subscription, no paid tier. Read the source before you decide to trust it."
+      }
+    },
+    "trustRepoLink": "View the source on GitHub",
+    "scopes": {
+      "count_one": "{{count}} permission",
+      "count_other": "{{count}} permissions",
+      "groups": {
+        "skills": "Skills & clones",
+        "money": "Money & market",
+        "industry": "Industry & planets",
+        "social": "Social & calendar",
+        "location": "Location & ships",
+        "structures": "Structures"
+      },
+      "planetsNote": "EVE's consent screen lists the planetary scope as \"manage your planetary installations\". Neocom Desk only reads that data and never writes to it.",
+      "separateNote": "Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
+      "revoke": "You can take access back at any time:",
+      "revokeLink": "EVE's authorized apps page"
+    },
+    "communityHeading": "Bugs, ideas and chat",
+    "community": {
+      "body": "The Discord is where to report a bug, suggest an idea or just talk shop with other pilots who use Neocom Desk.",
+      "join": "Join Discord"
+    },
+    "faqHeading": "Quick answers",
+    "faq": {
+      "readMore": "Read more in the privacy policy",
+      "writes": {
+        "q": "Can it move ISK or change anything in EVE?",
+        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
+      },
+      "free": {
+        "q": "Is it free?",
+        "a": "Yes. There is no account to create, no ads and no subscription. Donations are welcome, never expected, and the app stays free."
+      },
+      "stores": {
+        "q": "What does it store, and where?",
+        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed), and anything you choose to share with a Community."
+      },
+      "delete": {
+        "q": "Can I leave and delete my data?",
+        "a": "Yes. Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Anything you shared with a Community is removed by leaving that Community."
+      },
+      "phone": {
+        "q": "Does it work on a phone?",
+        "a": "Yes. In a phone browser, or installed to the home screen, the same pages use a narrower layout with a bottom navigation. It is designed first for a desktop beside the game, so dense tables and editors are easier on a larger screen."
+      },
+      "community": {
+        "q": "What is a Community?",
+        "a": "A named group of Characters under one admin. You create one or join with an invite link, and share only what you pick: blueprints, Fittings and Skill Plans. Every Member can read what is shared, and it is stored on our server. Members can also post Requests for items and Pledge to fill each other's."
       }
     },
     "bottomCtaHeading": "Undock into your dashboard.",
@@ -10167,10 +10309,21 @@
     "deviceDeleteUnpurged_one": "The synced data for {{names}} could not be deleted from the sync server (offline, or the login has expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
     "faq": {
-      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device.",
+      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device. The exceptions are listed below: alerts you have seen, push and Alerts when closed if you turn them on, and anything you choose to share with a Community.",
+      "groups": {
+        "using": "Using Neocom Desk",
+        "data": "Your data"
+      },
       "q": {
+        "permissions": "Why does login ask for so many permissions?",
+        "dataLag": "Why do my numbers differ from, or lag behind, the game?",
+        "alerts": "What are Alerts, and how do I get them when the app is closed?",
+        "characters": "Can I use several Characters?",
+        "phone": "Does it work on a phone?",
+        "communities": "What is a Community, and what do Members see?",
         "synced": "What syncs between my devices?",
         "local": "What stays on this device?",
+        "communityData": "What do Communities share?",
         "retention": "How long is my data stored?",
         "writes": "Does Neocom Desk change anything in EVE?",
         "delete": "How do I delete my data?",
@@ -10181,10 +10334,16 @@
         "backups": "How do backups work?"
       },
       "a": {
-        "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Another device still logged in keeps its own copy and can sync it back. Log out of all characters clears this device only.",
+        "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Another device still logged in keeps its own copy and can sync it back. Log out of all characters clears this device only. Communities are separate: Delete all data does not remove a Character from a Community or delete what it shared there. Leave each Community first, which deletes your shared data and your Requests and Pledges there right away. A Character no device has synced in 90 days is removed from its Communities automatically. A Community's admin can't leave: hand the Community to someone else, or delete it, which deletes it for every Member.",
         "install": "<link>Settings › Data & storage › Install this app</link> shows the steps for your browser, or an Install button where your browser offers one. On iPhone and iPad this is also what makes notifications work.",
         "update": "The app updates itself in the background. To get a new version now, open Settings › Data & storage and press Update now: it checks and reloads.",
-        "pushKinds": "Only alerts whose time is known ahead: a skill level finishing, training stopping or a queue ending, an industry job finishing, a courier delivery due, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Everything else needs the app open. Turn them on in Settings › Notifications."
+        "pushKinds": "Alerts whose time is known ahead: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract about to expire, market orders about to lapse, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Turn them on in Settings › Notifications.",
+        "permissions": "Plain login asks for everything the pages read from EVE, because EVE grants permissions only at login and a page can't read what you haven't granted. You don't have to accept the lot: <custom>Log in with custom permissions</custom> on the login page lets you pick, and only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions. To take one away, revoke it on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in grant, and Alerts when closed is a further, notifications-only grant per Character.",
+        "dataLag": "Neocom Desk reads EVE's ESI, not the game client, and ESI is not live. For a Character's own data it reuses what it fetched in the last 10 minutes (a day for game constants such as item names), or until EVE says the data may change if that is later, so moving between pages doesn't ask again. EVE itself caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows how old the data is: amber after an hour, red after a day. It is hidden on a narrow screen, so <data>Settings › Data & storage</data> lists the last update of every source. Where a page has a Refresh button, it asks EVE again straight away.",
+        "alerts": "Alerts are the bell panel (press A). While the app is open it checks each Character and raises an Alert for the events you switched on in Settings › Notifications. With the app closed you get two things. Alerts whose time is known ahead, such as a skill finishing, are scheduled up to 72 hours in advance and pushed to a device that has notifications on. And Alerts when closed, which is off until you turn it on per Character: you authorize that Character a second time for notifications only, and our server then checks EVE's notifications about every 15 minutes and pushes the types you enabled. Turn off deletes that token. On iPhone and iPad, install the app first.",
+        "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C to open Characters). Pick which Character you are looking at from the switcher, and sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character, and some pages, such as Contacts, can show all your Characters together.",
+        "phone": "Yes. In a phone browser, or installed to the home screen, the same pages use a narrower layout with a bottom navigation. Neocom Desk is designed first for a desktop beside the game, so dense tables and editors are easier on a larger screen, and the age badge is hidden on a phone. On iPhone and iPad, notifications only work once the app is installed.",
+        "communities": "A Community is a named group of Characters under one admin, up to 100 Members, with each Character in up to 10 Communities. You create one or join with an invite link, and the admin can require approval first. Each Character joins on its own and shares only what you pick: blueprints, Fittings and Skill Plans. Members can also post Requests for items and Pledge to fill each other's. Every Member sees the roster of Character names, and what each Member shared, Requests and Pledges, as listed under What do Communities share? The admin also sees who is waiting to join, can remove Members, Requests and Pledges, and can delete the Community. Leaving deletes what you shared there right away."
       },
       "store": {
         "synced": {
@@ -10217,7 +10376,7 @@
         },
         "local": {
           "title": "Kept on this device only",
-          "description": "Everything read from EVE is cached here and never uploaded.",
+          "description": "Everything read from EVE is cached here and is not uploaded, apart from what you choose to share with a Community or turn on for alerts.",
           "esi": "Your characters' EVE data: assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
           "corp": "Corporation data: wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and LP stores.",
@@ -10228,11 +10387,22 @@
           "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers.",
           "ansiblex": "Route Safety's Ansiblex jump gate list, and whether Route Safety uses it. Structure access is private alliance information, so it never leaves this device."
         },
+        "communities": {
+          "title": "Shared with a Community you join",
+          "description": "Only if you create or join a Community, and only the parts you pick. Every Member of that Community can read it, and it sits on our server (Google Firebase), filed under your Character's EVE ID.",
+          "membership": "Your Character's name and EVE ID, and which Communities it is in. The admin also sees a Character waiting to join and the mail invites they sent.",
+          "blueprints": "Blueprints you share: type, ME/TE, runs, and the station or structure and system each one sits in. Never containers, hangars or item IDs. Read from your assets on this device and kept current automatically while the app is open.",
+          "fittings": "Fittings you share: name, hull and share code. Never notes or your skills.",
+          "plans": "Skill Plans you share, one at a time: name and ordered skill targets. Never milestones, implants or your trained skills.",
+          "requests": "Requests you post: the items and quantities, a location, a one-line note, whether you want to hear about Pledges in the app or by mail, and your Character's name.",
+          "pledges": "Pledges you make: quantities, what you marked delivered, and the IDs of the contracts behind it. The contract IDs and delivered amounts come from your finished contracts, read on this device and uploaded while the app is open. Nothing else about the contracts is.",
+          "mail": "Mail about invites and Pledges is sent from your own Character, so its text goes to EVE and not to us. Our server records only who was mailed and when, to enforce a daily limit."
+        },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
           "crashes": "Crash reports: the error and the page it happened on. No IP addresses; request and response bodies are never captured; EVE tokens are stripped first.",
           "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
-          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account, saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
+          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
           "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
@@ -10270,7 +10440,11 @@
           "push": "Push notification text, if on:",
           "pushKept": "the next 72 hours of alerts, plus alerts already sent for 30 days.",
           "idle": "An account no device has synced in:",
-          "idleKept": "90 days, then all of its synced data is deleted."
+          "idleKept": "90 days, then all of its synced data is deleted and the Character is removed from its Communities. A Community it administers is deleted.",
+          "community": "What you shared in a Community:",
+          "communityKept": "until you leave, an admin removes you, or the Community is deleted. Then it is deleted right away.",
+          "communityRequests": "Community Requests, with their Pledges:",
+          "communityRequestsKept": "30 days after posting or your last Extend, then 7 more days before they are deleted. A closed Request is deleted 7 days after it closes."
         }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."
@@ -10290,8 +10464,8 @@
       "skillsTitle": "Finding skills to train",
       "skillsIntro": "Every Add button puts the skill in your target Skill Plan. Ways to start:",
       "skillsQueue": "Copy your in-game queue: Skills > Plans > a plan > Import > From skill queue.",
-      "skillsCertified": "Follow a CCP career path: Skills > Plans > From a Certified Plan.",
-      "skillsShip": "Fly a hull: Ship Tree > a ship > Skills & Mastery.",
+      "skillsCertified": "Follow a CCP career path: Skills > Plans > the arrow beside New plan > From a Certified Plan.",
+      "skillsShip": "Fly a hull: Ships > Tree > a ship > Skills & Mastery.",
       "skillsFit": "Improve a fit: the Missing skills chip and What to train panel in Fittings.",
       "skillsSearch": "Know the name: search in the plan editor, or browse Skills > Trained and add the next level.",
       "skillsPaste": "Bring a plan from elsewhere: Import > From text or file (skill lists, .emp, .xml, EFT fits).",

@@ -35,6 +35,8 @@ import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/csr/ArrowCount
 import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
 import { ArrowLineDown } from '@phosphor-icons/react/dist/csr/ArrowLineDown';
 import { ArrowLineUp } from '@phosphor-icons/react/dist/csr/ArrowLineUp';
+import { DiscordLogo } from '@phosphor-icons/react/dist/csr/DiscordLogo';
+import { GithubLogo } from '@phosphor-icons/react/dist/csr/GithubLogo';
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
 import { ArrowsDownUp } from '@phosphor-icons/react/dist/csr/ArrowsDownUp';
 import { ArrowsLeftRight } from '@phosphor-icons/react/dist/csr/ArrowsLeftRight';
@@ -420,6 +422,10 @@ export const TokenPrivacy = withWeight(LockKey);
 export const SkillLocked = withWeight(LockKey);
 /** The project's source being public. */
 export const OpenSource = withWeight(Code);
+/** The Discord server link in the landing header. */
+export const Discord = withWeight(DiscordLogo);
+/** The source repository link in the landing header. */
+export const Github = withWeight(GithubLogo);
 /** Start the EVE SSO round trip. Replaces the `▶` dingbat the login button used to draw (DESIGN.md §5). */
 export const SignIn = withWeight(SignInGlyph);
 /**
