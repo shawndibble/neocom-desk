@@ -122,6 +122,29 @@ export async function setRequestClosed(
   });
 }
 
+/** The Community admin removes any Request, with every Pledge on it (checked server side). */
+export async function removeRequest(
+  characterId: number,
+  communityId: string,
+  requestId: string
+): Promise<void> {
+  await callCommunity(characterId, 'removeCommunityRequestCallable', { communityId, requestId });
+}
+
+/** The Community admin removes one Member's Pledge on a Request (checked server side). */
+export async function removePledge(
+  characterId: number,
+  communityId: string,
+  requestId: string,
+  pledgeUid: string
+): Promise<void> {
+  await callCommunity(characterId, 'removeCommunityPledgeCallable', {
+    communityId,
+    requestId,
+    pledgeUid,
+  });
+}
+
 type PledgeLines = RequestPledge['lines'];
 
 /** A Pledge document as stored: the lines keyed by index. Null when it does not read as one. */

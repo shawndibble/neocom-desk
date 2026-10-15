@@ -578,6 +578,19 @@ describe('Requests', () => {
       await assertFails(setDoc(doc(other, PLEDGE), pledgeDoc({ 0: entry(1) })));
     });
 
+    it('denies the admin removing a Request or a Pledge from the client: removal is a callable', async () => {
+      // char:1 is the Community's admin; the Request below is char:2's.
+      const admin = characterAuth(env, 1, 'hash-1').firestore();
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(
+          doc(ctx.firestore(), `${C}/itemRequests/r-theirs`),
+          request({ ownerUid: 'char:2', ownerHash: 'hash-2' })
+        );
+      });
+      await assertFails(deleteDoc(doc(admin, `${C}/itemRequests/r-theirs`)));
+      await assertFails(deleteDoc(doc(admin, PLEDGE)));
+    });
+
     it('denies the requester Pledging on their own Request', async () => {
       const db = characterAuth(env, 1, 'hash-1').firestore();
       await assertFails(

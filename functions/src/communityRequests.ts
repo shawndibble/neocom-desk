@@ -36,6 +36,10 @@ export const MAX_TERMS_LENGTH = 140;
 export const MAX_ITEM_NAME_LENGTH = 120;
 /** A Request expires this long after its last activity; Extend restarts the clock. */
 export const REQUEST_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+/** A closed Request is deleted this long after it was closed (issue #3812). */
+export const CLOSED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** An expired Request is deleted this long after it expired, so the requester can still Extend it meanwhile (issue #3812). */
+export const EXPIRED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 /** Far above any real stack; keeps a typo from becoming an unbounded number. */
 export const MAX_LINE_QUANTITY = 1_000_000_000_000;
 
@@ -63,6 +67,11 @@ export interface PostRequestInput {
 export interface RequestIdInput {
   communityId: string;
   requestId: string;
+}
+
+export interface RemovePledgeInput extends RequestIdInput {
+  /** The Pledger's uid: the Pledge document's id. */
+  pledgeUid: string;
 }
 
 export interface SetClosedInput extends RequestIdInput {
@@ -155,6 +164,11 @@ export function parseRequestIdInput(data: unknown): RequestIdInput {
     communityId: docId(d.communityId, 'communityId'),
     requestId: docId(d.requestId, 'requestId'),
   };
+}
+
+export function parseRemovePledgeInput(data: unknown): RemovePledgeInput {
+  const d = record(data);
+  return { ...parseRequestIdInput(data), pledgeUid: docId(d.pledgeUid, 'pledgeUid') };
 }
 
 export function parseSetClosedInput(data: unknown): SetClosedInput {
@@ -282,4 +296,24 @@ export function decideRequestMail(state: {
     return state.dailyCount >= MAX_REQUEST_MAILS_PER_DAY ? 'daily-cap' : 'retake-charged';
   }
   return state.dailyCount >= MAX_REQUEST_MAILS_PER_DAY ? 'daily-cap' : 'ok';
+}
+
+export type SweepDecision = 'keep' | 'delete';
+
+/**
+ * The scheduled sweep's verdict on one Request (issue #3812). A closed Request
+ * goes 7 days after `closedAt`, whatever its expiry (closing always stores
+ * it); any other goes 7 days after its `expiresAt`, so it stays Expired, and
+ * extendable by the requester, for that week. A malformed time is kept, never
+ * guessed.
+ */
+export function decideRequestSweep(
+  request: { closed: boolean; closedAt: number | null; expiresAt: number },
+  now: number
+): SweepDecision {
+  if (request.closed && request.closedAt !== null) {
+    return now - request.closedAt >= CLOSED_RETENTION_MS ? 'delete' : 'keep';
+  }
+  if (!Number.isFinite(request.expiresAt)) return 'keep';
+  return now - request.expiresAt >= EXPIRED_RETENTION_MS ? 'delete' : 'keep';
 }

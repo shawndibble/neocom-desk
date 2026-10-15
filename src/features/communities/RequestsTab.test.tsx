@@ -15,6 +15,8 @@ const store = vi.hoisted(() => ({
   reserveRequestMail: vi.fn(),
   confirmRequestMail: vi.fn(),
   releaseRequestMail: vi.fn(),
+  removeRequest: vi.fn(),
+  removePledge: vi.fn(),
 }));
 vi.mock('./requestStore', () => store);
 
@@ -101,7 +103,8 @@ function renderTab(
   requests: CommunityRequest[] | null,
   onReload = vi.fn(),
   pledges: Record<string, RequestPledge[]> = {},
-  pledgesFailed = false
+  pledgesFailed = false,
+  isAdmin = false
 ) {
   render(
     <MemoryRouter>
@@ -110,6 +113,8 @@ function renderTab(
         communityId="c1"
         communityName="Pals"
         myUid="char:1"
+        isAdmin={isAdmin}
+        memberNames={new Map([['char:3', 'Dax Orrelin']])}
         requests={requests}
         pledges={new Map(Object.entries(pledges))}
         pledgesFailed={pledgesFailed}
@@ -146,6 +151,8 @@ beforeEach(async () => {
   store.extendRequest.mockResolvedValue({ expiresAt: 1 });
   store.setRequestClosed.mockResolvedValue(undefined);
   store.updateMyPledge.mockResolvedValue(null);
+  store.removeRequest.mockResolvedValue(undefined);
+  store.removePledge.mockResolvedValue(undefined);
   refreshPledges.mockResolvedValue([]);
   store.loadRequestMailsToday.mockResolvedValue(0);
 });
@@ -658,5 +665,56 @@ describe('My pledges', () => {
     renderTab([request({})]);
     await user.click(screen.getByRole('button', { name: 'My pledges' }));
     expect(screen.getByText('You have no Pledges on open Requests')).toBeInTheDocument();
+  });
+});
+
+describe('Admin removal', () => {
+  const pledged = { r1: [pledgeOf('char:3', 400), pledgeOf('char:9', 100)] };
+
+  it('offers no remove control to a Member who is not the admin', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})], vi.fn(), pledged);
+    await user.click(screen.getByText('Tritanium'));
+    const panel = screen.getByRole('dialog', { name: /Aria Voss's request/ });
+    expect(within(panel).queryByRole('button', { name: /Remove/ })).toBeNull();
+    expect(within(panel).queryByText('Pledges on this request')).toBeNull();
+  });
+
+  it('names each Pledger in the panel and removes one Pledge after a confirm', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})], vi.fn(), pledged, false, true);
+    await user.click(screen.getByText('Tritanium'));
+    const panel = screen.getByRole('dialog', { name: /Aria Voss's request/ });
+    expect(within(panel).getByText('Dax Orrelin')).toBeInTheDocument();
+    expect(within(panel).getByText('Former Member')).toBeInTheDocument();
+    await user.click(within(panel).getByRole('button', { name: "Remove Dax Orrelin's Pledge" }));
+    const confirm = await screen.findByRole('dialog', { name: "Remove Dax Orrelin's Pledge?" });
+    await user.click(within(confirm).getByRole('button', { name: 'Remove Pledge' }));
+    await waitFor(() => expect(store.removePledge).toHaveBeenCalledWith(1, 'c1', 'r1', 'char:3'));
+    expect(refreshPledges).toHaveBeenCalledWith('r1');
+  });
+
+  it('removes the Request from its panel and closes the panel', async () => {
+    const user = userEvent.setup();
+    const reload = renderTab([request({})], vi.fn(), {}, false, true);
+    await user.click(screen.getByText('Tritanium'));
+    const panel = screen.getByRole('dialog', { name: /Aria Voss's request/ });
+    await user.click(within(panel).getByRole('button', { name: 'Remove request…' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Remove this request?' });
+    await user.click(within(confirm).getByRole('button', { name: 'Remove request' }));
+    await waitFor(() => expect(store.removeRequest).toHaveBeenCalledWith(1, 'c1', 'r1'));
+    await waitFor(() => expect(reload).toHaveBeenCalled());
+  });
+
+  it('says the removal failed and keeps the dialog open', async () => {
+    store.removeRequest.mockRejectedValue(new Error('denied'));
+    const user = userEvent.setup();
+    renderTab([request({})], vi.fn(), {}, false, true);
+    await user.click(screen.getByText('Tritanium'));
+    const panel = screen.getByRole('dialog', { name: /Aria Voss's request/ });
+    await user.click(within(panel).getByRole('button', { name: 'Remove request…' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Remove this request?' });
+    await user.click(within(confirm).getByRole('button', { name: 'Remove request' }));
+    expect(await within(confirm).findByRole('alert')).toBeInTheDocument();
   });
 });

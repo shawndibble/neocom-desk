@@ -77,6 +77,7 @@ import {
 } from './communitiesStore.js';
 import {
   parsePostRequestInput,
+  parseRemovePledgeInput,
   parseRequestIdInput,
   parseRequestMailInput,
   parseSetClosedInput,
@@ -89,6 +90,7 @@ import {
   reserveRequestMail,
   setRequestClosed,
 } from './communityRequestsStore.js';
+import { removePledge, removeRequest, sweepRequests } from './communityRequestsCleanup.js';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
 import {
   LP_STORE_OFFERS_CHUNK_SIZE,
@@ -685,6 +687,47 @@ export const releaseCommunityRequestMailCallable = onCall<unknown>(
       requestId,
       targetCharacterId
     );
+  }
+);
+
+// The admin removes any Request or Pledge (issue #3812): no per-Community
+// switch, so the callables only check the caller is the Community's admin.
+export const removeCommunityRequestCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, requestId } = parseRequestIdInput(request.data);
+    await removeRequest(getFirestore(), callerOf(request), communityId, requestId);
+  }
+);
+
+export const removeCommunityPledgeCallable = onCall<unknown>(
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, requestId, pledgeUid } = parseRemovePledgeInput(request.data);
+    await removePledge(getFirestore(), callerOf(request), communityId, requestId, pledgeUid);
+  }
+);
+
+/**
+ * sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a
+ * week ago and Requests closed a week ago, with their Pledges. Bounded to 500
+ * deletes a run; a backlog continues on the next tick. Up to 500 sequential
+ * read and recursive deletes, so it takes the 9-minute maximum timeout.
+ */
+export const sweepCommunityRequests = onSchedule(
+  { schedule: 'every 24 hours', timeoutSeconds: 540 },
+  async () => {
+    const result = await sweepRequests(getFirestore(), Date.now());
+    const { deleted, failed, truncated } = result;
+    if (failed > 0 || truncated) {
+      logWarn('Community Request sweep incomplete, continues next run', {
+        deleted,
+        failed,
+        truncated,
+      });
+    } else {
+      logInfo('Community Request sweep done', { deleted, failed, truncated });
+    }
   }
 );
 

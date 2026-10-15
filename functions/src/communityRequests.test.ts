@@ -10,8 +10,12 @@ import {
   MAX_OPEN_REQUESTS_PER_MEMBER,
   MAX_TERMS_LENGTH,
   REQUEST_LIFETIME_MS,
+  CLOSED_RETENTION_MS,
+  EXPIRED_RETENTION_MS,
   decideExtend,
   decideRequestMail,
+  decideRequestSweep,
+  parseRemovePledgeInput,
   decidePost,
   decideSetClosed,
   isOpenRequest,
@@ -275,5 +279,46 @@ describe('Request mail', () => {
         })
       ).toBe('already-mailed');
     }
+  });
+});
+
+describe('decideRequestSweep', () => {
+  const now = 10_000_000_000;
+  const open = { closed: false, closedAt: null, expiresAt: now + 1 };
+
+  it('keeps an expired Request for 7 days after its expiry, so it can still be extended', () => {
+    expect(EXPIRED_RETENTION_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(decideRequestSweep({ ...open, expiresAt: now + 1 }, now)).toBe('keep');
+    expect(decideRequestSweep({ ...open, expiresAt: now - 1 }, now)).toBe('keep');
+    expect(decideRequestSweep({ ...open, expiresAt: now - EXPIRED_RETENTION_MS + 1 }, now)).toBe(
+      'keep'
+    );
+    expect(decideRequestSweep({ ...open, expiresAt: now - EXPIRED_RETENTION_MS }, now)).toBe(
+      'delete'
+    );
+  });
+
+  it('keeps a closed Request for 7 days after closedAt, whatever its expiry', () => {
+    const closed = { closed: true, expiresAt: now - EXPIRED_RETENTION_MS - 1 };
+    expect(CLOSED_RETENTION_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(decideRequestSweep({ ...closed, closedAt: now - CLOSED_RETENTION_MS + 1 }, now)).toBe(
+      'keep'
+    );
+    expect(decideRequestSweep({ ...closed, closedAt: now - CLOSED_RETENTION_MS }, now)).toBe(
+      'delete'
+    );
+  });
+
+  it('never deletes a malformed Request on a missing expiry alone', () => {
+    expect(decideRequestSweep({ ...open, expiresAt: Number.NaN }, now)).toBe('keep');
+  });
+});
+
+describe('parseRemovePledgeInput', () => {
+  it('needs a Community, a Request and a Pledger', () => {
+    expect(
+      parseRemovePledgeInput({ communityId: 'c1', requestId: 'r1', pledgeUid: 'char:7' })
+    ).toEqual({ communityId: 'c1', requestId: 'r1', pledgeUid: 'char:7' });
+    expect(() => parseRemovePledgeInput({ communityId: 'c1', requestId: 'r1' })).toThrow();
   });
 });

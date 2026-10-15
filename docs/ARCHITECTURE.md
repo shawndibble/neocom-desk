@@ -406,6 +406,16 @@ fetch+memoize the built JSON once per session.
   callables' bookkeeping (100 mails a day, a slot per recipient), read-only to
   clients. Leave/removal deletes a Member's Requests and
   Pledges in `deleteMemberShares`.
+  Cleanup (issue #3812): the daily `sweepCommunityRequests` (`functions/src/communityRequestsCleanup.ts`,
+  verdict in the pure `decideRequestSweep`) deletes Requests expired 7 days ago
+  (they stay Expired and extendable meanwhile) and Requests closed 7 days ago with their Pledges (`recursiveDelete`; two
+  single-field queries per Community, each candidate re-read before its delete,
+  capped per run). The Community admin removes any Request or Pledge through
+  `removeCommunityRequestCallable` / `removeCommunityPledgeCallable` (admin
+  checked server side; the rules still deny the client), surfaced as the side
+  panel's **Remove request…** and per-Pledger **Remove…**, each behind
+  `ConfirmDialog`. Neither the sweep nor the callables are deployed by
+  CI: `firebase deploy --only functions`.
 - Firestore rules tests live in `rules-tests/` (`@firebase/rules-unit-testing`,
   `vitest.rules.config.ts`) and run only via `npm run test:rules`, which starts
   the Firestore emulator (needs a JRE; CI's `rules` job installs Java 21). They
