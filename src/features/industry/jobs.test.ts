@@ -3,6 +3,7 @@ import { http, HttpResponse, delay } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
+import { AuthError } from '@/auth/sso';
 import type { IndustryJob } from '@/esi/endpoints';
 import {
   loadCharacterIndustryJobs,
@@ -123,6 +124,27 @@ describe('loadCharacterIndustryJobs', () => {
 
     const history = await db.industryJobHistory.get(CHAR_ID);
     expect(history?.jobs.map((j) => j.job_id).sort()).toEqual([3, 9]);
+  });
+
+  it('serves the cached jobs, with no reauth, when the token refresh cannot reach SSO', async () => {
+    const cachedJobs = [job({ job_id: 7 })];
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'industryJobs',
+      value: cachedJobs,
+      fetchedAt: 1,
+    });
+    configureEsi({
+      getToken: async () => {
+        throw new AuthError('network_error', 'offline', 0);
+      },
+    });
+
+    const result = await loadCharacterIndustryJobs(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.fromCache).toBe(true);
+    expect(result.cached?.data).toEqual(cachedJobs);
   });
 
   it('falls back to the cache when ESI is unreachable (offline)', async () => {

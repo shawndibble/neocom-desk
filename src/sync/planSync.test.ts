@@ -1936,6 +1936,10 @@ describe('triggerSync: settings', () => {
 });
 
 describe('sync orchestration', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('reports syncing -> idle with lastSyncedAt via subscribeSyncStatus', async () => {
     const states: SyncStatus[] = [];
     const unsubscribe = subscribeSyncStatus((s) => states.push(s));
@@ -1955,6 +1959,16 @@ describe('sync orchestration', () => {
     unsubscribe();
     expect(states[states.length - 1].state).toBe('error');
     expect(states[states.length - 1].error).toMatch(/Unknown character/);
+  });
+
+  it('marks a failure recorded while the browser was offline, and only that one', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    await expect(triggerSync(999)).rejects.toThrow(/Unknown character/);
+    expect(getSyncStatus(999)).toMatchObject({ state: 'error', offline: true });
+
+    vi.stubGlobal('navigator', { onLine: true });
+    await expect(triggerSync(999)).rejects.toThrow(/Unknown character/);
+    expect(getSyncStatus(999)).toMatchObject({ state: 'error', offline: false });
   });
 
   it("keeps status per character: B's success does not mask A's error", async () => {

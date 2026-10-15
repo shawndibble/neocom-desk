@@ -13,6 +13,7 @@ import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { subscribeSyncStatus, type SyncStatus } from '@/sync/status';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useOnline } from '@/stores/network';
 import { FIRST_PULL_WAIT_MS, syncSettled } from './firstRun';
 import { OVERVIEW_LAYOUT_KEY, parseLayout } from './layoutStore';
 
@@ -22,9 +23,7 @@ export function useFirstRunReady(hydrated: boolean): boolean {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const syncConfigured = isSyncConfigured();
   const [status, setStatus] = useState<SyncStatus>(INITIAL);
-  const [online, setOnline] = useState(() =>
-    typeof navigator === 'undefined' ? true : navigator.onLine
-  );
+  const online = useOnline();
   const [waitedOut, setWaitedOut] = useState(false);
   const [rowChecked, setRowChecked] = useState<'pending' | 'absent' | 'present'>('pending');
 
@@ -36,17 +35,6 @@ export function useFirstRunReady(hydrated: boolean): boolean {
       }
     });
   }, [syncConfigured, activeCharacterId]);
-
-  useEffect(() => {
-    const goOnline = () => setOnline(true);
-    const goOffline = () => setOnline(false);
-    window.addEventListener('online', goOnline);
-    window.addEventListener('offline', goOffline);
-    return () => {
-      window.removeEventListener('online', goOnline);
-      window.removeEventListener('offline', goOffline);
-    };
-  }, []);
 
   useEffect(() => {
     if (!syncConfigured) return;

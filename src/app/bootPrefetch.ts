@@ -95,9 +95,10 @@ export const LAZY_SDE_WARM_DELAY_MS = 90_000;
 /**
  * Schedules `warmLazySde` (the lazy SDE files + dogma engine, for offline
  * first use) after `LAZY_SDE_WARM_DELAY_MS`, then an idle slot, from its own
- * chunk. Gated on connection inside the warm; returns its cancel.
+ * chunk. Gated on connection inside the warm; returns its cancel. `delayMs`
+ * is for a caller that is already past boot (`reconnectRecovery.ts`).
  */
-export function scheduleLazySdeWarm(): () => void {
+export function scheduleLazySdeWarm(delayMs: number = LAZY_SDE_WARM_DELAY_MS): () => void {
   const signal = { cancelled: false };
   let cancelWait = () => {};
 
@@ -118,7 +119,7 @@ export function scheduleLazySdeWarm(): () => void {
       const handle = setTimeout(start, BOOT_PREFETCH_IDLE_TIMEOUT_MS);
       cancelWait = () => clearTimeout(handle);
     }
-  }, LAZY_SDE_WARM_DELAY_MS);
+  }, delayMs);
 
   return () => {
     signal.cancelled = true;

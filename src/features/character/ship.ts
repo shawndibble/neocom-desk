@@ -13,9 +13,8 @@
  */
 import { useEffect, useState } from 'react';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
-import { AuthError } from '@/auth/sso';
 import { loadWithCache } from '@/esi/cache';
-import { EsiError } from '@/esi/client';
+import { isCredentialFailure } from '@/esi/client';
 import { getCharacterShip } from '@/esi/endpoints';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -32,8 +31,7 @@ export async function loadCharacterShipTypeId(characterId: number): Promise<numb
     async () => (await getCharacterShip(characterId)).data?.ship_type_id ?? null,
     {
       staleAfterMs: SHIP_STALE_AFTER_MS,
-      detectAuthFailure: (err) =>
-        err instanceof AuthError || (err instanceof EsiError && err.status === 401),
+      detectAuthFailure: isCredentialFailure,
     }
   );
   return result?.data ?? null;

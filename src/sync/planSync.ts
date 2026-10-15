@@ -63,6 +63,7 @@ import {
   writePullCursor,
   type PullCursor,
 } from './localBookkeeping';
+import { isOnline } from '@/stores/network';
 import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
 import {
@@ -465,15 +466,22 @@ function pump(): void {
 async function runPass(job: SyncJob): Promise<void> {
   const { characterId } = job;
   let failure: { error: unknown } | undefined;
-  setStatus(characterId, { state: 'syncing', error: null });
+  setStatus(characterId, { state: 'syncing', error: null, offline: false });
   try {
     await syncCharacter(characterId);
-    setStatus(characterId, { state: 'idle', lastSyncedAt: Date.now(), error: null });
+    setStatus(characterId, {
+      state: 'idle',
+      lastSyncedAt: Date.now(),
+      error: null,
+      offline: false,
+    });
   } catch (error) {
     failure = { error };
     setStatus(characterId, {
       state: 'error',
       error: error instanceof Error ? error.message : String(error),
+      // A failure while the browser is offline is the network's, not the sync's.
+      offline: !isOnline(),
     });
   } finally {
     busy = false;

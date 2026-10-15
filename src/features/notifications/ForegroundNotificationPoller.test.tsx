@@ -127,6 +127,42 @@ describe('ForegroundNotificationPoller', () => {
     expect(leaderMock.seats()).toBe(0);
   });
 
+  describe('offline', () => {
+    function setOnLine(value: boolean) {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => value });
+    }
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, 'onLine');
+    });
+
+    it('skips its ticks while offline', () => {
+      vi.useFakeTimers();
+      setOnLine(false);
+      render(<ForegroundNotificationPoller />);
+      vi.advanceTimersByTime(FIRST_POLL_DELAY_MS);
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+      expect(runForegroundPoll).not.toHaveBeenCalled();
+    });
+
+    it('catches up at once when the connection returns', () => {
+      vi.useFakeTimers();
+      setOnLine(false);
+      render(<ForegroundNotificationPoller />);
+      vi.advanceTimersByTime(FIRST_POLL_DELAY_MS);
+      expect(runForegroundPoll).not.toHaveBeenCalled();
+      setOnLine(true);
+      window.dispatchEvent(new Event('online'));
+      expect(runForegroundPoll).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not catch up before the boot hold-off is over', () => {
+      vi.useFakeTimers();
+      render(<ForegroundNotificationPoller />);
+      window.dispatchEvent(new Event('online'));
+      expect(runForegroundPoll).not.toHaveBeenCalled();
+    });
+  });
+
   describe('with another tab leading', () => {
     afterEach(() => leaderMock.setLeader(true));
 
