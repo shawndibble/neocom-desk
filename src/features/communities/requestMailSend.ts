@@ -7,10 +7,11 @@
  * the mail invites do (`MailInvitePanel`). A failed mail never undoes the
  * Request: each recipient gets a result of their own.
  */
-import { EsiError } from '@/esi/errors';
 import { sendMail } from '@/features/character/mail';
+import { mailSafe } from '@/engine/communities/requestMail';
 import type { RequestLine } from '@/engine/communities/requests';
 import { callableErrorReason } from './callableError';
+import { sendAndSettle } from './mailSettle';
 import {
   confirmRequestMail,
   releaseRequestMail,
@@ -45,13 +46,6 @@ export interface RequestMailDeps {
   release: (target: RequestMailRecipient) => Promise<void>;
   send: (characterId: number, subject: string, body: string) => Promise<unknown>;
 }
-
-// NOTE: the same loop as MailInvitePanel.tsx (isDefiniteRejection, confirm retries); keep in step.
-/** Only an answer from ESI that refuses the mail proves it was not sent; a timeout or 5xx proves nothing. */
-const isDefiniteRejection = (err: unknown) =>
-  err instanceof EsiError && err.status >= 400 && err.status < 500;
-
-const CONFIRM_ATTEMPTS = 3;
 
 export async function sendRequestMails(
   input: {
@@ -92,27 +86,14 @@ export async function sendRequestMails(
       continue;
     }
     const { subject, body } = input.compose(reservation);
-    try {
-      await deps.send(recipient.characterId, subject, body);
-    } catch (err) {
-      if (isDefiniteRejection(err)) {
-        await deps.release(recipient).catch(() => undefined);
-        record(recipient, 'refused');
-      } else {
-        record(recipient, 'unsure');
-      }
-      continue;
-    }
-    // The mail is out: stamp it, retrying, since an unstamped one reads as unsent.
-    for (let attempt = 0; attempt < CONFIRM_ATTEMPTS; attempt += 1) {
-      try {
-        await deps.confirm(recipient);
-        break;
-      } catch {
-        // Try again; the server holds the cap whether or not this lands.
-      }
-    }
-    record(recipient, 'sent');
+    record(
+      recipient,
+      await sendAndSettle({
+        send: () => deps.send(recipient.characterId, subject, body),
+        release: () => deps.release(recipient),
+        confirm: () => deps.confirm(recipient),
+      })
+    );
   }
   return results;
 }
@@ -145,9 +126,6 @@ export function requestMailDeps(
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
-/** EVE renders mail as limited HTML: a name or free text must not bring tags of its own. */
-const plain = (text: string) => text.replace(/[<>]/g, '');
-
 /** One line of the mail: `350,000 x Reactive Metals`, with a copy's runs, ME and TE after it. */
 function lineText(t: Translate, line: RequestLine): string {
   const spec =
@@ -167,7 +145,7 @@ function lineText(t: Translate, line: RequestLine): string {
         ];
   return t('communities.board.requestMail.line', {
     quantity: formatQuantity(line.quantity),
-    name: plain(line.name),
+    name: mailSafe(line.name),
     spec: spec.length > 0 ? ` (${spec.join(', ')})` : '',
   });
 }
@@ -184,21 +162,23 @@ export function buildRequestMail(
     link: string;
   }
 ): { subject: string; body: string } {
-  const community = plain(input.communityName);
+  const community = mailSafe(input.communityName);
   const parts = [
     t('communities.board.requestMail.intro', {
-      requester: plain(input.requesterName),
+      requester: mailSafe(input.requesterName),
       community,
     }),
     input.lines.map((line) => lineText(t, line)).join('\n'),
   ];
   if (input.location)
-    parts.push(t('communities.board.requestMail.location', { location: plain(input.location) }));
+    parts.push(t('communities.board.requestMail.location', { location: mailSafe(input.location) }));
   if (input.terms)
-    parts.push(t('communities.board.requestMail.terms', { terms: plain(input.terms) }));
+    parts.push(t('communities.board.requestMail.terms', { terms: mailSafe(input.terms) }));
   parts.push(t('communities.board.requestMail.outro', { link: input.link }));
   return {
-    subject: t('communities.board.requestMail.subject', { requester: plain(input.requesterName) }),
+    subject: t('communities.board.requestMail.subject', {
+      requester: mailSafe(input.requesterName),
+    }),
     body: parts.join('\n\n'),
   };
 }

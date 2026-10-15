@@ -5,7 +5,7 @@ import {
   sendRequestMails,
   type RequestMailDeps,
   type RequestMailRecipient,
-} from './requestMail';
+} from './requestMailSend';
 import { callableErrorReason } from './callableError';
 
 const recipients: RequestMailRecipient[] = [

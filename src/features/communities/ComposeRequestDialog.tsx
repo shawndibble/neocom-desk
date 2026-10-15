@@ -34,7 +34,7 @@ import {
   sendRequestMails,
   type RequestMailRecipient,
   type RequestMailResult,
-} from './requestMail';
+} from './requestMailSend';
 import { postRequest } from './requestStore';
 import { namedLike, needleOf } from './shareLists';
 

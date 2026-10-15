@@ -13,7 +13,11 @@ import {
 import { cx } from '@/lib/cx';
 import { characterIdForUid } from '@/sync/uid';
 import { loadMemberLibraries, type CommunityMember } from './communityStore';
-import type { RequestMailOutcome, RequestMailRecipient, RequestMailResult } from './requestMail';
+import type {
+  RequestMailOutcome,
+  RequestMailRecipient,
+  RequestMailResult,
+} from './requestMailSend';
 import { loadRequestMailsToday } from './requestStore';
 
 const SEND_MAIL = ['postCharacterMail'] as const;
