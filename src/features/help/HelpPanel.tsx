@@ -16,12 +16,12 @@ const SKILLS_PATHS = [
 ] as const;
 
 /**
- * Settings' Help & Support tab: Discord is the one destination for bug
+ * Help › Support: Discord is the one destination for bug
  * reports, feature requests, and discussion — GitHub is for reading the
  * source or contributing a pull request, not for filing anything. Split out
- * from the FAQ tab (which now answers only "what does this app store") so a
- * pilot looking for help finds one clearly-named destination instead of
- * scrolling past a data-storage explainer first.
+ * from the FAQ tab (how-to answers and what the app stores) so a pilot
+ * looking for help finds one clearly-named destination instead of scrolling
+ * past a data-storage explainer first.
  */
 export function HelpPanel() {
   const { t } = useTranslation();
