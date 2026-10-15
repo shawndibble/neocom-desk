@@ -552,3 +552,40 @@ describe('invalidateHubPrices while a fetch is in flight', () => {
     expect(hits.count).toBe(2);
   });
 });
+
+describe('a Fuzzwork request that never answers', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('times out to null prices and leaves nothing in flight for the next asker to join', async () => {
+    const hung = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        })
+    );
+    vi.stubGlobal('fetch', hung);
+    // Only the timer is faked: the persisted-price read before the fetch needs real turns.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const clock = () => 1_000_000;
+
+    const first = getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    while (hung.mock.calls.length === 0) await new Promise((resolve) => setImmediate(resolve));
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect((await first).get(34)).toEqual({
+      sellMin: null,
+      buyMax: null,
+      sellVolume: 0,
+      buyVolume: 0,
+    });
+
+    // A dead promise left in flight would be joined here and hang; a fresh ask fetches again.
+    const second = getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    while (hung.mock.calls.length < 2) await new Promise((resolve) => setImmediate(resolve));
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect((await second).get(34)?.sellMin).toBeNull();
+    expect(hung).toHaveBeenCalledTimes(2);
+  });
+});

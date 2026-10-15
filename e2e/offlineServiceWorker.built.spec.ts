@@ -16,12 +16,19 @@
  * `/styleguide` is the target page: outside `RequireCharacter`, no ESI.
  */
 import { test, expect } from './support/testBase';
+import { LAZY_SDE_FILES } from '../src/sde/lazySdeFiles';
 
 test.use({ serviceWorkers: 'allow' });
 
-// A lazy (not precached, see vite.config.ts globIgnores) SDE file. Any `?v=`
-// matches `isVersionedSdeData`; the route never checks the hash itself.
-const LAZY_SDE_URL = '/data/shipTree.json?v=e2e-offline';
+// A lazy (not precached) SDE file, taken from the same list `vite.config.ts`
+// ignores, so this cannot drift from the precache again. Any `?v=` matches
+// `isVersionedSdeData`; the route never checks the hash itself.
+const LAZY_FILE = LAZY_SDE_FILES.find((f) => f === 'pi-system-planets.json') ?? LAZY_SDE_FILES[0];
+const LAZY_SDE_URL = `/data/${LAZY_FILE}?v=e2e-offline`;
+// A core feature file that IS precached (docs/context/decisions/
+// *-core-feature-sde-files-are-precached-for-offline.md): never fetched online
+// below, yet served offline. The precache ignores the `v` parameter.
+const PRECACHED_SDE_URL = '/data/blueprints.json?v=e2e-offline';
 
 test('boots, deep-links and serves a cached lazy SDE file with no network', async ({
   page,
@@ -67,4 +74,11 @@ test('boots, deep-links and serves a cached lazy SDE file with no network', asyn
   }, LAZY_SDE_URL);
   expect(offline.status).toBe(200);
   expect(offline.bytes).toBeGreaterThan(0);
+
+  // A precached core file needs no prior online fetch.
+  const precached = await page.evaluate(
+    async (url) => (await fetch(url)).status,
+    PRECACHED_SDE_URL
+  );
+  expect(precached).toBe(200);
 });

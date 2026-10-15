@@ -7,24 +7,29 @@
  * Shaped after `eveImages.ts`: one named helper per entity kind, so the
  * path segments live in one place instead of as template strings in JSX.
  */
+import type { KillmailHashLookup } from '@/engine/fittings/load';
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 import type { KillRecord, KillSpace } from '@/engine/pilotList/killActivity';
 import type { RecentKill, RecentKillAttacker } from '@/engine/route/recentKills';
 
 /**
  * A zKillboard link carries only the killmail id, but ESI's killmail endpoint
- * also wants the hash — which only zKillboard's API knows. `null` when the
- * kill isn't there or the request fails.
+ * also wants the hash — which only zKillboard's API knows. `not-found` when
+ * zKillboard answers and has no such kill (a 404, or an empty list);
+ * `unreachable` when it can't be asked at all (offline, a timeout, an error
+ * status, an unreadable body), which says nothing about the kill.
  */
-export async function fetchKillmailHash(killmailId: number): Promise<string | null> {
+export async function fetchKillmailHash(killmailId: number): Promise<KillmailHashLookup> {
   try {
-    const response = await fetch(`https://zkillboard.com/api/killID/${killmailId}/`);
-    if (!response.ok) return null;
+    const response = await fetchWithTimeout(`https://zkillboard.com/api/killID/${killmailId}/`);
+    if (response.status === 404) return { status: 'not-found' };
+    if (!response.ok) return { status: 'unreachable' };
     const body: unknown = await response.json();
     const hash = Array.isArray(body) ? (body[0] as { zkb?: { hash?: unknown } })?.zkb?.hash : null;
-    return typeof hash === 'string' ? hash : null;
+    return typeof hash === 'string' ? { status: 'ok', hash } : { status: 'not-found' };
   } catch {
-    return null;
+    return { status: 'unreachable' };
   }
 }
 
@@ -90,7 +95,9 @@ export function parseHullLosses(body: unknown, limit = HULL_LOSS_LIMIT): ZkillHu
  */
 export async function fetchHullLosses(shipTypeId: number): Promise<HullLossesResult> {
   try {
-    const response = await fetch(`https://zkillboard.com/api/losses/shipTypeID/${shipTypeId}/`);
+    const response = await fetchWithTimeout(
+      `https://zkillboard.com/api/losses/shipTypeID/${shipTypeId}/`
+    );
     if (!response.ok) return { ok: false, losses: [] };
     return { ok: true, losses: parseHullLosses(await response.json()) };
   } catch {
@@ -214,7 +221,7 @@ async function fetchEntityStats(entity: StatsEntity, id: number): Promise<PilotS
   const cached = pilotStatsCache.get(key);
   if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) return cached.value;
   try {
-    const response = await fetch(`https://zkillboard.com/api/stats/${entity}/${id}/`);
+    const response = await fetchWithTimeout(`https://zkillboard.com/api/stats/${entity}/${id}/`);
     if (!response.ok) return { kind: 'failed' };
     const parsed = parsePilotStats(await response.json());
     if (parsed === null) return { kind: 'failed' };
@@ -343,7 +350,7 @@ function fetchPilotList(characterId: number, path: PilotListPath): Promise<unkno
   const key = `${path}/${characterId}`;
   const cached = pilotListCache.get(key);
   if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) return cached.body;
-  const body: Promise<unknown[] | null> = fetch(
+  const body: Promise<unknown[] | null> = fetchWithTimeout(
     `https://zkillboard.com/api/${path}/characterID/${characterId}/`
   )
     .then(async (response) => {
@@ -600,7 +607,7 @@ export function parseRegionKills(body: unknown): Map<number, RecentKill[]> {
  */
 export async function fetchSystemRecentKills(systemId: number): Promise<SystemRecentKillsResult> {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://zkillboard.com/api/kills/systemID/${systemId}/pastSeconds/3600/`
     );
     if (!response.ok) return { ok: false };
@@ -638,7 +645,7 @@ export async function fetchRegionRecentKills(
   try {
     for (let pageNumber = 1; pageNumber <= REGION_MAX_PAGES; pageNumber += 1) {
       const suffix = pageNumber === 1 ? '' : `page/${pageNumber}/`;
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `https://zkillboard.com/api/kills/regionID/${regionId}/pastSeconds/${pastSeconds}/${suffix}`
       );
       if (!response.ok) return { ok: false };

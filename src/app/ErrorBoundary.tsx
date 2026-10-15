@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, type ErrorInfo, type ReactNode } from 'react';
+import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 
@@ -28,6 +28,27 @@ function ErrorScreen({ inline }: { inline: boolean }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   // The failed page took the focused control with it; say what happened.
   useEffect(() => headingRef.current?.focus(), []);
+  // Offline, usually a route chunk that was never cached: reloading now would
+  // fail the same way, so say so and retry when the connection returns.
+  const [offline, setOffline] = useState(() => navigator.onLine === false);
+  const wasOffline = useRef(offline);
+  useEffect(() => {
+    const goOffline = () => {
+      wasOffline.current = true;
+      setOffline(true);
+    };
+    const comeOnline = () => {
+      setOffline(false);
+      // Reload, not a boundary reset: `lazy()` memoizes a rejected import.
+      if (wasOffline.current) window.location.reload();
+    };
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', comeOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', comeOnline);
+    };
+  }, []);
   // Inside the shell the page already sits in `Layout`'s `<main>`.
   const Wrapper = inline ? 'section' : 'main';
   return (
@@ -44,10 +65,15 @@ function ErrorScreen({ inline }: { inline: boolean }) {
         {t('error.title', { defaultValue: 'Something went wrong' })}
       </h1>
       <p className="max-w-prose text-xs text-text-dim">
-        {t('error.hint', {
-          defaultValue:
-            'Reloading usually fixes this. Your Skill Plans and Build Plans are stored locally and are not affected.',
-        })}
+        {offline
+          ? t('error.offlineHint', {
+              defaultValue:
+                "This page can't load while you're offline. It will try again when your connection returns. Your Skill Plans and Build Plans are stored locally and are not affected.",
+            })
+          : t('error.hint', {
+              defaultValue:
+                'Reloading usually fixes this. Your Skill Plans and Build Plans are stored locally and are not affected.',
+            })}
       </p>
       <Button size="sm" onClick={() => window.location.reload()}>
         {t('error.reload', { defaultValue: 'Reload' })}
