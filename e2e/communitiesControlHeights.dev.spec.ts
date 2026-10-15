@@ -75,9 +75,20 @@ const RHYTHM_WIDTHS = [1440, 1024, 390] as const;
 async function firstHeight(page: Page, selector: string): Promise<number> {
   const row = page.locator(selector).first();
   await expect(row).toBeVisible();
-  const box = await row.boundingBox();
-  expect(box, selector).not.toBeNull();
-  return box?.height ?? 0;
+  // The row can re-render between the visibility check and the measurement
+  // (the list swaps in place after an in-app route), leaving no box for a
+  // moment; poll until it has one rather than reading it once.
+  let height = 0;
+  await expect
+    .poll(
+      async () => {
+        height = (await row.boundingBox())?.height ?? 0;
+        return height;
+      },
+      { message: selector }
+    )
+    .toBeGreaterThan(0);
+  return height;
 }
 
 for (const width of RHYTHM_WIDTHS) {
