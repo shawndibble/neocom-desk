@@ -81,6 +81,24 @@ async function swap(
   return 'applying';
 }
 
+/**
+ * A page no worker controls (a hard reload, which bypasses the worker) already
+ * runs the latest build from the network, so there is nothing to reload into:
+ * only bring the worker up to date, so the next normal load serves the new
+ * precache instead of swapping on it. Never reloads, never holds the page.
+ */
+async function settleWorker(env: BootUpdateEnv, registration: ServiceWorkerRegistration) {
+  if (!registration.waiting) {
+    const found = (async () => {
+      await registration.update();
+      await waitForInstall(registration, BOOT_UPDATE_CHECK_CAP_MS);
+    })();
+    found.catch(() => undefined);
+    await Promise.race([found, env.wait(BOOT_UPDATE_CHECK_CAP_MS)]);
+  }
+  if (registration.waiting) await activateWaitingWorker(registration);
+}
+
 export async function runBootUpdate(
   env: BootUpdateEnv = defaultBootUpdateEnv()
 ): Promise<BootUpdateOutcome> {
@@ -102,8 +120,13 @@ export async function runBootUpdate(
       env.wait(BOOT_UPDATE_CHECK_CAP_MS).then(() => undefined),
     ]);
 
-    // Dev, a blocked worker, or the very first install: nothing to swap.
-    if (!registration || !env.hasController) return 'current';
+    // Dev or a blocked worker: nothing to swap.
+    if (!registration) return 'current';
+
+    if (!env.hasController) {
+      await settleWorker(env, registration);
+      return 'current';
+    }
 
     if (registration.waiting) return await swap(env, registration);
 

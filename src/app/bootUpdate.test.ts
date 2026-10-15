@@ -92,12 +92,37 @@ describe('runBootUpdate', () => {
     await expect(runBootUpdate(env)).resolves.toBe('current');
   });
 
-  it('is current at once on a first-ever install (no controller)', async () => {
-    const registration = reg({ waiting: { postMessage: vi.fn() } });
-    const env = makeEnv(registration, { hasController: false });
-    await expect(runBootUpdate(env)).resolves.toBe('current');
-    expect(registration.update).not.toHaveBeenCalled();
-    expect(env.reload).not.toHaveBeenCalled();
+  describe('a page no worker controls (hard reload, or a first install)', () => {
+    it('activates a waiting build without reloading', async () => {
+      const postMessage = vi.fn();
+      const registration = reg({ waiting: { postMessage } });
+      const env = makeEnv(registration, { hasController: false });
+      const done = runBootUpdate(env);
+      await vi.waitFor(() => expect(postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' }));
+      listeners.controllerchange();
+      await expect(done).resolves.toBe('current');
+      expect(env.reload).not.toHaveBeenCalled();
+    });
+
+    it('activates a build found by the check, still without reloading', async () => {
+      const postMessage = vi.fn();
+      const registration: Record<string, unknown> = reg();
+      (registration.update as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        registration.waiting = { postMessage };
+      });
+      const env = makeEnv(registration, { hasController: false });
+      const done = runBootUpdate(env);
+      await vi.waitFor(() => expect(postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' }));
+      listeners.controllerchange();
+      await expect(done).resolves.toBe('current');
+      expect(env.reload).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when there is nothing waiting (a first install)', async () => {
+      const env = makeEnv(reg(), { hasController: false });
+      await expect(runBootUpdate(env)).resolves.toBe('current');
+      expect(env.reload).not.toHaveBeenCalled();
+    });
   });
 
   it('swaps a build that is already waiting, then reloads once it takes control', async () => {
