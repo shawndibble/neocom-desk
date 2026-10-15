@@ -1,0 +1,212 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  BOOT_UPDATE_CHECK_CAP_MS,
+  bootUpdateMayHold,
+  runBootUpdate,
+  type BootUpdateEnv,
+} from './bootUpdate';
+
+const realServiceWorker = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+let listeners: Record<string, () => void>;
+
+beforeEach(() => {
+  listeners = {};
+  Object.defineProperty(navigator, 'serviceWorker', {
+    configurable: true,
+    value: {
+      addEventListener: (type: string, fn: () => void) => {
+        listeners[type] = fn;
+      },
+      removeEventListener: vi.fn(),
+    },
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  if (realServiceWorker) Object.defineProperty(navigator, 'serviceWorker', realServiceWorker);
+  else Reflect.deleteProperty(navigator, 'serviceWorker');
+});
+
+const never = () => new Promise<void>(() => {});
+
+function makeEnv(
+  registration: unknown,
+  overrides: Partial<BootUpdateEnv> = {}
+): BootUpdateEnv & { reload: ReturnType<typeof vi.fn> } {
+  let last = 0;
+  return {
+    online: true,
+    pathname: '/',
+    getRegistration: vi.fn().mockResolvedValue(registration),
+    hasController: true,
+    wait: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+    reload: vi.fn(),
+    now: () => 1_000_000,
+    readLast: () => last,
+    writeLast: (at: number) => {
+      last = at;
+    },
+    ...overrides,
+  } as BootUpdateEnv & { reload: ReturnType<typeof vi.fn> };
+}
+
+function reg(extra: Record<string, unknown> = {}) {
+  return {
+    update: vi.fn().mockResolvedValue(undefined),
+    installing: null,
+    waiting: null,
+    ...extra,
+  };
+}
+
+describe('runBootUpdate', () => {
+  it('skips without any check while offline', async () => {
+    const registration = reg();
+    const env = makeEnv(registration, { online: false });
+    await expect(runBootUpdate(env)).resolves.toBe('skipped');
+    expect(env.getRegistration).not.toHaveBeenCalled();
+    expect(registration.update).not.toHaveBeenCalled();
+  });
+
+  it('on /callback checks for an update but never waits or swaps', async () => {
+    const postMessage = vi.fn();
+    const registration = reg({ waiting: { postMessage }, update: vi.fn(() => never()) });
+    const env = makeEnv(registration, { pathname: '/callback' });
+    await expect(runBootUpdate(env)).resolves.toBe('skipped');
+    expect(registration.update).toHaveBeenCalledOnce();
+    expect(postMessage).not.toHaveBeenCalled();
+    expect(env.reload).not.toHaveBeenCalled();
+  });
+
+  it('on /callback does not wait for the registration lookup', async () => {
+    const env = makeEnv(reg({}), { pathname: '/callback' });
+    env.getRegistration = vi.fn(() => never()) as unknown as typeof env.getRegistration;
+    await expect(runBootUpdate(env)).resolves.toBe('skipped');
+    expect(env.reload).not.toHaveBeenCalled();
+  });
+
+  it('is current at once with no registration', async () => {
+    const env = makeEnv(undefined);
+    await expect(runBootUpdate(env)).resolves.toBe('current');
+  });
+
+  it('is current at once on a first-ever install (no controller)', async () => {
+    const registration = reg({ waiting: { postMessage: vi.fn() } });
+    const env = makeEnv(registration, { hasController: false });
+    await expect(runBootUpdate(env)).resolves.toBe('current');
+    expect(registration.update).not.toHaveBeenCalled();
+    expect(env.reload).not.toHaveBeenCalled();
+  });
+
+  it('swaps a build that is already waiting, then reloads once it takes control', async () => {
+    const postMessage = vi.fn();
+    const registration = reg({ waiting: { postMessage } });
+    const env = makeEnv(registration);
+    const done = runBootUpdate(env);
+    await vi.waitFor(() => expect(postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' }));
+    expect(env.reload).not.toHaveBeenCalled();
+    listeners.controllerchange();
+    await expect(done).resolves.toBe('applying');
+    expect(env.reload).toHaveBeenCalledOnce();
+    expect(registration.update).not.toHaveBeenCalled();
+  });
+
+  it('swaps a build found within the cap', async () => {
+    const postMessage = vi.fn();
+    const registration: Record<string, unknown> = reg();
+    (registration.update as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      registration.waiting = { postMessage };
+    });
+    const env = makeEnv(registration);
+    const done = runBootUpdate(env);
+    await vi.waitFor(() => expect(postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' }));
+    listeners.controllerchange();
+    await expect(done).resolves.toBe('applying');
+    expect(env.reload).toHaveBeenCalledOnce();
+  });
+
+  it('is current when the check finds nothing', async () => {
+    const env = makeEnv(reg());
+    await expect(runBootUpdate(env)).resolves.toBe('current');
+    expect(env.reload).not.toHaveBeenCalled();
+  });
+
+  it('times out at the cap, posting nothing and leaving the update waiting', async () => {
+    vi.useFakeTimers();
+    const postMessage = vi.fn();
+    const registration: Record<string, unknown> = reg({ update: vi.fn(() => never()) });
+    const env = makeEnv(registration);
+    const done = runBootUpdate(env);
+    await vi.advanceTimersByTimeAsync(BOOT_UPDATE_CHECK_CAP_MS);
+    await expect(done).resolves.toBe('timed-out');
+    registration.waiting = { postMessage };
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(postMessage).not.toHaveBeenCalled();
+    expect(env.reload).not.toHaveBeenCalled();
+  });
+
+  it('is current when update() rejects', async () => {
+    const env = makeEnv(reg({ update: vi.fn().mockRejectedValue(new Error('offline')) }));
+    await expect(runBootUpdate(env)).resolves.toBe('current');
+    expect(env.reload).not.toHaveBeenCalled();
+  });
+
+  it('is current when the registration lookup throws', async () => {
+    const env = makeEnv(undefined, { getRegistration: vi.fn().mockRejectedValue(new Error('x')) });
+    await expect(runBootUpdate(env)).resolves.toBe('current');
+  });
+
+  it('still reloads after a bounded wait when controllerchange never arrives', async () => {
+    vi.useFakeTimers();
+    const registration = reg({ waiting: { postMessage: vi.fn() } });
+    const env = makeEnv(registration);
+    const done = runBootUpdate(env);
+    await vi.advanceTimersByTimeAsync(4000);
+    await expect(done).resolves.toBe('applying');
+    expect(env.reload).toHaveBeenCalledOnce();
+  });
+
+  it('does not swap again right after a swap that did not take (reload-loop guard)', async () => {
+    const postMessage = vi.fn();
+    const registration = reg({ waiting: { postMessage } });
+    const env = makeEnv(registration, { readLast: () => 1_000_000 - 5_000 });
+    await expect(runBootUpdate(env)).resolves.toBe('current');
+    expect(postMessage).not.toHaveBeenCalled();
+    expect(env.reload).not.toHaveBeenCalled();
+  });
+
+  it('swaps again once the guard window has passed, and records the attempt', async () => {
+    vi.useFakeTimers();
+    const writeLast = vi.fn();
+    const env = makeEnv(reg({ waiting: { postMessage: vi.fn() } }), {
+      readLast: () => 1_000_000 - 60_000,
+      writeLast,
+    });
+    const done = runBootUpdate(env);
+    await vi.advanceTimersByTimeAsync(4000);
+    await expect(done).resolves.toBe('applying');
+    expect(writeLast).toHaveBeenCalledWith(1_000_000);
+  });
+
+  it('does not swap when storage is unavailable', async () => {
+    const postMessage = vi.fn();
+    const env = makeEnv(reg({ waiting: { postMessage } }), {
+      readLast: () => {
+        throw new Error('denied');
+      },
+    });
+    await expect(runBootUpdate(env)).resolves.toBe('current');
+    expect(postMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('bootUpdateMayHold', () => {
+  it('holds only when online, controlled by a worker, and not on /callback', () => {
+    expect(bootUpdateMayHold(makeEnv(undefined))).toBe(true);
+    expect(bootUpdateMayHold(makeEnv(undefined, { online: false }))).toBe(false);
+    expect(bootUpdateMayHold(makeEnv(undefined, { hasController: false }))).toBe(false);
+    expect(bootUpdateMayHold(makeEnv(undefined, { pathname: '/callback' }))).toBe(false);
+  });
+});

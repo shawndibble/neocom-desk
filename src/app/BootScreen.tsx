@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, LiveStatus, LogoMark, Spinner } from '@/components/ui';
 import { recoverFromStalledBoot } from './bootRecovery';
+import {
+  BOOT_TIP_DELAY_MS,
+  BOOT_TIP_ROTATE_MS,
+  getBootTip,
+  nextBootTip,
+  type BootTipKey,
+} from './bootTips';
 import { reportBootStallOnce, reportBootStallResolved, type BootGate } from './bootStallReport';
 
 /**
@@ -30,6 +37,22 @@ export function BootScreen({ gate }: { gate?: BootGate }) {
   // state from the render that created it (mount, `recovering` still
   // `false`) — a ref reads the current value instead of that stale one.
   const recoveringRef = useRef(false);
+  const [tip, setTip] = useState<BootTipKey | null>(null);
+
+  // A tip only for a wait long enough to notice, and a new one only if this
+  // same screen is still up after another stretch: a fast boot sees no text
+  // flash, and the memoised first pick survives the hand-off between gates.
+  useEffect(() => {
+    const show = setTimeout(() => setTip(getBootTip()), BOOT_TIP_DELAY_MS);
+    const rotate = setInterval(
+      () => setTip((current) => nextBootTip(current ?? getBootTip())),
+      BOOT_TIP_ROTATE_MS
+    );
+    return () => {
+      clearTimeout(show);
+      clearInterval(rotate);
+    };
+  }, []);
 
   useEffect(() => {
     // No gate: a wait on something other than a boot read (the signed-in
@@ -54,6 +77,11 @@ export function BootScreen({ gate }: { gate?: BootGate }) {
       <h1 className="text-sm font-semibold tracking-widest uppercase">{t('app.name')}</h1>
       <Spinner label={t('common.loading')} />
       <p className="text-xs text-text-dim">{t('common.loadingEllipsis')}</p>
+      {/* Decoration for the wait, not status: aria-hidden so it is never
+          announced, and a reserved height so it landing moves nothing. */}
+      <p aria-hidden="true" className="min-h-8 max-w-prose text-xs text-text-dim">
+        {tip === null ? null : t(tip)}
+      </p>
       {/* Mounted empty from the start so the hint is *announced* when it
           lands; the spinner's own status never changes. The visible copy
           below is aria-hidden so the hint is not read twice. */}
