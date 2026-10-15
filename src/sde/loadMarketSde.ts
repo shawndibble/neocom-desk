@@ -19,11 +19,13 @@ import type {
   LpCorporationEntry,
 } from './marketTypes';
 import { sdeDataUrl } from './sdeDataUrl';
+import { fetchJsonWithIdleTimeout } from '@/lib/idleTimeout';
 
-async function fetchJson<T>(file: string): Promise<T> {
-  const res = await fetch(sdeDataUrl(import.meta.env.BASE_URL, `market/${file}`));
-  if (!res.ok) throw new Error(`Failed to load market/${file}: HTTP ${res.status}`);
-  return res.json() as Promise<T>;
+function fetchJson<T>(file: string): Promise<T> {
+  return fetchJsonWithIdleTimeout<T>(
+    sdeDataUrl(import.meta.env.BASE_URL, `market/${file}`),
+    `market/${file}`
+  );
 }
 
 function cached<T>(file: string): () => Promise<T> {

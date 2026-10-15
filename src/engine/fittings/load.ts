@@ -64,6 +64,7 @@ export type LoadError =
   | 'eve-workbench-not-found'
   | 'eve-workbench-failed'
   | 'killmail-not-found'
+  | 'killmail-unreachable'
   | 'killmail-failed';
 
 /** A Fitting's parts as each loader resolves them, before it has a name. */
@@ -135,12 +136,20 @@ export function toLoadOutcome(parts: LoadParts, name: string, source: LoadSource
 export type EveWorkbenchEft =
   { status: 'ok'; eft: string } | { status: 'not-found' } | { status: 'failed' };
 
+/**
+ * What zKillboard answered for a killmail's hash. `not-found` is a killmail it
+ * doesn't know; `unreachable` is zKillboard not answering at all (offline, a
+ * timeout, an error status), which says nothing about the killmail.
+ */
+export type KillmailHashLookup =
+  { status: 'ok'; hash: string } | { status: 'not-found' } | { status: 'unreachable' };
+
 export interface TextLoadSources {
   /** Name → typeId and typeId → rack; read only for text that needs them. */
   catalog: () => Promise<{ typeByName: EftTypeLookup; slotByTypeId: EftSlotLookup }>;
   hullName: (typeId: number) => Promise<string>;
-  /** zKillboard's hash for a killmail; null when it doesn't know the killmail. */
-  killmailHash: (killmailId: number) => Promise<string | null>;
+  /** zKillboard's hash for a killmail. */
+  killmailHash: (killmailId: number) => Promise<KillmailHashLookup>;
   /** ESI's killmail victim; null or a throw when ESI couldn't supply it. */
   killmailVictim: (killmailId: number, hash: string) => Promise<KillmailVictim | null>;
   /** A published EVE Workbench fit's EFT; a throw reads as unreachable. */
@@ -157,8 +166,13 @@ async function readKillmail(
   slotByTypeId: EftSlotLookup,
   sources: TextLoadSources
 ): Promise<LoadParts | LoadError> {
-  const resolvedHash = hash ?? (await sources.killmailHash(killmailId));
-  if (resolvedHash === null) return 'killmail-not-found';
+  let resolvedHash = hash;
+  if (resolvedHash === undefined) {
+    const lookup = await sources.killmailHash(killmailId);
+    if (lookup.status === 'unreachable') return 'killmail-unreachable';
+    if (lookup.status === 'not-found') return 'killmail-not-found';
+    resolvedHash = lookup.hash;
+  }
   try {
     const victim = await sources.killmailVictim(killmailId, resolvedHash);
     return victim === null ? 'killmail-failed' : killmailVictimToLoadResult(victim, slotByTypeId);

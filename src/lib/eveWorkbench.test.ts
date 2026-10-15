@@ -75,3 +75,23 @@ describe('fetchEveWorkbenchEft', () => {
     expect(await fetchEveWorkbenchEft(FIT_ID)).toEqual({ status: 'failed' });
   });
 });
+
+describe('fetchEveWorkbenchEft when Workbench never answers', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('reports failed after the timeout instead of waiting forever', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_input: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+          })
+      )
+    );
+    const answer = fetchEveWorkbenchEft(FIT_ID);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await answer).toEqual({ status: 'failed' });
+  });
+});
