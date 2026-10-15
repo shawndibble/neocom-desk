@@ -6,9 +6,10 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
-import { EveSsoButton, LogoMark, Modal, Panel, plainTextActionClassName } from '@/components/ui';
+import { EveSsoButton, LogoMark, Panel, plainTextActionClassName } from '@/components/ui';
 import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
+import { QuestionGrid } from '@/features/landing/QuestionGrid';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import {
   focusRingClassName,
@@ -33,7 +34,6 @@ import {
   Orders,
   Planetary,
   ReadOnly,
-  Search,
   ScheduledPush,
   Ships,
   Skills,
@@ -109,93 +109,6 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
 ];
 
 /**
- * One captured screen behind a question tile: the file under
- * `public/screenshots/` and the `login.screenshots.*` key its alt text and
- * enlarged-view caption live under. Real captures filled with sample data, not
- * mockups — the hero preview already covers "what it would look like"; these
- * answer "what does it actually look like". WebP sits outside the PWA precache
- * glob, so a signed-in user never downloads them.
- */
-interface Screenshot {
-  file: string;
-  key: string;
-  size: { width: number; height: number };
-}
-
-/** Every capture of one form factor was encoded at the same size. */
-const DESKTOP_SIZE = { width: 1600, height: 900 };
-const PHONE_SIZE = { width: 540, height: 1104 };
-
-function screenshotSrc(shot: Screenshot): string {
-  return `/screenshots/${shot.file}.webp`;
-}
-
-/**
- * One tile of the questions grid: the question, the capture that answers it,
- * and the `login.answers.*` key its words live under. `span` is a literal
- * Tailwind class (never built from a number, which the compiler would not see)
- * and the six-column grid is arranged so every row sums to six.
- */
-interface Tile {
-  key: string;
-  shot: Screenshot;
-  span: string;
-}
-
-/**
- * The questions the page leads with. Each names a surface a signed-in pilot
- * actually opens, so the claim under it can be checked against the app rather
- * than admired — no benefit here is broader than what ships.
- */
-const TILES: Tile[] = [
-  {
-    key: 'orders',
-    shot: { file: 'desktop-order-detail', key: 'orderDetail', size: DESKTOP_SIZE },
-    span: 'lg:col-span-2',
-  },
-  {
-    key: 'build',
-    shot: { file: 'desktop-build-plan', key: 'buildPlan', size: DESKTOP_SIZE },
-    span: 'lg:col-span-2',
-  },
-  {
-    key: 'journal',
-    shot: { file: 'desktop-wallet-journal', key: 'walletJournal', size: DESKTOP_SIZE },
-    span: 'lg:col-span-2',
-  },
-  {
-    key: 'marketJumps',
-    shot: { file: 'phone-market-jumps', key: 'phoneMarketJumps', size: PHONE_SIZE },
-    span: 'lg:col-span-2',
-  },
-  {
-    key: 'routeSafety',
-    shot: { file: 'phone-route-safety', key: 'phoneRouteSafety', size: PHONE_SIZE },
-    span: 'lg:col-span-2',
-  },
-  {
-    key: 'pilot',
-    shot: { file: 'phone-pilot-lookup', key: 'phonePilotLookup', size: PHONE_SIZE },
-    span: 'lg:col-span-2',
-  },
-  {
-    key: 'flyNext',
-    shot: { file: 'desktop-ship-tree', key: 'shipTree', size: DESKTOP_SIZE },
-    span: 'lg:col-span-2',
-  },
-  {
-    key: 'fitting',
-    shot: { file: 'desktop-fitting', key: 'fitting', size: DESKTOP_SIZE },
-    span: 'lg:col-span-2',
-  },
-  {
-    key: 'survey',
-    shot: { file: 'desktop-survey', key: 'survey', size: DESKTOP_SIZE },
-    span: 'lg:col-span-2',
-  },
-];
-
-/**
  * The objections a pilot weighs before handing an EVE SSO grant to a
  * third-party site. Deliberately the last thing above the closing button —
  * it is where the hesitation actually happens.
@@ -216,7 +129,6 @@ export function Login() {
 
   // The tile capture shown enlarged, or null. One modal for the page
   // rather than one per tile: only one can be open at a time anyway.
-  const [zoomed, setZoomed] = useState<Screenshot | null>(null);
 
   // One Customize permissions dialog for the whole page, opened from either
   // "Log in" button's own link right under it.
@@ -287,36 +199,7 @@ export function Login() {
 
         <LandingSection id="login-answers" heading={t('login.answersHeading')}>
           <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
-          {/*
-          One grid, not a questions list over a separate gallery: each tile is a
-          question, the screen that answers it, and one line of why. Selecting
-          the picture enlarges it. The picture is a crop (top-aligned, fixed
-          height), so the enlarged view is where the table text becomes
-          readable.
-        */}
-          <ul className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-6">
-            {TILES.map((tile) => (
-              <li key={tile.key} className={cx('flex', tile.span)}>
-                <QuestionTile tile={tile} onOpen={() => setZoomed(tile.shot)} />
-              </li>
-            ))}
-          </ul>
-          <Modal
-            open={zoomed !== null}
-            onClose={() => setZoomed(null)}
-            title={zoomed ? t(`login.screenshots.${zoomed.key}.caption`) : ''}
-            placement="media"
-          >
-            {zoomed && (
-              <img
-                src={screenshotSrc(zoomed)}
-                alt={t(`login.screenshots.${zoomed.key}.alt`)}
-                width={zoomed.size.width}
-                height={zoomed.size.height}
-                className="mx-auto block h-auto max-h-[80vh] w-auto max-w-full"
-              />
-            )}
-          </Modal>
+          <QuestionGrid />
         </LandingSection>
         <LandingSection id="login-features" heading={t('login.featuresHeading')}>
           {FEATURE_GROUPS.map(({ group, items }) => (
@@ -427,58 +310,6 @@ function LandingSection({
         {children}
       </div>
     </section>
-  );
-}
-
-/**
- * One question tile: a capture that opens enlarged, then the question and one
- * line of answer. The button's label carries the image's alt plus what
- * selecting does — a button's children are presentational, so the alt alone
- * would never be read. Explicit `width`/`height` reserve the image's box before
- * the lazy image arrives, so the grid does not jump as a visitor scrolls into
- * it; the fixed height and `object-top` crop every capture to the same strip
- * whatever its shape (a phone capture is far taller than a desktop one).
- */
-function QuestionTile({ tile, onOpen }: { tile: Tile; onOpen: () => void }) {
-  const { t } = useTranslation();
-  const { shot } = tile;
-  const alt = t(`login.screenshots.${shot.key}.alt`);
-  return (
-    <Panel padded={false} className="h-full w-full">
-      <button
-        type="button"
-        onClick={onOpen}
-        aria-label={t('login.screenshotEnlarge', { alt })}
-        className={cx(
-          'relative block h-48 w-full cursor-zoom-in overflow-hidden sm:h-56',
-          // Inset: the button clips its own overflow, so an outset ring would be cut off.
-          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent'
-        )}
-      >
-        <img
-          src={screenshotSrc(shot)}
-          alt={alt}
-          width={shot.size.width}
-          height={shot.size.height}
-          loading="lazy"
-          decoding="async"
-          className={cx('h-full w-full object-cover object-top', interactiveClassName)}
-        />
-        {/* DESIGN.md §6c "Magnifier badge": the at-rest cue that the picture opens, since a phone has no cursor. */}
-        <span
-          aria-hidden="true"
-          className="absolute right-2 bottom-2 rounded-xs border border-line bg-bg/80 p-1 text-text"
-        >
-          <Search size={ICON_SIZE.sm} aria-hidden="true" />
-        </span>
-      </button>
-      <div className="border-t border-line p-4">
-        <h3 className="text-base font-semibold text-balance">
-          {t(`login.answers.${tile.key}.question`)}
-        </h3>
-        <p className="mt-2 text-sm text-text-dim">{t(`login.answers.${tile.key}.answer`)}</p>
-      </div>
-    </Panel>
   );
 }
 

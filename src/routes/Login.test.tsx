@@ -136,10 +136,10 @@ describe('Login', () => {
       await screen.findByRole('heading', { name: /the questions it exists to answer/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /which of my orders is quietly losing isk/i })
+      screen.getByRole('heading', { name: /which order is quietly losing isk/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /is this blueprint worth building today/i })
+      screen.getByRole('heading', { name: /is this blueprint worth building/i })
     ).toBeInTheDocument();
   });
 
