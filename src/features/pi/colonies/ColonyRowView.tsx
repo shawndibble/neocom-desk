@@ -265,7 +265,7 @@ function FaultTags({ tags, planetName }: { tags: readonly FaultTag[]; planetName
  * column has a fixed width so `ColonyListHeader`'s labels sit over the cells.
  */
 const ROW_GRID =
-  'lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)_12rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
+  'lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)_9rem_2.25rem] min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_13rem_2.25rem]';
 
 /**
  * A column's label and help. In a row (`inRow`) the list header shows both from `lg`,
@@ -282,7 +282,7 @@ function ColumnLabel({
 }) {
   const { t } = useTranslation();
   return (
-    <span className={`flex items-center gap-1 ${MICRO}`}>
+    <span className={`flex items-center gap-1 whitespace-nowrap ${MICRO}`}>
       <span className={inRow ? 'lg:sr-only' : undefined}>{label}</span>
       <span className={inRow ? 'lg:hidden' : undefined}>
         <InfoTooltip label={t('common.aboutLabel', { label })} content={help} />
