@@ -104,6 +104,7 @@ const community = (typeId: number) =>
     runs: -1,
     quantity: 1,
     communityNames: ['C'],
+    communities: [{ id: 'c1', name: 'C' }],
     stale: false,
     asOf: null,
     locationName: 'Somewhere',

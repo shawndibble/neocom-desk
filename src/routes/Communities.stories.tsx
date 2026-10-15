@@ -9,6 +9,8 @@ import {
   SAMPLE_ADMIN_COMMUNITY_ID,
   SAMPLE_MEMBER_COMMUNITY_ID,
 } from '@/storybook/communitiesFixture';
+import { AskToCopyDialog } from '@/features/communities/AskToCopyDialog';
+import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
 import { Communities } from './Communities';
 
 /** Sample Communities answer in place of the backend, fresh per story so a change never leaks into the next. */
@@ -280,3 +282,45 @@ export const RequestsComposeRecipientsPhone: Story = {
 export const RequestsEmpty: Story = {
   parameters: { shell: requestsShell(SAMPLE_MEMBER_COMMUNITY_ID) },
 };
+
+/** What BPC Sourcing opens from a Community Offer row's "ask <name> to copy…": Rifter Blueprint (a BPO) held by Ilvara Nokk. */
+const askToCopy = (communities: { id: string; name: string }[]): Story => ({
+  render: () => (
+    <AskToCopyDialog
+      characterId={SAMPLE_ACTIVE_CHARACTER.characterId}
+      offer={{
+        source: 'community',
+        typeId: 691,
+        runs: -1,
+        memberUid: 'char:2119000001',
+        communities,
+      }}
+      blueprintName="Rifter Blueprint"
+      holderName="Ilvara Nokk"
+      onClose={() => undefined}
+    />
+  ),
+});
+
+const brass = { id: SAMPLE_ADMIN_COMMUNITY_ID, name: 'Brass Meridian Industrialists' };
+const providence = { id: SAMPLE_MEMBER_COMMUNITY_ID, name: 'Providence Mining Co-op' };
+
+/** @summary Ask to copy (BPC Sourcing): compose opens with one Rifter Blueprint line, quantity 1; step 2 has the holder ticked. */
+export const AskToCopyCompose: Story = askToCopy([brass]);
+
+/** @summary Ask to copy in the phone shell. */
+export const AskToCopyComposePhone: Story = { ...AskToCopyCompose, globals: phone };
+
+/** @summary Ask to copy, step 2: Ilvara Nokk, who holds it, ticked. */
+export const AskToCopyRecipients: Story = {
+  ...askToCopy([brass]),
+  parameters: { shell: { path: '/communities', scopes: MAIL_SCOPES } },
+  play: async () => {
+    const dialog = within(document.body);
+    await userEvent.click(await dialog.findByRole('button', { name: 'Next: who to mail' }));
+    await dialog.findByText('Ilvara Nokk');
+  },
+};
+
+/** @summary Ask to copy when the holder shares it in two Communities: pick which one first. */
+export const AskToCopyPickCommunity: Story = askToCopy([brass, providence]);

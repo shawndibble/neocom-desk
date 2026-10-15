@@ -72,4 +72,14 @@ Not pictured; added to the panel screen for the Community admin only (decision `
 
 - **Side panel:** below the Message button, a **Pledges on this request** list (name, "N lines", **Remove…** with the Pledger's name in its accessible label), then **Remove request…** as a danger button, each behind a `ConfirmDialog` naming what goes. Names come from the Members list; a Pledger who has since left reads "Former Member". A failed removal keeps the dialog open with the shared "That did not work. Try again." line. The panel for the requester and for a plain Member, and the whole board, are as pictured: there is no row menu (one action does not earn a ⋮, DESIGN.md §6c).
 
+## Deviations in Ask to copy (issue #3813)
+
+Compose opens as pictured (`compose-lines`, `compose-recipients`), as stories `pages-communities--ask-to-copy-compose`, `-compose-phone`, `-recipients` and `-pick-community`, where the page behind is the Communities page (the real thing opens over BPC Sourcing). Where it differs from the pictures:
+
+- **Pre-filled line:** one line, "Rifter Blueprint" as a Blueprint copy, quantity 1, Runs/ME/TE empty; location and terms empty. The pictures show a pasted pile.
+- **Step 2:** the holder is ticked, with any Member sharing a matching blueprint, as in the picture.
+- **Community choice (not pictured):** when the holder shares the blueprint in several Communities, a small dialog (select and Continue) comes first. One Community goes straight to compose.
+- **Roster failure (not pictured):** a dialog with the failure in words and Close.
+- **The row control** ("ask <name> to copy…", an accent inline link) is not pictured: the mockup has no BPC Sourcing screen.
+
 Delete this folder and the story when the last ticket that links it closes.

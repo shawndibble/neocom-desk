@@ -41,7 +41,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import { activeOptionClassName, inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useRememberedUrlParams, useUrlSort } from '@/lib/useUrlState';
 import {
   bpcSourcingParams,
@@ -65,6 +65,8 @@ import {
   loadPublicBpcContracts,
   type PublicBpcContractsSnapshot,
 } from '@/features/bpcContracts/syncedContracts';
+import { AskToCopyDialog } from '@/features/communities/AskToCopyDialog';
+import { canAskToCopy } from '@/engine/communities/askToCopy';
 import { bpcOfferRows } from '@/features/bpcContracts/bpcOfferRows';
 import {
   bpcMarketLookup,
@@ -159,6 +161,8 @@ interface Snapshot {
   contractsResult: CachedResult<PublicBpcContractsSnapshot> | null;
   syncConfigured: boolean;
   blueprintNames: Map<number, string>;
+  /** Reaction formulas: they cannot be copied, so never "ask to copy" (GLOSSARY Community Offer). */
+  reactionFormulaTypeIds: ReadonlySet<number>;
   regionNames: Map<number, string>;
   /** A 401/403 fetching these just resolves empty — Industry's own top-level banner (same `loadCharacterBlueprints` call) already covers re-login on every tab. */
   ownedBlueprints: CharacterBlueprint[];
@@ -177,6 +181,7 @@ async function loadBpcContractsSnapshot(
       contractsResult: null,
       syncConfigured: false,
       blueprintNames: new Map(),
+      reactionFormulaTypeIds: new Set(),
       regionNames: new Map(),
       ownedBlueprints: [],
       contractLocations: new Map(),
@@ -193,6 +198,12 @@ async function loadBpcContractsSnapshot(
   ]);
   const blueprintNames = new Map(
     Object.entries(blueprintMap).map(([typeId, bp]) => [Number(typeId), bp.name])
+  );
+
+  const reactionFormulaTypeIds = new Set(
+    Object.entries(blueprintMap)
+      .filter(([, bp]) => bp.activity === 'reaction')
+      .map(([typeId]) => Number(typeId))
   );
 
   // Already superseded: skip the region-name fan-out, its result would be discarded.
@@ -234,6 +245,7 @@ async function loadBpcContractsSnapshot(
     contractsResult,
     syncConfigured: true,
     blueprintNames,
+    reactionFormulaTypeIds,
     regionNames,
     ownedBlueprints,
     contractLocations,
@@ -582,6 +594,7 @@ export function BpcSourcingPanel({
   const contractsResult = data?.contractsResult ?? null;
   const syncConfigured = data?.syncConfigured ?? true;
   const blueprintNames = data?.blueprintNames ?? EMPTY_MAP;
+  const reactionFormulaTypeIds = data?.reactionFormulaTypeIds ?? EMPTY_TYPE_IDS;
   const regionNames = data?.regionNames ?? EMPTY_MAP;
   const ownedBlueprints = data?.ownedBlueprints ?? EMPTY_OWNED_BLUEPRINTS;
   const contractLocations = data?.contractLocations ?? EMPTY_CONTRACT_LOCATIONS;
@@ -685,6 +698,8 @@ export function BpcSourcingPanel({
   const selectedTypeId = params['sourcing.type'];
   /** The row whose contract detail is open, if any. */
   const [openRow, setOpenRow] = useState<BpcContractRow | null>(null);
+  // The Community Offer whose "ask to copy…" dialog is open.
+  const [askRow, setAskRow] = useState<Extract<BpcSearchRow, { source: 'community' }> | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -1563,11 +1578,23 @@ export function BpcSourcingPanel({
               >
                 <span className="min-w-0 max-w-full">{title}</span>
                 <span className="inline-flex flex-wrap items-center gap-1.5 text-[0.6875rem] font-normal text-text-dim">
-                  <span>
-                    {row.runs === -1
-                      ? t('bpcContracts.communityAskToCopy', { name: row.memberName })
-                      : t('bpcContracts.communityFrom', { name: row.memberName })}
-                  </span>
+                  {row.runs !== -1 ? (
+                    <span>{t('bpcContracts.communityFrom', { name: row.memberName })}</span>
+                  ) : activeCharacterId !== null && canAskToCopy(row, reactionFormulaTypeIds) ? (
+                    // A raw button, not Button: it is a text-sized action inside the
+                    // item cell (DESIGN.md §6c, the inline link look), and a row with
+                    // no primary action of its own, so the name beside it stays plain.
+                    // The trailing "…" says it opens a dialog needing more input.
+                    <button
+                      type="button"
+                      className={inlineLinkClassName}
+                      onClick={() => setAskRow(row)}
+                    >
+                      {t('bpcContracts.communityAskToCopyAction', { name: row.memberName })}
+                    </button>
+                  ) : (
+                    <span>{t('bpcContracts.communityAskToCopy', { name: row.memberName })}</span>
+                  )}
                   <span className="text-[0.625rem] font-semibold tracking-widest uppercase">
                     {t('bpcContracts.communityChip', { names: row.communityNames.join(', ') })}
                   </span>
@@ -1618,6 +1645,8 @@ export function BpcSourcingPanel({
     regionLabel,
     blueprintPicked,
     isPhone,
+    activeCharacterId,
+    reactionFormulaTypeIds,
   ]);
   // Item plus the visible columns, like the table itself.
   const csvColumns = useMemo(
@@ -2106,6 +2135,16 @@ export function BpcSourcingPanel({
           </>
         )}
 
+        {askRow !== null && activeCharacterId !== null && (
+          <AskToCopyDialog
+            characterId={activeCharacterId}
+            offer={askRow}
+            blueprintName={blueprintNames.get(askRow.typeId) ?? `#${askRow.typeId}`}
+            holderName={askRow.memberName}
+            onClose={() => setAskRow(null)}
+          />
+        )}
+
         {openRow !== null && (
           <BpcContractModal
             row={openRow}
@@ -2154,6 +2193,7 @@ function DenseOmit({ children }: { children: ReactNode }) {
 
 /** Stable identity, so a missing snapshot doesn't invalidate memoized columns/options every render. */
 const EMPTY_MAP: ReadonlyMap<number, string> = new Map();
+const EMPTY_TYPE_IDS: ReadonlySet<number> = new Set();
 const EMPTY_OWNED_BLUEPRINTS: CharacterBlueprint[] = [];
 const EMPTY_CONTRACT_LOCATIONS: ReadonlyMap<number, ContractLocationInfo> = new Map();
 const EMPTY_OWNED_LOCATIONS: ReadonlyMap<number, ResolvedLocation> = new Map();
