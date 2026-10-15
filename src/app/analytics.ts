@@ -15,6 +15,7 @@
  * (`app/bootImportGraph.test.ts` guards that now).
  */
 import type { Analytics } from 'firebase/analytics';
+import { useAnalyticsEnabled } from './analyticsPref';
 
 export interface AnalyticsEnv {
   MODE?: string;
@@ -63,6 +64,10 @@ export function pageLocationFor(location: Pick<Location, 'origin' | 'pathname'>)
  * bug in `logEvent`'s payload still surfaces.
  */
 export async function trackPageView(pagePath: string, pageTitle?: string): Promise<void> {
+  // Hydrate first: Dexie is async, so a pilot who opted out must not fire a
+  // page view at the default. Read at call time so a mid-session toggle applies.
+  await useAnalyticsEnabled.getState().hydrate();
+  if (!useAnalyticsEnabled.getState().value) return;
   let analytics: Analytics | null;
   let logEvent: typeof import('firebase/analytics').logEvent;
   try {
