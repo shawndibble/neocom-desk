@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, SlideOver } from '@/components/ui';
-import { STALE_PLEDGE_DAYS, type MyPledgeRow } from '@/engine/communities/requests';
+import { STALE_PLEDGE_DAYS, lineKey, type MyPledgeRow } from '@/engine/communities/requests';
 import { cx } from '@/lib/cx';
 import { formatQuantity } from './requestFormat';
 
@@ -44,7 +44,7 @@ export function MyPledgesPanel({
         >
           {rows.map(({ request, line, entry, stale }) => (
             <li
-              key={`${request.id}:${line.typeId}:${line.kind}`}
+              key={`${request.id}:${lineKey(line)}`}
               className={cx('space-y-1 px-1 py-2.5', stale && 'opacity-60')}
             >
               <div className="flex flex-wrap items-baseline gap-x-2">

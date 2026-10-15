@@ -9,13 +9,12 @@
 import {
   collection,
   collectionGroup,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
-  setDoc,
   where,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
@@ -31,6 +30,7 @@ import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
 import { callCommunity } from './communityStore';
+import { trackPledgeWrite, underFirebaseSession } from './pledgeWrites';
 
 const KINDS: readonly RequestLineKind[] = ['item', 'bpc', 'bpo'];
 
@@ -58,10 +58,10 @@ export async function loadRequests(
 ): Promise<CommunityRequest[]> {
   const override = communityBackendOverride();
   if (override?.loadItemRequests) return override.loadItemRequests(communityId);
-  await ensureSignedIn(characterId);
-  const snap = await getDocs(
-    collection(getSyncFirestore(), 'communities', communityId, 'itemRequests')
-  );
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDocs(collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'));
+  });
   return snap.docs
     .map((entry): CommunityRequest | null => {
       const d = entry.data();
@@ -163,6 +163,8 @@ function readPledge(uid: string, d: Record<string, unknown>): RequestPledge | nu
         ? e.contractIds.filter((id): id is number => typeof id === 'number')
         : [],
       ...(typeof e.manual === 'number' && e.manual > 0 ? { manual: e.manual } : {}),
+      ...(typeof e.auto === 'number' && e.auto >= 0 ? { auto: e.auto } : {}),
+      ...(typeof e.through === 'number' && e.through >= 0 ? { through: e.through } : {}),
     };
   }
   const stamp = d.updatedAt as { toMillis?: () => number } | undefined;
@@ -177,10 +179,19 @@ export async function loadPledges(
 ): Promise<RequestPledge[]> {
   const override = communityBackendOverride();
   if (override?.loadPledges) return override.loadPledges(communityId, requestId);
-  await ensureSignedIn(characterId);
-  const snap = await getDocs(
-    collection(getSyncFirestore(), 'communities', communityId, 'itemRequests', requestId, 'pledges')
-  );
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDocs(
+      collection(
+        getSyncFirestore(),
+        'communities',
+        communityId,
+        'itemRequests',
+        requestId,
+        'pledges'
+      )
+    );
+  });
   return snap.docs
     .map((entry) => readPledge(entry.id, entry.data()))
     .filter((pledge): pledge is RequestPledge => pledge !== null);
@@ -204,10 +215,12 @@ export async function loadCommunityPledges(
     }
     return found;
   }
-  await ensureSignedIn(characterId);
-  const snap = await getDocs(
-    query(collectionGroup(getSyncFirestore(), 'pledges'), where('communityId', '==', communityId))
-  );
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDocs(
+      query(collectionGroup(getSyncFirestore(), 'pledges'), where('communityId', '==', communityId))
+    );
+  });
   for (const entry of snap.docs) {
     const requestId = entry.ref.parent.parent?.id;
     const pledge = readPledge(entry.id, entry.data());
@@ -218,10 +231,11 @@ export async function loadCommunityPledges(
 }
 
 /**
- * Rewrites this Character's Pledge on one Request: reads the stored document
- * first (so a delivery marked from another device is kept), applies `change`,
- * then writes it, or deletes it when no line is left. Returns the new Pledge,
- * null when withdrawn.
+ * Rewrites this Character's Pledge on one Request: inside a transaction, reads
+ * the stored document (so a delivery marked from another device, or a typed
+ * amount saved a moment ago, is kept; a concurrent write makes it retry on the
+ * fresh document), applies `change`, then writes it, or deletes it when no
+ * line is left. Returns the new Pledge, null when withdrawn.
  */
 export async function updateMyPledge(
   characterId: number,
@@ -237,6 +251,18 @@ export async function updateMyPledge(
     override.savePledge(communityId, requestId, Object.keys(next).length === 0 ? null : next);
     return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
   }
+  return trackPledgeWrite(() =>
+    underFirebaseSession(() => writeMyPledge(characterId, communityId, requestId, uid, change))
+  );
+}
+
+async function writeMyPledge(
+  characterId: number,
+  communityId: string,
+  requestId: string,
+  uid: string,
+  change: (lines: PledgeLines) => PledgeLines
+): Promise<RequestPledge | null> {
   await ensureSignedIn(characterId);
   const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
   if (!ownerHash) throw new Error('This Character has no owner hash yet');
@@ -249,77 +275,38 @@ export async function updateMyPledge(
     'pledges',
     uid
   );
-  const stored = await getDoc(ref);
-  const before = stored.exists() ? readPledge(uid, stored.data()) : null;
-  const next = change(before?.lines ?? {});
-  if (Object.keys(next).length === 0) {
-    await deleteDoc(ref);
-    return null;
-  }
-  const lines: Record<
-    string,
-    { quantity: number; delivered: number; contractIds: number[]; manual?: number }
-  > = {};
-  for (const [index, entry] of Object.entries(next)) {
-    lines[index] = {
-      quantity: entry.quantity,
-      delivered: entry.delivered,
-      contractIds: [...(entry.contractIds ?? [])],
-      ...(entry.manual !== undefined ? { manual: entry.manual } : {}),
-    };
-  }
-  await setDoc(ref, { ownerHash, communityId, lines, updatedAt: serverTimestamp() });
+  const withdrawn = await runTransaction(getSyncFirestore(), async (tx) => {
+    const stored = await tx.get(ref);
+    const before = stored.exists() ? readPledge(uid, stored.data()) : null;
+    const next = change(before?.lines ?? {});
+    if (Object.keys(next).length === 0) {
+      tx.delete(ref);
+      return true;
+    }
+    const lines: Record<
+      string,
+      {
+        quantity: number;
+        delivered: number;
+        contractIds: number[];
+        manual?: number;
+        auto?: number;
+        through?: number;
+      }
+    > = {};
+    for (const [index, entry] of Object.entries(next)) {
+      lines[index] = {
+        quantity: entry.quantity,
+        delivered: entry.delivered,
+        contractIds: [...(entry.contractIds ?? [])],
+        ...(entry.manual !== undefined ? { manual: entry.manual } : {}),
+        ...(entry.auto !== undefined ? { auto: entry.auto } : {}),
+        ...(entry.through !== undefined ? { through: entry.through } : {}),
+      };
+    }
+    tx.set(ref, { ownerHash, communityId, lines, updatedAt: serverTimestamp() });
+    return false;
+  });
+  if (withdrawn) return null;
   return readPledge(uid, (await getDoc(ref)).data() ?? {});
-}
-
-export interface RequestMailTarget {
-  communityId: string;
-  requestId: string;
-  targetCharacterId: number;
-  targetName: string;
-}
-
-export interface RequestMailReservation {
-  communityName: string;
-  requesterName: string;
-  /** Request mails left today after this one. */
-  remaining: number;
-}
-
-/** Claims one of the day's Request mails and the one-per-recipient slot; the server holds the cap. */
-export function reserveRequestMail(characterId: number, target: RequestMailTarget) {
-  return callCommunity<RequestMailTarget, RequestMailReservation>(
-    characterId,
-    'reserveCommunityRequestMailCallable',
-    target
-  );
-}
-
-/** The mail went out: stamps it. */
-export async function confirmRequestMail(
-  characterId: number,
-  target: RequestMailTarget
-): Promise<void> {
-  await callCommunity(characterId, 'confirmCommunityRequestMailCallable', target);
-}
-
-/** Gives the reserved slot back after a send ESI refused. */
-export async function releaseRequestMail(
-  characterId: number,
-  target: RequestMailTarget
-): Promise<void> {
-  await callCommunity(characterId, 'releaseCommunityRequestMailCallable', target);
-}
-
-/** Request mails this Character has sent today (UTC): a convenience, the server holds the cap. */
-export async function loadRequestMailsToday(
-  characterId: number,
-  now = Date.now()
-): Promise<number> {
-  const override = communityBackendOverride();
-  if (override) return override.loadRequestMailsToday?.() ?? 0;
-  const uid = await ensureSignedIn(characterId);
-  const day = new Date(now).toISOString().slice(0, 10);
-  const snap = await getDoc(doc(getSyncFirestore(), 'characters', uid, 'requestMailQuota', day));
-  return Number(snap.exists() ? (snap.data().count ?? 0) : 0);
 }

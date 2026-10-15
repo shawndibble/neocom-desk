@@ -35,6 +35,7 @@ import {
   type CommunityRequest,
   type RequestLine,
   type RequestPledge,
+  type SharedItem,
 } from './requests';
 
 const DAY = 86_400_000;
@@ -246,13 +247,19 @@ describe('lineKey', () => {
 });
 
 describe('canFillRequest', () => {
-  const shared = new Set([11534]);
+  const shared = [{ typeId: 11534, runs: -1 }];
+  const onlyCopy = [{ typeId: 11534, runs: 10 }];
   it('is true when a blueprint line is one the Member shares', () => {
     const bp = request({ lines: [line(1, 5), line(11534, 2, { kind: 'bpc' })] });
     expect(canFillRequest(bp, shared)).toBe(true);
+    expect(canFillRequest(bp, onlyCopy)).toBe(true);
     expect(canFillRequest(request({ lines: [line(11534, 2, { kind: 'bpo' })] }), shared)).toBe(
       true
     );
+  });
+  it('needs an original shared to fill a BPO line, as mail recipients do', () => {
+    const bpo = request({ lines: [line(11534, 2, { kind: 'bpo' })] });
+    expect(canFillRequest(bpo, onlyCopy)).toBe(false);
   });
   it('is false for other blueprints, and for a plain item that shares a type id', () => {
     expect(canFillRequest(request({ lines: [line(7, 2, { kind: 'bpc' })] }), shared)).toBe(false);
@@ -262,16 +269,16 @@ describe('canFillRequest', () => {
 
 describe('filterRequests: I can fill', () => {
   const now = 5 * DAY;
-  const shared = new Set([11534]);
+  const shared = [{ typeId: 11534, runs: -1 }];
   const bp = (id: string, over: Partial<CommunityRequest> = {}) =>
     request({ id, lines: [line(11534, 1, { kind: 'bpc' })], ...over });
-  const run = (rows: CommunityRequest[], sharedTypeIds: ReadonlySet<number> | null = shared) =>
+  const run = (rows: CommunityRequest[], sharedItems: readonly SharedItem[] | null = shared) =>
     filterRequests(rows, {
       filter: 'canFill',
       query: '',
       myUid: 'me',
       now,
-      sharedTypeIds: sharedTypeIds ?? undefined,
+      sharedItems: sharedItems ?? undefined,
     }).map((r) => r.id);
 
   it('lists open Requests of others with a line for a shared blueprint', () => {
@@ -297,7 +304,7 @@ describe('filterRequests: I can fill', () => {
         query: 'efa',
         myUid: 'me',
         now,
-        sharedTypeIds: shared,
+        sharedItems: shared,
       }).map((r) => r.id)
     ).toEqual(['b']);
   });

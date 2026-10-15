@@ -8,6 +8,7 @@ import { pledgeEntryAfterManual } from '@/engine/communities/delivery';
 import {
   canPledge,
   isStalePledge,
+  lineKey,
   lineProgress,
   withPledgeLine,
   withdrawPledgeLine,
@@ -16,15 +17,17 @@ import {
   type RequestPledge,
 } from '@/engine/communities/requests';
 import { formatAge } from '@/lib/age';
-import { itemsSummary, mailSafe, mailSubject } from '@/engine/communities/requestMail';
+import { itemsSummary, mailSubject } from '@/engine/communities/requestMail';
+import { mailSafe } from '@/lib/mailSafe';
 import { characterIdForUid } from '@/sync/uid';
 import { ConfirmDialog } from './ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
 import { callableErrorReason } from './callableError';
+import { notePledgeEdit } from './pledgeWrites';
 import { DELIVERY_ENDPOINTS, slotKey } from './requestDelivery';
 import { useDeliverySync } from './useDeliverySync';
-import { daysLeft } from './requestFormat';
+import { describeExpiry } from './requestFormat';
 import {
   extendRequest,
   removePledge,
@@ -127,12 +130,16 @@ export function RequestPanel({
   const changePledge = async (key: string, change: Parameters<typeof updateMyPledge>[3]) => {
     setPledgeBusy(key);
     setPledgeError(null);
+    // A delivery run that began before this edit read the Pledge as it was: it must not write over it.
+    notePledgeEdit(characterId, communityId);
     try {
       await updateMyPledge(characterId, communityId, request.id, change);
       await refreshPledges(request.id);
-    } catch {
+    } catch (err) {
+      console.warn('Pledge could not be saved', err);
       setPledgeError(t('communities.board.pledgeFailed'));
     } finally {
+      notePledgeEdit(characterId, communityId);
       setPledgeBusy(null);
     }
   };
@@ -160,16 +167,14 @@ export function RequestPanel({
     (count) => t('communities.board.more', { count })
   );
 
-  const left = daysLeft(request.expiresAt, now);
   const place = request.location;
   const posted = t('communities.board.posted', { age: formatAge(now - request.createdAt, t) });
   const closes = request.closed
     ? t('communities.board.closedNote')
-    : request.expiresAt <= now
-      ? t('communities.board.status.expired')
-      : left === 0
-        ? t('communities.board.closesUnderDay')
-        : t('communities.board.closesIn', { count: left });
+    : describeExpiry(request.expiresAt, now, t, {
+        underDay: 'communities.board.closesUnderDay',
+        days: 'communities.board.closesIn',
+      });
 
   return (
     <SlideOver
@@ -192,7 +197,7 @@ export function RequestPanel({
         <ul className="divide-y divide-line" aria-label={t('communities.board.linesLabel')}>
           {request.lines.map((line, index) => {
             const own = myPledge?.lines[index];
-            const key = `${line.typeId}:${line.kind}`;
+            const key = lineKey(line);
             return (
               <PledgeRow
                 key={key}

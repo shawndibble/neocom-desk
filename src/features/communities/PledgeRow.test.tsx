@@ -39,6 +39,21 @@ describe('PledgeRow delivery', () => {
     expect(onSaveDelivered).toHaveBeenCalledWith(4);
   });
 
+  it('reads 00 and 000 as 0, which clears the typed amount', async () => {
+    const { onSaveDelivered } = setup({
+      manualEntry: true,
+      own: { quantity: 10, delivered: 4, manual: 4 },
+    });
+    const field = screen.getByRole('textbox', {
+      name: 'Quantity you delivered of Ishtar Blueprint',
+    });
+    await userEvent.clear(field);
+    await userEvent.type(field, '000');
+    expect(screen.queryByRole('alert')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Save delivered' }));
+    expect(onSaveDelivered).toHaveBeenCalledWith(0);
+  });
+
   it('refuses more than the Pledge, in words', async () => {
     const { onSaveDelivered } = setup({ manualEntry: true });
     await userEvent.type(

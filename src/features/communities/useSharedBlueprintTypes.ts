@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import type { SharedItem } from '@/engine/communities/requests';
 import { loadMemberLibraries } from './communityStore';
 
 export type SharedBlueprintTypes =
-  { status: 'loading' } | { status: 'failed' } | { status: 'ready'; typeIds: ReadonlySet<number> };
+  { status: 'loading' } | { status: 'failed' } | { status: 'ready'; items: readonly SharedItem[] };
 
 /**
- * The blueprint types this Member has shared with a Community: what the
+ * The blueprints (type and runs) this Member has shared with a Community: what the
  * library they publish to this Community holds, the same list the Community Library shows
  * under their name, so "I can fill" agrees with it. One read of their own
  * library, once `enabled`.
@@ -31,7 +32,7 @@ export function useSharedBlueprintTypes(
           key,
           value: {
             status: 'ready',
-            typeIds: new Set(libraries.flatMap((l) => l.items.map((item) => item.typeId))),
+            items: libraries.flatMap((l) => l.items.map(({ typeId, runs }) => ({ typeId, runs }))),
           },
         }),
       () => !cancelled && setLoaded({ key, value: { status: 'failed' } })

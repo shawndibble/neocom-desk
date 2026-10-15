@@ -26,7 +26,7 @@ import {
   type RequestPledge,
   type RequestStatus,
 } from '@/engine/communities/requests';
-import { ComposeRequestDialog, type ComposePrefill } from './ComposeRequestDialog';
+import { ComposeRequestDialog } from './ComposeRequestDialog';
 import type { CommunityMember } from './communityStore';
 import { MyPledgesPanel } from './MyPledgesPanel';
 import { PledgeBar } from './PledgeBar';
@@ -81,7 +81,6 @@ export function RequestsTab({
   failed,
   now,
   members,
-  initialCompose,
   onReload,
   refreshPledges,
 }: {
@@ -103,8 +102,6 @@ export function RequestsTab({
   now: number;
   /** The roster, for compose step 2; null until it has loaded. */
   members: readonly CommunityMember[] | null;
-  /** Open New request… on mount with this filled in (a Library "Request this" starts here). */
-  initialCompose?: ComposePrefill;
   onReload: () => void;
   /** Re-reads one Request's Pledges after a Pledge write. */
   refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
@@ -114,18 +111,18 @@ export function RequestsTab({
   const [filter, setFilter] = useState<RequestFilter>('open');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
-  const [composing, setComposing] = useState(initialCompose !== undefined);
+  const [composing, setComposing] = useState(false);
   const [pledgesOpen, setPledgesOpen] = useState(false);
   const [maxJumps, setMaxJumps] = useState<number | null>(null);
   const shared = useSharedBlueprintTypes(characterId, communityId, myUid, requests !== null);
-  const sharedTypeIds = shared.status === 'ready' ? shared.typeIds : undefined;
+  const sharedItems = shared.status === 'ready' ? shared.items : undefined;
   const distance = useRequestDistance(characterId, maxJumps !== null);
   // A limit that can no longer be measured (Permission revoked, location lost) is no limit:
   // the select then reads "Any distance", never a limit the list is not applying.
   const limit = distance.status === 'unavailable' ? null : maxJumps;
 
   const { rows, unmeasured } = useMemo(() => {
-    const filtered = filterRequests(requests ?? [], { filter, query, myUid, now, sharedTypeIds });
+    const filtered = filterRequests(requests ?? [], { filter, query, myUid, now, sharedItems });
     const { within, unmeasured: left } =
       distance.status === 'ready'
         ? withinJumps(filtered, limit, (request) => distance.jumpsOf(request.location))
@@ -142,7 +139,7 @@ export function RequestsTab({
         };
       }),
     };
-  }, [requests, pledges, filter, query, myUid, now, sharedTypeIds, distance, limit]);
+  }, [requests, pledges, filter, query, myUid, now, sharedItems, distance, limit]);
 
   const statusLabels: Record<RequestStatus, string> = {
     open: t('communities.board.status.open'),
@@ -197,6 +194,7 @@ export function RequestsTab({
     {
       id: 'status',
       header: t('communities.board.columns.status'),
+      className: 'whitespace-nowrap',
       render: ({ status }) => <span className={STATUS_TONE[status]}>{statusLabels[status]}</span>,
       sortValue: ({ status }) => STATUS_ORDER[status],
     },
@@ -211,19 +209,18 @@ export function RequestsTab({
     },
   ];
 
+  const reloadFailed = (
+    <div className="flex flex-wrap items-center gap-2">
+      <p role="alert" className="min-w-0 flex-1 text-xs text-danger">
+        {t('communities.board.loadFailed')}
+      </p>
+      <Button size="sm" onClick={onReload}>
+        {t('communities.retry')}
+      </Button>
+    </div>
+  );
   if (failed && requests === null) {
-    return (
-      <Panel>
-        <div className="flex flex-wrap items-center gap-2">
-          <p role="alert" className="min-w-0 flex-1 text-xs text-danger">
-            {t('communities.board.loadFailed')}
-          </p>
-          <Button size="sm" onClick={onReload}>
-            {t('communities.retry')}
-          </Button>
-        </div>
-      </Panel>
-    );
+    return <Panel>{reloadFailed}</Panel>;
   }
   if (requests === null) {
     return (
@@ -239,7 +236,6 @@ export function RequestsTab({
       communityId={communityId}
       myUid={myUid}
       members={members}
-      prefill={initialCompose}
       onClose={() => setComposing(false)}
       onPosted={() => {
         setFilter('mine');
@@ -257,6 +253,7 @@ export function RequestsTab({
   if (requests.length === 0) {
     return (
       <>
+        {failed && <Panel>{reloadFailed}</Panel>}
         <Panel>
           <EmptyState
             title={t('communities.board.empty')}
@@ -277,7 +274,7 @@ export function RequestsTab({
     query: '',
     myUid,
     now,
-    sharedTypeIds,
+    sharedItems,
   }).length;
   const panelRequest = requests.find((r) => r.id === openId) ?? null;
   const distanceOff = distance.status === 'unavailable';
@@ -289,6 +286,8 @@ export function RequestsTab({
 
   return (
     <div className="space-y-3">
+      {/* The board on screen is the last good read: say the refresh failed rather than pass it off as current. */}
+      {failed && <Panel>{reloadFailed}</Panel>}
       <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line px-3 py-2">
         <p className="min-w-0 basis-full text-xs text-text-dim sm:basis-0 sm:flex-1">
           {inProgress > 0

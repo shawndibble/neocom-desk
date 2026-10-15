@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type CommunityRequest,
   type PledgesByRequest,
@@ -13,7 +13,7 @@ const NO_PLEDGES: PledgesByRequest = new Map();
  * `enabled` is true (the Requests tab has been opened) and again on
  * `reload()`. Firestore here has no listeners, so a change refetches:
  * `refreshPledges(id)` re-reads one Request's Pledges after a Pledge write.
- * `requests` is null until the first read lands; `pledgesFailed` says the
+ * `requests` is null until the first read lands (a later failed reload keeps the last board and sets `failed`); `pledgesFailed` says the
  * Pledge read failed, so the board does not pass an unread Request off as Open.
  */
 export function useCommunityRequests(characterId: number, communityId: string, enabled: boolean) {
@@ -22,24 +22,34 @@ export function useCommunityRequests(characterId: number, communityId: string, e
   const [failed, setFailed] = useState(false);
   const [pledgesFailed, setPledgesFailed] = useState(false);
   const [version, setVersion] = useState(0);
+  // Whose Pledges `pledges` holds: a failed re-read keeps them only for the same board.
+  const pledgesFor = useRef('');
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    (async () => {
-      const loaded = await loadRequests(characterId, communityId);
-      // A failed Pledge read must not hide the board, nor pass for "no Pledges".
-      const found = await loadCommunityPledges(characterId, communityId).catch(() => null);
-      return { loaded, found };
-    })().then(
-      ({ loaded, found }) => {
+    // Together, not one after the other. A failed Pledge read must not hide the
+    // board, nor pass for "no Pledges".
+    Promise.all([
+      loadRequests(characterId, communityId),
+      loadCommunityPledges(characterId, communityId).catch((err) => {
+        console.warn('Community Pledges could not be read', err);
+        return null;
+      }),
+    ]).then(
+      ([loaded, found]) => {
         if (cancelled) return;
         setRequests(loaded);
-        setPledges(found ?? NO_PLEDGES);
+        const board = `${characterId}:${communityId}`;
+        // A Pledge read that fails on a reload keeps the Pledges already shown (the banner says so).
+        setPledges((before) => found ?? (pledgesFor.current === board ? before : NO_PLEDGES));
+        if (found) pledgesFor.current = board;
         setPledgesFailed(found === null);
         setFailed(false);
       },
-      () => {
-        if (!cancelled) setFailed(true);
+      (err) => {
+        if (cancelled) return;
+        console.warn('Community Requests could not be read', err);
+        setFailed(true);
       }
     );
     return () => {

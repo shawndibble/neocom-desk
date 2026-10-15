@@ -5,6 +5,7 @@ import type { DeliveryFlag } from '@/engine/communities/delivery';
 import {
   STALE_PLEDGE_DAYS,
   defaultPledgeQuantity,
+  parseQuantity,
   parsePledgeQuantity,
   pledgeOverage,
   type LineProgress,
@@ -17,9 +18,9 @@ import { formatQuantity } from './requestFormat';
 /** A delivered amount typed in: a whole number from 0 (clears it) up to the Pledge. */
 function parseDelivered(text: string, max: number): number | null {
   const digits = text.replace(/,/g, '').trim();
-  if (!/^\d+$/.test(digits)) return null;
-  const value = Number(digits);
-  return Number.isSafeInteger(value) && value <= max ? value : null;
+  // 0 clears it, and so do "00" and "000": parseQuantity wants a positive number.
+  const value = /^\d+$/.test(digits) && Number(digits) === 0 ? 0 : parseQuantity(text);
+  return value !== null && value <= max ? value : null;
 }
 
 /**

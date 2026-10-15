@@ -8,6 +8,7 @@
  * entry also reserves `delivered` and `contractIds` for delivery marking
  * (#3809), which this ticket never writes beyond preserving them.
  */
+import { DAY_MS } from '@/lib/age';
 
 /** Mirrors `functions/src/communityRequests.ts`, which enforces them. */
 export const MAX_LINES_PER_REQUEST = 50;
@@ -60,6 +61,14 @@ export interface PledgeEntry {
    * every automatic recompute and is never added to it.
    */
   manual?: number;
+  /**
+   * What contracts alone account for, kept as counted: it is not clamped to a
+   * lowered `quantity`, so raising the Pledge back restores it (#3809). Absent
+   * on an entry from before it was stored.
+   */
+  auto?: number;
+  /** The latest finish time (ms) of any contract counted into `auto`. Absent likewise. */
+  through?: number;
 }
 
 /** One Member's Pledges on a Request, keyed by line index. */
@@ -137,12 +146,27 @@ export function isOpenRequest(request: CommunityRequest, now: number): boolean {
 
 export type RequestFilter = 'open' | 'mine' | 'canFill';
 
-/** A line for a blueprint (copy or original) the Member shares with this Community. */
-export function canFillRequest(
-  request: CommunityRequest,
-  sharedTypeIds: ReadonlySet<number>
-): boolean {
-  return request.lines.some((line) => line.kind !== 'item' && sharedTypeIds.has(line.typeId));
+/** One blueprint a Member shares: its type and runs (-1 is an original). */
+export interface SharedItem {
+  typeId: number;
+  runs: number;
+}
+
+/**
+ * Whether a Member's shared blueprints meet a line: a copy line by any copy or
+ * original of the type, an original (BPO) line only by an original (runs -1).
+ * Plain item lines are met by nothing a Member shares.
+ */
+export function libraryCovers(line: RequestLine, items: readonly SharedItem[]): boolean {
+  if (line.kind === 'item') return false;
+  return items.some(
+    (item) => item.typeId === line.typeId && (line.kind !== 'bpo' || item.runs === -1)
+  );
+}
+
+/** A line for a blueprint the Member shares with this Community, in the form the line asks for. */
+export function canFillRequest(request: CommunityRequest, items: readonly SharedItem[]): boolean {
+  return request.lines.some((line) => libraryCovers(line, items));
 }
 
 export function filterRequests(
@@ -152,8 +176,8 @@ export function filterRequests(
     query: string;
     myUid: string;
     now: number;
-    /** The blueprint type ids this Member shares with the Community; undefined while not known. */
-    sharedTypeIds?: ReadonlySet<number>;
+    /** The blueprints this Member shares with the Community; undefined while not known. */
+    sharedItems?: readonly SharedItem[];
   }
 ): CommunityRequest[] {
   const needle = options.query.trim().toLowerCase();
@@ -166,7 +190,7 @@ export function filterRequests(
         : options.filter === 'canFill'
           ? isOpenRequest(request, options.now) &&
             request.ownerUid !== options.myUid &&
-            canFillRequest(request, options.sharedTypeIds ?? new Set())
+            canFillRequest(request, options.sharedItems ?? [])
           : isOpenRequest(request, options.now);
     if (!inFilter) return false;
     if (needle === '') return true;
@@ -240,8 +264,6 @@ export const isBlueprintName = (name: string) => / Blueprint$/.test(name);
 export const defaultKind = (name: string): RequestLineKind =>
   isBlueprintName(name) ? 'bpc' : 'item';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 /** Pledges per Request id, as the board and My pledges read them. */
 export type PledgesByRequest = ReadonlyMap<string, readonly RequestPledge[]>;
 
@@ -273,14 +295,21 @@ type PledgeLines = Readonly<Record<number, PledgeEntry>>;
 /** The lines with `quantity` Pledged on `index`; a repeat keeps what was delivered (up to the new quantity) and its contracts. */
 export function withPledgeLine(lines: PledgeLines, index: number, quantity: number): PledgeLines {
   const before = lines[index];
+  const manual = before?.manual !== undefined ? Math.min(before.manual, quantity) : undefined;
   return {
     ...lines,
     [index]: {
       quantity,
-      // The rules bound both by the quantity, so lowering a Pledge lowers them too.
-      delivered: Math.min(before?.delivered ?? 0, quantity),
+      // The rules bound these by the quantity, so lowering a Pledge lowers them
+      // too; `auto` is kept as counted, so raising it back restores the figure.
+      delivered:
+        before?.auto !== undefined
+          ? Math.min(quantity, Math.max(before.auto, manual ?? 0))
+          : Math.min(before?.delivered ?? 0, quantity),
       contractIds: [...(before?.contractIds ?? [])],
-      ...(before?.manual !== undefined ? { manual: Math.min(before.manual, quantity) } : {}),
+      ...(manual !== undefined ? { manual } : {}),
+      ...(before?.auto !== undefined ? { auto: before.auto } : {}),
+      ...(before?.through !== undefined ? { through: before.through } : {}),
     },
   };
 }
@@ -360,11 +389,7 @@ export function requestRecipients(
     .filter((member) => member.uid !== myUid)
     .map((member) => {
       const items = library.get(member.uid) ?? [];
-      const shared = blueprintLines.filter((line) =>
-        items.some(
-          (item) => item.typeId === line.typeId && (line.kind !== 'bpo' || item.runs === -1)
-        )
-      ).length;
+      const shared = blueprintLines.filter((line) => libraryCovers(line, items)).length;
       return { uid: member.uid, characterName: member.characterName, shared };
     })
     .sort((a, b) => b.shared - a.shared || a.characterName.localeCompare(b.characterName));
