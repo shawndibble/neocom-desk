@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { focusRingInsetClassName } from '@/components/ui/controlStyles';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { PHONE_TILES, QUESTION_TILES, type Tile } from './questionTiles';
 import { screenshotSrc, type Screenshot } from './screenshots';
@@ -8,9 +8,11 @@ import { ScreenshotZoom, ZoomBadge } from './ScreenshotZoom';
 
 const EYEBROW_CLASS = 'font-mono text-[0.6875rem] tracking-widest text-text-dim uppercase';
 
-/** The cell background shift on hover or keyboard focus, shared by every cell. */
-const CELL_CLASS =
-  'group relative flex bg-bg motion-safe:transition-colors motion-safe:duration-300 hover:bg-panel has-[:focus-visible]:bg-panel';
+/** The cell background shift on hover or keyboard focus (the shared row recipe), shared by every cell. */
+const CELL_CLASS = cx(
+  'group relative flex bg-bg has-[:focus-visible]:bg-panel-2',
+  rowInteractiveClassName
+);
 
 /**
  * The questions grid: one hairline-divided frame (a `bg-line` grid with 1px

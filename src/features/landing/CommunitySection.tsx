@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { ExternalMark } from '@/components/ui/ExternalLink';
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Discord, ICON_SIZE } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -31,15 +31,13 @@ export function CommunitySection({ quotes = LANDING_QUOTES }: { quotes?: readonl
       <div className="mt-6 flex flex-col items-start gap-4 border border-line bg-bg/90 px-5 py-6 sm:flex-row sm:items-center sm:gap-5">
         <Discord size={ICON_SIZE.lg} aria-hidden="true" className="shrink-0 text-accent" />
         <p className="min-w-0 flex-1 text-sm text-text-dim">{t('login.community.body')}</p>
-        <a
+        <ExternalLink
           href={DISCORD_URL}
-          target="_blank"
-          rel="noopener noreferrer"
+          variant="bare"
           className={cx('shrink-0 sm:ml-auto', buttonClassName({ variant: 'accent' }))}
         >
           {t('login.community.join')}
-          <ExternalMark />
-        </a>
+        </ExternalLink>
       </div>
       <QuotesRow quotes={quotes} />
     </>

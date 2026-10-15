@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EveSsoButton, LogoMark, Tooltip, iconButtonClassName } from '@/components/ui';
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { Discord, Github } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -139,15 +140,15 @@ function HeaderIconLink({
 }) {
   return (
     <Tooltip content={label}>
-      <a
+      <ExternalLink
         href={href}
-        target="_blank"
-        rel="noopener noreferrer"
+        variant="bare"
+        mark="text"
         aria-label={label}
         className={iconButtonClassName({ variant: 'plain' })}
       >
         {children}
-      </a>
+      </ExternalLink>
     </Tooltip>
   );
 }
