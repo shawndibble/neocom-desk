@@ -518,12 +518,14 @@ service cloud.firestore {
         allow write: if false;
 
         // One Member's Pledges on the Request (issue #3808, ADR 0021): a map
-        // from line index to {quantity, delivered, contractIds}. The owner
-        // alone writes it, directly. `delivered` and `contractIds` are the
-        // seam for delivery marking (#3809); the Pledger's client asserts
-        // them, so they are only shape-bounded here (up to 20 positive integer
-        // contract ids a line; the elements are a nested chain that stops at the
-        // list's size, so an empty list costs almost nothing).
+        // from line index to {quantity, delivered, contractIds, manual?}. The
+        // owner alone writes it, directly. `delivered` is what the Pledger's
+        // client marked delivered (from their ESI contracts, #3809, or typed);
+        // `contractIds` are the contracts behind it; `manual` is an amount they
+        // typed. The client asserts all three, so they are only shape-bounded
+        // here: `delivered` and `manual` within 0/1..quantity, up to 20 positive
+        // integer contract ids a line (the elements are a nested chain that
+        // stops at the list's size, so an empty list costs almost nothing).
         // `communityId` repeats the path so one collection-group query can read
         // a whole Community's Pledges (see the rule at the end of the file). Not on one's own
         // Request, only while the Request is open, only on lines it has.
