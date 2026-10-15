@@ -147,7 +147,7 @@ export function contractsDeadlineNote(t: Translate, data: ContractsBoardData): s
   return data.route === null ? note : `${note} · ${data.route}`;
 }
 
-/** Contracts: hauls in flight and the clock on them, else a listing about to lapse, else nothing. */
+/** Contracts: hauls in flight and the clock on them, else a listing about to lapse, else the outstanding count, else nothing. */
 export function contractsSummary(
   t: Translate,
   data: ContractsBoardData | null,
@@ -155,7 +155,7 @@ export function contractsSummary(
 ): string {
   if (data === null) return t(CHECKING);
   if (data.needsReauth) return t(REAUTH);
-  const { inProgress, overdue, soonest } = data.summary;
+  const { inProgress, outstanding, overdue, soonest } = data.summary;
   const parts: string[] = [];
   if (inProgress > 0) parts.push(t('overview.board.contractsInProgress', { count: inProgress }));
   if (overdue > 0) {
@@ -170,6 +170,9 @@ export function contractsSummary(
         { duration }
       )
     );
+  }
+  if (parts.length === 0 && outstanding > 0) {
+    parts.push(t('overview.board.contractsOutstanding', { count: outstanding }));
   }
   return parts.length > 0 ? parts.join(' · ') : t('overview.board.contractsNothingDue');
 }

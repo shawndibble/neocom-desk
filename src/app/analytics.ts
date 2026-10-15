@@ -15,6 +15,7 @@
  * (`app/bootImportGraph.test.ts` guards that now).
  */
 import type { Analytics } from 'firebase/analytics';
+import { useAnalyticsEnabled } from './analyticsPref';
 
 export interface AnalyticsEnv {
   MODE?: string;
@@ -52,9 +53,14 @@ function getAnalyticsInstance(): Promise<Analytics | null> {
   return analyticsPromise;
 }
 
-/** Origin + pathname only: query strings and fragments can carry pilot names or searches. */
-export function pageLocationFor(location: Pick<Location, 'origin' | 'pathname'>): string {
-  return location.origin + location.pathname;
+/**
+ * Origin + the route pattern `pagePathFor` reports, never the raw pathname:
+ * that carries a Share Link's id (`/s/:shareId`, the only secret keeping a
+ * share private), plan ids and corporation ids. Query strings and fragments
+ * are dropped too, since they can carry pilot names or searches.
+ */
+export function pageLocationFor(location: Pick<Location, 'origin'>, pagePath: string): string {
+  return location.origin + pagePath;
 }
 
 /**
@@ -63,6 +69,10 @@ export function pageLocationFor(location: Pick<Location, 'origin' | 'pathname'>)
  * bug in `logEvent`'s payload still surfaces.
  */
 export async function trackPageView(pagePath: string, pageTitle?: string): Promise<void> {
+  // Hydrate first: Dexie is async, so a pilot who opted out must not fire a
+  // page view at the default. Read at call time so a mid-session toggle applies.
+  await useAnalyticsEnabled.getState().hydrate();
+  if (!useAnalyticsEnabled.getState().value) return;
   let analytics: Analytics | null;
   let logEvent: typeof import('firebase/analytics').logEvent;
   try {
@@ -75,6 +85,6 @@ export async function trackPageView(pagePath: string, pageTitle?: string): Promi
   logEvent(analytics, 'page_view', {
     page_path: pagePath,
     page_title: pageTitle,
-    page_location: pageLocationFor(window.location),
+    page_location: pageLocationFor(window.location, pagePath),
   });
 }
