@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
@@ -375,6 +375,33 @@ describe('Login', () => {
     // inside the test that made it — this was the intermittent
     // "expected 1, got 2" in `builds a PKCE authorize URL` below.
     await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
+  });
+
+  it('adds a header login button, wired like the hero one, once the hero button scrolls away', async () => {
+    const user = userEvent.setup();
+    let report: (entries: { isIntersecting: boolean }[]) => void = () => {};
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(cb: typeof report) {
+          report = cb;
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    try {
+      renderLogin();
+      const name = { name: /log in with eve online/i };
+      const before = (await screen.findAllByRole('button', name)).length;
+      act(() => report([{ isIntersecting: false }]));
+      const header = within(screen.getByRole('banner'));
+      await user.click(header.getByRole('button', name));
+      expect(screen.getAllByRole('button', name)).toHaveLength(before + 1);
+      await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('opens the custom permissions dialog from the link under the login button (#1522)', async () => {

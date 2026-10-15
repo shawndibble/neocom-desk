@@ -3293,6 +3293,14 @@
   "login": {
     "button": "Log in with EVE Online",
     "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, the ship you are flying, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
+    "header": {
+      "nav": "Page sections",
+      "answers": "Answers",
+      "features": "Features",
+      "trust": "Trust",
+      "discord": "Join the Discord",
+      "github": "View the source on GitHub"
+    },
     "eyebrow": "Free · Open source · Runs on your device",
     "heading": "Answers, not API dumps.",
     "previewLabel": "Example — logged-in view",

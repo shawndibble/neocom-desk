@@ -1,5 +1,5 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useState, type ComponentType, type ReactNode } from 'react';
+import { useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -7,6 +7,7 @@ import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
 import { EveSsoButton, LogoMark, Modal, Panel, plainTextActionClassName } from '@/components/ui';
+import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import {
@@ -221,6 +222,9 @@ export function Login() {
   // "Log in" button's own link right under it.
   const [customizing, setCustomizing] = useState(false);
 
+  // The hero's large login button; the sticky header shows its own only once this scrolls away.
+  const heroCtaRef = useRef<HTMLDivElement>(null);
+
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
   const characterCount = useLiveQuery(() => db.characters.count());
@@ -249,12 +253,7 @@ export function Login() {
 
   return (
     <div className="bg-bg text-text">
-      <header className="border-b border-line">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-6 py-4">
-          <LogoMark className="size-7" />
-          <span className="text-sm font-bold tracking-wide">{t('app.name')}</span>
-        </div>
-      </header>
+      <LandingHeader heroCtaRef={heroCtaRef} pending={pending} onLogin={onLogin} />
 
       <main>
         {/*
@@ -272,7 +271,7 @@ export function Login() {
               {t('login.heading')}
             </h1>
             <p className="mt-4 max-w-xl text-text-dim text-balance">{t('app.tagline')}</p>
-            <div className="mt-7 flex flex-col items-center gap-3">
+            <div ref={heroCtaRef} className="mt-7 flex flex-col items-center gap-3">
               <EveSsoButton
                 size="large"
                 pending={pending}
@@ -416,7 +415,11 @@ function LandingSection({
   children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={`${id}-heading`} className="border-t border-line">
+    <section
+      id={id}
+      aria-labelledby={`${id}-heading`}
+      className="scroll-mt-16 border-t border-line"
+    >
       <div className="mx-auto max-w-6xl px-6 py-14">
         <h2 id={`${id}-heading`} className="text-xl font-semibold">
           {heading}

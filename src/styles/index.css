@@ -1461,3 +1461,23 @@
     color: var(--color-text);
   }
 }
+
+/*
+ * Landing page: the sticky header's anchor links scroll smoothly (motion only
+ * for people who have not asked for less), and the small login button slides
+ * in when the hero's large one scrolls out of view.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+  @keyframes landing-header-cta-in {
+    from {
+      opacity: 0;
+      transform: translateY(-0.5rem);
+    }
+  }
+  .landing-header-cta-in {
+    animation: landing-header-cta-in 200ms ease-out;
+  }
+}
