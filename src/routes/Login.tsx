@@ -1,57 +1,26 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
-import { EveSsoButton, LogoMark, Panel, plainTextActionClassName } from '@/components/ui';
+import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
+import { CommunitySection } from '@/features/landing/CommunitySection';
 import { FeatureShowcase } from '@/features/landing/FeatureShowcase';
 import { HowItWorks } from '@/features/landing/HowItWorks';
+import { LandingFaq } from '@/features/landing/LandingFaq';
+import { TrustSection } from '@/features/landing/TrustSection';
 import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { Reveal } from '@/features/landing/Reveal';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
-import {
-  focusRingClassName,
-  inlineLinkClassName,
-  interactiveClassName,
-} from '@/components/ui/controlStyles';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import {
-  ICON_SIZE,
-  Offline,
-  OpenSource,
-  ReadOnly,
-  TokenPrivacy,
-  type IconProps,
-} from '@/components/ui/icons';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 import { isPlayStoreApp } from '@/lib/playStoreApp';
-
-/**
- * One illustrated row of landing copy: a glyph, and the `login.*` sub-key its
- * words live under. Every list on this page is a list of these — the shapes
- * differ only in which strings they read off the key.
- */
-interface LandingRow {
-  icon: ComponentType<IconProps>;
-  key: string;
-}
-
-/**
- * The objections a pilot weighs before handing an EVE SSO grant to a
- * third-party site. Deliberately the last thing above the closing button —
- * it is where the hesitation actually happens.
- */
-const TRUST: LandingRow[] = [
-  { icon: ReadOnly, key: 'readOnly' },
-  { icon: TokenPrivacy, key: 'token' },
-  { icon: Offline, key: 'offline' },
-  { icon: OpenSource, key: 'openSource' },
-];
 
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
 export function Login() {
@@ -59,9 +28,6 @@ export function Login() {
   const [pending, setPending] = useState(false);
   // Read once: a TWA launch referrer only exists on the first load.
   const [inApp] = useState(isPlayStoreApp);
-
-  // The tile capture shown enlarged, or null. One modal for the page
-  // rather than one per tile: only one can be open at a time anyway.
 
   // One Customize permissions dialog for the whole page, opened from either
   // "Log in" button's own link right under it.
@@ -120,7 +86,6 @@ export function Login() {
             </p>
             <div
               ref={heroCtaRef}
-
               className="lp-hero-in lp-hero-in-3 lp-cta-glow mt-7 flex flex-col items-center gap-3"
             >
               <EveSsoButton
@@ -147,28 +112,13 @@ export function Login() {
           <HowItWorks onCustomize={() => setCustomizing(true)} />
         </LandingSection>
         <LandingSection id="login-trust" heading={t('login.trustHeading')}>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {TRUST.map(({ icon: Icon, key }) => (
-              <Panel key={key}>
-                <Icon size={ICON_SIZE.lg} aria-hidden="true" className="text-accent" />
-                <h3 className="mt-3 text-sm font-semibold">{t(`login.trust.${key}.name`)}</h3>
-                <p className="mt-1 text-sm text-text-dim">{t(`login.trust.${key}.desc`)}</p>
-              </Panel>
-            ))}
-          </div>
-          {/*
-          The full scope enumeration sits here rather than beside the hero
-          button: it is what a hesitant reader wants *after* the trust points
-          and immediately before the closing CTA, and at hero size it was a
-          wall of 11px text nobody read.
-        */}
-          <p className="mt-6 max-w-3xl text-sm text-text-dim">{t('login.permissionsHint')}</p>
-          <p className="mt-2 max-w-3xl text-sm text-text-dim">
-            {t('login.permissionsPrivacy')}{' '}
-            <a href="/privacy.html" className={inlineLinkClassName}>
-              {t('login.footerPrivacy')}
-            </a>
-          </p>
+          <TrustSection />
+        </LandingSection>
+        <LandingSection id="login-community" heading={t('login.communityHeading')}>
+          <CommunitySection />
+        </LandingSection>
+        <LandingSection id="login-faq" heading={t('login.faqHeading')}>
+          <LandingFaq />
         </LandingSection>
 
         <section className="border-t border-line">

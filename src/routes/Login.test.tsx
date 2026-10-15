@@ -6,14 +6,16 @@ import '@/i18n';
 import { db } from '@/db';
 import { SCOPES } from '@/esi/scopes';
 import { assignLocation } from '@/app/navigation';
+import { AUTHORIZED_APPS_URL, DISCORD_URL, REPO_URL } from '@/lib/links';
 import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
 import { Login } from './Login';
 
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
 
 /**
- * Every read scope in the Base Grant, against the words `login.permissionsHint`
- * discloses it with. Hand-maintained on purpose: only a person can decide how
+ * Every read scope in the Base Grant, against the words that disclose it.
+ * The scopes accordion's own coverage is pinned in `scopeGroups.test.ts`; this
+ * map stays hand-maintained on purpose: only a person can decide how
  * a new scope should be described to someone deciding whether to grant it.
  * Two scopes may share a phrase where the disclosure honestly is the same
  * (`read_clones`/`read_implants`), but a scope may never be absent.
@@ -316,9 +318,65 @@ describe('Login', () => {
       screen.getByRole('heading', { name: /your login stays on this device/i })
     ).toBeInTheDocument();
 
-    const permissions = screen.getByText(/logging in lets it read/i);
-    for (const phrase of new Set(Object.values(READ_ONLY_PHRASES))) {
-      expect(permissions).toHaveTextContent(phrase);
+    const trust = within(screen.getByRole('region', { name: /it writes only when you act/i }));
+    expect(trust.getByText(/logging in lets it read/i)).toBeInTheDocument();
+    for (const name of [
+      /skills & clones/i,
+      /money & market/i,
+      /industry & planets/i,
+      /social & calendar/i,
+      /location & ships/i,
+      /^structures/i,
+    ]) {
+      expect(trust.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+    }
+    expect(trust.getByRole('button', { name: /money & market/i })).toHaveTextContent(
+      '4 permissions'
+    );
+  });
+
+  it('opens an area to list its permissions with their captions', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    await user.click(await screen.findByRole('button', { name: /industry & planets/i }));
+    expect(screen.getByText('Your mining ledger.')).toBeInTheDocument();
+    expect(screen.getByText('Your planetary colonies.')).toBeInTheDocument();
+  });
+
+  it('keeps the planetary-scope note, the separate-grants note and the revoke link', async () => {
+    renderLogin();
+    const trust = within(
+      await screen.findByRole('region', { name: /it writes only when you act/i })
+    );
+    expect(trust.getByText(/manage your planetary installations/i)).toHaveTextContent(
+      /only reads that data and never writes/i
+    );
+    expect(trust.getByText(/player-structure markets are separate grants/i)).toBeInTheDocument();
+    expect(trust.getByRole('link', { name: /authorized apps page/i })).toHaveAttribute(
+      'href',
+      AUTHORIZED_APPS_URL
+    );
+    expect(trust.getByRole('link', { name: /view the source on github/i })).toHaveAttribute(
+      'href',
+      REPO_URL
+    );
+  });
+
+  it('puts a Discord section and a FAQ after trust, with FAQ links to public pages only', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    const community = within(await screen.findByRole('region', { name: /bugs, ideas and chat/i }));
+    expect(community.getByRole('link', { name: /join discord/i })).toHaveAttribute(
+      'href',
+      DISCORD_URL
+    );
+    expect(community.queryByRole('figure')).not.toBeInTheDocument();
+
+    const faq = within(screen.getByRole('region', { name: /quick answers/i }));
+    await user.click(faq.getByRole('button', { name: /move isk or change anything/i }));
+    expect(faq.getByRole('link', { name: /read more/i })).toHaveAttribute('href', '/privacy.html');
+    for (const link of faq.queryAllByRole('link')) {
+      expect(link.getAttribute('href')).not.toMatch(/^\/help/);
     }
   });
 
