@@ -6,7 +6,7 @@ import { screenshotSrc, type Screenshot } from './screenshots';
 
 /**
  * The enlarged view of a landing screenshot: one Modal for the section, `shot`
- * null while closed. Same look as the question grid's own zoom.
+ * null while closed. Shared by the question grid and the showcase.
  */
 export function ScreenshotZoom({
   shot,
@@ -38,7 +38,8 @@ export function ScreenshotZoom({
 
 /**
  * The magnifier in a picture's corner (DESIGN.md §6c "Magnifier badge"). The
- * parent button must be a `group`.
+ * nearest `group` is either the button itself (`group-focus-visible`) or a
+ * wrapper around it (`group-has-[:focus-visible]`); both reveal it on focus.
  */
 export function ZoomBadge({ className }: { className?: string }) {
   return (
@@ -46,7 +47,7 @@ export function ZoomBadge({ className }: { className?: string }) {
       aria-hidden="true"
       className={cx(
         'absolute right-2 bottom-2 rounded-xs border border-line bg-bg/80 p-1 text-text',
-        'opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',
+        'opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 group-has-[:focus-visible]:opacity-100',
         'touch:opacity-100 [@media(hover:none)]:opacity-100',
         className
       )}

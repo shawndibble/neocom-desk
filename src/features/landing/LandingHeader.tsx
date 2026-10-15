@@ -8,22 +8,28 @@ import { LANDING_ANCHORS } from './landingAnchors';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 
 /**
- * Whether the hero's large login button is scrolled out of view. Starts as
- * "visible" and stays that way without `IntersectionObserver` (jsdom, very old
- * browsers), so the header never shows a second login button by default.
+ * Whether every large login button on the page is scrolled out of view. `targets`
+ * must be a stable array. Starts
+ * as "visible" and stays that way until each target has reported, and without
+ * `IntersectionObserver` (jsdom, very old browsers), so the header never shows
+ * a second login button by default.
  */
-function useHeroOutOfView(target: RefObject<HTMLElement | null>): boolean {
+function useAllOutOfView(targets: RefObject<HTMLElement | null>[]): boolean {
   const [out, setOut] = useState(false);
   useEffect(() => {
-    const el = target.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
+    if (typeof IntersectionObserver === 'undefined') return;
+    const elements = targets.map((target) => target.current).filter((el) => el !== null);
+    if (elements.length === 0) return;
+    const visible = new Map<Element, boolean>();
     const observer = new IntersectionObserver((entries) => {
-      const last = entries[entries.length - 1];
-      if (last) setOut(!last.isIntersecting);
+      for (const entry of entries) visible.set(entry.target, entry.isIntersecting);
+      setOut(
+        visible.size === elements.length && [...visible.values()].every((isShown) => !isShown)
+      );
     });
-    observer.observe(el);
+    for (const el of elements) observer.observe(el);
     return () => observer.disconnect();
-  }, [target]);
+  }, [targets]);
   return out;
 }
 
@@ -35,21 +41,21 @@ const ANCHOR_CLASS = cx(
 
 /**
  * The landing page's sticky banner: brand, section anchors (md up), Discord and
- * GitHub, and, once the hero's large login button has scrolled away, a small
+ * GitHub, and, once no large login button is in view, a small
  * one in its place. Phones get the logo, Discord and that conditional button.
  */
 export function LandingHeader({
-  heroCtaRef,
+  ctaRefs,
   pending,
   onLogin,
 }: {
-  /** Wraps the hero's large login button; the header's own appears only when this leaves the viewport. */
-  heroCtaRef: RefObject<HTMLElement | null>;
+  /** Wrap each of the page's large login buttons; the header's own appears only when none is in the viewport. */
+  ctaRefs: RefObject<HTMLElement | null>[];
   pending: boolean;
   onLogin: () => void;
 }) {
   const { t } = useTranslation();
-  const heroOut = useHeroOutOfView(heroCtaRef);
+  const ctaOut = useAllOutOfView(ctaRefs);
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur supports-[backdrop-filter]:bg-bg/60">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-2">
@@ -77,7 +83,7 @@ export function LandingHeader({
               <Github aria-hidden="true" />
             </HeaderIconLink>
           </span>
-          {heroOut && (
+          {ctaOut && (
             <div className="landing-header-cta-in ml-2">
               <EveSsoButton
                 size="small"

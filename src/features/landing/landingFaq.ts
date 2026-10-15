@@ -10,5 +10,5 @@ export const LANDING_FAQ: readonly { id: string; readMore?: string }[] = [
   { id: 'stores', readMore: '/privacy.html' },
   { id: 'delete', readMore: '/privacy.html' },
   { id: 'phone' },
-  { id: 'community' },
+  { id: 'community', readMore: '/privacy.html' },
 ];

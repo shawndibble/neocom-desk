@@ -7,10 +7,10 @@ import { DISCORD_URL, REPO_URL } from '@/lib/links';
 import { LandingHeader } from './LandingHeader';
 import { LANDING_ANCHORS } from './landingAnchors';
 
-type Callback = (entries: { isIntersecting: boolean }[]) => void;
+type Callback = (entries: { target: Element; isIntersecting: boolean }[]) => void;
 
-/** Installs a mock IntersectionObserver and returns a function reporting the hero's visibility. */
-function mockObserver(): (visible: boolean) => void {
+/** Installs a mock IntersectionObserver and returns a function reporting one observed element's visibility. */
+function mockObserver(): (target: Element, visible: boolean) => void {
   let callback: Callback = () => {};
   class MockObserver {
     constructor(cb: Callback) {
@@ -20,18 +20,25 @@ function mockObserver(): (visible: boolean) => void {
     disconnect() {}
   }
   vi.stubGlobal('IntersectionObserver', MockObserver);
-  return (visible) => act(() => callback([{ isIntersecting: visible }]));
+  return (target, visible) => act(() => callback([{ target, isIntersecting: visible }]));
 }
 
 function setup(onLogin = vi.fn()) {
-  const ref = createRef<HTMLDivElement>();
+  const hero = createRef<HTMLDivElement>();
+  const bottom = createRef<HTMLDivElement>();
+  const ctaRefs = [hero, bottom];
   render(
     <>
-      <LandingHeader heroCtaRef={ref} pending={false} onLogin={onLogin} />
-      <div ref={ref} />
+      <LandingHeader ctaRefs={ctaRefs} pending={false} onLogin={onLogin} />
+      <div ref={hero} data-testid="hero" />
+      <div ref={bottom} data-testid="bottom" />
     </>
   );
-  return onLogin;
+  return {
+    onLogin,
+    hero: () => screen.getByTestId('hero'),
+    bottom: () => screen.getByTestId('bottom'),
+  };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -58,15 +65,30 @@ describe('LandingHeader', () => {
     expect(screen.queryByRole('button', { name: 'Log in with EVE Online' })).toBeNull();
   });
 
-  it('shows the small login button only once the hero button is out of view', async () => {
+  it('shows the small login button only once every large one is out of view', async () => {
     const report = mockObserver();
-    const onLogin = setup();
-    report(true);
-    expect(screen.queryByRole('button', { name: 'Log in with EVE Online' })).toBeNull();
-    report(false);
-    await userEvent.click(screen.getByRole('button', { name: 'Log in with EVE Online' }));
+    const { onLogin, hero, bottom } = setup();
+    const name = { name: 'Log in with EVE Online' };
+    // Nothing has reported yet: stay hidden.
+    expect(screen.queryByRole('button', name)).toBeNull();
+    report(hero(), true);
+    report(bottom(), false);
+    expect(screen.queryByRole('button', name)).toBeNull();
+    report(hero(), false);
+    await userEvent.click(screen.getByRole('button', name));
     expect(onLogin).toHaveBeenCalledTimes(1);
-    report(true);
-    expect(screen.queryByRole('button', { name: 'Log in with EVE Online' })).toBeNull();
+    report(hero(), true);
+    expect(screen.queryByRole('button', name)).toBeNull();
+  });
+
+  it('hides the small login button while the closing call to action is on screen', () => {
+    const report = mockObserver();
+    const { hero, bottom } = setup();
+    const name = { name: 'Log in with EVE Online' };
+    report(hero(), false);
+    report(bottom(), false);
+    expect(screen.getByRole('button', name)).toBeInTheDocument();
+    report(bottom(), true);
+    expect(screen.queryByRole('button', name)).toBeNull();
   });
 });

@@ -1468,7 +1468,7 @@
  * in when the hero's large one scrolls out of view.
  */
 @media (prefers-reduced-motion: no-preference) {
-  html {
+  html:has(.landing-root) {
     scroll-behavior: smooth;
   }
   @keyframes landing-header-cta-in {
@@ -1508,6 +1508,9 @@
   .lp-hero-in {
     animation: lp-hero-in 600ms ease-out both;
   }
+  .lp-hero-in-0 {
+    animation-delay: 0ms;
+  }
   .lp-hero-in-1 {
     animation-delay: 90ms;
   }
@@ -1535,7 +1538,11 @@
     inset: -1.5rem -3rem;
     z-index: -1;
     border-radius: 9999px;
-    background: radial-gradient(closest-side, rgba(87, 199, 244, 0.22), transparent);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--color-accent) 22%, transparent),
+      transparent
+    );
     opacity: 0.55;
     pointer-events: none;
     animation: lp-cta-glow 5s ease-in-out infinite;
@@ -1550,7 +1557,7 @@
   @keyframes lp-badge-pulse {
     40% {
       transform: scale(1.5);
-      box-shadow: 0 0 0 6px rgba(87, 199, 244, 0.35);
+      box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 35%, transparent);
     }
   }
   .lp-badge-pulse {

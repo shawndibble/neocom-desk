@@ -200,7 +200,7 @@ describe('Login', () => {
       'Ships & travel': ['Ships', 'Skills', 'Clones', 'Travel'],
       'Planetary & mining': ['Planetary Industry', 'Mining'],
       Corporation: ['Corporation'],
-      'Mail & contracts': ['Mail & Calendar', 'Contracts', 'Contacts & Standings'],
+      Mail: ['Mail & Calendar', 'Contracts', 'Contacts & Standings'],
       Alerts: ['Alerts', 'Notifications'],
     };
     const seen: string[] = [];
@@ -447,9 +447,11 @@ describe('Login', () => {
     await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
   });
 
-  it('adds a header login button, wired like the hero one, once the hero button scrolls away', async () => {
+  it('adds a header login button, wired like the hero one, once neither large login button is in view', async () => {
     const user = userEvent.setup();
-    let report: (entries: { isIntersecting: boolean }[]) => void = () => {};
+    type Entry = { target: Element; isIntersecting: boolean };
+    let report: (entries: Entry[]) => void = () => {};
+    const observed: Element[] = [];
     let captured = false;
     vi.stubGlobal(
       'IntersectionObserver',
@@ -459,8 +461,12 @@ describe('Login', () => {
           // observers constructed after it must not replace it.
           if (!captured) report = cb;
           captured = true;
+          this.mine = report === cb;
         }
-        observe() {}
+        mine = false;
+        observe(el: Element) {
+          if (this.mine) observed.push(el);
+        }
         disconnect() {}
       }
     );
@@ -468,7 +474,12 @@ describe('Login', () => {
       renderLogin();
       const name = { name: /log in with eve online/i };
       const before = (await screen.findAllByRole('button', name)).length;
-      act(() => report([{ isIntersecting: false }]));
+      // The hero's and the closing call to action's wrappers are the two targets.
+      expect(observed).toHaveLength(2);
+      act(() => report([{ target: observed[0], isIntersecting: false }]));
+      act(() => report([{ target: observed[1], isIntersecting: true }]));
+      expect(within(screen.getByRole('banner')).queryByRole('button', name)).toBeNull();
+      act(() => report([{ target: observed[1], isIntersecting: false }]));
       const header = within(screen.getByRole('banner'));
       await user.click(header.getByRole('button', name));
       expect(screen.getAllByRole('button', name)).toHaveLength(before + 1);

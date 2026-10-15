@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TabPanel, Tabs, useTabsId } from '@/components/ui';
 import { ICON_SIZE } from '@/components/ui/icons';
+import { focusRingInsetClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { screenshotSrc, type Screenshot } from './screenshots';
 import { ScreenshotZoom, ZoomBadge } from './ScreenshotZoom';
@@ -126,7 +127,7 @@ function ShotButton({
       type="button"
       onClick={onOpen}
       aria-label={label}
-      className="group relative block w-full cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      className={cx('group relative block w-full cursor-zoom-in', focusRingInsetClassName)}
     >
       <img
         src={screenshotSrc(shot)}

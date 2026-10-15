@@ -14,6 +14,6 @@ export interface Screenshot {
 export const DESKTOP_SIZE = { width: 1600, height: 900 };
 export const PHONE_SIZE = { width: 540, height: 1104 };
 
-export function screenshotSrc(shot: Screenshot): string {
+export function screenshotSrc(shot: Pick<Screenshot, 'file'>): string {
   return `/screenshots/${shot.file}.webp`;
 }

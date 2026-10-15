@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { plainTextActionClassName } from '@/components/ui';
 import { cx } from '@/lib/cx';
-import { DESKTOP_SIZE } from './screenshots';
+import { DESKTOP_SIZE, screenshotSrc, type Screenshot } from './screenshots';
 
 /**
  * The three steps from signed out to an answer: the `login.how.steps.<key>`
@@ -10,14 +10,14 @@ import { DESKTOP_SIZE } from './screenshots';
  */
 interface Step {
   key: string;
-  file: string;
-  size: { width: number; height: number };
+  /** Its alt text comes from `login.how.steps.<key>.alt`, so no `login.screenshots` key. */
+  shot: Omit<Screenshot, 'key'>;
 }
 
 const STEPS: Step[] = [
-  { key: 'login', file: 'step-login', size: { width: 700, height: 300 } },
-  { key: 'share', file: 'step-permissions', size: { width: 1025, height: 766 } },
-  { key: 'answers', file: 'desktop-overview-alerts', size: DESKTOP_SIZE },
+  { key: 'login', shot: { file: 'step-login', size: { width: 700, height: 300 } } },
+  { key: 'share', shot: { file: 'step-permissions', size: { width: 1025, height: 766 } } },
+  { key: 'answers', shot: { file: 'desktop-overview-alerts', size: DESKTOP_SIZE } },
 ];
 
 /**
@@ -31,16 +31,16 @@ export function HowItWorks({ onCustomize }: { onCustomize: () => void }) {
     <ol className="mt-6 grid grid-cols-1 gap-px overflow-hidden border border-line bg-line md:grid-cols-3">
       {STEPS.map((step, index) => (
         <li key={step.key} className="flex flex-col bg-bg">
-          {/* Fixed shape with the capture pinned to its top: the three differ in size. */}
-          <div className="aspect-video overflow-hidden border-b border-line">
+          {/* Fixed shape; each capture is fitted whole (never cropped) and centred: the three differ in aspect. */}
+          <div className="aspect-video overflow-hidden border-b border-line bg-panel">
             <img
-              src={`/screenshots/${step.file}.webp`}
+              src={screenshotSrc(step.shot)}
               alt={t(`login.how.steps.${step.key}.alt`)}
-              width={step.size.width}
-              height={step.size.height}
+              width={step.shot.size.width}
+              height={step.shot.size.height}
               loading="lazy"
               decoding="async"
-              className="block h-auto w-full"
+              className="block h-full w-full object-contain"
             />
           </div>
           <div className="flex flex-1 flex-col p-4">

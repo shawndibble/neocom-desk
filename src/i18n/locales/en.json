@@ -3475,7 +3475,7 @@
         "access": "It appears only when a character holds a Corp Role in game, and corporation data is a separate grant, requested only when you open those pages."
       },
       "comms": {
-        "tab": "Mail & contracts",
+        "tab": "Mail",
         "mail": "Mail is a two-pane client: read what came in, then reply or forward.",
         "calendar": "Calendar lists every clock a character can read in one deadline-ordered list beside a map of days, and sends your response to an invite.",
         "contracts": "Contracts searches public offers for an item, lists courier jobs and keeps your history.",
@@ -3608,7 +3608,7 @@
       "readMore": "Read more in the privacy policy",
       "writes": {
         "q": "Can it move ISK or change anything in EVE?",
-        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account, saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
+        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
       },
       "free": {
         "q": "Is it free?",
@@ -3616,7 +3616,7 @@
       },
       "stores": {
         "q": "What does it store, and where?",
-        "a": "What it reads from EVE is cached on this device and is not uploaded. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. Your login token never leaves this device, apart from the opt-in Alerts when closed."
+        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed), and anything you choose to share with a Community."
       },
       "delete": {
         "q": "Can I leave and delete my data?",
@@ -3628,7 +3628,7 @@
       },
       "community": {
         "q": "What is a Community?",
-        "a": "A named group of Characters under one admin. You create one or join with an invite link, and share only what you pick: blueprints, Fittings and Skill Plans. Members can also post Requests for items and Pledge to fill each other's."
+        "a": "A named group of Characters under one admin. You create one or join with an invite link, and share only what you pick: blueprints, Fittings and Skill Plans. Every Member can read what is shared, and it is stored on our server. Members can also post Requests for items and Pledge to fill each other's."
       }
     },
     "bottomCtaHeading": "Undock into your dashboard.",

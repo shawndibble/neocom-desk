@@ -1,5 +1,5 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -33,8 +33,11 @@ export function Login() {
   // "Log in" button's own link right under it.
   const [customizing, setCustomizing] = useState(false);
 
-  // The hero's large login button; the sticky header shows its own only once this scrolls away.
+  // The large login buttons (hero and closing call to action); the sticky
+  // header shows its own only while neither is in view.
   const heroCtaRef = useRef<HTMLDivElement>(null);
+  const bottomCtaRef = useRef<HTMLDivElement>(null);
+  const ctaRefs = useMemo(() => [heroCtaRef, bottomCtaRef], []);
 
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
@@ -63,8 +66,8 @@ export function Login() {
   }
 
   return (
-    <div className="bg-bg text-text">
-      <LandingHeader heroCtaRef={heroCtaRef} pending={pending} onLogin={onLogin} />
+    <div className="landing-root bg-bg text-text">
+      <LandingHeader ctaRefs={ctaRefs} pending={pending} onLogin={onLogin} />
 
       <main>
         {/*
@@ -127,7 +130,7 @@ export function Login() {
             <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">
               {t('login.bottomCtaBody')}
             </p>
-            <div className="mt-6 flex flex-col items-center gap-3">
+            <div ref={bottomCtaRef} className="mt-6 flex flex-col items-center gap-3">
               <EveSsoButton
                 size="large"
                 pending={pending}

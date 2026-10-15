@@ -88,6 +88,16 @@
         character is separate: nothing is stored for a character you did not turn it on for.
       </p>
       <p>
+        <strong>Push notifications</strong> are the other opt-in exception. If you turn them on, the
+        app's server (Google Firebase) stores this device's push token, the IDs of the characters on
+        it, and the text of the next 72 hours of alerts, so they can arrive while the app is closed.
+        Alerts already sent are kept for 30 days. To register a character the server checks the EVE
+        access token once to confirm the character is yours; that token is discarded right after and
+        is not stored. When the device's token is dropped (for example when you log out or remove
+        the character), the server deletes its registration and any unsent alert text the next time
+        it runs.
+      </p>
+      <p>
         If you turn on cross-device sync, a copy of your plans, settings and similar data is stored
         on Google Firebase, linked to an anonymous ID derived from your EVE character — not your
         name, email, or any real-world identity. Removing a character from the app only clears it

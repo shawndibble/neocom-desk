@@ -1,29 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui';
-import { ICON_SIZE, Search } from '@/components/ui/icons';
+import { focusRingInsetClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-
-/**
- * One captured screen behind a question tile: the file under
- * `public/screenshots/` and the `login.screenshots.*` key its alt text and
- * enlarged-view caption live under. Real captures filled with sample data, not
- * mockups. WebP sits outside the PWA precache glob, so a signed-in user never
- * downloads them.
- */
-interface Screenshot {
-  file: string;
-  key: string;
-  size: { width: number; height: number };
-}
-
-/** Every capture of one form factor was encoded at the same size. */
-const DESKTOP_SIZE = { width: 1600, height: 900 };
-const PHONE_SIZE = { width: 540, height: 1104 };
-
-function screenshotSrc(shot: Screenshot): string {
-  return `/screenshots/${shot.file}.webp`;
-}
+import { DESKTOP_SIZE, PHONE_SIZE, screenshotSrc, type Screenshot } from './screenshots';
+import { ScreenshotZoom, ZoomBadge } from './ScreenshotZoom';
 
 /**
  * One cell of the grid: the `login.answers.<key>` copy and the capture that
@@ -130,22 +110,7 @@ export function QuestionGrid() {
           </div>
         </li>
       </ul>
-      <Modal
-        open={zoomed !== null}
-        onClose={() => setZoomed(null)}
-        title={zoomed ? t(`login.screenshots.${zoomed.key}.caption`) : ''}
-        placement="media"
-      >
-        {zoomed && (
-          <img
-            src={screenshotSrc(zoomed)}
-            alt={t(`login.screenshots.${zoomed.key}.alt`)}
-            width={zoomed.size.width}
-            height={zoomed.size.height}
-            className="mx-auto block h-auto max-h-[80vh] w-auto max-w-full"
-          />
-        )}
-      </Modal>
+      <ScreenshotZoom shot={zoomed} onClose={() => setZoomed(null)} />
     </>
   );
 }
@@ -181,7 +146,7 @@ function ShotButton({
       className={cx(
         'relative block cursor-zoom-in overflow-hidden',
         // Inset: the button clips its own overflow, so an outset ring would be cut off.
-        'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+        focusRingInsetClassName,
         className
       )}
     >
@@ -199,16 +164,7 @@ function ShotButton({
           imageClassName
         )}
       />
-      <span
-        aria-hidden="true"
-        className={cx(
-          'absolute right-2 bottom-2 rounded-xs border border-line bg-bg/80 p-1 text-text',
-          'opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-has-[:focus-visible]:opacity-100',
-          'touch:opacity-100 [@media(hover:none)]:opacity-100'
-        )}
-      >
-        <Search size={ICON_SIZE.sm} aria-hidden="true" />
-      </span>
+      <ZoomBadge />
     </button>
   );
 }

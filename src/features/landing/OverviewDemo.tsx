@@ -202,7 +202,7 @@ export function OverviewDemo() {
       ref={frameRef}
       role="group"
       aria-labelledby="login-preview-label"
-      className="lp-float relative w-full rounded-xs border border-line bg-panel/85 p-4 text-left shadow-[0_0_60px_-20px_rgba(87,199,244,0.25)] backdrop-blur-sm sm:p-6"
+      className="lp-float relative w-full rounded-xs border border-line bg-panel/85 p-4 text-left shadow-[0_0_60px_-20px_color-mix(in_srgb,var(--color-accent)_25%,transparent)] backdrop-blur-sm sm:p-6"
     >
       <span
         id="login-preview-label"
