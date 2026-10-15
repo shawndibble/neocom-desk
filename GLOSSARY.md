@@ -215,6 +215,8 @@ here — they go one per file in `docs/context/decisions/`.
   share it, with a "missing from the Community" filter. Those rows are every
   blueprint reachable by any route — market, contract-only or LP store — so a
   gap is a blueprint nobody in the Community holds.
+- **Request**: A **Member**'s post in a **Community**'s Requests tab asking for items: one or more lines (item and quantity), an optional location and an optional one-line terms field. Any Member posts one; it carries no price. Its status (Open, Pledged, Part delivered, Delivered) is derived from its **Pledge**s; only Closed is set by hand. Distinct from a **Join Request**, which asks to enter the Community.
+- **Pledge**: A **Member**'s note on a **Request** line that they can provide a quantity of it. Non-exclusive: it reserves nothing and Pledges may add up to more than the need. It carries the delivered quantity, marked from the Member's own finished contracts. Not a claim, which would imply a hold.
 - **Community Offer**: A **BPC Sourcing** row sourced from a **Shared
   Blueprint** at 0 ISK, named for the **Member** holding it. Distinct from a
   contract **Offer**: nothing is listed or bought. A Shared BPO appears as
