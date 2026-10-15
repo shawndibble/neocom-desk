@@ -18,6 +18,7 @@ import {
   useTabsId,
   type DataTableColumn,
 } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { NewComponent } from './NewComponent';
 
 /**
@@ -435,10 +436,12 @@ function ComposeRequestDialog({ step }: { step: 'lines' | 'recipients' }) {
                 ['Dana Reyes', '', false],
                 ['Eli Park', '', false],
               ].map(([name, why, on]) => (
-                <li key={String(name)} className="flex items-center gap-2 px-3 py-1.5">
-                  <Checkbox defaultChecked={Boolean(on)} aria-label={`Mail ${String(name)}`} />
-                  <span className="flex-1">{String(name)}</span>
-                  <span className="text-xs text-text-dim">{String(why)}</span>
+                <li key={String(name)}>
+                  <label className={`flex items-center gap-2 px-3 ${tappableRowClassName}`}>
+                    <Checkbox defaultChecked={Boolean(on)} />
+                    <span className="flex-1">{String(name)}</span>
+                    <span className="text-xs text-text-dim">{String(why)}</span>
+                  </label>
                 </li>
               ))}
             </ul>
