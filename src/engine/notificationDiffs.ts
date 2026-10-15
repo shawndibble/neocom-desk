@@ -935,6 +935,15 @@ export interface ContractEntrySnapshot {
    */
   dueLeadMs?: number;
   /**
+   * `date_expired`, epoch ms, set only on an `outstanding` contract the
+   * Character themselves issued (`contractExpiring`, issue #3797) — a contract
+   * merely offered *to* them is not theirs to relist. Optional so a baseline
+   * persisted before this field existed still validates.
+   */
+  expiresMs?: number;
+  /** The Character's `contractExpiringLeadHours` in ms, baked in beside `expiresMs` for `dueLeadMs`'s reason. */
+  expiringLeadMs?: number;
+  /**
    * ESI's `date_accepted` / `date_completed`, epoch ms — what dates a
    * `contractAccepted` / `contractCompleted` feed row, rather than the poll
    * that happened to notice it. Optional: absent until ESI sets them, and a
@@ -950,12 +959,17 @@ export interface ContractSnapshot {
 }
 
 export interface ContractNotificationFire {
-  eventId: 'contractAccepted' | 'contractCompleted' | 'contractFailed' | 'courierDeliveryDue';
+  eventId:
+    | 'contractAccepted'
+    | 'contractCompleted'
+    | 'contractFailed'
+    | 'courierDeliveryDue'
+    | 'contractExpiring';
   characterId: number;
   contractId: number;
-  /** `courierDeliveryDue` only (issue #1713): the deliver-by instant the warning is about. */
+  /** `courierDeliveryDue` (issue #1713) / `contractExpiring` (issue #3797): the deliver-by / expiry instant the warning is about. */
   deadlineMs?: number;
-  /** `courierDeliveryDue` only: the lead time, in ms, that it crossed. */
+  /** `courierDeliveryDue` / `contractExpiring`: the lead time, in ms, that it crossed. */
   thresholdMs?: number;
   /**
    * `contractAccepted` / `contractCompleted` only: when ESI says that
@@ -1044,6 +1058,130 @@ export function diffCourierDeliveryDue(
     });
   }
   return fires;
+}
+
+/**
+ * Fires once an `outstanding` contract the Character issued has its
+ * `date_expired` inside their configured lead time (issue #3797), so they can
+ * relist before it lapses unaccepted. Accepted, deleted and finished
+ * contracts are not `outstanding`, so they never fire; neither does one merely
+ * assigned to the Character. A courier already in progress is
+ * `courierDeliveryDue`'s, which judges the delivery deadline instead.
+ *
+ * Window-crossing exactly as `diffCourierDeliveryDue`: this poll's
+ * `expiringLeadMs` decides "inside now", the previous entry's own decides
+ * "was already inside", so a changed lead time takes effect on the next poll.
+ */
+export function diffContractExpiring(
+  characterId: number,
+  prev: ContractSnapshot | undefined,
+  next: ContractSnapshot
+): ContractNotificationFire[] {
+  if (!prev) return [];
+  const prevById = new Map(prev.entries.map((entry) => [entry.contractId, entry]));
+  const fires: ContractNotificationFire[] = [];
+  for (const entry of next.entries) {
+    const { expiresMs, expiringLeadMs } = entry;
+    if (entry.status !== 'outstanding' || entry.issuerId !== characterId) continue;
+    if (expiresMs === undefined || expiringLeadMs === undefined) continue;
+    const remainingNow = expiresMs - next.nowMs;
+    if (remainingNow <= 0 || remainingNow > expiringLeadMs) continue;
+    const before = prevById.get(entry.contractId);
+    if (
+      before !== undefined &&
+      before.status === 'outstanding' &&
+      before.expiresMs === expiresMs &&
+      before.expiringLeadMs !== undefined &&
+      expiresMs - prev.nowMs <= before.expiringLeadMs
+    ) {
+      continue;
+    }
+    fires.push({
+      eventId: 'contractExpiring',
+      characterId,
+      contractId: entry.contractId,
+      deadlineMs: expiresMs,
+      thresholdMs: expiringLeadMs,
+    });
+  }
+  return fires;
+}
+
+/** One of the Character's own open market orders and when it lapses (`ordersLapsing`, issue #3797). */
+export interface OrderExpiryEntrySnapshot {
+  orderId: number;
+  /** `issued` + `duration`, epoch ms, worked out at the ESI boundary so this module stays pure. */
+  expiresMs: number;
+  /** The Character's `ordersLapsingLeadHours` in ms when this poll ran, baked in for `dueLeadMs`'s reason. */
+  leadMs: number;
+}
+
+export interface OrderExpirySnapshot {
+  entries: readonly OrderExpiryEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface OrdersLapsingFire {
+  eventId: 'ordersLapsing';
+  characterId: number;
+  /** Orders inside the window when it opened. */
+  count: number;
+  /** The soonest of them to lapse. */
+  soonestMs: number;
+  /** The lead time, in ms, that was crossed. */
+  thresholdMs: number;
+}
+
+/**
+ * Orders lapsing within an hour of each other are one batch (a bulk relist
+ * issued in one sitting), so they share one alert; orders further apart each
+ * get their own once the earlier batch has gone.
+ */
+export const ORDER_BATCH_WINDOW_MS = 3_600_000;
+
+/** The orders lapsing inside their own lead time at `nowMs`, soonest first. */
+function ordersInWindow(snapshot: OrderExpirySnapshot): OrderExpiryEntrySnapshot[] {
+  return snapshot.entries
+    .filter((e) => e.expiresMs > snapshot.nowMs && e.expiresMs - snapshot.nowMs <= e.leadMs)
+    .sort((a, b) => a.expiresMs - b.expiresMs);
+}
+
+/** How many of `sorted` (soonest first) belong to the batch that starts at its head. */
+export function ordersInBatch(sorted: readonly OrderExpiryEntrySnapshot[]): number {
+  if (sorted.length === 0) return 0;
+  const limit = sorted[0].expiresMs + ORDER_BATCH_WINDOW_MS;
+  return sorted.filter((e) => e.expiresMs <= limit).length;
+}
+
+/**
+ * One batched fire per batch (issue #3797) — never one per order. It fires
+ * when the soonest order inside its lead time starts a batch the previous
+ * poll was not already warning about: nothing was inside the window, or the
+ * previous soonest has lapsed (or been relisted) and the next one is more
+ * than `ORDER_BATCH_WINDOW_MS` later. Orders entering the window behind a
+ * batch already warned about stay silent until that batch has gone, then
+ * get their own alert, so staggered orders are never left unwarned.
+ */
+export function diffOrdersLapsing(
+  characterId: number,
+  prev: OrderExpirySnapshot | undefined,
+  next: OrderExpirySnapshot
+): OrdersLapsingFire[] {
+  if (!prev) return [];
+  const inside = ordersInWindow(next);
+  if (inside.length === 0) return [];
+  const soonestMs = inside[0].expiresMs;
+  const before = ordersInWindow(prev);
+  if (before.length > 0 && soonestMs - before[0].expiresMs <= ORDER_BATCH_WINDOW_MS) return [];
+  return [
+    {
+      eventId: 'ordersLapsing',
+      characterId,
+      count: ordersInBatch(inside),
+      soonestMs,
+      thresholdMs: inside[0].leadMs,
+    },
+  ];
 }
 
 /** `outstanding` and `in_progress` are the two statuses a contract's terminal diffs treat as "still live" — see `wasLiveContractStatus`. */

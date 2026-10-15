@@ -188,6 +188,21 @@ const CATALOG = [
     scope: requiredScope('getCharacterContracts'),
   },
   {
+    // A lead-time warning (issue #3797) for a contract the Character issued
+    // that is still unaccepted — relist before it lapses.
+    id: 'contractExpiring',
+    labelKey: 'settings.notifications.event.contractExpiring',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterContracts'),
+  },
+  {
+    // One batched warning (issue #3797) for open market orders about to lapse.
+    id: 'ordersLapsing',
+    labelKey: 'settings.notifications.event.ordersLapsing',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterOrders'),
+  },
+  {
     id: 'walletBalanceChanged',
     labelKey: 'settings.notifications.event.walletBalanceChanged',
     defaultChannels: 'feedOnly',

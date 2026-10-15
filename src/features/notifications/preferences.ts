@@ -34,6 +34,8 @@ import type { NotificationEventId } from './events';
 import {
   DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
   DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
+  DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
+  DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   defaultedThresholds,
@@ -73,6 +75,8 @@ export {
   DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
   DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
+  DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
+  DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
   DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -93,6 +97,8 @@ const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
   DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
   DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
+  DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
+  DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
 ]);
 
 function projectionInputs(value: NotificationPreferencesValue): string {
@@ -129,6 +135,8 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       extractorExpiringLeadHours,
       skillQueueEndingLeadHours,
       courierDeliveryDueLeadHours,
+      contractExpiringLeadHours,
+      ordersLapsingLeadHours,
     } = characterEventThresholds(value, characterId);
     const entry = JSON.stringify([
       eventsOffDefault,
@@ -137,6 +145,8 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       extractorExpiringLeadHours,
       skillQueueEndingLeadHours,
       courierDeliveryDueLeadHours,
+      contractExpiringLeadHours,
+      ordersLapsingLeadHours,
     ]);
     // An all-default Character reads the same as an absent one.
     if (entry !== DEFAULT_PROJECTION_ENTRY) characters[id] = entry;

@@ -199,7 +199,7 @@ Events (`NOTIFICATION_EVENTS`, `events.ts`), with scope endpoint:
 
 - Skills: `skillLevelComplete`, `characterNotTraining`, `skillQueueEnding` (queue); `spExtractionReady` (skills; opt-in via SP extraction monitoring setting)
 - Industry: `industryJobComplete`; `cloneJumpReady` (clones); `newMail`; `planetaryExtractionDone`, `planetaryExtractorExpiring` (planets)
-- Market/contracts: `marketOrderFilled`, `marketOrderUndercut` (orders); `contractAccepted`, `contractCompleted`, `contractFailed`, `courierDeliveryDue` (contracts); `walletBalanceChanged` (wallet)
+- Market/contracts: `marketOrderFilled`, `marketOrderUndercut` (orders); `contractAccepted`, `contractCompleted`, `contractFailed`, `courierDeliveryDue`, `contractExpiring` (contracts); `ordersLapsing` (orders); `walletBalanceChanged` (wallet)
 - Calendar: `newCalendarEvent`, `calendarEventStarting`
 - `eveNotification`: CCP's in-game notifications, with a per-type breakdown grouped by Notification Family (per-family select-all per channel). Per-type defaults: Overview only, except attack/loss alerts which also pop up
 - Corp group (own header with select-all, one shared Needs-permission line, best-effort disclosure): `structureFuelLow` (structures), `corpIndustryJobReady`, `corpMemberJoined`, `corpMemberLeft`, `corpWalletThreshold`

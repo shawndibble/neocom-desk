@@ -36,6 +36,8 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   contractCompleted: 'market',
   contractFailed: 'market',
   courierDeliveryDue: 'market',
+  contractExpiring: 'market',
+  ordersLapsing: 'market',
   walletBalanceChanged: 'market',
   stockBelowTarget: 'market',
   priceAlertTriggered: 'market',

@@ -63,6 +63,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // The still-open contract's row in History (issue #1713), the same page the
   // three transitions above land on.
   courierDeliveryDue: '/contracts/history',
+  contractExpiring: '/contracts/history',
   // The tab is a path segment (ADR 0015) — this lands straight on the tab
   // that actually shows the event, not just the page.
   walletBalanceChanged: '/wallet/journal',
@@ -77,6 +78,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // one (issue #1423). `notificationUrlForSubject` adds `?highlight=`, which
   // pulses that row on arrival, same as `marketOrderFilled`'s destination.
   marketOrderUndercut: '/market/orders',
+  // Open Orders, no highlight: the alert is about a batch (issue #3797).
+  ordersLapsing: '/market/orders',
   // ~100 EVE-native types (issue #274), most with no corresponding page in
   // the app. `/alerts` is a deliberate choice for this event rather than an
   // inherited default — and now a real destination rather than a shrug: the
@@ -182,6 +185,7 @@ const SUBJECT_URLS: Partial<Record<NotificationEventId, SubjectUrl>> = {
   contractCompleted: highlightRow,
   contractFailed: highlightRow,
   courierDeliveryDue: highlightRow,
+  contractExpiring: highlightRow,
   industryJobComplete: highlightRow,
   corpIndustryJobReady: highlightRow,
   corpMemberJoined: highlightRow,
