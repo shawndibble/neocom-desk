@@ -1471,15 +1471,6 @@
   html:has(.landing-root) {
     scroll-behavior: smooth;
   }
-  @keyframes landing-header-cta-in {
-    from {
-      opacity: 0;
-      transform: translateY(-0.5rem);
-    }
-  }
-  .landing-header-cta-in {
-    animation: landing-header-cta-in 200ms ease-out;
-  }
 }
 
 /*

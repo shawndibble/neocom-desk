@@ -83,16 +83,38 @@ export function LandingHeader({
               <Github aria-hidden="true" />
             </HeaderIconLink>
           </span>
-          {ctaOut && (
-            <div className="landing-header-cta-in ml-2">
-              <EveSsoButton
-                size="small"
-                pending={pending}
-                onClick={onLogin}
-                label={t('login.button')}
-              />
+          {/*
+            Always laid out, collapsed to zero width until no large login
+            button is in view: opening the track (not mounting the button) is
+            what slides the icons beside it over instead of making them jump.
+            Collapsed it is `inert` and hidden from assistive tech, so it can
+            neither be tabbed to nor announced. Without motion the width just
+            changes at once.
+          */}
+          <div
+            data-open={ctaOut}
+            inert={!ctaOut}
+            aria-hidden={!ctaOut}
+            className="grid grid-cols-[0fr] data-[open=true]:grid-cols-[1fr] motion-safe:transition-[grid-template-columns] motion-safe:duration-300 motion-safe:ease-out"
+          >
+            <div className="min-w-0 overflow-hidden">
+              <div
+                className={cx(
+                  'pl-2 opacity-0 data-[open=true]:opacity-100',
+                  'motion-safe:transition-[opacity,translate] motion-safe:duration-300 motion-safe:ease-out',
+                  'translate-x-3 data-[open=true]:translate-x-0'
+                )}
+                data-open={ctaOut}
+              >
+                <EveSsoButton
+                  size="small"
+                  pending={pending}
+                  onClick={onLogin}
+                  label={t('login.button')}
+                />
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </header>
