@@ -12,19 +12,13 @@ const { updateServiceWorker, state, registerSWOptions } = vi.hoisted(() => ({
     current: undefined as
       | {
           onRegisteredSW?: (...a: unknown[]) => void;
-          onNeedReload?: () => void;
-          onNeedRefresh?: () => void;
         }
       | undefined,
   },
 }));
 
 vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: (options?: {
-    onRegisteredSW?: (...a: unknown[]) => void;
-    onNeedReload?: () => void;
-    onNeedRefresh?: () => void;
-  }) => {
+  useRegisterSW: (options?: { onRegisteredSW?: (...a: unknown[]) => void }) => {
     registerSWOptions.current = options;
     return {
       needRefresh: [state.needRefresh, vi.fn()],
@@ -105,16 +99,18 @@ describe('ReloadPrompt', () => {
     expect(updateServiceWorker).not.toHaveBeenCalled();
   });
 
-  it('applies the update on the next in-app route change while the tab stays visible', () => {
+  it('never applies an update on a route change, even with one waiting', () => {
     renderPrompt();
 
     navigateTo('/other');
+    navigateTo('/another');
 
-    expect(updateServiceWorker).toHaveBeenCalledTimes(1);
+    expect(updateServiceWorker).not.toHaveBeenCalled();
   });
 
-  it('does not apply just because the app mounted on some route', () => {
+  it('never applies on a manual reload or on mount', () => {
     renderPrompt();
+    window.dispatchEvent(new Event('beforeunload'));
     expect(updateServiceWorker).not.toHaveBeenCalled();
   });
 
@@ -122,72 +118,6 @@ describe('ReloadPrompt', () => {
     renderPrompt();
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
     expect(updateServiceWorker).not.toHaveBeenCalled();
-  });
-
-  it('treats a manual reload as consent to apply an update that is waiting', () => {
-    renderPrompt();
-    expect(updateServiceWorker).not.toHaveBeenCalled();
-
-    window.dispatchEvent(new Event('beforeunload'));
-
-    expect(updateServiceWorker).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not call updateServiceWorker on unload when no update is waiting', () => {
-    state.needRefresh = false;
-    renderPrompt();
-
-    window.dispatchEvent(new Event('beforeunload'));
-
-    expect(updateServiceWorker).not.toHaveBeenCalled();
-  });
-
-  it('covers the viewport with the app background before reloading, instead of reloading instantly', async () => {
-    const reloadSpy = vi.fn();
-    vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
-    renderPrompt();
-
-    registerSWOptions.current?.onNeedReload?.();
-
-    expect(document.querySelector('[data-pwa-update-overlay]')).not.toBeNull();
-    expect(reloadSpy).not.toHaveBeenCalled();
-
-    await vi.waitFor(() => expect(reloadSpy).toHaveBeenCalledTimes(1));
-    vi.unstubAllGlobals();
-  });
-
-  describe('boot apply', () => {
-    const BOOT_APPLY_WINDOW_MS = 15 * 1000;
-
-    beforeEach(() => {
-      state.needRefresh = false;
-      renderPrompt();
-    });
-
-    it('applies an update found right after the app loads, without a route change', () => {
-      registerSWOptions.current?.onNeedRefresh?.();
-      expect(updateServiceWorker).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not apply on mount alone', () => {
-      expect(updateServiceWorker).not.toHaveBeenCalled();
-    });
-
-    it('leaves an update found after the boot window to the route-change rule', async () => {
-      await vi.advanceTimersByTimeAsync(BOOT_APPLY_WINDOW_MS + 1000);
-      registerSWOptions.current?.onNeedRefresh?.();
-      expect(updateServiceWorker).not.toHaveBeenCalled();
-    });
-
-    it('never reloads the OAuth callback page, whose code is already spent', () => {
-      window.history.pushState({}, '', '/callback?code=abc');
-      try {
-        registerSWOptions.current?.onNeedRefresh?.();
-        expect(updateServiceWorker).not.toHaveBeenCalled();
-      } finally {
-        window.history.pushState({}, '', '/');
-      }
-    });
   });
 
   describe('periodic update check', () => {

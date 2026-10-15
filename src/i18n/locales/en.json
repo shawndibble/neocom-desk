@@ -6,7 +6,19 @@
   "boot": {
     "stalledHint": "Still loading. Another copy of the app may be holding your local data open.",
     "stalledAction": "Reload",
-    "stalledPending": "Reloading…"
+    "stalledPending": "Reloading…",
+    "tips": {
+      "commandPalette": "Press Ctrl+K (Cmd+K on a Mac) to open Go to… and jump to any page from anywhere.",
+      "shortcutsList": "Press ? outside a text box to see every keyboard shortcut.",
+      "pageKeys": "Single keys jump between pages: O for Overview, M for Market, I for Industry, W for Wallet.",
+      "pasteFit": "Paste a fit or an item list outside a text box and Neocom Desk opens it in Fittings or Appraisal.",
+      "pasteLocal": "Paste a Local list or a D-Scan outside a text box to check the pilots in Pilot Lookup.",
+      "pasteBack": "After a paste takes you to a page, the browser's Back button returns you to where you were.",
+      "backup": "Settings › Data & storage exports a password-protected backup of every character on this device.",
+      "timeFormat": "Settings › Display switches timers between your local time and EVE time.",
+      "textSize": "Settings › Display changes the text size on this device.",
+      "selfUpdate": "Neocom Desk updates itself when you open it or reload the page."
+    }
   },
   "nav": {
     "skipToContent": "Skip to content",
@@ -10293,7 +10305,7 @@
     "installMenuSteps": "Open your browser's menu and choose Install app (or Add to Home Screen). If you don't see it, this browser may not support installing.",
     "installInstalled": "Neocom Desk is installed on this device.",
     "updateTitle": "App updates",
-    "updateHint": "Neocom Desk normally updates itself in the background. Update now checks for a new version right away and reloads the app.",
+    "updateHint": "Neocom Desk updates itself when it is opened or the page is reloaded. Update now checks for a new version right away and reloads the app.",
     "updateAction": "Update now",
     "updateWorking": "Updating…",
     "updateFailed": "Could not check for a new version. Check your connection and try again.",
