@@ -1399,7 +1399,8 @@ function contractEntry(
   contractId: number,
   status: ContractEntrySnapshot['status'],
   issuerId = 7,
-  acceptorId = 7
+  // An unaccepted contract has no acceptor; ESI sends 0.
+  acceptorId = status === 'outstanding' ? 0 : 7
 ): ContractEntrySnapshot {
   return { contractId, status, issuerId, acceptorId };
 }
@@ -1434,6 +1435,14 @@ describe('diffContractAccepted', () => {
     expect(diffContractAccepted(7, prev, next)).toEqual([
       { eventId: 'contractAccepted', characterId: 7, contractId: 1, occurredMs: T0 - 60_000 },
     ]);
+  });
+
+  it('does not fire for a courier a baseline already recorded as accepted but outstanding', () => {
+    // Baselines saved before `withAcceptedCourierInProgress` hold accepted couriers as
+    // `outstanding` with their acceptor set; only the label changed, nobody accepted anything.
+    const prev = contractSnapshot([contractEntry(1, 'outstanding', 7, 9)], T0);
+    const next = contractSnapshot([contractEntry(1, 'in_progress', 7, 9)], T0 + FIVE_MIN);
+    expect(diffContractAccepted(7, prev, next)).toEqual([]);
   });
 
   it('does not fire while the contract stays outstanding', () => {

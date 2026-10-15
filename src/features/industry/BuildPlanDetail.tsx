@@ -1243,12 +1243,8 @@ export function BuildPlanDetail({
   }
 
   /**
-   * Unlike Market/Assets, this page already holds the whole blueprint catalog
-   * (it needs it to render the plan at all), so the "Build Plan" action
-   * resolves synchronously — never the "checking…" state those
-   * lazily-loading pages show. For a material something else manufactures
-   * the action lands back here with `?product=`, creating or selecting that
-   * material's own plan so its build-vs-buy read can be compared with this one.
+   * This page is already a Build Plan and has no Compare drawer, so the menu
+   * leaves out "Build Plan" and "Add to Compare".
    */
   function itemContextMenu(typeId: number, trigger: ReactElement) {
     return (
@@ -1256,6 +1252,8 @@ export function BuildPlanDetail({
         typeId={typeId}
         itemName={nameForType(catalog, typeId)}
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
+        hideBuildPlan
+        hideCompare
       >
         {trigger}
       </ItemContextMenu>
@@ -1279,6 +1277,8 @@ export function BuildPlanDetail({
         typeId={typeId}
         itemName={nameForType(catalog, typeId)}
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
+        hideBuildPlan
+        hideCompare
       />
     );
   }

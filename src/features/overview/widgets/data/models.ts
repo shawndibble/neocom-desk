@@ -86,8 +86,8 @@ import type {
   Translate,
 } from './types';
 
-/** The Contracts History table filtered to accepted contracts, the courier hauls the widget counts. */
-export const CONTRACTS_IN_PROGRESS_HREF = '/contracts/history?history.status=in_progress';
+/** The Contracts History table, unfiltered: the widget counts hauls and item exchanges, which no one status covers. */
+export const CONTRACTS_HREF = '/contracts/history';
 
 // --- Which reads a kind needs ------------------------------------------------
 
@@ -501,7 +501,7 @@ const orders: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
 const contracts: Builder = (feeds, { t, now }) => {
   const feed = feeds.contracts;
   const data = feed?.data ?? null;
-  const to = CONTRACTS_IN_PROGRESS_HREF;
+  const to = CONTRACTS_HREF;
   if (!data) return blank(to, statusOf(feed));
   const { summary } = data;
   const note = data.needsReauth ? null : contractsDeadlineNote(t, data);
@@ -512,6 +512,12 @@ const contracts: Builder = (feeds, { t, now }) => {
       title: t('overview.board.contractsInProgressTile'),
       value: count(summary.inProgress),
       tone: summary.inProgress > 0 ? 'watch' : 'clear',
+    },
+    {
+      key: 'exchanges',
+      title: t('overview.board.contractsExchangesTile'),
+      value: count(summary.exchanges),
+      tone: summary.exchanges > 0 ? 'watch' : 'clear',
     },
     {
       key: 'dueSoon',

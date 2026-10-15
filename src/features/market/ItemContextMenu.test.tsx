@@ -50,6 +50,41 @@ describe('ItemContextMenu — Open in EVE', () => {
   });
 });
 
+describe('ItemContextMenu — hideBuildPlan / hideCompare', () => {
+  function renderWith(hide: boolean) {
+    render(
+      <MemoryRouter initialEntries={['/industry']}>
+        <FakeItemActions>
+          <ItemContextMenu
+            typeId={TRITANIUM}
+            itemName="Tritanium"
+            blueprintTypeID={1}
+            hideBuildPlan={hide}
+            hideCompare={hide}
+          >
+            <button type="button">Tritanium</button>
+          </ItemContextMenu>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+  }
+
+  it('lists Build Plan and Add to Compare by default', async () => {
+    renderWith(false);
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    expect(await screen.findByRole('menuitem', { name: 'Build Plan' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
+  });
+
+  it('leaves both out when the page opts out', async () => {
+    renderWith(true);
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Build Plan' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Add to Compare' })).not.toBeInTheDocument();
+  });
+});
+
 describe('ItemContextMenu — View in Industry as material (issue #414)', () => {
   it('offers the action when the caller supplies it, and invokes it on select', async () => {
     const onViewInIndustryAsMaterial = vi.fn();

@@ -3774,6 +3774,7 @@
       "contractsCourierOverdue": "Courier overdue",
       "contractsListingExpires": "Listing expires",
       "contractsInProgressTile": "In progress",
+      "contractsExchangesTile": "Item exchanges",
       "contractsDueTile": "Due < 24h"
     },
     "widgets": {
