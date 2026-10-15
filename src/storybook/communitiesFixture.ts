@@ -355,6 +355,22 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
           if (found) found.closed = closed;
           return {};
         }
+        case 'removeCommunityRequestCallable': {
+          const { requestId } = data as { requestId: string };
+          itemRequests[communityId] = (itemRequests[communityId] ?? []).filter(
+            (entry) => entry.id !== requestId
+          );
+          delete pledges[communityId]?.[requestId];
+          return {};
+        }
+        case 'removeCommunityPledgeCallable': {
+          const { requestId, pledgeUid } = data as { requestId: string; pledgeUid: string };
+          const board = pledges[communityId];
+          if (board?.[requestId]) {
+            board[requestId] = board[requestId].filter((entry) => entry.uid !== pledgeUid);
+          }
+          return {};
+        }
         case 'revokeCommunityInviteCallable':
           patch(communityId, { inviteCode: null });
           return {};

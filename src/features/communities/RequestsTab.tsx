@@ -73,6 +73,8 @@ export function RequestsTab({
   communityId,
   communityName,
   myUid,
+  isAdmin,
+  memberNames,
   requests,
   pledges,
   pledgesFailed,
@@ -87,6 +89,10 @@ export function RequestsTab({
   communityId: string;
   communityName: string;
   myUid: string;
+  /** The viewer administers this Community: the side panel offers Remove request… and Remove… per Pledge. */
+  isAdmin: boolean;
+  /** Member uid to display name, to name each Pledger in the admin's panel. */
+  memberNames: ReadonlyMap<string, string>;
   /** Null until the first read lands. */
   requests: CommunityRequest[] | null;
   /** The Pledges under each open Request, from the board's read. */
@@ -421,8 +427,14 @@ export function RequestsTab({
           characterId={characterId}
           communityId={communityId}
           communityName={communityName}
+          isAdmin={isAdmin}
+          memberNames={memberNames}
           onClose={() => setOpenId(null)}
           onChanged={onReload}
+          onRemoved={() => {
+            setOpenId(null);
+            onReload();
+          }}
           refreshPledges={refreshPledges}
         />
       )}

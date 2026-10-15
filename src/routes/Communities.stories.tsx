@@ -202,6 +202,15 @@ export const RequestsPanelAsRequester: Story = {
   play: openRequest('Ishtar Blueprint'),
 };
 
+/** @summary A Request opened by the admin: each Pledger with Remove…, and Remove request…. */
+export const RequestsPanelAsAdmin: Story = {
+  ...RequestsBoard,
+  play: openRequest('Reactive Metals'),
+};
+
+/** @summary The admin's panel in the phone shell. */
+export const RequestsPanelAsAdminPhone: Story = { ...RequestsPanelAsAdmin, globals: phone };
+
 /** @summary My pledges: the slide-out of this Member's Pledges, opened from the strip. */
 export const RequestsMyPledges: Story = {
   ...RequestsBoard,

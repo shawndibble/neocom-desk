@@ -109,7 +109,7 @@ export async function isCurrentMember(db: Firestore, communityId: string, caller
   return member.exists && member.get('ownerHash') === caller.ownerHash;
 }
 
-async function requireAdmin(db: Firestore, communityId: string, caller: CallerCharacter) {
+export async function requireAdmin(db: Firestore, communityId: string, caller: CallerCharacter) {
   const snap = await loadCommunity(db, communityId);
   if (snap.get('adminUid') !== caller.uid || !(await isCurrentMember(db, communityId, caller))) {
     fail('not-admin');
@@ -395,7 +395,11 @@ export async function queuePledgeDeletes(
  * their Requests with the Pledges under them. Every delete-on-leave path goes
  * through this so a new kind of shared data can't be missed in one.
  */
-async function deleteMemberShares(db: Firestore, communityId: string, uid: string): Promise<void> {
+export async function deleteMemberShares(
+  db: Firestore,
+  communityId: string,
+  uid: string
+): Promise<void> {
   await db.recursiveDelete(memberRef(db, communityId, uid).collection(LIBRARY_COLLECTION));
   const fittings = await communityRef(db, communityId)
     .collection(FITTINGS_COLLECTION)

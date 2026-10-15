@@ -14,11 +14,18 @@ import {
 import { formatAge } from '@/lib/age';
 import { itemsSummary, mailSafe, mailSubject } from '@/engine/communities/requestMail';
 import { characterIdForUid } from '@/sync/uid';
+import { ConfirmDialog } from './ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
 import { callableErrorReason } from './callableError';
 import { daysLeft } from './requestFormat';
-import { extendRequest, setRequestClosed, updateMyPledge } from './requestStore';
+import {
+  extendRequest,
+  removePledge,
+  removeRequest,
+  setRequestClosed,
+  updateMyPledge,
+} from './requestStore';
 
 /** "BPC, runs 10, ME 10": what the requester asked of a blueprint line, empty for a plain item. */
 function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unknown>) => string) {
@@ -40,7 +47,9 @@ function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unkn
  * (issue #3808); Pledges are written straight to the Member's own document.
  * The requester gets Extend 30 days and Close request (Reopen once closed)
  * and no Pledge controls; everyone else also gets Message <requester>…, which
- * opens an in-game mail to them.
+ * opens an in-game mail to them. The Community admin also gets Remove
+ * request… and, per Pledger, Remove… on their Pledge (issue #3812), each behind
+ * a confirm; the server checks the admin, this only hides the controls.
  */
 export function RequestPanel({
   request,
@@ -51,8 +60,11 @@ export function RequestPanel({
   characterId,
   communityId,
   communityName,
+  isAdmin,
+  memberNames,
   onClose,
   onChanged,
+  onRemoved,
   refreshPledges,
 }: {
   request: CommunityRequest;
@@ -63,9 +75,15 @@ export function RequestPanel({
   characterId: number;
   communityId: string;
   communityName: string;
+  /** The viewer administers this Community: may remove the Request or any Pledge. */
+  isAdmin: boolean;
+  /** Member uid to display name, for naming each Pledger to the admin. */
+  memberNames: ReadonlyMap<string, string>;
   onClose: () => void;
   /** The Request changed on the server: refetch the board. */
   onChanged: () => void;
+  /** The admin removed this Request: close the panel and refetch the board. */
+  onRemoved: () => void;
   /** Re-reads this Request's Pledges into the board after a Pledge write. */
   refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
 }) {
@@ -74,6 +92,9 @@ export function RequestPanel({
   const [error, setError] = useState<string | null>(null);
   const [pledgeBusy, setPledgeBusy] = useState<string | null>(null);
   const [pledgeError, setPledgeError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<
+    { kind: 'request' } | { kind: 'pledge'; uid: string; name: string } | null
+  >(null);
 
   // The board only loads Pledges for open Requests, and may be minutes old: read this one fresh.
   useEffect(() => {
@@ -193,6 +214,42 @@ export function RequestPanel({
             })}
           />
         )}
+        {isAdmin && pledges.length > 0 && (
+          <section aria-label={t('communities.board.admin.pledgesLabel')} className="space-y-1">
+            <p className="text-xs text-text-dim">{t('communities.board.admin.pledgesLabel')}</p>
+            <ul className="divide-y divide-line">
+              {pledges.map((pledge) => {
+                const name =
+                  memberNames.get(pledge.uid) ?? t('communities.board.admin.unknownPledger');
+                return (
+                  <li key={pledge.uid} className="flex min-h-11 items-center gap-2 py-1.5 text-xs">
+                    <span className="min-w-0 flex-1 truncate">{name}</span>
+                    <span className="text-text-dim">
+                      {t('communities.board.admin.pledgeSummary', {
+                        count: Object.keys(pledge.lines).length,
+                      })}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={t('communities.board.admin.removePledgeFor', { name })}
+                      onClick={() => setRemoving({ kind: 'pledge', uid: pledge.uid, name })}
+                    >
+                      {t('communities.board.admin.removePledge')}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+        {isAdmin && (
+          <div>
+            <Button size="sm" variant="danger" onClick={() => setRemoving({ kind: 'request' })}>
+              {t('communities.board.admin.removeRequest')}
+            </Button>
+          </div>
+        )}
         {mine && (
           <div className="flex flex-wrap gap-2">
             {request.closed ? (
@@ -240,6 +297,34 @@ export function RequestPanel({
           </p>
         )}
       </div>
+      <ConfirmDialog
+        open={removing?.kind === 'request'}
+        title={t('communities.board.admin.removeRequestTitle')}
+        body={t('communities.board.admin.removeRequestBody', {
+          name: request.ownerName,
+          items,
+        })}
+        actionLabel={t('communities.board.admin.removeRequestAction')}
+        onClose={() => setRemoving(null)}
+        onConfirm={async () => {
+          await removeRequest(characterId, communityId, request.id);
+          onRemoved();
+        }}
+      />
+      <ConfirmDialog
+        open={removing?.kind === 'pledge'}
+        title={t('communities.board.admin.removePledgeTitle', {
+          name: removing?.kind === 'pledge' ? removing.name : '',
+        })}
+        body={t('communities.board.admin.removePledgeBody')}
+        actionLabel={t('communities.board.admin.removePledgeAction')}
+        onClose={() => setRemoving(null)}
+        onConfirm={async () => {
+          if (removing?.kind !== 'pledge') return;
+          await removePledge(characterId, communityId, request.id, removing.uid);
+          await refreshPledges(request.id);
+        }}
+      />
     </SlideOver>
   );
 }

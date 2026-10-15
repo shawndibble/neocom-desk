@@ -66,4 +66,10 @@ Built as `pages-communities--requests-compose-recipients` (and `-phone`); the sh
 - **After posting with mail:** the dialog stays open and lists each recipient with a text result (Mailed, refused, not confirmed, daily limit), then Done. Not pictured.
 - **Nav badge:** the Communities item carries a count of new Requests (the rail's existing badge, `NavItem`); it has no picture.
 
+## Deviations in the cleanup build (issue #3812): the admin's removal
+
+Not pictured; added to the panel screen for the Community admin only (decision `20261015-005522-community-request-admin-removal-and-expiry-grace.md`, story `pages-communities--requests-panel-as-admin`, with a `-phone` twin).
+
+- **Side panel:** below the Message button, a **Pledges on this request** list (name, "N lines", **Remove…** with the Pledger's name in its accessible label), then **Remove request…** as a danger button, each behind a `ConfirmDialog` naming what goes. Names come from the Members list; a Pledger who has since left reads "Former Member". A failed removal keeps the dialog open with the shared "That did not work. Try again." line. The panel for the requester and for a plain Member, and the whole board, are as pictured: there is no row menu (one action does not earn a ⋮, DESIGN.md §6c).
+
 Delete this folder and the story when the last ticket that links it closes.

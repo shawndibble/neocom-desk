@@ -184,6 +184,7 @@ export function CommunityDetail({
     setReload((n) => n + 1);
     onChanged();
   };
+  const memberNames = new Map((members ?? []).map((m) => [m.uid, m.characterName]));
   const others = (members ?? []).filter((member) => member.uid !== community.adminUid);
   // A changed or revoked link swaps the buttons out from under the confirm:
   // focus goes back to the invite controls' first action instead of the page top.
@@ -304,6 +305,8 @@ export function CommunityDetail({
               communityId={community.id}
               communityName={community.name}
               myUid={myUid}
+              isAdmin={admin}
+              memberNames={memberNames}
               requests={board.requests}
               pledges={board.pledges}
               pledgesFailed={board.pledgesFailed}
