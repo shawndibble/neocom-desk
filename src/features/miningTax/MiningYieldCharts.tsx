@@ -487,6 +487,7 @@ function MetricCharts({
   typeComparison: ValueRanked[];
 }) {
   const { t } = useTranslation();
+  const compressed = useMiningTaxCompressedOre((state) => state.value);
   const rateChartTitle = t(
     metric === 'volume'
       ? 'miningTax.overview.dayChartTitleVolume'
@@ -631,6 +632,7 @@ function MetricCharts({
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
                 interval={0}
+                tickFormatter={(name: string) => stripCompressedPrefix(name, compressed)}
                 width={scalePx(120)}
               />
               <Tooltip content={(props) => <MetricCompareTooltip {...props} metric={metric} />} />
@@ -659,6 +661,11 @@ function MetricCharts({
             label={compareChartTitle}
           />
         </div>
+        {compressed && (
+          <p className="mt-1 text-[0.6875rem] text-text-dim">
+            {t('miningTax.overview.assumesCompressedNote')}
+          </p>
+        )}
       </Panel>
     </div>
   );
