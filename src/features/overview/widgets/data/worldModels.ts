@@ -413,13 +413,24 @@ export const planetary: Builder = (feeds, { t, now }) => {
         ]
       : [],
     summary: planetarySummary(t, data),
-    // Every running colony on its own bar, soonest first: the batches hid which planet to visit.
+    // Every colony on its own bar, stopped first then soonest: the batches hid which planet to visit.
+    // A stopped or idle colony has no time left, so its bar is empty and its state is the figure.
     chart:
       hbarsFromRows(
         t,
         colonies
-          .filter((colony) => colony.kind === 'running' && colony.expiryMs !== null)
+          .filter((colony) => colony.kind !== 'running' || colony.expiryMs !== null)
           .map((colony) => {
+            if (colony.kind !== 'running') {
+              return {
+                key: colony.key,
+                label: colony.name,
+                value: 0,
+                share: 0,
+                text: colonyState(t, colony),
+                color: colony.kind === 'expired' ? ('warning' as const) : undefined,
+              };
+            }
             const seconds = Math.max(0, (colony.expiryMs ?? 0) - now) / 1000;
             return {
               key: colony.key,

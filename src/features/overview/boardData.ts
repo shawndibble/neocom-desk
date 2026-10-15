@@ -263,7 +263,7 @@ export interface ContractsBoardData {
   summary: ContractsBoardSummary;
   /** "Jita → Amarr" for the soonest courier, or null when it is not a courier or the names did not resolve. */
   route: string | null;
-  /** The same for every courier in `summary.items`, by contract id: `[from, to]` full location names. */
+  /** The same for every courier in `summary.rows`, by contract id: `[from, to]` full location names. */
   routes?: Record<number, readonly [string, string]>;
   needsReauth: boolean;
   fetchedAt: Date | null;
@@ -281,7 +281,7 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
   // Names are cached lookups; a failed one leaves that row without a route, never the board.
   const routes: Record<number, readonly [string, string]> = {};
   await Promise.all(
-    summary.items
+    summary.rows
       .filter((item) => item.kind === 'courier')
       .slice(0, 12)
       .map(async (item) => {
