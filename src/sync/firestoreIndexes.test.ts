@@ -117,6 +117,8 @@ describe('firestore.indexes.json field overrides', () => {
       'surveyIgnores',
       'surveyInfo',
       'publicContractOffersIndex',
+      // R2PublishState keeps ~12k type hashes in one map (#3784).
+      'systemConditions',
     ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
   });
