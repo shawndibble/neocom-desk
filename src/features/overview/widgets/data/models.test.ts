@@ -618,7 +618,7 @@ describe('mail table', () => {
 });
 
 describe('contracts table', () => {
-  const noItems = { inProgress: 2, dueSoon: 0, overdue: 0, soonest: null, items: [] };
+  const noItems = { inProgress: 2, exchanges: 0, dueSoon: 0, overdue: 0, soonest: null, items: [] };
   const data = (over: Record<string, unknown> = {}) => ({
     summary: { ...noItems, ...over },
     route: null,

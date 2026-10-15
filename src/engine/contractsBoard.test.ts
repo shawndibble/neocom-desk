@@ -36,9 +36,25 @@ const courier = (over: Partial<Contract>) =>
   });
 
 describe('summarizeContractsBoard', () => {
+  it('counts outstanding item exchanges the pilot issued or was sent, whatever their expiry', () => {
+    const summary = summarizeContractsBoard(
+      [
+        contract({ contract_id: 1 }),
+        contract({ contract_id: 2, issuer_id: 42, assignee_id: ME }),
+        contract({ contract_id: 3, issuer_id: 42 }),
+        contract({ contract_id: 4, for_corporation: true }),
+        contract({ contract_id: 5, status: 'finished' }),
+      ],
+      ME,
+      NOW
+    );
+    expect(summary.exchanges).toBe(2);
+  });
+
   it('is empty with nothing qualifying', () => {
     expect(summarizeContractsBoard([], ME, NOW)).toEqual({
       inProgress: 0,
+      exchanges: 0,
       dueSoon: 0,
       overdue: 0,
       soonest: null,
