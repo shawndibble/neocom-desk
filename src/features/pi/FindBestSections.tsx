@@ -159,13 +159,15 @@ export function FindBestControls({
       />
       {mode === 'picks' && (
         <span className="flex max-w-full flex-wrap items-center gap-2">
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase max-md:basis-full">
             {t('piPlan.find.make')}
           </span>
-          <span className="max-w-full overflow-x-auto">
+          <span className="max-w-full overflow-x-auto max-md:basis-full">
             <SegmentedControl<RecipeFilter>
               label={t('piPlan.find.make')}
               size={size}
+              uppercase={mdUp}
+              fill={!mdUp}
               value={filter}
               onChange={onFilter}
               options={[

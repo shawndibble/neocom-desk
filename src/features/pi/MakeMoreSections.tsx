@@ -829,8 +829,9 @@ export function RebuildPanel({
       title={t(
         view.quickWins.length > 0 ? 'piPlan.make.rebuildTitleThen' : 'piPlan.make.rebuildTitle'
       )}
+      wrapMeta
       meta={
-        <span className="text-[0.6875rem] text-text-dim tabular-nums">
+        <span className="text-[0.6875rem] text-text-dim tabular-nums max-md:basis-full">
           {t('piPlan.make.rebuildCount', {
             changed: view.headline.rebuildCount,
             total: view.headline.colonyCount,
