@@ -41,12 +41,13 @@ export function CommunityHeader({
     .filter((id): id is number => id !== null);
 
   return (
-    // On a phone the identity takes the row and Manage wraps under it, so the name is never squeezed.
-    <div className="flex flex-wrap items-start gap-3 rounded-xs border border-line bg-panel p-3 md:p-4">
-      <div className="flex min-w-0 flex-1 basis-64 items-start gap-3">
+    // Manage stays top-right on a phone too; the name wraps beside it.
+    <div className="flex items-start gap-3 rounded-xs border border-line bg-panel p-3 md:p-4">
+      {/* A grid, not a flex row: a stretched flex item doesn't derive its width from aspect-ratio, a grid item does. */}
+      <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] gap-3">
         <span
           aria-hidden="true"
-          className="grid size-10 shrink-0 place-items-center rounded-xs border border-accent-dim bg-panel-2 text-sm font-semibold text-accent md:size-11"
+          className="grid aspect-square min-h-10 place-items-center rounded-xs border border-accent-dim bg-panel-2 text-sm font-semibold text-accent"
         >
           {communityInitials(community.name)}
         </span>
