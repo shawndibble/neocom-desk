@@ -1,14 +1,26 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadSystemSecurity, readCachedSystemSecurity } from './systemSecurity';
+import {
+  loadSystemName,
+  loadSystemNameAndSecurity,
+  loadSystemSecurity,
+  readCachedSystemSecurity,
+} from './systemSecurity';
+
+// The bundled solar-system table: by default it cannot be read, so the ESI
+// path is what the cases below exercise; the local-table cases set it.
+const lookupSolarSystem = vi.hoisted(() => vi.fn());
+vi.mock('@/sde/solarSystems', () => ({ lookupSolarSystem }));
 
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
+  lookupSolarSystem.mockReset();
+  lookupSolarSystem.mockResolvedValue(undefined);
   await db.esiCache.clear();
 });
 afterEach(() => server.resetHandlers());
@@ -63,5 +75,31 @@ describe('readCachedSystemSecurity', () => {
     const security = await readCachedSystemSecurity(30000142);
 
     expect(security).toBeCloseTo(0.9459);
+  });
+});
+
+describe('the bundled solar-system table', () => {
+  const JITA = { id: 30000142, name: 'Jita', security: 0.9459, regionId: 10000002 };
+
+  it('answers name and security with no ESI request (the shared server errors on any)', async () => {
+    lookupSolarSystem.mockResolvedValue(JITA);
+
+    expect(await loadSystemSecurity(30000142)).toBeCloseTo(0.9459);
+    expect(await loadSystemName(30000142)).toBe('Jita');
+    expect(await loadSystemNameAndSecurity(30000142)).toEqual({ name: 'Jita', security: 0.9459 });
+  });
+
+  it('falls back to ESI for an id the table does not hold', async () => {
+    lookupSolarSystem.mockResolvedValue(null);
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/systems/31000007`, () =>
+        HttpResponse.json({ system_id: 31000007, name: 'J105443', security_status: -0.99 })
+      )
+    );
+
+    expect(await loadSystemNameAndSecurity(31000007)).toEqual({
+      name: 'J105443',
+      security: -0.99,
+    });
   });
 });

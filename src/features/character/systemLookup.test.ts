@@ -1,17 +1,30 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
 import { rejectBadEsiHeaders } from '@/esi/test-helpers';
 import { db } from '@/db';
+import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import { resolveSolarSystem, clearSystemLookupCache } from './systemLookup';
 
 const server = setupServer();
+
+// The local solar-system table. Tests that exercise the ESI fallback make it unreadable.
+const LOCAL_SYSTEMS = [{ id: 30000142, name: 'Jita', security: 0.9459, regionId: 10000002 }];
+let localTable: 'ok' | 'down' = 'down';
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadSolarSystems: async () => {
+    if (localTable === 'down') throw new Error('offline');
+    return LOCAL_SYSTEMS;
+  },
+}));
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(async () => {
+  localTable = 'down';
+  clearSolarSystemIndex();
   clearSystemLookupCache();
   await db.esiCache.clear();
 });
@@ -151,11 +164,30 @@ describe('resolveSolarSystem', () => {
       systemHandler(0.6587)
     );
 
-    expect(await resolveSolarSystem('Badivefi')).toBeNull();
+    expect(await resolveSolarSystem('Badivefi')).toBeUndefined();
     expect(await resolveSolarSystem('Badivefi')).toEqual({
       id: 30003888,
       name: 'Badivefi',
       security: 'highsec',
     });
+  });
+});
+
+describe('resolveSolarSystem from the local solar-system table', () => {
+  beforeEach(() => {
+    localTable = 'ok';
+  });
+
+  it('resolves a name with no ESI call at all', async () => {
+    // No ESI handler registered: onUnhandledRequest 'error' fails on any call.
+    expect(await resolveSolarSystem('jita')).toEqual({
+      id: 30000142,
+      name: 'Jita',
+      security: 'highsec',
+    });
+  });
+
+  it('says not found (null) for a name the table does not hold, without asking ESI', async () => {
+    expect(await resolveSolarSystem('Nowhere')).toBeNull();
   });
 });

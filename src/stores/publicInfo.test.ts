@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import { db } from '@/db';
 import { usePublicInfo } from './publicInfo';
 
 const CHAR_ID = 91;
@@ -81,7 +82,8 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
-beforeEach(() => {
+beforeEach(async () => {
+  await db.esiCache.clear();
   characterRequests = 0;
   affiliationRequests = 0;
   namesRequests = 0;
@@ -126,6 +128,31 @@ describe('usePublicInfo', () => {
   it('tolerates network failure without caching', async () => {
     server.use(http.get('https://esi.evetech.net/characters/:id', () => HttpResponse.error()));
     await expect(usePublicInfo.getState().load(CHAR_ID)).resolves.toBeUndefined();
+    expect(usePublicInfo.getState().byCharacterId[CHAR_ID]).toBeUndefined();
+  });
+
+  it('shows the names last seen on an offline cold start (empty store, ESI unreachable)', async () => {
+    await usePublicInfo.getState().load(CHAR_ID);
+    usePublicInfo.setState({ byCharacterId: {} });
+    server.use(
+      http.get('https://esi.evetech.net/characters/:id', () => HttpResponse.error()),
+      http.get('https://esi.evetech.net/corporations/:id', () => HttpResponse.error()),
+      http.get('https://esi.evetech.net/alliances/:id', () => HttpResponse.error())
+    );
+
+    await usePublicInfo.getState().load(CHAR_ID);
+
+    expect(usePublicInfo.getState().byCharacterId[CHAR_ID]).toEqual({
+      corporationName: 'Test Corp',
+      allianceName: 'Test Alliance',
+      corporationId: 1001,
+      allianceId: 2001,
+    });
+  });
+
+  it('stores nothing when the corporation was never cached and ESI is down', async () => {
+    server.use(http.get('https://esi.evetech.net/corporations/:id', () => HttpResponse.error()));
+    await usePublicInfo.getState().load(CHAR_ID);
     expect(usePublicInfo.getState().byCharacterId[CHAR_ID]).toBeUndefined();
   });
 });
@@ -180,9 +207,38 @@ describe('usePublicInfo.loadMany', () => {
 
   it('tolerates network failure without caching', async () => {
     server.use(
-      http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.error())
+      http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.error()),
+      http.get('https://esi.evetech.net/characters/:id', () => HttpResponse.error())
     );
     await expect(usePublicInfo.getState().loadMany([CHAR_ID])).resolves.toBeUndefined();
     expect(usePublicInfo.getState().byCharacterId[CHAR_ID]).toBeUndefined();
+  });
+
+  it('falls back to each character cached record when the batch POSTs are unreachable', async () => {
+    await usePublicInfo.getState().load(CHAR_ID);
+    usePublicInfo.setState({ byCharacterId: {} });
+    server.use(
+      http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.error()),
+      http.get('https://esi.evetech.net/characters/:id', () => HttpResponse.error()),
+      http.get('https://esi.evetech.net/corporations/:id', () => HttpResponse.error()),
+      http.get('https://esi.evetech.net/alliances/:id', () => HttpResponse.error())
+    );
+
+    await usePublicInfo.getState().loadMany([CHAR_ID, 92]);
+
+    expect(usePublicInfo.getState().byCharacterId[CHAR_ID]?.corporationName).toBe('Test Corp');
+    // 92 was never read on this device: nothing stored, so a later visit retries.
+    expect(usePublicInfo.getState().byCharacterId[92]).toBeUndefined();
+  });
+
+  it('serves names from the cache on a second batch without another names POST', async () => {
+    await usePublicInfo.getState().loadMany([CHAR_ID]);
+    usePublicInfo.setState({ byCharacterId: {} });
+    namesRequests = 0;
+
+    await usePublicInfo.getState().loadMany([CHAR_ID]);
+
+    expect(namesRequests).toBe(0);
+    expect(usePublicInfo.getState().byCharacterId[CHAR_ID]?.allianceName).toBe('Test Alliance');
   });
 });

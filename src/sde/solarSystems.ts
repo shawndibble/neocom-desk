@@ -51,7 +51,40 @@ export async function lookupSolarSystem(
   return byId.get(systemId) ?? null;
 }
 
+let nameIndex: Promise<ReadonlyMap<string, SolarSystemEntry> | null> | null = null;
+
+/**
+ * The snapshot as a lookup by lower-cased system name, or `null` if it could
+ * not be read. System names are unique, so this is the by-name twin of
+ * `loadSolarSystemsById` for a caller that holds only a name (a typed Build
+ * Plan system, a Shared Blueprint's system).
+ */
+export function loadSolarSystemsByName(): Promise<ReadonlyMap<string, SolarSystemEntry> | null> {
+  nameIndex ??= loadSolarSystemsById().then((byId) => {
+    if (!byId) {
+      nameIndex = null;
+      return null;
+    }
+    return new Map([...byId.values()].map((entry) => [entry.name.toLowerCase(), entry]));
+  });
+  return nameIndex;
+}
+
+/**
+ * The snapshot's entry for a system name (case-insensitive), `null` if the
+ * snapshot loaded and holds no such system, `undefined` if it could not be
+ * read — the same three answers as `lookupSolarSystem`.
+ */
+export async function lookupSolarSystemByName(
+  name: string
+): Promise<SolarSystemEntry | null | undefined> {
+  const byName = await loadSolarSystemsByName();
+  if (!byName) return undefined;
+  return byName.get(name.trim().toLowerCase()) ?? null;
+}
+
 /** Test-only: drops the memoized index so tests can swap the snapshot between cases. */
 export function clearSolarSystemIndex(): void {
   index = null;
+  nameIndex = null;
 }

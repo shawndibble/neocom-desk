@@ -1100,6 +1100,21 @@ describe('BuildPlanDetail build system', () => {
     expect(valueOf(systemInput())).toBe('Notasystem');
   });
 
+  it('says it could not check, not "no such system", when the lookup is unavailable', async () => {
+    resolveSolarSystem.mockResolvedValueOnce(undefined as never);
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness onUpdate={onUpdate} />);
+    await openOverride(user);
+
+    await user.type(systemInput(), 'Badivefi');
+    await user.tab();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't check that name");
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(valueOf(systemInput())).toBe('Badivefi');
+  });
+
   it('clears back to the hub system when the field is emptied', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();

@@ -1,19 +1,19 @@
 /**
  * Solar-system name -> id, for a Build Plan's build system.
  *
- * ESI's `/universe/ids` is an exact, case-insensitive match, not a search, so
- * this resolves a name the player has finished typing rather than powering an
- * autocomplete. The bundled SDE carries no system table (src/sde is market
- * types and blueprints only), and naming all ~5000 systems that appear in the
- * cost-index response would cost six `/universe/names` posts per session for a
- * list the player needs one entry of.
+ * Resolves a name the player has finished typing rather than powering an
+ * autocomplete. The local solar-system table (`market/systems.json`, read by
+ * `sde/solarSystems.ts`) is asked first, so a name resolves offline with its
+ * security band and no ESI call. Only when that table cannot be read does it
+ * fall back to ESI's `/universe/ids`, an exact, case-insensitive match.
  *
- * Resolutions are cached for the session under the lower-cased name: system
- * names never change, and a plan re-resolves the same one on every edit.
+ * ESI-path resolutions are cached for the session under the lower-cased name:
+ * system names never change, and a plan re-resolves the same one on every edit.
  */
 import { postUniverseIds } from '@/esi/endpoints';
 import { loadSystemSecurity } from '@/features/character/systemSecurity';
 import { securityBand, type SecurityBand } from '@/engine/securityStatus';
+import { lookupSolarSystemByName } from '@/sde/solarSystems';
 
 export interface SolarSystemRef {
   id: number;
@@ -37,16 +37,26 @@ export function clearSystemLookupCache(): void {
 }
 
 /**
- * Resolves one system name. `null` for a blank name, an unknown name, or an
- * ESI failure — the caller shows "not found" either way, and nothing here
- * throws (a Build Plan edit must never blank the results panel).
+ * Resolves one system name. `null` for a blank or unknown name; `undefined`
+ * when the name could not be checked at all (no local table and ESI
+ * unreachable) — "couldn't check" is not "not found", and the caller words
+ * them differently. Nothing here throws (a Build Plan edit must never blank
+ * the results panel).
  */
-export async function resolveSolarSystem(name: string): Promise<SolarSystemRef | null> {
+export async function resolveSolarSystem(name: string): Promise<SolarSystemRef | null | undefined> {
   const trimmed = name.trim();
   if (trimmed === '') return null;
   const key = trimmed.toLowerCase();
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
+
+  const local = await lookupSolarSystemByName(trimmed);
+  if (local !== undefined) {
+    // The table lists every system, so a miss in it is a real "not found".
+    return local === null
+      ? null
+      : { id: local.id, name: local.name, security: securityBand(local.security) };
+  }
 
   let found: SolarSystemRef | null = null;
   try {
@@ -70,7 +80,7 @@ export async function resolveSolarSystem(name: string): Promise<SolarSystemRef |
   } catch {
     // An unreachable ESI is not a wrong name: leave it uncached so the next
     // edit retries instead of pinning "not found" for the session.
-    return null;
+    return undefined;
   }
   cache.set(key, found);
   return found;

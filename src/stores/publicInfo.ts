@@ -1,14 +1,16 @@
 // Session cache of public character info (corp/alliance names) keyed by
-// character ID. Thin by design: durable API caching is a later milestone.
+// character ID. The fetches go through the esiCache-backed loaders in
+// `features/character/publicInfoData.ts` and `names.ts`, so a cold start
+// offline still shows the names last seen; the store itself stays in memory.
 import { create } from 'zustand';
-import {
-  getCharacterPublicInfo,
-  getCorporationPublicInfo,
-  getAlliancePublicInfo,
-  postCharactersAffiliation,
-  postUniverseNames,
-} from '@/esi/endpoints';
+import { postCharactersAffiliation } from '@/esi/endpoints';
 import { recordCharacterCorporation } from '@/auth/session';
+import {
+  loadPublicAllianceInfo,
+  loadPublicCharacterInfo,
+  loadPublicCorporationRecord,
+} from '@/features/character/publicInfoData';
+import { resolveNames } from '@/features/character/names';
 
 export interface PublicInfoEntry {
   corporationName: string | null;
@@ -38,43 +40,51 @@ interface PublicInfoState {
 
 const inflight = new Set<number>();
 
+/**
+ * One character's corp/alliance names through the cached loaders, or null when
+ * any of them is unavailable (offline and never seen) — a half-known entry is
+ * not stored, so the next visit retries instead of pinning "—".
+ */
+async function loadEntry(characterId: number): Promise<PublicInfoEntry | null> {
+  const info = await loadPublicCharacterInfo(characterId);
+  if (!info) return null;
+  // This response is the app's only source for which corporation a
+  // character is in — the SSO JWT carries no such claim — so it is also
+  // the only place a corp *change* can be noticed and the old corp's
+  // cached rows dropped (issue #293). Its own failure is not this store's
+  // to report: the names below are what the view is waiting for.
+  try {
+    await recordCharacterCorporation(characterId, info.corporation_id);
+  } catch {
+    // Dexie unavailable: re-learned on the next public-info read.
+  }
+  const corporation = await loadPublicCorporationRecord(info.corporation_id);
+  if (!corporation) return null;
+  let allianceName: string | null = null;
+  if (info.alliance_id !== undefined) {
+    const alliance = await loadPublicAllianceInfo(info.alliance_id);
+    if (!alliance) return null;
+    allianceName = alliance.name;
+  }
+  return {
+    corporationName: corporation.name,
+    allianceName,
+    corporationId: info.corporation_id,
+    allianceId: info.alliance_id,
+  };
+}
+
 export const usePublicInfo = create<PublicInfoState>((set, get) => ({
   byCharacterId: {},
   load: async (characterId) => {
     if (get().byCharacterId[characterId] || inflight.has(characterId)) return;
     inflight.add(characterId);
     try {
-      const info = (await getCharacterPublicInfo(characterId)).data;
-      if (!info) return;
-      // This response is the app's only source for which corporation a
-      // character is in — the SSO JWT carries no such claim — so it is also
-      // the only place a corp *change* can be noticed and the old corp's
-      // cached rows dropped (issue #293). Its own failure is not this store's
-      // to report: the names below are what the view is waiting for.
-      try {
-        await recordCharacterCorporation(characterId, info.corporation_id);
-      } catch {
-        // Dexie unavailable: re-learned on the next public-info read.
-      }
-      const corporationName =
-        (await getCorporationPublicInfo(info.corporation_id)).data?.name ?? null;
-      const allianceName =
-        info.alliance_id === undefined
-          ? null
-          : ((await getAlliancePublicInfo(info.alliance_id)).data?.name ?? null);
-      set((state) => ({
-        byCharacterId: {
-          ...state.byCharacterId,
-          [characterId]: {
-            corporationName,
-            allianceName,
-            corporationId: info.corporation_id,
-            allianceId: info.alliance_id,
-          },
-        },
-      }));
+      const entry = await loadEntry(characterId);
+      if (!entry) return;
+      set((state) => ({ byCharacterId: { ...state.byCharacterId, [characterId]: entry } }));
     } catch {
-      // Offline or ESI down: cache nothing so a later visit retries; UI shows "—".
+      // Dexie or ESI failure: cache nothing so a later visit retries; UI shows "—".
     } finally {
       inflight.delete(characterId);
     }
@@ -102,25 +112,38 @@ export const usePublicInfo = create<PublicInfoState>((set, get) => ({
         corpAndAllianceIds.add(affiliation.corporation_id);
         if (affiliation.alliance_id !== undefined) corpAndAllianceIds.add(affiliation.alliance_id);
       }
-      const names = await postUniverseNames([...corpAndAllianceIds]);
-      const nameById = new Map(names.map((name) => [name.id, name.name]));
+      const nameById = await resolveNames([...corpAndAllianceIds]);
       set((state) => {
         const byCharacterId = { ...state.byCharacterId };
         for (const affiliation of affiliations) {
+          const corporationName = nameById.get(affiliation.corporation_id);
+          const allianceName =
+            affiliation.alliance_id === undefined ? null : nameById.get(affiliation.alliance_id);
+          // A name that couldn't be resolved (offline, never seen) stores
+          // nothing, so a later visit retries instead of pinning "—".
+          if (corporationName === undefined || allianceName === undefined) continue;
           byCharacterId[affiliation.character_id] = {
-            corporationName: nameById.get(affiliation.corporation_id) ?? null,
+            corporationName,
             corporationId: affiliation.corporation_id,
             allianceId: affiliation.alliance_id,
-            allianceName:
-              affiliation.alliance_id === undefined
-                ? null
-                : (nameById.get(affiliation.alliance_id) ?? null),
+            allianceName,
           };
         }
         return { byCharacterId };
       });
     } catch {
-      // Offline or ESI down: cache nothing so a later visit retries; UI shows "—".
+      // The batched affiliation POST is not cached, so offline it fails: fall
+      // back to each character's cached record. Whatever is still unknown
+      // caches nothing, so a later visit retries; UI shows "—".
+      const entries = await Promise.all(toFetch.map((id) => loadEntry(id).catch(() => null)));
+      set((state) => {
+        const byCharacterId = { ...state.byCharacterId };
+        toFetch.forEach((id, i) => {
+          const entry = entries[i];
+          if (entry) byCharacterId[id] = entry;
+        });
+        return { byCharacterId };
+      });
     } finally {
       for (const characterId of toFetch) inflight.delete(characterId);
     }

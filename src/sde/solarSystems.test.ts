@@ -11,7 +11,12 @@ vi.mock('./loadMarketSde', () => ({
   loadSolarSystems: () => loadSolarSystems(),
 }));
 
-import { clearSolarSystemIndex, lookupSolarSystem } from './solarSystems';
+import {
+  clearSolarSystemIndex,
+  loadSolarSystemsByName,
+  lookupSolarSystem,
+  lookupSolarSystemByName,
+} from './solarSystems';
 
 beforeEach(() => {
   clearSolarSystemIndex();
@@ -50,5 +55,23 @@ describe('lookupSolarSystem', () => {
     expect(await lookupSolarSystem(30000142)).toBeUndefined();
 
     expect((await lookupSolarSystem(30000142))?.name).toBe('Jita');
+  });
+});
+
+describe('lookupSolarSystemByName', () => {
+  it('finds a system by name, ignoring case and surrounding space', async () => {
+    expect((await lookupSolarSystemByName('  jita '))?.id).toBe(30000142);
+    expect((await lookupSolarSystemByName('J105443'))?.regionId).toBe(11000001);
+  });
+
+  it('answers null for a name a loaded snapshot does not hold', async () => {
+    expect(await lookupSolarSystemByName('Nowhere')).toBeNull();
+  });
+
+  it('answers undefined when the snapshot itself cannot be read', async () => {
+    loadSolarSystems.mockRejectedValue(new Error('offline'));
+
+    expect(await lookupSolarSystemByName('Jita')).toBeUndefined();
+    expect(await loadSolarSystemsByName()).toBeNull();
   });
 });
