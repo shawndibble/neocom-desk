@@ -8229,7 +8229,7 @@
       "summary_other": "You have {{count}} open Requests.",
       "new": "New request…",
       "search": "Search Requests",
-      "searchPlaceholder": "Search item, requester or place",
+      "searchPlaceholder": "Search item, requester or place…",
       "filters": {
         "open": "Open",
         "mine": "Mine"
