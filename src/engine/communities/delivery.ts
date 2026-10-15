@@ -6,7 +6,8 @@
  * Idempotent by construction. `delivered` is recomputed from the whole set of
  * matching contracts on every run, never incremented, so running twice (or on
  * two devices) gives one answer. Because ESI only keeps recent contracts, what
- * an earlier run recorded is kept as a floor (`previousAuto`).
+ * an earlier run recorded is carried as a base (`previousAuto`), and only
+ * contracts that run had not already counted are added on top of it.
  *
  * Only the Request, the line, a quantity and contract ids ever leave this
  * module's result for Firestore: no prices, no issuer, no other contents.
@@ -88,6 +89,16 @@ function accepts(slot: DeliverySlot, contract: DeliveryContract, item: DeliveryI
   return true;
 }
 
+/**
+ * Whether a contract id is one a stored entry already counts. The recorded
+ * list keeps only the highest ids, so at the cap a lower id was trimmed, not new.
+ */
+function recordedTest(ids: readonly number[]): (id: number) => boolean {
+  const set = new Set(ids);
+  const floor = ids.length >= MAX_CONTRACT_IDS_PER_LINE ? Math.min(...ids) : -Infinity;
+  return (id) => set.has(id) || id < floor;
+}
+
 /** Matches contracts to slots; one entry per slot, in any order. */
 export function matchDeliveries(
   slots: readonly DeliverySlot[],
@@ -98,10 +109,15 @@ export function matchDeliveries(
     (a, b) => a.completedAt - b.completedAt || a.contractId - b.contractId
   );
   const counted = new Map<string, number>();
+  /** Of `counted`, what came from contracts the stored entry already records. */
+  const countedRecorded = new Map<string, number>();
+  const recorded = new Map<string, (id: number) => boolean>();
   const matched = new Map<string, Set<number>>();
   const flags = new Map<string, DeliveryFlag[]>();
   for (const slot of slots) {
     counted.set(slot.key, 0);
+    countedRecorded.set(slot.key, 0);
+    recorded.set(slot.key, recordedTest(slot.previousContractIds));
     matched.set(slot.key, new Set());
     flags.set(slot.key, []);
   }
@@ -117,6 +133,9 @@ export function matchDeliveries(
         const take = Math.min(room, left);
         left -= take;
         counted.set(slot.key, (counted.get(slot.key) ?? 0) + take);
+        if (recorded.get(slot.key)?.(contract.contractId)) {
+          countedRecorded.set(slot.key, (countedRecorded.get(slot.key) ?? 0) + take);
+        }
         matched.get(slot.key)?.add(contract.contractId);
         const asked = slot.line.runs;
         const list = flags.get(slot.key) ?? [];
@@ -140,7 +159,10 @@ export function matchDeliveries(
 
   const result = new Map<string, SlotDelivery>();
   for (const slot of slots) {
-    const auto = Math.max(counted.get(slot.key) ?? 0, slot.previousAuto);
+    // What an earlier run recorded from contracts ESI no longer shows is a base;
+    // what it recorded from contracts still visible is in `counted` already.
+    const aged = Math.max(0, slot.previousAuto - (countedRecorded.get(slot.key) ?? 0));
+    const auto = aged + (counted.get(slot.key) ?? 0);
     const ids = [...new Set([...slot.previousContractIds, ...(matched.get(slot.key) ?? [])])]
       .sort((a, b) => a - b)
       .slice(-MAX_CONTRACT_IDS_PER_LINE);

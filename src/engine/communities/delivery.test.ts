@@ -154,6 +154,56 @@ describe('matchDeliveries', () => {
     expect(out.get('a')).toMatchObject({ delivered: 120, contractIds: [1] });
   });
 
+  it('adds a new contract on top of one that has aged out of ESI', () => {
+    const out = matchDeliveries(
+      [slot('a', ore, 100, { previousAuto: 40, previousContractIds: [1] })],
+      [contract(2, [{ typeId: 100, quantity: 30, blueprint: null }])]
+    );
+    expect(out.get('a')).toMatchObject({ delivered: 70, contractIds: [1, 2] });
+  });
+
+  it('does not count a recorded contract again while ESI still shows it', () => {
+    const contracts = [
+      contract(1, [{ typeId: 100, quantity: 40, blueprint: null }]),
+      contract(2, [{ typeId: 100, quantity: 30, blueprint: null }]),
+    ];
+    const out = matchDeliveries(
+      [slot('a', ore, 100, { previousAuto: 40, previousContractIds: [1] })],
+      contracts
+    );
+    expect(out.get('a')?.delivered).toBe(70);
+    const again = matchDeliveries(
+      [slot('a', ore, 100, { previousAuto: 70, previousContractIds: [1, 2] })],
+      contracts
+    );
+    expect(again.get('a')?.delivered).toBe(70);
+  });
+
+  it('caps the aged-out figure plus new contracts at the Pledge', () => {
+    const out = matchDeliveries(
+      [slot('a', ore, 100, { previousAuto: 90, previousContractIds: [1] })],
+      [contract(2, [{ typeId: 100, quantity: 30, blueprint: null }])]
+    );
+    expect(out.get('a')?.delivered).toBe(100);
+  });
+
+  it('does not double count a contract whose id was trimmed from the recorded list', () => {
+    const contracts = Array.from({ length: MAX_CONTRACT_IDS_PER_LINE + 5 }, (_, i) =>
+      contract(i + 1, [{ typeId: 100, quantity: 1, blueprint: null }])
+    );
+    const first = matchDeliveries([slot('a', ore, 1000)], contracts).get('a')!;
+    const again = matchDeliveries(
+      [
+        slot('a', ore, 1000, {
+          previousAuto: first.delivered,
+          previousContractIds: first.contractIds,
+        }),
+      ],
+      contracts
+    ).get('a')!;
+    expect(again.delivered).toBe(MAX_CONTRACT_IDS_PER_LINE + 5);
+  });
+
   it('keeps the most recent contract ids when more than the cap match', () => {
     const contracts = Array.from({ length: MAX_CONTRACT_IDS_PER_LINE + 5 }, (_, i) =>
       contract(i + 1, [{ typeId: 100, quantity: 1, blueprint: null }])
