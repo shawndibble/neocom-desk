@@ -77,6 +77,46 @@ test.describe('PI Plan — Goal Planner', () => {
   });
 });
 
+test.describe('PI Plan — phone headings and filters (issue #3863)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await signInAndGoto(page, './planetary-industry/colonies');
+    await mockPlannerColonies(page);
+    await mockHubPrices(page);
+  });
+
+  test('the Rebuild panel title is not truncated at 390px', async ({ page }) => {
+    await page.goto('./planetary-industry/plan?q=make-more');
+    const heading = page.getByRole('heading', {
+      name: /^(What to change|Then, if you want more: rebuild)$/,
+    });
+    await expect(heading).toBeVisible({ timeout: 20_000 });
+    const fit = await heading.evaluate((el) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth);
+  });
+
+  test('all three Make segments sit inside the viewport at 390px', async ({ page }) => {
+    await page.goto('./planetary-industry/plan?q=find-best');
+    const make = page.getByRole('group', { name: 'Make' });
+    await expect(make).toBeVisible({ timeout: 60_000 });
+    const buttons = make.getByRole('button');
+    await expect(buttons).toHaveCount(3);
+    for (let i = 0; i < 3; i++) {
+      const box = (await buttons.nth(i).boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
+    }
+    const fit = await make.evaluate((el) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth);
+  });
+});
+
 test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
   const ALT_ID = 90000002;
 
