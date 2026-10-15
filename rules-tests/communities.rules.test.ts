@@ -6,13 +6,16 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 import { characterAuth, createRulesEnv } from './testEnv';
 
@@ -451,26 +454,63 @@ describe('shared Fittings', () => {
 
 // Requests (issue #3807, ADR 0021): the whole Community reads them; only the
 // callables write, so even the requester's own client writes are denied.
+// Pledges (issue #3808) are the exception: each Member writes their own.
 describe('Requests', () => {
   const REQ = `${C}/itemRequests/r1`;
+  const CLOSED_REQ = `${C}/itemRequests/r-closed`;
+  const EXPIRED_REQ = `${C}/itemRequests/r-expired`;
   const PLEDGE = `${REQ}/pledges/char:2`;
+  const DAY = 86_400_000;
+  const request = (over: Record<string, unknown> = {}) => ({
+    ownerUid: 'char:1',
+    ownerHash: 'hash-1',
+    ownerName: 'One',
+    location: 'Efa',
+    terms: '',
+    lines: [
+      { typeId: 1, name: 'Tritanium', quantity: 5, kind: 'item' },
+      { typeId: 2, name: 'Pyerite', quantity: 9, kind: 'item' },
+    ],
+    createdAt: 1,
+    lastActivityAt: 1,
+    expiresAt: Date.now() + 30 * DAY,
+    closed: false,
+    ...over,
+  });
+  const entry = (quantity: number, over: Record<string, unknown> = {}) => ({
+    quantity,
+    delivered: 0,
+    contractIds: [],
+    ...over,
+  });
+  const pledgeDoc = (lines: Record<string, unknown>, over: Record<string, unknown> = {}) => ({
+    ownerHash: 'hash-2',
+    communityId: 'c1',
+    lines,
+    updatedAt: serverTimestamp(),
+    ...over,
+  });
 
   beforeEach(async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
-      await setDoc(doc(db, REQ), {
-        ownerUid: 'char:1',
-        ownerHash: 'hash-1',
-        ownerName: 'One',
-        location: 'Efa',
-        terms: '',
-        lines: [{ typeId: 1, name: 'Tritanium', quantity: 5, kind: 'item' }],
-        createdAt: 1,
-        lastActivityAt: 1,
-        expiresAt: 2,
-        closed: false,
+      await setDoc(doc(db, REQ), request());
+      await setDoc(doc(db, CLOSED_REQ), request({ closed: true }));
+      await setDoc(doc(db, EXPIRED_REQ), request({ expiresAt: Date.now() - DAY }));
+      for (const parent of [CLOSED_REQ, EXPIRED_REQ]) {
+        await setDoc(doc(db, `${parent}/pledges/char:2`), {
+          ownerHash: 'hash-2',
+          communityId: 'c1',
+          lines: { 0: entry(1) },
+          updatedAt: new Date(),
+        });
+      }
+      await setDoc(doc(db, PLEDGE), {
+        ownerHash: 'hash-2',
+        communityId: 'c1',
+        lines: { 0: entry(1) },
+        updatedAt: new Date(),
       });
-      await setDoc(doc(db, PLEDGE), { lines: { 0: { quantity: 1, delivered: 0 } } });
     });
   });
 
@@ -494,7 +534,7 @@ describe('Requests', () => {
     }
   });
 
-  it('denies every client write, the requester’s and another Member’s alike', async () => {
+  it('denies every client write to a Request itself, the requester’s and another Member’s alike', async () => {
     for (const db of [
       characterAuth(env, 1, 'hash-1').firestore(),
       characterAuth(env, 2, 'hash-2').firestore(),
@@ -503,7 +543,260 @@ describe('Requests', () => {
       await assertFails(updateDoc(doc(db, REQ), { terms: 'hijacked' }));
       await assertFails(deleteDoc(doc(db, REQ)));
       await assertFails(setDoc(doc(db, `${C}/itemRequests/r2`), { ownerUid: 'char:1' }));
-      await assertFails(setDoc(doc(db, PLEDGE), { lines: {} }));
     }
+  });
+
+  describe('Pledges', () => {
+    const NEW_PLEDGE = (uid: number) => `${REQ}/pledges/char:${uid}`;
+
+    it('lets a Member create, update and withdraw their own Pledge', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(40), 1: entry(2) })));
+      await assertSucceeds(
+        setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(40, { delivered: 3, contractIds: [9] }) }))
+      );
+      await assertSucceeds(deleteDoc(doc(db, PLEDGE)));
+    });
+
+    it('lets a Member over-pledge: the quantity may exceed the need', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(5_000_000) })));
+    });
+
+    it('denies writing or withdrawing another Member’s Pledge', async () => {
+      const db = characterAuth(env, 1, 'hash-1').firestore();
+      const other = characterAuth(env, 3, 'hash-3').firestore();
+      await assertFails(
+        setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1) }, { ownerHash: 'hash-1' }))
+      );
+      await assertFails(deleteDoc(doc(db, PLEDGE)));
+      await assertFails(setDoc(doc(other, PLEDGE), pledgeDoc({ 0: entry(1) })));
+    });
+
+    it('denies the requester Pledging on their own Request', async () => {
+      const db = characterAuth(env, 1, 'hash-1').firestore();
+      await assertFails(
+        setDoc(doc(db, NEW_PLEDGE(1)), pledgeDoc({ 0: entry(1) }, { ownerHash: 'hash-1' }))
+      );
+    });
+
+    it('denies a non-Member and a transferred Character', async () => {
+      await assertFails(
+        setDoc(
+          doc(characterAuth(env, 3, 'hash-3').firestore(), NEW_PLEDGE(3)),
+          pledgeDoc({ 0: entry(1) }, { ownerHash: 'hash-3' })
+        )
+      );
+      await assertFails(
+        setDoc(
+          doc(characterAuth(env, 2, 'hash-2-new-owner').firestore(), PLEDGE),
+          pledgeDoc({ 0: entry(1) }, { ownerHash: 'hash-2-new-owner' })
+        )
+      );
+    });
+
+    it('denies a Pledge on a closed or an expired Request', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertFails(
+        setDoc(doc(db, `${CLOSED_REQ}/pledges/char:2`), pledgeDoc({ 0: entry(1) }))
+      );
+      await assertFails(
+        setDoc(doc(db, `${EXPIRED_REQ}/pledges/char:2`), pledgeDoc({ 0: entry(1) }))
+      );
+    });
+
+    it('denies a quantity that is not a positive integer or is beyond the cap', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      for (const quantity of [0, -4, 1.5, '7', 1_000_000_000_001]) {
+        await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(quantity as number) })));
+      }
+      await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1_000_000_000_000) })));
+    });
+
+    it('denies a line the Request does not have, and keys that are not line indexes', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 2: entry(1) })));
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 49: entry(1) })));
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 50: entry(1) })));
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ x: entry(1) })));
+    });
+
+    it('validates every contract id: positive integers, at most 20 a line', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertSucceeds(
+        setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1, { contractIds: [1, 2, 3, 19] }) }))
+      );
+      await assertSucceeds(
+        setDoc(
+          doc(db, PLEDGE),
+          pledgeDoc({ 0: entry(1, { contractIds: Array.from({ length: 20 }, (_, i) => i + 1) }) })
+        )
+      );
+      for (const contractIds of [
+        ['x'],
+        [1.5],
+        [0],
+        [-3],
+        [1, 'a' + 'b'.repeat(5000)],
+        [{ a: 1 }],
+      ]) {
+        await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1, { contractIds }) })));
+      }
+    });
+
+    it('still allows a write that changes several lines at once', async () => {
+      const SEVERAL = 4;
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(
+          doc(ctx.firestore(), REQ),
+          request({
+            lines: Array.from({ length: SEVERAL }, (_, i) => ({
+              typeId: i + 1,
+              name: `T${i}`,
+              quantity: 5,
+              kind: 'item',
+            })),
+          })
+        );
+      });
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      const lines = Object.fromEntries(
+        Array.from({ length: SEVERAL }, (_, i) => [
+          String(i),
+          entry(3, { contractIds: [i + 1, i + 100] }),
+        ])
+      );
+      await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc(lines)));
+    });
+
+    it('denies lines or an entry that is not a map', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertFails(
+        setDoc(doc(db, PLEDGE), pledgeDoc([entry(1)] as unknown as Record<string, unknown>))
+      );
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: 5 })));
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: [1] })));
+      await assertFails(
+        setDoc(doc(db, PLEDGE), pledgeDoc('x' as unknown as Record<string, unknown>))
+      );
+    });
+
+    it('denies more lines than a Request can have', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      const lines = Object.fromEntries(Array.from({ length: 51 }, (_, i) => [String(i), entry(1)]));
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc(lines)));
+    });
+
+    it('denies an update on a closed or an expired Request, but still lets the Member withdraw', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      for (const parent of [CLOSED_REQ, EXPIRED_REQ]) {
+        const ref = doc(db, `${parent}/pledges/char:2`);
+        await assertFails(setDoc(ref, pledgeDoc({ 0: entry(9) })));
+        await assertSucceeds(deleteDoc(ref));
+      }
+    });
+
+    it('denies a Pledge on a Request that does not exist', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertFails(
+        setDoc(doc(db, `${C}/itemRequests/nope/pledges/char:2`), pledgeDoc({ 0: entry(1) }))
+      );
+    });
+
+    it('denies a wrong or missing communityId', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1) }, { communityId: 'c2' })));
+      const { communityId: _drop, ...without } = pledgeDoc({ 0: entry(1) });
+      void _drop;
+      await assertFails(setDoc(doc(db, PLEDGE), without));
+    });
+
+    it('lets a Member change one line while another stands unchanged and stale', async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), PLEDGE), {
+          ownerHash: 'hash-2',
+          communityId: 'c1',
+          lines: { 0: entry(1), 1: entry(2) },
+          updatedAt: new Date(Date.now() - 30 * DAY),
+        });
+      });
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1), 1: entry(8) })));
+    });
+
+    it('denies a departed Member and a transferred Character writing or withdrawing', async () => {
+      const transferred = characterAuth(env, 2, 'hash-2-new-owner').firestore();
+      await assertFails(
+        setDoc(
+          doc(transferred, PLEDGE),
+          pledgeDoc({ 0: entry(1) }, { ownerHash: 'hash-2-new-owner' })
+        )
+      );
+      await assertFails(deleteDoc(doc(transferred, PLEDGE)));
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await deleteDoc(doc(ctx.firestore(), MEMBER_2));
+      });
+      const departed = characterAuth(env, 2, 'hash-2').firestore();
+      await assertFails(setDoc(doc(departed, PLEDGE), pledgeDoc({ 0: entry(1) })));
+      await assertFails(deleteDoc(doc(departed, PLEDGE)));
+    });
+
+    describe('collection-group read by communityId', () => {
+      const board = (
+        db: ReturnType<typeof characterAuth>['firestore'] extends () => infer F ? F : never,
+        id: string
+      ) => getDocs(query(collectionGroup(db, 'pledges'), where('communityId', '==', id)));
+
+      it('lets a Member read their own Community’s Pledges in one query', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        await assertSucceeds(board(db, 'c1'));
+      });
+
+      it('denies a Member of another Community, a non-Member, a visitor and a transferred Character', async () => {
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          await setDoc(doc(ctx.firestore(), 'communities/c2/members/char:3'), {
+            ownerHash: 'hash-3',
+            joinedAt: 1,
+            characterName: 'Three',
+          });
+          await setDoc(doc(ctx.firestore(), 'communities/c2/itemRequests/x/pledges/char:3'), {
+            ownerHash: 'hash-3',
+            communityId: 'c2',
+            lines: { 0: entry(1) },
+            updatedAt: new Date(),
+          });
+        });
+        await assertFails(board(characterAuth(env, 3, 'hash-3').firestore(), 'c1'));
+        await assertSucceeds(board(characterAuth(env, 3, 'hash-3').firestore(), 'c2'));
+        await assertFails(board(characterAuth(env, 4, 'hash-4').firestore(), 'c1'));
+        await assertFails(board(env.unauthenticatedContext().firestore(), 'c1'));
+        await assertFails(board(characterAuth(env, 2, 'hash-2-new-owner').firestore(), 'c1'));
+      });
+
+      it('denies an unfiltered query and one filtered to a Community the Member is not in', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        await assertFails(getDocs(collectionGroup(db, 'pledges')));
+        await assertFails(board(db, 'c2'));
+      });
+    });
+
+    it('denies a malformed entry or document', async () => {
+      const db = characterAuth(env, 2, 'hash-2').firestore();
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({})));
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: { quantity: 1 } })));
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1, { extra: true }) })));
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1, { delivered: -1 }) })));
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1, { contractIds: 'a' }) })));
+      await assertFails(
+        setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1, { contractIds: new Array(21).fill(1) }) }))
+      );
+      await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1) }, { extra: 1 })));
+      await assertFails(
+        setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1) }, { updatedAt: new Date(5) }))
+      );
+      await assertFails(
+        setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1) }, { ownerHash: 'hash-9' }))
+      );
+    });
   });
 });

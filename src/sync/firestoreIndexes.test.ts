@@ -119,8 +119,26 @@ describe('firestore.indexes.json field overrides', () => {
       'publicContractOffersIndex',
       // R2PublishState keeps ~12k type hashes in one map (#3784).
       'systemConditions',
+      // The Community board reads every Pledge in one collection-group query (#3808).
+      'pledges',
     ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
+  });
+
+  it('indexes pledges by communityId at collection and collection-group scope', () => {
+    // `loadCommunityPledges` runs `collectionGroup('pledges').where('communityId', '==', id)`;
+    // a collection-group scope index is never automatic.
+    expect(overridesFor('pledges')).toEqual([
+      {
+        collectionGroup: 'pledges',
+        fieldPath: 'communityId',
+        ttl: false,
+        indexes: [
+          { order: 'ASCENDING', queryScope: 'COLLECTION' },
+          { order: 'ASCENDING', queryScope: 'COLLECTION_GROUP' },
+        ],
+      },
+    ]);
   });
 
   it('expires shares by a TTL policy on expiresAt, and indexes none of their fields', () => {

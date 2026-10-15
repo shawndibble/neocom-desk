@@ -1,13 +1,34 @@
 /**
  * Community Requests client (issue #3807, ADR 0021): the board reads through
  * Firestore under the membership rules; posting, extending, closing and
- * reopening go through the Request callables, which hold the caps. Firestore
- * here is the `lite` build (no listeners), so callers refetch after a change.
+ * reopening go through the Request callables, which hold the caps. Pledges
+ * (issue #3808) are the Member's own documents, written here directly under
+ * the rules. Firestore here is the `lite` build (no listeners), so callers
+ * refetch after a change.
  */
-import { collection, getDocs } from 'firebase/firestore/lite';
-import type { CommunityRequest, RequestLine, RequestLineKind } from '@/engine/communities/requests';
+import {
+  collection,
+  collectionGroup,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from 'firebase/firestore/lite';
+import { db as localDb } from '@/db';
+import type {
+  CommunityRequest,
+  PledgeEntry,
+  RequestLine,
+  RequestLineKind,
+  RequestPledge,
+} from '@/engine/communities/requests';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
+import { uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
 import { callCommunity } from './communityStore';
 
@@ -99,4 +120,126 @@ export async function setRequestClosed(
     requestId,
     closed,
   });
+}
+
+type PledgeLines = RequestPledge['lines'];
+
+/** A Pledge document as stored: the lines keyed by index. Null when it does not read as one. */
+function readPledge(uid: string, d: Record<string, unknown>): RequestPledge | null {
+  if (typeof d.lines !== 'object' || d.lines === null) return null;
+  const lines: Record<number, PledgeEntry> = {};
+  for (const [key, raw] of Object.entries(d.lines as Record<string, unknown>)) {
+    const index = Number(key);
+    const e = raw as Record<string, unknown> | null;
+    if (!Number.isInteger(index) || typeof e !== 'object' || e === null) continue;
+    if (typeof e.quantity !== 'number') continue;
+    lines[index] = {
+      quantity: e.quantity,
+      delivered: typeof e.delivered === 'number' ? e.delivered : 0,
+      contractIds: Array.isArray(e.contractIds)
+        ? e.contractIds.filter((id): id is number => typeof id === 'number')
+        : [],
+    };
+  }
+  const stamp = d.updatedAt as { toMillis?: () => number } | undefined;
+  return { uid, lines, updatedAt: stamp?.toMillis?.() ?? 0 };
+}
+
+/** Every Member's Pledges on one Request. */
+export async function loadPledges(
+  characterId: number,
+  communityId: string,
+  requestId: string
+): Promise<RequestPledge[]> {
+  const override = communityBackendOverride();
+  if (override?.loadPledges) return override.loadPledges(communityId, requestId);
+  await ensureSignedIn(characterId);
+  const snap = await getDocs(
+    collection(getSyncFirestore(), 'communities', communityId, 'itemRequests', requestId, 'pledges')
+  );
+  return snap.docs
+    .map((entry) => readPledge(entry.id, entry.data()))
+    .filter((pledge): pledge is RequestPledge => pledge !== null);
+}
+
+/**
+ * Every Pledge in a Community, by Request id, in ONE collection-group query on
+ * `pledges` filtered by `communityId` (each Pledge repeats its Community, and
+ * the rules bind that field to its path). Needs the collection-group index
+ * and rule in firestore.indexes.json / firestore.rules to be deployed.
+ */
+export async function loadCommunityPledges(
+  characterId: number,
+  communityId: string
+): Promise<Map<string, RequestPledge[]>> {
+  const found = new Map<string, RequestPledge[]>();
+  const override = communityBackendOverride();
+  if (override?.loadAllPledges) {
+    for (const [requestId, list] of Object.entries(override.loadAllPledges(communityId))) {
+      found.set(requestId, list);
+    }
+    return found;
+  }
+  await ensureSignedIn(characterId);
+  const snap = await getDocs(
+    query(collectionGroup(getSyncFirestore(), 'pledges'), where('communityId', '==', communityId))
+  );
+  for (const entry of snap.docs) {
+    const requestId = entry.ref.parent.parent?.id;
+    const pledge = readPledge(entry.id, entry.data());
+    if (!requestId || !pledge) continue;
+    found.set(requestId, [...(found.get(requestId) ?? []), pledge]);
+  }
+  return found;
+}
+
+/**
+ * Rewrites this Character's Pledge on one Request: reads the stored document
+ * first (so a delivery marked from another device is kept), applies `change`,
+ * then writes it, or deletes it when no line is left. Returns the new Pledge,
+ * null when withdrawn.
+ */
+export async function updateMyPledge(
+  characterId: number,
+  communityId: string,
+  requestId: string,
+  change: (lines: PledgeLines) => PledgeLines
+): Promise<RequestPledge | null> {
+  const uid = uidForCharacter(characterId);
+  const override = communityBackendOverride();
+  if (override?.loadPledges && override.savePledge) {
+    const mine = override.loadPledges(communityId, requestId).find((p) => p.uid === uid);
+    const next = change(mine?.lines ?? {});
+    override.savePledge(communityId, requestId, Object.keys(next).length === 0 ? null : next);
+    return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
+  }
+  await ensureSignedIn(characterId);
+  const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+  if (!ownerHash) throw new Error('This Character has no owner hash yet');
+  const ref = doc(
+    getSyncFirestore(),
+    'communities',
+    communityId,
+    'itemRequests',
+    requestId,
+    'pledges',
+    uid
+  );
+  const stored = await getDoc(ref);
+  const before = stored.exists() ? readPledge(uid, stored.data()) : null;
+  const next = change(before?.lines ?? {});
+  if (Object.keys(next).length === 0) {
+    await deleteDoc(ref);
+    return null;
+  }
+  const lines: Record<string, { quantity: number; delivered: number; contractIds: number[] }> = {};
+  for (const [index, entry] of Object.entries(next)) {
+    lines[index] = {
+      quantity: entry.quantity,
+      delivered: entry.delivered,
+      contractIds: [...(entry.contractIds ?? [])],
+    };
+  }
+  await setDoc(ref, { ownerHash, communityId, lines, updatedAt: serverTimestamp() });
+  return readPledge(uid, (await getDoc(ref)).data() ?? {});
 }

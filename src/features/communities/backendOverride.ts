@@ -9,7 +9,7 @@
  * (`sharedFittings.ts`, `sharedPlans.ts`) reading "no stand-in".
  */
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
-import type { CommunityRequest } from '@/engine/communities/requests';
+import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedPlan } from '@/engine/communities/sharedPlans';
 import type { CommunityMember, CommunitySummary, JoinRequest } from './communityStore';
@@ -26,6 +26,16 @@ export interface CommunityBackendOverride {
   loadFittings?: (communityId: string) => SharedFitting[];
   /** Every Request on the board, any status. */
   loadItemRequests?: (communityId: string) => CommunityRequest[];
+  /** Every Member's Pledges on one Request. */
+  loadPledges?: (communityId: string, requestId: string) => RequestPledge[];
+  /** Every Pledge in the Community, by Request id. */
+  loadAllPledges?: (communityId: string) => Record<string, RequestPledge[]>;
+  /** Writes (or, with null, withdraws) the signed-in Member's Pledge on one Request. */
+  savePledge?: (
+    communityId: string,
+    requestId: string,
+    lines: RequestPledge['lines'] | null
+  ) => void;
   /** Every Skill Plan shared into the Community, by anyone. */
   loadPlans?: (communityId: string) => SharedPlan[];
 }

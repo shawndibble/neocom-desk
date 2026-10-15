@@ -32,7 +32,10 @@ import {
   type CreateCommunityInput,
   type JoinCommunityInput,
 } from './communities.js';
-import { REQUESTS_COLLECTION as ITEM_REQUESTS_COLLECTION } from './communityRequests.js';
+import {
+  PLEDGES_COLLECTION,
+  REQUESTS_COLLECTION as ITEM_REQUESTS_COLLECTION,
+} from './communityRequests.js';
 
 const LIBRARY_COLLECTION = 'library';
 const REQUESTS_COLLECTION = 'requests';
@@ -370,6 +373,23 @@ export async function decideJoinRequest(
 }
 
 /**
+ * Queues the deletion of one Member's Pledge on every Request of a Community
+ * (the Pledge doc id is the Pledger's uid; deleting one that does not exist is
+ * harmless). Returns the delete promises so the caller can await them.
+ */
+export async function queuePledgeDeletes(
+  db: Firestore,
+  writer: { delete: (ref: FirebaseFirestore.DocumentReference) => Promise<unknown> },
+  communityId: string,
+  uid: string
+): Promise<Promise<unknown>[]> {
+  const board = await communityRef(db, communityId)
+    .collection(ITEM_REQUESTS_COLLECTION)
+    .listDocuments();
+  return board.map((request) => writer.delete(request.collection(PLEDGES_COLLECTION).doc(uid)));
+}
+
+/**
  * Everything one Member shared into a Community: their blueprint library
  * chunks, their shared Fittings (issue #3605), their shared Skill Plans and
  * their Requests with the Pledges under them. Every delete-on-leave path goes
@@ -391,9 +411,14 @@ async function deleteMemberShares(db: Firestore, communityId: string, uid: strin
     .where('ownerUid', '==', uid)
     .get();
   for (const request of posted.docs) await db.recursiveDelete(request.ref);
+  // Their Pledges on other Members' Requests (the doc id is the Pledger's uid).
   const writer = db.bulkWriter();
+  const pledgeDeletes = await queuePledgeDeletes(db, writer, communityId, uid);
   // Awaited, so a delete that fails after its retries fails the leave rather than orphaning a readable copy.
-  const deletes = [...fittings.docs, ...plans.docs].map((shared) => writer.delete(shared.ref));
+  const deletes = [
+    ...pledgeDeletes,
+    ...[...fittings.docs, ...plans.docs].map((shared) => writer.delete(shared.ref)),
+  ];
   await writer.close();
   await Promise.all(deletes);
 }

@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, SlideOver } from '@/components/ui';
 import {
+  canPledge,
+  isStalePledge,
   lineProgress,
+  withPledgeLine,
+  withdrawPledgeLine,
   type CommunityRequest,
   type RequestLine,
   type RequestPledge,
@@ -11,10 +15,10 @@ import { formatAge } from '@/lib/age';
 import { itemsSummary, mailSafe, mailSubject } from '@/engine/communities/requestMail';
 import { characterIdForUid } from '@/sync/uid';
 import { MessageRequesterButton } from './MessageRequesterButton';
-import { PledgeBar } from './PledgeBar';
+import { PledgeRow } from './PledgeRow';
 import { callableErrorReason } from './callableError';
 import { daysLeft } from './requestFormat';
-import { extendRequest, setRequestClosed } from './requestStore';
+import { extendRequest, setRequestClosed, updateMyPledge } from './requestStore';
 
 /** "BPC, runs 10, ME 10": what the requester asked of a blueprint line, empty for a plain item. */
 function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unknown>) => string) {
@@ -30,15 +34,18 @@ function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unkn
 }
 
 /**
- * A Request's side panel, read-only: its terms and each line's progress. The
- * requester also gets Extend 30 days and Close request (Reopen once closed);
- * everyone else gets Message <requester>…, which opens an in-game mail to them
- * (Pledging is a later ticket). `pledges` is empty until then, and a line shows
- * 0 pledged.
+ * A Request's side panel: its terms and each line's progress. A Member who
+ * can Pledge (any Member but the requester, while the Request is open) also
+ * gets each line's quantity field with Pledge, Update pledge and Withdraw
+ * (issue #3808); Pledges are written straight to the Member's own document.
+ * The requester gets Extend 30 days and Close request (Reopen once closed)
+ * and no Pledge controls; everyone else also gets Message <requester>…, which
+ * opens an in-game mail to them.
  */
 export function RequestPanel({
   request,
   mine,
+  myUid,
   pledges,
   now,
   characterId,
@@ -46,9 +53,11 @@ export function RequestPanel({
   communityName,
   onClose,
   onChanged,
+  refreshPledges,
 }: {
   request: CommunityRequest;
   mine: boolean;
+  myUid: string;
   pledges: readonly RequestPledge[];
   now: number;
   characterId: number;
@@ -57,10 +66,37 @@ export function RequestPanel({
   onClose: () => void;
   /** The Request changed on the server: refetch the board. */
   onChanged: () => void;
+  /** Re-reads this Request's Pledges into the board after a Pledge write. */
+  refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
 }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState<'extend' | 'close' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pledgeBusy, setPledgeBusy] = useState<string | null>(null);
+  const [pledgeError, setPledgeError] = useState<string | null>(null);
+
+  // The board only loads Pledges for open Requests, and may be minutes old: read this one fresh.
+  useEffect(() => {
+    refreshPledges(request.id).catch(() =>
+      setPledgeError(t('communities.board.pledgesLoadFailed'))
+    );
+  }, [request.id, refreshPledges, t]);
+
+  const myPledge = pledges.find((p) => p.uid === myUid);
+  const mayPledge = canPledge(request, myUid, now);
+
+  const changePledge = async (key: string, change: Parameters<typeof updateMyPledge>[3]) => {
+    setPledgeBusy(key);
+    setPledgeError(null);
+    try {
+      await updateMyPledge(characterId, communityId, request.id, change);
+      await refreshPledges(request.id);
+    } catch {
+      setPledgeError(t('communities.board.pledgeFailed'));
+    } finally {
+      setPledgeBusy(null);
+    }
+  };
 
   const run = async (which: 'extend' | 'close', action: () => Promise<unknown>) => {
     setBusy(which);
@@ -116,18 +152,34 @@ export function RequestPanel({
         )}
         <ul className="divide-y divide-line" aria-label={t('communities.board.linesLabel')}>
           {request.lines.map((line, index) => {
-            const spec = lineSpec(line, t);
+            const own = myPledge?.lines[index];
+            const key = `${line.typeId}:${line.kind}`;
             return (
-              <li key={`${line.typeId}:${line.kind}`} className="space-y-1.5 px-1 py-2.5">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="font-medium">{line.name}</span>
-                  {spec && <span className="text-xs text-text-dim">{spec}</span>}
-                </div>
-                <PledgeBar {...lineProgress(index, line, pledges)} />
-              </li>
+              <PledgeRow
+                key={key}
+                line={line}
+                spec={lineSpec(line, t)}
+                progress={lineProgress(index, line, pledges)}
+                own={own}
+                stale={own !== undefined && isStalePledge(own, myPledge?.updatedAt ?? 0, now)}
+                canPledge={mayPledge}
+                busy={pledgeBusy === key}
+                onPledge={(quantity) =>
+                  void changePledge(key, (lines) => withPledgeLine(lines, index, quantity))
+                }
+                onWithdraw={() =>
+                  void changePledge(key, (lines) => withdrawPledgeLine(lines, index))
+                }
+              />
             );
           })}
         </ul>
+        {mayPledge && <p className="text-xs text-text-dim">{t('communities.board.pledgeNote')}</p>}
+        {pledgeError && (
+          <p role="alert" className="text-xs text-danger">
+            {pledgeError}
+          </p>
+        )}
         {requesterId !== null && (
           <MessageRequesterButton
             characterId={characterId}

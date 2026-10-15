@@ -3,9 +3,10 @@
  * Request is one Member's ask for items; its status is derived from Pledges
  * and deliveries, never stored. No Firestore, fetch or DOM here.
  *
- * Pledges (issue #3808) are modelled now so the board's progress and status
- * already read them: a Member's Pledge document keys its entries by line
- * index. Until that ticket writes any, every list passed in is empty.
+ * A Pledge (issue #3808) is a Member's non-exclusive note of a quantity they
+ * can provide on one line; their document keys its entries by line index. Each
+ * entry also reserves `delivered` and `contractIds` for delivery marking
+ * (#3809), which this ticket never writes beyond preserving them.
  */
 
 /** Mirrors `functions/src/communityRequests.ts`, which enforces them. */
@@ -14,6 +15,10 @@ export const MAX_OPEN_REQUESTS_PER_MEMBER = 10;
 export const MAX_LOCATION_LENGTH = 100;
 export const MAX_TERMS_LENGTH = 140;
 export const REQUEST_LIFETIME_DAYS = 30;
+/** Far above any real stack; the rules enforce the same cap on a Pledge. */
+export const MAX_PLEDGE_QUANTITY = 1_000_000_000_000;
+/** A Pledge with nothing delivered this long after it was last written greys out. */
+export const STALE_PLEDGE_DAYS = 14;
 
 export type RequestLineKind = 'item' | 'bpc' | 'bpo';
 
@@ -45,12 +50,16 @@ export interface CommunityRequest {
 export interface PledgeEntry {
   quantity: number;
   delivered: number;
+  /** The contracts behind `delivered` (#3809); absent on a Pledge read from before that. */
+  contractIds?: readonly number[];
 }
 
 /** One Member's Pledges on a Request, keyed by line index. */
 export interface RequestPledge {
   uid: string;
   lines: Readonly<Record<number, PledgeEntry>>;
+  /** When the Member last wrote this document, ms since epoch. */
+  updatedAt: number;
 }
 
 export interface LineProgress {
@@ -222,3 +231,95 @@ export const isBlueprintName = (name: string) => / Blueprint$/.test(name);
 /** The kind a line starts as: a copy for a blueprint (what a requester usually wants), else an item. */
 export const defaultKind = (name: string): RequestLineKind =>
   isBlueprintName(name) ? 'bpc' : 'item';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Pledges per Request id, as the board and My pledges read them. */
+export type PledgesByRequest = ReadonlyMap<string, readonly RequestPledge[]>;
+
+/** Any Member but the requester may Pledge, while the Request is open. */
+export function canPledge(request: CommunityRequest, myUid: string, now: number): boolean {
+  return request.ownerUid !== myUid && isOpenRequest(request, now);
+}
+
+/** How far the Pledges overshoot the need; Pledges reserve nothing, so this never blocks. */
+export function pledgeOverage(progress: LineProgress): number {
+  return Math.max(0, progress.pledged - progress.needed);
+}
+
+/** What a line's quantity field starts as: the Member's own Pledge, else what is still uncovered. */
+export function defaultPledgeQuantity(progress: LineProgress, own: number | undefined): number {
+  if (own !== undefined) return own;
+  const uncovered = progress.needed - progress.pledged;
+  return uncovered > 0 ? uncovered : progress.needed;
+}
+
+/** A quantity typed for a Pledge: a positive whole number, no larger than the rules allow. */
+export function parsePledgeQuantity(text: string): number | null {
+  const value = parseQuantity(text);
+  return value !== null && value <= MAX_PLEDGE_QUANTITY ? value : null;
+}
+
+type PledgeLines = Readonly<Record<number, PledgeEntry>>;
+
+/** The lines with `quantity` Pledged on `index`; a repeat keeps what was delivered and its contracts. */
+export function withPledgeLine(lines: PledgeLines, index: number, quantity: number): PledgeLines {
+  const before = lines[index];
+  return {
+    ...lines,
+    [index]: {
+      quantity,
+      delivered: before?.delivered ?? 0,
+      contractIds: [...(before?.contractIds ?? [])],
+    },
+  };
+}
+
+/** The lines without `index`. */
+export function withdrawPledgeLine(lines: PledgeLines, index: number): PledgeLines {
+  const rest = { ...lines };
+  delete rest[index];
+  return rest;
+}
+
+/** Nothing delivered within the stale window since the Pledge was last written: it greys out, nothing releases. */
+export function isStalePledge(entry: PledgeEntry, updatedAt: number, now: number): boolean {
+  return entry.delivered === 0 && now - updatedAt >= STALE_PLEDGE_DAYS * DAY_MS;
+}
+
+export interface MyPledgeRow {
+  request: CommunityRequest;
+  index: number;
+  line: RequestLine;
+  entry: PledgeEntry;
+  updatedAt: number;
+  stale: boolean;
+}
+
+/** One Member's Pledges on open Requests, newest first, for the My pledges slide-out. */
+export function myPledgeRows(
+  requests: readonly CommunityRequest[],
+  pledges: PledgesByRequest,
+  myUid: string,
+  now: number
+): MyPledgeRow[] {
+  const rows: MyPledgeRow[] = [];
+  for (const request of requests) {
+    if (!isOpenRequest(request, now)) continue;
+    const mine = (pledges.get(request.id) ?? []).find((p) => p.uid === myUid);
+    if (!mine) continue;
+    request.lines.forEach((line, index) => {
+      const entry = mine.lines[index];
+      if (!entry) return;
+      rows.push({
+        request,
+        index,
+        line,
+        entry,
+        updatedAt: mine.updatedAt,
+        stale: isStalePledge(entry, mine.updatedAt, now),
+      });
+    });
+  }
+  return rows.sort((a, b) => b.updatedAt - a.updatedAt || a.index - b.index);
+}
