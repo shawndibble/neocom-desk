@@ -546,8 +546,12 @@ const contracts: Builder = (feeds, { t, now }) => {
         tone,
       }
     : {
-        value: count(summary.inProgress),
-        unit: t('overview.widgets.contracts.unit'),
+        // Hauls lead; with none in flight, open item exchanges are the fact worth a number, not a 0.
+        value: count(summary.inProgress === 0 ? summary.exchanges : summary.inProgress),
+        unit:
+          summary.inProgress === 0 && summary.exchanges > 0
+            ? t('overview.widgets.contracts.exchangesUnit')
+            : t('overview.widgets.contracts.unit'),
         secondary: { text: t('overview.board.contractsNothingDue') },
         tone,
       };
