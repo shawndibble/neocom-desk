@@ -295,10 +295,10 @@ describe('FaqPanel: Communities', () => {
     expect(screen.getByText(/IDs of the contracts behind it/)).toBeInTheDocument();
   });
 
-  it('says Delete all data does not leave a Community, and how a Community goes', () => {
+  it('says Delete all data can leave your Communities, and how a Community goes', () => {
     renderFaq();
     expect(
-      screen.getByText(/Delete all data does not remove a Character from a Community/)
+      screen.getByText(/Delete all data also offers to leave your Communities/)
     ).toBeInTheDocument();
     expect(screen.getByText(/A Community's admin can't leave/)).toBeInTheDocument();
   });

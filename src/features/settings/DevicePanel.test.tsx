@@ -9,6 +9,8 @@ vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
 const deleteMock = vi.hoisted(() => ({
   purgeAllRemoteCharacterData: vi.fn<() => Promise<number[]>>(async () => []),
   deleteAllLocalData: vi.fn(async () => {}),
+  loadAllCommunities: vi.fn<() => Promise<unknown[]>>(async () => []),
+  leaveAllCommunities: vi.fn<(communities: unknown[]) => Promise<number[]>>(async () => []),
 }));
 vi.mock('@/features/character/deleteAllCharacterData', () => deleteMock);
 
@@ -18,6 +20,8 @@ beforeEach(async () => {
   vi.clearAllMocks();
   vi.stubGlobal('location', { ...window.location, replace });
   deleteMock.purgeAllRemoteCharacterData.mockImplementation(async () => []);
+  deleteMock.loadAllCommunities.mockImplementation(async () => []);
+  deleteMock.leaveAllCommunities.mockImplementation(async () => []);
   await db.characters.clear();
   await db.characters.bulkPut([
     { characterId: 1, name: 'Alpha', ownerHash: 'h1', addedAt: 1 },
@@ -65,5 +69,53 @@ describe('DevicePanel delete all character data', () => {
 
     expect(deleteMock.purgeAllRemoteCharacterData).toHaveBeenCalledOnce();
     expect(deleteMock.deleteAllLocalData).toHaveBeenCalledWith(true);
+  });
+
+  describe('Communities', () => {
+    const joined = { characterId: 1, communityId: 'a', name: 'Haulers', administered: false };
+    const run = { characterId: 2, communityId: 'b', name: 'Miners', administered: true };
+
+    it('shows no checkbox, and leaves nothing, when no Character is in a Community', async () => {
+      const { user, dialog } = await openDeleteDialog();
+      expect(within(dialog).queryByLabelText('Also leave my Communities')).toBeNull();
+      await user.click(within(dialog).getByRole('button', { name: 'Delete all' }));
+      expect(deleteMock.leaveAllCommunities).not.toHaveBeenCalled();
+    });
+
+    it('offers a checked box, lists a Community it administers, and leaves before the wipe', async () => {
+      deleteMock.loadAllCommunities.mockImplementation(async () => [joined, run]);
+      const { user, dialog } = await openDeleteDialog();
+      expect(await within(dialog).findByLabelText('Also leave my Communities')).toBeChecked();
+      expect(within(dialog).getByText(/You run Miners: delete it or hand it over/)).toBeVisible();
+
+      await user.click(within(dialog).getByRole('button', { name: 'Delete all' }));
+
+      expect(deleteMock.leaveAllCommunities).toHaveBeenCalledWith([joined, run]);
+      expect(deleteMock.deleteAllLocalData).toHaveBeenCalled();
+    });
+
+    it('leaves nothing when the box is unticked', async () => {
+      deleteMock.loadAllCommunities.mockImplementation(async () => [joined]);
+      const { user, dialog } = await openDeleteDialog();
+      await user.click(await within(dialog).findByLabelText('Also leave my Communities'));
+      await user.click(within(dialog).getByRole('button', { name: 'Delete all' }));
+      expect(deleteMock.leaveAllCommunities).not.toHaveBeenCalled();
+      expect(deleteMock.deleteAllLocalData).toHaveBeenCalled();
+    });
+
+    it('reports a Character that could not leave, and still waits for Finish deleting', async () => {
+      deleteMock.loadAllCommunities.mockImplementation(async () => [joined]);
+      deleteMock.leaveAllCommunities.mockImplementation(async () => [1]);
+      const { user, dialog } = await openDeleteDialog();
+      await within(dialog).findByLabelText('Also leave my Communities');
+      await user.click(within(dialog).getByRole('button', { name: 'Delete all' }));
+      expect(
+        await within(dialog).findByText(/Alpha could not leave its Communities/)
+      ).toBeVisible();
+      expect(deleteMock.deleteAllLocalData).not.toHaveBeenCalled();
+      await user.click(within(dialog).getByRole('button', { name: 'Finish deleting' }));
+      expect(deleteMock.deleteAllLocalData).toHaveBeenCalled();
+      expect(deleteMock.leaveAllCommunities).toHaveBeenCalledTimes(1);
+    });
   });
 });

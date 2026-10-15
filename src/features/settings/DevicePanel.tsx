@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, Field, Fields, Modal, Panel } from '@/components/ui';
+import { Button, Checkbox, Field, Fields, Modal, Panel } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { logoutAllCharacters } from '@/features/character/logoutAll';
 import { RemoveSharedOption } from '@/features/communities/RemoveSharedOption';
 import {
   deleteAllLocalData,
+  leaveAllCommunities,
+  loadAllCommunities,
   purgeAllRemoteCharacterData,
+  type CharacterCommunity,
 } from '@/features/character/deleteAllCharacterData';
 
 type Dialog = 'logout' | 'delete';
@@ -30,12 +34,24 @@ export function DevicePanel() {
   const [removeShared, setRemoveShared] = useState(true);
   // Characters whose remote purge could not run now; set once step one is done.
   const [unpurged, setUnpurged] = useState<number[] | null>(null);
+  // Characters with a Community that could not be left (the wipe waits on them too).
+  const [leaveFailed, setLeaveFailed] = useState<number[]>([]);
+  /** Delete all data's Communities question: null until looked up. */
+  const [communities, setCommunities] = useState<CharacterCommunity[] | null>(null);
+  const [leaveCommunities, setLeaveCommunities] = useState(true);
   const syncConfigured = isSyncConfigured();
 
   function openDialog(next: Dialog) {
     setFailed(false);
     setUnpurged(null);
+    setLeaveFailed([]);
+    setCommunities(null);
+    setLeaveCommunities(true);
     setDialog(next);
+    // No network unless sync is on; a lookup that fails just hides the question.
+    if (next === 'delete' && syncConfigured) {
+      void loadAllCommunities().then(setCommunities, () => setCommunities([]));
+    }
   }
 
   async function run(action: () => Promise<void>) {
@@ -60,8 +76,12 @@ export function DevicePanel() {
   const confirmDelete = () =>
     run(async () => {
       if (syncConfigured && unpurged === null) {
+        // Before the purge, while each Character can still sign in.
+        const notLeft =
+          leaveCommunities && communities?.length ? await leaveAllCommunities(communities) : [];
         const notPurged = await purgeAllRemoteCharacterData();
-        if (notPurged.length > 0) {
+        if (notPurged.length > 0 || notLeft.length > 0) {
+          setLeaveFailed(notLeft);
           setUnpurged(notPurged);
           return;
         }
@@ -72,13 +92,14 @@ export function DevicePanel() {
     });
 
   const loggedIn = characters?.length ?? 0;
-  const unpurgedNames = unpurged
-    ? new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(
-        unpurged.map(
-          (id) => characters?.find((character) => character.characterId === id)?.name ?? String(id)
-        )
+  const listNames = (ids: readonly number[]) =>
+    new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(
+      ids.map(
+        (id) => characters?.find((character) => character.characterId === id)?.name ?? String(id)
       )
-    : '';
+    );
+  const unpurgedNames = unpurged ? listNames(unpurged) : '';
+  const administered = (communities ?? []).filter((entry) => entry.administered);
 
   return (
     <Panel title={t('settings.deviceTitle')}>
@@ -167,7 +188,12 @@ export function DevicePanel() {
       >
         <p className="text-xs text-text-dim">
           {unpurged
-            ? t('settings.deviceDeleteUnpurged', { count: unpurged.length, names: unpurgedNames })
+            ? unpurged.length > 0
+              ? t('settings.deviceDeleteUnpurged', { count: unpurged.length, names: unpurgedNames })
+              : t('settings.deviceDeleteLeaveFailed', {
+                  count: leaveFailed.length,
+                  names: listNames(leaveFailed),
+                })
             : t(
                 syncConfigured
                   ? 'settings.deviceDeleteConfirm'
@@ -175,6 +201,36 @@ export function DevicePanel() {
                 { count: loggedIn }
               )}
         </p>
+        {unpurged && unpurged.length > 0 && leaveFailed.length > 0 && (
+          <p className="mt-2 text-xs text-text-dim">
+            {t('settings.deviceDeleteLeaveFailed', {
+              count: leaveFailed.length,
+              names: listNames(leaveFailed),
+            })}
+          </p>
+        )}
+        {!unpurged && communities && communities.length > 0 && (
+          <>
+            <label className={`mt-3 flex items-center gap-2 text-xs ${tappableRowClassName}`}>
+              <Checkbox
+                checked={leaveCommunities}
+                disabled={working}
+                onChange={(event) => setLeaveCommunities(event.target.checked)}
+              />
+              {t('settings.deviceDeleteLeaveCommunities')}
+            </label>
+            {leaveCommunities && administered.length > 0 && (
+              <p className="text-xs text-text-dim">
+                {t('settings.deviceDeleteAdministered', {
+                  names: new Intl.ListFormat(i18n.language, {
+                    style: 'long',
+                    type: 'conjunction',
+                  }).format(administered.map((entry) => entry.name)),
+                })}
+              </p>
+            )}
+          </>
+        )}
         {failed && (
           <p role="alert" className="mt-2 text-xs text-danger">
             {t('settings.deviceDeleteFailed')}
