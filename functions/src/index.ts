@@ -1084,12 +1084,15 @@ async function publishOffersToR2(
         accessKeyId: R2_ACCESS_KEY_ID.value(),
         secretAccessKey: R2_SECRET_ACCESS_KEY.value(),
       }),
+      onProgress: async (state) => {
+        await stateRef.set(state);
+      },
     });
     await stateRef.set(result.state);
-    const { uploaded, skipped, failed, indexWritten, firstError } = result;
+    const { uploaded, skipped, failed, remaining, indexWritten, firstError } = result;
     (result.failed > 0 || !result.indexWritten ? logWarn : logInfo)(
       'public contract offers R2 publish',
-      { uploaded, skipped, failed, indexWritten, firstError }
+      { uploaded, skipped, failed, remaining, indexWritten, firstError }
     );
   } catch (error) {
     logError('public contract offers R2 publish failed', { error: String(error) });
