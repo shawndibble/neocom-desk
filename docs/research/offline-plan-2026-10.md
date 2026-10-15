@@ -43,8 +43,11 @@ Every workstream follows the repo rules:
   `industry/jobs.ts` and `pi/data.ts`.
 - `cache.test.ts` gets a case for each.
 
-**Offline short-circuit.** `esiFetch` throws `EsiOfflineError` before the
-token refresh when `navigator.onLine === false`.
+**Network failures classified.** A fetch or token-refresh network failure
+(a fetch `TypeError`, or an `AuthError` with status 0) is classified as an
+offline failure. There is deliberately no gate on `navigator.onLine` before the
+request: browsers can report `false` while endpoints are reachable, so the
+signal stays advisory (UI status, skipping polls, the reconnect trigger).
 
 - `cache.ts` treats it as a network failure and serves the cache.
 - It never writes `authFailure` to the activity log or burns the error
