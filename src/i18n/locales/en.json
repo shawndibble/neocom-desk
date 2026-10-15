@@ -5477,6 +5477,8 @@
       "compareChartTitle": "Raw vs. refined value by type",
       "compareChartTitleRawOnly": "Value by ore type",
       "refiningHiddenNote": "Refining hidden. Raw value only.",
+      "refiningHiddenCompressedNote": "Refining hidden. Raw compressed value only.",
+      "assumesCompressedNote": "Assumes compressed.",
       "chartMetric": {
         "title": "Chart metric",
         "iskOption": "ISK",
@@ -5901,7 +5903,8 @@
       "deselectAll": "Deselect all",
       "addToQuickbar": "Add to Quickbar",
       "addToCompare": "Add to Compare",
-      "copyNames": "Copy names"
+      "copyNames": "Copy names",
+      "copyWithQuantities": "Copy with quantities"
     },
     "itemCount_one": "{{count, number}} item",
     "itemCount_other": "{{count, number}} items",

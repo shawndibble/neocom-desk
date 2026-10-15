@@ -37,6 +37,23 @@ export function selectAll(selected: ReadonlySet<number>, ids: readonly number[])
   return next;
 }
 
+/** One `Name xQty` line per distinct type, quantities summed — the multibuy/Appraisal paste format. */
+export function quantityLinesForSelection(
+  itemIds: readonly number[],
+  assetsByItemId: ReadonlyMap<number, { type_id: number; quantity: number }>,
+  typeNames: ReadonlyMap<number, string>
+): string[] {
+  const totals = new Map<number, number>();
+  for (const id of itemIds) {
+    const asset = assetsByItemId.get(id);
+    if (!asset) continue;
+    totals.set(asset.type_id, (totals.get(asset.type_id) ?? 0) + asset.quantity);
+  }
+  return [...totals].map(
+    ([typeId, quantity]) => `${typeNames.get(typeId) ?? `Type #${typeId}`} x${quantity}`
+  );
+}
+
 export function namesForSelection(
   itemIds: readonly number[],
   assetsByItemId: ReadonlyMap<number, { type_id: number }>,

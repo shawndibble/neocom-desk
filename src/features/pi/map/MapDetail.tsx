@@ -149,7 +149,7 @@ export function ProductDetail(props: ProductDetailProps) {
             {t('market.contextMenu.showInfo')}
           </Button>
         )}
-        <OpenInEveButton kind="information" id={typeId} name={product.name} />
+        <OpenInEveButton kind="marketDetails" id={typeId} name={product.name} />
       </div>
 
       <p className="mt-3 text-xs text-text">

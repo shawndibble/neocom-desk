@@ -1998,8 +1998,9 @@ export function postAutopilotWaypoint(
 // --- POST /ui/openwindow/information (esi-ui.open_window.v1) ---
 
 /**
- * Opens the EVE client's information window on a character, corporation,
- * alliance, inventory type, station, structure or solar system (Open in EVE).
+ * Opens the EVE client's information window on a character, corporation or
+ * alliance (Open in EVE). ESI documents nothing else: it answers 204 for an
+ * inventory type too, but the client ignores it — use market details for those.
  * ESI answers 204 with no body; nothing in the game changes.
  */
 export function postOpenWindowInformation(

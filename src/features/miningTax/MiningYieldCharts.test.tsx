@@ -32,7 +32,9 @@ describe('MiningYieldCharts — ISK metric', () => {
       />
     );
     expect(screen.getByText('Raw vs. refined value by type')).toBeInTheDocument();
-    expect(screen.queryByText('Refining hidden. Raw value only.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Refining hidden. Raw compressed value only.')
+    ).not.toBeInTheDocument();
   });
 
   it('gives screen readers each chart as a table of every day and every type', () => {
@@ -140,7 +142,7 @@ describe('MiningYieldCharts — ISK metric', () => {
       />
     );
     expect(screen.getByText('Value by ore type')).toBeInTheDocument();
-    expect(screen.getByText('Refining hidden. Raw value only.')).toBeInTheDocument();
+    expect(screen.getByText('Refining hidden. Raw compressed value only.')).toBeInTheDocument();
     expect(screen.queryByText('Raw vs. refined value by type')).not.toBeInTheDocument();
   });
 });
@@ -161,7 +163,9 @@ describe('MiningYieldCharts — volume metric', () => {
     );
     expect(screen.getByText('m³ mined per day')).toBeInTheDocument();
     expect(screen.getByText('m³ by ore type')).toBeInTheDocument();
-    expect(screen.queryByText('Refining hidden. Raw value only.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Refining hidden. Raw compressed value only.')
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Refined value')).not.toBeInTheDocument();
 
     const rate = screen.getByRole('table', { name: 'm³ mined per day' });
@@ -185,7 +189,9 @@ describe('MiningYieldCharts — volume metric', () => {
         showRefining={false}
       />
     );
-    expect(screen.queryByText('Refining hidden. Raw value only.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Refining hidden. Raw compressed value only.')
+    ).not.toBeInTheDocument();
   });
 });
 

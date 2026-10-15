@@ -2058,6 +2058,36 @@ describe('multi-select and bulk actions (issue #90)', () => {
     });
   });
 
+  it('copies the selection as "Name xQty" lines, summing identical items', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            { ...assetPage1[0], item_id: 1, type_id: 34, quantity: 1000 },
+            { ...assetPage1[0], item_id: 2, type_id: 34, quantity: 500 },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+    await screen.findAllByText('Tritanium');
+
+    await clickTool(user, 'Select');
+    for (const box of screen.getAllByRole('checkbox', { name: 'Select Tritanium' })) {
+      await user.click(box);
+    }
+    await user.click(screen.getByRole('button', { name: 'Copy with quantities' }));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('Tritanium x1500');
+    });
+  });
+
   it('"Select all in view" selects every item at the current level without needing to check each one (issue #415)', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
