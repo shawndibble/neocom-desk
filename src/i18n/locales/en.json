@@ -467,6 +467,11 @@
       "noSlotRoom": "No free {{rack}} left",
       "noResources": "Too much CPU, powergrid or calibration for this hull",
       "cantAdd": "Can't add: {{reasons}}",
+      "preview": {
+        "title": "Adding {{name}}",
+        "more_one": "and {{count}} more change",
+        "more_other": "and {{count}} more changes"
+      },
       "openButton": "Add module",
       "tab": {
         "modules": "Modules",
@@ -5482,6 +5487,8 @@
       "compareChartTitle": "Raw vs. refined value by type",
       "compareChartTitleRawOnly": "Value by ore type",
       "refiningHiddenNote": "Refining hidden. Raw value only.",
+      "refiningHiddenCompressedNote": "Refining hidden. Raw compressed value only.",
+      "assumesCompressedNote": "Assumes compressed.",
       "chartMetric": {
         "title": "Chart metric",
         "iskOption": "ISK",
@@ -5906,7 +5913,8 @@
       "deselectAll": "Deselect all",
       "addToQuickbar": "Add to Quickbar",
       "addToCompare": "Add to Compare",
-      "copyNames": "Copy names"
+      "copyNames": "Copy names",
+      "copyWithQuantities": "Copy with quantities"
     },
     "itemCount_one": "{{count, number}} item",
     "itemCount_other": "{{count, number}} items",
@@ -8549,6 +8557,15 @@
         "title": "Courier delivery due",
         "body": "{{character}}'s courier contract must be delivered in under {{hours}} hours."
       },
+      "contractExpiring": {
+        "title": "Contract expiring",
+        "body": "{{character}}'s issued contract expires in under {{hours}} hours."
+      },
+      "ordersLapsing": {
+        "title": "Market orders lapsing",
+        "body_one": "{{character}} has {{count}} market order that lapses in under {{hours}} hours.",
+        "body_other": "{{character}} has {{count}} market orders that lapse in under {{hours}} hours."
+      },
       "skillQueueEnding": {
         "title": "Skill queue ending soon",
         "body": "{{character}}'s skill queue will run dry in under {{hours}} hours."
@@ -10122,6 +10139,8 @@
         "contractCompleted": "Contract Completed",
         "contractFailed": "Contract Failed",
         "courierDeliveryDue": "Courier Delivery Due",
+        "contractExpiring": "Contract Expiring",
+        "ordersLapsing": "Orders Lapsing",
         "walletBalanceChanged": "Wallet Balance Changed",
         "eveNotification": "EVE Notifications",
         "structureFuelLow": "Structure Fuel Low",
@@ -10146,6 +10165,12 @@
       "courierDeliveryDueLeadTimeLabel": "Warn this far before a courier delivery is due:",
       "courierDeliveryDueLeadTimeOption_one": "{{count}} hour",
       "courierDeliveryDueLeadTimeOption_other": "{{count}} hours",
+      "contractExpiringLeadTimeLabel": "Warn this far before a contract you issued expires:",
+      "contractExpiringLeadTimeOption_one": "{{count}} hour",
+      "contractExpiringLeadTimeOption_other": "{{count}} hours",
+      "ordersLapsingLeadTimeLabel": "Warn this far before market orders lapse:",
+      "ordersLapsingLeadTimeOption_one": "{{count}} hour",
+      "ordersLapsingLeadTimeOption_other": "{{count}} hours",
       "skillQueueEndingLeadTimeLabel": "Warn this far before the skill queue runs dry:",
       "skillQueueEndingLeadTimeOption_one": "{{count}} hour",
       "skillQueueEndingLeadTimeOption_other": "{{count}} hours",
@@ -11016,6 +11041,9 @@
         "killsLabel": "Kills, 30 days",
         "mainSpace": "Mostly {{space}}",
         "progress": "Loading zKillboard, {{done}} of {{total}}",
+        "newTag": "New",
+        "newSinceLastPaste_one": "{{count}} new since last paste",
+        "newSinceLastPaste_other": "{{count}} new since last paste",
         "stateLoading": "Loading…",
         "stateUnreachable": "zKillboard couldn't be reached",
         "noContact": "No contact",
@@ -11858,6 +11886,7 @@
         "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
         "infoTooltip": "? circle: explains a term (InfoTooltip)",
         "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
+        "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
         "infoButton": "ⓘ IconButton: opens Show Info or an explanation modal",
         "pencil": "Faint pencil after a value: edit in place",
         "assumed": "Amber warning mark: a default you have not confirmed",
@@ -11924,6 +11953,7 @@
         "infoLabel": "About material efficiency",
         "infoContent": "Percent of materials saved per run.",
         "showInfo": "Show info",
+        "addPreviewName": "Damage Control II",
         "editableValue": "Fleet name",
         "assumedFee": "Assuming NPC station fees",
         "myOrder": "5.50",

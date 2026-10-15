@@ -43,7 +43,10 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { useNow } from '@/lib/useNow';
 import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { newArrivals } from '@/engine/pilotList/localDiff';
 import { FleetBoard } from './FleetBoard';
+import { useLastLocal } from './lastLocal';
+import { NewArrivalTag } from './NewArrivalTag';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
 import { rowThreat } from './rowThreat';
 import { PilotAffiliation } from './PilotAffiliation';
@@ -101,6 +104,12 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   const [showFriendly, setShowFriendly] = useState(false);
   const now = useNow();
   const isPhone = useIsPhone();
+  const previous = useLastLocal(paste.names);
+  const arrivals = useMemo(
+    () => (previous ? newArrivals(paste.names, previous) : null),
+    [paste.names, previous]
+  );
+  const isNew = (row: PilotListRow) => arrivals?.has(row.name) === true;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -191,6 +200,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
                 <CharacterLink id={row.characterId}>{row.name}</CharacterLink>
               )}
               {threat !== null && <ThreatBadge level={threat} solid />}
+              {isNew(row) && <NewArrivalTag threat={threat} />}
             </span>
             <PilotAffiliation row={row} className="text-[0.6875rem] text-text-dim" />
           </>
@@ -260,6 +270,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
             threat={rowThreat(row, now)}
             spaces={spaces}
             flew={flewOf(row)}
+            isNew={isNew(row)}
           />
         ))}
       </ul>
@@ -282,6 +293,11 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     <Panel>
       <div className="flex flex-col gap-6">
         <HereControl here={here} />
+        {arrivals !== null && arrivals.size > 0 && (
+          <p className="text-xs text-text-dim">
+            {t('travel.pilot.list.newSinceLastPaste', { count: arrivals.size })}
+          </p>
+        )}
         {settled < found.length && (
           <p role="status" className="flex items-center gap-2 text-xs text-text-dim">
             <Spinner label={t('common.loading')} />

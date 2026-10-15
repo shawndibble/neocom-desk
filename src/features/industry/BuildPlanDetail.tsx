@@ -1271,9 +1271,11 @@ export function BuildPlanDetail({
    * renders one of these, built from the identical props so the right-click
    * menu and the button can never list different actions.
    */
-  function itemActionsFor(typeId: number): ReactElement {
+  function itemActionsFor(typeId: number, bordered = false): ReactElement {
     return (
       <ItemMoreActions
+        variant={bordered ? 'ghost' : undefined}
+        size={bordered ? 'sm' : undefined}
         typeId={typeId}
         itemName={nameForType(catalog, typeId)}
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}

@@ -110,6 +110,7 @@ const DOM_TS_TESTS = [
   'src/features/industry/useDetectedOwnedStock.test.ts',
   'src/features/industry/useMarketSnapshot.test.ts',
   'src/features/industry/useRunCountsByPlan.test.ts',
+  'src/features/fittings/useModuleAddPreview.test.ts',
   'src/features/fittings/useModuleVariations.test.ts',
   'src/features/fittings/useSkillGains.test.ts',
   'src/features/fittings/useSkillLevelGain.test.ts',

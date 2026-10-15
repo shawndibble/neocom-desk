@@ -74,14 +74,13 @@ export function ShowInfoMenuItem({ typeId, itemName }: { typeId: number; itemNam
   );
 }
 
-/** "Open in EVE"'s two item windows (Show info, Market details), for every menu that carries `ShowInfoMenuItem`. */
+/**
+ * "Open in EVE" for an item, for every menu that carries `ShowInfoMenuItem`.
+ * Market details only: ESI's information window opens characters,
+ * corporations and alliances, and silently ignores an inventory type.
+ */
 export function OpenInEveItemMenuItems({ typeId }: { typeId: number }) {
-  return (
-    <>
-      <OpenInEveMenuItem kind="information" id={typeId} />
-      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
-    </>
-  );
+  return <OpenInEveMenuItem kind="marketDetails" id={typeId} />;
 }
 
 /** The item menu's "View in Market", keeping the page's region or hub; reused as `ShowInfoMenuItem` is. */
@@ -297,8 +296,10 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
  * trigger — it builds its own copy of the items rather than reading a
  * surrounding `ItemContextMenu`'s.
  */
-export function ItemMoreActions(props: ItemMenuProps) {
-  const { typeId, itemName } = props;
+export function ItemMoreActions(
+  props: ItemMenuProps & { variant?: 'ghost' | 'plain'; size?: 'row' | 'sm' }
+) {
+  const { typeId, itemName, variant, size } = props;
   const [alertOpen, setAlertOpen] = useState(false);
   const [stockOpen, setStockOpen] = useState(false);
   const items = useItemMenuItems(
@@ -310,7 +311,7 @@ export function ItemMoreActions(props: ItemMenuProps) {
   return (
     <>
       <RowActionsContext.Provider value={{ name: itemName, items }}>
-        <RowMoreActions />
+        <RowMoreActions variant={variant} size={size} />
       </RowActionsContext.Provider>
       {alertOpen && (
         <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />

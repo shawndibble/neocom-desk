@@ -268,7 +268,17 @@ export function RowActionsMenu({
  * allow a ⋮: at least two real actions reachable nowhere else, one trailing
  * control cluster at the row's right edge.
  */
-export function RowMoreActions({ className }: { className?: string }) {
+export function RowMoreActions({
+  className,
+  variant = 'plain',
+  size = 'row',
+}: {
+  className?: string;
+  /** `ghost` draws the hairline border, for a ⋮ that stands beside a `Button` rather than inside a row. */
+  variant?: 'ghost' | 'plain';
+  /** `sm` matches `Button size="sm"`'s height. */
+  size?: 'row' | 'sm';
+}) {
   const { t } = useTranslation();
   const actions = useContext(RowActionsContext);
   const extras = useContext(RowMenuExtrasContext);
@@ -279,8 +289,8 @@ export function RowMoreActions({ className }: { className?: string }) {
         <IconButton
           icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
           label={t('common.moreActionsLabel', { name: actions.name })}
-          variant="plain"
-          size="row"
+          variant={variant}
+          size={size}
           className={className}
         />
       </DropdownMenuTrigger>

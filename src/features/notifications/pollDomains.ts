@@ -42,6 +42,7 @@ import { loadCalendarEvents as loadCharacterCalendarEvents } from '@/features/ch
 import { loadContracts as loadCharacterContracts } from '@/features/character/contracts';
 import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
+import { orderExpiry } from '@/engine/market/orderHealth';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import { UPWELL_STRUCTURE_ID_FLOOR } from '@/esi/locationIds';
 import { classifyStationUndercut } from '@/engine/market/stationUndercutState';
@@ -113,6 +114,9 @@ import {
   type OrderUndercutEntrySnapshot,
   type OrderUndercutSnapshot,
   type MarketOrderUndercutFire,
+  type OrderExpiryEntrySnapshot,
+  type OrderExpirySnapshot,
+  type OrdersLapsingFire,
   type EveNotificationEntrySnapshot,
   type EveNotificationSnapshot,
   type EveNotificationFire,
@@ -166,6 +170,7 @@ import {
   projectColonies,
   projectCalendar,
   projectContracts,
+  projectOrdersLapsing,
   projectStructureFuel,
   projectEveNotificationReinforcementExit,
   reinforcementExitStructureIds,
@@ -915,13 +920,26 @@ function isContractEntrySnapshot(raw: unknown): raw is ContractEntrySnapshot {
     // lacks both, and must stay readable rather than reset every character.
     (r.deliveryDeadlineMs === undefined || typeof r.deliveryDeadlineMs === 'number') &&
     (r.dueLeadMs === undefined || typeof r.dueLeadMs === 'number') &&
+    (r.expiresMs === undefined || typeof r.expiresMs === 'number') &&
+    (r.expiringLeadMs === undefined || typeof r.expiringLeadMs === 'number') &&
     (r.dateAcceptedMs === undefined || typeof r.dateAcceptedMs === 'number') &&
     (r.dateCompletedMs === undefined || typeof r.dateCompletedMs === 'number')
   );
 }
 
-function toContractEntrySnapshot(contract: Contract, dueLeadMs: number): ContractEntrySnapshot {
+function toContractEntrySnapshot(
+  contract: Contract,
+  characterId: number,
+  dueLeadMs: number,
+  expiringLeadMs: number
+): ContractEntrySnapshot {
   const deliveryDeadlineMs = courierDeliveryDeadlineMs(contract);
+  // Only an unaccepted contract the Character issued can lapse on them
+  // (`contractExpiring`, issue #3797).
+  const expiresMs =
+    contract.status === 'outstanding' && contract.issuer_id === characterId
+      ? optionalDateMs(contract.date_expired)
+      : undefined;
   const dateAcceptedMs = optionalDateMs(contract.date_accepted);
   const dateCompletedMs = optionalDateMs(contract.date_completed);
   return {
@@ -930,6 +948,7 @@ function toContractEntrySnapshot(contract: Contract, dueLeadMs: number): Contrac
     issuerId: contract.issuer_id,
     acceptorId: contract.acceptor_id,
     ...(deliveryDeadlineMs === null ? {} : { deliveryDeadlineMs, dueLeadMs }),
+    ...(expiresMs === undefined ? {} : { expiresMs, expiringLeadMs }),
     ...(dateAcceptedMs === undefined ? {} : { dateAcceptedMs }),
     ...(dateCompletedMs === undefined ? {} : { dateCompletedMs }),
   };
@@ -952,17 +971,25 @@ export const contractDomain = defineDomain<
     // them as newly appearing and false-fire contractAccepted (issue #174
     // review) — skip this poll entirely rather than save a partial baseline.
     if (result.cached.truncated) return null;
-    const dueLeadMs = (await currentThresholds(characterId)).courierDeliveryDueLeadHours * HOUR_MS;
-    return result.cached.data.map((contract) => toContractEntrySnapshot(contract, dueLeadMs));
+    const thresholds = await currentThresholds(characterId);
+    const dueLeadMs = thresholds.courierDeliveryDueLeadHours * HOUR_MS;
+    const expiringLeadMs = thresholds.contractExpiringLeadHours * HOUR_MS;
+    return result.cached.data.map((contract) =>
+      toContractEntrySnapshot(contract, characterId, dueLeadMs, expiringLeadMs)
+    );
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   // Projects at the Character's *current* lead time, not the one baked into
   // the baseline, for `skillQueueDomain.projection`'s reason (issue #1248).
   projection: async (characterId, characterName, snapshot, nowMs) => {
-    const dueLeadMs = (await currentThresholds(characterId)).courierDeliveryDueLeadHours * HOUR_MS;
-    const entries = snapshot.entries.map((entry) =>
-      entry.deliveryDeadlineMs === undefined ? entry : { ...entry, dueLeadMs }
-    );
+    const thresholds = await currentThresholds(characterId);
+    const dueLeadMs = thresholds.courierDeliveryDueLeadHours * HOUR_MS;
+    const expiringLeadMs = thresholds.contractExpiringLeadHours * HOUR_MS;
+    const entries = snapshot.entries.map((entry) => ({
+      ...entry,
+      ...(entry.deliveryDeadlineMs === undefined ? {} : { dueLeadMs }),
+      ...(entry.expiresMs === undefined ? {} : { expiringLeadMs }),
+    }));
     return projectContracts(
       characterId,
       characterName,
@@ -1250,6 +1277,62 @@ export const marketOrderUndercutDomain = defineDomain<
   names: async (fire) => {
     const names = await loadTypeNames([fire.typeId]).catch(() => new Map<number, string>());
     return { item: names.get(fire.typeId) };
+  },
+});
+
+/* -------------------------------------------------------------------------- */
+/* Market orders: lapsing                                                     */
+/* -------------------------------------------------------------------------- */
+
+function isOrderExpiryEntrySnapshot(raw: unknown): raw is OrderExpiryEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.orderId === 'number' && typeof r.expiresMs === 'number' && typeof r.leadMs === 'number'
+  );
+}
+
+/**
+ * Its own domain rather than a widened `marketOrderDomain`, for
+ * `marketOrderUndercutDomain`'s reason (widening discards stored fill
+ * baselines). Open orders only — the history-derived `filled` entries have
+ * already lapsed or filled — and the Character's own: corp orders are not
+ * theirs to relist from here. The expiry is `issued + duration` days.
+ */
+export const orderExpiryDomain = defineDomain<
+  OrderExpiryEntrySnapshot,
+  OrderExpirySnapshot,
+  OrdersLapsingFire
+>({
+  source: SNAPSHOT_SOURCES.orderExpiry,
+  stateKey: 'notifications.pollerState.orderExpiry',
+  entriesKey: 'entries',
+  isEntry: isOrderExpiryEntrySnapshot,
+  load: async (characterId) => {
+    const result = await loadOrders(characterId);
+    if (result.needsReauth || result.cached === null) return null;
+    const leadMs = (await currentThresholds(characterId)).ordersLapsingLeadHours * HOUR_MS;
+    const entries: OrderExpiryEntrySnapshot[] = [];
+    for (const order of result.cached.data) {
+      if (order.is_corporation === true) continue;
+      const expiry = orderExpiry(order.issued, order.duration, Date.now());
+      if (expiry === null) continue;
+      entries.push({ orderId: order.order_id, expiresMs: expiry.expiresAt, leadMs });
+    }
+    return entries;
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  // The Character's *current* lead time, not the baked one (`contractDomain`'s reason).
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    const leadMs = (await currentThresholds(characterId)).ordersLapsingLeadHours * HOUR_MS;
+    return projectOrdersLapsing(
+      characterId,
+      characterName,
+      snapshot.entries.map((entry) => ({ ...entry, leadMs })),
+      (fire, character, names) =>
+        NOTIFICATION_EVENT_ENTRIES.ordersLapsing.projection.push(fire, character, names),
+      nowMs
+    );
   },
 });
 
@@ -1875,6 +1958,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   walletDomain,
   marketOrderDomain,
   marketOrderUndercutDomain,
+  orderExpiryDomain,
   eveNotificationDomain,
   structureFuelDomain,
   corpIndustryJobDomain,

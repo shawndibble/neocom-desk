@@ -30,7 +30,7 @@ here — they go one per file in `docs/context/decisions/`.
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer.
-- **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation, alliance, item, station or system; a type's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
+- **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation or alliance; an item's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
@@ -543,6 +543,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Worn clone**: The clone a Character is in right now, whose implants are the Character's fitted implants; listed on the Clones page as "Wearing now" and distinct from its Jump Clones.
 - **Clone Jump Ready**: Fires once when a Character's jump-clone cooldown ends: 24 hours minus the Effective Skill Level of Infomorph Synchronizing after the last clone jump. A **Scheduled Push** event; a Character who has never jumped never fires it.
 - **Courier Delivery Due**: Fires once an accepted courier contract's deliver-by deadline (never its expiry date) falls within a Character's configured lead time. A **Scheduled Push** warning ahead of **Contract Failed**, which only arrives after the collateral is already forfeited. Only for contracts the Character themselves accepted.
+- **Contract Expiring**: Fires once a contract the Character issued, still unaccepted (`outstanding`), has its expiry date inside their configured lead time, so they can relist it. A **Scheduled Push** warning. Never for a contract merely assigned to them; a courier in progress is **Courier Delivery Due**'s.
+- **Orders Lapsing**: One batched alert, with a count, when the Character's own open market orders come within their configured lead time of lapsing. A single alert per window, never one per order; corp orders are excluded. A **Scheduled Push** warning.
 - **Incursion Nearby**: Fires once when an Incursion's staging system comes within a Character's chosen number of jumps of their **Current System**, counted on Route Safety's jump basis. Edge-triggered per constellation; a changed Current System or jump count re-baselines silently.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Skill Plan schedule**: A **Skill Plan** costed in time: per-level steps with training seconds, plan total, projected finish, skill count, **Remap Marker** segments, **Booster**-boosted and Alpha-capped steps and effective **Priority (Skill Plan)**, computed in one pass from the plan, the Character's trained skills and attributes, **Clone State**, implants (or **What-If Implants**) and Booster. Every timing figure the plan editor shows reads from it, so none can disagree.

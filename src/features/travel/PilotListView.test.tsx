@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { db } from '@/db';
 import type { KillSpace } from '@/engine/pilotList/killActivity';
 import { summarizeKills } from '@/engine/pilotList/killActivity';
 import type { PilotListRow } from './pilotListData';
@@ -91,7 +92,8 @@ function renderList(overflow = 0) {
 }
 
 describe('PilotListView (Local list)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await db.settings.clear();
     vi.resetAllMocks();
     mocks.here.space = 'highsec';
     mocks.phone = false;
@@ -280,5 +282,73 @@ describe('DscanShareControl', () => {
   it('is disabled when the scan is too large to share', () => {
     render(<DscanShareControl paste={scan(SCAN + NL + 'x'.repeat(60_000))} characterId={1} />);
     expect(share()).toBeDisabled();
+  });
+});
+
+describe('PilotListView (new since last paste)', () => {
+  const PREVIOUS = ['Ann', 'Bob', 'Cat', 'Dan'];
+
+  beforeEach(async () => {
+    await db.settings.clear();
+    vi.resetAllMocks();
+    mocks.here.space = 'highsec';
+    mocks.phone = false;
+    mocks.loadPilotList.mockImplementation(
+      (names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+        onRows(names.map((name) => row(name)));
+        return Promise.resolve();
+      }
+    );
+  });
+
+  function paste(names: string[]) {
+    return render(
+      <MemoryRouter>
+        <PilotListView paste={{ kind: 'local', names, overflow: 0 }} />
+      </MemoryRouter>
+    );
+  }
+
+  it('shows no marker and no count on the first paste ever', async () => {
+    paste(PREVIOUS);
+    await screen.findByText('Ann');
+    await waitFor(async () =>
+      expect((await db.settings.get('local.lastPaste'))?.value).toEqual(PREVIOUS)
+    );
+    expect(screen.queryByText('New')).toBeNull();
+    expect(screen.queryByText(/new since last paste/)).toBeNull();
+  });
+
+  it('marks only the added pilots and counts them when the same Local is pasted again', async () => {
+    await db.settings.put({ key: 'local.lastPaste', value: PREVIOUS });
+    paste([...PREVIOUS, 'Eve']);
+    expect(await screen.findByText('1 new since last paste')).toBeTruthy();
+    const tags = screen.getAllByText('New');
+    expect(tags).toHaveLength(1);
+    expect(tags[0].parentElement?.textContent).toContain('Eve');
+  });
+
+  it('marks nothing when the paste shares too little with the last one', async () => {
+    await db.settings.put({ key: 'local.lastPaste', value: PREVIOUS });
+    paste(['Xan', 'Yul', 'Zed', 'Ann']);
+    await screen.findByText('Xan');
+    await waitFor(async () =>
+      expect((await db.settings.get('local.lastPaste'))?.value).toEqual([
+        'Xan',
+        'Yul',
+        'Zed',
+        'Ann',
+      ])
+    );
+    expect(screen.queryByText('New')).toBeNull();
+    expect(screen.queryByText(/new since last paste/)).toBeNull();
+  });
+
+  it('marks new pilots on the phone cards too', async () => {
+    mocks.phone = true;
+    await db.settings.put({ key: 'local.lastPaste', value: PREVIOUS });
+    paste([...PREVIOUS, 'Eve']);
+    expect(await screen.findByText('1 new since last paste')).toBeTruthy();
+    expect(screen.getAllByText('New')).toHaveLength(1);
   });
 });
