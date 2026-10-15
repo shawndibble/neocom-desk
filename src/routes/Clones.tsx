@@ -34,8 +34,7 @@ import { loadCharacterSpSummary } from '@/features/character/characterSp';
 import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { loadStationName, loadStationSystemId } from '@/features/character/stations';
-import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
+import { resolvePlace } from '@/features/places';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadSystemNameAndSecurity, loadSystemSecurity } from '@/features/character/systemSecurity';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -181,24 +180,21 @@ async function loadClonesSnapshot(
   }
   const stationIds = idsForType('station');
   const structureIds = idsForType('structure');
-  const [stationSystems, structureSystems] = await Promise.all([
-    Promise.all(stationIds.map((id) => loadStationSystemId(id))),
-    Promise.all(structureIds.map((id) => loadStructureSystemId(characterId, id))),
-  ]);
+  // A station comes out of the SDE snapshot rather than ESI (issue #655) — a
+  // map lookup per id, nothing worth capping. A structure 403 means outside
+  // this character's ACL, not a revoked scope: it renders with an id fallback.
+  const places = await Promise.all(
+    [
+      ...stationIds.map((id) => ({ locationId: id, characterId, kind: 'station' as const })),
+      ...structureIds.map((id) => ({ locationId: id, characterId, kind: 'structure' as const })),
+    ].map(async (ref) => ({ ref, place: await resolvePlace(ref) }))
+  );
   const systemIds = new Map<number, number | null>();
-  stationIds.forEach((id, i) => systemIds.set(id, stationSystems[i] ?? null));
-  structureIds.forEach((id, i) => systemIds.set(id, structureSystems[i] ?? null));
-  const [resolvedStations, resolvedStructures] = await Promise.all([
-    // Every id here is an NPC station by `location_type`, and those come out
-    // of the SDE snapshot rather than ESI (issue #655) — a map lookup per id,
-    // so there is nothing worth capping. Only an unreadable snapshot puts a
-    // request back behind each id; see `loadAssetsSnapshot` for the same note.
-    Promise.all(stationIds.map((id) => loadStationName(id))),
-    // A 403 here means the structure is outside this character's ACL, not a
-    // revoked scope — loadStructureName already narrows that so it never
-    // signals a re-auth failure; the clone just renders with an id fallback.
-    Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
-  ]);
+  const locationNames = new Map<number, string>();
+  for (const { ref, place } of places) {
+    systemIds.set(ref.locationId, place.systemId);
+    if (place.name) locationNames.set(ref.locationId, place.name);
+  }
   const securityIds = signal.cancelled
     ? []
     : [
@@ -216,15 +212,6 @@ async function loadClonesSnapshot(
   securityIds.forEach((id, i) => {
     const security = securityList[i];
     if (security !== null && security !== undefined) securities.set(id, security);
-  });
-  const locationNames = new Map<number, string>();
-  stationIds.forEach((id, i) => {
-    const name = resolvedStations[i];
-    if (name) locationNames.set(id, name);
-  });
-  structureIds.forEach((id, i) => {
-    const name = resolvedStructures[i];
-    if (name) locationNames.set(id, name);
   });
 
   // The verdict needs the worn implants and the queue; either missing is its own one-line state.

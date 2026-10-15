@@ -5,8 +5,7 @@ import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
 import { planMove, type MoveHull, type PackHold } from '@/engine/assets/movePlan';
 import { loadOtherCharactersAssets } from '@/features/character/assets';
-import { loadStationName, loadStationSystemId } from '@/features/character/stations';
-import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
+import { resolvePlace } from '@/features/places';
 import { loadTypeNames, loadTypePackagedVolumes } from '@/features/character/typeNames';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
 import {
@@ -60,18 +59,6 @@ interface Loaded {
   rigs: Map<number, number>;
 }
 
-function placeName(stack: PickerStack): Promise<string | null> {
-  return stack.locationType === 'station'
-    ? loadStationName(stack.locationId)
-    : loadStructureName(stack.characterId, stack.locationId);
-}
-
-function placeSystem(stack: PickerStack): Promise<number | null> {
-  return stack.locationType === 'station'
-    ? loadStationSystemId(stack.locationId)
-    : loadStructureSystemId(stack.characterId, stack.locationId);
-}
-
 async function load(characterIds: readonly number[]): Promise<Loaded> {
   const [sources, types, groupCategories] = await Promise.all([
     loadOtherCharactersAssets(characterIds),
@@ -97,8 +84,13 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
   for (const s of stacks) if (!byPlace.has(s.locationId)) byPlace.set(s.locationId, s);
   await Promise.all(
     [...byPlace].map(async ([id, stack]) => {
-      places.set(id, (await placeName(stack).catch(() => null)) ?? String(id));
-      systems.set(id, await placeSystem(stack).catch(() => null));
+      const place = await resolvePlace({
+        locationId: id,
+        characterId: stack.characterId,
+        kind: stack.locationType === 'station' ? 'station' : 'structure',
+      }).catch(() => ({ name: null, systemId: null }));
+      places.set(id, place.name ?? String(id));
+      systems.set(id, place.systemId);
     })
   );
   const hues = pickupHues(stacks.map((s) => s.locationId));
@@ -287,7 +279,15 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     try {
       const destinationSystem =
         destStation !== null
-          ? await loadStationSystemId(destStation).catch(() => null)
+          ? await resolvePlace(
+              { locationId: destStation, characterId: null, kind: 'station' },
+              undefined,
+              {
+                name: false,
+              }
+            )
+              .then((place) => place.systemId)
+              .catch(() => null)
           : destSystem;
       const hulls = await loadHulls();
       const base = {
