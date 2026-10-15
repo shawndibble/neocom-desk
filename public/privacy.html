@@ -115,18 +115,18 @@
         <strong>Cross-device sync</strong> runs automatically for every character you log in with;
         there is no separate account and, for now, no switch in Settings to turn it off. To sync,
         the app sends one short-lived EVE access token to the app operator's server (a Google
-        Firebase function), which checks it with CCP, does not keep it, and returns a Firebase login
-        for an anonymous ID derived from your EVE character ID — not your name, email, or any
-        real-world identity. Under that ID, a copy of what you make in the app is stored on Google
-        Firebase: Skill Plans, Build Plans, Production Runs, your Market Quickbar, pinned stations,
-        PI picks, Moon Mining payees and assignments, saved Fittings, your daily net worth history,
-        alerts you have already seen, and a list of your synced settings and preferences. What the
-        app reads from EVE (assets, wallet, mail and so on) is not part of this. Removing a
-        character from the app only clears it from that device. Its synced data is deleted from
-        Firebase automatically once no device has synced that character for 90 days, or right away
-        with <strong>Delete all data</strong> in the app's Settings. When you delete a synced
-        record, a deletion marker stays for 30 days so your other devices catch up, then goes too.
-        Community data, below, is separate.
+        Firebase function), which verifies it against CCP's published signing keys, does not keep
+        it, and returns a Firebase login for an anonymous ID derived from your EVE character ID —
+        not your name, email, or any real-world identity. Under that ID, a copy of what you make in
+        the app is stored on Google Firebase: Skill Plans, Build Plans, Production Runs, your Market
+        Quickbar, pinned stations, PI picks, Moon Mining payees and assignments, saved Fittings,
+        your daily net worth history, alerts you have already seen, and a list of your synced
+        settings and preferences. What the app reads from EVE (assets, wallet, mail and so on) is
+        not part of this. Removing a character from the app only clears it from that device. Its
+        synced data is deleted from Firebase automatically once no device has synced that character
+        for 90 days, or right away with <strong>Delete all data</strong> in the app's Settings. When
+        you delete a synced record, a deletion marker stays for 30 days so your other devices catch
+        up, then goes too. Community data, below, is separate.
       </p>
       <p>
         If you export a <strong>backup</strong> (Settings &rarr; Data &amp; storage), the app writes
