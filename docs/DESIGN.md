@@ -954,6 +954,8 @@ count-labelled button ("Grant selected (3)") that appears once a row is ticked.
 The per-row action stays. Ticks belong to the context they were made in and
 clear when it changes (a different Character).
 
+**New since last time.** A row that was not there on the previous look (Pilot Lookup's Local list, `NewArrivalTag`) carries the word "New" as small plain text after its name, with a count line above the list. It is not a box, so it does not read as clickable; amber only stresses it on a row that is already a threat, and the word carries the meaning without the colour.
+
 **Menu item that opens a dialog.** A menu item that opens a dialog opens it
 after the menu has closed (`useOpenAfterMenu`), so closing the dialog puts
 focus back on the menu button. Opened from the item's `onSelect`, the dialog
