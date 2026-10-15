@@ -8323,7 +8323,8 @@
         "places": "Matching systems and regions",
         "locationHint": "A system or region lets others filter Requests by distance.",
         "locationMeasurable": "Others can filter this Request by distance.",
-        "locationFree": "Not a system or region, so distance filters can't place this Request. Pick one from the list to fix that."
+        "locationFree": "Not a system or region, so distance filters can't place this Request. Pick one from the list to fix that.",
+        "locationNoList": "Couldn't load the list of systems and regions, so there are no suggestions. The text posts as typed and distance filters can't place it."
       },
       "canFillHint": "Requests with a line for a blueprint you share with this Community.",
       "canFillFailed": "Couldn't read what you share with this Community, so this filter can't run.",

@@ -358,6 +358,9 @@ describe('I can fill', () => {
     renderTab([request({})]);
     const chip = await screen.findByRole('button', { name: /^I can fill/ });
     await waitFor(() => expect(chip).toHaveAttribute('aria-disabled', 'true'));
+    expect(chip).not.toHaveTextContent('I can fill0');
+    // Asked strictly, so an unreadable library is not mistaken for an empty one.
+    expect(world.library).toHaveBeenCalledWith(1, 'c1', ['char:1'], { strict: true });
   });
 });
 
@@ -386,6 +389,19 @@ describe('distance', () => {
     await user.selectOptions(select(), 'Any distance');
     await waitFor(() => expect(rowNames()).toHaveLength(3));
     expect(screen.queryByText(/no place to measure from/)).not.toBeInTheDocument();
+  });
+
+  it('falls back to Any distance when the Permission goes away under a chosen limit', async () => {
+    const user = userEvent.setup();
+    await grant(LOCATION_SCOPE);
+    renderTab([near, far]);
+    await waitFor(() => expect(select()).toBeEnabled());
+    await user.selectOptions(select(), 'Within 5 jumps');
+    await waitFor(() => expect(rowNames()).toHaveLength(1));
+    await db.tokens.clear();
+    await waitFor(() => expect(select()).toBeDisabled());
+    expect(select()).toHaveValue('any');
+    expect(rowNames()).toHaveLength(2);
   });
 
   it('is disabled with the Grant link when the location Permission is missing', async () => {

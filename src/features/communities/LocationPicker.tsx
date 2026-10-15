@@ -1,34 +1,10 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextInput } from '@/components/ui';
-import {
-  buildPlaceIndex,
-  resolvePlace,
-  searchPlaces,
-  type PlaceIndex,
-} from '@/engine/communities/requestPlaces';
-import { loadMarketRegions } from '@/sde/loadMarketSde';
-import { loadSolarSystemsById } from '@/sde/solarSystems';
+import { resolvePlace, searchPlaces } from '@/engine/communities/requestPlaces';
+import { usePlaceIndex } from './usePlaceIndex';
 
 const SUGGESTIONS = 6;
-
-/** The system and region names, read once; null while loading or when the snapshot cannot be read. */
-function usePlaceIndex(): PlaceIndex | null {
-  const [index, setIndex] = useState<PlaceIndex | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([loadSolarSystemsById(), loadMarketRegions()]).then(
-      ([systems, regions]) => {
-        if (!cancelled && systems) setIndex(buildPlaceIndex([...systems.values()], regions));
-      },
-      () => {}
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return index;
-}
 
 /**
  * The compose dialog's location field (issue #3811): free text as before, with
@@ -48,7 +24,8 @@ export function LocationPicker({
 }) {
   const { t } = useTranslation();
   const id = useId();
-  const index = usePlaceIndex();
+  const places = usePlaceIndex();
+  const index = places.status === 'ready' ? places.index : null;
   /** Suggestions follow typing; picking one closes them until the next keystroke. */
   const [typing, setTyping] = useState(false);
   const suggestions = useMemo(
@@ -96,11 +73,13 @@ export function LocationPicker({
         </ul>
       )}
       <p id={`${id}-hint`} className="text-xs text-text-dim">
-        {measurable === null
-          ? t('communities.board.compose.locationHint')
-          : measurable
-            ? t('communities.board.compose.locationMeasurable')
-            : t('communities.board.compose.locationFree')}
+        {places.status === 'failed'
+          ? t('communities.board.compose.locationNoList')
+          : measurable === null
+            ? t('communities.board.compose.locationHint')
+            : measurable
+              ? t('communities.board.compose.locationMeasurable')
+              : t('communities.board.compose.locationFree')}
       </p>
     </div>
   );

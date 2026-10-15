@@ -1,17 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import {
-  buildPlaceIndex,
-  jumpsToPlace,
-  resolvePlace,
-  type PlaceIndex,
-} from '@/engine/communities/requestPlaces';
+import { jumpsToPlace, resolvePlace } from '@/engine/communities/requestPlaces';
 import { jumpDistancesFrom } from '@/engine/route/jumpRoute';
 import type { EsiEndpointId } from '@/esi/registry';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
-import { loadMarketRegions } from '@/sde/loadMarketSde';
 import { loadJumpGraph } from '@/sde/jumpGraph';
-import { loadSolarSystemsById } from '@/sde/solarSystems';
+import { usePlaceIndex } from './usePlaceIndex';
 
 /** What knowing where the pilot is takes: the Character's location Permission. */
 export const LOCATION_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLocation'];
@@ -36,6 +30,7 @@ export type RequestDistance =
  * board must say why distance is off, never quietly ignore it.
  */
 export function useRequestDistance(characterId: number, wanted: boolean): RequestDistance {
+  const places = usePlaceIndex(wanted);
   const lacksScope = useCharacterLacksEndpoints(characterId, LOCATION_ENDPOINTS);
   const [origin, setOrigin] = useState<{
     characterId: number;
@@ -48,7 +43,6 @@ export function useRequestDistance(characterId: number, wanted: boolean): Reques
         systemId: number;
         failed: false;
         distances: ReadonlyMap<number, number>;
-        index: PlaceIndex;
       }
     | null
   >(null);
@@ -70,10 +64,10 @@ export function useRequestDistance(characterId: number, wanted: boolean): Reques
   useEffect(() => {
     if (!wanted || systemId === undefined || systemId === null) return;
     let cancelled = false;
-    Promise.all([loadJumpGraph(), loadSolarSystemsById(), loadMarketRegions().catch(() => null)])
-      .then(([graph, systems, regions]) => {
+    loadJumpGraph()
+      .then((graph) => {
         if (cancelled) return;
-        if (!graph || !systems || !regions) {
+        if (!graph) {
           setMap({ characterId, systemId, failed: true });
           return;
         }
@@ -82,7 +76,6 @@ export function useRequestDistance(characterId: number, wanted: boolean): Reques
           systemId,
           failed: false,
           distances: jumpDistancesFrom(graph, systemId),
-          index: buildPlaceIndex([...systems.values()], regions),
         });
       })
       .catch(() => !cancelled && setMap({ characterId, systemId, failed: true }));
@@ -98,8 +91,10 @@ export function useRequestDistance(characterId: number, wanted: boolean): Reques
     if (systemId === null) return { status: 'unavailable', reason: 'location' };
     if (!wanted) return { status: 'idle' };
     if (!ready) return { status: 'loading' };
-    if (ready.failed) return { status: 'failed' };
-    const { distances, index } = ready;
+    if (ready.failed || places.status === 'failed') return { status: 'failed' };
+    if (places.status === 'loading') return { status: 'loading' };
+    const { distances } = ready;
+    const { index } = places;
     return {
       status: 'ready',
       jumpsOf: (text) => {
@@ -107,5 +102,5 @@ export function useRequestDistance(characterId: number, wanted: boolean): Reques
         return place ? jumpsToPlace(place, distances, index) : null;
       },
     };
-  }, [lacksScope, systemId, wanted, ready]);
+  }, [lacksScope, systemId, wanted, ready, places]);
 }

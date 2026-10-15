@@ -101,12 +101,15 @@ export function RequestsTab({
   const shared = useSharedBlueprintTypes(characterId, communityId, myUid, requests !== null);
   const sharedTypeIds = shared.status === 'ready' ? shared.typeIds : undefined;
   const distance = useRequestDistance(characterId, maxJumps !== null);
+  // A limit that can no longer be measured (Permission revoked, location lost) is no limit:
+  // the select then reads "Any distance", never a limit the list is not applying.
+  const limit = distance.status === 'unavailable' ? null : maxJumps;
 
   const { rows, unmeasured } = useMemo(() => {
     const filtered = filterRequests(requests ?? [], { filter, query, myUid, now, sharedTypeIds });
     const { within, unmeasured: left } =
       distance.status === 'ready'
-        ? withinJumps(filtered, maxJumps, (request) => distance.jumpsOf(request.location))
+        ? withinJumps(filtered, limit, (request) => distance.jumpsOf(request.location))
         : { within: filtered, unmeasured: 0 };
     return {
       unmeasured: left,
@@ -120,7 +123,7 @@ export function RequestsTab({
         };
       }),
     };
-  }, [requests, filter, query, myUid, now, sharedTypeIds, distance, maxJumps]);
+  }, [requests, filter, query, myUid, now, sharedTypeIds, distance, limit]);
 
   const statusLabels: Record<RequestStatus, string> = {
     open: t('communities.board.status.open'),
@@ -257,7 +260,7 @@ export function RequestsTab({
   }).length;
   const panelRequest = requests.find((r) => r.id === openId) ?? null;
   const distanceOff = distance.status === 'unavailable';
-  const measuring = maxJumps !== null && distance.status === 'loading';
+  const measuring = limit !== null && distance.status === 'loading';
 
   return (
     <div className="space-y-3">
@@ -305,7 +308,7 @@ export function RequestsTab({
             aria-label={t('communities.board.distance.label')}
             aria-describedby={distanceOff ? `${distanceNoteId}` : undefined}
             disabled={distanceOff}
-            value={maxJumps === null ? 'any' : String(maxJumps)}
+            value={limit === null ? 'any' : String(limit)}
             onChange={(e) => setMaxJumps(e.target.value === 'any' ? null : Number(e.target.value))}
           >
             <option value="any">{t('communities.board.distance.any')}</option>
@@ -328,12 +331,12 @@ export function RequestsTab({
             )}
           </p>
         )}
-        {distance.status === 'failed' && maxJumps !== null && (
+        {distance.status === 'failed' && limit !== null && (
           <p role="alert" className="mb-3 text-xs text-danger">
             {t('communities.board.distance.failed')}
           </p>
         )}
-        {distance.status === 'ready' && maxJumps !== null && unmeasured > 0 && (
+        {distance.status === 'ready' && limit !== null && unmeasured > 0 && (
           <p role="status" className="mb-3 text-xs text-text-dim">
             {t('communities.board.distance.unmeasured', { count: unmeasured })}
           </p>
@@ -345,8 +348,8 @@ export function RequestsTab({
             title={
               query.trim()
                 ? t('communities.board.noMatch')
-                : distance.status === 'ready' && maxJumps !== null
-                  ? t('communities.board.distance.none', { count: maxJumps })
+                : distance.status === 'ready' && limit !== null
+                  ? t('communities.board.distance.none', { count: limit })
                   : filter === 'mine'
                     ? t('communities.board.noneMine')
                     : filter === 'canFill'

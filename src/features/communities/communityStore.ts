@@ -132,7 +132,9 @@ export async function loadJoinRequests(
 export async function loadMemberLibraries(
   characterId: number,
   communityId: string,
-  memberUids: readonly string[]
+  memberUids: readonly string[],
+  /** `strict`: an unreadable library throws instead of reading as empty (a caller that must tell "none" from "could not read"). */
+  { strict = false }: { strict?: boolean } = {}
 ): Promise<MemberLibrary[]> {
   const standIn = communityBackendOverride()?.loadLibraries;
   if (standIn) {
@@ -155,7 +157,8 @@ export async function loadMemberLibraries(
           return Array.isArray(list) ? (list as SharedBlueprint[]) : [];
         });
         return { uid, items };
-      } catch {
+      } catch (err) {
+        if (strict) throw err;
         return { uid, items: [] };
       }
     })

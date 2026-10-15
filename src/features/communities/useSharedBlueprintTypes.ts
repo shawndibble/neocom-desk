@@ -5,8 +5,8 @@ export type SharedBlueprintTypes =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; typeIds: ReadonlySet<number> };
 
 /**
- * The blueprint types this Member has shared with a Community: what their
- * own published library holds, the same list the Community Library shows
+ * The blueprint types this Member has shared with a Community: what the
+ * library they publish to this Community holds, the same list the Community Library shows
  * under their name, so "I can fill" agrees with it. One read of their own
  * library, once `enabled`.
  */
@@ -24,7 +24,7 @@ export function useSharedBlueprintTypes(
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    loadMemberLibraries(characterId, communityId, [myUid]).then(
+    loadMemberLibraries(characterId, communityId, [myUid], { strict: true }).then(
       (libraries) =>
         !cancelled &&
         setLoaded({
