@@ -43,7 +43,7 @@ async function warmFile(file: string): Promise<void> {
   // Already cached (by use or an earlier warm): nothing to fetch.
   if (await caches.match(url)) return;
   // Read the body to the end so the SW finishes its cache write.
-  await fetchWithIdleTimeout(url);
+  await fetchWithIdleTimeout(url, { drain: true });
 }
 
 /**

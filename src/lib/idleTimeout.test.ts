@@ -73,3 +73,39 @@ describe('fetchWithIdleTimeout', () => {
     );
   });
 });
+
+describe('fetchWithIdleTimeout with drain', () => {
+  it('survives a slow body like the reader does, and keeps no bytes', async () => {
+    const gap = IDLE_TIMEOUT_MS - 1_000;
+    vi.stubGlobal('fetch', trickleFetch(6, gap));
+    const loading = fetchWithIdleTimeout('https://example.test/big.json', { drain: true });
+    await vi.advanceTimersByTimeAsync(gap * 6);
+    expect(await loading).toEqual({ ok: true, status: 200, bytes: new Uint8Array() });
+  });
+
+  it('aborts when the body goes quiet partway through', async () => {
+    vi.stubGlobal('fetch', trickleFetch(2, 1_000, true));
+    const loading = expect(
+      fetchWithIdleTimeout('https://example.test/x.json', { drain: true })
+    ).rejects.toMatchObject({ name: 'TimeoutError' });
+    await vi.advanceTimersByTimeAsync(1_000 + IDLE_TIMEOUT_MS + 1_000);
+    await loading;
+  });
+});
+
+describe('fetchWithIdleTimeout on an error answer', () => {
+  it('cancels the unread body', async () => {
+    const cancel = vi.fn(async () => {});
+    const response = new Response('nope', { status: 503 });
+    Object.defineProperty(response, 'body', { value: { cancel } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response)
+    );
+    expect(await fetchWithIdleTimeout('https://example.test/x.json')).toMatchObject({
+      ok: false,
+      status: 503,
+    });
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+});

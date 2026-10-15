@@ -72,17 +72,45 @@ export async function readBodyWithGuard(
 }
 
 /**
+ * Reads a response body to the end under `guard` and keeps nothing: for a
+ * download whose point is the side effect (a service worker or Cache Storage
+ * writing it), where holding a copy of a multi-MB file would be waste.
+ */
+export async function drainBodyWithGuard(response: Response, guard: IdleGuard): Promise<void> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    guard.arm(NO_STREAM_TIMEOUT_MS);
+    await response.arrayBuffer();
+    return;
+  }
+  for (;;) {
+    const { done } = await reader.read();
+    if (done) return;
+    guard.arm();
+  }
+}
+
+/**
  * Fetches `url` and reads its body under an idle guard. The body is read only
- * for a 2xx answer (an error page is not worth waiting on).
+ * for a 2xx answer (an error page is not worth waiting on; it is cancelled).
+ * With `drain`, the body is read and discarded and `bytes` is empty.
  */
 export async function fetchWithIdleTimeout(
-  url: string
+  url: string,
+  options: { drain?: boolean } = {}
 ): Promise<{ ok: boolean; status: number; bytes: Uint8Array }> {
   const guard = createIdleGuard();
   try {
     guard.arm();
     const response = await fetch(url, { signal: guard.signal });
-    if (!response.ok) return { ok: false, status: response.status, bytes: new Uint8Array() };
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => {});
+      return { ok: false, status: response.status, bytes: new Uint8Array() };
+    }
+    if (options.drain) {
+      await drainBodyWithGuard(response, guard);
+      return { ok: true, status: response.status, bytes: new Uint8Array() };
+    }
     return { ok: true, status: response.status, bytes: await readBodyWithGuard(response, guard) };
   } finally {
     guard.clear();

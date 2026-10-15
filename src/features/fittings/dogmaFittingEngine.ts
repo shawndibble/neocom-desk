@@ -7,7 +7,7 @@ import wasmInit, {
   type Projection,
   type Violation,
 } from '@eveshipfit/dogma-engine';
-import { createIdleGuard, readBodyWithGuard } from '@/lib/idleTimeout';
+import { createIdleGuard, drainBodyWithGuard, readBodyWithGuard } from '@/lib/idleTimeout';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import type { PlanEntry } from '@/engine/types';
 import { racksWithSlots } from '@/engine/fittings/hullFitKey';
@@ -164,7 +164,7 @@ export async function warmDogmaEngineAssets(): Promise<void> {
         if (!isEngineAsset(response)) return;
         // The put consumes the body but can't re-arm the guard; a clone read
         // alongside it can.
-        await Promise.all([cache.put(url, response.clone()), readBodyWithGuard(response, guard)]);
+        await Promise.all([cache.put(url, response.clone()), drainBodyWithGuard(response, guard)]);
       } finally {
         guard.clear();
       }
