@@ -38,7 +38,7 @@ describe('fittingCanFly', () => {
     expect(await fittingCanFly(fit(587, UNREADABLE_TYPE_ID), new Map())).toBe(false);
   });
 
-  it('rejects rather than answering true when a type could not be read', async () => {
-    await expect(fittingCanFly(fit(600, UNREADABLE_TYPE_ID), new Map())).rejects.toThrow();
+  it('is null rather than true when a type could not be read', async () => {
+    expect(await fittingCanFly(fit(600, UNREADABLE_TYPE_ID), new Map())).toBeNull();
   });
 });

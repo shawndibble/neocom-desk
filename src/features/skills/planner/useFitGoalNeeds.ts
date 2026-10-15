@@ -19,6 +19,7 @@ import { fittingRequirementTypeIds } from '@/engine/fittings/skillGaps';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import type { PlanEntry } from '@/engine/types';
 import { loadRequirementsForTypes } from '@/features/fittings/skillRequirements';
+import { useReconnectCount } from '@/stores/network';
 
 export interface FitGoalNeed {
   id: string;
@@ -67,6 +68,9 @@ export function useFitGoalNeeds(
   // is keyed on what a Fitting needs from them: its id and code.
   const wantedKey = wanted.map((r) => `${r.id}:${r.code}:${r.name}`).join('|');
 
+  // Requirements that could not be read offline are looked up again on reconnect.
+  const reconnects = useReconnectCount();
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -84,7 +88,7 @@ export function useFitGoalNeeds(
     };
     // `wanted` is covered by `wantedKey`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantedKey]);
+  }, [wantedKey, reconnects]);
 
   const needs = useMemo(() => new Map(loaded.needs.map((need) => [need.id, need])), [loaded]);
   const unknownIds = useMemo(() => new Set(loaded.unknownIds), [loaded]);

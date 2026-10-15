@@ -223,6 +223,12 @@ export function DefensePanel({ stats }: { stats: FittingStats }) {
   );
 }
 
+/** Said when some fitted type's skill requirements couldn't be loaded: not "can fly", not "nothing missing". */
+export function SkillsUnknownNote() {
+  const { t } = useTranslation();
+  return <p className="text-xs text-text-dim">{t('fittings.start.preview.skillsUnknown')}</p>;
+}
+
 /** Whether the Character can fly it, and what is missing with the time to train it. */
 export function SkillsPanel({
   fitting,
@@ -244,7 +250,7 @@ export function SkillsPanel({
   if (gaps.missing.length === 0) {
     // "Nothing missing" only counts when every requirement was actually read.
     return gaps.unknown ? (
-      <p className="text-xs text-text-dim">{t('fittings.start.preview.skillsUnknown')}</p>
+      <SkillsUnknownNote />
     ) : (
       <p className="text-sm text-success">{t('fittings.start.preview.canFly')}</p>
     );
@@ -257,9 +263,7 @@ export function SkillsPanel({
         characterId={characterId}
         fittingName={fitting.name}
       />
-      {gaps.unknown && (
-        <p className="text-xs text-text-dim">{t('fittings.start.preview.skillsUnknown')}</p>
-      )}
+      {gaps.unknown && <SkillsUnknownNote />}
     </div>
   );
 }

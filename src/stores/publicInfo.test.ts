@@ -150,6 +150,40 @@ describe('usePublicInfo', () => {
     });
   });
 
+  it('notices a corporation change on that load, not a day late (issue #293)', async () => {
+    await db.characters.put({
+      characterId: CHAR_ID,
+      name: 'Pilot One',
+      ownerHash: 'h',
+      addedAt: 1,
+      corporationId: 1001,
+    });
+    // A character record read two hours ago, still inside the static window.
+    await db.esiCache.put({
+      characterId: 0,
+      key: `public-character:${CHAR_ID}`,
+      value: { name: 'Pilot One', corporation_id: 1001, alliance_id: 2001 },
+      fetchedAt: Date.now() - 2 * 60 * 60_000,
+    });
+    server.use(
+      http.get('https://esi.evetech.net/characters/:id', () =>
+        HttpResponse.json({
+          name: 'Pilot One',
+          corporation_id: 1002,
+          birthday: '2015-01-01T00:00:00Z',
+          bloodline_id: 1,
+          gender: 'female',
+          race_id: 1,
+        })
+      )
+    );
+
+    await usePublicInfo.getState().load(CHAR_ID);
+
+    expect((await db.characters.get(CHAR_ID))?.corporationId).toBe(1002);
+    expect(usePublicInfo.getState().byCharacterId[CHAR_ID]?.corporationId).toBe(1002);
+  });
+
   it('stores nothing when the corporation was never cached and ESI is down', async () => {
     server.use(http.get('https://esi.evetech.net/corporations/:id', () => HttpResponse.error()));
     await usePublicInfo.getState().load(CHAR_ID);

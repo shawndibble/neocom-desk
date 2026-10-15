@@ -53,8 +53,15 @@ export interface PublicAllianceInfo extends AlliancePublicInfo {
   alliance_id: number;
 }
 
+/**
+ * `staleAfterMs` defaults to the long static window. A caller that must notice
+ * the character *changing corporation* (`stores/publicInfo`, issue #293) passes
+ * a short one, so online it reads live and a lapsed row is only the offline
+ * fallback.
+ */
 export async function loadPublicCharacterInfo(
-  characterId: number
+  characterId: number,
+  options: { staleAfterMs?: number } = {}
 ): Promise<PublicCharacterInfo | null> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterPublicInfo(characterId, options)
@@ -63,7 +70,7 @@ export async function loadPublicCharacterInfo(
     GLOBAL_CACHE_CHARACTER_ID,
     `public-character:${characterId}`,
     fetchLive,
-    { staleAfterMs: STALE_AFTER.static, conditional }
+    { staleAfterMs: options.staleAfterMs ?? STALE_AFTER.static, conditional }
   );
   return result ? { ...result.data, character_id: characterId } : null;
 }

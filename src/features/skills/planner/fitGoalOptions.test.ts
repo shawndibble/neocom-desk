@@ -22,7 +22,8 @@ describe('fitGoalOptions', () => {
       new Map(),
       [],
       new Map(),
-      new Date(0)
+      new Date(0),
+      new Set()
     );
     expect(option.state).toBe('loading');
   });
@@ -34,7 +35,8 @@ describe('fitGoalOptions', () => {
       new Map(),
       [],
       new Map(),
-      new Date(0)
+      new Date(0),
+      new Set()
     );
     expect(option.state).toBe('flyable-now');
   });

@@ -42,7 +42,7 @@ async function loadSystem(systemId: number): Promise<UniverseSystem | null> {
 async function loadLocalSystem(
   systemId: number
 ): Promise<{ name: string; security: number } | null> {
-  const entry = await lookupSolarSystem(systemId).catch(() => null);
+  const entry = await lookupSolarSystem(systemId);
   return entry ? { name: entry.name, security: entry.security } : null;
 }
 

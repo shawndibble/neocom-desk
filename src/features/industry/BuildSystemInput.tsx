@@ -53,6 +53,7 @@ export function BuildSystemInput({
   const [text, setText] = useState(systemName ?? '');
   const [status, setStatus] = useState<'idle' | 'resolving' | 'notFound' | 'unavailable'>('idle');
   const errorId = `${idPrefix}-error`;
+  const hasError = status === 'notFound' || status === 'unavailable';
 
   // Follows the plan when it changes underneath — switching plans, or a sync
   // landing an edit made on another device. Adjusted during render rather than
@@ -74,13 +75,12 @@ export function BuildSystemInput({
       return;
     }
     setStatus('resolving');
-    const system = await resolveSolarSystem(trimmed);
-    // `undefined` is "couldn't check" (offline, no local table): not a verdict on the name.
-    if (system === undefined) return setStatus('unavailable');
-    if (system === null) return setStatus('notFound');
+    const result = await resolveSolarSystem(trimmed);
+    // "Couldn't check" (offline, no local table) is not a verdict on the name.
+    if (result.status !== 'found') return setStatus(result.status);
     setStatus('idle');
-    setText(system.name);
-    onChange(system);
+    setText(result.system.name);
+    onChange(result.system);
   }
 
   return (
@@ -99,10 +99,10 @@ export function BuildSystemInput({
           value={text}
           placeholder={hubSystemName}
           aria-invalid={status === 'notFound'}
-          aria-describedby={status === 'notFound' || status === 'unavailable' ? errorId : undefined}
+          aria-describedby={hasError ? errorId : undefined}
           onChange={(e) => {
             setText(e.target.value);
-            if (status === 'notFound' || status === 'unavailable') setStatus('idle');
+            if (hasError) setStatus('idle');
           }}
           onBlur={() => void commit()}
           onKeyDown={(e) => {

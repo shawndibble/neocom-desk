@@ -752,7 +752,7 @@
         "signature": "Signature",
         "skillsNeedCharacter": "Pick a Character to see which skills this needs.",
         "skillsHint": "You can't fly this yet. Add the missing skills to a Skill Plan:",
-        "skillsUnknown": "Some skill requirements couldn't be loaded, so this can't be confirmed as flyable. Try again when you're online.",
+        "skillsUnknown": "Some skill requirements couldn't be loaded, so this can't be confirmed as flyable. They're looked up again when you're back online.",
         "tooLargeToCompare": "Too large to compare through a link",
         "meter": "{{used}} / {{total}} {{unit}}",
         "meterOver": "{{used}} / {{total}} {{unit}} (over)",

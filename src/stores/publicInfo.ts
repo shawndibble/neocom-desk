@@ -3,6 +3,7 @@
 // `features/character/publicInfoData.ts` and `names.ts`, so a cold start
 // offline still shows the names last seen; the store itself stays in memory.
 import { create } from 'zustand';
+import { STALE_AFTER } from '@/esi/cache';
 import { postCharactersAffiliation } from '@/esi/endpoints';
 import { recordCharacterCorporation } from '@/auth/session';
 import {
@@ -46,7 +47,10 @@ const inflight = new Set<number>();
  * not stored, so the next visit retries instead of pinning "—".
  */
 async function loadEntry(characterId: number): Promise<PublicInfoEntry | null> {
-  const info = await loadPublicCharacterInfo(characterId);
+  // Short window, not the long static one: this response is what notices a
+  // corporation change (below), so online it must be read live, not up to a
+  // day late. Corp and alliance names change almost never and keep the long one.
+  const info = await loadPublicCharacterInfo(characterId, { staleAfterMs: STALE_AFTER.default });
   if (!info) return null;
   // This response is the app's only source for which corporation a
   // character is in — the SSO JWT carries no such claim — so it is also

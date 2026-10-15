@@ -16,6 +16,7 @@ import {
   type SkillGaps,
 } from '@/engine/fittings/skillGaps';
 import type { Fitting } from '@/engine/fittings/types';
+import { useReconnectCount } from '@/stores/network';
 import { loadActivePilotProfile } from './fittingPilotProfile';
 import { loadRequirementsForTypes } from './skillRequirements';
 
@@ -32,6 +33,9 @@ export function useFittingSkillGaps(
     characterId: number;
     gaps: FittingSkillGaps;
   } | null>(null);
+
+  // Requirements that could not be read offline are looked up again on reconnect.
+  const reconnects = useReconnectCount();
 
   useEffect(() => {
     if (fitting === null || characterId === null) return;
@@ -62,7 +66,7 @@ export function useFittingSkillGaps(
     return () => {
       cancelled = true;
     };
-  }, [fitting, characterId]);
+  }, [fitting, characterId, reconnects]);
 
   // Keyed to what was computed for, so a switch never shows the previous
   // Character's (or Fitting's) gaps while the new ones load.

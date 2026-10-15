@@ -4,8 +4,9 @@
  * Resolves a name the player has finished typing rather than powering an
  * autocomplete. The local solar-system table (`market/systems.json`, read by
  * `sde/solarSystems.ts`) is asked first, so a name resolves offline with its
- * security band and no ESI call. Only when that table cannot be read does it
- * fall back to ESI's `/universe/ids`, an exact, case-insensitive match.
+ * security band and no ESI call. A name the table lacks (or a table that
+ * cannot be read) falls back to ESI's `/universe/ids`, an exact,
+ * case-insensitive match.
  *
  * ESI-path resolutions are cached for the session under the lower-cased name:
  * system names never change, and a plan re-resolves the same one on every edit.
@@ -37,25 +38,37 @@ export function clearSystemLookupCache(): void {
 }
 
 /**
- * Resolves one system name. `null` for a blank or unknown name; `undefined`
- * when the name could not be checked at all (no local table and ESI
- * unreachable) — "couldn't check" is not "not found", and the caller words
- * them differently. Nothing here throws (a Build Plan edit must never blank
- * the results panel).
+ * The three answers a name lookup can give. "Couldn't check" is not "not
+ * found", and the caller words them differently.
  */
-export async function resolveSolarSystem(name: string): Promise<SolarSystemRef | null | undefined> {
+export type SolarSystemResolution =
+  { status: 'found'; system: SolarSystemRef } | { status: 'notFound' } | { status: 'unavailable' };
+
+const NOT_FOUND: SolarSystemResolution = { status: 'notFound' };
+const UNAVAILABLE: SolarSystemResolution = { status: 'unavailable' };
+
+/**
+ * Resolves one system name. A blank name is `notFound`. The local table is
+ * asked first; a name it lacks still goes to ESI, because the bundled snapshot
+ * can lag the game, so `notFound` means ESI too found no such system, and
+ * `unavailable` means neither could answer. Nothing here throws (a Build Plan
+ * edit must never blank the results panel).
+ */
+export async function resolveSolarSystem(name: string): Promise<SolarSystemResolution> {
   const trimmed = name.trim();
-  if (trimmed === '') return null;
+  if (trimmed === '') return NOT_FOUND;
   const key = trimmed.toLowerCase();
   const cached = cache.get(key);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) {
+    return cached === null ? NOT_FOUND : { status: 'found', system: cached };
+  }
 
   const local = await lookupSolarSystemByName(trimmed);
-  if (local !== undefined) {
-    // The table lists every system, so a miss in it is a real "not found".
-    return local === null
-      ? null
-      : { id: local.id, name: local.name, security: securityBand(local.security) };
+  if (local) {
+    return {
+      status: 'found',
+      system: { id: local.id, name: local.name, security: securityBand(local.security) },
+    };
   }
 
   let found: SolarSystemRef | null = null;
@@ -74,14 +87,16 @@ export async function resolveSolarSystem(name: string): Promise<SolarSystemRef |
       // unreachable `/universe/ids`, so it gets the same answer: return what we
       // have and cache nothing, or a band that failed once would stay null for
       // the rest of the session with no way to re-derive it.
-      if (status === null) return { id: match.id, name: match.name, security: null };
+      if (status === null) {
+        return { status: 'found', system: { id: match.id, name: match.name, security: null } };
+      }
       found = { id: match.id, name: match.name, security: securityBand(status) };
     }
   } catch {
     // An unreachable ESI is not a wrong name: leave it uncached so the next
     // edit retries instead of pinning "not found" for the session.
-    return undefined;
+    return UNAVAILABLE;
   }
   cache.set(key, found);
-  return found;
+  return found === null ? NOT_FOUND : { status: 'found', system: found };
 }

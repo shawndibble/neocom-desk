@@ -14,6 +14,13 @@ export type FitGoalOption =
   | { id: string; name: string; state: 'on-date'; date: Date }
   | { id: string; name: string; state: 'missing'; missingLevels: number; toAdd: PlanEntry[] };
 
+/** Whether the picker can pick this row: not still loading, not unconfirmable, not already flyable. */
+export function isFitGoalPickable(
+  option: FitGoalOption
+): option is Exclude<FitGoalOption, { state: 'loading' | 'unknown' | 'flyable-now' }> {
+  return option.state !== 'loading' && option.state !== 'unknown' && option.state !== 'flyable-now';
+}
+
 export function fitGoalOptions(
   records: readonly { id: string; name: string }[],
   needs: ReadonlyMap<string, FitGoalNeed>,
@@ -21,7 +28,7 @@ export function fitGoalOptions(
   scheduled: readonly ScheduledStep[],
   stepByKey: ReadonlyMap<StepKey, ScheduledStep>,
   startDate: Date,
-  unknownIds: ReadonlySet<string> = new Set()
+  unknownIds: ReadonlySet<string>
 ): FitGoalOption[] {
   return records.map(({ id, name }): FitGoalOption => {
     const need = needs.get(id);

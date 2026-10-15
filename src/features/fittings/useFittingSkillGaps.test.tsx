@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { Fitting } from '@/engine/fittings/types';
 import type { PilotProfile } from '@/engine/fittings/types';
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
@@ -15,6 +15,8 @@ vi.mock('./fittingPilotProfile', () => ({
 
 let inFlight = 0;
 let maxInFlight = 0;
+// 99998 starts unreadable and becomes readable (a reconnect); its result is cached once read.
+let reconnectTypeReadable = false;
 // 99999 stands for a type neither the cache nor ESI could supply.
 const UNREADABLE_TYPE_ID = 99999;
 // typeId 587 (the hull) requires skillTypeID 3300 at level 5; everything else needs nothing.
@@ -24,7 +26,7 @@ vi.mock('@/features/skills/data', () => ({
     maxInFlight = Math.max(maxInFlight, inFlight);
     await Promise.resolve();
     inFlight -= 1;
-    if (typeId === 99999) return null;
+    if (typeId === 99999 || (typeId === 99998 && !reconnectTypeReadable)) return null;
     return {
       data: {
         dogma_attributes:
@@ -74,6 +76,22 @@ describe('useFittingSkillGaps', () => {
       missing: [],
       unknown: true,
     });
+  });
+
+  it('looks the unreadable type up again on reconnect and then stops reporting unknown', async () => {
+    const unreadable: Fitting = {
+      ...RIFTER,
+      modules: [{ slot: 'high', slotIndex: 0, typeId: 99998, state: 'active' }],
+    };
+    const { result } = renderHook(() => useFittingSkillGaps(unreadable, 1));
+    await waitFor(() => expect(result.current?.unknown).toBe(true));
+
+    reconnectTypeReadable = true;
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    await waitFor(() => expect(result.current?.unknown).toBe(false));
   });
 
   it('still lists the confirmed gaps when another type is unknown', async () => {
