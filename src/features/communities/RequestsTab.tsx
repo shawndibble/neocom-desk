@@ -211,19 +211,18 @@ export function RequestsTab({
     },
   ];
 
+  const reloadFailed = (
+    <div className="flex flex-wrap items-center gap-2">
+      <p role="alert" className="min-w-0 flex-1 text-xs text-danger">
+        {t('communities.board.loadFailed')}
+      </p>
+      <Button size="sm" onClick={onReload}>
+        {t('communities.retry')}
+      </Button>
+    </div>
+  );
   if (failed && requests === null) {
-    return (
-      <Panel>
-        <div className="flex flex-wrap items-center gap-2">
-          <p role="alert" className="min-w-0 flex-1 text-xs text-danger">
-            {t('communities.board.loadFailed')}
-          </p>
-          <Button size="sm" onClick={onReload}>
-            {t('communities.retry')}
-          </Button>
-        </div>
-      </Panel>
-    );
+    return <Panel>{reloadFailed}</Panel>;
   }
   if (requests === null) {
     return (
@@ -257,6 +256,7 @@ export function RequestsTab({
   if (requests.length === 0) {
     return (
       <>
+        {failed && <Panel>{reloadFailed}</Panel>}
         <Panel>
           <EmptyState
             title={t('communities.board.empty')}
@@ -289,6 +289,8 @@ export function RequestsTab({
 
   return (
     <div className="space-y-3">
+      {/* The board on screen is the last good read: say the refresh failed rather than pass it off as current. */}
+      {failed && <Panel>{reloadFailed}</Panel>}
       <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line px-3 py-2">
         <p className="min-w-0 basis-full text-xs text-text-dim sm:basis-0 sm:flex-1">
           {inProgress > 0

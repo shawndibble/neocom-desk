@@ -104,7 +104,8 @@ function renderTab(
   onReload = vi.fn(),
   pledges: Record<string, RequestPledge[]> = {},
   pledgesFailed = false,
-  isAdmin = false
+  isAdmin = false,
+  failed = false
 ) {
   render(
     <MemoryRouter>
@@ -118,7 +119,7 @@ function renderTab(
         requests={requests}
         pledges={new Map(Object.entries(pledges))}
         pledgesFailed={pledgesFailed}
-        failed={false}
+        failed={failed}
         now={NOW}
         members={[]}
         onReload={onReload}
@@ -629,6 +630,17 @@ describe('Board from Pledges', () => {
     );
     expect(screen.getByText('Part delivered')).toBeInTheDocument();
     expect(screen.getByText('Delivered')).toBeInTheDocument();
+  });
+});
+
+describe('A failed board reload', () => {
+  it('shows the retry banner above the last good board, not only before the first load', async () => {
+    const user = userEvent.setup();
+    const onReload = renderTab([request({ id: 'a' })], vi.fn(), {}, false, false, true);
+    expect(screen.getByRole('alert')).toHaveTextContent(/Couldn't load this Community's Requests/);
+    expect(screen.getByText('Tritanium')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onReload).toHaveBeenCalledTimes(1);
   });
 });
 
