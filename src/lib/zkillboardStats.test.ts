@@ -10,6 +10,9 @@ import {
   resetPilotStatsCache,
 } from './zkillboard';
 
+/** zKillboard is asked with no custom headers (no CORS preflight); the only init is the timeout's signal. */
+const NO_HEADERS = { signal: expect.any(AbortSignal) };
+
 describe('parsePilotStats', () => {
   it('reads the stated numbers from a recorded zKillboard stats body', () => {
     const parsed = parsePilotStats(recorded);
@@ -125,7 +128,8 @@ describe('fetchPilotStats', () => {
     const fetchMock = stubFetch(okBody(recorded));
     const result = await fetchPilotStats(443630591);
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://zkillboard.com/api/stats/characterID/443630591/'
+      'https://zkillboard.com/api/stats/characterID/443630591/',
+      NO_HEADERS
     );
     expect(result.kind).toBe('stats');
   });
@@ -168,7 +172,8 @@ describe('fetchCorporationStats', () => {
     vi.stubGlobal('fetch', fetchMock);
     const result = await fetchCorporationStats(98000001);
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://zkillboard.com/api/stats/corporationID/98000001/'
+      'https://zkillboard.com/api/stats/corporationID/98000001/',
+      NO_HEADERS
     );
     expect(result.kind).toBe('stats');
   });
@@ -198,7 +203,10 @@ describe('fetchAllianceStats', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     expect((await fetchAllianceStats(99005130)).kind).toBe('stats');
-    expect(fetchMock).toHaveBeenCalledWith('https://zkillboard.com/api/stats/allianceID/99005130/');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://zkillboard.com/api/stats/allianceID/99005130/',
+      NO_HEADERS
+    );
   });
 });
 

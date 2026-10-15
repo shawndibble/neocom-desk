@@ -10,6 +10,7 @@
  */
 import { sdeDataUrl } from './sdeDataUrl';
 import { currentWarmLevel } from '@/lib/lazyAssetWarmGate';
+import { fetchWithTimeout, SDE_FETCH_TIMEOUT_MS } from '@/lib/fetchWithTimeout';
 
 /** Everything `vite.config.ts` globIgnores under `data/` (the dogma engine is cached separately). */
 export const LAZY_SDE_FILES = [
@@ -41,7 +42,7 @@ async function warmFile(file: string): Promise<void> {
   const url = sdeDataUrl(import.meta.env.BASE_URL, file);
   // Already cached (by use or an earlier warm): nothing to fetch.
   if (await caches.match(url)) return;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url, undefined, SDE_FETCH_TIMEOUT_MS);
   if (res.ok) await res.arrayBuffer(); // drain so the SW finishes its cache write
 }
 

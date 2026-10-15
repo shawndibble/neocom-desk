@@ -15,6 +15,7 @@ import {
   type TheraHub,
   type WormholeShipSize,
 } from '@/engine/route/theraConnections';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 export const EVE_SCOUT_SIGNATURES_URL = 'https://api.eve-scout.com/v2/public/signatures';
 
@@ -90,7 +91,7 @@ let inFlight: Promise<TheraConnectionsResult> | null = null;
 
 async function fetchConnections(now: number): Promise<TheraConnectionsResult> {
   try {
-    const response = await fetch(EVE_SCOUT_SIGNATURES_URL);
+    const response = await fetchWithTimeout(EVE_SCOUT_SIGNATURES_URL);
     if (!response.ok) throw new Error(`EVE-Scout answered ${response.status}`);
     const result = {
       kind: 'ok' as const,

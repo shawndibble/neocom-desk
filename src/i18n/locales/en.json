@@ -266,6 +266,7 @@
         "eve-workbench-not-found": "EVE Workbench has no published fit at that link. It may have been deleted or made private.",
         "eve-workbench-failed": "EVE Workbench couldn't be reached. Try again in a moment.",
         "killmail-not-found": "That killmail couldn't be found on zKillboard.",
+        "killmail-unreachable": "Couldn't reach zKillboard — you may be offline. Paste the fit as EFT text instead.",
         "killmail-failed": "The killmail couldn't be fetched from ESI. Try again in a moment."
       },
       "tooLargeToShare": "This Fitting is loaded, but too large to carry in a link.",

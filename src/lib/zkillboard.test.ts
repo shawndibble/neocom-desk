@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchHullLosses,
+  fetchKillmailHash,
   fetchRegionRecentKills,
   REGION_PAGE_SIZE,
   fetchSystemRecentKills,
@@ -9,6 +10,9 @@ import {
   parseSystemKills,
   systemZkillUrl,
 } from './zkillboard';
+
+/** zKillboard is asked with no custom headers (no CORS preflight); the only init is the timeout's signal. */
+const NO_HEADERS = { signal: expect.any(AbortSignal) };
 
 const VICTIM = {
   ship_type_id: 626,
@@ -75,7 +79,10 @@ describe('fetchHullLosses', () => {
       json: () => Promise.resolve([{ killmail_id: 1, zkb: { hash: 'a' } }]),
     });
     const result = await fetchHullLosses(626);
-    expect(fetchMock).toHaveBeenCalledWith('https://zkillboard.com/api/losses/shipTypeID/626/');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://zkillboard.com/api/losses/shipTypeID/626/',
+      NO_HEADERS
+    );
     expect(result).toEqual({
       ok: true,
       losses: [{ killmailId: 1, hash: 'a', value: null, time: null, victim: null }],
@@ -168,7 +175,8 @@ describe('fetchSystemRecentKills', () => {
     });
     const result = await fetchSystemRecentKills(30002813);
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://zkillboard.com/api/kills/systemID/30002813/pastSeconds/3600/'
+      'https://zkillboard.com/api/kills/systemID/30002813/pastSeconds/3600/',
+      NO_HEADERS
     );
     expect(result.ok && result.kills.map((kill) => kill.killmailId)).toEqual([138801220]);
   });
@@ -230,7 +238,8 @@ describe('fetchRegionRecentKills', () => {
     const result = await fetchRegionRecentKills(10000002);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://zkillboard.com/api/kills/regionID/10000002/pastSeconds/3600/'
+      'https://zkillboard.com/api/kills/regionID/10000002/pastSeconds/3600/',
+      NO_HEADERS
     );
     expect(result.ok && result.bySystem.get(30002813)).toHaveLength(1);
   });
@@ -244,7 +253,8 @@ describe('fetchRegionRecentKills', () => {
     const result = await fetchRegionRecentKills(10000002);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock).toHaveBeenLastCalledWith(
-      'https://zkillboard.com/api/kills/regionID/10000002/pastSeconds/3600/page/3/'
+      'https://zkillboard.com/api/kills/regionID/10000002/pastSeconds/3600/page/3/',
+      NO_HEADERS
     );
     expect(result.ok && result.bySystem.get(30002813)).toHaveLength(2 * REGION_PAGE_SIZE + 2);
   });
@@ -308,5 +318,69 @@ describe('fetchRegionRecentKills', () => {
 describe('systemZkillUrl', () => {
   it("links zKillboard's system page", () => {
     expect(systemZkillUrl(30002813)).toBe('https://zkillboard.com/system/30002813/');
+  });
+});
+/** A fetch that never answers and rejects only when its signal aborts, as a hung request does. */
+function hangingFetch() {
+  return vi.fn(
+    (_input: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      })
+  );
+}
+
+describe('fetchKillmailHash', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function stubResponse(response: Response | Error) {
+    const fetchMock = vi.fn(() =>
+      response instanceof Error ? Promise.reject(response) : Promise.resolve(response)
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it("reads the hash from zKillboard's killID list", async () => {
+    const fetchMock = stubResponse(Response.json([{ killmail_id: 7, zkb: { hash: 'abc123' } }]));
+    expect(await fetchKillmailHash(7)).toEqual({ status: 'ok', hash: 'abc123' });
+    expect(fetchMock).toHaveBeenCalledWith('https://zkillboard.com/api/killID/7/', NO_HEADERS);
+  });
+
+  it('says not-found for a 404 and for a list with no kill in it', async () => {
+    stubResponse(new Response(null, { status: 404 }));
+    expect(await fetchKillmailHash(7)).toEqual({ status: 'not-found' });
+    stubResponse(Response.json([]));
+    expect(await fetchKillmailHash(7)).toEqual({ status: 'not-found' });
+    stubResponse(Response.json([{ killmail_id: 7 }]));
+    expect(await fetchKillmailHash(7)).toEqual({ status: 'not-found' });
+  });
+
+  it('says unreachable for a network error, a server error and an unreadable body, never not-found', async () => {
+    stubResponse(new TypeError('Failed to fetch'));
+    expect(await fetchKillmailHash(7)).toEqual({ status: 'unreachable' });
+    stubResponse(new Response(null, { status: 503 }));
+    expect(await fetchKillmailHash(7)).toEqual({ status: 'unreachable' });
+    stubResponse(new Response('<html>', { status: 200 }));
+    expect(await fetchKillmailHash(7)).toEqual({ status: 'unreachable' });
+  });
+
+  it('says unreachable when zKillboard never answers, instead of waiting forever', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', hangingFetch());
+    const lookup = fetchKillmailHash(7);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await lookup).toEqual({ status: 'unreachable' });
+  });
+
+  it('gives up on a hung losses request as a failed one', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', hangingFetch());
+    const losses = fetchHullLosses(626);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await losses).toEqual({ ok: false, losses: [] });
   });
 });
