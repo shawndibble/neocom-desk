@@ -23,6 +23,10 @@ describe('canAskToCopy', () => {
     expect(canAskToCopy(offer(), new Set([33078]))).toBe(false);
   });
 
+  it('is false while the formulas are unknown, never assumed allowed', () => {
+    expect(canAskToCopy(offer(), null)).toBe(false);
+  });
+
   it('is false for any row that is not a Community Offer', () => {
     expect(canAskToCopy(offer({ source: 'market' }), new Set())).toBe(false);
   });

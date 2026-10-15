@@ -103,7 +103,6 @@ const community = (typeId: number) =>
     te: 20,
     runs: -1,
     quantity: 1,
-    communityNames: ['C'],
     communities: [{ id: 'c1', name: 'C' }],
     stale: false,
     asOf: null,

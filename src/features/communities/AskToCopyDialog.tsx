@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, NativeSelect, Spinner } from '@/components/ui';
 import { askToCopyPrefill, type AskToCopyOffer } from '@/engine/communities/askToCopy';
@@ -31,7 +31,7 @@ export function AskToCopyDialog({
 }) {
   const { t } = useTranslation();
   const selectId = useId();
-  const communities = offer.communities ?? [];
+  const communities = offer.communities;
   const [chosen, setChosen] = useState<string | null>(
     communities.length === 1 ? communities[0].id : null
   );
@@ -39,7 +39,7 @@ export function AskToCopyDialog({
 
   if (chosen === null) {
     return (
-      <Modal open onClose={onClose} title={t('communities.askToCopy.title', { name: holderName })}>
+      <AskToCopyShell holderName={holderName} onClose={onClose}>
         <p className="text-xs text-text-dim">
           {t('communities.askToCopy.pickHint', { name: holderName, blueprint: blueprintName })}
         </p>
@@ -66,7 +66,7 @@ export function AskToCopyDialog({
             {t('communities.askToCopy.continue')}
           </Button>
         </div>
-      </Modal>
+      </AskToCopyShell>
     );
   }
   return (
@@ -119,7 +119,7 @@ function AskToCopyCompose({
 
   if (failed) {
     return (
-      <Modal open onClose={onClose} title={t('communities.askToCopy.title', { name: holderName })}>
+      <AskToCopyShell holderName={holderName} onClose={onClose}>
         <p role="alert" className="text-xs text-danger">
           {t('communities.askToCopy.membersFailed')}
         </p>
@@ -128,14 +128,14 @@ function AskToCopyCompose({
             {t('communities.askToCopy.close')}
           </Button>
         </div>
-      </Modal>
+      </AskToCopyShell>
     );
   }
   if (members === null) {
     return (
-      <Modal open onClose={onClose} title={t('communities.askToCopy.title', { name: holderName })}>
+      <AskToCopyShell holderName={holderName} onClose={onClose}>
         <Spinner size="sm" label={t('communities.loading')} />
-      </Modal>
+      </AskToCopyShell>
     );
   }
   return (
@@ -146,7 +146,26 @@ function AskToCopyCompose({
       members={members}
       prefill={askToCopyPrefill(offer, blueprintName)}
       onClose={onClose}
+      // no board on this page
       onPosted={() => undefined}
     />
+  );
+}
+
+/** The small dialog the choice, the wait and the failure share. */
+function AskToCopyShell({
+  holderName,
+  onClose,
+  children,
+}: {
+  holderName: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Modal open onClose={onClose} title={t('communities.askToCopy.title', { name: holderName })}>
+      {children}
+    </Modal>
   );
 }

@@ -80,6 +80,6 @@ Compose opens as pictured (`compose-lines`, `compose-recipients`), as stories `p
 - **Step 2:** the holder is ticked, with any Member sharing a matching blueprint, as in the picture.
 - **Community choice (not pictured):** when the holder shares the blueprint in several Communities, a small dialog (select and Continue) comes first. One Community goes straight to compose.
 - **Roster failure (not pictured):** a dialog with the failure in words and Close.
-- **The row control** ("ask <name> to copy…", an accent inline link) is not pictured: the mockup has no BPC Sourcing screen.
+- **Ask to copy row** (`ask-to-copy-row-1440.png`, `-390.png`; story `bpccontracts-communityoffercell--rows`): the Item cell of a Community Offer row, "ask <name> to copy…" as an accent inline link beside the community chip (ask, a copy's "from <name>", a reaction formula's plain text, a stale library). The cell is its own component (`CommunityOfferCell`) so it can be pictured: a whole BPC Sourcing page story needs the contracts snapshot (Firestore), the SDE and an ESI character, which is too large a fixture. The mockup itself has no BPC Sourcing screen.
 
 Delete this folder and the story when the last ticket that links it closes.

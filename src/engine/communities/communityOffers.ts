@@ -24,9 +24,7 @@ export interface CommunityOffer extends SharedBlueprint {
   memberName: string;
   /** Identical copies the sharer holds (the most any one Community lists). */
   quantity: number;
-  /** Every Community that shows this instance, sorted by name. */
-  communityNames: string[];
-  /** The same Communities by id, in the same order: where "ask to copy" posts to. */
+  /** Every Community that shows this instance (id and name), sorted by name; "ask to copy" posts to one. */
   communities: { id: string; name: string }[];
   asOf: number | null;
   stale: boolean;
@@ -76,7 +74,6 @@ export function buildCommunityOffers(
             uid: member.uid,
             memberName: member.characterName,
             quantity: count,
-            communityNames: [communityName],
             communities: [{ id: communityId, name: communityName }],
             asOf: member.asOf,
             stale: isLibraryStale(member.asOf, now),
@@ -85,7 +82,6 @@ export function buildCommunityOffers(
         }
         existing.quantity = Math.max(existing.quantity, count);
         if (!existing.communities.some((c) => c.id === communityId)) {
-          existing.communityNames.push(communityName);
           existing.communities.push({ id: communityId, name: communityName });
         }
         // The freshest stamp across Communities decides: one fresh view means it is current.
@@ -99,7 +95,6 @@ export function buildCommunityOffers(
   const offers = [...byKey.values()];
   for (const offer of offers) {
     offer.communities.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-    offer.communityNames = offer.communities.map((c) => c.name);
   }
   return offers.sort(
     (a, b) =>

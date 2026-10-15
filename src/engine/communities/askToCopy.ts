@@ -12,23 +12,24 @@ export interface AskToCopyOffer {
   /** -1 is an original (BPO); anything else is a copy. */
   runs: number;
   memberUid?: string;
-  communities?: readonly { id: string; name: string }[];
+  communities: readonly { id: string; name: string }[];
 }
 
 /**
  * Only a Shared BPO from a Community Offer: a copy is "from <name>" (not
  * something to copy), and a reaction formula cannot be copied at all
- * (GLOSSARY Community Offer).
+ * (GLOSSARY Community Offer). Formulas not known yet (`null`) is not allowed.
  */
 export function canAskToCopy(
   offer: AskToCopyOffer,
-  reactionFormulaTypeIds: ReadonlySet<number>
+  reactionFormulaTypeIds: ReadonlySet<number> | null
 ): boolean {
   return (
     offer.source === 'community' &&
     offer.runs === -1 &&
     !!offer.memberUid &&
-    (offer.communities?.length ?? 0) > 0 &&
+    offer.communities.length > 0 &&
+    reactionFormulaTypeIds !== null &&
     !reactionFormulaTypeIds.has(offer.typeId)
   );
 }
