@@ -3297,6 +3297,7 @@
       "nav": "Page sections",
       "answers": "Answers",
       "features": "Features",
+      "how": "How it works",
       "trust": "Trust",
       "discord": "Join the Discord",
       "github": "View the source on GitHub"
@@ -3414,14 +3415,97 @@
       "phonePilotLookup": {
         "alt": "Pilot Lookup on a phone: a pilot’s corporation, threat reading, danger and fleet-size ratios and kills per month by kind of space.",
         "caption": "Pilot lookup"
+      },
+      "planetaryColonies": {
+        "alt": "Planetary Industry’s Colonies tab: the next thing to do and when to log in next, then every colony ranked by what needs attention first, with its extractor timer and a next step.",
+        "caption": "Colonies ranked by what needs you first"
+      },
+      "overviewAlerts": {
+        "alt": "The Overview with the alerts bell open: an undercut order, a finished skill, an industry job ready, an extractor about to run out and a new mail, each with View and Dismiss.",
+        "caption": "Alerts for everything that needs you"
+      },
+      "corporation": {
+        "alt": "The Corporation overview: deadlines per day for the next 14 days and a fuel list that puts the structure running out soonest first.",
+        "caption": "One deadline-ranked board for the corp"
+      },
+      "mail": {
+        "alt": "Mail in two panes: the inbox on the left with unread mail in bold, the open mail on the right with reply and forward buttons.",
+        "caption": "A two-pane mail client"
       }
     },
     "featuresHeading": "Everything outside the client",
-    "featureGroups": {
-      "command": "Command",
-      "progression": "Progression",
-      "economy": "Economy",
-      "social": "Social"
+    "showcase": {
+      "label": "Areas of the app",
+      "covers": "Covers",
+      "industry": {
+        "tab": "Industry",
+        "costs": "A Build Plan costs materials, job cost and taxes at live hub prices.",
+        "verdict": "It says whether building beats buying, and whether it still profits after fees.",
+        "setup": "Blueprint search and facility presets set the assumptions; sub-builds roll up into the plan.",
+        "jobs": "Your active industry jobs sit on the same page."
+      },
+      "market": {
+        "tab": "Market & orders",
+        "orders": "Open Orders files each order under the worst thing wrong with it, worst first, across every character.",
+        "market": "Market shows every order for an item with its jump count from the system you pick, on a phone too.",
+        "wallet": "Each Wallet journal line links to the contract or item behind it.",
+        "assets": "Assets finds a thing and drills into stations, ships and containers."
+      },
+      "ships": {
+        "tab": "Ships & travel",
+        "tree": "The Ship Tree marks every hull “can fly” or the training time it still needs, with its Mastery tiers.",
+        "fitting": "Build a fit on the ring and see its DPS against a target profile.",
+        "skills": "Skill Plans work out when a plan finishes and how to get there faster. Clones shows where each jump clone is and when the next jump is allowed.",
+        "travel": "Route Safety flags the chokepoints between two systems, and Pilot Lookup reads a pilot’s killboard history."
+      },
+      "planetary": {
+        "tab": "Planetary & mining",
+        "colonies": "Colonies leads with the next thing to do and ranks every colony by what needs you first.",
+        "logIn": "Log in next says when you need to be back, so one login covers everything due.",
+        "plan": "Plan sets goals per day over your colonies and lists the shortfalls and the changes that close them.",
+        "mining": "Mining tracks what you mined and what it is worth; the Tax ledger shows who you owe rent to and what is paid, and Survey says when a belt will be mined out."
+      },
+      "corp": {
+        "tab": "Corporation",
+        "board": "The Corporation overview merges fuel, structure timers, moon extractions, finished jobs and offline services into one deadline-ranked board.",
+        "deadlines": "A strip shows the deadlines per day for the next 14 days, beside the fuel list, soonest first.",
+        "tables": "Members, Wallet and Assets are the tables behind it.",
+        "access": "It appears only when a character holds a Corp Role in game, and corporation data is a separate grant, requested only when you open those pages."
+      },
+      "comms": {
+        "tab": "Mail & contracts",
+        "mail": "Mail is a two-pane client: read what came in, then reply or forward.",
+        "calendar": "Calendar lists every clock a character can read in one deadline-ordered list beside a map of days, and sends your response to an invite.",
+        "contracts": "Contracts searches public offers for an item, lists courier jobs and keeps your history.",
+        "contacts": "Contacts mirrors your in-game contact list, compares your characters’ standings, and shows the NPC standings that set broker fees."
+      },
+      "alerts": {
+        "tab": "Alerts",
+        "bell": "The bell collects what fired: undercut orders, finished jobs and skills, extractors running out, new mail.",
+        "record": "Alerts keeps the record of everything that fired, for every character, grouped by type.",
+        "choose": "Notifications lets you pick which events fire, for which character, as a device pop-up or in the in-app list.",
+        "closed": "Alerts when closed is opt-in per character, and is how an alert reaches you with the app shut."
+      }
+    },
+    "how": {
+      "heading": "How it works",
+      "steps": {
+        "login": {
+          "title": "Log in with EVE",
+          "body": "You sign in on EVE Online’s own page. Neocom Desk reads your data, and writes to EVE only when you act.",
+          "alt": "The sign-in area of this page: the Log in with EVE Online button and the link to log in with custom permissions."
+        },
+        "share": {
+          "title": "Choose what to share",
+          "body": "Grant every permission or pick your own. Skills and structure lookup are required; the rest are optional, and you can add more later in Settings.",
+          "alt": "The Log in with custom permissions dialog: skills and structure lookup marked required, every other permission an optional checkbox."
+        },
+        "answers": {
+          "title": "See your answers",
+          "body": "The Overview gathers what needs you next: training, wallet, orders and alerts. Open any page for the detail.",
+          "alt": "The Overview after logging in, with the alerts bell open."
+        }
+      }
     },
     "features": {
       "corp": {

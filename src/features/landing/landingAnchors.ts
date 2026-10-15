@@ -6,5 +6,6 @@
 export const LANDING_ANCHORS: { id: string; key: string }[] = [
   { id: 'login-answers', key: 'answers' },
   { id: 'login-features', key: 'features' },
+  { id: 'login-how', key: 'how' },
   { id: 'login-trust', key: 'trust' },
 ];
