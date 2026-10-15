@@ -369,14 +369,14 @@ describe('BuildPlanList: build groups (#626)', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent(longName);
   });
 
-  it('shows the full plan name in a tooltip when truncated (#2175)', async () => {
+  it('shows no tooltip on a plan name, truncated or not', async () => {
     const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
     renderGrouped({
       plans: [plan({ id: 'a', name: longName, buildGroupId: 'g1' })],
       expandedGroupIds: new Set(['g1']),
     });
     await userEvent.hover(screen.getByText(longName));
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(longName);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('always lists a plan that is in no group', () => {
