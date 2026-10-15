@@ -119,7 +119,8 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
 
   return (
     <>
-      <DropdownMenu>
+      {/* The demo scrolls the whole document, so a modal menu's scroll lock would hide the page scrollbar and shift the page. */}
+      <DropdownMenu modal={!inert}>
         <DropdownMenuTrigger asChild>
           <IconButton
             size="row"
