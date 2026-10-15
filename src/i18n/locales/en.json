@@ -4881,6 +4881,7 @@
     "byItem": "By item",
     "byItemRange": "Fills from {{from}} to {{to}}.",
     "byItemRangeTruncated": "Includes fills from {{from}} to {{to}}; older history was not loaded.",
+    "byItemPartial": "Recent fills only",
     "byItemOrder": "Order items by margin",
     "bestFirst": "Best first",
     "worstFirst": "Worst first",

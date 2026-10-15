@@ -51,8 +51,8 @@ export function rankItemMargins(
   order: 'best' | 'worst'
 ): ItemMarginRow[] {
   const sign = order === 'best' ? -1 : 1;
-  const ranked = rows.filter((r) => r.margin !== null);
+  const ranked = rows.filter((r): r is ItemMarginRow & { margin: number } => r.margin !== null);
   const unranked = rows.filter((r) => r.margin === null);
-  ranked.sort((a, b) => sign * ((a.margin as number) - (b.margin as number)));
+  ranked.sort((a, b) => sign * (a.margin - b.margin));
   return [...ranked, ...unranked];
 }

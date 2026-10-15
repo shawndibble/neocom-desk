@@ -75,6 +75,7 @@ export function TransactionsItemRollup({
   return (
     <Disclosure
       label={t('wallet.byItem')}
+      trailing={truncated ? t('wallet.byItemPartial') : undefined}
       expanded={expanded}
       onToggle={() => setExpanded((open) => !open)}
     >
@@ -102,6 +103,7 @@ export function TransactionsItemRollup({
         <DataTable
           label={t('wallet.byItem')}
           density="compact"
+          responsive="table"
           columns={columns}
           rows={rows}
           rowKey={itemRowKey}
