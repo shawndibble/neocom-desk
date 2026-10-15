@@ -16,16 +16,14 @@ import {
   isSnapshotWith,
   withCharacterSnapshot,
 } from './pollerState';
-import {
-  skillQueueDomain,
-  industryJobDomain,
-  colonyDomain,
-  mailDomain,
-  calendarDomain,
-  contractDomain,
-  walletDomain,
-  marketOrderDomain,
-} from './pollDomains';
+import { skillQueueDomain } from './pollDomains/skillQueue';
+import { industryJobDomain } from './pollDomains/industryJobs';
+import { colonyDomain } from './pollDomains/colonies';
+import { mailDomain } from './pollDomains/mail';
+import { calendarDomain } from './pollDomains/calendar';
+import { contractDomain } from './pollDomains/contracts';
+import { walletDomain } from './pollDomains/wallet';
+import { marketOrderDomain } from './pollDomains/marketOrders';
 
 /** A snapshot guard that only checks the shared `{ nowMs, entries[] }` frame. */
 const isSnapshotOfAnything = isSnapshotWith<{ nowMs: number }>('entries', () => true);

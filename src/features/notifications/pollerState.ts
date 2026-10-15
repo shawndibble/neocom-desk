@@ -5,7 +5,7 @@
  * doesn't lose the baseline and re-fire a notification for a change the poller
  * already reported.
  *
- * One store factory and one merge, shared by every entry in `pollDomains.ts`
+ * One store factory and one merge, shared by every entry in `pollDomains/`
  * (issue #273). A ninth polled domain is a registry entry, not another copy of
  * a guard, a `createLocalSetting` call and a `withCharacter*Snapshot` helper.
  */
@@ -48,7 +48,7 @@ function isPollerState<TSnapshot>(
 
 /**
  * One `createLocalSetting` store for one polled domain. Called once per key at
- * module scope from `pollDomains.ts`, which is where `createLocalSetting`
+ * module scope from `pollDomains/`, which is where `createLocalSetting`
  * requires it to happen.
  */
 export function createPollerStateStore<TSnapshot>(

@@ -30,7 +30,7 @@ export interface SkillQueueEntrySnapshot {
   /**
    * The Character's `skillQueueEndingLeadHours` threshold, in ms, as it stood
    * when this poll ran (issue #1410) — baked in per entry at
-   * `pollDomains.ts`'s `skillQueueDomain.load()` time, the same
+   * `pollDomains/`'s `skillQueueDomain.load()` time, the same
    * `StructureFuelEntrySnapshot.thresholdMs` pattern `diffStructureFuelLow`
    * and `diffPlanetaryExtractorExpiring` use, since `DomainDiff` itself is
    * synchronous and cannot read the character's preference.
@@ -245,7 +245,7 @@ export function diffSkillQueueEnding(
 export interface SpExtractionEntrySnapshot {
   totalSp: number;
   /**
-   * Baked in at fetch time (`pollDomains.ts`'s `spExtractionDomain`), same as
+   * Baked in at fetch time (`pollDomains/`'s `spExtractionDomain`), same as
    * `walletDomain`'s `thresholdIsk` below — a preference read at the impure
    * boundary, never here.
    */
@@ -295,7 +295,7 @@ export function diffSpExtractionReady(
 /**
  * At most one entry — none for a Character who has never jumped (ESI omits
  * `last_clone_jump_date`), so there is no cooldown to end. `readyAtMs` is
- * baked in at fetch time (`pollDomains.ts`'s `cloneJumpDomain`), from the
+ * baked in at fetch time (`pollDomains/`'s `cloneJumpDomain`), from the
  * last jump and the effective Infomorph Synchronizing level.
  */
 export interface CloneJumpEntrySnapshot {
@@ -432,7 +432,7 @@ export interface ColonyExtractorSnapshot {
   expiryTimeMs: number;
   /**
    * The Character's current `extractorExpiringLeadHours` preference (issue
-   * #750), converted to ms and baked in per entry at `pollDomains.ts`'s
+   * #750), converted to ms and baked in per entry at `pollDomains/`'s
    * `colonyDomain.load()` time — the same `StructureFuelEntrySnapshot.thresholdMs`
    * pattern `structureFuelLowDays` uses, since `DomainDiff` itself is
    * synchronous and cannot read the character's preference.
@@ -774,7 +774,7 @@ export function diffNewMail(
 
 /**
  * ESI's `event_response` values. Exported as a runtime array (rather than a
- * bare union type) so `pollDomains.ts`'s persisted-baseline validator can
+ * bare union type) so `pollDomains/`'s persisted-baseline validator can
  * check against the same literals instead of retyping them — a second typed
  * copy is exactly the drift a 5th ESI value would silently break.
  */
@@ -1332,7 +1332,7 @@ export interface WalletNotificationFire {
  *
  * Also requires the entry's absolute amount to be at or above the
  * Character's chosen threshold (`entry.thresholdIsk`, baked in per entry at
- * `pollDomains.ts`'s `load()` time — see `StructureFuelEntrySnapshot`), so a
+ * `pollDomains/`'s `load()` time — see `StructureFuelEntrySnapshot`), so a
  * threshold change takes effect on the very next poll without special-casing
  * it here: an entry once seen (id `<=` the high-water mark) is never
  * re-evaluated even if the threshold is lowered later, matching
@@ -1557,7 +1557,7 @@ function prevEntryFor(
  * Builds one order's stored snapshot entry, folding in the `armed` latch
  * against the previous poll's baseline. Pure and synchronous — the poll
  * domain's `load()` does the async classification (Fuzzwork reads); this is
- * what `pollDomains.ts`'s `marketOrderUndercutDomain.toSnapshot` calls per
+ * what `pollDomains/`'s `marketOrderUndercutDomain.toSnapshot` calls per
  * entry, and what this module's own sequential tests call directly to prove
  * the three-poll shape without going through the domain at all.
  */
@@ -1708,7 +1708,7 @@ export interface StructureFuelEntrySnapshot {
   fuelExpiresMs: number | null;
   /**
    * The user's chosen lead time, in ms, as it stood when this poll ran (issue
-   * #299) — baked in per entry at `pollDomains.ts`'s `load()` time, since
+   * #299) — baked in per entry at `pollDomains/`'s `load()` time, since
    * `DomainDiff` itself is synchronous and cannot read the character's
    * preference. Carried on every entry of one poll rather than as a snapshot
    * scalar, matching every other domain's `{ nowMs, <entries> }` shape.

@@ -64,7 +64,7 @@ import type { IncursionNearbyFire } from './incursions/incursionAlert';
 
 /**
  * Every fire an Occurrence Key can be derived from — the same members as
- * `features/notifications/pollDomains.ts`'s `AnyNotificationFire`, kept as an
+ * `features/notifications/pollDomains/`'s `AnyNotificationFire`, kept as an
  * independent union rather than importing that one: engines don't depend on
  * the feature layer above them (ARCHITECTURE.md), and every fire type it
  * unions already lives in this module's sibling `notificationDiffs.ts`.
