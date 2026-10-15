@@ -70,12 +70,13 @@ import { MyShipsView } from '@/features/character/MyShipsView';
 import { useRememberedUrlParams } from '@/lib/useUrlState';
 import { boolParam, textParam } from '@/lib/urlState';
 import type { CachedResult } from '@/esi/cache';
-import { loadStationName, loadStationSystemId } from '@/features/character/stations';
-import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
-import { loadSystemSecurity, loadSystemName } from '@/features/character/systemSecurity';
+import { loadStationName } from '@/features/character/stations';
+import { loadStructureName } from '@/features/character/structures';
+import { loadSystemName } from '@/features/character/systemSecurity';
 import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
-import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
+import { placeKey, usePlaceDetails } from '@/features/places';
+import { useJumpBasis } from '@/features/route/jumpBasis';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -651,6 +652,16 @@ function baseRowHeight(row: BrowseRow): number {
   }
 }
 
+type PlaceRefs = Parameters<typeof usePlaceDetails>[0];
+
+/** An asset group's `location_type` as the kind a Place resolves under. */
+function placeKindForStation(
+  locationType: AssetTreeStation['locationType']
+): 'station' | 'solar_system' | 'structure' | undefined {
+  if (locationType === 'station' || locationType === 'solar_system') return locationType;
+  return locationType === 'other' || locationType === 'item' ? 'structure' : undefined;
+}
+
 /**
  * An orphan group: `buildAssetTree` promotes an asset whose parent wasn't in
  * the fetched page to its own top-level group, which is why a bare "Container"
@@ -989,10 +1000,6 @@ export function Assets() {
   const [routeOverride, setRouteOverride] = useState<RoutePreferenceKind | null>(null);
   const assetsRoute = useJumpBasis(routeOverride);
   const routePreference = assetsRoute.rules.preference;
-  // What a jumps-away answer was worked out under: every Travel rule changes
-  // the route, so the whole query is in its key.
-  const jumpsFor = assetsRoute.key;
-  const avoidedHydrated = assetsRoute.hydrated;
 
   const stationSortField = useStationSort((state) => state.value);
   const hydrateStationSort = useStationSort((state) => state.hydrate);
@@ -1012,9 +1019,41 @@ export function Assets() {
     void hydrateAssetSort();
   }, [hydrateAssetSort]);
 
-  const [jumpsAwayByKey, setJumpsAwayByKey] = useState<ReadonlyMap<string, JumpsAwayResult>>(
-    new Map()
-  );
+  // Jumps-away distances (issue #87): the active character's current solar
+  // system, fetched once per page load (not polled) via ESI's location
+  // endpoint. Re-fetched whenever the active character changes.
+  const [characterSystemId, setCharacterSystemId] = useState<number | null>(null);
+  const [characterLocationResolved, setCharacterLocationResolved] = useState(false);
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    setCharacterLocationResolved(false);
+    let cancelled = false;
+    void loadCharacterSolarSystemId(activeCharacterId).then((systemId) => {
+      if (cancelled) return;
+      setCharacterSystemId(systemId);
+      setCharacterLocationResolved(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId]);
+
+  // Each scoped station's system, security and jumps away: see the effect-free
+  // adjust-state-during-render below for which stations. The refs live in state
+  // up here because the station sort reads the jumps, and the scoped set is
+  // itself derived from that sort.
+  const [scopedPlaceRefs, setScopedPlaceRefs] = useState<PlaceRefs>([]);
+  const placeDetails = usePlaceDetails(scopedPlaceRefs, {
+    scopeId: activeCharacterId,
+    enabled: activeCharacterId !== null,
+    origin: { systemId: characterSystemId, resolved: characterLocationResolved },
+    basis: assetsRoute,
+    // Names come from the page's own bulk lookups.
+    names: false,
+  });
+  const placeDetailFor = (locationId: number) =>
+    placeDetails.get(placeKey({ locationId, characterId: activeCharacterId }));
+  const jumpsAwayOf = (locationId: number) => placeDetailFor(locationId)?.jumps;
 
   // The tree is built from every asset, unpruned: search no longer filters it
   // (results are a separate flat list), so browsing always sees the whole
@@ -1044,7 +1083,10 @@ export function Assets() {
         mergedTypeNames,
         (station) => pinStateFor(station.locationId),
         stationSortField,
-        (station) => jumpsAwayByKey.get(`${station.locationId}:${jumpsFor}`)
+        (station) =>
+          placeDetails.get(
+            placeKey({ locationId: station.locationId, characterId: activeCharacterId })
+          )?.jumps
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
     [
@@ -1054,8 +1096,7 @@ export function Assets() {
       pins,
       activeCharacterId,
       stationSortField,
-      jumpsAwayByKey,
-      jumpsFor,
+      placeDetails,
     ]
   );
 
@@ -1290,25 +1331,6 @@ export function Assets() {
   useFocusHeading(levelHeadingRef, levelKey);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Jumps-away distances (issue #87): the active character's current solar
-  // system, fetched once per page load (not polled) via ESI's location
-  // endpoint. Re-fetched whenever the active character changes.
-  const [characterSystemId, setCharacterSystemId] = useState<number | null>(null);
-  const [characterLocationResolved, setCharacterLocationResolved] = useState(false);
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    setCharacterLocationResolved(false);
-    let cancelled = false;
-    void loadCharacterSolarSystemId(activeCharacterId).then((systemId) => {
-      if (cancelled) return;
-      setCharacterSystemId(systemId);
-      setCharacterLocationResolved(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCharacterId]);
-
   // Locations with a row in the virtualizer's current visible range — the
   // "currently visible" half of GLOSSARY.md round 14's "only for pinned and
   // currently visible/expanded stations". Keyed on the range's indices, not
@@ -1348,177 +1370,29 @@ export function Assets() {
     mergedLocationNames,
   ]);
 
-  // Narrows the three effects below to the station-id *set*, not the memo
-  // above's array identity (issue #415): `pins` is a live Dexie query that
-  // gets a new array on every write, including a pin toggle for a station
-  // that isn't even in this scoped set, which gives `jumpsAwayScopedStations`
-  // a new reference every time even when the resulting station-id set is
-  // unchanged. React's sanctioned "adjust state during render" pattern (same
-  // shape as `PlanEditor.tsx`'s stale-result clear) turns that back into a
-  // reference that only actually changes when the set does, which is what
-  // the three effects below key off of instead.
-  const scopedStationIdsKey = jumpsAwayScopedStations.map((s) => s.locationId).join(',');
-  const [stableScopedStations, setStableScopedStations] = useState(jumpsAwayScopedStations);
-  const [stableScopedStationIdsKey, setStableScopedStationIdsKey] = useState(scopedStationIdsKey);
-  if (scopedStationIdsKey !== stableScopedStationIdsKey) {
-    setStableScopedStationIdsKey(scopedStationIdsKey);
-    setStableScopedStations(jumpsAwayScopedStations);
+  // Narrows the places the hook reads to the station *set*, not the memo
+  // above's array identity (issue #415): `pins` is a live Dexie query that gets
+  // a new array on every write, including a pin toggle for a station that
+  // isn't even in this scoped set. React's sanctioned "adjust state during
+  // render" pattern keeps the last reference until the set really changes.
+  // A resolved orphan (see isUnresolvedParent) is a structure id in every case
+  // seen so far, so it resolves through the same call that named it.
+  const scopedPlaceRefsNext = jumpsAwayScopedStations.map((station) => ({
+    locationId: station.locationId,
+    characterId: activeCharacterId,
+    kind: placeKindForStation(station.locationType),
+  }));
+  const scopedPlaceRefsKey = scopedPlaceRefsNext
+    .map((r) => `${r.locationId}:${r.kind ?? ''}`)
+    .join(',');
+  const [stablePlaceRefsKey, setStablePlaceRefsKey] = useState(scopedPlaceRefsKey);
+  if (scopedPlaceRefsKey !== stablePlaceRefsKey) {
+    setStablePlaceRefsKey(scopedPlaceRefsKey);
+    setScopedPlaceRefs(scopedPlaceRefsNext);
   }
 
-  // Each station's own solar system id (resolved once, then reused across a
-  // preference switch) and the resulting jumps-away result per (station,
-  // preference) pair — keying by preference means switching it never needs
-  // an explicit cache invalidation, a stale entry under the old preference
-  // is simply never read again. Both effects below guard against
-  // re-requesting a key with a ref (not just the `pending` filter over
-  // state): resolving one station's system id updates `stationSystemIds`,
-  // which is itself a dependency of the jumps-away effect, so that effect
-  // legitimately re-runs mid-flight for *other* still-pending stations — the
-  // ref is what stops that re-run from re-issuing a request already inflight
-  // for the same key, which the state-only filter cannot do since the write
-  // that would exclude it hasn't landed yet.
-  const [stationSystemIds, setStationSystemIds] = useState<ReadonlyMap<number, number | null>>(
-    new Map()
-  );
-  // Security status (issue #148) piggybacks on `stationSystemIds`/
-  // `jumpsAwayScopedStations` above rather than resolving its own scoped
-  // station list: same station set, same reason to bound the fan-out
-  // (GLOSSARY.md round 14), keyed by system id (not station id) since two
-  // stations can share a system and only need the lookup once.
-  const [securityBySystemId, setSecurityBySystemId] = useState<ReadonlyMap<number, number | null>>(
-    new Map()
-  );
-  const systemIdRequested = useRef<Set<number>>(new Set());
-  const jumpsAwayRequested = useRef<Set<string>>(new Set());
-  const securityRequested = useRef<Set<number>>(new Set());
-  // Tracks which character an in-flight request was made for. A plain
-  // per-effect `cancelled` closure would also be tripped by an *unrelated*
-  // re-render that merely gives `jumpsAwayScopedStations`/`stationSystemIds`
-  // a new array/Map identity with the same content (e.g. clicking a pin
-  // writes to Dexie, which re-renders `pins` mid-flight) — since the
-  // request is already marked in the refs above, that spurious cancellation
-  // would discard the result and it would never be retried. Comparing
-  // against the character a request was actually made for is the correct,
-  // narrower staleness check: only a real character switch should discard
-  // a write, and the reset effect below already clears state for that case.
-  const activeCharacterIdRef = useRef(activeCharacterId);
-  useEffect(() => {
-    activeCharacterIdRef.current = activeCharacterId;
-  }, [activeCharacterId]);
-  useEffect(() => {
-    // A fresh character is a fresh page context: a structure's system id is
-    // ACL-checked per character, so a previous character's resolved/inflight
-    // set must not suppress this one's requests.
-    setStationSystemIds(new Map());
-    setJumpsAwayByKey(new Map());
-    setSecurityBySystemId(new Map());
-    systemIdRequested.current = new Set();
-    jumpsAwayRequested.current = new Set();
-    securityRequested.current = new Set();
-  }, [activeCharacterId]);
-
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    const missing = stableScopedStations.filter(
-      (station) =>
-        !stationSystemIds.has(station.locationId) &&
-        !systemIdRequested.current.has(station.locationId)
-    );
-    if (missing.length === 0) return;
-    for (const station of missing) systemIdRequested.current.add(station.locationId);
-
-    const requestedForCharacterId = activeCharacterId;
-    void mapWithConcurrencyLimit(missing, ESI_FANOUT_CONCURRENCY, async (station) => {
-      const systemId =
-        station.locationType === 'station'
-          ? await loadStationSystemId(station.locationId)
-          : station.locationType === 'other' ||
-              // A resolved orphan (see isUnresolvedParent) is a structure id in
-              // every case seen so far, so its system comes from the same call
-              // that already resolved its name.
-              (station.locationType === 'item' && mergedLocationNames.has(station.locationId))
-            ? await loadStructureSystemId(activeCharacterId, station.locationId)
-            : // `location_type: "solar_system"` already *is* the system id —
-              // nothing to fetch.
-              station.locationType === 'solar_system'
-              ? station.locationId
-              : null;
-      if (activeCharacterIdRef.current === requestedForCharacterId) {
-        setStationSystemIds((prev) => new Map(prev).set(station.locationId, systemId));
-      }
-    });
-  }, [activeCharacterId, stableScopedStations, stationSystemIds, mergedLocationNames]);
-
-  useEffect(() => {
-    if (activeCharacterId === null || !characterLocationResolved || !avoidedHydrated) return;
-    const pending = stableScopedStations.filter((station) => {
-      const key = `${station.locationId}:${jumpsFor}`;
-      if (jumpsAwayByKey.has(key) || jumpsAwayRequested.current.has(key)) return false;
-      return characterSystemId === null || stationSystemIds.has(station.locationId);
-    });
-    if (pending.length === 0) return;
-    for (const station of pending) {
-      jumpsAwayRequested.current.add(`${station.locationId}:${jumpsFor}`);
-    }
-
-    const requestedForCharacterId = activeCharacterId;
-    void mapWithConcurrencyLimit(pending, ESI_FANOUT_CONCURRENCY, async (station) => {
-      const key = `${station.locationId}:${jumpsFor}`;
-      let result: JumpsAwayResult;
-      if (characterSystemId === null) {
-        result = { kind: 'unknown', reason: 'noLocation' };
-      } else {
-        const systemId = stationSystemIds.get(station.locationId) ?? null;
-        result =
-          systemId === null
-            ? { kind: 'unknown', reason: 'noRoute' }
-            : await jumpsBetween(characterSystemId, systemId, assetsRoute);
-      }
-      if (activeCharacterIdRef.current === requestedForCharacterId) {
-        setJumpsAwayByKey((prev) => new Map(prev).set(key, result));
-      }
-    });
-  }, [
-    activeCharacterId,
-    characterLocationResolved,
-    characterSystemId,
-    stableScopedStations,
-    jumpsAwayByKey,
-    stationSystemIds,
-    assetsRoute,
-    avoidedHydrated,
-    jumpsFor,
-  ]);
-
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    const missing = new Set<number>();
-    for (const station of stableScopedStations) {
-      const systemId = stationSystemIds.get(station.locationId);
-      if (
-        systemId != null &&
-        !securityBySystemId.has(systemId) &&
-        !securityRequested.current.has(systemId)
-      ) {
-        missing.add(systemId);
-      }
-    }
-    if (missing.size === 0) return;
-    for (const systemId of missing) securityRequested.current.add(systemId);
-
-    const requestedForCharacterId = activeCharacterId;
-    void mapWithConcurrencyLimit([...missing], ESI_FANOUT_CONCURRENCY, async (systemId) => {
-      const security = await loadSystemSecurity(systemId);
-      if (activeCharacterIdRef.current === requestedForCharacterId) {
-        setSecurityBySystemId((prev) => new Map(prev).set(systemId, security));
-      }
-    });
-  }, [activeCharacterId, stableScopedStations, stationSystemIds, securityBySystemId]);
-
   function securityForStation(locationId: number): number | null | undefined {
-    const systemId = stationSystemIds.get(locationId);
-    if (systemId == null) return systemId;
-    return securityBySystemId.get(systemId);
+    return placeDetailFor(locationId)?.security;
   }
 
   // Bulk actions (issue #90): the three actions the item context menu already
@@ -1670,9 +1544,7 @@ export function Assets() {
         ),
       });
     }
-    const jumps = resolvedStation
-      ? jumpsAwayByKey.get(`${station.locationId}:${jumpsFor}`)
-      : undefined;
+    const jumps = resolvedStation ? jumpsAwayOf(station.locationId) : undefined;
     if (jumps) {
       facts.push({
         key: 'jumps',
@@ -2003,9 +1875,7 @@ export function Assets() {
                               security={securityForStation(resolved.station.locationId)}
                             />
                             <JumpsAwayText
-                              result={jumpsAwayByKey.get(
-                                `${resolved.station.locationId}:${jumpsFor}`
-                              )}
+                              result={jumpsAwayOf(resolved.station.locationId)}
                               t={t}
                               locationId={resolved.station.locationId}
                               preference={routeOverride}
@@ -2182,9 +2052,7 @@ export function Assets() {
                                   nodeLabel={nodeLabel}
                                   locationNames={mergedLocationNames}
                                   securityForStation={securityForStation}
-                                  jumpsAwayFor={(locationId) =>
-                                    jumpsAwayByKey.get(`${locationId}:${jumpsFor}`)
-                                  }
+                                  jumpsAwayFor={jumpsAwayOf}
                                   pinStateFor={pinStateFor}
                                   onTogglePin={(locationId) => void handleTogglePin(locationId)}
                                   pathStationId={pathStationId}
