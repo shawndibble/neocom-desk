@@ -1292,9 +1292,9 @@ export function Characters() {
     setRemoving(true);
     try {
       await removeCharacterAfterSync(id, isSyncConfigured(), removeShared);
-      setRemovingCharacter(null);
       useAuthFailure.getState().dismissNeedsLogin(id);
-      // The dialog has closed by now, so this isn't overridden by its focus return.
+      // Requested in the same batch as the dialog closing (`finally`), so the
+      // request outlives the dialog's own focus return, which it retries past.
       focusAfterCommit(
         cardButton(at >= 0 ? ids[at + 1] : undefined),
         cardButton(at > 0 ? ids[at - 1] : undefined),
@@ -1303,9 +1303,9 @@ export function Characters() {
     } catch {
       // The local removal is one transaction, so a failure left every row in
       // place — say so rather than leave the click looking ignored.
-      setRemovingCharacter(null);
       setRemoveFailedName(name);
     } finally {
+      setRemovingCharacter(null);
       setRemoving(false);
     }
   }

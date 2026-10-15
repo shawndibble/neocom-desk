@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { useOnline } from '@/stores/network';
+import { subscribeSyncStatus } from '@/sync/status';
 import { mayHaveUnsyncedChanges } from './unsyncedChanges';
 
 /**
@@ -19,6 +21,9 @@ export function UnsyncedChangesWarning({
 }) {
   const { t } = useTranslation();
   const online = useOnline();
+  // Re-evaluate when a sync starts, finishes or fails, or an edit is scheduled.
+  const [, setTick] = useState(0);
+  useEffect(() => subscribeSyncStatus(() => setTick((n) => n + 1)), []);
   if (!mayHaveUnsyncedChanges({ characterIds, syncConfigured, online })) return null;
   return (
     <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs text-text-dim">

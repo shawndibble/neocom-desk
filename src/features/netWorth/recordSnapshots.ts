@@ -7,6 +7,7 @@
  */
 import { captureException } from '@sentry/react';
 import { db } from '@/db';
+import { STALE_AFTER } from '@/esi/cache';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import {
@@ -45,6 +46,12 @@ async function hubIdSetting(): Promise<string> {
   return typeof stored === 'string' && getTradeHub(stored) ? stored : DEFAULT_TRADE_HUB.id;
 }
 
+/** Not today's number: served from the cache after a failed call, or older than the loaders' window. */
+function isStale(cached: { fromCache: boolean; fetchedAt: Date } | null): boolean {
+  if (!cached) return false;
+  return cached.fromCache || Date.now() - cached.fetchedAt.getTime() > STALE_AFTER.default;
+}
+
 export const liveSources: SnapshotSources = {
   async fetch(characterId) {
     const token = await db.tokens.get(characterId);
@@ -58,11 +65,11 @@ export const liveSources: SnapshotSources = {
     ]);
     // A permission revoked since the grant check: the cached copy is not today's number.
     if (wallet.needsReauth || assets.needsReauth || orders.needsReauth) return null;
-    // A stale copy (the live call failed, e.g. offline) is not today's number, and a
-    // complete row is final for the day — it would freeze days-old figures and sync them.
-    if (wallet.cached?.fromCache || assets.cached?.fromCache || orders.cached?.fromCache) {
-      return null;
-    }
+    // A stale copy is not today's number, and a complete row is final for the day —
+    // it would freeze days-old figures and sync them. The live call failing flags the
+    // copy `fromCache`; a call that merely hangs (lie-fi) is answered with the expired
+    // row after the stale grace, unflagged, so its age is checked as well.
+    if ([wallet, assets, orders].some((source) => isStale(source.cached))) return null;
     const hubId = await hubIdSetting();
     const assetList = assets.cached?.data ?? null;
     const typeIds = [...new Set((assetList ?? []).map((a) => a.type_id))].filter(
@@ -72,11 +79,6 @@ export const liveSources: SnapshotSources = {
       getHubPrices(getTradeHub(hubId) ?? DEFAULT_TRADE_HUB, typeIds),
       getAveragePriceByType(),
     ]);
-    // The hub answered with no sell price for any asset: its prices are down, and
-    // the averages alone would freeze a different valuation into the day.
-    if (typeIds.length > 0 && typeIds.every((id) => hubPrices.get(id)?.sellMin == null)) {
-      return null;
-    }
     // Hub sell price where the hub trades the item, the average otherwise.
     const priceByTypeId = new Map<number, number>();
     for (const id of typeIds) {

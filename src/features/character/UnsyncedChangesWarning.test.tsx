@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import '@/i18n';
-import { setStatus } from '@/sync/status';
+import { setStatus, setSyncScheduled } from '@/sync/status';
 import { UnsyncedChangesWarning } from './UnsyncedChangesWarning';
 
 function go(online: boolean) {
@@ -14,6 +14,7 @@ function go(online: boolean) {
 afterEach(() => {
   Reflect.deleteProperty(navigator, 'onLine');
   setStatus(7, { state: 'idle', lastSyncedAt: null, error: null });
+  setSyncScheduled(7, false);
 });
 
 describe('UnsyncedChangesWarning', () => {
@@ -35,6 +36,18 @@ describe('UnsyncedChangesWarning', () => {
   it('warns online when the Character has not synced cleanly', () => {
     render(<UnsyncedChangesWarning characterIds={[7]} syncConfigured />);
     expect(screen.getByRole('alert')).toHaveTextContent(/may not have synced/i);
+  });
+
+  it('follows the sync status while the dialog is open', () => {
+    setStatus(7, { state: 'idle', lastSyncedAt: 5, error: null });
+    render(<UnsyncedChangesWarning characterIds={[7]} syncConfigured />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    act(() => setSyncScheduled(7, true));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    act(() => setSyncScheduled(7, false));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    act(() => setStatus(7, { state: 'error', error: 'boom' }));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
   it('renders nothing without sync, even offline', () => {

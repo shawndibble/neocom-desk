@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import {
   liveSources,
@@ -164,12 +164,28 @@ describe('liveSources.fetch', () => {
     cached: { data, fetchedAt: new Date(DAY1), fromCache: false, truncated: false },
     needsReauth: false,
   });
+  // A hung call: the loader answers with the expired row, not flagged `fromCache`.
+  const lieFi = <T>(data: T) => ({
+    cached: {
+      data,
+      fetchedAt: new Date(DAY1 - 3 * 86_400_000),
+      fromCache: false,
+      truncated: false,
+    },
+    needsReauth: false,
+  });
   const stale = <T>(data: T) => ({
     cached: { data, fetchedAt: new Date(DAY1 - 3 * 86_400_000), fromCache: true, truncated: false },
     needsReauth: false,
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(DAY1);
     const { REQUIRED_SCOPES } = await import('./recordSnapshots');
     await db.tokens.clear();
     await db.tokens.put({ characterId: 1, scopes: REQUIRED_SCOPES } as never);
@@ -196,9 +212,24 @@ describe('liveSources.fetch', () => {
     expect(await liveSources.fetch(1)).toBeNull();
   });
 
-  it('records nothing when no hub price came back, even with average prices on hand', async () => {
+  it.each([
+    ['wallet', () => mocks.wallet.mockResolvedValue(lieFi(100))],
+    [
+      'assets',
+      () => mocks.assets.mockResolvedValue(lieFi([{ item_id: 1, type_id: 34, quantity: 2 }])),
+    ],
+    ['orders', () => mocks.orders.mockResolvedValue(lieFi([]))],
+  ])(
+    'records nothing when the %s is an expired row served unflagged after a hung call',
+    async (_name, degrade) => {
+      degrade();
+      expect(await liveSources.fetch(1)).toBeNull();
+    }
+  );
+
+  it('keeps the average-priced valuation when the hub lists none of the assets', async () => {
     mocks.hubPrices.mockResolvedValue(new Map([[34, { sellMin: null }]]));
     mocks.averages.mockResolvedValue(new Map([[34, 4]]));
-    expect(await liveSources.fetch(1)).toBeNull();
+    expect(await liveSources.fetch(1)).not.toBeNull();
   });
 });

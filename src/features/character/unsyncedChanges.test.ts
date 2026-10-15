@@ -40,6 +40,18 @@ describe('mayHaveUnsyncedChanges', () => {
     ).toBe(true);
   });
 
+  it('is true when an edit is scheduled but not yet pushed, even after a clean sync', () => {
+    expect(
+      mayHaveUnsyncedChanges({
+        characterIds: [1],
+        syncConfigured: true,
+        online: true,
+        statusOf,
+        pendingOf: (id) => id === 1,
+      })
+    ).toBe(true);
+  });
+
   it('is false without sync: there is no copy to fall behind', () => {
     expect(
       mayHaveUnsyncedChanges({ characterIds: [3], syncConfigured: false, online: false, statusOf })

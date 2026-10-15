@@ -553,6 +553,8 @@ function DataPanel() {
   const [clearedConfirm, setClearedConfirm] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const online = useOnline();
+  const clearConfirmTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(clearConfirmTimer.current), []);
 
   async function handleClearCache() {
     // Blunt on purpose, matching `esi/cachePurge.ts`'s own tier-2 fallback:
@@ -560,7 +562,7 @@ function DataPanel() {
     // 100% re-derivable from ESI, so over-clearing costs a refetch, not data.
     await db.esiCache.clear();
     setClearedConfirm(true);
-    setTimeout(() => setClearedConfirm(false), 2000);
+    clearConfirmTimer.current = setTimeout(() => setClearedConfirm(false), 2000);
   }
 
   return (
@@ -573,8 +575,10 @@ function DataPanel() {
         <ConfirmDialog
           open={confirmingClear}
           title={t('settings.clearCacheTitle')}
-          body={`${t('settings.clearCacheBody')}${online ? '' : ` ${t('settings.clearCacheOfflineBody')}`}`}
+          body={t(online ? 'settings.clearCacheBody' : 'settings.clearCacheBodyOffline')}
           actionLabel={t('settings.clearCacheAction')}
+          cancelLabel={t('characters.cancel')}
+          failedLabel={t('settings.clearCacheFailed')}
           onConfirm={handleClearCache}
           onClose={() => setConfirmingClear(false)}
         />

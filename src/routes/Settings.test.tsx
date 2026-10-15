@@ -183,7 +183,10 @@ afterEach(() => {
 describe('Settings', () => {
   it('renders the page heading and the font-scale control, defaulting to 100%', async () => {
     render(<App />);
-    expect(await screen.findByRole('heading', { level: 1, name: /settings/i })).toBeInTheDocument();
+    // First render of the file: the lazy Settings chunk compiles cold, which can exceed 1 s.
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /settings/i }, { timeout: 6000 })
+    ).toBeInTheDocument();
 
     const group = screen.getByRole('group', { name: /text size/i });
     expect(group.querySelector('[aria-pressed="true"]')).toHaveTextContent(/default/i);
