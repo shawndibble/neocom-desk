@@ -5,7 +5,7 @@
  * materials (round 27), product heading, revenue and owned-sale rows, and the
  * recipe and Blueprint Acquisition modals.
  */
-import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -297,7 +297,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
  * surrounding `ItemContextMenu`'s.
  */
 export function ItemMoreActions(
-  props: ItemMenuProps & { variant?: 'ghost' | 'plain'; size?: 'row' | 'sm' }
+  props: ItemMenuProps & Pick<ComponentProps<typeof RowMoreActions>, 'variant' | 'size'>
 ) {
   const { typeId, itemName, variant, size } = props;
   const [alertOpen, setAlertOpen] = useState(false);

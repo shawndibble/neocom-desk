@@ -49,6 +49,7 @@ import {
   DropdownMenuTrigger,
 } from './DropdownMenu';
 import { IconButton } from './IconButton';
+import type { IconButtonSize, IconButtonVariant } from './iconButtonClassName';
 import * as Icon from './icons';
 import {
   MenuKindContext,
@@ -266,7 +267,9 @@ export function RowActionsMenu({
  * so it doesn't compete with the row's own content. Renders nothing outside
  * a row that publishes actions. Only place one where §6c's restraint rules
  * allow a ⋮: at least two real actions reachable nowhere else, one trailing
- * control cluster at the row's right edge.
+ * control cluster at the row's right edge. Beside a `Button` in an action row
+ * (the plan hero, next to Log production) pass `variant="ghost" size="sm"`:
+ * a bordered button of the Button's own height.
  */
 export function RowMoreActions({
   className,
@@ -275,9 +278,9 @@ export function RowMoreActions({
 }: {
   className?: string;
   /** `ghost` draws the hairline border, for a ⋮ that stands beside a `Button` rather than inside a row. */
-  variant?: 'ghost' | 'plain';
+  variant?: Extract<IconButtonVariant, 'ghost' | 'plain'>;
   /** `sm` matches `Button size="sm"`'s height. */
-  size?: 'row' | 'sm';
+  size?: Extract<IconButtonSize, 'row' | 'sm'>;
 }) {
   const { t } = useTranslation();
   const actions = useContext(RowActionsContext);
