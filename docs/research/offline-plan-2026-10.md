@@ -111,29 +111,20 @@ with a new decision file.
 
 ## Wave 2
 
-### W4, stale prices core (R2, I3)
+### W4, price placeholders (R2, I3, and the price parts of W7)
 
-**Scope decision.** Last-known prices are served, labelled with their age,
-when the fetch fails. This supersedes the "never a stale fallback" rule.
-
-**`prices.ts`.**
-
-- A failed hub fetch serves the persisted row up to the 7-day prune.
-- Results expose `fetchedAt`, a stale flag, and the set of types that
-  _failed_ (as opposed to those with _no orders_).
-
-**Industry.**
-
-- Industry uses adjusted prices with `allowStale`.
-- The cost index falls back to its last stored value.
-- `useMarketSnapshot` (and PI `planPrices`) stamps the data's real age.
-
-**Labels.**
-
-- The build plan, plan list and Compare, and the PI Plan and Map tabs show
-  "Prices as of …" when prices are stale.
-- The plan list, group and Compare flag "job fee unknown" instead of using a
-  silent 0.
+**Owner decision.** Market pricing being unavailable offline is acceptable.
+There is no stale-price fallback, no change to the `prices.ts` cache or TTL
+semantics, and no scope decision. The goals are only that no page errors or
+spins forever when prices can't be fetched, and that misleading copy ("no
+orders", "0 ISK", "move to a busier hub", "Healthy", "Try again shortly") is
+replaced by a neutral "Prices unavailable offline" placeholder. This is
+delivered by a small status signal (`getHubPricesWithStatus` and
+`getStationPricesWithStatus` return `{ prices, unreachable }`;
+`MarketSnapshot.pricesUnreachable` carries it to Build Plan, PI and the LP
+Store) and by consumers that read it: Build Plan detail, PI Plan and Map,
+Appraisal and Compare Hubs, Open Orders, contract market value, Mining Tax,
+LP Store, and the Skills injector and skills-to-buy panels.
 
 ### W5, data integrity (D1, D2, D5)
 
@@ -164,14 +155,11 @@ when the fetch fails. This supersedes the "never a stale fallback" rule.
 
 ### W7, price consumers (D3, D4, market copy)
 
-- **Open Orders.** A station tier that wasn't price-checked shows
-  "competition not checked", and its orders aren't recorded as undercut
-  samples.
-- **Appraisal, Compare Hubs, contract market value, LP Store, Mining Tax,
-  skills injector and skill books.** "Couldn't reach prices" is shown
-  separately from "no orders", with "as of" labels on stale prices.
-- **Mining Tax Assign** warns before saving lines that are unpriced because
-  the fetch failed.
+The price items of this workstream (Open Orders, Appraisal and Compare Hubs,
+contract market value, LP Store, Mining Tax and its Assign warning, and the
+skills injector and skills-to-buy panels) moved into W4's revised scope as
+"Prices unavailable offline" placeholders. Nothing price-related is left
+here.
 
 ### W8, failed states: Industry, market, LP, mining
 
