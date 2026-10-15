@@ -257,4 +257,23 @@ describe('usePlaceDetails', () => {
     await waitFor(() => expect(result.current.get(key(2))?.security).toBe(0.95));
     expect(result.current.get(key(1))).toBeUndefined();
   });
+
+  it('a failed name read keeps the system, security and jumps', async () => {
+    const source = setup();
+    source.stationName = () => Promise.reject(new Error('name down'));
+    const { result } = renderHook(() =>
+      usePlaceDetails([station], {
+        scopeId: 1,
+        origin: { systemId: 30000001, resolved: true },
+        basis,
+        source,
+      })
+    );
+    await waitFor(() => expect(result.current.get(placeKey(station))?.jumps).toEqual(known(3)));
+    expect(result.current.get(placeKey(station))).toMatchObject({
+      name: null,
+      systemId: 30000142,
+      security: 0.95,
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -35,9 +35,16 @@ vi.mock('@/features/character/assets', () => ({
       },
     ]),
 }));
+const failing = vi.hoisted(() => ({ name: false, system: false }));
 vi.mock('@/features/character/stations', () => ({
-  loadStationName: (id: number) => Promise.resolve(id === 60003760 ? 'Jita 4-4' : 'Amarr VIII'),
-  loadStationSystemId: (id: number) => Promise.resolve(id === 60003760 ? 30000142 : 30002187),
+  loadStationName: (id: number) =>
+    failing.name
+      ? Promise.reject(new Error('name down'))
+      : Promise.resolve(id === 60003760 ? 'Jita 4-4' : 'Amarr VIII'),
+  loadStationSystemId: (id: number) =>
+    failing.system
+      ? Promise.reject(new Error('system down'))
+      : Promise.resolve(id === 60003760 ? 30000142 : 30002187),
 }));
 vi.mock('@/features/character/structures', () => ({
   loadStructureName: () => Promise.resolve(null),
@@ -87,6 +94,33 @@ async function open() {
 }
 
 describe('MovePlanTab', () => {
+  beforeEach(() => {
+    failing.name = false;
+    failing.system = false;
+  });
+
+  it('keeps the pickup system and its Route Safety link when the name read fails', async () => {
+    failing.name = true;
+    const user = await open();
+    await user.click(screen.getByRole('checkbox', { name: /select everything at 60008494/i }));
+    await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    await user.click(screen.getByRole('button', { name: 'Show plan' }));
+
+    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(screen.getAllByRole('link', { name: /^Route Safety/ })).toHaveLength(1);
+  });
+
+  it('keeps the pickup name when the system read fails', async () => {
+    failing.system = true;
+    const user = await open();
+    await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
+    await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    await user.click(screen.getByRole('button', { name: 'Show plan' }));
+
+    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Amarr VIII/ })).toBeTruthy();
+  });
+
   it('plans a move from the picker to the destination system with a Route Safety link per pickup', async () => {
     const user = await open();
     await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
