@@ -4,6 +4,7 @@ import {
   adoptGameBaseline,
   effectiveCurrentSystem,
   isJumpRange,
+  jumpRangeLimit,
   jumpRangeSystems,
   withinJumpRange,
 } from './jumpRange';
@@ -115,5 +116,13 @@ describe('adoptGameBaseline', () => {
     expect(adoptGameBaseline(null, HERE)).toBeNull();
     expect(adoptGameBaseline({ systemId: FAR, gameSystemId: null }, null)).toBeNull();
     expect(adoptGameBaseline({ systemId: FAR, gameSystemId: NEAR }, HERE)).toBeNull();
+  });
+});
+
+describe('jumpRangeLimit', () => {
+  it('is no limit for any, zero for the current system, else the jump count', () => {
+    expect(jumpRangeLimit('any')).toBeNull();
+    expect(jumpRangeLimit('system')).toBe(0);
+    expect(jumpRangeLimit('15')).toBe(15);
   });
 });

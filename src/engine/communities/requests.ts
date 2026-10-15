@@ -368,6 +368,8 @@ export interface RequestRecipient {
   uid: string;
   characterName: string;
   shared: number;
+  /** The requester's own character: listed first, so they can mail themselves the Request. */
+  self: boolean;
 }
 
 /**
@@ -386,13 +388,19 @@ export function requestRecipients(
   const blueprintLines = lines.filter((line) => line.kind !== 'item');
   const library = new Map(libraries.map((l) => [l.uid, l.items]));
   return members
-    .filter((member) => member.uid !== myUid)
     .map((member) => {
+      const self = member.uid === myUid;
       const items = library.get(member.uid) ?? [];
-      const shared = blueprintLines.filter((line) => libraryCovers(line, items)).length;
-      return { uid: member.uid, characterName: member.characterName, shared };
+      // Nobody's own blueprints are "shared with" themselves.
+      const shared = self ? 0 : blueprintLines.filter((line) => libraryCovers(line, items)).length;
+      return { uid: member.uid, characterName: member.characterName, shared, self };
     })
-    .sort((a, b) => b.shared - a.shared || a.characterName.localeCompare(b.characterName));
+    .sort(
+      (a, b) =>
+        Number(b.self) - Number(a.self) ||
+        b.shared - a.shared ||
+        a.characterName.localeCompare(b.characterName)
+    );
 }
 
 /** Request mails still to send today, given the day's count. */

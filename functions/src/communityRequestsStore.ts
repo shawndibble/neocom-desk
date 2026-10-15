@@ -15,7 +15,11 @@ import {
   decideRequestMail,
   REQUEST_LIFETIME_MS,
   MAX_OPEN_REQUESTS_PER_MEMBER,
+  decideEdit,
   decideExtend,
+  sameLineSlots,
+  PLEDGES_COLLECTION,
+  type EditRequestInput,
   decidePost,
   decideSetClosed,
   isOpenRequest,
@@ -41,6 +45,12 @@ function failRequestDecision(decision: OwnerActionDecision): never {
       throw new HttpsError('permission-denied', 'Only the requester can do this');
     case 'closed':
       throw new HttpsError('failed-precondition', 'Reopen the Request first');
+    case 'lines-locked':
+      throw new HttpsError(
+        'failed-precondition',
+        'Members have Pledged on this Request, so its items cannot change, only their quantities and specs',
+        { reason: 'lines-locked' }
+      );
     case 'too-many-open-requests':
       throw new HttpsError(
         'resource-exhausted',
@@ -109,6 +119,44 @@ export async function postRequest(
     });
   });
   return { requestId: ref.id };
+}
+
+/**
+ * The requester edits their own Request: location, terms and lines. It keeps
+ * its id, its Pledges and its expiry; an edit is not a reason to extend it.
+ * Once a Pledge exists the lines keep their slots (Pledges are keyed by line
+ * index), so only their quantity and blueprint specs can change.
+ */
+export async function editRequest(
+  db: Firestore,
+  caller: CallerCharacter,
+  input: EditRequestInput,
+  now = Date.now()
+): Promise<void> {
+  await db.runTransaction(async (tx) => {
+    await requireMember(tx, db, input.communityId, caller);
+    const ref = requestCollection(db, input.communityId).doc(input.requestId);
+    const snap = await tx.get(ref);
+    const pledges = snap.exists ? await tx.get(ref.collection(PLEDGES_COLLECTION).limit(1)) : null;
+    const decision = decideEdit({
+      exists: snap.exists,
+      ownerUid: snap.exists ? String(snap.get('ownerUid')) : null,
+      callerUid: caller.uid,
+      closed: snap.get('closed') === true,
+      hasPledges: pledges !== null && !pledges.empty,
+      slotsKept: sameLineSlots(
+        (snap.get('lines') as { typeId: number; kind: string }[] | undefined) ?? [],
+        input.lines
+      ),
+    });
+    if (decision !== 'ok') failRequestDecision(decision);
+    tx.update(ref, {
+      location: input.location,
+      terms: input.terms,
+      lines: input.lines,
+      lastActivityAt: now,
+    });
+  });
 }
 
 /** The requester restarts the 30-day clock on an open Request. */

@@ -1,7 +1,7 @@
 /**
  * "Ask <name> to copy" (issue #3813): a Shared BPO on a Community Offer row of
  * BPC Sourcing becomes a Request for one copy of that blueprint, the holder
- * pre-ticked on compose's step 2. Pure: the dialog is `AskToCopyDialog`.
+ * added to compose's Mail to field. Pure: the dialog is `AskToCopyDialog`.
  */
 import type { RequestLine } from './requests';
 

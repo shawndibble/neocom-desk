@@ -20,6 +20,11 @@ function maxJumps(range: Exclude<JumpRange, 'any'>): number {
   return range === 'system' ? 0 : Number(range);
 }
 
+/** A range as a jump count: `null` for no limit, 0 for the current system alone. */
+export function jumpRangeLimit(range: JumpRange): number | null {
+  return range === 'any' ? null : maxJumps(range);
+}
+
 /**
  * The systems a range admits, or `null` for no restriction.
  *

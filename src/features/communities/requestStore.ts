@@ -100,6 +100,20 @@ export function postRequest(characterId: number, communityId: string, draft: Pos
   );
 }
 
+/** The requester edits their own Request (checked server side). */
+export async function editRequest(
+  characterId: number,
+  communityId: string,
+  requestId: string,
+  draft: PostRequestDraft
+): Promise<void> {
+  await callCommunity(characterId, 'editCommunityRequestCallable', {
+    communityId,
+    requestId,
+    ...draft,
+  });
+}
+
 export function extendRequest(characterId: number, communityId: string, requestId: string) {
   return callCommunity<{ communityId: string; requestId: string }, { expiresAt: number }>(
     characterId,

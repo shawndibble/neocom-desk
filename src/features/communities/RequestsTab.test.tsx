@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 
 const store = vi.hoisted(() => ({
@@ -47,16 +48,15 @@ vi.mock('@/sde/jumpGraph', () => ({
       ])
     ),
 }));
+const SYSTEMS = new Map([
+  [1, { id: 1, name: 'Jita', security: 0.9, regionId: 100 }],
+  [2, { id: 2, name: 'Perimeter', security: 0.9, regionId: 100 }],
+  [8, { id: 8, name: 'Badivefi', security: 0.6, regionId: 200 }],
+  [9, { id: 9, name: 'Efa', security: 0.4, regionId: 200 }],
+]);
 vi.mock('@/sde/solarSystems', () => ({
-  loadSolarSystemsById: () =>
-    Promise.resolve(
-      new Map([
-        [1, { id: 1, name: 'Jita', security: 0.9, regionId: 100 }],
-        [2, { id: 2, name: 'Perimeter', security: 0.9, regionId: 100 }],
-        [8, { id: 8, name: 'Badivefi', security: 0.6, regionId: 200 }],
-        [9, { id: 9, name: 'Efa', security: 0.4, regionId: 200 }],
-      ])
-    ),
+  loadSolarSystemsById: () => Promise.resolve(SYSTEMS),
+  lookupSolarSystem: (id: number) => Promise.resolve(SYSTEMS.get(id) ?? null),
 }));
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketRegions: () =>
@@ -143,8 +143,19 @@ async function grant(...scopes: string[]) {
   });
 }
 
+/** The board's filters sit behind the funnel; open it once. */
+async function openFilters(user: ReturnType<typeof userEvent.setup>) {
+  const funnel = screen.getByRole('button', { name: /^Filters/ });
+  if (funnel.getAttribute('aria-expanded') !== 'true') await user.click(funnel);
+}
+async function chooseFilter(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
+  await openFilters(user);
+  await user.click(screen.getByRole('button', { name }));
+}
+
 beforeEach(async () => {
   vi.clearAllMocks();
+  useActiveCharacter.setState({ activeCharacterId: 1 });
   await db.tokens.clear();
   world.library.mockResolvedValue([{ uid: 'char:1', items: [] }]);
   world.location.mockResolvedValue(1);
@@ -191,7 +202,7 @@ describe('RequestsTab board', () => {
     ]);
     await user.type(screen.getByRole('searchbox', { name: 'Search Requests' }), 'pyer');
     expect(screen.getByText('No Requests match your search')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^Mine/ }));
+    await chooseFilter(user, /^Mine/);
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 });
@@ -217,10 +228,37 @@ describe('Request panel', () => {
     expect(reload).toHaveBeenCalledTimes(2);
   });
 
+  it('lets the requester edit: Edit opens the dialog with the Request, and locks the items once Pledged', async () => {
+    const user = userEvent.setup();
+    const mine = request({ ownerUid: 'char:1', ownerName: 'Me', location: 'Efa' });
+    renderTab([mine], vi.fn(), {
+      r1: [
+        {
+          uid: 'char:3',
+          lines: { 0: { quantity: 10, delivered: 0, contractIds: [] } },
+          updatedAt: 1,
+        },
+      ],
+    });
+    await user.click(screen.getByText('Tritanium'));
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit request' });
+    expect(within(dialog).getByLabelText(/^Location/)).toHaveValue('Efa');
+    expect(within(dialog).getByText(/Members have Pledged on this Request/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /^Remove / })).toBeNull();
+  });
+
+  it('gives a Member no Edit button', async () => {
+    const user = userEvent.setup();
+    renderTab([request({})]);
+    await user.click(screen.getByText('Tritanium'));
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  });
+
   it('offers Reopen on a closed Request of mine', async () => {
     const user = userEvent.setup();
     renderTab([request({ ownerUid: 'char:1', ownerName: 'Me', closed: true })]);
-    await user.click(screen.getByRole('button', { name: /^Mine/ }));
+    await chooseFilter(user, /^Mine/);
     await user.click(screen.getByText('Tritanium'));
     await user.click(screen.getByRole('button', { name: 'Reopen request' }));
     expect(store.setRequestClosed).toHaveBeenCalledWith(1, 'c1', 'r1', false);
@@ -230,17 +268,18 @@ describe('Request panel', () => {
     const user = userEvent.setup();
     store.setRequestClosed.mockRejectedValue({ details: { reason: 'too-many-open-requests' } });
     renderTab([request({ ownerUid: 'char:1', ownerName: 'Me', closed: true })]);
-    await user.click(screen.getByRole('button', { name: /^Mine/ }));
+    await chooseFilter(user, /^Mine/);
     await user.click(screen.getByText('Tritanium'));
     await user.click(screen.getByRole('button', { name: 'Reopen request' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/most open Requests/);
   });
 });
 
-/** Step 1 to step 2 to posted: nobody is ticked, so no mail goes out. */
+/** Posted from the one page: nobody is a Member here, so no mail goes out. */
 async function postFromDialog(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Next: who to mail' }));
-  await user.click(await screen.findByRole('button', { name: 'Post request' }));
+  const post = screen.getByRole('button', { name: 'Post request' });
+  await waitFor(() => expect(post).toBeEnabled());
+  await user.click(post);
 }
 
 describe('New request dialog', () => {
@@ -300,13 +339,13 @@ describe('New request dialog', () => {
     const user = userEvent.setup();
     renderTab([]);
     await user.click(screen.getByRole('button', { name: 'New request…' }));
-    expect(await screen.findByRole('button', { name: 'Next: who to mail' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Post request' })).toBeDisabled();
     await user.click(screen.getByLabelText(/Paste a list/));
     await user.paste('Tritanium 5');
     const quantity = await screen.findByLabelText('Tritanium quantity');
     await user.clear(quantity);
     await user.type(quantity, 'lots');
-    expect(screen.getByRole('button', { name: 'Next: who to mail' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Post request' })).toBeDisabled();
   });
 
   it('shows the cap message when the server refuses', async () => {
@@ -328,10 +367,10 @@ describe('New request dialog', () => {
     await user.click(await screen.findByLabelText(/Paste a list/));
     await user.paste(Array.from({ length: 51 }, (_, i) => `Bulk ${i + 1} 5`).join('\n'));
     expect(await screen.findByText(/1 more than the 50-line limit/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next: who to mail' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Post request' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Remove Bulk 1' }));
     expect(screen.queryByText(/-line limit/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next: who to mail' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Post request' })).toBeEnabled();
   });
 
   it('adds the same blueprint again as the other kind, so a copy and an original coexist', async () => {
@@ -380,6 +419,7 @@ describe('I can fill', () => {
         lines: [blueprintLine(99, 'Ishtar Blueprint')],
       }),
     ]);
+    await openFilters(user);
     const chip = screen.getByRole('button', { name: /^I can fill/ });
     await waitFor(() => expect(chip).toHaveTextContent('I can fill1'));
     await user.click(chip);
@@ -388,8 +428,10 @@ describe('I can fill', () => {
   });
 
   it('is disabled with its reason when the shared blueprints cannot be read', async () => {
+    const user = userEvent.setup();
     world.library.mockRejectedValue(new Error('offline'));
     renderTab([request({})]);
+    await openFilters(user);
     const chip = await screen.findByRole('button', { name: /^I can fill/ });
     await waitFor(() => expect(chip).toHaveAttribute('aria-disabled', 'true'));
     expect(chip).not.toHaveTextContent('I can fill0');
@@ -403,14 +445,18 @@ describe('distance', () => {
   const far = request({ id: 'far', location: 'Badivefi, Khanid', terms: 'far one' });
   const free = request({ id: 'free', location: 'my hangar', terms: 'free one' });
   const select = () => screen.getByRole('combobox', { name: 'Distance' });
+  async function pick(user: ReturnType<typeof userEvent.setup>, name: string) {
+    await openFilters(user);
+    await user.click(select());
+    await user.click(await screen.findByRole('option', { name }));
+  }
 
   it('limits the list to Requests within N jumps and says how many it cannot place', async () => {
     const user = userEvent.setup();
     await grant(LOCATION_SCOPE);
     renderTab([near, far, free]);
-    await waitFor(() => expect(select()).toBeEnabled());
     expect(rowNames()).toHaveLength(3);
-    await user.selectOptions(select(), 'Within 5 jumps');
+    await pick(user, 'Within 5 jumps');
     expect(
       await screen.findByText(
         '1 Request with no place to measure from isn’t listed.'.replace('’', "'")
@@ -418,40 +464,40 @@ describe('distance', () => {
     ).toBeInTheDocument();
     expect(rowNames()).toHaveLength(1);
     expect(rowNames()[0]).toContain('near one');
-    await user.selectOptions(select(), 'Within 10 jumps');
+    await pick(user, 'Within 10 jumps');
     await waitFor(() => expect(rowNames()).toHaveLength(2));
-    await user.selectOptions(select(), 'Any distance');
+    await pick(user, 'Any distance');
     await waitFor(() => expect(rowNames()).toHaveLength(3));
     expect(screen.queryByText(/no place to measure from/)).not.toBeInTheDocument();
   });
 
-  it('falls back to Any distance when the Permission goes away under a chosen limit', async () => {
+  it('offers the same From system picker as every other Jump Range filter', async () => {
     const user = userEvent.setup();
     await grant(LOCATION_SCOPE);
-    renderTab([near, far]);
-    await waitFor(() => expect(select()).toBeEnabled());
-    await user.selectOptions(select(), 'Within 5 jumps');
-    await waitFor(() => expect(rowNames()).toHaveLength(1));
-    await db.tokens.clear();
-    await waitFor(() => expect(select()).toBeDisabled());
-    expect(select()).toHaveValue('any');
-    expect(rowNames()).toHaveLength(2);
+    renderTab([near]);
+    await openFilters(user);
+    expect(await screen.findByRole('button', { name: /From:/ })).toBeInTheDocument();
   });
 
-  it('is disabled with the Grant link when the location Permission is missing', async () => {
+  it('explains the missing Permission with the Grant link', async () => {
+    const user = userEvent.setup();
     await grant();
+    // Without the Permission ESI gives no location.
+    world.location.mockResolvedValue(null);
     renderTab([near]);
-    await waitFor(() => expect(select()).toBeDisabled());
-    expect(screen.getByText(/Distance needs your pilot's location/)).toBeInTheDocument();
+    await pick(user, 'Within 5 jumps');
+    expect(await screen.findByText(/Distance needs your pilot's location/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Grant missing Permissions' })).toBeInTheDocument();
   });
 
-  it('is disabled with a reason when the pilot location is not known', async () => {
+  it('says why when the pilot location is not known, and still lists everything', async () => {
+    const user = userEvent.setup();
     await grant(LOCATION_SCOPE);
     world.location.mockResolvedValue(null);
-    renderTab([near]);
+    renderTab([near, far]);
+    await pick(user, 'Within 5 jumps');
     expect(await screen.findByText(/location isn't known right now/)).toBeInTheDocument();
-    expect(select()).toBeDisabled();
+    expect(rowNames()).toHaveLength(2);
   });
 });
 
@@ -586,7 +632,7 @@ describe('Pledging', () => {
   it('shows no Pledge controls on a closed Request', async () => {
     const user = userEvent.setup();
     renderTab([request({ closed: true, ownerUid: 'char:1' })]);
-    await user.click(screen.getByRole('button', { name: /^Mine/ }));
+    await chooseFilter(user, /^Mine/);
     await user.click(screen.getByText('Tritanium'));
     expect(screen.queryByLabelText(/Quantity you can provide/)).toBeNull();
   });

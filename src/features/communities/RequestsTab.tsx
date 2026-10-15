@@ -5,8 +5,9 @@ import {
   Button,
   DataTable,
   EmptyState,
+  FilterBar,
   FilterChip,
-  NativeSelect,
+  FilterField,
   Panel,
   SearchInput,
   Spinner,
@@ -26,6 +27,9 @@ import {
   type RequestPledge,
   type RequestStatus,
 } from '@/engine/communities/requests';
+import { jumpRangeLimit, type JumpRange } from '@/engine/route/jumpRange';
+import { useCurrentSystem } from '@/features/route/currentSystem';
+import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
 import { ComposeRequestDialog } from './ComposeRequestDialog';
 import type { CommunityMember } from './communityStore';
 import { MyPledgesPanel } from './MyPledgesPanel';
@@ -35,8 +39,6 @@ import { STATUS_TONE, formatLeft, formatShortAge } from './requestFormat';
 import { LOCATION_ENDPOINTS, useRequestDistance } from './useRequestDistance';
 import { useSharedBlueprintTypes } from './useSharedBlueprintTypes';
 
-/** The jump limits the distance select offers; "any" is no limit. */
-const DISTANCE_CHOICES = [5, 10, 20] as const;
 const LOCATION_GROUPS = permissionsForEndpoints(LOCATION_ENDPOINTS);
 
 interface Row {
@@ -100,7 +102,7 @@ export function RequestsTab({
   pledgesFailed: boolean;
   failed: boolean;
   now: number;
-  /** The roster, for compose step 2; null until it has loaded. */
+  /** The roster, for compose's Mail to field; null until it has loaded. */
   members: readonly CommunityMember[] | null;
   onReload: () => void;
   /** Re-reads one Request's Pledges after a Pledge write. */
@@ -113,13 +115,18 @@ export function RequestsTab({
   const [openId, setOpenId] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const [pledgesOpen, setPledgesOpen] = useState(false);
-  const [maxJumps, setMaxJumps] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [jumps, setJumps] = useState<JumpRange>('any');
+  const currentSystem = useCurrentSystem();
+  const maxJumps = jumpRangeLimit(jumps);
   const shared = useSharedBlueprintTypes(characterId, communityId, myUid, requests !== null);
   const sharedItems = shared.status === 'ready' ? shared.items : undefined;
-  const distance = useRequestDistance(characterId, maxJumps !== null);
+  const distance = useRequestDistance(characterId, currentSystem, maxJumps !== null);
   // A limit that can no longer be measured (Permission revoked, location lost) is no limit:
   // the select then reads "Any distance", never a limit the list is not applying.
   const limit = distance.status === 'unavailable' ? null : maxJumps;
+  // What the funnel shows: a range that cannot be measured reads "Any distance", never a limit the list is not applying.
+  const shownJumps: JumpRange = limit === null ? 'any' : jumps;
 
   const { rows, unmeasured } = useMemo(() => {
     const filtered = filterRequests(requests ?? [], { filter, query, myUid, now, sharedItems });
@@ -244,6 +251,18 @@ export function RequestsTab({
       }}
     />
   );
+  const editing = editingId !== null ? (requests.find((r) => r.id === editingId) ?? null) : null;
+  const edit = editing && (
+    <ComposeRequestDialog
+      characterId={characterId}
+      communityId={communityId}
+      myUid={myUid}
+      members={members}
+      editing={{ request: editing, linesLocked: (pledges.get(editing.id) ?? []).length > 0 }}
+      onClose={() => setEditingId(null)}
+      onPosted={onReload}
+    />
+  );
   const newRequest = (
     <Button size="sm" variant="primary" onClick={() => setComposing(true)}>
       {t('communities.board.new')}
@@ -318,54 +337,69 @@ export function RequestsTab({
         </div>
       )}
       <Panel>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <SearchInput
-            className="min-w-48 flex-1"
-            aria-label={t('communities.board.search')}
-            placeholder={t('communities.board.searchPlaceholder')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <FilterChip
-            label={t('communities.board.filters.open')}
-            selected={filter === 'open'}
-            count={open.length}
-            onToggle={() => setFilter('open')}
-          />
-          <FilterChip
-            label={t('communities.board.filters.mine')}
-            selected={filter === 'mine'}
-            count={mineCount}
-            onToggle={() => setFilter('mine')}
-          />
-          <FilterChip
-            label={t('communities.board.filters.canFill')}
-            selected={filter === 'canFill'}
-            count={shared.status === 'ready' ? fillCount : undefined}
-            tooltip={
-              shared.status === 'failed'
-                ? t('communities.board.canFillFailed')
-                : t('communities.board.canFillHint')
-            }
-            disabled={shared.status === 'failed'}
-            onToggle={() => setFilter('canFill')}
-          />
-          {/* A native select, as the mockup draws it: four fixed choices, where a phone gets the OS picker. */}
-          <NativeSelect
-            aria-label={t('communities.board.distance.label')}
-            aria-describedby={distanceOff ? `${distanceNoteId}` : undefined}
-            disabled={distanceOff}
-            value={limit === null ? 'any' : String(limit)}
-            onChange={(e) => setMaxJumps(e.target.value === 'any' ? null : Number(e.target.value))}
-          >
-            <option value="any">{t('communities.board.distance.any')}</option>
-            {DISTANCE_CHOICES.map((jumps) => (
-              <option key={jumps} value={jumps}>
-                {t('communities.board.distance.within', { count: jumps })}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
+        <FilterBar
+          className="mb-3"
+          value={{ filter, jumps: shownJumps }}
+          onChange={(next) => {
+            setFilter(next.filter);
+            setJumps(next.jumps);
+          }}
+          activeCount={(filter !== 'open' ? 1 : 0) + (shownJumps !== 'any' ? 1 : 0)}
+          search={
+            <SearchInput
+              className="min-w-48 flex-1"
+              aria-label={t('communities.board.search')}
+              placeholder={t('communities.board.searchPlaceholder')}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          }
+        >
+          {(draft, setDraft) => (
+            <>
+              <FilterField label={t('communities.board.filters.show')}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <FilterChip
+                    size="md"
+                    label={t('communities.board.filters.open')}
+                    selected={draft.filter === 'open'}
+                    count={open.length}
+                    onToggle={() => setDraft({ ...draft, filter: 'open' })}
+                  />
+                  <FilterChip
+                    size="md"
+                    label={t('communities.board.filters.mine')}
+                    selected={draft.filter === 'mine'}
+                    count={mineCount}
+                    onToggle={() => setDraft({ ...draft, filter: 'mine' })}
+                  />
+                  <FilterChip
+                    size="md"
+                    label={t('communities.board.filters.canFill')}
+                    selected={draft.filter === 'canFill'}
+                    count={shared.status === 'ready' ? fillCount : undefined}
+                    tooltip={
+                      shared.status === 'failed'
+                        ? t('communities.board.canFillFailed')
+                        : t('communities.board.canFillHint')
+                    }
+                    disabled={shared.status === 'failed'}
+                    onToggle={() => setDraft({ ...draft, filter: 'canFill' })}
+                  />
+                </div>
+              </FilterField>
+              <FilterField label={t('communities.board.distance.label')}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <JumpRangeSelect
+                    value={draft.jumps}
+                    onChange={(next) => setDraft({ ...draft, jumps: next })}
+                  />
+                  <CurrentSystemPicker current={currentSystem} />
+                </div>
+              </FilterField>
+            </>
+          )}
+        </FilterBar>
         {distanceOff && (
           <p id={distanceNoteId} className="mb-3 text-xs text-text-dim">
             {distance.reason === 'permission' ? (
@@ -430,6 +464,7 @@ export function RequestsTab({
           memberNames={memberNames}
           onClose={() => setOpenId(null)}
           onChanged={onReload}
+          onEdit={() => setEditingId(panelRequest.id)}
           onRemoved={() => {
             setOpenId(null);
             onReload();
@@ -448,6 +483,7 @@ export function RequestsTab({
         }}
       />
       {compose}
+      {edit}
     </div>
   );
 }
