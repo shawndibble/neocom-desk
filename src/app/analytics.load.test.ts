@@ -141,3 +141,46 @@ describe('trackPageView privacy', () => {
     expect(firebaseAnalytics.getAnalytics).not.toHaveBeenCalled();
   });
 });
+
+describe('trackPageView analytics switch', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.stubEnv('MODE', 'production');
+    vi.stubEnv('VITE_FIREBASE_MEASUREMENT_ID', 'G-ABC123');
+    stubLocation('https://neocomdesk.com', '/', 'https://neocomdesk.com/');
+    firebaseAnalytics.failImport = false;
+    firebaseAnalytics.logEvent.mockClear();
+    firebaseAnalytics.initializeAnalytics.mockClear();
+    const { db } = await import('@/db');
+    await db.settings.delete('analyticsEnabled');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('sends nothing and never initializes Firebase when the stored switch is off', async () => {
+    const { db } = await import('@/db');
+    await db.settings.put({ key: 'analyticsEnabled', value: false });
+    const { trackPageView } = await import('./analytics');
+    await trackPageView('/market/browser');
+    expect(firebaseAnalytics.initializeAnalytics).not.toHaveBeenCalled();
+    expect(firebaseAnalytics.logEvent).not.toHaveBeenCalled();
+  });
+
+  it('stops logging when switched off mid-session and resumes when switched back on', async () => {
+    const { trackPageView } = await import('./analytics');
+    const { useAnalyticsEnabled } = await import('./analyticsPref');
+    await trackPageView('/a');
+    expect(firebaseAnalytics.logEvent).toHaveBeenCalledTimes(1);
+
+    await useAnalyticsEnabled.getState().setValue(false);
+    await trackPageView('/b');
+    expect(firebaseAnalytics.logEvent).toHaveBeenCalledTimes(1);
+
+    await useAnalyticsEnabled.getState().setValue(true);
+    await trackPageView('/c');
+    expect(firebaseAnalytics.logEvent).toHaveBeenCalledTimes(2);
+  });
+});
