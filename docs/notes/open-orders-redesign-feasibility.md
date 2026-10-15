@@ -121,7 +121,7 @@ copy-to-clipboard prices on desktop only.
 ### Alerts
 
 Slots straight into the existing notification machinery: adding a polled
-domain is one entry in `features/notifications/pollDomains.ts`, `loadOrders` is
+domain is one entry in `features/notifications/pollDomains/`, `loadOrders` is
 already one of them (`marketOrderFilled`), and per-Character inline thresholds
 already exist (`CharacterEventThresholds`, issue #299 / #363 — synced).
 

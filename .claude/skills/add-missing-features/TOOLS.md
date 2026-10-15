@@ -205,7 +205,7 @@ Numbering is stable — later runs cite these by number. Append, never renumber.
 5. **No historical ESI series** — kills cost-index-over-time.
 6. **Settled scope wins** — check `docs/context/decisions/`, `.out-of-scope/`.
 7. **Assets endpoint has no timestamp** — kills staleness/idle-inventory.
-8. **Not in `pollDomains.ts` ≠ sampled.** Assets is page-visit-only.
+8. **Not in `pollDomains/` ≠ sampled.** Assets is page-visit-only.
 9. **A scope wired for one feature isn't free for another**
    (`structureMarkets`).
 10. **Materials are fungible** — kills FIFO cost reconstruction either side.

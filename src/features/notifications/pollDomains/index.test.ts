@@ -1,32 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
+import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from '../events';
+import { POLL_DOMAINS, domainForEvent, renderNotification, notificationSubjectId } from './index';
+import { calendarDomain } from './calendar';
+import { skillQueueDomain } from './skillQueue';
+import { industryJobDomain } from './industryJobs';
+import { cloneJumpDomain } from './cloneJump';
+import { colonyDomain } from './colonies';
+import { contractDomain } from './contracts';
+import { mailDomain } from './mail';
+import { walletDomain } from './wallet';
 import {
-  POLL_DOMAINS,
-  calendarDomain,
-  skillQueueDomain,
-  industryJobDomain,
-  cloneJumpDomain,
-  colonyDomain,
-  contractDomain,
-  mailDomain,
-  walletDomain,
   marketOrderDomain,
   marketOrderUndercutDomain,
+  deriveMarketOrderEntries,
+} from './marketOrders';
+import { eveNotificationDomain } from './eveNotifications';
+import {
   structureFuelDomain,
-  eveNotificationDomain,
   corpIndustryJobDomain,
   corpRosterDomain,
   corpWalletDomain,
-  priceAlertDomain,
-  stockTargetDomain,
-  deriveMarketOrderEntries,
-  domainForEvent,
-  renderNotification,
-  notificationSubjectId,
-} from './pollDomains';
-import { SUBJECT_ROUTED_EVENT_IDS } from './notificationOptions';
+} from './corp';
+import { priceAlertDomain } from './priceAlerts';
+import { stockTargetDomain } from './stockTargets';
+import { SUBJECT_ROUTED_EVENT_IDS } from '../notificationOptions';
 import { useStockLists } from '@/features/stockTargets/stockListsStore';
-import { eventEntry } from './eventEntries';
+import { eventEntry } from '../eventEntries';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { resolveNames } from '@/features/character/names';
 import { getHubPrices, getStationPrices } from '@/market/prices';
@@ -39,7 +38,7 @@ import {
   withCharacterEventThreshold,
   withEveNotificationTypeToggled,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
-} from './preferences';
+} from '../preferences';
 import { loadContracts } from '@/features/character/contracts';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';

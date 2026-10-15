@@ -15,7 +15,7 @@ import { useOverviewCardOrder } from '@/features/overview/cardOrder';
 import { OVERVIEW_HIDDEN_CARDS_KEY, useOverviewHiddenCards } from '@/features/overview/hiddenCards';
 import { OVERVIEW_LAYOUT_KEY, useOverviewLayout } from '@/features/overview/widgets/layoutStore';
 import type { OverviewLayout, Widget } from '@/features/overview/widgets/layout';
-import { priceAlertDomain } from '@/features/notifications/pollDomains';
+import { priceAlertDomain } from '@/features/notifications/pollDomains/priceAlerts';
 import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,

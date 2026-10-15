@@ -2,7 +2,7 @@
  * The Event Entry catalog (issue #1285): one entry per Notification Event,
  * and the one place that event's behaviour is declared —
  *
- * - `source` — which poll domain's snapshot it reads (`pollDomains.ts` owns
+ * - `source` — which poll domain's snapshot it reads (`pollDomains/` owns
  *   the fetching; several events can share one fetch),
  * - `diff` — the pure engine diff that fires it (`engine/notificationDiffs.ts`),
  * - `copy` — its live wording and click subject (`domainCopy.ts`),
@@ -18,7 +18,7 @@
  * further tied to `engine/projection.ts`'s `PROJECTABLE_EVENT_IDS` per key:
  * a projectable event must declare one and any other must say `null`.
  *
- * What reads it: `pollDomains.ts` derives each domain's event list, diffs,
+ * What reads it: `pollDomains/` derives each domain's event list, diffs,
  * renderer and push copy from the entries naming it as their `source`;
  * `NotificationsPanel.tsx` and `notificationRows.ts` derive an event's
  * threshold controls, row hint and Scheduled Push badge from it. The
@@ -189,7 +189,7 @@ export type AnyNotificationFire =
 
 /**
  * A typed handle on one poll domain's snapshot: the domain in
- * `pollDomains.ts` that fetches it and every entry that diffs it name the
+ * `pollDomains/` that fetches it and every entry that diffs it name the
  * same handle, so an entry's `diff` and `copy` are checked against the
  * snapshot and name-lookup shapes that domain actually produces.
  */
@@ -292,7 +292,7 @@ function defineEvent<
  * syntax on purpose: method parameters compare bivariantly, which is what
  * lets every typed entry satisfy this one shape without a cast. The domain
  * only ever hands an entry its own source's snapshot and fires
- * (`pollDomains.ts`), which is what makes that sound in practice.
+ * (`pollDomains/`), which is what makes that sound in practice.
  */
 export interface ErasedEventEntry {
   readonly source: { readonly id: string };

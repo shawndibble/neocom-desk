@@ -5,7 +5,7 @@ import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { loadCalendarEvents, loadCalendarEvent, respondToCalendarEvent } from './calendar';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
-import { calendarDomain } from '@/features/notifications/pollDomains';
+import { calendarDomain } from '@/features/notifications/pollDomains/calendar';
 import type { CalendarSnapshot } from '@/engine/notificationDiffs';
 
 const CHAR_ID = 91;

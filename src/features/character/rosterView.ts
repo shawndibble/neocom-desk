@@ -61,7 +61,7 @@ function queueInfoFor(entry: RosterEntry, nowMs: number): QueueInfo {
  * one field. `correctedTotalSp` exists so a displayed SP total doesn't
  * contradict a per-skill figure shown beside it (roster.ts's own comment);
  * SP-extraction readiness needs no such agreement, and it must match what
- * `pollDomains.ts`'s `spExtractionDomain` alerts on (also raw `total_sp`), or
+ * `pollDomains/`'s `spExtractionDomain` alerts on (also raw `total_sp`), or
  * the table and the alert could disagree about whether a character is ready.
  */
 function totalSpFor(entry: RosterEntry): number | undefined {
