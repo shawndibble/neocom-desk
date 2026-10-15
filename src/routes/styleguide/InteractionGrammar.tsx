@@ -1,3 +1,4 @@
+import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { useState, type ReactNode } from 'react';
 import { Chart } from '@/features/overview/widgets/charts/Chart';
 import { useTranslation } from 'react-i18next';
@@ -212,6 +213,18 @@ export function InteractionGrammar() {
               }}
             />
           </div>
+        </Cue>
+        <Cue rule={k('rules.addPreview')}>
+          <AddPreviewReadout
+            name={k('samples.addPreviewName')}
+            preview={{
+              typeId: 0,
+              delta: { count: 1, changes: [{ key: 'ehp', before: 20000, after: 24000 }] },
+              fits: true,
+              overage: null,
+              canFly: true,
+            }}
+          />
         </Cue>
         <Cue rule={k('rules.infoButton')}>
           <IconButton icon={<Icon.Info />} label={k('samples.showInfo')} />

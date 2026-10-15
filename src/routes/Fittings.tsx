@@ -315,6 +315,17 @@ function FittingsPage() {
     setLibrary(action);
   }
 
+  /** The Fitting as a click on the module would leave it — same slot choice as `handleAdd` — for the Add panel's hover preview. */
+  function previewAdd(f: Fitting, typeId: number, rack: CandidateRack): Fitting | null {
+    if (rack === 'drone' || slotCounts === null) return null;
+    const slotIndex =
+      target?.kind === 'slot' && target.slot === rack
+        ? target.slotIndex
+        : firstFreeSlotIndex(f, rack, slotCounts[rack]);
+    if (slotIndex === null) return null;
+    return addModule(f, rack, slotIndex, typeId, () => defaultCharges(f.shipTypeId, rack, typeId));
+  }
+
   function handleAdd(typeId: number, rack: CandidateRack) {
     if (rack === 'drone') {
       edit((f) => addDronesWithinBay(f, typeId, 1, droneBay), `drone-add-${typeId}`);
@@ -402,6 +413,11 @@ function FittingsPage() {
       onLoadCharge={(chargeTypeId) => charges.load(chargeTypeId)}
       onAddCargo={(typeId, quantity) => edit((f) => addCargo(f, typeId, quantity))}
       dragToRing={isDesktop && !coarsePointer}
+      preview={
+        coarsePointer || slotCounts === null
+          ? undefined
+          : { variants: workspace.variants, build: previewAdd }
+      }
       showDrones={dronesShown}
       droneRoomFor={(typeId) => droneRoom(fitting, typeId, droneBay)}
       slotFreeFor={

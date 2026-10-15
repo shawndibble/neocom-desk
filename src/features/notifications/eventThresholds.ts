@@ -22,6 +22,10 @@ export interface CharacterEventThresholds {
   skillQueueEndingLeadHours?: number;
   /** Hours before an accepted courier's deliver-by deadline that trigger `courierDeliveryDue` (issue #1713) — one of `COURIER_DELIVERY_DUE_LEAD_HOUR_OPTIONS`. */
   courierDeliveryDueLeadHours?: number;
+  /** Hours before an issued, unaccepted contract's `date_expired` that trigger `contractExpiring` (issue #3797) — one of `CONTRACT_EXPIRING_LEAD_HOUR_OPTIONS`. */
+  contractExpiringLeadHours?: number;
+  /** Hours before the soonest open market order lapses that trigger `ordersLapsing` (issue #3797) — one of `ORDERS_LAPSING_LEAD_HOUR_OPTIONS`. */
+  ordersLapsingLeadHours?: number;
   /** ISK balance at or under which `corpWalletThreshold` fires its `balanceBelow` half. */
   corpWalletBalanceFloorIsk?: number;
   /** ISK amount a single journal entry must exceed to fire `corpWalletThreshold`'s `transactionAbove` half. */
@@ -50,6 +54,12 @@ export const SKILL_QUEUE_ENDING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 
 /** The lead times `courierDeliveryDue`'s inline control offers (issue #1713), all within the 72-hour Projection Horizon. */
 export const COURIER_DELIVERY_DUE_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
 
+/** The lead times `contractExpiring`'s inline control offers (issue #3797), all within the 72-hour Projection Horizon. */
+export const CONTRACT_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 12, 6];
+
+/** The lead times `ordersLapsing`'s inline control offers (issue #3797), all within the 72-hour Projection Horizon. */
+export const ORDERS_LAPSING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 12, 6];
+
 /** How near an Incursion must be for `incursionNearby` (issue #3542): a short hop up to a long trip. */
 export const INCURSION_NEARBY_JUMP_OPTIONS: readonly number[] = [3, 5, 10, 15, 20];
 
@@ -57,6 +67,8 @@ export const INCURSION_NEARBY_JUMP_OPTIONS: readonly number[] = [3, 5, 10, 15, 2
 export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
 export const DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS = 6;
 export const DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS = 6;
+export const DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS = 24;
+export const DEFAULT_ORDERS_LAPSING_LEAD_HOURS = 24;
 export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
@@ -136,6 +148,26 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       labelKey: 'settings.notifications.courierDeliveryDueLeadTimeLabel',
       options: COURIER_DELIVERY_DUE_LEAD_HOUR_OPTIONS,
       optionKey: 'settings.notifications.courierDeliveryDueLeadTimeOption',
+    },
+  },
+  contractExpiringLeadHours: {
+    key: 'contractExpiringLeadHours',
+    defaultValue: DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.contractExpiringLeadTimeLabel',
+      options: CONTRACT_EXPIRING_LEAD_HOUR_OPTIONS,
+      optionKey: 'settings.notifications.contractExpiringLeadTimeOption',
+    },
+  },
+  ordersLapsingLeadHours: {
+    key: 'ordersLapsingLeadHours',
+    defaultValue: DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.ordersLapsingLeadTimeLabel',
+      options: ORDERS_LAPSING_LEAD_HOUR_OPTIONS,
+      optionKey: 'settings.notifications.ordersLapsingLeadTimeOption',
     },
   },
   skillQueueEndingLeadHours: {

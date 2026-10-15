@@ -97,9 +97,10 @@ interface PlanVerdictHeroProps {
    * Visible "More actions" button beside the product heading (WCAG 2.1.1,
    * issue #1498) — the hero's `<h2>` has no focusable trigger of its own, so
    * this is that surface's only keyboard path to the item menu. Omitted
-   * where the caller has none to offer.
+   * where the caller has none to offer. `bordered` asks for the ⋮ as a
+   * bordered button the height of a small `Button`, to stand beside one.
    */
-  itemActionsFor?: (typeId: number) => ReactElement;
+  itemActionsFor?: (typeId: number, bordered?: boolean) => ReactElement;
   runs: number;
   /** The owned BPC's real run limit when the plan's runs exceed it and nothing extends it (issue #1775); the hero names the blueprint instead of a generic empty state. */
   bpcCoverage?: { coveredRuns: number; neededRuns: number } | null;
@@ -188,25 +189,14 @@ export function PlanVerdictHero({
   const hasItemActions = itemActionsFor !== undefined && productTypeID != null;
 
   return (
-    <Panel className="relative border-line-bright">
-      {/* The product's "More actions" button sits in the panel's own corner, as
-          item cards do elsewhere, rather than trailing the heading. */}
-      {hasItemActions && (
-        <div className="absolute top-1 right-1">{itemActionsFor(productTypeID)}</div>
-      )}
+    <Panel className="border-line-bright">
       {/*
         Figure and pills share a row from `md`; the buttons join it only from
         `xl`. Below that they wrap under, so the panel can never be wider than
         its column — three fixed-width blocks side by side used to force the
         whole page to scroll sideways at ordinary desktop widths.
       */}
-      {/* The right padding clears the corner button: 44px on touch below `md`, 28px above. */}
-      <div
-        className={cx(
-          'flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between',
-          hasItemActions && 'pr-10 md:pr-6'
-        )}
-      >
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-4 md:flex-row md:items-start md:gap-6">
           <div className="min-w-0 space-y-1 md:flex-1">
             <p className="flex flex-wrap items-baseline gap-x-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -351,7 +341,7 @@ export function PlanVerdictHero({
           Two doors into one modal only made the hero's action row ambiguous
           about which button was the primary one.
         */}
-        <div className="flex shrink-0 flex-wrap gap-2 xl:flex-col xl:items-end">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="primary"
@@ -361,6 +351,8 @@ export function PlanVerdictHero({
             <Icon.AddToPlan size={Icon.ICON_SIZE.sm} aria-hidden="true" />
             {t('industry.logProduction')}
           </Button>
+          {/* The product's "More actions" button, bordered and the same height as Log production so it reads as a button. */}
+          {hasItemActions && itemActionsFor(productTypeID, true)}
         </div>
       </div>
 

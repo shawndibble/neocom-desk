@@ -187,10 +187,17 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       colonies: ['planetaryExtractionDone', 'planetaryExtractorExpiring'],
       mail: ['newMail'],
       calendar: ['newCalendarEvent', 'calendarEventStarting'],
-      contracts: ['contractAccepted', 'contractCompleted', 'contractFailed', 'courierDeliveryDue'],
+      contracts: [
+        'contractAccepted',
+        'contractCompleted',
+        'contractFailed',
+        'courierDeliveryDue',
+        'contractExpiring',
+      ],
       wallet: ['walletBalanceChanged'],
       marketOrders: ['marketOrderFilled'],
       marketOrderUndercut: ['marketOrderUndercut'],
+      orderExpiry: ['ordersLapsing'],
       eveNotification: ['eveNotification'],
       structureFuel: ['structureFuelLow'],
       corpIndustryJobs: ['corpIndustryJobReady'],
@@ -463,7 +470,7 @@ describe('projection wiring', () => {
     });
   });
 
-  it('gives exactly the nine fixed-future-timestamp domains a projection', () => {
+  it('gives exactly the ten fixed-future-timestamp domains a projection', () => {
     const withProjection = POLL_DOMAINS.filter((domain) => domain.projection !== undefined).map(
       (domain) => domain.id
     );
@@ -476,6 +483,7 @@ describe('projection wiring', () => {
         'corpIndustryJobs',
         'eveNotification',
         'industryJobs',
+        'orderExpiry',
         'skillQueue',
         'structureFuel',
       ].sort()

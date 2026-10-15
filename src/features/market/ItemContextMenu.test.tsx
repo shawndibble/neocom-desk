@@ -41,12 +41,12 @@ function renderMenu(typeId: number, itemName: string) {
 }
 
 describe('ItemContextMenu — Open in EVE', () => {
-  it('offers both the item window and its market window right after Show info', async () => {
+  it('offers only the market window: ESI cannot open an item information window', async () => {
     renderMenu(TRITANIUM, 'Tritanium');
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
 
-    expect(await screen.findByRole('menuitem', { name: 'Open in EVE' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Open market in EVE' })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'Open market in EVE' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Open in EVE' })).not.toBeInTheDocument();
   });
 });
 

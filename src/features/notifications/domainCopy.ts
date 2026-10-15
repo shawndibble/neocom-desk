@@ -44,6 +44,7 @@ import type {
   WalletNotificationFire,
   MarketOrderNotificationFire,
   MarketOrderUndercutFire,
+  OrdersLapsingFire,
   EveNotificationFire,
   StructureReinforcementExitFire,
   StructureFuelLowFire,
@@ -315,13 +316,20 @@ export const contractCopy: DomainCopy<ContractNotificationFire, NoNames> & {
       hours: Math.round((fire.thresholdMs ?? 0) / HOUR_MS),
     }),
   /**
-   * Only `courierDeliveryDue` projects, and it hedges: delivering the haul —
-   * the action the warning exists to prompt — falsifies the prediction before
-   * the push fires (`engine/projection.ts`'s `projectionWording`).
+   * `courierDeliveryDue` and `contractExpiring` project, and both hedge:
+   * delivering the haul or relisting the contract — the action the warning
+   * exists to prompt — falsifies the prediction before the push fires (`engine/projection.ts`'s `projectionWording`).
    */
   push: (fire, character) => {
-    assertProjectionWording('courierDeliveryDue', 'hedge');
     const hours = Math.round((fire.thresholdMs ?? 0) / HOUR_MS);
+    if (fire.eventId === 'contractExpiring') {
+      assertProjectionWording('contractExpiring', 'hedge');
+      return {
+        title: 'Contract expiring',
+        body: `${character}'s issued contract was due to expire in under ${hours} hours.`,
+      };
+    }
+    assertProjectionWording('courierDeliveryDue', 'hedge');
     return {
       title: 'Courier delivery due',
       body: `${character}'s courier contract was due for delivery in under ${hours} hours.`,
@@ -329,6 +337,30 @@ export const contractCopy: DomainCopy<ContractNotificationFire, NoNames> & {
   },
   // The contract row. Still listed — the filter defaults to every status.
   subjectOf: (fire) => fire.contractId,
+};
+
+/* Orders lapsing ---------------------------------------------------------- */
+
+export const ordersLapsingCopy: DomainCopy<OrdersLapsingFire, NoNames> & {
+  readonly push: PushCopy<OrdersLapsingFire, NoNames>;
+} = {
+  poll: (fire, character) => ({
+    title: fired('ordersLapsing', 'title'),
+    body: fired('ordersLapsing', 'body', {
+      character,
+      count: fire.count,
+      hours: Math.round(fire.thresholdMs / HOUR_MS),
+    }),
+  }),
+  // Hedged: relisting the orders — what the warning prompts — falsifies it.
+  push: (fire, character) => {
+    assertProjectionWording('ordersLapsing', 'hedge');
+    const hours = Math.round(fire.thresholdMs / HOUR_MS);
+    return {
+      title: 'Market orders lapsing',
+      body: `${character} had ${fire.count === 1 ? '1 market order' : `${fire.count} market orders`} due to lapse within ${hours} hours.`,
+    };
+  },
 };
 
 /* Wallet ------------------------------------------------------------------ */

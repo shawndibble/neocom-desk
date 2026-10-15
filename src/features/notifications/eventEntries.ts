@@ -61,6 +61,8 @@ import {
   diffContractCompleted,
   diffContractFailed,
   diffCourierDeliveryDue,
+  diffContractExpiring,
+  diffOrdersLapsing,
   diffWalletBalanceChanged,
   diffMarketOrderFilled,
   diffMarketOrderUndercut,
@@ -84,6 +86,7 @@ import {
   type WalletNotificationFire,
   type MarketOrderNotificationFire,
   type MarketOrderUndercutFire,
+  type OrdersLapsingFire,
   type EveNotificationFire,
   type StructureFuelLowFire,
   type CorpIndustryJobNotificationFire,
@@ -102,6 +105,7 @@ import {
   type WalletSnapshot,
   type MarketOrderSnapshot,
   type OrderUndercutSnapshot,
+  type OrderExpirySnapshot,
   type EveNotificationSnapshot,
   type StructureFuelSnapshot,
   type CorpIndustryJobSnapshot,
@@ -123,6 +127,7 @@ import {
   walletCopy,
   marketOrderCopy,
   marketOrderUndercutCopy,
+  ordersLapsingCopy,
   eveNotificationCopy,
   structureFuelCopy,
   corpIndustryJobCopy,
@@ -161,6 +166,7 @@ export type AnyNotificationFire =
   | WalletNotificationFire
   | MarketOrderNotificationFire
   | MarketOrderUndercutFire
+  | OrdersLapsingFire
   | EveNotificationFire
   | StructureFuelLowFire
   | CorpIndustryJobNotificationFire
@@ -205,6 +211,7 @@ export const SNAPSHOT_SOURCES = {
   wallet: source<WalletSnapshot>('wallet'),
   marketOrders: source<MarketOrderSnapshot, ItemNames>('marketOrders'),
   marketOrderUndercut: source<OrderUndercutSnapshot, ItemNames>('marketOrderUndercut'),
+  orderExpiry: source<OrderExpirySnapshot>('orderExpiry'),
   eveNotification: source<EveNotificationSnapshot, EveNotificationNames>('eveNotification'),
   structureFuel: source<StructureFuelSnapshot>('structureFuel'),
   corpIndustryJobs: source<CorpIndustryJobSnapshot, ItemNames>('corpIndustryJobs'),
@@ -456,6 +463,22 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     copy: contractCopy,
     projection: { push: contractCopy.push, everyOccurrence: true },
     thresholds: { fields: [THRESHOLD_FIELDS.courierDeliveryDueLeadHours], hintKey: null },
+    rowHintKey: null,
+  }),
+  contractExpiring: defineEvent({
+    source: SNAPSHOT_SOURCES.contracts,
+    diff: diffContractExpiring,
+    copy: contractCopy,
+    projection: { push: contractCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.contractExpiringLeadHours], hintKey: null },
+    rowHintKey: null,
+  }),
+  ordersLapsing: defineEvent({
+    source: SNAPSHOT_SOURCES.orderExpiry,
+    diff: diffOrdersLapsing,
+    copy: ordersLapsingCopy,
+    projection: { push: ordersLapsingCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.ordersLapsingLeadHours], hintKey: null },
     rowHintKey: null,
   }),
   walletBalanceChanged: defineEvent({

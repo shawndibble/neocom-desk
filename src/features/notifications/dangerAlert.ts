@@ -74,6 +74,8 @@ const EVENT_CHIP: Readonly<Record<string, TopicChip>> = {
   contractCompleted: 'market',
   contractFailed: 'market',
   courierDeliveryDue: 'market',
+  contractExpiring: 'market',
+  ordersLapsing: 'market',
   industryJobComplete: 'industry',
   corpIndustryJobReady: 'industry',
   planetaryExtractionDone: 'industry',

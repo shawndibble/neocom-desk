@@ -44,6 +44,7 @@ import type {
   WalletNotificationFire,
   MarketOrderNotificationFire,
   MarketOrderUndercutFire,
+  OrdersLapsingFire,
   EveNotificationFire,
   StructureFuelLowFire,
   CorpIndustryJobNotificationFire,
@@ -81,6 +82,7 @@ export type OccurrenceFire =
   | WalletNotificationFire
   | MarketOrderNotificationFire
   | MarketOrderUndercutFire
+  | OrdersLapsingFire
   | EveNotificationFire
   | StructureFuelLowFire
   | CorpIndustryJobNotificationFire
@@ -151,9 +153,14 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // `planetaryExtractorExpiring`'s precedent: `diffCourierDeliveryDue` can
     // re-fire for the same contract after a lower-then-raised lead time.
     case 'courierDeliveryDue':
+    case 'contractExpiring':
       return [characterId, fire.eventId, fire.contractId, fire.deadlineMs, fire.thresholdMs].join(
         ':'
       );
+    // The soonest expiry and the threshold, never the count (issue #3797): the
+    // count is what the window held when each device saw it open.
+    case 'ordersLapsing':
+      return [characterId, fire.eventId, fire.soonestMs, fire.thresholdMs].join(':');
     case 'marketOrderFilled':
       return [characterId, fire.eventId, fire.orderId].join(':');
     // The order's own price is the extra part: a relist at a new price is a
@@ -285,6 +292,8 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'contractFailed':
     // falls through: a future deadline, not the moment the contract failed.
     case 'courierDeliveryDue':
+    case 'contractExpiring':
+    case 'ordersLapsing':
     case 'marketOrderFilled':
     case 'structureReinforcementExit':
     case 'structureFuelLow':

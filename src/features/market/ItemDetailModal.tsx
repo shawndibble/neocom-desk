@@ -248,7 +248,7 @@ export function ItemDetailModal({
       title={itemName}
       titleActions={
         <>
-          <OpenInEveButton kind="information" id={typeId} name={itemName} />
+          <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
           {showOpenInMarket && (
             <OpenInMarketLink typeId={typeId} onNavigate={leave} replace={onLeave !== undefined} />
           )}

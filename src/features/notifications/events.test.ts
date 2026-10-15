@@ -29,6 +29,8 @@ describe('NOTIFICATION_EVENTS', () => {
       'contractCompleted',
       'contractFailed',
       'courierDeliveryDue',
+      'contractExpiring',
+      'ordersLapsing',
       'walletBalanceChanged',
       'eveNotification',
       'structureFuelLow',
