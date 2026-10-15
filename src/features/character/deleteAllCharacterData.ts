@@ -11,6 +11,11 @@
 
 import { db } from '@/db';
 import { haltSync, purgeCharacterRemoteData, signOutOfSync } from '@/sync';
+import {
+  isCommunityAdmin,
+  leaveCommunity,
+  loadMyCommunities,
+} from '@/features/communities/communityStore';
 import { deleteAlertGrantsBestEffort } from '@/features/notifications/alertsGrant';
 import { setAppBadgeCount } from '@/features/notifications/badge';
 import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
@@ -57,6 +62,62 @@ export async function purgeAllRemoteCharacterData(): Promise<number[]> {
     await deleteAlertGrantsBestEffort([characterId]);
   }
   return unpurged;
+}
+
+/** One Community one Character belongs to. */
+export interface CharacterCommunity {
+  characterId: number;
+  communityId: string;
+  name: string;
+  /** An admin cannot leave: it must delete or hand the Community over first. */
+  administered: boolean;
+}
+
+/**
+ * Every Community of every Character on this device, read sequentially (one
+ * shared Firebase session). A Character whose Communities can't be read now
+ * (offline, expired login) counts as having none.
+ */
+export async function loadAllCommunities(): Promise<CharacterCommunity[]> {
+  const characters = await db.characters.orderBy('characterId').toArray();
+  const found: CharacterCommunity[] = [];
+  for (const { characterId } of characters) {
+    try {
+      for (const community of await loadMyCommunities(characterId)) {
+        found.push({
+          characterId,
+          communityId: community.id,
+          name: community.name,
+          administered: isCommunityAdmin(community, characterId),
+        });
+      }
+    } catch {
+      // Best effort, like the purge: the wipe goes on without it.
+    }
+  }
+  return found;
+}
+
+/**
+ * Leave every Community in `communities` that isn't administered, each while
+ * its Character can still sign in (leaving deletes its shared items, Requests
+ * and Pledges server-side). Best effort: a failed leave never stops the wipe.
+ *
+ * @returns The Characters with at least one Community that could not be left.
+ */
+export async function leaveAllCommunities(
+  communities: readonly CharacterCommunity[]
+): Promise<number[]> {
+  const failed: number[] = [];
+  for (const { characterId, communityId, administered } of communities) {
+    if (administered) continue;
+    try {
+      await leaveCommunity(characterId, communityId);
+    } catch {
+      if (!failed.includes(characterId)) failed.push(characterId);
+    }
+  }
+  return failed;
 }
 
 /** True when `work` settled in time; false when the timeout won. */
