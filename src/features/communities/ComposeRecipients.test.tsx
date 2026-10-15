@@ -14,6 +14,7 @@ const store = vi.hoisted(() => ({
   releaseRequestMail: vi.fn(),
 }));
 vi.mock('./requestStore', () => store);
+vi.mock('./requestMailStore', () => store);
 const communities = vi.hoisted(() => ({ loadMemberLibraries: vi.fn() }));
 vi.mock('./communityStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./communityStore')>()),

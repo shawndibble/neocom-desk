@@ -19,6 +19,7 @@ const store = vi.hoisted(() => ({
   removePledge: vi.fn(),
 }));
 vi.mock('./requestStore', () => store);
+vi.mock('./requestMailStore', () => store);
 
 const world = vi.hoisted(() => ({
   library: vi.fn(),

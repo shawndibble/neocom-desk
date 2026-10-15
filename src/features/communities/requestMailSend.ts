@@ -17,7 +17,7 @@ import {
   releaseRequestMail,
   reserveRequestMail,
   type RequestMailReservation,
-} from './requestStore';
+} from './requestMailStore';
 import { formatQuantity } from './requestFormat';
 
 export interface RequestMailRecipient {

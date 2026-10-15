@@ -18,7 +18,7 @@ import type {
   RequestMailRecipient,
   RequestMailResult,
 } from './requestMailSend';
-import { loadRequestMailsToday } from './requestStore';
+import { loadRequestMailsToday } from './requestMailStore';
 
 const SEND_MAIL = ['postCharacterMail'] as const;
 
