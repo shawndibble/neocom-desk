@@ -118,7 +118,7 @@ export function Login() {
         <LandingSection
           id="login-features"
           heading={t('login.featuresHeading')}
-          ship={{ ship: 'hulk', side: 'right' }}
+          ship={{ ship: 'hulk', side: 'left' }}
         >
           <FeatureShowcase />
         </LandingSection>
