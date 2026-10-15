@@ -6,16 +6,15 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
-import { EveSsoButton, LogoMark, Panel, plainTextActionClassName } from '@/components/ui';
+import { EveSsoButton, LogoMark, plainTextActionClassName } from '@/components/ui';
+import { CommunitySection } from '@/features/landing/CommunitySection';
+import { LandingFaq } from '@/features/landing/LandingFaq';
+import { TrustSection } from '@/features/landing/TrustSection';
 import { LandingHeader } from '@/features/landing/LandingHeader';
 import { OverviewDemo } from '@/features/landing/OverviewDemo';
 import { QuestionGrid } from '@/features/landing/QuestionGrid';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
-import {
-  focusRingClassName,
-  inlineLinkClassName,
-  interactiveClassName,
-} from '@/components/ui/controlStyles';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import {
   Clones,
@@ -29,16 +28,12 @@ import {
   MoonMining,
   NavTravel,
   Notifications,
-  Offline,
-  OpenSource,
   Orders,
   Planetary,
-  ReadOnly,
   ScheduledPush,
   Ships,
   Skills,
   Social,
-  TokenPrivacy,
   Wallet,
   type IconProps,
 } from '@/components/ui/icons';
@@ -106,18 +101,6 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
       { icon: Social, key: 'contacts' },
     ],
   },
-];
-
-/**
- * The objections a pilot weighs before handing an EVE SSO grant to a
- * third-party site. Deliberately the last thing above the closing button —
- * it is where the hesitation actually happens.
- */
-const TRUST: LandingRow[] = [
-  { icon: ReadOnly, key: 'readOnly' },
-  { icon: TokenPrivacy, key: 'token' },
-  { icon: Offline, key: 'offline' },
-  { icon: OpenSource, key: 'openSource' },
 ];
 
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
@@ -222,28 +205,13 @@ export function Login() {
           ))}
         </LandingSection>
         <LandingSection id="login-trust" heading={t('login.trustHeading')}>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {TRUST.map(({ icon: Icon, key }) => (
-              <Panel key={key}>
-                <Icon size={ICON_SIZE.lg} aria-hidden="true" className="text-accent" />
-                <h3 className="mt-3 text-sm font-semibold">{t(`login.trust.${key}.name`)}</h3>
-                <p className="mt-1 text-sm text-text-dim">{t(`login.trust.${key}.desc`)}</p>
-              </Panel>
-            ))}
-          </div>
-          {/*
-          The full scope enumeration sits here rather than beside the hero
-          button: it is what a hesitant reader wants *after* the trust points
-          and immediately before the closing CTA, and at hero size it was a
-          wall of 11px text nobody read.
-        */}
-          <p className="mt-6 max-w-3xl text-sm text-text-dim">{t('login.permissionsHint')}</p>
-          <p className="mt-2 max-w-3xl text-sm text-text-dim">
-            {t('login.permissionsPrivacy')}{' '}
-            <a href="/privacy.html" className={inlineLinkClassName}>
-              {t('login.footerPrivacy')}
-            </a>
-          </p>
+          <TrustSection />
+        </LandingSection>
+        <LandingSection id="login-community" heading={t('login.communityHeading')}>
+          <CommunitySection />
+        </LandingSection>
+        <LandingSection id="login-faq" heading={t('login.faqHeading')}>
+          <LandingFaq />
         </LandingSection>
 
         <section className="border-t border-line px-6 py-14 text-center">

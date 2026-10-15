@@ -3292,12 +3292,14 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, the ship you are flying, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
+    "permissionsHint": "Logging in lets it read the data below, grouped by area. Open an area to see each permission and what it is used for.",
     "header": {
       "nav": "Page sections",
       "answers": "Answers",
       "features": "Features",
       "trust": "Trust",
+      "community": "Community",
+      "faq": "FAQ",
       "discord": "Join the Discord",
       "github": "View the source on GitHub"
     },
@@ -3493,6 +3495,56 @@
       "openSource": {
         "name": "Free, and open to read",
         "desc": "No account to create, no ads, no subscription, no paid tier. Read the source before you decide to trust it."
+      }
+    },
+    "trustRepoLink": "View the source on GitHub",
+    "scopes": {
+      "count_one": "{{count}} permission",
+      "count_other": "{{count}} permissions",
+      "groups": {
+        "skills": "Skills & clones",
+        "money": "Money & market",
+        "industry": "Industry & planets",
+        "social": "Social & calendar",
+        "location": "Location & ships",
+        "structures": "Structures"
+      },
+      "planetsNote": "EVE's consent screen lists the planetary scope as \"manage your planetary installations\". Neocom Desk only reads that data and never writes to it.",
+      "separateNote": "Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
+      "revoke": "You can take access back at any time:",
+      "revokeLink": "EVE's authorized apps page"
+    },
+    "communityHeading": "Bugs, ideas and chat",
+    "community": {
+      "body": "The Discord is where to report a bug, suggest an idea or just talk shop with other pilots who use Neocom Desk.",
+      "join": "Join Discord"
+    },
+    "faqHeading": "Quick answers",
+    "faq": {
+      "readMore": "Read more in the privacy policy",
+      "writes": {
+        "q": "Can it move ISK or change anything in EVE?",
+        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account, saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
+      },
+      "free": {
+        "q": "Is it free?",
+        "a": "Yes. There is no account to create, no ads and no subscription. Donations are welcome, never expected, and the app stays free."
+      },
+      "stores": {
+        "q": "What does it store, and where?",
+        "a": "What it reads from EVE is cached on this device and is not uploaded. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. Your login token never leaves this device, apart from the opt-in Alerts when closed."
+      },
+      "delete": {
+        "q": "Can I leave and delete my data?",
+        "a": "Yes. Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Anything you shared with a Community is removed by leaving that Community."
+      },
+      "phone": {
+        "q": "Does it work on a phone?",
+        "a": "Yes. In a phone browser, or installed to the home screen, the same pages use a narrower layout with a bottom navigation. It is designed first for a desktop beside the game, so dense tables and editors are easier on a larger screen."
+      },
+      "community": {
+        "q": "What is a Community?",
+        "a": "A named group of Characters under one admin. You create one or join with an invite link, and share only what you pick: blueprints, Fittings and Skill Plans. Members can also post Requests for items and Pledge to fill each other's."
       }
     },
     "bottomCtaHeading": "Undock into your dashboard.",

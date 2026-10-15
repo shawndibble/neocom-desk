@@ -1,0 +1,46 @@
+import { useTranslation } from 'react-i18next';
+import { ExternalMark } from '@/components/ui/ExternalLink';
+import { buttonClassName } from '@/components/ui/buttonClassName';
+import { Discord, ICON_SIZE } from '@/components/ui/icons';
+import { DISCORD_URL } from '@/lib/links';
+import { LANDING_QUOTES, type Quote } from './landingQuotes';
+
+/** Pull-quotes in a hairline-divided row; renders nothing when there are none. */
+export function QuotesRow({ quotes }: { quotes: readonly Quote[] }) {
+  if (quotes.length === 0) return null;
+  return (
+    <ul className="mt-8 grid divide-y divide-line border border-line sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+      {quotes.map(({ text, attribution }) => (
+        <li key={`${attribution}-${text}`}>
+          <figure className="px-5 py-4">
+            <blockquote className="text-sm">{text}</blockquote>
+            <figcaption className="mt-2 text-xs text-text-dim">{attribution}</figcaption>
+          </figure>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The body of the landing page's community section: what the Discord is for, one join link, and quotes when there are any. */
+export function CommunitySection({ quotes = LANDING_QUOTES }: { quotes?: readonly Quote[] }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="mt-4 flex flex-col items-start gap-4 border border-line px-5 py-5 sm:flex-row sm:items-center">
+        <Discord size={ICON_SIZE.lg} aria-hidden="true" className="shrink-0 text-accent" />
+        <p className="max-w-2xl flex-1 text-sm text-text-dim">{t('login.community.body')}</p>
+        <a
+          href={DISCORD_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonClassName({ variant: 'accent' })}
+        >
+          {t('login.community.join')}
+          <ExternalMark />
+        </a>
+      </div>
+      <QuotesRow quotes={quotes} />
+    </>
+  );
+}
