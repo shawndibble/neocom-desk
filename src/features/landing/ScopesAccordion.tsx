@@ -46,7 +46,7 @@ export function ScopesAccordion() {
   }
 
   return (
-    <div className="divide-y divide-line border border-line">
+    <div className="divide-y divide-line border border-line bg-bg/60">
       {LANDING_SCOPE_GROUPS.map(({ id, rows }) => (
         <Disclosure
           key={id}
