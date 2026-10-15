@@ -1,6 +1,8 @@
 import { useLayoutEffect, type ReactNode } from 'react';
 import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
-import { userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { walletFixtureRoutes } from '@/storybook/esiFixtureRoutes';
+import type { FixtureRoute } from '@/storybook/fixtureFetch';
 import { setCommunityBackendOverride } from '@/features/communities/communityStore';
 import {
   createCommunitiesFixture,
@@ -118,6 +120,26 @@ export const AdminInvites: Story = {
 
 const requestsPath = (id: string) => `/communities?community=${id}&tab=requests`;
 
+/** The sample pilot is in Efa (Khanid), and holds the location and Open in EVE Permissions. */
+const requestsRoutes = (): FixtureRoute[] => [
+  ...walletFixtureRoutes(),
+  {
+    path: /^\/characters\/(\d+)\/location$/,
+    respond: () => ({ body: { solar_system_id: 30003892, station_id: 60012601 } }),
+  },
+];
+const requestsScopes = [
+  'esi-wallet.read_character_wallet.v1',
+  'esi-characters.read_loyalty.v1',
+  'esi-location.read_location.v1',
+  'esi-ui.open_window.v1',
+] as const;
+const requestsShell = (id: string) => ({
+  path: requestsPath(id),
+  routes: requestsRoutes,
+  scopes: requestsScopes,
+});
+
 /** Clicks the board row whose first line is `name`, the way a pilot opens its side panel. */
 const openRequest =
   (name: string): Story['play'] =>
@@ -128,7 +150,38 @@ const openRequest =
 
 /** @summary Requests: the board of the Community's Requests, Open and Mine filters, search, a table. */
 export const RequestsBoard: Story = {
-  parameters: { shell: { path: requestsPath(SAMPLE_ADMIN_COMMUNITY_ID) } },
+  parameters: { shell: requestsShell(SAMPLE_ADMIN_COMMUNITY_ID) },
+};
+
+/** @summary The board with "I can fill" on: open Requests with a line for a blueprint you share. */
+export const RequestsBoardCanFill: Story = {
+  ...RequestsBoard,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole('button', { name: /^I can fill/ }));
+  },
+};
+
+/** @summary The board limited to Requests within 5 jumps of the pilot (in Efa), with the count of those it cannot place. */
+export const RequestsBoardNearby: Story = {
+  ...RequestsBoard,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const select = await canvas.findByRole('combobox', { name: 'Distance' });
+    await waitFor(() => expect(select).toBeEnabled());
+    await userEvent.selectOptions(select, 'Within 5 jumps');
+    await canvas.findByText(/no place to measure from/, undefined, { timeout: 8000 });
+  },
+};
+
+/** @summary Distance with no location Permission: the select is disabled and says why, with the Grant link. */
+export const RequestsBoardNoLocationGrant: Story = {
+  parameters: {
+    shell: {
+      ...requestsShell(SAMPLE_ADMIN_COMMUNITY_ID),
+      scopes: ['esi-wallet.read_character_wallet.v1', 'esi-characters.read_loyalty.v1'],
+    },
+  },
 };
 
 /** @summary The Requests board in the phone shell (dense cards). */
@@ -170,5 +223,5 @@ export const RequestsComposePhone: Story = { ...RequestsCompose, globals: phone 
 
 /** @summary A Community with no Requests yet. */
 export const RequestsEmpty: Story = {
-  parameters: { shell: { path: requestsPath(SAMPLE_MEMBER_COMMUNITY_ID) } },
+  parameters: { shell: requestsShell(SAMPLE_MEMBER_COMMUNITY_ID) },
 };

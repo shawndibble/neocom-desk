@@ -296,6 +296,7 @@ export function CommunityDetail({
             <RequestsTab
               characterId={characterId}
               communityId={community.id}
+              communityName={community.name}
               myUid={myUid}
               requests={board.requests}
               failed={board.failed}

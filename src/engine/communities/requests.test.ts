@@ -8,6 +8,8 @@ import {
   REQUEST_LIFETIME_DAYS,
   lineKey,
   filterRequests,
+  canFillRequest,
+  withinJumps,
   defaultKind,
   isBlueprintName,
   isOpenRequest,
@@ -221,5 +223,87 @@ describe('constants shared with the callables', () => {
 describe('lineKey', () => {
   it('tells a BPC from a BPO of one blueprint', () => {
     expect(lineKey({ typeId: 1, kind: 'bpc' })).not.toBe(lineKey({ typeId: 1, kind: 'bpo' }));
+  });
+});
+
+describe('canFillRequest', () => {
+  const shared = new Set([11534]);
+  it('is true when a blueprint line is one the Member shares', () => {
+    const bp = request({ lines: [line(1, 5), line(11534, 2, { kind: 'bpc' })] });
+    expect(canFillRequest(bp, shared)).toBe(true);
+    expect(canFillRequest(request({ lines: [line(11534, 2, { kind: 'bpo' })] }), shared)).toBe(
+      true
+    );
+  });
+  it('is false for other blueprints, and for a plain item that shares a type id', () => {
+    expect(canFillRequest(request({ lines: [line(7, 2, { kind: 'bpc' })] }), shared)).toBe(false);
+    expect(canFillRequest(request({ lines: [line(11534, 2)] }), shared)).toBe(false);
+  });
+});
+
+describe('filterRequests: I can fill', () => {
+  const now = 5 * DAY;
+  const shared = new Set([11534]);
+  const bp = (id: string, over: Partial<CommunityRequest> = {}) =>
+    request({ id, lines: [line(11534, 1, { kind: 'bpc' })], ...over });
+  const run = (rows: CommunityRequest[], sharedTypeIds: ReadonlySet<number> | null = shared) =>
+    filterRequests(rows, {
+      filter: 'canFill',
+      query: '',
+      myUid: 'me',
+      now,
+      sharedTypeIds: sharedTypeIds ?? undefined,
+    }).map((r) => r.id);
+
+  it('lists open Requests of others with a line for a shared blueprint', () => {
+    const rows = [
+      bp('a'),
+      bp('own', { ownerUid: 'me' }),
+      bp('closed', { closed: true }),
+      bp('expired', { expiresAt: now - 1 }),
+      request({ id: 'other' }),
+    ];
+    expect(run(rows)).toEqual(['a']);
+  });
+
+  it('lists nothing while the shared blueprints are unknown', () => {
+    expect(run([bp('a')], null)).toEqual([]);
+  });
+
+  it('still applies the search', () => {
+    const rows = [bp('a', { location: 'Jita' }), bp('b', { location: 'Efa' })];
+    expect(
+      filterRequests(rows, {
+        filter: 'canFill',
+        query: 'efa',
+        myUid: 'me',
+        now,
+        sharedTypeIds: shared,
+      }).map((r) => r.id)
+    ).toEqual(['b']);
+  });
+});
+
+describe('withinJumps', () => {
+  const rows = [request({ id: 'near' }), request({ id: 'far' }), request({ id: 'free' })];
+  const jumps = new Map<string, number | null>([
+    ['near', 4],
+    ['far', 12],
+    ['free', null],
+  ]);
+  const jumpsOf = (r: CommunityRequest) => jumps.get(r.id) ?? null;
+  const ids = (list: CommunityRequest[]) => list.map((r) => r.id);
+
+  it('keeps Requests at or under the limit and counts those it cannot measure', () => {
+    const result = withinJumps(rows, 5, jumpsOf);
+    expect(ids(result.within)).toEqual(['near']);
+    expect(result.unmeasured).toBe(1);
+    expect(ids(withinJumps(rows, 12, jumpsOf).within)).toEqual(['near', 'far']);
+  });
+
+  it('is no filter at all without a limit', () => {
+    const result = withinJumps(rows, null, jumpsOf);
+    expect(ids(result.within)).toEqual(['near', 'far', 'free']);
+    expect(result.unmeasured).toBe(0);
   });
 });

@@ -8,6 +8,9 @@ import {
   type RequestPledge,
 } from '@/engine/communities/requests';
 import { formatAge } from '@/lib/age';
+import { itemsSummary, mailSafe, mailSubject } from '@/engine/communities/requestMail';
+import { characterIdForUid } from '@/sync/uid';
+import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeBar } from './PledgeBar';
 import { callableErrorReason } from './callableError';
 import { daysLeft } from './requestFormat';
@@ -29,8 +32,9 @@ function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unkn
 /**
  * A Request's side panel, read-only: its terms and each line's progress. The
  * requester also gets Extend 30 days and Close request (Reopen once closed);
- * everyone else has nothing to press yet, since Pledging is a later ticket.
- * `pledges` is empty until then, and a line shows 0 pledged.
+ * everyone else gets Message <requester>…, which opens an in-game mail to them
+ * (Pledging is a later ticket). `pledges` is empty until then, and a line shows
+ * 0 pledged.
  */
 export function RequestPanel({
   request,
@@ -39,6 +43,7 @@ export function RequestPanel({
   now,
   characterId,
   communityId,
+  communityName,
   onClose,
   onChanged,
 }: {
@@ -48,6 +53,7 @@ export function RequestPanel({
   now: number;
   characterId: number;
   communityId: string;
+  communityName: string;
   onClose: () => void;
   /** The Request changed on the server: refetch the board. */
   onChanged: () => void;
@@ -72,6 +78,12 @@ export function RequestPanel({
       setBusy(null);
     }
   };
+
+  const requesterId = mine ? null : characterIdForUid(request.ownerUid);
+  const items = itemsSummary(
+    request.lines.map((line) => line.name),
+    (count) => t('communities.board.more', { count })
+  );
 
   const left = daysLeft(request.expiresAt, now);
   const place = request.location;
@@ -116,6 +128,19 @@ export function RequestPanel({
             );
           })}
         </ul>
+        {requesterId !== null && (
+          <MessageRequesterButton
+            characterId={characterId}
+            recipientId={requesterId}
+            name={request.ownerName}
+            subject={mailSubject(t('communities.board.mail.subject', { items }))}
+            body={t('communities.board.mail.body', {
+              name: mailSafe(request.ownerName),
+              community: mailSafe(communityName),
+              items: mailSafe(items),
+            })}
+          />
+        )}
         {mine && (
           <div className="flex flex-wrap gap-2">
             {request.closed ? (

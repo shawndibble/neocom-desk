@@ -33,4 +33,14 @@ The Requests tab, board, read-only side panel, compose step 1 and the empty stat
 - **Search placeholder** ends in "…" (the i18n convention test requires it).
 - **Column header** Age has no default sort (rows arrive newest first); Request, Status and Age sort.
 
+## Deviations in the Request filters build (issue #3811)
+
+The I can fill chip, the Distance select and the Message button are built (`pages-communities--requests-board`, `-can-fill`, `-nearby`, `-no-location-grant`, `-panel-as-member`). Where they differ from the pictures:
+
+- **Filter row:** chips and select are the pictured controls in the pictured order (`FilterChip` Open, Mine, I can fill with the pictured tooltip; `NativeSelect` Any distance, Within 5, 10, 20 jumps). On a phone the select sits beside Mine and I can fill on the second row where the picture wraps it to a third, because the chips are narrower in the sample (counts of one digit).
+- **Disabled and failed states** are not pictured: Distance is disabled with a line under the row saying why (the location Permission is missing, with the Grant link, or the pilot's location is unknown); I can fill is disabled with a tooltip when the Member's shared blueprints could not be read. Under a limit, a line says how many Requests with no place the app can measure from are left out.
+- **Location is picked in compose** (a suggestion list under the field, a line saying whether the text can be measured); the compose pictures have a plain field.
+- **Message button:** at the foot of the panel as pictured, with no delivery note above it (#3808) and, without the Open in EVE Permission, a line with the Grant link beside it. The label ends in an ellipsis as pictured.
+- **Sample data:** the second Request's place is "Domain (region)", not the picture's "Amarr (region)", since Amarr is a system and the board reads a region by its real name. I can fill counts 1, not 2: the sample pilot shares one blueprint a Request asks for.
+
 Delete this folder and the story when the last ticket that links it closes.

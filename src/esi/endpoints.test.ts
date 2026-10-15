@@ -39,6 +39,7 @@ import {
   getIndustrySystemCostIndices,
   postAutopilotWaypoint,
   postOpenWindowContract,
+  postOpenWindowNewMail,
   postOpenWindowInformation,
   postOpenWindowMarketDetails,
   postRoute,
@@ -488,6 +489,32 @@ describe('Open in EVE', () => {
     expect(result.data).toBeNull();
     expect(auth).toBe(`Bearer token-${CHARACTER_ID}`);
     expect(query).toEqual({ [param]: '30000142' });
+  });
+});
+
+describe('Open a new mail in EVE', () => {
+  it('postOpenWindowNewMail POSTs the draft as JSON and gets 204', async () => {
+    let auth: string | null = null;
+    let body: unknown = null;
+    server.use(
+      http.post(`${ESI_BASE_URL}/ui/openwindow/newmail`, async ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        auth = request.headers.get('authorization');
+        body = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    const result = await postOpenWindowNewMail(CHARACTER_ID, {
+      recipientId: 2119000001,
+      subject: 'Your Request',
+      body: 'Hello',
+    });
+
+    expect(result.data).toBeNull();
+    expect(auth).toBe(`Bearer token-${CHARACTER_ID}`);
+    expect(body).toEqual({ recipients: [2119000001], subject: 'Your Request', body: 'Hello' });
   });
 });
 

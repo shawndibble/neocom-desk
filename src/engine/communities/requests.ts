@@ -118,19 +118,39 @@ export function isOpenRequest(request: CommunityRequest, now: number): boolean {
   return !request.closed && request.expiresAt > now;
 }
 
-export type RequestFilter = 'open' | 'mine';
+export type RequestFilter = 'open' | 'mine' | 'canFill';
+
+/** A line for a blueprint (copy or original) the Member shares with this Community. */
+export function canFillRequest(
+  request: CommunityRequest,
+  sharedTypeIds: ReadonlySet<number>
+): boolean {
+  return request.lines.some((line) => line.kind !== 'item' && sharedTypeIds.has(line.typeId));
+}
 
 export function filterRequests(
   requests: readonly CommunityRequest[],
-  options: { filter: RequestFilter; query: string; myUid: string; now: number }
+  options: {
+    filter: RequestFilter;
+    query: string;
+    myUid: string;
+    now: number;
+    /** The blueprint type ids this Member shares with the Community; undefined while not known. */
+    sharedTypeIds?: ReadonlySet<number>;
+  }
 ): CommunityRequest[] {
   const needle = options.query.trim().toLowerCase();
   return requests.filter((request) => {
     // Mine keeps closed and expired ones: that is where a requester reopens or extends.
+    // I can fill is open Requests of others: a requester cannot Pledge on their own.
     const inFilter =
       options.filter === 'mine'
         ? request.ownerUid === options.myUid
-        : isOpenRequest(request, options.now);
+        : options.filter === 'canFill'
+          ? isOpenRequest(request, options.now) &&
+            request.ownerUid !== options.myUid &&
+            canFillRequest(request, options.sharedTypeIds ?? new Set())
+          : isOpenRequest(request, options.now);
     if (!inFilter) return false;
     if (needle === '') return true;
     return [request.ownerName, request.location, request.terms, ...request.lines.map((l) => l.name)]
@@ -138,6 +158,28 @@ export function filterRequests(
       .toLowerCase()
       .includes(needle);
   });
+}
+
+/**
+ * The Requests within `maxJumps` of the pilot, and how many could not be
+ * measured (no place the app can read, or none of it reachable by stargate).
+ * Those are left out while a limit is set, and the caller says how many.
+ * `maxJumps` null is no limit: everything stays and nothing counts as unmeasured.
+ */
+export function withinJumps(
+  requests: readonly CommunityRequest[],
+  maxJumps: number | null,
+  jumpsOf: (request: CommunityRequest) => number | null
+): { within: CommunityRequest[]; unmeasured: number } {
+  if (maxJumps === null) return { within: [...requests], unmeasured: 0 };
+  const within: CommunityRequest[] = [];
+  let unmeasured = 0;
+  for (const request of requests) {
+    const jumps = jumpsOf(request);
+    if (jumps === null) unmeasured += 1;
+    else if (jumps <= maxJumps) within.push(request);
+  }
+  return { within, unmeasured };
 }
 
 /** A line's identity: a BPC and a BPO of one blueprint are two lines. The server dedupes on it. */

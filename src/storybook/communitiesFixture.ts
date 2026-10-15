@@ -100,7 +100,14 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
   });
   const libraries: Record<string, MemberLibrary[]> = {
     [SAMPLE_ADMIN_COMMUNITY_ID]: [
-      { uid: ME, items: [blueprint(691, -1, 'Efa'), blueprint(32881, 40, 'Efa')] },
+      {
+        uid: ME,
+        items: [
+          blueprint(691, -1, 'Efa'),
+          blueprint(32881, 40, 'Efa'),
+          blueprint(11534, 10, 'Efa'),
+        ],
+      },
       { uid: OTHER, items: [blueprint(24699, -1, 'Amarr'), blueprint(950, 10, 'Amarr')] },
       { uid: 'char:2119000001', items: [blueprint(2184, -1, 'Jita'), blueprint(691, 5, 'Jita')] },
       { uid: 'char:2119000003', items: [blueprint(940, -1, 'Dodixie')] },
@@ -222,7 +229,7 @@ export function createCommunitiesFixture(now = Date.now()): CommunityBackendOver
         'req-2',
         'char:2119000002',
         'Dax Orrelin',
-        'Amarr (region)',
+        'Domain (region)',
         '90% JBV, will accept contracts daily',
         24,
         [
