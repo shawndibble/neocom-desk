@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import '@/i18n';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -9,7 +9,17 @@ function Boom(): never {
 
 // React logs the caught error; silence it so a passing run stays readable.
 const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-afterEach(() => consoleError.mockClear());
+afterEach(() => {
+  consoleError.mockClear();
+  vi.unstubAllGlobals();
+});
+
+function stubOnline(online: boolean) {
+  const reload = vi.fn();
+  vi.stubGlobal('location', { ...window.location, reload });
+  Object.defineProperty(navigator, 'onLine', { value: online, configurable: true });
+  return reload;
+}
 
 describe('ErrorBoundary', () => {
   it('renders children when nothing throws', () => {
@@ -76,5 +86,68 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
     expect(screen.getByText('wallet')).toBeInTheDocument();
+  });
+
+  describe('offline', () => {
+    afterEach(() => {
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    });
+
+    it('says the page cannot load offline and will retry, instead of offering a futile reload hint', () => {
+      stubOnline(false);
+      render(
+        <ErrorBoundary inline>
+          <Boom />
+        </ErrorBoundary>
+      );
+      expect(screen.getByText(/can't load while you're offline/i)).toBeInTheDocument();
+      expect(screen.getByText(/try again when your connection returns/i)).toBeInTheDocument();
+      expect(screen.queryByText(/reloading usually fixes this/i)).not.toBeInTheDocument();
+    });
+
+    it('reloads when the connection returns', () => {
+      const reload = stubOnline(false);
+      render(
+        <ErrorBoundary inline>
+          <Boom />
+        </ErrorBoundary>
+      );
+      expect(reload).not.toHaveBeenCalled();
+      act(() => {
+        window.dispatchEvent(new Event('online'));
+      });
+      expect(reload).toHaveBeenCalledOnce();
+    });
+
+    it('also retries when the error appeared online and the connection dropped and came back', () => {
+      const reload = stubOnline(true);
+      render(
+        <ErrorBoundary inline>
+          <Boom />
+        </ErrorBoundary>
+      );
+      expect(screen.getByText(/reloading usually fixes this/i)).toBeInTheDocument();
+      act(() => {
+        window.dispatchEvent(new Event('offline'));
+      });
+      expect(screen.getByText(/can't load while you're offline/i)).toBeInTheDocument();
+      act(() => {
+        window.dispatchEvent(new Event('online'));
+      });
+      expect(reload).toHaveBeenCalledOnce();
+    });
+
+    it('does not reload on an online event when the screen was never offline', () => {
+      const reload = stubOnline(true);
+      render(
+        <ErrorBoundary inline>
+          <Boom />
+        </ErrorBoundary>
+      );
+      act(() => {
+        window.dispatchEvent(new Event('online'));
+      });
+      expect(reload).not.toHaveBeenCalled();
+    });
   });
 });

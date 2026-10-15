@@ -14,7 +14,11 @@ import { BootUpdateGate } from './app/BootUpdateGate';
 import { hideBootCover, showBootCover } from './app/bootCover';
 import { installInputModality } from './app/inputModality';
 import { installTranslateGuard } from './app/translateGuard';
-import { recoverFromStaleBuild } from './app/staleBuildRecovery';
+import {
+  canRecoverFromStaleBuild,
+  defaultStaleBuildEnv,
+  recoverFromStaleBuild,
+} from './app/staleBuildRecovery';
 import './i18n';
 import './styles/index.css';
 
@@ -22,15 +26,19 @@ import './styles/index.css';
 // to fetch — typically a deploy replaced its hashed file while this tab still
 // ran the old entry, or the service worker's precache still serves the old
 // `index.html`. Vite announces that as `vite:preloadError`. A plain reload
-// cannot cure the second case, so drop the worker and its caches first
-// (`app/staleBuildRecovery.ts`). Once per minute at most, so a chunk that is
-// genuinely unreachable (offline, a broken deploy) falls through to the
-// route's error boundary instead of looping.
+// cannot cure the second case, so drop the worker and its precache first
+// (`app/staleBuildRecovery.ts`). The decision is made here, synchronously:
+// cancelling the failure (`preventDefault`) is only safe when a recovery will
+// follow. Offline (a purge would leave nothing to reload into) or once per
+// minute (a genuinely unreachable chunk, a broken deploy) the failure is left
+// alone, the import rejects, and the route's error boundary renders.
 window.addEventListener('vite:preloadError', (event) => {
+  const env = defaultStaleBuildEnv();
+  if (!canRecoverFromStaleBuild(env)) return;
   event.preventDefault();
   // Cover the page so the purge-and-reload reads as a boot; uncover if it declined.
   showBootCover();
-  void recoverFromStaleBuild().then((reloading) => {
+  void recoverFromStaleBuild(env).then((reloading) => {
     if (!reloading) hideBootCover();
   });
 });
