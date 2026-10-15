@@ -4,7 +4,11 @@ import type { CommunityRequest, PledgeEntry, RequestPledge } from '@/engine/comm
 const mocks = vi.hoisted(() => ({
   scopes: ['esi-contracts.read_character_contracts.v1'] as string[],
   contracts: vi.fn(),
+  /** The network: what ESI answers for a contract's items, or null for a failure. */
   items: vi.fn(),
+  /** The status of the failure `items` returned null for. */
+  failure: { status: 0 },
+  detailed: vi.fn(),
   requests: vi.fn(),
   pledges: vi.fn(),
   update: vi.fn(),
@@ -14,7 +18,9 @@ vi.mock('@/db', () => ({
   db: { tokens: { get: async () => ({ scopes: mocks.scopes }) } },
 }));
 vi.mock('@/features/character/contracts', () => ({ loadContracts: mocks.contracts }));
-vi.mock('@/features/character/contractItems', () => ({ loadContractItems: mocks.items }));
+vi.mock('@/features/character/contractItems', () => ({
+  loadContractItemsDetailed: mocks.detailed,
+}));
 vi.mock('./requestStore', () => ({
   loadRequests: mocks.requests,
   loadCommunityPledges: mocks.pledges,
@@ -70,6 +76,25 @@ const contract = (id: number, over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.failure.status = 0;
+  // Like production: a first read goes to the network and is stored; a repeat is a fresh row
+  // (fromCache false, no network); a failure carries the status ESI answered with.
+  const rows = new Map<number, unknown>();
+  mocks.detailed.mockImplementation(async (characterId: number, contractId: number) => {
+    if (rows.has(contractId)) {
+      return {
+        result: { data: rows.get(contractId), fromCache: false, fetchedAt: new Date() },
+        networkRead: false,
+      };
+    }
+    const answer = (await mocks.items(characterId, contractId)) as { data: unknown } | null;
+    if (!answer) return { result: null, networkRead: true, failureStatus: mocks.failure.status };
+    rows.set(contractId, answer.data);
+    return {
+      result: { data: answer.data, fromCache: false, fetchedAt: new Date() },
+      networkRead: true,
+    };
+  });
   mocks.scopes = ['esi-contracts.read_character_contracts.v1'];
   mocks.requests.mockResolvedValue([request()]);
   mocks.pledges.mockResolvedValue(
@@ -303,75 +328,33 @@ describe('syncRequestDeliveries', () => {
     expect(mocks.update.mock.calls[0]?.[2]).toBe('r1');
   });
 
-  it('stops reading items at the first failed read and gives up on a contract that keeps failing', async () => {
+  it('never gives up on a contract for transient failures, however many', async () => {
     mocks.contracts.mockResolvedValue({
       cached: { data: [contract(41), contract(42)], truncated: false },
       needsReauth: false,
     });
     mocks.items.mockResolvedValue(null);
-    expect((await syncRequestDeliveries(ME, 'c1', NOW)).status).toBe('read-failed');
-    expect(mocks.items).toHaveBeenCalledTimes(1);
-    await syncRequestDeliveries(ME, 'c1', NOW);
-    expect(mocks.items).toHaveBeenCalledTimes(2);
-    mocks.items.mockClear();
-    // 41 is now given up on; 42 is tried (and fails once).
-    await syncRequestDeliveries(ME, 'c1', NOW);
-    expect(mocks.items).toHaveBeenCalledTimes(1);
-    expect(mocks.items.mock.calls[0]?.[1]).toBe(42);
+    for (let run = 0; run < 4; run += 1) {
+      expect((await syncRequestDeliveries(ME, 'c1', NOW + run * 60 * 60_000)).status).toBe(
+        'read-failed'
+      );
+    }
+    // Stops at the first failure each time, and keeps retrying the same contract.
+    expect(mocks.items.mock.calls.map((c) => c[1])).toEqual([41, 41, 41, 41]);
   });
 
-  it('on a first sync with more contracts than one run reads, counts the oldest and holds back the rest', async () => {
-    const DAYS = 86_400_000;
-    // 45 contracts, newest first as ESI lists them; contract n finished n days after day 0.
-    const all = Array.from({ length: 45 }, (_, i) => 45 - i).map((n) =>
-      contract(1000 + n, {
-        date_completed: new Date(Date.parse('2026-09-01T00:00:00Z') + n * DAYS).toISOString(),
-      })
-    );
-    mocks.contracts.mockResolvedValue({
-      cached: { data: all, truncated: false },
-      needsReauth: false,
-    });
-    const read = new Set<number>();
-    mocks.items.mockImplementation(async (_c: number, id: number) => {
-      const fromCache = read.has(id);
-      read.add(id);
-      return {
-        fromCache,
-        data: [{ record_id: 1, type_id: 100, quantity: 1, is_included: true, is_singleton: false }],
-      };
-    });
-    mocks.requests.mockResolvedValue([request({ createdAt: Date.parse('2026-08-01T00:00:00Z') })]);
-    let stored: Record<number, PledgeEntry> = {
-      0: { quantity: 500, delivered: 0, contractIds: [] },
-    };
-    mocks.pledges.mockImplementation(async () => new Map([['r1', [pledge(stored)]]]));
-    mocks.update.mockImplementation(async (_c, _g, _r, change) => {
-      stored = change(stored) as Record<number, PledgeEntry>;
-    });
-    const first = await syncRequestDeliveries(ME, 'c1', NOW);
-    expect(first.status).toBe('read-failed');
-    // The 40 oldest are counted; the 5 newest wait for the next run.
-    expect(stored[0]?.auto).toBe(40);
-    // The next run (their items now cached or read) counts them once, and a third adds nothing.
-    mocks.items.mockClear();
-    await syncRequestDeliveries(ME, 'c1', NOW);
-    expect(stored[0]?.auto).toBe(45);
-    await syncRequestDeliveries(ME, 'c1', NOW);
-    expect(stored[0]?.auto).toBe(45);
-  });
-
-  it('holds back what finished after an unreadable contract, then releases it once given up', async () => {
-    const early = contract(91, { date_completed: '2026-10-11T00:00:00Z' });
-    const later = [92, 93, 94].map((id, i) =>
+  it('gives up on a contract ESI keeps answering 404 for, over time, and releases what followed', async () => {
+    const early = contract(51, { date_completed: '2026-10-11T00:00:00Z' });
+    const later = [52, 53, 54].map((id, i) =>
       contract(id, { date_completed: `2026-10-1${2 + i}T00:00:00Z` })
     );
     mocks.contracts.mockResolvedValue({
       cached: { data: [...later, early], truncated: false },
       needsReauth: false,
     });
+    mocks.failure.status = 404;
     mocks.items.mockImplementation(async (_c: number, id: number) =>
-      id === 91
+      id === 51
         ? null
         : {
             data: [
@@ -386,16 +369,58 @@ describe('syncRequestDeliveries', () => {
     mocks.update.mockImplementation(async (_c, _g, _r, change) => {
       stored = change(stored) as Record<number, PledgeEntry>;
     });
-    // X (91) fails: nothing after it counts, run after run, until it is given up (twice).
+    const MIN = 60_000;
+    // Two 404s within a minute are a burst, not a verdict: what finished after 51 stays held back.
     await syncRequestDeliveries(ME, 'c1', NOW);
+    await syncRequestDeliveries(ME, 'c1', NOW + MIN);
     expect(stored[0]?.auto ?? 0).toBe(0);
-    await syncRequestDeliveries(ME, 'c1', NOW);
-    expect(stored[0]?.auto ?? 0).toBe(0);
-    // Given up: skipped for good, the three later ones count once and stay stable.
-    await syncRequestDeliveries(ME, 'c1', NOW);
+    // Two failures spanning minutes: given up. Skipped for good, the three later ones
+    // count once, `through` advances past it, and it is never read again.
+    await syncRequestDeliveries(ME, 'c1', NOW + 6 * MIN);
+    expect(stored[0]).toMatchObject({ auto: 30, through: Date.parse('2026-10-14T00:00:00Z') });
+    await syncRequestDeliveries(ME, 'c1', NOW + 7 * MIN);
     expect(stored[0]?.auto).toBe(30);
+    expect(mocks.items.mock.calls.filter((c) => c[1] === 51)).toHaveLength(2);
+  });
+
+  it('reads only what could still change a result: 45 contracts take three runs, the second reads just the 5 left', async () => {
+    const DAYS = 86_400_000;
+    // 45 contracts, newest first as ESI lists them; contract n finished n days after day 0.
+    const all = Array.from({ length: 45 }, (_, i) => 45 - i).map((n) =>
+      contract(1000 + n, {
+        date_completed: new Date(Date.parse('2026-09-01T00:00:00Z') + n * DAYS).toISOString(),
+      })
+    );
+    mocks.contracts.mockResolvedValue({
+      cached: { data: all, truncated: false },
+      needsReauth: false,
+    });
+    mocks.items.mockResolvedValue({
+      data: [{ record_id: 1, type_id: 100, quantity: 1, is_included: true, is_singleton: false }],
+    });
+    mocks.requests.mockResolvedValue([request({ createdAt: Date.parse('2026-08-01T00:00:00Z') })]);
+    let stored: Record<number, PledgeEntry> = {
+      0: { quantity: 500, delivered: 0, contractIds: [] },
+    };
+    mocks.pledges.mockImplementation(async () => new Map([['r1', [pledge(stored)]]]));
+    mocks.update.mockImplementation(async (_c, _g, _r, change) => {
+      stored = change(stored) as Record<number, PledgeEntry>;
+    });
+    const first = await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(first.status).toBe('read-failed');
+    expect(mocks.items).toHaveBeenCalledTimes(40);
+    // The 40 oldest are counted; the 5 newest wait for the next run.
+    expect(stored[0]?.auto).toBe(40);
+    mocks.items.mockClear();
     await syncRequestDeliveries(ME, 'c1', NOW);
-    expect(stored[0]?.auto).toBe(30);
+    // Already counted contracts are not read again: only the 5 unread ones.
+    expect(mocks.items.mock.calls.map((c) => c[1])).toEqual([1041, 1042, 1043, 1044, 1045]);
+    expect(stored[0]?.auto).toBe(45);
+    mocks.items.mockClear();
+    const third = await syncRequestDeliveries(ME, 'c1', NOW);
+    expect(third).toMatchObject({ status: 'ok', updated: 0 });
+    expect(mocks.items).not.toHaveBeenCalled();
+    expect(stored[0]?.auto).toBe(45);
   });
 
   it('skips Requests that are closed or the Member’s own', async () => {

@@ -231,6 +231,24 @@ describe('matchDeliveries', () => {
     expect(out.get('r1')?.delivered).toBe(40 + MAX_CONTRACT_IDS_PER_LINE + 1);
   });
 
+  it('does not let a newer Request, pledged later, recredit what an older one recorded', () => {
+    const a = contract(7, [{ typeId: 100, quantity: 40, blueprint: null }], 50);
+    const out = matchDeliveries(
+      [
+        slot('r0', ore, 100, {
+          order: [1, 0],
+          previousAuto: 40,
+          previousThrough: 50,
+          previousContractIds: [7],
+        }),
+        slot('r1', ore, 100, { order: [2, 0] }),
+      ],
+      [a]
+    );
+    expect(out.get('r0')?.delivered).toBe(40);
+    expect(out.get('r1')?.delivered).toBe(0);
+  });
+
   it('credits the other item of a multi-item contract to the line that asks for it', () => {
     const other: RequestLine = { typeId: 101, name: 'Other', quantity: 5, kind: 'item' };
     const A = contract(

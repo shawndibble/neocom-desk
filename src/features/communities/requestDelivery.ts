@@ -17,6 +17,7 @@ import {
   MAX_CONTRACT_IDS_PER_LINE,
   batchLines,
   contractCompletedAt,
+  contractNeedsItems,
   eligibleContracts,
   matchDeliveries,
   previousFromEntry,
@@ -34,7 +35,7 @@ import {
   type RequestPledge,
 } from '@/engine/communities/requests';
 import { loadContracts } from '@/features/character/contracts';
-import { loadContractItems } from '@/features/character/contractItems';
+import { loadContractItemsDetailed } from '@/features/character/contractItems';
 import { characterIdForUid, uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
 import { pledgeEditVersion } from './pledgeWrites';
@@ -138,17 +139,33 @@ function buildSlots(planned: readonly Planned[]): DeliverySlot[] {
 }
 
 /**
- * Contract ids whose items could not be read, by failures this session. A
- * contract that failed twice is skipped, so a few bad ones cannot use up every
- * run's read cap.
+ * Contracts ESI answered a definite no for (404, 403), by this session: when
+ * first and how often. One that keeps failing so, over a few minutes, is given
+ * up on, so a few bad ones cannot hold the rest back or use up every run's read
+ * cap. Anything else (offline, a rate limit, a 5xx) is transient: it holds the
+ * rest back this run but never counts toward giving up.
  */
-const itemReadFailures = new Map<number, number>();
+const itemReadFailures = new Map<number, { count: number; first: number }>();
 const GIVE_UP_AFTER = 2;
+/** The failures must span at least this long: one burst on a flaky network is not a verdict. */
+export const GIVE_UP_SPAN_MS = 5 * 60_000;
 
-/** The eligible contracts with their items. Stops at the first failed read (rate limit, offline). */
+const isDefiniteNo = (status: number | undefined) => status === 404 || status === 403;
+
+const givenUp = (contractId: number, now: number) => {
+  const failure = itemReadFailures.get(contractId);
+  return (
+    failure !== undefined &&
+    failure.count >= GIVE_UP_AFTER &&
+    now - failure.first >= GIVE_UP_SPAN_MS
+  );
+};
+
+/** The eligible contracts with their items. Stops at the first transient failure (rate limit, offline). */
 async function readContracts(
   characterId: number,
-  slots: readonly DeliverySlot[]
+  slots: readonly DeliverySlot[],
+  now: number
 ): Promise<
   | { status: 'needs-scope' | 'read-failed' }
   | { status: 'ok'; contracts: DeliveryContract[]; degraded: boolean; horizon: number }
@@ -174,40 +191,69 @@ async function readContracts(
   let reads = 0;
   // Eligible contracts whose items were not read this run: nothing finishing at
   // or after the earliest of them is counted (see `matchDeliveries`). One given up
-  // on after repeated failures is skipped for good instead: it never counts and
-  // does not hold the rest back.
+  // on after repeated definite failures is skipped for good instead: it never
+  // counts and does not hold the rest back.
   let horizon = Infinity;
-  const unread = (contract: (typeof eligible)[number]) => {
+  const hold = (contract: (typeof eligible)[number]) => {
     horizon = Math.min(horizon, contractCompletedAt(contract));
   };
-  for (const contract of eligible) {
-    if ((itemReadFailures.get(contract.contract_id) ?? 0) >= GIVE_UP_AFTER) {
+  for (const [position, contract] of eligible.entries()) {
+    const header = {
+      contractId: contract.contract_id,
+      completedAt: contractCompletedAt(contract),
+      recipients: [contract.assignee_id, contract.acceptor_id],
+    };
+    // Already counted by every Pledge that could take it: nothing to read, nothing to hold back.
+    if (!contractNeedsItems(slots, header)) continue;
+    if (givenUp(contract.contract_id, now)) {
       degraded = true;
       continue;
     }
     if (reads >= MAX_ITEM_READS_PER_RUN) {
       degraded = true;
-      for (const rest of eligible.slice(eligible.indexOf(contract))) unread(rest);
+      for (const rest of eligible.slice(position)) {
+        const restHeader = {
+          contractId: rest.contract_id,
+          completedAt: contractCompletedAt(rest),
+          recipients: [rest.assignee_id, rest.acceptor_id],
+        };
+        if (contractNeedsItems(slots, restHeader) && !givenUp(rest.contract_id, now)) hold(rest);
+      }
       break;
     }
-    const items = await loadContractItems(characterId, contract.contract_id).catch(() => null);
-    if (!items) {
-      itemReadFailures.set(
-        contract.contract_id,
-        (itemReadFailures.get(contract.contract_id) ?? 0) + 1
-      );
+    const outcome = await loadContractItemsDetailed(characterId, contract.contract_id).catch(
+      () => ({ result: null, networkRead: true, failureStatus: 0 })
+    );
+    // Only a read that went to ESI counts against the run's cap.
+    if (outcome.networkRead) reads += 1;
+    if (!outcome.result) {
       degraded = true;
-      // The first failure may be the error limit or a rate limit: do not press on.
-      for (const rest of eligible.slice(eligible.indexOf(contract))) unread(rest);
+      hold(contract);
+      if (isDefiniteNo(outcome.failureStatus)) {
+        const before = itemReadFailures.get(contract.contract_id);
+        itemReadFailures.set(contract.contract_id, {
+          count: (before?.count ?? 0) + 1,
+          first: before?.first ?? now,
+        });
+        // A definite answer about this contract alone: the others can still be read.
+        continue;
+      }
+      // Offline, a rate limit or an error limit: do not press on, and do not count it against the contract.
+      for (const rest of eligible.slice(position + 1)) {
+        const restHeader = {
+          contractId: rest.contract_id,
+          completedAt: contractCompletedAt(rest),
+          recipients: [rest.assignee_id, rest.acceptor_id],
+        };
+        if (contractNeedsItems(slots, restHeader) && !givenUp(rest.contract_id, now)) hold(rest);
+      }
       break;
     }
-    // A cached read costs nothing: only live ones count against the run's cap.
-    if (!items.fromCache) reads += 1;
     contracts.push({
-      contractId: contract.contract_id,
-      completedAt: contractCompletedAt(contract),
-      recipients: [contract.assignee_id, contract.acceptor_id],
-      items: items.data.map(toDeliveryItem).filter((item): item is DeliveryItem => item !== null),
+      ...header,
+      items: outcome.result.data
+        .map(toDeliveryItem)
+        .filter((item): item is DeliveryItem => item !== null),
     });
   }
   return { status: 'ok', contracts, degraded, horizon };
@@ -378,7 +424,7 @@ async function doSync(
   const slots = buildSlots(planned);
   if (slots.length === 0) return { status: 'ok', updated: 0, flags: none };
 
-  const read = await readContracts(characterId, slots);
+  const read = await readContracts(characterId, slots, now);
   if (read.status !== 'ok') return { status: read.status, updated: 0, flags: none };
 
   const result = matchDeliveries(slots, read.contracts, { horizon: read.horizon });

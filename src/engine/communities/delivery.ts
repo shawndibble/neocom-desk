@@ -100,6 +100,32 @@ function accepts(slot: DeliverySlot, contract: DeliveryContract, item: DeliveryI
   return true;
 }
 
+/** Counted already: by id, or finished no later than what an earlier run counted through. */
+const alreadyCounted = (
+  slot: DeliverySlot,
+  contract: Pick<DeliveryContract, 'contractId' | 'completedAt'>
+) =>
+  slot.previousContractIds.includes(contract.contractId) ||
+  (slot.previousThrough !== undefined && contract.completedAt <= slot.previousThrough);
+
+/**
+ * Whether reading a contract's items could change any slot: some slot for a
+ * requester it went to, with room left, that has not already counted it. A
+ * contract no slot needs is never read, so it costs no read of the run's cap.
+ */
+export function contractNeedsItems(
+  slots: readonly DeliverySlot[],
+  contract: { contractId: number; completedAt: number; recipients: readonly number[] }
+): boolean {
+  return slots.some(
+    (slot) =>
+      contract.recipients.includes(slot.requesterId) &&
+      contract.completedAt >= slot.since &&
+      slot.previousAuto < slot.quantity &&
+      !alreadyCounted(slot, contract)
+  );
+}
+
 /** Matches contracts to slots; one entry per slot, in any order. */
 export function matchDeliveries(
   slots: readonly DeliverySlot[],
@@ -129,11 +155,6 @@ export function matchDeliveries(
     matched.set(slot.key, []);
     flags.set(slot.key, []);
   }
-  /** Counted already: by id, or finished no later than what an earlier run counted through. */
-  const alreadyCounted = (slot: DeliverySlot, contract: DeliveryContract) =>
-    slot.previousContractIds.includes(contract.contractId) ||
-    (slot.previousThrough !== undefined && contract.completedAt <= slot.previousThrough);
-
   for (const contract of sorted) {
     if (contract.completedAt >= horizon) break;
     for (const item of contract.items) {
