@@ -336,7 +336,7 @@ function SlotCard({
         {/* The controls keep their own right-click and press-and-hold (a count
             box's paste or text selection) rather than opening the item's menu. */}
         <div
-          className="flex min-w-0 basis-full items-center gap-2 @min-[44rem]:min-w-auto @min-[44rem]:basis-auto"
+          className="flex min-w-0 basis-full items-center gap-2 @min-[44rem]:basis-auto"
           onContextMenu={menu ? (event) => event.stopPropagation() : undefined}
           onPointerDown={menu ? (event) => event.stopPropagation() : undefined}
         >

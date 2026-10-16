@@ -8,6 +8,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { expectNoPageOverflow } from './support/overflow';
 
 /** The shared ESI mock only carries a few fixture types — answer for any id. */
 async function answerAnyType(page: Page) {
@@ -33,12 +34,16 @@ const RIFTER_EFT = [
   '',
   '',
   '125mm Gatling AutoCannon I, EMP S',
+  'Caldari Navy Heavy Missile Launcher, Scourge Heavy Missile',
   '',
   '',
   'Hobgoblin I x5',
 ].join('\n');
 
-const NAMES = ['125mm Gatling AutoCannon I', 'Hobgoblin I'];
+const NAMES = ['125mm Gatling AutoCannon I', 'Caldari Navy Heavy Missile Launcher', 'Hobgoblin I'];
+
+/** The name's one-line floor, `min-w-40` (10rem), less a pixel of rounding. */
+const NAME_MIN_PX = 159;
 
 /** Each named row's layout: one line or two, the name's width, and whether remove spills out. */
 async function measureRows(page: Page) {
@@ -72,23 +77,18 @@ test.describe('Fitter List rows', () => {
     await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
     await expect(page.getByText(NAMES[0], { exact: true }).first()).toBeVisible();
 
-    for (const width of [390, 768, 1024, 1280, 1366, 1440, 1920]) {
+    for (const width of [390, 744, 768, 1024, 1280, 1366, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(async () => {
         for (const row of await measureRows(page)) {
           const at = `${row.name} at ${width}px`;
           expect(row.removeInside, at).toBe(true);
-          if (!row.twoLine) expect(row.nameWidth, at).toBeGreaterThanOrEqual(159);
+          if (!row.twoLine) expect(row.nameWidth, at).toBeGreaterThanOrEqual(NAME_MIN_PX);
+          if (width === 390) expect(row.twoLine, at).toBe(true);
+          if (width === 1920) expect(row.twoLine, at).toBe(false);
         }
       }).toPass({ timeout: 3000 });
-      const rows = await measureRows(page);
-      if (width === 390) expect(rows.every((row) => row.twoLine)).toBe(true);
-      if (width === 1920) expect(rows.every((row) => !row.twoLine)).toBe(true);
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
-        )
-      ).toBe(true);
+      await expectNoPageOverflow(page);
     }
   });
 });
