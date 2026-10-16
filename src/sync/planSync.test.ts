@@ -18,6 +18,7 @@ import { FEED_SYNC_WINDOW_MAX_ROWS, FEED_SYNC_WINDOW_MS } from '@/features/notif
 import { backfillAccountWideData } from './accountWideBackfill';
 import { pullCursorKey } from './localBookkeeping';
 import { TOMBSTONE_TTL_MS } from './merge';
+import { hasPendingSync } from './status';
 import {
   clearStationPin,
   deleteSyncedSetting,
@@ -2193,6 +2194,35 @@ describe('sync orchestration', () => {
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT);
     expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1); // the heartbeat, once
+  });
+});
+
+describe('hasPendingSync', () => {
+  afterEach(() => {
+    resetSyncHalt();
+  });
+
+  it('is true while an edit waits out its debounce, false once the sync starts', async () => {
+    expect(hasPendingSync(1)).toBe(false);
+    scheduleSync(1, 20);
+    expect(hasPendingSync(1)).toBe(true);
+    await vi.waitFor(() => expect(hasPendingSync(1)).toBe(false));
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalled());
+  });
+
+  it('is false when a sync runs now, and for the background sweep', async () => {
+    scheduleSync(1, 20);
+    await triggerSync(1);
+    expect(hasPendingSync(1)).toBe(false);
+    scheduleSync(2, 20, 'background');
+    expect(hasPendingSync(2)).toBe(false);
+    await haltSync();
+  });
+
+  it('is cleared when sync is halted', async () => {
+    scheduleSync(1, 20);
+    await haltSync();
+    expect(hasPendingSync(1)).toBe(false);
   });
 });
 

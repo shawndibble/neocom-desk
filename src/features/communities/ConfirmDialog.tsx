@@ -12,6 +12,8 @@ export function ConfirmDialog({
   onConfirm,
   onClose,
   returnFocusFallback,
+  cancelLabel,
+  failedLabel,
 }: {
   open: boolean;
   title: string;
@@ -23,6 +25,9 @@ export function ConfirmDialog({
   onClose: () => void;
   /** Where focus goes on close when the control that opened it is gone (`Modal`'s). */
   returnFocusFallback?: () => HTMLElement | null;
+  /** Defaults to the Communities wording; pass one when used outside Communities. */
+  cancelLabel?: string;
+  failedLabel?: string;
 }) {
   const { t } = useTranslation();
   const [working, setWorking] = useState(false);
@@ -53,12 +58,12 @@ export function ConfirmDialog({
       <p className="text-xs text-text-dim">{body}</p>
       {failed && (
         <p role="alert" className="mt-2 text-xs text-danger">
-          {t('communities.actionFailed')}
+          {failedLabel ?? t('communities.actionFailed')}
         </p>
       )}
       <div className="mt-3 flex justify-end gap-2">
         <Button size="sm" disabled={working} onClick={onClose}>
-          {t('communities.cancel')}
+          {cancelLabel ?? t('communities.cancel')}
         </Button>
         <Button
           variant={danger ? 'danger' : 'primary'}
