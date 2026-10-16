@@ -7,7 +7,7 @@ import { disabledClassName, focusRingClassName, interactiveClassName } from './c
 /**
  * CCP's own "Log in with EVE Online" button, the artwork their SSO docs ask
  * third-party apps to use so players see one familiar button everywhere. The
- * PNGs are self-hosted under `public/brand/` (offline PWA, no third-party
+ * PNGs (plus 2x copies for high-DPI screens; CCP publishes only 1x) are self-hosted under `public/brand/` (offline PWA, no third-party
  * request on the login page); the label is baked into the image, so `label`
  * is only the accessible name.
  *
@@ -15,8 +15,18 @@ import { disabledClassName, focusRingClassName, interactiveClassName } from './c
  * connection" tooltip, since the press navigates to EVE's SSO.
  */
 const SIZES = {
-  large: { src: '/brand/eve-sso-login-black-large.png', width: 270, height: 45 },
-  small: { src: '/brand/eve-sso-login-black-small.png', width: 195, height: 30 },
+  large: {
+    src: '/brand/eve-sso-login-black-large.png',
+    src2x: '/brand/eve-sso-login-black-large@2x.png',
+    width: 270,
+    height: 45,
+  },
+  small: {
+    src: '/brand/eve-sso-login-black-small.png',
+    src2x: '/brand/eve-sso-login-black-small@2x.png',
+    width: 195,
+    height: 30,
+  },
 } as const;
 
 export function EveSsoButton({
@@ -31,7 +41,7 @@ export function EveSsoButton({
   onClick: () => void;
 }) {
   const { t } = useTranslation();
-  const { src, width, height } = SIZES[size];
+  const { src, src2x, width, height } = SIZES[size];
   return (
     <NeedsConnection>
       <button
@@ -48,7 +58,14 @@ export function EveSsoButton({
           disabledClassName
         )}
       >
-        <img src={src} alt={label} width={width} height={height} className="block" />
+        <img
+          src={src}
+          srcSet={`${src} 1x, ${src2x} 2x`}
+          alt={label}
+          width={width}
+          height={height}
+          className="block"
+        />
         {pending && (
           <span className="absolute inset-0 flex items-center justify-center">
             <Spinner size="sm" label={t('common.loading')} />
