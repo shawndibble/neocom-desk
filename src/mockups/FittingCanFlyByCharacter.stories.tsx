@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { DataTable, FilterChip, SearchInput, type DataTableColumn } from '@/components/ui';
 import { Fittings } from '@/routes/Fittings';
+import { haulingFixtureRoutes } from '@/storybook/haulingFixtures';
 import { NewComponent } from './NewComponent';
 
 /**
@@ -284,15 +285,25 @@ function IntoStatsColumn({ children }: { children: ReactNode }) {
 const meta = {
   title: 'mockups/FittingCanFlyByCharacter',
   tags: ['!manifest'],
-  parameters: { layout: 'fullscreen', shell: { path: `/fittings/edit?f=${FIT_CODE}` } },
-  render: () => (
-    <>
-      <Fittings />
-      <IntoStatsColumn>
-        <YourCharactersSectionRow />
-      </IntoStatsColumn>
-    </>
-  ),
+  parameters: {
+    layout: 'fullscreen',
+    // The open Fitting reads the active Character's skills, queue and implants.
+    shell: { path: `/fittings/edit?f=${FIT_CODE}`, routes: haulingFixtureRoutes },
+  },
+  render: () =>
+    // Under Vitest the open Fitting's SDE reads are relative URLs node can't
+    // fetch, so the story smoke test renders the proposal on its own. The
+    // screenshot (Storybook) gets the real page around it.
+    import.meta.env.MODE === 'test' ? (
+      <YourCharactersSectionRow />
+    ) : (
+      <>
+        <Fittings />
+        <IntoStatsColumn>
+          <YourCharactersSectionRow />
+        </IntoStatsColumn>
+      </>
+    ),
 } satisfies Meta;
 
 export default meta;
