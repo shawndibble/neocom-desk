@@ -131,6 +131,12 @@ describe('touch tier', () => {
     }
   });
 
+  it('keeps a bare checkbox target 44px wide beside long text, so rows stay aligned', () => {
+    // A flex item shrinks by default: a long caption beside it squeezed the
+    // label narrower and slid the box left of its neighbours' boxes.
+    expect(touchCheckboxLabelClassName).toContain('shrink-0');
+  });
+
   it('grows a grip hit area along the vertical axis only, so it cannot cover a neighbour', () => {
     expect(gripHitAreaClassName).toContain('touch:before:inset-x-0');
     expect(gripHitAreaClassName).toContain('touch:before:h-11');

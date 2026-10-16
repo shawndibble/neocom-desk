@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assetShipToFitting } from './assetShipMapper';
+import type { ItemMutation } from './types';
 
 const HEAVY_LAUNCHER = 2410;
 const SCOURGE = 209;
@@ -75,5 +76,40 @@ describe('assetShipToFitting', () => {
       drones: [],
       cargo: [],
     });
+  });
+});
+
+describe('assetShipToFitting — mutated items', () => {
+  const NEUT_MUTATION = {
+    baseTypeId: 16475,
+    mutaplasmidTypeId: 47831,
+    attributes: { 6: 419.25 },
+  };
+  const DRONE_MUTATION = { baseTypeId: 2454, mutaplasmidTypeId: 60461, attributes: { 64: 1.9 } };
+
+  it('gives a fitted abyssal module and a mutated drone their rolls, by item id', () => {
+    const fitting = assetShipToFitting(
+      { typeId: 17843, name: 'Abyssal VNI' },
+      [
+        { typeId: 47832, quantity: 1, flag: 'HiSlot0', itemId: 1054645434634 },
+        { typeId: DAMAGE_CONTROL, quantity: 1, flag: 'LoSlot0', itemId: 5 },
+        { typeId: 60478, quantity: 1, flag: 'DroneBay', itemId: 77 },
+        { typeId: 60478, quantity: 1, flag: 'DroneBay', itemId: 78 },
+      ],
+      (typeId) => typeId === 47832 || typeId === DAMAGE_CONTROL,
+      new Map<number, ItemMutation>([
+        [1054645434634, NEUT_MUTATION],
+        [77, DRONE_MUTATION],
+      ])
+    );
+    expect(fitting.modules).toEqual([
+      { slot: 'high', slotIndex: 0, typeId: 47832, state: 'active', mutation: NEUT_MUTATION },
+      { slot: 'low', slotIndex: 0, typeId: DAMAGE_CONTROL, state: 'active' },
+    ]);
+    // Rolls ESI couldn't supply leave that drone with none (base unknown).
+    expect(fitting.drones).toEqual([
+      { typeId: 60478, quantity: 1, state: 'online', mutation: DRONE_MUTATION },
+      { typeId: 60478, quantity: 1, state: 'online' },
+    ]);
   });
 });

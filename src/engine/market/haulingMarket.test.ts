@@ -87,6 +87,28 @@ describe('summarizeDemand', () => {
   });
 });
 
+describe('summarizeDemand listing side', () => {
+  // A day with one listing bought (high) and one dump into a buy order (low): its average is a price nobody paid.
+  const split = (offset: number): MarketHistoryPoint => ({
+    ...day(offset, 2, 157_155_000),
+    highest: 289_000_000,
+    lowest: 25_310_000,
+  });
+
+  it('prices from what listings sold for (the day’s highest), not the blended average', () => {
+    expect(summarizeDemand([split(3)], '2026-09-26').recentSalePrice).toBe(289_000_000);
+  });
+
+  it('keeps the latest trading day’s split so the detail can show it', () => {
+    const s = summarizeDemand([day(5, 3, 100), split(3)], '2026-09-26');
+    expect(s.latestDay).toEqual({ date: '2026-09-23', highest: 289_000_000, lowest: 25_310_000 });
+  });
+
+  it('has no latest day without history', () => {
+    expect(summarizeDemand([], '2026-09-26').latestDay).toBeNull();
+  });
+});
+
 describe('summarizeDemand outliers', () => {
   it('is not moved by one stray trade at a wildly different price', () => {
     const points = [day(0, 1000, 0.23), day(1, 1000, 0.23), day(2, 1000, 0.23), day(3, 1381, 1000)];

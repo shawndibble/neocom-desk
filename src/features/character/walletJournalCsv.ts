@@ -1,6 +1,6 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { WalletJournalEntry } from '@/esi/endpoints';
-import { humanizeRefType } from './format';
+import { journalRefKey, type JournalRow } from '@/engine/journalNetting';
+import { journalRefLabel } from './journalRefLabel';
 
 /**
  * CSV columns for the wallet journal: date, ref type, description, amount,
@@ -10,11 +10,26 @@ import { humanizeRefType } from './format';
  * i18n keys serve both. `date` passes through as the raw ISO string — the
  * table's `toLocaleString()` rendering is display-only. Every optional field
  * is blank (not 0) when ESI omitted it; an actual 0 stays 0 (`??`, not `||`).
+ * The ref type reads as the table's does (PLEX bought / sold); `characterName`
+ * adds the multi-Character view's Character column after the date.
  */
-export function walletJournalCsvColumns(t: CsvTranslate): CsvColumn<WalletJournalEntry>[] {
+export function walletJournalCsvColumns(
+  t: CsvTranslate,
+  characterName?: (characterId: number) => string
+): CsvColumn<JournalRow>[] {
+  const characterColumn: CsvColumn<JournalRow>[] = characterName
+    ? [
+        {
+          header: t('wallet.balanceCharacterColumn'),
+          value: (entry) =>
+            entry.characterId === undefined ? null : characterName(entry.characterId),
+        },
+      ]
+    : [];
   return [
     { header: t('wallet.date'), value: (entry) => entry.date },
-    { header: t('wallet.refType'), value: (entry) => humanizeRefType(entry.ref_type) },
+    ...characterColumn,
+    { header: t('wallet.refType'), value: (entry) => journalRefLabel(journalRefKey(entry), t) },
     { header: t('wallet.description'), value: (entry) => entry.description },
     { header: t('wallet.amount'), value: (entry) => entry.amount ?? null },
     { header: t('wallet.balanceCol'), value: (entry) => entry.balance ?? null },

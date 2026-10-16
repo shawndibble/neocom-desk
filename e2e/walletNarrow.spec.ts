@@ -124,29 +124,22 @@ test.describe('Journal phone table', () => {
     await signInAndGoto(page);
   });
 
-  test('journal is a plain table at 390px, sorted from its header, without the sort picker', async ({
-    page,
-  }) => {
+  test('journal is day-grouped cards at 390px, sorted from the picker', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./wallet/journal');
 
     const table = page.getByRole('table', { name: 'Journal' });
-    const firstRow = table.locator('tbody tr:not(.dt-spacer)').first();
-    await expect(firstRow).toBeVisible();
-    expect(await firstRow.evaluate((tr) => getComputedStyle(tr).display)).toBe('table-row');
+    const rows = table.locator('tbody tr[data-row-key]');
+    await expect(rows.first()).toBeVisible();
+    expect(await rows.first().evaluate((tr) => getComputedStyle(tr).display)).toBe('flex');
+    await expect(table.locator('.dt-group-header').first()).toContainText('EVE time');
 
-    // Balance is shed; Date, Type, Description and Amount stay.
-    await expect(table.getByRole('columnheader', { name: /Description/ })).toBeVisible();
-    await expect(table.getByRole('columnheader', { name: /Balance/ })).toBeHidden();
-    await expect(table.getByRole('columnheader', { name: /Amount/ })).toBeVisible();
-
-    const amounts = () =>
-      table.locator('tbody tr:not(.dt-spacer) td[data-label="Amount"]').allTextContents();
-    const before = await amounts();
-    expect(before).toHaveLength(4);
-    // Newest first by default: the 100 ISK gift leads. Sorting by Amount moves it.
-    await table.getByRole('button', { name: /Amount/ }).click();
-    await expect.poll(async () => (await amounts())[0]).not.toBe(before[0]);
+    // Cards always show the date; Balance rides on line two.
+    const picker = page.getByRole('combobox', { name: 'Sort by' });
+    await expect(picker).toBeVisible();
+    await picker.selectOption('amount:desc');
+    // Amount sort is a flat list: no day headers.
+    await expect(table.locator('.dt-group-header')).toHaveCount(0);
     await expectNoPageOverflow(page);
   });
 
@@ -155,15 +148,12 @@ test.describe('Journal phone table', () => {
     await page.goto('./wallet/journal');
 
     const table = page.getByRole('table', { name: 'Journal' });
-    await expect(table.locator('tbody tr:not(.dt-spacer)').first()).toBeVisible();
+    const rows = table.locator('tbody tr[data-row-key]');
+    await expect(rows.first()).toBeVisible();
     const rights = await table
-      .locator('thead th, tbody tr:not(.dt-spacer) td[data-label="Amount"]')
-      .evaluateAll((cells) =>
-        cells
-          .filter((c) => /Amount/.test(c.getAttribute('data-label') ?? c.textContent ?? ''))
-          .map((c) => c.getBoundingClientRect().right)
-      );
-    expect(rights.length).toBeGreaterThanOrEqual(5);
+      .locator('tbody tr[data-row-key] td[data-label="Amount"]')
+      .evaluateAll((cells) => cells.map((c) => c.getBoundingClientRect().right));
+    expect(rights.length).toBeGreaterThanOrEqual(1);
     for (const right of rights) expect(right).toBeLessThanOrEqual(PHONE.width);
     await expectNoPageOverflow(page);
   });

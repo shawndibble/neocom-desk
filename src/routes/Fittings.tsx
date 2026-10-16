@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
+import { AbyssalRunPlanner } from '@/features/fittings/AbyssalRunPlanner';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { SkillsUnknownNote } from '@/features/fittings/FittingPreviewPanels';
 import { StatFields } from '@/features/fittings/StatFacts';
@@ -78,6 +79,7 @@ import {
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
+import { FittingMutationPanel } from '@/features/fittings/FittingMutationPanel';
 import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPanel';
 import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
 import { StatsHeadingLabel } from '@/features/fittings/StatsHeadingLabel';
@@ -133,6 +135,13 @@ export function Fittings() {
 
 function FittingsPage() {
   const { t } = useTranslation();
+  // Opening Fittings online is intent to use it offline later: fetch the
+  // engine now instead of waiting for the idle warm (gated inside).
+  useEffect(() => {
+    void import('@/sde/warmLazySde')
+      .then(({ warmFittingAssets }) => warmFittingAssets())
+      .catch(() => {});
+  }, []);
   const navigate = useNavigate();
   const location = useLocation();
   const workspace = useFittingWorkspace();
@@ -179,6 +188,7 @@ function FittingsPage() {
   // The module dialog's variations start folded: a tap on a module is
   // mostly for its state and ammo.
   const [variationsOpen, setVariationsOpen] = useState(false);
+  const [mutationOpen, setMutationOpen] = useState(false);
   const [affectedOpen, setAffectedOpen] = useState(false);
   // The filled slot whose module panel is open.
   const [moduleSlot, setModuleSlot] = useState<{ slot: FittingSlotKind; slotIndex: number } | null>(
@@ -193,6 +203,11 @@ function FittingsPage() {
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
     [activeCharacterId]
   )?.name;
+  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const yourCharacters = useMemo(
+    () => allCharacters.map(({ characterId, name }) => ({ characterId, name })),
+    [allCharacters]
+  );
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const alpha = useFittingAlpha(workspace.fitting);
   const hardpoints = useFittingHardpoints(workspace.fitting);
@@ -296,6 +311,13 @@ function FittingsPage() {
     setRackSheet(null);
     setModuleSlot({ slot, slotIndex });
     setVariationsOpen(true);
+    setMutationOpen(false);
+  }, []);
+  const openMutation = useCallback((slot: FittingSlotKind, slotIndex: number) => {
+    setRackSheet(null);
+    setModuleSlot({ slot, slotIndex });
+    setVariationsOpen(false);
+    setMutationOpen(true);
   }, []);
   const { itemActions, fitAt, droneBay, noteRecent, defaultCharges } = useEditorItemActions({
     fitting,
@@ -311,6 +333,7 @@ function FittingsPage() {
     selectTarget,
     openCargoQuantity: setCargoQuantityFor,
     openVariations,
+    openMutation,
   });
 
   function openLibrary(action: LibraryAction) {
@@ -386,6 +409,7 @@ function FittingsPage() {
   function openModuleDialog(slot: FittingSlotKind, slotIndex: number, withVariations: boolean) {
     setModuleSlot({ slot, slotIndex });
     setVariationsOpen(withVariations);
+    setMutationOpen(false);
   }
 
   /** From a phone sheet (a rack's or the drones'): one sheet at a time, so the Add sheet takes over. */
@@ -601,6 +625,7 @@ function FittingsPage() {
           catalogue={catalogue}
         />
       }
+      yourCharacters={yourCharacters.length > 1 ? yourCharacters : undefined}
       implants={
         <>
           <ImplantSetControl
@@ -625,6 +650,11 @@ function FittingsPage() {
             <TacticalModePicker fitting={fitting} onChange={edit} />
             <AbyssalWeatherPicker field />
           </StatFields>
+          <AbyssalRunPlanner
+            hullGroupId={catalogue?.types[String(fitting.shipTypeId)]?.groupID}
+            compare={workspace.compareWeather}
+            typeName={typeName}
+          />
           {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
             <MissingSkillsChip
               entries={gaps.missing}
@@ -1001,6 +1031,23 @@ function FittingsPage() {
                     <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
                   </div>
                 </Disclosure>
+                {itemActions?.canMutate(openModule.typeId) && (
+                  <Disclosure
+                    label={t('fittings.mutation.title')}
+                    expanded={mutationOpen}
+                    onToggle={() => setMutationOpen((open) => !open)}
+                    className="rounded-xs border border-line"
+                  >
+                    <div className="p-2">
+                      <FittingMutationPanel
+                        module={openModule}
+                        catalogue={catalogue}
+                        edit={edit}
+                        characterId={activeCharacterId}
+                      />
+                    </div>
+                  </Disclosure>
+                )}
                 <Disclosure
                   label={t('fittings.affectedBy.title')}
                   expanded={affectedOpen}

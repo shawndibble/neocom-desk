@@ -5,17 +5,19 @@
  * and one column-visibility store, so hiding a column on one hides it on the
  * other.
  */
-import { useEffect, useMemo, type ReactNode } from 'react';
-import { Trans, useTranslation } from 'react-i18next';
+import { formatIsoDay } from '@/lib/formatDateTick';
+import { useMemo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Button,
-  CollapsiblePanel,
   ColumnPickerMenu,
   DataTable,
   DateRangeFields,
   EmptyState,
   FilterBar,
   FilterField,
+  IconButton,
   LiveStatus,
   SearchInput,
   Select,
@@ -24,28 +26,36 @@ import {
   SelectTrigger,
   SelectValue,
   type DataTableColumn,
+  type DataTableGroupBy,
   type DataTableSort,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
-import type { WalletJournalEntry } from '@/esi/endpoints';
-import { humanizeRefType, iskToneClass } from '@/features/character/format';
-import {
-  defaultBreakdownOpen,
-  useJournalBreakdownPref,
-} from '@/features/character/journalBreakdownPref';
+import type { JournalCoverage, JournalRow } from '@/engine/journalNetting';
+import { ActiveFilterRow } from '@/features/character/ActiveFilterRow';
+import { IskFlowChart } from '@/features/character/IskFlowChart';
+import { IskBreakdownPanel } from '@/features/character/IskBreakdownPanel';
+import { journalRefLabel } from '@/features/character/journalRefLabel';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
-  journalNetTotal,
+  journalNet,
   journalRefTypeBreakdown,
   toggleBreakdownRefType,
-  type RefTypeBreakdownRow,
   type WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
+import { netToneClass } from '@/features/character/format';
+import {
+  journalDayKey,
+  journalDayLabel,
+  newestJournalDays,
+} from '@/features/character/walletJournalDays';
 import { signedIsk } from '@/features/market/signedIsk';
 import { useColumnVisibility } from '@/lib/columnVisibility';
-import { clampIskZero, formatIsk } from '@/lib/isk';
-import { useIsNarrow } from '@/lib/useIsNarrow';
+import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatTimeOfDay, formatTimestamp } from '@/lib/timestamp';
 import {
   useVisibleWalletJournalColumns,
   WALLET_JOURNAL_COLUMN_IDS,
@@ -67,12 +77,6 @@ interface JournalFilterBarProps {
  * here, and the empty string reads to it as "nothing selected".
  */
 const ALL_REF_TYPES = '__all';
-
-/** Whole-ISK ledger figure, with an explicit `+` on gains (the wallet reconciles against the game client). */
-function formatIskSigned(value: number): string {
-  const text = formatIsk(value);
-  return value > 0 && !text.startsWith('-') ? `+${text}` : text;
-}
 
 /** The ref-type / date-range / text filter row above a journal table (issue #413). */
 function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: JournalFilterBarProps) {
@@ -110,7 +114,7 @@ function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: Journal
                 <SelectItem value={ALL_REF_TYPES}>{t('wallet.refTypeFilterAll')}</SelectItem>
                 {refTypeOptions.map((refType) => (
                   <SelectItem key={refType} value={refType}>
-                    {humanizeRefType(refType)}
+                    {journalRefLabel(refType, t)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -130,29 +134,84 @@ function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: Journal
   );
 }
 
+/**
+ * Width (rem) of the journal's own container below which its columns no longer
+ * fit and the rows become cards (ADR 0017). Measured in Chrome with every
+ * default column shown.
+ */
+const JOURNAL_TABLE_CARDS_REM = 43;
+
 interface JournalTableProps {
   filter: WalletJournalFilter;
   onFilterChange: (filter: WalletJournalFilter) => void;
   refTypeOptions: string[];
-  filteredJournal: readonly WalletJournalEntry[];
-  /** The journal under the date range and text filters only, for the ref-type breakdown. */
-  breakdownJournal: readonly WalletJournalEntry[];
-  journalColumns: DataTableColumn<WalletJournalEntry>[];
+  filteredJournal: readonly JournalRow[];
+  /** The journal under the date range and text filters only, for the panel's ref-type list. */
+  breakdownJournal: readonly JournalRow[];
+  /** The journal under the ref-type and text filters only: the chart sets its own date axis. */
+  chartJournal: readonly JournalRow[];
+  journalColumns: DataTableColumn<JournalRow>[];
   label: string;
   /**
    * The journal line a wallet alert pointed at. Passed by `/wallet` only —
    * `walletBalanceChanged` is a character event, and the corp journal has its
-   * own rows with their own ids.
+   * own rows with their own ids. `${characterId}:${id}` when `keyByCharacter`.
    */
-  highlightRowKey?: number | null;
+  highlightRowKey?: string | number | null;
+  /** Rows come from more than one Character, whose entry ids can repeat: key them per Character. */
+  keyByCharacter?: boolean;
   sort: DataTableSort;
   onSortChange: (sort: DataTableSort) => void;
   /** The export the panel's title-bar export button drives, so row menus export the same rows. */
-  tableExport: UseTableExport<WalletJournalEntry>;
+  tableExport: UseTableExport<JournalRow>;
+  /**
+   * "Where the ISK went": the side panel. Both journals have one; only
+   * `/wallet` passes `coverage`, which turns on own-Character netting.
+   */
+  panel: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    /** The scope in words: "All characters", or the corp division. */
+    scopeLabel: string;
+    coverage?: JournalCoverage;
+  };
 }
 
 /** Module-level so the table's windowing and row memo see one stable function. */
-const journalRowKey = (entry: WalletJournalEntry) => entry.id;
+const journalRowKey = (entry: JournalRow) => entry.id;
+const characterRowKey = (entry: JournalRow) => `${entry.characterId}:${entry.id}`;
+
+/** The panel's date range in words: with none set, the span the journal really holds. */
+function rangeLabel(
+  filter: WalletJournalFilter,
+  rows: readonly JournalRow[],
+  t: TFunction
+): string {
+  const from = filter.startDate && formatIsoDay(filter.startDate);
+  const to = filter.endDate && formatIsoDay(filter.endDate);
+  if (from && to) return from === to ? from : t('wallet.journalRangeBetween', { from, to });
+  if (from) return t('wallet.journalRangeFrom', { from });
+  if (to) return t('wallet.journalRangeTo', { to });
+  const first = rows.reduce<string | null>(
+    (min, entry) => (min === null || entry.date < min ? entry.date : min),
+    null
+  );
+  return first === null
+    ? t('wallet.journalRangeAll')
+    : t('wallet.journalRangeSince', { since: formatIsoDay(first.slice(0, 10)) });
+}
+
+/**
+ * The columns the phone sort picker offers: Date, Amount and Type. The owner
+ * ruled out Description and Character sorts, and Balance is off by default.
+ */
+const CARD_SORT_COLUMNS = new Set(['date', 'amount', 'refType']);
+
+/** Days a phone journal starts unfolded, newest first. */
+const OPEN_DAYS = 3;
+
+/** Columns that are not in the picker's catalog and so are never hidden by it. */
+const ALWAYS_SHOWN_COLUMNS = new Set(['refType', 'character']);
 
 /** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
 export function JournalTable({
@@ -161,78 +220,28 @@ export function JournalTable({
   refTypeOptions,
   filteredJournal,
   breakdownJournal,
+  chartJournal,
   journalColumns,
   label,
   highlightRowKey = null,
+  keyByCharacter = false,
   sort,
   onSortChange,
   tableExport,
+  panel,
 }: JournalTableProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isPhone = useIsPhone();
+  const [tableRef, [tableNarrow = false]] = useElementNarrowerThan<HTMLDivElement>([
+    JOURNAL_TABLE_CARDS_REM,
+  ]);
+  // The phone list, and the table beside the open panel when its columns no longer fit.
+  const cards = isPhone || tableNarrow;
+  const timeZone = useTimeZone();
+  // Internal lines (own-Character transfers) are in neither, so the panel and the
+  // Journal's In / Out / Net line can never disagree.
+  const totals = useMemo(() => journalRefTypeBreakdown(filteredJournal), [filteredJournal]);
   const breakdown = useMemo(() => journalRefTypeBreakdown(breakdownJournal), [breakdownJournal]);
-  // Open on desktop when the list is short, folded on a phone or a long list
-  // where the headline alone answers the question — until the pilot toggles it, then their choice sticks.
-  const isNarrow = useIsNarrow();
-  const storedBreakdownOpen = useJournalBreakdownPref((state) => state.value);
-  const breakdownPrefHydrated = useJournalBreakdownPref((state) => state.hydrated);
-  const hydrateBreakdownOpen = useJournalBreakdownPref((state) => state.hydrate);
-  const setStoredBreakdownOpen = useJournalBreakdownPref((state) => state.setValue);
-  useEffect(() => {
-    void hydrateBreakdownOpen();
-  }, [hydrateBreakdownOpen]);
-  const breakdownOpen =
-    storedBreakdownOpen ?? defaultBreakdownOpen(isNarrow, breakdown.rows.length);
-  const breakdownColumns = useMemo<DataTableColumn<RefTypeBreakdownRow>[]>(
-    () => [
-      {
-        id: 'refType',
-        header: t('wallet.journalBreakdownRefType'),
-        render: (row) => humanizeRefType(row.refType),
-        sortValue: (row) => row.refType,
-      },
-      {
-        id: 'net',
-        header: t('wallet.journalBreakdownNet'),
-        align: 'right',
-        className: 'tabular-nums',
-        cellClassName: (row) => (clampIskZero(row.net, 0) === 0 ? '' : iskToneClass(row.net)),
-        render: (row) => (
-          <>
-            {formatIskSigned(row.net)}
-            {row.income > 0 && row.expense > 0 && (
-              <span className="block text-xs font-normal text-text-dim">
-                {t('wallet.journalBreakdownBothSides', {
-                  in: formatIsk(row.income),
-                  out: formatIsk(row.expense),
-                })}
-              </span>
-            )}
-          </>
-        ),
-        sortValue: (row) => row.net,
-      },
-    ],
-    [t]
-  );
-  const breakdownHeadline = (
-    <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
-      <span>
-        {t('wallet.journalBreakdownIn')}{' '}
-        <span className="text-isk-pos">{formatIsk(breakdown.totalIn)}</span>
-      </span>
-      <span>
-        {t('wallet.journalBreakdownOut')}{' '}
-        <span className="text-isk-neg">{formatIsk(breakdown.totalOut)}</span>
-      </span>
-      <span>
-        {t('wallet.journalBreakdownNet')}{' '}
-        <span className={clampIskZero(breakdown.net, 0) === 0 ? '' : iskToneClass(breakdown.net)}>
-          {formatIskSigned(breakdown.net)}
-        </span>
-      </span>
-    </span>
-  );
-  const filteredNet = useMemo(() => journalNetTotal(filteredJournal), [filteredJournal]);
   // One store for both journals, so hiding a column on one hides it on the other.
   const { visible, isVisible, toggle, reset } = useColumnVisibility(
     useVisibleWalletJournalColumns,
@@ -243,7 +252,7 @@ export function JournalTable({
     () =>
       Object.fromEntries(journalColumns.map((column) => [column.id, column])) as Record<
         WalletJournalColumnId,
-        DataTableColumn<WalletJournalEntry>
+        DataTableColumn<JournalRow>
       >,
     [journalColumns]
   );
@@ -253,9 +262,101 @@ export function JournalTable({
   const shownColumns = useMemo(
     () =>
       journalColumns.filter(
-        (column) => column.id === 'refType' || isVisible(column.id as WalletJournalColumnId)
+        (column) =>
+          ALWAYS_SHOWN_COLUMNS.has(column.id) ||
+          // Cards print the time on the Date column and sort by it, so it can't be hidden.
+          (cards && column.id === 'date') ||
+          isVisible(column.id as WalletJournalColumnId)
       ),
-    [journalColumns, isVisible]
+    [journalColumns, isVisible, cards]
+  );
+  // A URL sort on a column the cards don't offer would leave the picker blank.
+  const cardsSort = useMemo<DataTableSort>(
+    () =>
+      cards && !CARD_SORT_COLUMNS.has(sort.columnId)
+        ? { columnId: 'date', direction: 'desc' }
+        : sort,
+    [cards, sort]
+  );
+  // Phone only; the beside-the-panel cards stay flat. Day headers only under the
+  // Date sort: under Amount or Type a day's rows would be scattered.
+  const grouped = isPhone && cardsSort.columnId === 'date';
+  const cardColumns = useMemo(
+    () =>
+      shownColumns.map((column): DataTableColumn<JournalRow> => {
+        const sortable = CARD_SORT_COLUMNS.has(column.id) ? {} : { sortValue: undefined };
+        switch (column.id) {
+          case 'date':
+            return {
+              ...column,
+              // Under a day header only the time, in UTC like the day (see timeFormat.ts);
+              // a flat list needs the date and follows the time-format preference.
+              render: (entry) =>
+                grouped
+                  ? formatTimeOfDay(new Date(entry.date), 'UTC')
+                  : formatTimestamp(new Date(entry.date), timeZone),
+            };
+          case 'description':
+            return {
+              ...column,
+              ...sortable,
+              primary: true,
+              className: 'whitespace-normal [overflow-wrap:anywhere]',
+            };
+          case 'amount':
+            return {
+              ...column,
+              cardCorner: true,
+              render: (entry) =>
+                entry.amount !== undefined ? signedIsk(entry.amount, 0) : t('common.unknown'),
+            };
+          case 'balance':
+            return {
+              ...column,
+              ...sortable,
+              stackAffix: { before: `${t('wallet.balanceCol')} ` },
+            };
+          default:
+            return { ...column, ...sortable };
+        }
+      }),
+    [shownColumns, grouped, timeZone, t]
+  );
+  // Folded groups mount nothing and grouping turns windowing off, so a year of
+  // archive opens only its newest days (and the day a ?highlight link points at).
+  const openDays = useMemo(() => {
+    const days = new Set(newestJournalDays(filteredJournal, OPEN_DAYS));
+    if (highlightRowKey !== null) {
+      const key = keyByCharacter ? characterRowKey : journalRowKey;
+      const target = filteredJournal.find((entry) => key(entry) === highlightRowKey);
+      const day = target ? journalDayKey(target) : null;
+      if (day) days.add(day);
+    }
+    return days;
+  }, [filteredJournal, highlightRowKey, keyByCharacter]);
+  const groupBy = useMemo<DataTableGroupBy<JournalRow> | undefined>(
+    () =>
+      grouped
+        ? {
+            key: journalDayKey,
+            minSize: 1,
+            defaultExpanded: (rows) => openDays.has(journalDayKey(rows[0] as JournalRow) ?? ''),
+            renderHeader: (rows) => {
+              const net = journalNet(rows);
+              // DataTable never renders a header for a null key.
+              const day = journalDayKey(rows[0] as JournalRow) as string;
+              return (
+                <span className="flex w-full items-baseline justify-between gap-4 tabular-nums">
+                  <span>
+                    {t('wallet.journalDayHeader', { day: journalDayLabel(day, i18n.language) })}
+                  </span>
+                  <span className={netToneClass(net)}>{signedIsk(net, 0)}</span>
+                </span>
+              );
+            },
+          }
+        : undefined,
+    [grouped, openDays, t, i18n.language]
   );
   // A filter with no criteria active still runs (it's the identity filter), so
   // "is a filter active" is asked separately here rather than read off the result.
@@ -267,70 +368,57 @@ export function JournalTable({
         onChange={onFilterChange}
         refTypeOptions={refTypeOptions}
         actions={
-          <ColumnPickerMenu
-            available={WALLET_JOURNAL_COLUMN_IDS}
-            visible={visible}
-            columnsById={columnsById}
-            showLabel
-            onToggle={toggle}
-            onReset={reset}
-            buttonLabel={t('common.columnsButton')}
-            menuTitle={t('common.columnsMenuTitle')}
-            resetLabel={t('common.resetColumns')}
-          />
+          <>
+            <IconButton
+              icon={<Icon.Orders />}
+              label={t('wallet.journalBreakdownTitle')}
+              visibleLabel={t('wallet.journalBreakdownTitle')}
+              pressed={panel.open}
+              onClick={() => panel.onOpenChange(!panel.open)}
+            />
+            <ColumnPickerMenu
+              available={WALLET_JOURNAL_COLUMN_IDS}
+              visible={visible}
+              columnsById={columnsById}
+              showLabel
+              onToggle={toggle}
+              onReset={reset}
+              buttonLabel={t('common.columnsButton')}
+              menuTitle={t('common.columnsMenuTitle')}
+              resetLabel={t('common.resetColumns')}
+            />
+          </>
         }
       />
-      {/* Held back until the stored choice has loaded, so a pilot who folded it never sees it flash open. */}
-      {breakdown.rows.length > 0 && breakdownPrefHydrated && (
-        <CollapsiblePanel
-          title={t('wallet.journalBreakdownTitle')}
-          expanded={breakdownOpen}
-          onToggle={() => void setStoredBreakdownOpen(!breakdownOpen)}
-          labels={{
-            show: t('wallet.journalBreakdownShow'),
-            hide: t('wallet.journalBreakdownHide'),
-          }}
-          padded={false}
-          collapsedSummary={<div className="px-3 py-2">{breakdownHeadline}</div>}
-        >
-          <div className="px-3 py-2">{breakdownHeadline}</div>
-          <DataTable
-            label={t('wallet.journalBreakdownTitle')}
-            columns={breakdownColumns}
-            rows={breakdown.rows}
-            rowKey={(row) => row.refType}
-            selectedRowKey={filter.refType}
-            onRowClick={(row) => onFilterChange(toggleBreakdownRefType(filter, row.refType))}
-            responsive="table"
-          />
-        </CollapsiblePanel>
-      )}
-      {filterIsActive && filteredJournal.length > 0 && (
-        <p className="border-b border-line px-3 py-2 text-xs text-text-dim">
-          <Trans
-            i18nKey="wallet.journalFilteredSummary"
-            count={filteredJournal.length}
-            values={{ net: signedIsk(filteredNet, 0) }}
-            components={{
-              net: (
-                <span
-                  className={`tabular-nums ${
-                    clampIskZero(filteredNet, 0) === 0 ? '' : iskToneClass(filteredNet)
-                  }`}
-                />
-              ),
-            }}
-          />
-        </p>
-      )}
+      <div className="border-b border-line px-3 py-2">
+        <ActiveFilterRow
+          filter={filter}
+          onChange={onFilterChange}
+          totals={totals}
+          entryCount={filteredJournal.length}
+          showInternal={panel.coverage !== undefined}
+        />
+      </div>
       <LiveStatus>
         {filterIsActive &&
           filteredJournal.length > 0 &&
           t('wallet.journalFilteredSummaryStatus', {
             count: filteredJournal.length,
-            net: signedIsk(filteredNet, 2),
+            net: signedIsk(totals.net, 2),
           })}
       </LiveStatus>
+      <IskBreakdownPanel
+        open={panel.open}
+        onClose={() => panel.onOpenChange(false)}
+        scopeLabel={panel.scopeLabel}
+        rangeLabel={rangeLabel(filter, filteredJournal, t)}
+        totals={totals}
+        breakdown={breakdown}
+        selectedRefType={filter.refType}
+        onSelectRefType={(refType) => onFilterChange(toggleBreakdownRefType(filter, refType))}
+        coverage={panel.coverage}
+        chart={<IskFlowChart rows={chartJournal} filter={filter} onFilterChange={onFilterChange} />}
+      />
       {filteredJournal.length === 0 ? (
         <EmptyState
           title={t('wallet.journalNoFilterMatches')}
@@ -345,19 +433,23 @@ export function JournalTable({
           }
         />
       ) : (
-        <div className="overflow-x-auto">
+        <div ref={tableRef} className="overflow-x-auto">
           <DataTable
             {...tableExport.tableProps}
             label={label}
-            columns={shownColumns}
+            columns={cards ? cardColumns : shownColumns}
             rows={filteredJournal}
-            rowKey={journalRowKey}
+            rowKey={keyByCharacter ? characterRowKey : journalRowKey}
             highlightRowKey={highlightRowKey}
-            sort={sort}
+            sort={cardsSort}
             onSortChange={onSortChange}
-            // A ledger read across columns: a plain table on a phone, scrolling
-            // sideways (DESIGN.md §6c Restraint).
-            responsive="table"
+            // A wide table on a desktop. On a phone, and beside the open panel where
+            // the table is narrower than its columns, two-line cards grouped by day.
+            responsive={cards ? 'stack' : 'table'}
+            stacked={cards}
+            stackLayout="dense"
+            mobileSort={isPhone}
+            groupBy={groupBy}
             // Every page of the journal, uncapped: thousands of rows for an
             // active trader.
             virtualize="auto"

@@ -112,6 +112,27 @@ async function seedCharacter(characterId: number): Promise<void> {
     rows: [{ date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: 1230 }],
     fetchedAt: 1,
   });
+  await db.walletJournalArchive.put({
+    characterId,
+    id: 5,
+    date: '2026-10-01T00:00:00Z',
+    ref_type: 'bounty_prizes',
+    description: 'x',
+  });
+  await db.walletTransactionArchive.put({
+    characterId,
+    transaction_id: 9,
+    date: '2026-10-01T00:00:00Z',
+    location_id: 1,
+    type_id: 34,
+    unit_price: 1,
+    quantity: 1,
+    client_id: 2,
+    is_buy: true,
+    journal_ref_id: 9,
+    is_personal: true,
+  });
+  await db.walletArchiveCoverage.put({ characterId, kind: 'journal', windows: [[1, 2]] });
   await db.netWorthSnapshots.put({
     id: `${characterId}:2026-10-07`,
     characterId,
@@ -201,6 +222,9 @@ describe('removeCharacter', () => {
     expect(await db.mailDrafts.where('characterId').equals(1).count()).toBe(0);
     expect(await db.miningLedgerHistory.get(1)).toBeUndefined();
     expect(await db.industryJobHistory.get(1)).toBeUndefined();
+    expect(await db.walletJournalArchive.where('characterId').equals(1).count()).toBe(0);
+    expect(await db.walletTransactionArchive.where('characterId').equals(1).count()).toBe(0);
+    expect(await db.walletArchiveCoverage.where('characterId').equals(1).count()).toBe(0);
     expect(await db.netWorthSnapshots.where('characterId').equals(1).count()).toBe(0);
   });
 

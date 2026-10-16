@@ -12,6 +12,9 @@ const FIT_CATEGORY_IDS = new Set([6, 7, 8, 18, 20, 22, 32, 87]);
 // carries them in cargo; every filament group is named "... Filaments".
 const COMMODITY_CATEGORY_ID = 17;
 const FILAMENT_GROUP_NAME = /Filaments$/;
+// Mutaplasmids are Commodities too; a Pyfa EFT export names one in each
+// mutated module's block, so the loader must resolve them.
+const MUTAPLASMID_GROUP_ID = 1964;
 
 /**
  * Published typeIDs a Fitting can hold.
@@ -27,7 +30,8 @@ export function fitTypeIds(types, groups) {
     const g = groups.get(t.groupID);
     if (!g) continue;
     const isFilament = g.categoryID === COMMODITY_CATEGORY_ID && FILAMENT_GROUP_NAME.test(g.name);
-    if (FIT_CATEGORY_IDS.has(g.categoryID) || isFilament) ids.add(typeID);
+    if (FIT_CATEGORY_IDS.has(g.categoryID) || isFilament || t.groupID === MUTAPLASMID_GROUP_ID)
+      ids.add(typeID);
   }
   return ids;
 }

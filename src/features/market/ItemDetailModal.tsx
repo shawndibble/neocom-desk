@@ -3,7 +3,7 @@
  * description for one item — the things a shopper checks before deciding
  * whether a price is worth paying. The item's own description, volume and
  * attribute values come from the baked typeInfo shards, falling back to
- * cached ESI (`itemDetailType.ts`); only order-book prices need the network.
+ * cached ESI (`skills/typeDetail.ts`); only order-book prices need the network.
  * The market snapshot carries the small attribute dictionary that turns
  * attribute ids into names/units/categories.
  * Rows whose value is an id rather than a measurement — a required skill, a
@@ -62,7 +62,7 @@ import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan'
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
-import { loadItemDetailType, type ItemDetailType } from './itemDetailType';
+import { loadTypeDetail, type TypeDetail } from '@/features/skills/typeDetail';
 import {
   loadOrderBookView,
   useSavedOrderBookLocation,
@@ -100,7 +100,7 @@ export interface ItemDetailModalProps {
 }
 
 interface DetailData {
-  type: ItemDetailType;
+  type: TypeDetail;
   /** Skill-requirement rows already excluded — the Required Skills section below owns those instead. */
   groups: AttributeGroup[];
   requiredSkills: RequiredSkill[];
@@ -202,7 +202,7 @@ export function ItemDetailModal({
         });
       try {
         const [type, dictionary, skillAttributeModifiers, skills] = await Promise.all([
-          loadItemDetailType(typeId),
+          loadTypeDetail(typeId),
           loadAttributeDictionary(),
           // Caught here, not by the shared handler below: the
           // attribute-modifier popover is a bonus, not core item detail, so

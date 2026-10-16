@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TabPanel, Tabs } from './Tabs';
 
 const tabs = [
@@ -42,28 +42,69 @@ describe('Tabs', () => {
   /**
    * The bar scrolls sideways once it outgrows its frame, so a tab selected
    * from outside this component — a deep link opening a specific tab — can
-   * start off-screen. jsdom does no layout, so what is asserted is that the
-   * newly selected tab is the one asked to scroll, and that it is asked with
-   * `block: 'nearest'`: the default would scroll the page vertically to put
-   * the tab bar at the top, which changing a tab never asked for.
+   * start off-screen. Bringing it back must only slide the bar: a bar below
+   * the fold (the landing page's feature tabs) once dragged the whole page
+   * down to it on load. jsdom does no layout, so the rects are stubbed.
    */
-  it('scrolls the selected tab into view when the selection changes', () => {
-    const scrollIntoView = vi
-      .spyOn(Element.prototype, 'scrollIntoView')
-      .mockImplementation(() => undefined);
+  describe('keeping the selected tab in view', () => {
+    afterEach(() => vi.restoreAllMocks());
 
-    const { rerender } = render(
-      <Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={() => undefined} />
-    );
-    expect(scrollIntoView.mock.instances.at(-1)).toBe(screen.getByRole('tab', { name: 'Open' }));
-    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'nearest' });
+    function stubRect(element: Element, left: number, right: number) {
+      vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+        left,
+        right,
+        top: 0,
+        bottom: 0,
+        width: right - left,
+        height: 0,
+        x: left,
+        y: 0,
+        toJSON: () => ({}),
+      });
+    }
 
-    rerender(
-      <Tabs tabsId="t" label="Orders" tabs={tabs} value="history" onChange={() => undefined} />
-    );
-    expect(scrollIntoView.mock.instances.at(-1)).toBe(screen.getByRole('tab', { name: 'History' }));
+    /** Lays the bar out at 0–100px with 24px edge padding, then selects `to` at the given rect. */
+    function selectOffscreen(to: string, left: number, right: number, scrollLeft = 0) {
+      const { rerender } = render(
+        <Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={() => undefined} />
+      );
+      const scroller = screen.getByRole('tablist').parentElement!;
+      // The edge fade's clearance (`.tab-scroller` in index.css); jsdom
+      // computes only the longhands.
+      scroller.style.scrollPaddingLeft = '24px';
+      scroller.style.scrollPaddingRight = '24px';
+      scroller.scrollLeft = scrollLeft;
+      stubRect(scroller, 0, 100);
+      stubRect(screen.getByRole('tab', { name: to }), left, right);
+      rerender(
+        <Tabs
+          tabsId="t"
+          label="Orders"
+          tabs={tabs}
+          value={to.toLowerCase()}
+          onChange={() => undefined}
+        />
+      );
+      return scroller;
+    }
 
-    scrollIntoView.mockRestore();
+    it('slides the bar, not the page, to a tab past its right edge', () => {
+      const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+      const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+
+      const scroller = selectOffscreen('History', 120, 180);
+
+      // 180 − (100 − 24): the tab's right edge stops clear of the fade.
+      expect(scroller.scrollLeft).toBe(104);
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    it('slides the bar back to a tab past its left edge', () => {
+      const scroller = selectOffscreen('History', -50, 10, 200);
+      // 200 − (24 − (−50)).
+      expect(scroller.scrollLeft).toBe(126);
+    });
   });
 
   it('moves selection with arrow keys, wrapping', async () => {

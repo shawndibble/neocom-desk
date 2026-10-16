@@ -1,12 +1,12 @@
 /** Fetch + cache layer for the Clones view. */
 import { getCharacterClones, type CharacterClones } from '@/esi/endpoints';
-import { loadUniverseType } from '@/features/skills/data';
+import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, extractImplantSlot } from '@/features/skills/dogma';
 import type { Attributes } from '@/engine/types';
 import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
-const KEY = 'clones';
+export const KEY = 'clones';
 
 /**
  * Jump clones, home location and last-jump timestamp. ESI or cache, with the
@@ -32,17 +32,17 @@ export interface ImplantDetail {
 
 /**
  * Keyed by typeID. A failed lookup leaves the id absent, so the caller renders
- * the bare name. `loadUniverseType` already retries once; a still-failing id
- * never rejects the whole snapshot.
+ * the bare name. Baked shard first; the ESI fallback retries once, and a
+ * still-failing id never rejects the whole snapshot.
  */
 export async function loadImplantDetails(
   typeIds: readonly number[]
 ): Promise<Map<number, ImplantDetail>> {
   const unique = [...new Set(typeIds)];
-  const types = await Promise.all(unique.map((id) => loadUniverseType(id).catch(() => null)));
+  const types = await Promise.all(unique.map((id) => loadTypeDetail(id, { retry: true })));
   const map = new Map<number, ImplantDetail>();
   unique.forEach((id, i) => {
-    const data = types[i]?.data;
+    const data = types[i];
     if (!data) return;
     const description = typeDescription(data.description);
     const slot = extractImplantSlot(data.dogma_attributes);

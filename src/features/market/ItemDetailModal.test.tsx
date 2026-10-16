@@ -907,6 +907,7 @@ describe('ItemDetailModal type info source (issue #3882)', () => {
     const esi = countEsiTypeCalls(TYPE_ID, () => HttpResponse.error());
     mockedLoadTypeInfo.mockResolvedValue({
       description: 'Baked frigate.',
+      effects: [],
       attributes: [[9, 1200]],
       volume: 27289,
     });

@@ -41,7 +41,9 @@
     <!-- Same cure as src/app/staleBuildRecovery.ts, for a build so stale that
          its own entry's static imports 404 — main.tsx never runs then, so no
          module code can react. Resource load errors do not bubble; capture
-         sees them. Keys and the 60s window match that module. -->
+         sees them. Keys, the 60s window, the offline guard and the
+         workbox-precache-only cache purge match that module (pinned by
+         staleBuildBootScript.test.ts). -->
     <script id="stale-build-boot">
       window.addEventListener(
         'error',
@@ -50,6 +52,7 @@
           if (!t || t === window) return;
           var u = t.src || t.href || '';
           if (!/\/assets\/[^/]+\.js(\?|$)/.test(u)) return;
+          if (navigator.onLine === false) return;
           try {
             var k = 'neocom:stale-build-purge-at';
             var n = Date.now();
@@ -75,9 +78,13 @@
             window.caches
               ? caches.keys().then(function (ks) {
                   return Promise.all(
-                    ks.map(function (k2) {
-                      return caches.delete(k2);
-                    })
+                    ks
+                      .filter(function (k2) {
+                        return k2.indexOf('workbox-precache') === 0;
+                      })
+                      .map(function (k2) {
+                        return caches.delete(k2);
+                      })
                   );
                 })
               : 0,

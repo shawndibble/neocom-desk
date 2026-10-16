@@ -3,12 +3,16 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
+import { loadPi } from '@/sde/loadSde';
 import { loadPlanetName, loadSchematicName, readCachedSchematicNames } from './names';
+
+vi.mock('@/sde/loadSde', () => ({ loadPi: vi.fn() }));
 
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
+  vi.mocked(loadPi).mockRejectedValue(new Error('no local data'));
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
 });
@@ -48,6 +52,17 @@ describe('loadSchematicName', () => {
       )
     );
     expect(await loadSchematicName(65)).toBe('Water');
+  });
+});
+
+describe('loadSchematicName with bundled pi.json', () => {
+  it('resolves from local data without any ESI call', async () => {
+    vi.mocked(loadPi).mockResolvedValue({
+      schematics: { '3645': { schematicId: 65, name: 'Water' } },
+    } as unknown as Awaited<ReturnType<typeof loadPi>>);
+    // No handler: onUnhandledRequest 'error' proves ESI was never reached.
+    expect(await loadSchematicName(65)).toBe('Water');
+    expect((await readCachedSchematicNames([65])).get(65)).toBe('Water');
   });
 });
 

@@ -16,6 +16,7 @@ import {
   getCorporationPublicInfo,
   getAlliancePublicInfo,
   getUniverseType,
+  getDogmaDynamicItem,
   getCharacterWalletJournal,
   getCharacterWalletTransactions,
   getCharacterAssets,
@@ -315,6 +316,30 @@ describe('public info endpoints', () => {
     expect(auth).toBeNull();
     expect(result.data?.name).toBe('Ocular Filter - Basic');
     expect(result.data?.description).toContain('ocular filter');
+  });
+
+  it('getDogmaDynamicItem is unauthenticated and reads the abyssal type and item id', async () => {
+    let auth: string | null = 'unset';
+    server.use(
+      http.get(`${ESI_BASE_URL}/dogma/dynamic/items/47832/1054645434634`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        auth = request.headers.get('authorization');
+        return HttpResponse.json({
+          created_by: 2123627600,
+          source_type_id: 16475,
+          mutator_type_id: 47831,
+          dogma_attributes: [{ attribute_id: 6, value: 419.25 }],
+          dogma_effects: [{ effect_id: 6187, is_default: false }],
+        });
+      })
+    );
+
+    const result = await getDogmaDynamicItem(47832, 1054645434634);
+
+    expect(auth).toBeNull();
+    expect(result.data?.source_type_id).toBe(16475);
+    expect(result.data?.dogma_attributes).toEqual([{ attribute_id: 6, value: 419.25 }]);
   });
 
   it('getUniverseType passes through dogma_attributes when present', async () => {

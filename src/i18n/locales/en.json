@@ -807,6 +807,49 @@
       "more_one": "and {{count}} more",
       "more_other": "and {{count}} more"
     },
+    "abyssalRun": {
+      "title": "Plan an Abyssal run",
+      "tier": "Filament tier",
+      "tierOption": "T{{tier}} {{name}}",
+      "tierName": {
+        "0": "Tranquil",
+        "1": "Calm",
+        "2": "Agitated",
+        "3": "Fierce",
+        "4": "Raging",
+        "5": "Chaotic",
+        "6": "Cataclysmic"
+      },
+      "strengthNote": "T{{tier}} rolls −{{low}}% or −{{high}}%",
+      "strengthOff": "T{{tier}} never rolls this strength; pick another above.",
+      "security": "Activate in",
+      "securityOption": "{{value}} security",
+      "securityBelow": "Low or null security",
+      "hull": {
+        "cruiser": "Cruiser: flies alone.",
+        "destroyer": "Destroyer: up to 2 ships. Only a fleet can activate it, even flying alone; the activating ship carries both filaments.",
+        "frigate": "Frigate: up to 3 ships. Only a fleet can activate it, even flying alone; the activating ship carries all three filaments.",
+        "unconfirmed": "No source names this hull type; check in game.",
+        "tech3Cruiser": "Tech 3 cruisers can't enter Abyssal Deadspace.",
+        "tooLarge": "Too big: only cruisers and smaller can enter.",
+        "unlisted": "No Abyssal rule known for this hull; check in game."
+      },
+      "activation": {
+        "clear": "T{{tier}} activates here with no suspect flag.",
+        "suspect": "T{{tier}} here flags you suspect: anyone can shoot you without CONCORD response.",
+        "blocked": "T{{tier}} can't be activated here; only T0 works in 1.0 and 0.9.",
+        "unpoliced": "No suspect flag here, but no CONCORD either: anyone can attack you at the trace."
+      },
+      "timer": "{{minutes}} minutes per run across {{pockets}} pockets (about {{perPocket}} each). Staying past it destroys ship and pod.",
+      "buy_one": "Buy {{count}} filament:",
+      "buy_other": "Buy {{count}} filaments:",
+      "pickWeather": "Pick an Abyssal weather above to see what it does to this fit and which filament to buy.",
+      "working": "Working out this fit in the weather…",
+      "failed": "Couldn't work out this fit in the weather.",
+      "deltaHeading": "This fit in {{weather}}, against normal space",
+      "range": "{{weapon}}: optimal {{before}} → {{after}} km, falloff {{fallBefore}} → {{fallAfter}} km",
+      "source": "Tiers, strengths and flag rules: EVE University wiki and downthechain.net, 2026."
+    },
     "weather": {
       "label": "Abyssal weather",
       "none": "Normal space",
@@ -892,6 +935,7 @@
         "appliedDps": "Applied DPS",
         "assumptions": "Implants & skills",
         "whatToTrain": "What to train",
+        "yourCharacters": "Your Characters",
         "defense": "Defense",
         "targeting": "Targeting",
         "navigation": "Navigation",
@@ -1117,6 +1161,27 @@
         "fuel": "{{value}} {{fuel}}"
       },
       "fightersNoOverheat": "Fighters don't overheat"
+    },
+    "yourCharacters": {
+      "headline": "{{canFly}} of {{total}} can fly",
+      "all": "All",
+      "canFly": "Can fly",
+      "cantFly": "Can't fly",
+      "search": "Search Characters",
+      "none": "No Characters match.",
+      "tableLabel": "Your Characters for this Fitting",
+      "character": "Character",
+      "missing": "Missing",
+      "toTrain": "To train",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
+      "notLoaded": "Skills not loaded",
+      "notLoadedReason": "This Character's skills couldn't be read.",
+      "unconfirmed": "Can't confirm",
+      "unconfirmedHint": "Some skill requirements couldn't be loaded, so this can't be confirmed as flyable. They're looked up again when you're back online.",
+      "hasEverySkill": "Has every skill this Fitting needs.",
+      "filter": "Filter Characters",
+      "prerequisite": "(prerequisite)"
     },
     "whatToTrain": {
       "noCharacter": "Log in a Character to see which skill to train next for this fit.",
@@ -1819,6 +1884,56 @@
       "turnInUnbuyable_other": "need {{count}}× {{name}}, nobody sells it",
       "turnInToBuy_one": "buy {{count}}× {{name}} ({{isk}} ISK, included)",
       "turnInToBuy_other": "buy {{count}}× {{name}} ({{isk}} ISK, included)"
+    },
+    "mutation": {
+      "menu": "Mutate…",
+      "title": "Mutation",
+      "loading": "Loading mutaplasmids…",
+      "mutaplasmid": "Mutaplasmid",
+      "pickMutaplasmid": "Apply a mutaplasmid",
+      "pickMadeBy": "Which mutaplasmid made it?",
+      "noMutaplasmids": "No mutaplasmid takes this module.",
+      "base": "Base module",
+      "pickBase": "Pick its base module",
+      "baseIs": "Mutated from {{name}}.",
+      "strain": {
+        "decayed": "Decayed",
+        "gravid": "Gravid",
+        "unstable": "Unstable",
+        "glorified": "Glorified",
+        "exigent": "Exigent",
+        "radical": "Radical",
+        "other": "Other"
+      },
+      "rollsLabel": "Rolls",
+      "quality": "{{pct}}% roll",
+      "baseValue": "base value",
+      "valueText": "{{value}}, {{pct}}% roll",
+      "worst": "Worst {{value}}",
+      "best": "Best {{value}}",
+      "remove": "Remove mutation",
+      "baseValuesFailed": "Couldn't read the base module's values, so its rolls can't be set here.",
+      "rollsUnknownNote": "Rolls unknown: the stats use the base module's own values. Move a slider, or load the rolls from your assets.",
+      "baseUnknownNote": "Base module unknown: this module adds nothing to the stats until you say which mutaplasmid and base module made it, or load it from your assets.",
+      "fromAssets": "Load rolls from my assets",
+      "fromAssetsFailed": "Couldn't read your assets, so it's not known whether you own one.",
+      "fromAssetsNone": "None of your assets is this module.",
+      "fromAssetsCount_one": "{{count}} in your assets. Pick one to use its rolls:",
+      "fromAssetsCount_other": "{{count}} in your assets. Pick one to use its rolls:",
+      "fromAssetsUnread_one": "{{count}} more couldn't be read.",
+      "fromAssetsUnread_other": "{{count}} more couldn't be read.",
+      "fromAssetsTruncated": "Your asset list was cut short, so some may be missing.",
+      "fromAssetsNeedsPermission": "Loading rolls from your assets needs the Assets Permission.",
+      "ownedItem": "{{base}} · {{mutaplasmid}}",
+      "ownedQuality": "avg {{pct}}%",
+      "badge": {
+        "rollsUnknown": "Rolls unknown",
+        "baseUnknown": "Base unknown",
+        "rollsUnknownTip": "Its rolls aren't known, so the stats use its base's own values.",
+        "baseUnknownTip": "What it was mutated from isn't known, so it adds nothing to the stats.",
+        "rollsUnknownFix": "Set them with Mutate… in its menu.",
+        "baseUnknownFix": "Say what made it with Mutate… in its menu."
+      }
     }
   },
   "skills": {
@@ -4108,6 +4223,31 @@
           "profit": "Profit",
           "mined": "Mined",
           "total": "Total"
+        },
+        "omega": {
+          "note": "Net income per 30 days. Lines mark what 1, 2... accounts cost.",
+          "partial": "Lighter bars are partial: your journal history starts inside them or has a gap there.",
+          "partialLatest": "Partial: your journal history has a gap in the last 30 days, so this may be short.",
+          "summaryPeriod": "to {{date}} {{net}}",
+          "truncated": "Some journal pages were missing.",
+          "skipped_one": "{{count}} Character's journal could not be read.",
+          "skipped_other": "{{count}} Characters' journals could not be read.",
+          "tick": "to {{date}}",
+          "tickPartial": "to {{date}} (partial)",
+          "line_one": "{{count}} account",
+          "line_other": "{{count}} accounts",
+          "summary_one": "Net income {{net}} ISK over the last 30 days covers {{count}} account at {{cost}} ISK each. Per 30 days, oldest first: {{periods}}.",
+          "summary_other": "Net income {{net}} ISK over the last 30 days covers {{count}} accounts at {{cost}} ISK each. Per 30 days, oldest first: {{periods}}.",
+          "summaryNoPrice": "Net income {{net}} ISK over the last 30 days. PLEX has no price, so accounts cannot be counted.",
+          "tip": {
+            "net": "Net income",
+            "covers": "Covers",
+            "accounts_one": "{{count}} account",
+            "accounts_other": "{{count}} accounts",
+            "plex": "Spent on PLEX",
+            "history": "History",
+            "partial": "Partial"
+          }
         }
       },
       "data": {
@@ -4181,6 +4321,18 @@
           "unit_one": "kill or loss",
           "unit_other": "kills and losses",
           "secondary": "Kills {{kills}} · Losses {{losses}}"
+        },
+        "omega": {
+          "covers_one": "Covers {{count}} account",
+          "covers_other": "Covers {{count}} accounts",
+          "coversNone": "Doesn't cover one account",
+          "shortBy": "short by {{amount}} ISK / 30 days",
+          "figures": "net {{net}} ISK / 30 days · one account {{cost}} ISK",
+          "next": "Next account needs +{{amount}} ISK / 30 days",
+          "noPrice": "No PLEX price",
+          "netOnly": "net {{net}} ISK / 30 days",
+          "noPriceHint": "Can't count accounts without PLEX's price. Try Refresh.",
+          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account."
         }
       },
       "training": {
@@ -4614,7 +4766,19 @@
         "nextPage": "Next page",
         "pageStatus": "{{from}}–{{to}} of {{count}}"
       },
-      "noWidgets": "There are no widgets to show on this Overview."
+      "noWidgets": "There are no widgets to show on this Overview.",
+      "omega": {
+        "title": "Omega coverage",
+        "description": "How many Omega accounts your net income could keep going",
+        "empty": "No wallet journal yet to work out your net income",
+        "period": "{{from}} – {{to}}",
+        "periodPartial": "{{title}} (partial)",
+        "col": {
+          "period": "30 days",
+          "net": "Net income",
+          "accounts": "Accounts"
+        }
+      }
     },
     "header": {
       "next": "Next",
@@ -4891,7 +5055,13 @@
       "top": "Move to top",
       "bottom": "Move to bottom",
       "phone": "Show on phone",
-      "remove": "Remove from Overview"
+      "remove": "Remove from Overview",
+      "plexPlan": "PLEX per 30 days…",
+      "plexPlanTitle": "{{title}}: your Omega plan",
+      "plexPlanLabel": "PLEX per 30 days",
+      "plexPlanHint": "Your plan, not a fact: 500 is one month, and longer plans cost less per month. Between 1 and 5000.",
+      "plexPlanSave": "Save",
+      "plexPlanCancel": "Cancel"
     }
   },
   "alerts": {
@@ -5126,6 +5296,14 @@
     "secondPartyId": "Second party ID",
     "journalItemNamesCappedHint": "Item names are only matched for the most recent transactions; older lines show no item.",
     "journalTruncatedHint": "Some pages failed to load. Refresh to try again.",
+    "history": {
+      "since": "History since {{date}} · kept on this device only.",
+      "rangeDays": "{{days}} days",
+      "range1y": "1 year",
+      "unconfirmed": "History is kept on this device only; how far back it reaches is not confirmed yet.",
+      "gapRange": "{{from}} – {{to}}",
+      "gap": "Not recorded: {{ranges, list}}. EVE only returns 30 days, so a stretch the app was not opened for can't be recovered."
+    },
     "sideFilterLabel": "Side",
     "sideFilterAll": "All sides",
     "transactionsSearchPlaceholder": "Search item…",
@@ -5191,18 +5369,51 @@
     "journalBountyOther": "Other",
     "journalBountyKills_one": "{{count}} NPC killed",
     "journalBountyKills_other": "{{count}} NPCs killed",
-    "journalFilteredSummary_one": "{{count}} entry · net <net>{{net}}</net>",
-    "journalFilteredSummary_other": "{{count}} entries · net <net>{{net}}</net>",
     "journalFilteredSummaryStatus_one": "{{count}} entry · net {{net}}",
     "journalFilteredSummaryStatus_other": "{{count}} entries · net {{net}}",
     "journalBreakdownTitle": "Where the ISK went",
+    "journalFlowHeading": "Daily flow",
+    "journalFlowHeadingType": "Daily flow · {{type}}",
+    "journalFlowHide": "Hide chart",
+    "journalFlowShow": "Show chart",
+    "journalFlowLegendIn": "In, above the line",
+    "journalFlowLegendOut": "Out, below the line",
+    "journalFlowClickHint": "Click a day to filter the Journal",
+    "journalFlowClickHint_touch": "Tap a day to read it",
+    "journalFlowHeadingTruncated": "{{heading}} · last {{count}} days of this range",
+    "journalFlowChartLabel": "Daily ISK in and out",
+    "journalFlowDay": "Day",
     "journalBreakdownIn": "In",
     "journalBreakdownOut": "Out",
     "journalBreakdownNet": "Net",
     "journalBreakdownRefType": "Ref type",
-    "journalBreakdownBothSides": "in {{in}} · out {{out}}",
-    "journalBreakdownShow": "Show breakdown",
-    "journalBreakdownHide": "Hide breakdown"
+    "journalBreakdownShare": "{{type}} share",
+    "journalPanelSubtitle": "{{scope}} · {{range}} · follows the Journal's filters",
+    "journalDayHeader": "{{day}} · EVE time",
+    "journalRangeAll": "all history",
+    "journalRangeSince": "since {{since}}",
+    "journalRangeBetween": "{{from}} – {{to}}",
+    "journalRangeFrom": "from {{from}}",
+    "journalRangeTo": "until {{to}}",
+    "journalScopeSome_one": "{{count}} Character",
+    "journalScopeSome_other": "{{count}} Characters",
+    "journalCoverage": "{{loaded}} of {{total}} Characters loaded.",
+    "journalCoverageMissing": "Not loaded: {{names}}. Transfers to or from them still count.",
+    "journalBetween_one": "Between your Characters · {{count}} entry",
+    "journalBetween_other": "Between your Characters · {{count}} entries",
+    "journalBetweenHelp": "Left out of In and Out: both sides are your Characters. ISK moved through a corporation wallet is not netted and still counts.",
+    "journalBetweenMarker": "Between your Characters",
+    "journalLeftOut_one": "{{count}} entry between your Characters left out",
+    "journalLeftOut_other": "{{count}} entries between your Characters left out",
+    "journalEntryCount_one": "{{count}} entry",
+    "journalEntryCount_other": "{{count}} entries",
+    "journalChipType": "Type: {{type}}",
+    "journalChipDay": "Day: {{date}}",
+    "journalChipFrom": "From: {{date}}",
+    "journalChipTo": "To: {{date}}",
+    "journalChipRemove": "Clear this filter",
+    "refTypePlexBought": "PLEX bought",
+    "refTypePlexSold": "PLEX sold"
   },
   "survey": {
     "title": "Mining Survey",
@@ -6196,7 +6407,8 @@
         "location": "Location",
         "security": "Sec",
         "jumps": "Jumps"
-      }
+      },
+      "openingFitting": "Opening the fitting…"
     },
     "minValue": {
       "label": "Minimum value",
@@ -9235,6 +9447,10 @@
     "installAndroidFirefoxCta": "Install Neocom Desk: open Firefox's menu (⋮), then choose Add app to Home screen."
   },
   "market": {
+    "mutamarket": {
+      "priceFrom": "Price from MutaMarket",
+      "estimateNote": "MutaMarket's model estimate for this exact roll, not a sale price."
+    },
     "title": "Market",
     "sharedAppraisalLoadFailed": "Couldn't load the shared appraisal. You may be offline.",
     "compareUndo": {
@@ -9404,6 +9620,7 @@
       "errorHint": "Hub prices did not load. Check your connection and try again.",
       "retry": "Try again",
       "emptyHiddenHint": "We looked at {{scanned}} items. Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
+      "emptyHiddenHintMaxPrice": "We looked at {{scanned}} items. Hidden by your filters: {{dear}} cost more than your max price per item, {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
       "emptyTitle": "Nothing worth hauling on this route",
       "emptyHint": "We looked at {{scanned}} items. Try another category, or loosen the filters above.",
       "volumeEach": "{{m3}} m³ each",
@@ -9428,10 +9645,13 @@
       "feesLine": "Fees: Accounting {{accounting}}, Broker Relations {{broker}}",
       "feesLineInstant": "Fees: Accounting {{accounting}}. Selling into buy orders pays sales tax only.",
       "hiddenLineInstant": "Hidden by your filters: {{low}} have a margin under your minimum.",
+      "hiddenLineInstantMaxPrice": "Hidden by your filters: {{dear}} cost more than your max price per item, {{low}} have a margin under your minimum.",
       "emptyHiddenHintInstant": "We looked at {{scanned}} items. Hidden by your filters: {{low}} have a margin under your minimum.",
+      "emptyHiddenHintInstantMaxPrice": "We looked at {{scanned}} items. Hidden by your filters: {{dear}} cost more than your max price per item, {{low}} have a margin under your minimum.",
       "cappedLine": "Only the best {{priced}} price gaps were checked for demand and the best {{books}} got order books, so more routes may exist. Narrow the category to see them.",
       "scannedLine": "{{count}} items looked at. Prices and history come from public market data.",
       "hiddenLine": "Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
+      "hiddenLineMaxPrice": "Hidden by your filters: {{dear}} cost more than your max price per item, {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
       "columns": {
         "item": "Item",
         "hub": "Hub",
@@ -9481,7 +9701,11 @@
         "anyDemand": "Show all",
         "anyTime": "Any time",
         "days_one": "{{count}} day",
-        "days_other": "{{count}} days"
+        "days_other": "{{count}} days",
+        "maxPrice": "Max price per item",
+        "maxSpend": "Max spend",
+        "maxSpendHint": "For the whole trip",
+        "noLimit": "No limit"
       },
       "plan": {
         "holdNamed": "{{name}} {{used}} of {{total}} m³",
@@ -9492,7 +9716,7 @@
         "sales": "a realistic share of a week's sales",
         "supply": "all that is worth buying",
         "space": "limited by space",
-        "budget": "limited by budget",
+        "budget": "limited by Max spend",
         "edited": "you set this",
         "none": "not selected"
       },
@@ -9519,10 +9743,7 @@
         "use": "Use",
         "working": "Working out cargo space…",
         "failed": "Couldn't work out that ship's cargo space. Try another, or enter it yourself.",
-        "budgetLabel": "Budget (optional)",
-        "budgetPlaceholder": "No limit",
-        "budgetHint": "The most ISK to spend on one load. Leave it empty for no limit.",
-        "clear": "Clear ship and budget",
+        "clear": "Clear ship",
         "holdKindLabel": "Takes",
         "anyItem": "Any item"
       },
@@ -9561,12 +9782,13 @@
         "planUnits_one": "{{units}} unit",
         "planUnits_other": "{{units}} units",
         "whyLead": "Why {{price}}:",
-        "whyTick": "the lower of the recent sale ({{recent}}) and one tick under the cheapest listing ({{undercut}}).",
-        "whyTickRounded": "the lower of the recent sale ({{recent}}) and one tick under the cheapest listing ({{undercut}}), rounded down to a valid price.",
-        "whyAsk": "the lower of the recent sale ({{recent}}) and the cheapest listing ({{undercut}}).",
-        "whyAskRounded": "the lower of the recent sale ({{recent}}) and the cheapest listing ({{undercut}}), rounded down to a valid price.",
+        "whyTick": "the lower of what listings recently sold for ({{recent}}) and one tick under the cheapest listing ({{undercut}}).",
+        "whyTickRounded": "the lower of what listings recently sold for ({{recent}}) and one tick under the cheapest listing ({{undercut}}), rounded down to a valid price.",
+        "whyAsk": "the lower of what listings recently sold for ({{recent}}) and the cheapest listing ({{undercut}}).",
+        "whyAskRounded": "the lower of what listings recently sold for ({{recent}}) and the cheapest listing ({{undercut}}), rounded down to a valid price.",
         "priceHistory": "Price history and orders in {{hub}}",
-        "routeSafety": "Route safety"
+        "routeSafety": "Route safety",
+        "lastSalesSplit": "Last sales ({{date}}): {{high}} from a listing, {{low}} into a buy order."
       },
       "holds": {
         "general": "Cargo hold",
@@ -9596,15 +9818,29 @@
         "perJump": "Profit per jump ({{jumps}})",
         "limitedSales": "Limited by sales: some items stop at a realistic share of a week's sales.",
         "limitedSpace": "The hold is full; space is the limit.",
-        "limitedBudget": "Your budget is the limit.",
+        "limitedBudget": "Your Max spend is the limit.",
         "selectHint": "Select an item to see its price math."
       },
       "fill": {
         "title": "Fill the free space",
         "find": "Find items to fill it",
-        "findNote": "Scans the other categories on this lane for items that fit the free {{m3}} m³. It costs a scan, so it runs only when you ask.",
-        "error": "Couldn't scan the other categories.",
-        "empty": "Nothing else on this lane fits.",
+        "findNote": "Scans every category on this lane, in batches, for items that fit the free {{m3}} m³. Each batch costs a scan, so it runs only when you ask.",
+        "error": "Couldn't scan for more items.",
+        "running": "Batch {{batch}} · {{m3}} m³ free",
+        "stop": "Stop",
+        "more": "Find more",
+        "stopped": {
+          "full": "Filled: {{m3}} m³ left.",
+          "nothingLeft": "Nothing else on this lane is profitable.",
+          "noGain": "This batch found nothing profitable; Find more checks the next items.",
+          "nothingLeftUnderMax": "Nothing else under your Max price is profitable on this lane.",
+          "noGainUnderMax": "This batch found nothing profitable under your Max price; Find more checks the next items.",
+          "budget": "Your Max spend is the limit.",
+          "batchCap": "Stopped after {{count}} batches; press Find more to keep going.",
+          "byYou": "Stopped."
+        },
+        "added_one": "Added {{count}} item · +{{m3}} m³ · {{free}} m³ still free",
+        "added_other": "Added {{count}} items · +{{m3}} m³ · {{free}} m³ still free",
         "listLabel": "Items that fit the free space",
         "add": "Add {{count}} · +{{m3}} m³",
         "addDetail": "+{{spend}} spend · {{profit}} profit",
@@ -10564,7 +10800,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views and order), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }
         },
@@ -10575,6 +10811,7 @@
           "corp": "Corporation data: wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and LP stores.",
           "miningHistory": "A year of mining ledger, longer than the 30 days EVE returns.",
+          "walletHistory": "A year of wallet journal and transactions, longer than the 30 days EVE returns. Not in backups.",
           "jobHistory": "Delivered industry jobs, kept after ESI stops returning them. Removed with the Character.",
           "login": "Your EVE login token.",
           "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted, notifications-only token on our server for each character you turn it on for, deleted when you turn it off or remove the character.",
@@ -10609,6 +10846,8 @@
           "moonTaxKept": "until you delete them or remove the character.",
           "ledger": "Mining ledger:",
           "ledgerKept": "one year.",
+          "wallet": "Wallet journal and transactions:",
+          "walletKept": "one year. Removed with the character.",
           "prices": "Daily Jita price snapshots:",
           "pricesKept": "one year.",
           "netWorth": "Net worth history:",

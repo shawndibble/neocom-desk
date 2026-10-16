@@ -75,6 +75,7 @@ import {
   useFittingItemActions,
   type FittingItemActions,
 } from './fittingItemActions';
+import { useUnknownMutation, useUnknownMutationTip } from './useUnknownMutation';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { MODULE_STATE_STYLE } from './moduleStateStyle';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
@@ -555,6 +556,8 @@ function SlotTile({
   const index = slot.index + 1;
   const shownState = module && shownModuleState(slot.rack, reachedState, module.state);
   const state = shownState ? t(`fittings.list.moduleState.${shownState}`) : '';
+  const unknownMutation = useUnknownMutation(module ? [module] : []);
+  const unknownMutationTip = useUnknownMutationTip(unknownMutation);
   const label = module
     ? [
         t('fittings.ring.slotFitted', {
@@ -564,6 +567,7 @@ function SlotTile({
           state,
         }),
         hardpoint ? t(`fittings.ring.hardpoints.${hardpoint}Label`) : null,
+        unknownMutation ? t(`fittings.mutation.badge.${unknownMutation}`) : null,
         cantUse ? t('fittings.list.cantUse') : null,
       ]
         .filter(Boolean)
@@ -622,6 +626,7 @@ function SlotTile({
           ? t('fittings.ring.tooltipCharge', { name: nameOf(module.chargeTypeId) })
           : null,
         hardpoint ? t(`fittings.ring.hardpoints.${hardpoint}Tile`) : null,
+        unknownMutationTip,
         cantUse ? t('fittings.ring.tooltipCantUse') : null,
         cycleHint,
       ]
@@ -746,6 +751,15 @@ function SlotTile({
         </span>
       </span>
       <span className="absolute inset-0" style={upright}>
+        {/* A mutated module the stats can't state exactly: an amber flag in the other corner. */}
+        {unknownMutation && (
+          <span
+            data-mutation-flag={unknownMutation}
+            className="absolute top-0 left-0 flex h-[34%] w-[34%] bg-warning p-px text-bg"
+          >
+            <Warn aria-hidden className="h-full w-full" />
+          </span>
+        )}
         {/* A corner flag, small enough to leave the module readable under it. */}
         {cantUse && (
           <span className="absolute top-0 right-0 flex h-[34%] w-[34%] bg-danger p-px text-bg">

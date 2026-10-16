@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ABYSSAL_WEATHER, abyssalWeatherById } from './abyssalWeather';
+import { ABYSSAL_WEATHER, abyssalWeatherById, abyssalWeatherOf } from './abyssalWeather';
 
 describe('ABYSSAL_WEATHER', () => {
   it('lists the five weathers at three strengths each, by their game beacon type ids', () => {
@@ -16,5 +16,10 @@ describe('ABYSSAL_WEATHER', () => {
 
   it('knows nothing of another type id', () => {
     expect(abyssalWeatherById(587)).toBeUndefined();
+  });
+
+  it('finds a weather by kind and strength', () => {
+    expect(abyssalWeatherOf('electrical', 2)).toMatchObject({ typeId: 47382, penaltyPercent: 50 });
+    expect(abyssalWeatherOf('firestorm', 3).typeId).toBe(47392);
   });
 });

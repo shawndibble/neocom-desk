@@ -11,7 +11,7 @@
  * Default `'local'`, which is what every `formatTimestamp` surface already
  * did, so nothing moves until the pilot asks it to.
  *
- * Two deliberate exclusions, recorded as a scope decision
+ * Three deliberate exclusions, recorded as a scope decision
  * (`docs/context/decisions/`):
  *
  * - **The Calendar grids.** `lib/calendarGrid.ts` buckets events into
@@ -23,6 +23,8 @@
  *   unconditionally. That column's whole purpose is reading back to the game
  *   client, and making it follow a preference defaulting to `'local'` would
  *   change today's behaviour rather than preserve it.
+ * - **The phone Wallet Journal's day groups.** Days are EVE (UTC) days, so the
+ *   times under a day header are UTC and the header says "EVE time".
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 

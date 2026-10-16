@@ -15,15 +15,7 @@ vi.mock('@/features/fittings/fittingPilotProfile', () => ({
 async function openCustomTab() {
   const user = userEvent.setup();
   const onCargoChange = vi.fn();
-  render(
-    <HaulingCargoControl
-      characterId={null}
-      cargo={null}
-      onCargoChange={onCargoChange}
-      budget={null}
-      onBudgetChange={() => {}}
-    />
-  );
+  render(<HaulingCargoControl characterId={null} cargo={null} onCargoChange={onCargoChange} />);
   await user.click(screen.getByRole('button', { name: 'Cargo space' }));
   await user.click(screen.getByRole('button', { name: 'Enter m³' }));
   return { user, onCargoChange };
@@ -63,5 +55,24 @@ describe('HaulingCargoControl, a typed Cargo Space', () => {
       label: 'Ammo hold',
       holds: [{ kind: 'ammo', capacityM3: 41_000 }],
     });
+  });
+});
+
+describe('HaulingCargoControl, no budget', () => {
+  it('has no budget field: Max spend lives in the Hauling filters, and Clear clears the ship only', async () => {
+    const user = userEvent.setup();
+    const onCargoChange = vi.fn();
+    render(
+      <HaulingCargoControl
+        characterId={null}
+        cargo={{ label: 'Custom', holds: [{ kind: 'general', capacityM3: 12_400 }] }}
+        onCargoChange={onCargoChange}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Cargo space' }));
+    expect(screen.queryByRole('textbox', { name: /budget|spend/i })).toBeNull();
+    expect(screen.queryByText(/budget/i)).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Clear ship' }));
+    expect(onCargoChange).toHaveBeenCalledWith(null);
   });
 });

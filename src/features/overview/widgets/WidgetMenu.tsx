@@ -33,7 +33,10 @@ import * as Icon from '@/components/ui/icons';
 import { kindSumsAcrossCharacters } from './data/models';
 import { useOverviewEdit } from './editContext';
 import { getKind } from './kinds';
+import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import {
+  isPlexPlan,
+  MAX_PLEX_PLAN,
   MAX_WIDGETS,
   WIDGET_RANGES,
   type Widget,
@@ -103,11 +106,79 @@ function RenameDialog({
   );
 }
 
+function PlexPlanDialog({
+  widget,
+  title,
+  open,
+  onClose,
+}: {
+  widget: Widget;
+  title: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { setPlexPer30Days } = useOverviewEdit();
+  const [draft, setDraft] = useState(String(widget.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS));
+  const inputRef = useRef<HTMLInputElement>(null);
+  const hintId = useId();
+  const fieldId = useId();
+  const value = Number(draft);
+  const valid = draft.trim() !== '' && isPlexPlan(value);
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('overview.menu.plexPlanTitle', { title })}
+      initialFocusRef={inputRef}
+    >
+      <form
+        className="grid gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!valid) return;
+          setPlexPer30Days(widget.id, value);
+          onClose();
+        }}
+      >
+        <label htmlFor={fieldId} className="grid gap-1 text-xs">
+          <span className="font-semibold">{t('overview.menu.plexPlanLabel')}</span>
+          <TextInput
+            id={fieldId}
+            ref={inputRef}
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={MAX_PLEX_PLAN}
+            step={1}
+            value={draft}
+            aria-describedby={hintId}
+            aria-invalid={!valid}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        </label>
+        <p id={hintId} className="text-xs text-text-dim">
+          {t('overview.menu.plexPlanHint')}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" onClick={onClose}>
+            {t('overview.menu.plexPlanCancel')}
+          </Button>
+          <Button type="submit" variant="primary" disabled={!valid}>
+            {t('overview.menu.plexPlanSave')}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: boolean }) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const [renaming, setRenaming] = useState(false);
+  const [planning, setPlanning] = useState(false);
   const kind = getKind(widget.kind);
   if (!kind) return null;
 
@@ -178,6 +249,14 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
               </DropdownMenuRadioGroup>
             </>
           )}
+          {kind.hasPlexPlan && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setPlanning(true)))}>
+                {t('overview.menu.plexPlan')}
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>
             {t('overview.menu.rename')}
@@ -209,6 +288,9 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {planning && (
+        <PlexPlanDialog widget={widget} title={title} open onClose={() => setPlanning(false)} />
+      )}
       {renaming && (
         <RenameDialog
           // A fresh draft each time the dialog opens.

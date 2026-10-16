@@ -163,6 +163,13 @@ import {
 } from './publicContracts.js';
 import { runWorkbenchSync } from './workbenchFits.js';
 import { firestoreWorkbenchFitsStore } from './workbenchFitsStore.js';
+import {
+  MutamarketBusyError,
+  MutamarketInputError,
+  MutamarketProxy,
+  MutamarketUnavailableError,
+  parseEstimateInput,
+} from './mutamarket.js';
 
 initializeApp();
 
@@ -1466,5 +1473,32 @@ export const syncLpStoreOffers = onSchedule(
       return;
     }
     await writeChunkedSnapshot(getFirestore(), LP_STORE_OFFERS_SNAPSHOT, rows);
+  }
+);
+
+// mutamarketEstimate (mutamarket.ts). Session required: an import publishes
+// the module on MutaMarket. `maxInstances: 1` keeps the proxy's cache and
+// import queue global.
+const mutamarket = new MutamarketProxy();
+
+export const mutamarketEstimate = onCall<unknown>(
+  { maxInstances: 1, timeoutSeconds: 120 },
+  async (request) => {
+    callerOf(request);
+    try {
+      return await mutamarket.estimate(parseEstimateInput(request.data));
+    } catch (err) {
+      if (err instanceof MutamarketInputError) {
+        throw new HttpsError('invalid-argument', err.message);
+      }
+      if (err instanceof MutamarketBusyError) {
+        throw new HttpsError('resource-exhausted', 'MutaMarket import queue is full');
+      }
+      if (err instanceof MutamarketUnavailableError) {
+        logWarn('MutaMarket unavailable', { error: err.message });
+        throw new HttpsError('unavailable', 'MutaMarket is unavailable');
+      }
+      throw err;
+    }
   }
 );

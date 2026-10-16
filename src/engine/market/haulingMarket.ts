@@ -84,8 +84,15 @@ export interface DemandSummary {
   dailyVolume: number;
   /** How many days of the window saw any trade. */
   daysWithTrades: number;
-  /** Volume-weighted median sale price over the recent window; null with no history. */
+  /**
+   * What listings recently sold for: a volume-weighted median of the recent
+   * days' *highest* fill, null with no history. A day's average mixes buyers
+   * taking a listing (high) with sellers dumping into buy orders (low), so on a
+   * thin item it is a price nobody paid; the high end is the listing side.
+   */
   recentSalePrice: number | null;
+  /** The newest trading day's extremes, so a split between the two kinds of sale can be shown; null with no history. */
+  latestDay: { date: string; highest: number; lowest: number } | null;
   demand: DemandKind;
 }
 
@@ -96,22 +103,28 @@ function dayNumber(date: string): number {
 }
 
 /**
- * The price half of the traded volume sold at or below: a volume-weighted
- * *median* of the days' averages, not their mean. One stray trade at a
- * wildly different price (a single order among many, on one day) drags a mean
- * anywhere, and this estimate is exactly what a hauler would then plan a load
- * around; a median moves only when most of the volume did.
+ * The price half of the traded volume sold at or below, by each day's
+ * `highest` fill: a volume-weighted *median*, not a mean, so one stray day at
+ * a wildly different price moves it only when most of the volume did.
  */
 function volumeWeightedMedian(points: readonly MarketHistoryPoint[]): number | null {
   const total = points.reduce((sum, p) => sum + p.volume, 0);
   if (total <= 0) return null;
-  const byPrice = [...points].sort((a, b) => a.average - b.average);
+  const byPrice = [...points].sort((a, b) => a.highest - b.highest);
   let cumulative = 0;
   for (const p of byPrice) {
     cumulative += p.volume;
-    if (cumulative >= total / 2) return p.average;
+    if (cumulative >= total / 2) return p.highest;
   }
-  return byPrice[byPrice.length - 1]!.average;
+  return byPrice[byPrice.length - 1]!.highest;
+}
+
+function latestDayOf(points: readonly MarketHistoryPoint[]): DemandSummary['latestDay'] {
+  const latest = points.reduce<MarketHistoryPoint | null>(
+    (best, p) => (best === null || p.date > best.date ? p : best),
+    null
+  );
+  return latest && { date: latest.date, highest: latest.highest, lowest: latest.lowest };
 }
 
 /**
@@ -148,6 +161,7 @@ export function summarizeDemand(
     dailyVolume: totalVolume / thresholds.historyDays,
     daysWithTrades,
     recentSalePrice: volumeWeightedMedian(recent.length > 0 ? recent : inWindow),
+    latestDay: latestDayOf(inWindow),
     demand,
   };
 }

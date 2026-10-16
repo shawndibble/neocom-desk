@@ -28,11 +28,8 @@ import {
   type SkillCatalog,
 } from '@/features/skills/skillMap';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
-import {
-  loadCharacterAttributes,
-  loadCharacterImplants,
-  loadUniverseType,
-} from '@/features/skills/data';
+import { loadCharacterAttributes, loadCharacterImplants } from '@/features/skills/data';
+import { loadImplantTypeBonuses } from '@/features/skills/typeDetail';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { formatCountdown } from '@/lib/duration';
 import { useUrlParam } from '@/lib/useUrlState';
@@ -44,7 +41,6 @@ import {
   type CompletedLevel,
 } from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
-import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
 import { skillCsvColumns, skillCsvRows } from '@/features/skills/skillsCsv';
 import { boardCsvGroups, buildSkillBoard } from '@/features/skills/skillBoard';
 import { GroupTile, SkillBoardRow } from '@/features/skills/SkillBoardView';
@@ -110,10 +106,7 @@ async function loadSkillsSnapshot(
   // Already superseded: skip the per-implant type lookups, their results would
   // be discarded.
   const implantIds = signal.cancelled ? [] : (implantsResult?.data ?? []);
-  const implantTypes = await Promise.all(implantIds.map((id) => loadUniverseType(id)));
-  const implantBonuses = sumAttributeBonuses(
-    implantTypes.map((r) => extractAttributeBonuses(r?.data?.dogma_attributes))
-  );
+  const implantBonuses = await loadImplantTypeBonuses(implantIds);
   const attributeBaseline = attributesResult?.data
     ? toAttributeBaseline(attributesResult.data, implantBonuses)
     : null;

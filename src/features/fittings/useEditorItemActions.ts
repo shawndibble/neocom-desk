@@ -42,6 +42,7 @@ import {
 } from '@/engine/fittings/fittingEdit';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
 import { buildVariationIndex, getVariations } from '@/engine/market/variations';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import type { AddTarget } from './addTarget';
 import type { FittingContext } from './fittingContext';
 import {
@@ -77,6 +78,8 @@ interface EditorItemActionsInput {
   openCargoQuantity: (typeId: number) => void;
   /** Opens a fitted module's dialog with its Variations unfolded. Stable. */
   openVariations: (rack: FittingSlotKind, index: number) => void;
+  /** Opens a fitted module's dialog with its Mutation section unfolded. Stable. */
+  openMutation: (rack: FittingSlotKind, index: number) => void;
 }
 
 export interface EditorItemActions {
@@ -118,7 +121,9 @@ export function useEditorItemActions({
   selectTarget,
   openCargoQuantity,
   openVariations,
+  openMutation,
 }: EditorItemActionsInput): EditorItemActions {
+  const mutaplasmids = useMutaplasmidLookup();
   // The types last fitted to each rack, newest first — an empty slot's
   // "Add module" and "Fill rack with last used".
   const [recent, setRecent] = useState<Partial<Record<FittingSlotKind, number[]>>>({});
@@ -316,6 +321,11 @@ export function useEditorItemActions({
                 (member) => member.typeId !== typeId
               ),
             openVariations,
+            canMutate: (typeId) =>
+              mutaplasmids !== null &&
+              (mutaplasmids.isAbyssalType(typeId) ||
+                mutaplasmids.mutaplasmidsForBase(typeId).length > 0),
+            openMutation,
             removeAllOfType: (typeId) => edit((f) => removeAllOfType(f, typeId)),
             remove: (rack, index) => edit((f) => removeModule(f, rack, index)),
             move: (rack, from, to) => edit((f) => moveModule(f, rack, from, to)),
@@ -387,6 +397,8 @@ export function useEditorItemActions({
       cargoUsed,
       openCargoQuantity,
       openVariations,
+      mutaplasmids,
+      openMutation,
       canPlace,
       droneBay,
       dragEnabled,

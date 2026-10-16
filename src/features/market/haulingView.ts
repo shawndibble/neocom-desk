@@ -1,6 +1,6 @@
 /**
  * The Hauling Opportunities table's rows: a scan's items at this Character's
- * own fee rates, with the two default filters applied and counted. Pure —
+ * own fee rates, with the row filters applied and counted. Pure —
  * `haulingData.ts` fetches, `engine/market/haulingMarket` prices, and this
  * only joins the two for the panel.
  */
@@ -64,42 +64,56 @@ export function toViewRows(
   rows: readonly HaulingScanRow[],
   feesAt: HaulingFeesAt
 ): HaulingViewRow[] {
-  return rows.map((row) => {
-    const fees = feesAt(row.toHub);
-    const candidate = toCandidate(row, fees);
-    const depth = profitableDepth(candidate, fees);
-    const suggestedUnits =
-      candidate.demandCapUnits === null ? depth : Math.min(candidate.demandCapUnits, depth);
-    const economics = lotEconomics({
-      buyLadder: row.buyLadder,
-      expectedPrice: candidate.expectedPrice,
-      quantity: suggestedUnits,
-      fees,
-      destBuyLadder: candidate.destBuyLadder,
-    });
-    const profitPerUnit = economics.filled > 0 ? economics.profit / economics.filled : 0;
-    const price =
-      row.mode === 'instant'
-        ? economics.filled > 0
-          ? economics.revenue / economics.filled
-          : candidate.expectedPrice
-        : row.sale.price;
-    return {
-      ...row,
-      suggestedUnits,
-      marginPct: economics.marginPct,
-      profitPerUnit,
-      iskPerM3: profitPerUnit / row.unitVolumeM3,
-      price,
-      fees,
-      flags: haulingFlags({
-        ladder: row.mode === 'list' ? row.destLadder : [],
-        demand: row.mode === 'list' ? row.demand.demand : null,
-        marginPct: economics.marginPct,
-      }),
-      candidate,
-    };
+  return rows.map((row) => toViewRow(row, feesAt(row.toHub)));
+}
+
+function toViewRow(row: HaulingScanRow, fees: AppraisalNetFees): HaulingViewRow {
+  const candidate = toCandidate(row, fees);
+  const depth = profitableDepth(candidate, fees);
+  const suggestedUnits =
+    candidate.demandCapUnits === null ? depth : Math.min(candidate.demandCapUnits, depth);
+  const economics = lotEconomics({
+    buyLadder: row.buyLadder,
+    expectedPrice: candidate.expectedPrice,
+    quantity: suggestedUnits,
+    fees,
+    destBuyLadder: candidate.destBuyLadder,
   });
+  const profitPerUnit = economics.filled > 0 ? economics.profit / economics.filled : 0;
+  const price =
+    row.mode === 'instant'
+      ? economics.filled > 0
+        ? economics.revenue / economics.filled
+        : candidate.expectedPrice
+      : row.sale.price;
+  return {
+    ...row,
+    suggestedUnits,
+    marginPct: economics.marginPct,
+    profitPerUnit,
+    iskPerM3: profitPerUnit / row.unitVolumeM3,
+    price,
+    fees,
+    flags: haulingFlags({
+      ladder: row.mode === 'list' ? row.destLadder : [],
+      demand: row.mode === 'list' ? row.demand.demand : null,
+      marginPct: economics.marginPct,
+    }),
+    candidate,
+  };
+}
+
+/**
+ * The row priced again from only the origin levels at or under `maxUnitPrice`,
+ * so the plan never buys past Max price. Unchanged when no level is above it.
+ */
+function capBuyLadder(row: HaulingViewRow, maxUnitPrice: number | null): HaulingViewRow {
+  if (maxUnitPrice === null || row.buyLadder.every((level) => level.price <= maxUnitPrice))
+    return row;
+  return toViewRow(
+    { ...row, buyLadder: row.buyLadder.filter((level) => level.price <= maxUnitPrice) },
+    row.fees
+  );
 }
 
 export interface HaulingFilters {
@@ -109,23 +123,40 @@ export interface HaulingFilters {
   minMarginPct: number;
   /** Hide rows whose demand is "rarely sells". */
   steadyOnly: boolean;
+  /** Highest origin unit price (the Buy column's figure) a row may have, ISK; null shows any. */
+  maxUnitPrice: number | null;
 }
 
 export interface FilteredHaulingRows {
   shown: HaulingViewRow[];
-  /** Why rows are missing, so the footer can name them instead of dropping them silently. A row failing several counts under the first that applies: thin, then slow. */
-  hidden: { thin: number; slow: number; lowMargin: number };
+  /** Why rows are missing, so the footer can name them instead of dropping them silently. A row failing several counts under the first that applies: too dear, thin, slow, then low margin. */
+  hidden: { tooDear: number; thin: number; slow: number; lowMargin: number };
 }
 
-/** Best margin first. */
+/**
+ * Best margin first. The one row filter: the table and the fill both run
+ * their rows through it, so a filter applies to both — Max price trims each
+ * shown row's origin ladder too, so the plan sized from it stays under it.
+ */
 export function filterHaulingRows(
   rows: readonly HaulingViewRow[],
   filters: HaulingFilters
 ): FilteredHaulingRows {
   const shown: HaulingViewRow[] = [];
-  const hidden = { thin: 0, slow: 0, lowMargin: 0 };
-  for (const row of rows) {
-    // Demand and Days to Sell are not read for an instant sale: only the margin filter applies.
+  const hidden = { tooDear: 0, thin: 0, slow: 0, lowMargin: 0 };
+  for (const listed of rows) {
+    const unitPrice = listed.buyLadder[0]?.price;
+    if (
+      filters.maxUnitPrice !== null &&
+      unitPrice !== undefined &&
+      unitPrice > filters.maxUnitPrice
+    ) {
+      hidden.tooDear += 1;
+      continue;
+    }
+    // The other filters read the row as the plan will buy it.
+    const row = capBuyLadder(listed, filters.maxUnitPrice);
+    // Demand and Days to Sell are not read for an instant sale: only the price and margin filters apply.
     if (row.mode === 'list' && filters.steadyOnly && row.demand.demand === 'rarely')
       hidden.thin += 1;
     else if (

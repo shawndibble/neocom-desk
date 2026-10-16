@@ -93,6 +93,17 @@ describe('parseLayout', () => {
     expect('range' in out!.widgets[0]).toBe(false);
   });
 
+  it('keeps a valid Omega plan and drops one that is not, or on a kind with no plan', () => {
+    const plan = (over: Record<string, unknown>) =>
+      parseLayout(wrap(good({ kind: 'omega', view: 'chart', ...over })))!.widgets[0];
+    expect(plan({ plexPer30Days: 1200 }).plexPer30Days).toBe(1200);
+    expect('plexPer30Days' in plan({ plexPer30Days: -3 })).toBe(false);
+    expect('plexPer30Days' in plan({ plexPer30Days: '500' })).toBe(false);
+    expect('plexPer30Days' in parseLayout(wrap(good({ plexPer30Days: 600 })))!.widgets[0]).toBe(
+      false
+    );
+  });
+
   it('keeps a valid rowsPerPage and drops one that is not offered', () => {
     expect(parseLayout(wrap(good({ rowsPerPage: 25 })))!.widgets[0].rowsPerPage).toBe(25);
     expect('rowsPerPage' in parseLayout(wrap(good({ rowsPerPage: 7 })))!.widgets[0]).toBe(false);

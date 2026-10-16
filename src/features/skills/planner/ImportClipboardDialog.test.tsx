@@ -11,8 +11,8 @@ vi.mock('../typeCatalog', () => ({
   loadSkillNameMap: vi.fn(async () => new Map([['gunnery', { typeID: 3300 }]])),
   loadItemNameMap: vi.fn(async () => new Map()),
 }));
-vi.mock('../data', () => ({
-  loadUniverseType: vi.fn(async () => null),
+vi.mock('../typeDetail', () => ({
+  loadTypeDetail: vi.fn(async () => null),
 }));
 
 const FIXTURES = join(__dirname, '__fixtures__');

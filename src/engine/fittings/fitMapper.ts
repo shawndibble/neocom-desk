@@ -2,18 +2,41 @@ import type { Fit, FitItem, Slot } from '@eveshipfit/dogma-engine';
 import { sideEffectsSwitchedOn } from './boosterSideEffects';
 import { fighterTubes } from './inventoryFlags';
 import { defaultTacticalMode, tacticalModesFor } from './tacticalModes';
-import type { DamageProfile, Fitting, FittingModule, PilotProfile } from './types';
+import { normaliseMutation, type MutaplasmidLookup } from './mutaplasmids';
+import type { DamageProfile, Fitting, FittingModule, ItemMutation, PilotProfile } from './types';
 
 /** EVE numbers implant/booster slots starting at 1, not 0 (dogma-engine's own `Slot` doc). */
 const SLOT_INDEX_START = 1;
 
-function moduleToFitItem(module: FittingModule): FitItem {
+/**
+ * The engine's `Mutation`, checked here whatever the source (`normaliseMutation`).
+ * No rolls: the engine states the base module. Fails the check, or no data
+ * loaded: the item goes in bare, the engine knowing only its slot.
+ */
+function toEngineMutation(
+  typeId: number,
+  mutation: ItemMutation | undefined,
+  mutaplasmids: MutaplasmidLookup | null
+): Pick<FitItem, 'mutation'> {
+  const checked = mutation && normaliseMutation(typeId, mutation, mutaplasmids);
+  if (!checked) return {};
+  const rolled = Object.keys(checked.attributes).length > 0;
+  return {
+    mutation: {
+      base: checked.baseTypeId,
+      ...(rolled ? { attributes: checked.attributes } : {}),
+    },
+  };
+}
+
+function moduleToFitItem(module: FittingModule, mutaplasmids: MutaplasmidLookup | null): FitItem {
   const slot: Slot = { type: module.slot, index: module.slotIndex };
   return {
     type_id: module.typeId,
     slot,
     state: module.state,
     ...(module.chargeTypeId === undefined ? {} : { charge: { type_id: module.chargeTypeId } }),
+    ...toEngineMutation(module.typeId, module.mutation, mutaplasmids),
   };
 }
 
@@ -64,14 +87,17 @@ function slottedItem(
  * not adapted) applies. The key is left off rather than set to `undefined` —
  * the engine rejects an explicit `environment: undefined` (live run,
  * 2026-09-24).
+ *
+ * `mutaplasmids`: see `toEngineMutation`.
  */
 export function fittingToDogmaFit(
   fitting: Fitting,
   profile: PilotProfile,
-  damageProfile?: DamageProfile
+  damageProfile?: DamageProfile,
+  mutaplasmids: MutaplasmidLookup | null = null
 ): Fit {
   const items: FitItem[] = [
-    ...fitting.modules.map(moduleToFitItem),
+    ...fitting.modules.map((module) => moduleToFitItem(module, mutaplasmids)),
     ...fitting.drones.map((drone): FitItem => ({
       type_id: drone.typeId,
       slot: { type: 'drone_bay' },
@@ -79,6 +105,7 @@ export function fittingToDogmaFit(
       // Engine treats a drone given 'online' as launched; its in-bay state is
       // 'offline', so a bay stack ('online' here) goes in as that.
       state: drone.state === 'active' ? 'active' : 'offline',
+      ...toEngineMutation(drone.typeId, drone.mutation, mutaplasmids),
     })),
     // Launched squadrons take the tubes in order; the rest wait in the bay.
     ...launchFighters(fitting),

@@ -45,6 +45,8 @@ export function fakeItemActions(
     copyToAllOfType: vi.fn(),
     hasVariants: () => false,
     openVariations: vi.fn(),
+    canMutate: () => false,
+    openMutation: vi.fn(),
     removeAllOfType: vi.fn(),
     remove: vi.fn(),
     move: vi.fn(),

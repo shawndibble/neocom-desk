@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Fitting } from '@/engine/fittings/types';
 
+// The baked typeInfo shard lacks every type here, so reads take the ESI fallback.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 const UNREADABLE_TYPE_ID = 99999;
 vi.mock('@/features/skills/data', () => ({
   loadUniverseType: async (typeId: number) =>
