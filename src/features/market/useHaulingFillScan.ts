@@ -23,7 +23,7 @@ import {
   type HaulingScan,
   type HaulingScanRow,
 } from './haulingData';
-import { haulingEndId, type HaulingEnd } from './haulingHubs';
+import type { HaulingEnd } from './haulingHubs';
 import { scanHaulingLane } from './haulingScanRun';
 
 /** What sizing everything found so far into the hold gives: `FillBatchOutcome`'s plan half. */
@@ -53,8 +53,9 @@ export type HaulingFillScanState =
 export interface HaulingFillScanInput {
   from: HaulingEnd;
   to: HaulingEnd;
-  categoryId: number;
   mode: HaulMode;
+  /** The route, category and mode as one key: a new one aborts → idle. */
+  laneKey: string;
   /** Type ids already in the table (scanned and added): never scanned again. Read before each batch. */
   excludeIds: () => Iterable<number>;
   /** Sizes every row found so far; `batchIds` are the last batch's. Null when nothing can be sized (stop). */
@@ -90,8 +91,7 @@ interface Found {
 }
 
 export function useHaulingFillScan(input: HaulingFillScanInput) {
-  const { from, to, categoryId, mode } = input;
-  const laneKey = `${haulingEndId(from)}>${haulingEndId(to)}:${categoryId}:${mode}`;
+  const { from, to, mode, laneKey } = input;
   const latest = useRef(input);
   useEffect(() => {
     latest.current = input;
@@ -207,7 +207,6 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
   }, [active, from, to, mode]);
 
   const find = useCallback(() => setRun({ laneKey, fresh: true }), [laneKey]);
-  /** Find more, and Try again after a failed batch: carries on from what was found. */
   const more = useCallback(() => setRun({ laneKey, fresh: false }), [laneKey]);
   /** Ends the run after the batch in flight is dropped, keeping what earlier batches found. */
   const stop = useCallback(() => {
@@ -224,7 +223,7 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
   if (active !== null) {
     if (view?.run === active) state = view.state;
     else {
-      // The frame before the run's first update: Find more carries on from the last press.
+      // The frame before the run's first update.
       const last =
         !active.fresh && view?.run.laneKey === laneKey && view.state.status !== 'idle'
           ? view.state

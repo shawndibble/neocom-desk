@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FILL_BATCH_CAP } from '@/engine/market/haulingFillStop';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { HaulingScan, HaulingScanRequest, HaulingScanRow } from './haulingData';
-import type { HaulingEnd } from './haulingHubs';
+import { haulingEndId, type HaulingEnd } from './haulingHubs';
 import type { HaulingFillMeasure } from './useHaulingFillScan';
 
 const groups = [
@@ -75,8 +75,10 @@ function renderFill(initial: Partial<Props> = {}) {
   return renderHook(
     (p: Props) =>
       useHaulingFillScan({
-        ...p,
+        from: p.from,
+        to: p.to,
         mode: 'list',
+        laneKey: `${haulingEndId(p.from)}>${haulingEndId(p.to)}:${p.categoryId}`,
         excludeIds: () => tableIds,
         measure: (rows, ids) => measure(rows, ids),
       }),

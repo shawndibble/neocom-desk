@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   FILL_BATCH_CAP,
+  fillCanFindMore,
   fillFullAtM3,
   haulingFillStop,
   type FillBatchOutcome,
@@ -61,5 +62,21 @@ describe('haulingFillStop', () => {
 
   it('names full before any other reason', () => {
     expect(stop({ freeM3: 10, binding: 'budget', batchesThisRun: FILL_BATCH_CAP })).toBe('full');
+  });
+});
+
+describe('fillCanFindMore', () => {
+  const room = { freeM3: 30_000, capacityM3: 60_000, binding: 'space' as const };
+  it('offers more while there is room and something may be left', () => {
+    for (const reason of ['no-gain', 'batch-cap', 'stopped'] as const) {
+      expect(fillCanFindMore({ ...room, reason })).toBe(true);
+    }
+  });
+  it('not when full, nothing is left, or Max spend binds', () => {
+    expect(fillCanFindMore({ ...room, reason: 'stopped', freeM3: 600 })).toBe(false);
+    expect(fillCanFindMore({ ...room, reason: 'nothing-left' })).toBe(false);
+    expect(fillCanFindMore({ ...room, reason: 'budget', binding: 'budget' })).toBe(false);
+    // A raised Max spend moves the binding: more is back.
+    expect(fillCanFindMore({ ...room, reason: 'budget' })).toBe(true);
   });
 });

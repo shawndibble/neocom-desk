@@ -244,7 +244,8 @@ export type HaulingFillStatus = 'idle' | 'loading' | 'ready' | 'error';
 const STOP_KEYS = {
   full: 'market.hauling.fill.stopped.full',
   'nothing-left': 'market.hauling.fill.stopped.nothingLeft',
-  'no-gain': 'market.hauling.fill.stopped.noGain',
+  // The same to the reader: only whether Find more is offered differs.
+  'no-gain': 'market.hauling.fill.stopped.nothingLeft',
   budget: 'market.hauling.fill.stopped.budget',
   'batch-cap': 'market.hauling.fill.stopped.batchCap',
   stopped: 'market.hauling.fill.stopped.byYou',

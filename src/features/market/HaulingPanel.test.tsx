@@ -123,8 +123,7 @@ vi.mock('./useHaulingFillScan', async () => {
   return {
     useHaulingFillScan: (input: HaulingFillScanInput) => {
       fillInput = input;
-      const end = (e: HaulingFillScanInput['from']) => (typeof e === 'string' ? e : e.id);
-      const lane = `${end(input.from)}>${end(input.to)}:${input.categoryId}:${input.mode}`;
+      const lane = input.laneKey;
       const [asked, setAsked] = useState<string | null>(null);
       return {
         // A new lane is idle until asked again, like the real hook.

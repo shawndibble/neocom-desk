@@ -9610,7 +9610,6 @@
         "stopped": {
           "full": "Filled: {{m3}} m³ left.",
           "nothingLeft": "Nothing else on this lane is profitable.",
-          "noGain": "Nothing else on this lane is profitable.",
           "budget": "Your Max spend is the limit.",
           "batchCap": "Stopped after {{count}} batches; press Find more to keep going.",
           "byYou": "Stopped."

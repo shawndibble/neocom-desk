@@ -1,13 +1,11 @@
 /**
  * Hauling's "Fill the free space": the on-demand batches, the rows added from
  * them, and the offer sized into the room the plan leaves. Two hooks: the
- * offer needs the plan, and the plan needs the added rows. The offer lends the
- * batches its sizing (`bindSize`), so each batch's stop is judged on exactly
- * what the list will show.
+ * offer needs the plan, and the plan needs the added rows.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { planFill } from '@/engine/market/haulingFill';
-import { fillFullAtM3 } from '@/engine/market/haulingFillStop';
+import { fillCanFindMore } from '@/engine/market/haulingFillStop';
 import type { HoldUse, TripCandidate, TripOverride, TripPlan } from '@/engine/market/haulingPlan';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
@@ -36,7 +34,6 @@ type SizeFill = (
 export interface HaulingFillInput {
   from: HaulingEnd;
   to: HaulingEnd;
-  categoryId: number;
   mode: HaulMode;
   /** The route, category and mode as one key: a new one drops the fill and its added rows. */
   laneKey: string;
@@ -51,7 +48,6 @@ export interface HaulingFillInput {
 export function useHaulingFill({
   from,
   to,
-  categoryId,
   mode,
   laneKey,
   feesAt,
@@ -61,7 +57,7 @@ export function useHaulingFill({
 }: HaulingFillInput) {
   const [addedIds, setAddedIds] = useState<ReadonlySet<number>>(NO_IDS);
   const [unticked, setUnticked] = useState<ReadonlySet<number>>(NO_IDS);
-  /** What the last Add loaded, for "Added 8 items · …"; cleared by the next Find. */
+  /** What the last Add loaded, for "Added 8 items · …"; cleared by the next Find or Find more. */
   const [lastAdded, setLastAdded] = useState<{ count: number; volumeM3: number } | null>(null);
   const [resetFor, setResetFor] = useState(laneKey);
   if (resetFor !== laneKey) {
@@ -79,7 +75,7 @@ export function useHaulingFill({
   /** Scan rows as the table shows them: the one filter the panel applies to its own rows. */
   const viewOf = useCallback(
     (scanRows: readonly HaulingScanRow[]) =>
-      filterHaulingRows(toViewRows([...scanRows], feesAt), filters).shown,
+      filterHaulingRows(toViewRows(scanRows, feesAt), filters).shown,
     [feesAt, filters]
   );
   const sizeRef = useRef<SizeFill | null>(null);
@@ -90,8 +86,8 @@ export function useHaulingFill({
   const scan = useHaulingFillScan({
     from,
     to,
-    categoryId,
     mode,
+    laneKey,
     excludeIds: () => [...scannedTypeIds, ...addedIds],
     measure: (scanRows, batchIds) => {
       const size = sizeRef.current;
@@ -136,7 +132,6 @@ export function useHaulingFill({
     setLastAdded(null);
     findFresh();
   };
-  /** Find more, and Try again: carries on from the batches already run. */
   const more = () => {
     setLastAdded(null);
     findMore();
@@ -163,7 +158,6 @@ export function useHaulingFill({
   }, [resetScan]);
 
   return {
-    status: state.status,
     state,
     requested: state.status !== 'idle' || addedIds.size > 0,
     rows,
@@ -206,7 +200,7 @@ export function useHaulingFillOffer(
   fill: HaulingFill,
   { offered, current, overrides, before, base, categoryName, pin }: HaulingFillOfferInput
 ) {
-  const ready = fill.status === 'ready';
+  const ready = fill.state.status === 'ready';
   const extras = useMemo(
     () => (offered && ready ? fill.rows.filter((r) => !fill.addedIds.has(r.typeId)) : []),
     [offered, ready, fill.rows, fill.addedIds]
@@ -219,7 +213,7 @@ export function useHaulingFillOffer(
     [base, current, overrides, before]
   );
 
-  // Each batch is judged on the plan of everything found so far, as the list would size it.
+  // Lent to the batches (`bindSize`): each stop is judged on what the list would show.
   const size = useCallback<SizeFill>(
     (rows, batchIds) => {
       const plan = planOf(rows);
@@ -276,17 +270,19 @@ export function useHaulingFillOffer(
   const freeAfterOffer = freeOf(afterOffer.holds);
   const reason = state.status === 'ready' ? state.reason : null;
   const list: Omit<HaulingFillListProps, 'freeM3' | 'progressText'> = {
-    status: fill.status,
+    status: fill.state.status,
     batch: state.status === 'loading' ? state.batch : 0,
     runningFreeM3: state.status === 'loading' ? state.freeM3 : null,
     reason,
     leftM3: freeAfterOffer,
     canFindMore:
       reason !== null &&
-      reason !== 'nothing-left' &&
-      // Spending more needs a higher Max spend first; then the binding moves and Find more is back.
-      afterOffer.binding !== 'budget' &&
-      freeAfterOffer > fillFullAtM3(capacityOf(before.holds)),
+      fillCanFindMore({
+        reason,
+        freeM3: freeAfterOffer,
+        capacityM3: capacityOf(before.holds),
+        binding: afterOffer.binding,
+      }),
     added: fill.lastAdded,
     items,
     ticked: new Set(offerLines.filter((l) => !fill.unticked.has(l.typeId)).map((l) => l.typeId)),

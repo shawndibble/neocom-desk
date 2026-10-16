@@ -46,3 +46,18 @@ export function haulingFillStop(
   if (o.batchesThisRun >= FILL_BATCH_CAP) return 'batch-cap';
   return null;
 }
+
+/**
+ * Whether Find more can add anything after a stop: room left, something left
+ * to scan, and the plan not held by Max spend (raising it moves the binding).
+ */
+export function fillCanFindMore(o: {
+  reason: Exclude<HaulingFillStopReason, 'error'>;
+  freeM3: number;
+  capacityM3: number;
+  binding: TripPlan['binding'];
+}): boolean {
+  return (
+    o.reason !== 'nothing-left' && o.binding !== 'budget' && o.freeM3 > fillFullAtM3(o.capacityM3)
+  );
+}

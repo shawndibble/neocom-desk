@@ -445,7 +445,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const fill = useHaulingFill({
     from,
     to,
-    categoryId,
     mode,
     laneKey: scanKey,
     feesAt: fees.at,
@@ -502,11 +501,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
   const freeM3 = plan.holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
 
-  // Fill the free space: on demand only (each batch costs a scan's ESI budget),
-  // from every category less the table's rows (Everything too), only once a
-  // Cargo Space binds the plan, and on a fixed lane only: with Any hub at an
-  // end it would scan every hub's books. Not before the category scan lands:
-  // until then the fill could not leave the table's own rows out.
+  // Fill the free space: needs a Cargo Space and a fixed lane (Any hub would
+  // scan every hub's books), and the category scan landed, so its rows stay out.
   const fillOffered = cargoSet && anyEnd === null && !sameHub && state.status === 'ready';
   const fillOffer = useHaulingFillOffer(fill, {
     offered: fillOffered,
