@@ -1412,6 +1412,15 @@
     scrollbar-gutter: stable;
   }
 
+  /* A modal Radix menu locks body scroll (react-remove-scroll) and, to stop the
+     page widening when the scrollbar vanishes, adds a body margin-right equal
+     to the scrollbar's width. The stable gutter above already keeps that width
+     reserved, so the compensation only shoves the whole page left while a menu
+     is open. Layered !important beats the library's unlayered !important. */
+  body[data-scroll-locked] {
+    margin-right: 0 !important;
+  }
+
   /* Below md the phone tab bar (Layout) is fixed over the bottom of the
      viewport — including desktop at 200% zoom. Without this, focusing a
      control near the bottom scrolls it only as far as the viewport edge,
