@@ -1,4 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  onTestFinished,
+  vi,
+} from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -44,6 +54,12 @@ import { Characters } from './Characters';
 vi.mock('@/app/loginFlow', () => ({
   beginAddCharacterLogin: vi.fn().mockResolvedValue(undefined),
   beginCustomizedAddCharacterLogin: vi.fn().mockResolvedValue(undefined),
+}));
+
+const syncConfigured = vi.hoisted(() => ({ value: false }));
+vi.mock('@/app/syncStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/syncStatus')>()),
+  isSyncConfigured: () => syncConfigured.value,
 }));
 
 vi.mock('@/features/character/removeCharacter', async (importOriginal) => ({
@@ -827,6 +843,68 @@ describe('Characters', () => {
         .length
     ).toBeGreaterThan(0);
     expect(screen.getByText('Pilot One')).toBeInTheDocument();
+  });
+
+  it('keeps the dialog open and busy while the removal runs, then closes it', async () => {
+    const removal = await import('@/features/character/removeCharacter');
+    let finish: () => void = () => undefined;
+    vi.spyOn(removal, 'removeCharacterAfterSync').mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    expect(screen.getByRole('dialog', { name: 'Remove' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Remove' })).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+    finish();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Remove' })).toBeNull());
+  });
+
+  it('warns that unsynced edits are lost when removing offline with sync on', async () => {
+    syncConfigured.value = true;
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    onTestFinished(() => {
+      syncConfigured.value = false;
+      Reflect.deleteProperty(navigator, 'onLine');
+    });
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/offline.*will be lost/i);
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeEnabled();
+  });
+
+  it('shows no unsynced warning when sync is off', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    onTestFinished(() => {
+      Reflect.deleteProperty(navigator, 'onLine');
+    });
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('keeps the character when the removal confirmation is declined', async () => {
