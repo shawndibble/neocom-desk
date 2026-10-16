@@ -79,7 +79,7 @@ export function EntityInfoRoute() {
   const info = parseEntityInfo(location.search);
   const kind = info?.kind ?? null;
   const id = info?.id ?? null;
-  const itemId = info?.itemId ?? null;
+  const itemId = info?.itemId;
   useEffect(() => {
     const publicInfo = usePublicInfoModalStore.getState();
     const skill = useSkillDetailModalStore.getState();
@@ -95,7 +95,7 @@ export function EntityInfoRoute() {
       item.show({
         typeId: id,
         itemName: staged?.typeId === id ? staged.itemName : undefined,
-        ...(itemId === null ? {} : { itemId }),
+        itemId,
       });
       item.stage(id, undefined);
     } else if (kind === 'skill') {

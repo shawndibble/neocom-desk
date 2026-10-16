@@ -69,7 +69,7 @@ export function usePageItemActions({
       addToQuickbar: (typeId, itemName) => latestAdd.current(typeId, itemName),
       showInfo: (typeId, itemName, itemId) => {
         if (!localInfo && itemInfoIsUrlBacked()) openItemInfo(typeId, itemName, itemId);
-        else setShown({ typeId, itemName, ...(itemId === undefined ? {} : { itemId }) });
+        else setShown({ typeId, itemName, itemId });
       },
       blueprints,
       blueprintFor: (typeId) => (lazyBlueprints ? blueprintTypeIdFor(blueprints, typeId) : null),

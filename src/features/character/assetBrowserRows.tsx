@@ -388,7 +388,7 @@ interface ItemRowProps {
   blueprintKind?: BlueprintKind | null;
   /** Makes the name a Market link (§6c); Show info stays in the row menu. */
   typeId?: number;
-  /** The stack's own item id, set for an abyssal module only: its Show info then shows its own rolls. */
+  /** Set for a Mutated module only: Show info opens on its own Rolls. */
   itemId?: number;
   /** Wraps the row in the shared item context menu — supplied by the route. */
   wrap: (children: ReactElement) => ReactNode;

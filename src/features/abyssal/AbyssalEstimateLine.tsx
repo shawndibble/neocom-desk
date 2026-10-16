@@ -1,6 +1,6 @@
 /**
- * An owned abyssal module's MutaMarket estimate, in Item Detail's price line
- * (scope decision `*-mutamarket-is-the-abyssal-price-source.md`). Looked up
+ * A Mutated module's MutaMarket estimate, in Item Detail's price line (scope
+ * decision `20261016-085744-mutamarket-is-the-abyssal-price-source.md`). Looked up
  * once on open, never imported: a module MutaMarket hasn't seen gets an
  * "Ask MutaMarket to price this" button, since importing publishes it on a
  * public MutaMarket page — the warning says so beside the button. Anything but

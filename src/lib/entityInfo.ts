@@ -1,9 +1,8 @@
 /**
  * The `info` search param: which entity's Show Info (or Skill) modal a URL
  * has open — `?info=character-<id>`, `corporation-<id>`, `alliance-<id>` or
- * `skill-<typeId>` or `type-<typeId>` (an item's Item Detail), or
- * `type-<typeId>-<itemId>` for one owned item of that type (an abyssal
- * module's own rolls). It rides on the *current* location, so a link to an
+ * `skill-<typeId>`, `type-<typeId>` (Item Detail) or `type-<typeId>-<itemId>`
+ * (one Mutated module's Rolls). It rides on the *current* location, so a link to an
  * entity is a real, shareable `<a href>` that opens the modal over whatever
  * page the pilot is on (DESIGN.md §6c "Entities").
  *
@@ -15,7 +14,7 @@ export type EntityInfoKind = 'character' | 'corporation' | 'alliance' | 'skill' 
 export interface EntityInfoTarget {
   kind: EntityInfoKind;
   id: number;
-  /** `type` only: one owned item of the type, by its unique item id. */
+  /** `type` only: a Mutated module's item id. */
   itemId?: number;
 }
 

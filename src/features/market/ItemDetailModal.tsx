@@ -17,12 +17,10 @@
  * reaction consumes gets "Used in" (`UsedInSection`), off the blueprint
  * catalog — the same SDE files Build Plan reads, not ESI.
  *
- * An abyssal (mutated) type or a mutaplasmid gets `AbyssalItemDetail`: its
- * shard carries almost nothing, and no market order exists for an abyssal
- * module, so its best sell/buy line gives way to MutaMarket's estimate when
- * the modal is opened on one owned module (`itemId`) and to nothing
- * otherwise. Opened on an owned module, its attributes are that module's
- * own, from ESI's dynamic item, rather than the type's.
+ * An Abyssal type or Mutaplasmid gets `AbyssalItemDetail`. No market order
+ * exists for an Abyssal type: its price line is MutaMarket's estimate on a
+ * Mutated module (`itemId`), else nothing. On a Mutated module the attributes
+ * are its own, from ESI's dynamic item.
  */
 import { cx } from '@/lib/cx';
 import {
@@ -84,18 +82,15 @@ import { skillNameOrFallback } from './skillNameOrFallback';
 import { UsedInSection } from './UsedInSection';
 import { AbyssalItemDetail } from '@/features/abyssal/AbyssalItemDetail';
 import { AbyssalEstimateLine } from '@/features/abyssal/AbyssalEstimateLine';
-import { loadMutaplasmidLookup, useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
+import { useIsAbyssalType } from '@/features/abyssal/mutaplasmidData';
 import { useDynamicItem } from '@/features/abyssal/useDynamicItem';
+import { recordAttributes } from '@/features/abyssal/dynamicItems';
 import type { DynamicItemRecord } from '@/db';
 import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
 
 export interface ItemDetailModalProps {
   typeId: number;
-  /**
-   * One owned item of the type (`?info=type-<typeId>-<itemId>`, an Assets
-   * row): for an abyssal module, its own rolls and MutaMarket estimate.
-   * Ignored for any other type.
-   */
+  /** A Mutated module's item id: its own Rolls and MutaMarket estimate. Ignored unless an Abyssal type. */
   itemId?: number;
   itemName: string;
   onClose: () => void;
@@ -172,26 +167,10 @@ export function ItemDetailModal({
   const priceLocation = location ?? savedLocation;
   const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
 
-  const mutaplasmids = useMutaplasmidLookup();
-  const [mutaplasmidsFailed, setMutaplasmidsFailed] = useState(false);
-  useEffect(() => {
-    if (mutaplasmids) return;
-    let live = true;
-    loadMutaplasmidLookup().catch(() => {
-      if (live) setMutaplasmidsFailed(true);
-    });
-    return () => {
-      live = false;
-    };
-  }, [mutaplasmids]);
-  /** Null until known, so the market line and link don't flash in on an abyssal type; no data reads as not abyssal. */
-  const abyssal: boolean | null = mutaplasmids
-    ? mutaplasmids.isAbyssalType(typeId)
-    : mutaplasmidsFailed
-      ? false
-      : null;
+  // Null until known, so the market line and link don't flash in on an Abyssal type.
+  const abyssal = useIsAbyssalType(typeId);
   const dynamic = useDynamicItem(typeId, abyssal ? itemId : undefined);
-  /** The owned module's own attributes, grouped as the type's are, for the record they were grouped from. */
+  /** The Mutated module's own attributes, grouped as the type's are, for the record they were grouped from. */
   const [dynamicGrouped, setDynamicGrouped] = useState<{
     record: DynamicItemRecord;
     groups: AttributeGroup[];
@@ -218,17 +197,11 @@ export function ItemDetailModal({
   }, [activeCharacterId]);
 
   useEffect(() => {
-    if (!priceLocation) return;
+    // No order book for an Abyssal type: skip the fetch.
+    if (!priceLocation || abyssal !== false) return;
     let cancelled = false;
     void (async () => {
       setPriceState({ status: 'loading' });
-      // No market order exists for an abyssal type: don't ask ESI for a book
-      // that can't have any (the line gives way to MutaMarket's estimate).
-      const abyssalType = await loadMutaplasmidLookup().then(
-        (lookup) => lookup.isAbyssalType(typeId),
-        () => false
-      );
-      if (cancelled || abyssalType) return;
       // Never rejects: a failure is its own status. A nice-to-have fetch, same
       // as the PI schematic below — it costs the price row, never the modal.
       const view = await loadOrderBookView(typeId, priceLocation);
@@ -240,7 +213,7 @@ export function ItemDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [typeId, priceLocation]);
+  }, [typeId, priceLocation, abyssal]);
 
   useEffect(() => {
     let cancelled = false;
@@ -301,10 +274,7 @@ export function ItemDetailModal({
   useEffect(() => {
     if (!data || !dynamicRecord) return;
     let cancelled = false;
-    const attributes = dynamicRecord.attributes.map(([attribute_id, value]) => ({
-      attribute_id,
-      value,
-    }));
+    const attributes = recordAttributes(dynamicRecord);
     void loadAttributeReferenceNames([attributes], data.dictionary).then((names) => {
       if (cancelled) return;
       setDynamicGrouped({
@@ -339,7 +309,6 @@ export function ItemDetailModal({
       titleActions={
         <>
           <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
-          {/* No market order exists for an abyssal type. */}
           {showOpenInMarket && abyssal === false && (
             <OpenInMarketLink typeId={typeId} onNavigate={leave} replace={onLeave !== undefined} />
           )}

@@ -1,5 +1,5 @@
 /**
- * Item Detail's section for abyssal (mutated) types and mutaplasmids
+ * Item Detail's section for Abyssal types and Mutaplasmids
  * (GLOSSARY.md **Abyssal type**, **Mutaplasmid**, **Roll**). An abyssal
  * type's baked typeInfo shard carries almost none of the attributes a pilot
  * opens it for, because they come from the base module and the roll, so this
@@ -8,7 +8,7 @@
  *
  * - An abyssal type: which base modules and mutaplasmids make it, and what
  *   each mutaplasmid can roll on a chosen base, in absolute values.
- * - One owned abyssal module (opened with its item id, from Assets): its own
+ * - One Mutated module (opened with its item id): its own
  *   rolls against its base, with roll quality.
  * - A mutaplasmid: which modules it applies to, what it makes, and its rolls
  *   as ±% of the base value.
@@ -17,13 +17,10 @@
  */
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { DataTable, NativeSelect, Spinner, type DataTableColumn } from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
-import {
-  mutationFromDynamicItem,
-  type Mutaplasmid,
-  type MutaplasmidLookup,
-} from '@/engine/fittings/mutaplasmids';
+import type { Mutaplasmid, MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
 import {
   defaultBaseTypeId,
   multiplierPercentRows,
@@ -42,6 +39,7 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { formatAttributeValue } from '@/features/market/format';
 import { useMutaplasmidLookup } from './mutaplasmidData';
+import { mutationFromRecord } from './dynamicItems';
 import type { DynamicItemState } from './useDynamicItem';
 
 const SECTION_HEADING =
@@ -121,29 +119,20 @@ function nameOf(names: Names | null, typeId: number): string {
 
 export interface AbyssalItemDetailProps {
   typeId: number;
-  /** The owned item's dynamic item, when Item Detail was opened on one (`useDynamicItem`). */
+  /** Set when opened on a Mutated module (`useDynamicItem`). */
   dynamic: DynamicItemState;
 }
 
 export function AbyssalItemDetail({ typeId, dynamic }: AbyssalItemDetailProps) {
   const lookup = useMutaplasmidLookup();
   const dictionary = useAttributeDictionary();
-  const mutation = useMemo(() => {
-    if (!lookup || dynamic.status !== 'ready') return null;
-    const { record } = dynamic;
-    return mutationFromDynamicItem(
-      typeId,
-      {
-        source_type_id: record.sourceTypeId,
-        mutator_type_id: record.mutatorTypeId,
-        dogma_attributes: record.attributes.map(([attribute_id, value]) => ({
-          attribute_id,
-          value,
-        })),
-      },
-      lookup
-    );
-  }, [lookup, dynamic, typeId]);
+  const mutation = useMemo(
+    () =>
+      lookup && dynamic.status === 'ready'
+        ? mutationFromRecord(typeId, dynamic.record, lookup)
+        : null,
+    [lookup, dynamic, typeId]
+  );
 
   if (!lookup || !dictionary) return null;
   const mutaplasmid = lookup.mutaplasmid(typeId);
@@ -210,10 +199,6 @@ function attributeLabel(
   };
 }
 
-function figure(value: number, unit: string | null): string {
-  return formatAttributeValue(value, unit);
-}
-
 /** Attribute cell: name, unit, and which way is the better roll — in words, not colour. */
 function AttributeCell({
   name,
@@ -256,11 +241,40 @@ function RangeText({ range, unit }: { range: DisplayRange | null; unit: string |
   return (
     <>
       {t('market.itemDetail.abyssal.range', {
-        low: figure(range.low, unit),
-        high: figure(range.high, unit),
+        low: formatAttributeValue(range.low, unit),
+        high: formatAttributeValue(range.high, unit),
       })}
     </>
   );
+}
+
+/** Both roll tables' leading columns: the attribute (sticky) and the base module's value. */
+function attributeAndBaseColumns<R extends { attributeId: number; base: number }>(
+  t: TFunction,
+  dictionary: AttributeDictionary,
+  lookup: MutaplasmidLookup,
+  highIsGood: (row: R) => boolean
+): DataTableColumn<R>[] {
+  return [
+    {
+      id: 'attribute',
+      header: t('market.itemDetail.abyssal.attributeColumn'),
+      stickyStart: true,
+      stickyStartOnPanel: true,
+      className: 'min-w-36',
+      render: (row) => {
+        const { name, unit } = attributeLabel(row.attributeId, dictionary, lookup);
+        return <AttributeCell name={name} unit={unit} highIsGood={highIsGood(row)} />;
+      },
+    },
+    {
+      id: 'base',
+      header: t('market.itemDetail.abyssal.baseColumn'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums text-text-dim',
+      render: (row) => formatAttributeValue(row.base, dictionary[row.attributeId]?.unit ?? null),
+    },
+  ];
 }
 
 /* ----------------------------------------------------------- abyssal type */
@@ -274,7 +288,7 @@ function AbyssalTypeSection({
   typeId: number;
   lookup: MutaplasmidLookup;
   dictionary: AttributeDictionary;
-  /** Opened on an owned item whose rolls couldn't be read: say so above the type's ranges. */
+  /** Opened on a Mutated module whose rolls couldn't be read: say so above the type's ranges. */
   rollsUnreadable: boolean;
 }) {
   const { t } = useTranslation();
@@ -313,24 +327,7 @@ function AbyssalTypeSection({
     : null;
 
   const columns: DataTableColumn<StrainRangeRow>[] = [
-    {
-      id: 'attribute',
-      header: t('market.itemDetail.abyssal.attributeColumn'),
-      stickyStart: true,
-      stickyStartOnPanel: true,
-      className: 'min-w-36',
-      render: (row) => {
-        const { name, unit } = attributeLabel(row.attributeId, dictionary, lookup);
-        return <AttributeCell name={name} unit={unit} highIsGood={row.highIsGood} />;
-      },
-    },
-    {
-      id: 'base',
-      header: t('market.itemDetail.abyssal.baseColumn'),
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => figure(row.base, dictionary[row.attributeId]?.unit ?? null),
-    },
+    ...attributeAndBaseColumns<StrainRangeRow>(t, dictionary, lookup, (row) => row.highIsGood),
     ...strains.map((m, index): DataTableColumn<StrainRangeRow> => ({
       id: `m${m.typeId}`,
       header: labelOf(m.typeId),
@@ -403,7 +400,7 @@ function AbyssalTypeSection({
   );
 }
 
-/* ------------------------------------------------------ one owned module */
+/* ----------------------------------------------------- one mutated module */
 
 function OwnedRollsSection({
   mutation,
@@ -428,30 +425,18 @@ function OwnedRollsSection({
   const unitOf = (row: RolledAttributeRow) => dictionary[row.attributeId]?.unit ?? null;
 
   const columns: DataTableColumn<RolledAttributeRow>[] = [
-    {
-      id: 'attribute',
-      header: t('market.itemDetail.abyssal.attributeColumn'),
-      stickyStart: true,
-      stickyStartOnPanel: true,
-      className: 'min-w-36',
-      render: (row) => {
-        const { name, unit } = attributeLabel(row.attributeId, dictionary, lookup);
-        return <AttributeCell name={name} unit={unit} highIsGood={row.range.highIsGood} />;
-      },
-    },
-    {
-      id: 'base',
-      header: t('market.itemDetail.abyssal.baseColumn'),
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => figure(row.base, unitOf(row)),
-    },
+    ...attributeAndBaseColumns<RolledAttributeRow>(
+      t,
+      dictionary,
+      lookup,
+      (row) => row.range.highIsGood
+    ),
     {
       id: 'rolled',
       header: t('market.itemDetail.abyssal.rolledColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => figure(row.rolled, unitOf(row)),
+      render: (row) => formatAttributeValue(row.rolled, unitOf(row)),
     },
     {
       id: 'range',

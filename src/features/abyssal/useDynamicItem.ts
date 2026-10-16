@@ -1,6 +1,6 @@
 /**
- * One owned abyssal module's dynamic item (`dynamicItems.ts`): its base,
- * mutaplasmid and full attribute set, for Item Detail opened on that item.
+ * A Mutated module's dynamic item (`dynamicItems.ts`): base, mutaplasmid and
+ * full attribute set.
  */
 import { useEffect, useState } from 'react';
 import type { DynamicItemRecord } from '@/db';
@@ -25,11 +25,7 @@ export function useDynamicItem(typeId: number, itemId: number | undefined): Dyna
         if (live) {
           setAnswer({
             key: asked,
-            // The cache is keyed by item id alone: a URL naming another type gets no rolls.
-            state:
-              record && record.typeId === typeId
-                ? { status: 'ready', record }
-                : { status: 'failed' },
+            state: record ? { status: 'ready', record } : { status: 'failed' },
           });
         }
       },

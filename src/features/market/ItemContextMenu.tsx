@@ -29,7 +29,7 @@ import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 export interface ItemContextMenuProps {
   typeId: number;
   itemName: string;
-  /** One owned item of the type (an Assets row's abyssal module): Show info opens on its own rolls. */
+  /** A Mutated module's item id: Show info opens on its own Rolls. */
   itemId?: number;
   /**
    * The blueprint behind Build Plan, when the row already knows it (an

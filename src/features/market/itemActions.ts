@@ -13,7 +13,7 @@ export interface ItemActions {
   /** False with no active character — the Quickbar has nobody to save the item under. */
   canAddToQuickbar: boolean;
   addToQuickbar: (typeId: number, itemName: string) => void;
-  /** Opens the page's Item Detail modal on this item; `itemId` names one owned item of the type (an abyssal module's own rolls). */
+  /** Opens the page's Item Detail modal on this item; `itemId` names a Mutated module (its own Rolls). */
   showInfo: (typeId: number, itemName: string, itemId?: number) => void;
   /** The lazily loaded catalog — null until it loads, and always on a page without one. */
   blueprints: BlueprintCatalog | null;

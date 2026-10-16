@@ -67,6 +67,22 @@ describe('getDynamicItem', () => {
     expect(getDogmaDynamicItem).toHaveBeenCalledTimes(1);
   });
 
+  it('answers nothing for an item cached under another type, and asks ESI nothing', async () => {
+    getDogmaDynamicItem.mockImplementation(async (_t: number, id: number) => answer(id));
+    await getDynamicItem({ typeId: NEUT, itemId: 1002 });
+
+    expect(await getDynamicItem({ typeId: 47740, itemId: 1002 })).toBeNull();
+    expect(getDogmaDynamicItem).toHaveBeenCalledTimes(1);
+  });
+
+  it('remembers a rejection for that type only, so a wrong type never blocks the real one', async () => {
+    getDogmaDynamicItem.mockRejectedValueOnce(new EsiError(400, 'Type mismatch'));
+    getDogmaDynamicItem.mockImplementation(async (_t: number, id: number) => answer(id));
+
+    expect(await getDynamicItem({ typeId: 47740, itemId: 9 })).toBeNull();
+    expect(await getDynamicItem({ typeId: NEUT, itemId: 9 })).not.toBeNull();
+  });
+
   it('tries again later after a failure that was not the id’s fault', async () => {
     getDogmaDynamicItem.mockRejectedValueOnce(new EsiError(503, 'down'));
     getDogmaDynamicItem.mockImplementation(async (_t: number, id: number) => answer(id));

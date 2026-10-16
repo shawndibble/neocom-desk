@@ -2223,7 +2223,7 @@ function NodeRowView({
   }
 
   const { asset } = node;
-  // An abyssal module's Show info opens on its own rolls; any other stack's on its type.
+  // A Mutated module's Show info opens on its own Rolls; any other stack's on its type.
   const itemId = mutaplasmids?.isAbyssalType(asset.type_id) ? asset.item_id : undefined;
   const estimatedValue = assetStackValue(asset, actions.priceByTypeId, actions.copyValueByItemId);
   const planTarget =

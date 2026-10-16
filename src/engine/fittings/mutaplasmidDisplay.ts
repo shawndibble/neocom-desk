@@ -1,7 +1,7 @@
 /**
  * Mutaplasmid rolls as Item Detail shows them, pure: absolute roll ranges
  * per mutaplasmid for one base module, a mutaplasmid's own ranges as ±% of
- * the base value, and an owned item's rolls against its base.
+ * the base value, and a Mutated module's rolls against its base.
  *
  * Every value is in the unit the game shows it in (`attributeUnits.ts`): a
  * duration in seconds, a resonance as a resistance. A conversion that runs
@@ -136,7 +136,7 @@ export function multiplierPercentRows(
   });
 }
 
-/** One of an owned item's rolls against its base. */
+/** One of a Mutated module's rolls against its base. */
 export interface RolledAttributeRow {
   attributeId: number;
   /** The base module's own value, as shown. */
@@ -150,7 +150,7 @@ export interface RolledAttributeRow {
 }
 
 /**
- * An owned item's rolls (`mutation`) beside its base module's values, one row
+ * A Mutated module's rolls (`mutation`) beside its base module's values, one row
  * per attribute the mutaplasmid rolls, by attribute id. A roll the item
  * doesn't carry, or one the base has no value for, is left out.
  */
