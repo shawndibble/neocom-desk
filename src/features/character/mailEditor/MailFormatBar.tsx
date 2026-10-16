@@ -1,9 +1,12 @@
 /**
  * The mail format bar (decision 20261016-124635): bold, italic, underline,
- * colour, size, link, table and clear formatting, as one row of icon buttons.
- * On a phone it docks above the on-screen keyboard and scrolls sideways; on a
- * wide screen it sits above the writing surface and wraps. Colour, size, link
- * and table open a sheet rather than crowding the row.
+ * colour, size, link, table and clear formatting, as one row of flat icon
+ * buttons split into groups by hairlines, with the Source toggle at the right
+ * end. Inline it is the top strip of the editor's card (the card owns the
+ * frame; the bar draws only a hairline under itself). On a phone with the
+ * keyboard up it docks above it as an edge-to-edge strip and scrolls sideways;
+ * on a wide screen it wraps. Colour, size, link and table open a sheet rather
+ * than crowding the row.
  *
  * It only calls `MailEditorCommands`, so it works the same over the Preview
  * (Tiptap) and the Source textarea. Buttons never take focus from the writing
@@ -37,8 +40,14 @@ interface MailFormatBarProps {
   /** The keyboard's height over the layout viewport; where a `keyboard` dock sits. */
   keyboardInset?: number;
   disabled?: boolean;
+  /** Source toggle at the right end; absent = no toggle. */
+  sourceActive?: boolean;
+  onToggleSource?: () => void;
   className?: string;
 }
+
+/** A hairline between button groups. */
+const Divider = () => <span aria-hidden className="mx-1 h-5 w-px shrink-0 self-center bg-line" />;
 
 export function MailFormatBar({
   commands,
@@ -47,6 +56,8 @@ export function MailFormatBar({
   visible,
   keyboardInset = 0,
   disabled,
+  sourceActive = false,
+  onToggleSource,
   className,
 }: MailFormatBarProps) {
   const { t } = useTranslation();
@@ -71,6 +82,7 @@ export function MailFormatBar({
       onClick={onClick}
       onPointerDown={keepFocus}
       onMouseDown={(e) => e.preventDefault()}
+      variant="plain"
       className="shrink-0"
     />
   );
@@ -101,12 +113,12 @@ export function MailFormatBar({
         style={dock === 'keyboard' ? { bottom: keyboardInset } : undefined}
         className={cx(
           shown ? 'flex' : 'hidden',
-          'gap-1 bg-panel',
+          'gap-0.5',
           // Phone: one row that scrolls sideways (the cut-off button is the cue, as in Tabs).
           phone ? 'tab-scroller flex-nowrap overflow-x-auto' : 'flex-wrap',
           dock === 'keyboard'
-            ? 'fixed inset-x-0 z-40 border-t border-line px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]'
-            : 'border border-line px-1 py-1',
+            ? 'fixed inset-x-0 z-40 border-t border-line bg-panel px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]'
+            : 'border-b border-line px-1 py-0.5',
           className
         )}
       >
@@ -133,16 +145,28 @@ export function MailFormatBar({
           () => commands.toggleMark('underline'),
           { pressed: state.underline }
         )}
+        <Divider />
         {button('color', colorDot, t('mail.format.color'), () => setSheet('color'))}
         {button('size', <Icon.FormatSize />, t('mail.format.size'), () => setSheet('size'))}
+        <Divider />
         {button('link', <Icon.FormatLink />, t('mail.format.link'), () => setSheet('link'), {
           pressed: state.link !== null,
+          disabled: !commands.canLink,
+          tooltip: commands.canLink ? undefined : t('mail.format.linkInTable'),
         })}
         {button('table', <Icon.TableView />, t('mail.format.table'), () => setSheet('table'))}
+        <Divider />
         {button('clear', <Icon.FormatClear />, t('mail.format.clear'), commands.clearFormatting, {
           disabled: !commands.canClear,
           tooltip: commands.canClear ? undefined : t('mail.format.clearUnavailable'),
         })}
+        {onToggleSource && (
+          <span className="ml-auto flex shrink-0 items-center pl-1">
+            {button('source', <Icon.OpenSource />, t('mail.format.source'), onToggleSource, {
+              pressed: sourceActive,
+            })}
+          </span>
+        )}
       </div>
 
       <ColorDialog

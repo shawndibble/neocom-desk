@@ -370,7 +370,6 @@ export function MailComposeBox({
           <label htmlFor={bodyId} className={labelClass}>
             {t('mail.bodyLabel')}
           </label>
-          <MailCounter id={bodyCountId} count={bodyLength} max={MAX_BODY_LENGTH} />
         </div>
         <BodyEditor
           id={bodyId}
@@ -381,6 +380,7 @@ export function MailComposeBox({
           }}
           disabled={sending}
           aria-describedby={bodyCountId}
+          counter={<MailCounter id={bodyCountId} count={bodyLength} max={MAX_BODY_LENGTH} />}
           aria-invalid={bodyOver}
           className="min-h-48"
         />

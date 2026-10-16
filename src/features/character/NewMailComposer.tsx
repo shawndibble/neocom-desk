@@ -345,7 +345,6 @@ export function NewMailComposer({
             <label htmlFor={bodyId} className={labelClass}>
               {t('mail.bodyLabel')}
             </label>
-            <MailCounter id={bodyCountId} count={bodyLength} max={MAX_BODY_LENGTH} />
           </div>
           <BodyEditor
             id={bodyId}
@@ -355,6 +354,7 @@ export function NewMailComposer({
               setBody(next);
             }}
             aria-describedby={bodyCountId}
+            counter={<MailCounter id={bodyCountId} count={bodyLength} max={MAX_BODY_LENGTH} />}
             aria-invalid={bodyOver}
             className={fullPane ? 'min-h-40 flex-1 resize-none' : 'min-h-64'}
           />

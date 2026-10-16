@@ -13,6 +13,7 @@ function commands(state: Partial<FormatState> = {}, over: Partial<MailEditorComm
   const c: MailEditorCommands = {
     state: { ...emptyFormatState, ...state },
     canClear: true,
+    canLink: true,
     canReset: true,
     toggleMark: vi.fn(),
     setColor: vi.fn(),
