@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -240,10 +240,10 @@ describe('SetWaypoints', () => {
 
     const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
     expect(button).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.pointerMove(button);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a connection');
     await userEvent.click(button);
     expect(postAutopilotWaypointMock).not.toHaveBeenCalled();
-    await userEvent.hover(button);
-    expect((await screen.findAllByText('Needs a connection')).length).toBeGreaterThan(0);
   });
 
   it('reports a failure plainly', async () => {

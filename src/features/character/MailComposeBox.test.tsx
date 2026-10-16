@@ -6,9 +6,10 @@
  * what a Send click actually calls.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { EsiTimeoutError } from '@/esi/errors';
 import { MailComposeBox } from './MailComposeBox';
 import type { MailHeader } from '@/esi/endpoints';
 
@@ -206,6 +207,22 @@ describe('recipient search offline', () => {
   });
 });
 
+describe('recipient search that fails while the browser says it is online', () => {
+  it('says the search needs a connection instead of "No characters found"', async () => {
+    searchMailRecipients.mockRejectedValue(new TypeError('Failed to fetch'));
+    const user = userEvent.setup();
+    renderBox('forward');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Subject')).toHaveValue('FWD: Ratting fleet up')
+    );
+
+    await user.type(screen.getByLabelText('Add recipient'), 'Fen');
+
+    expect(await screen.findByText('Search needs a connection.')).toBeInTheDocument();
+    expect(screen.queryByText('No characters found.')).not.toBeInTheDocument();
+  });
+});
+
 describe('a saved draft', () => {
   it('is used instead of the reply-all defaults', async () => {
     drafts.loadDraft.mockResolvedValue({
@@ -308,6 +325,33 @@ describe('sending', () => {
     expect(onSent).not.toHaveBeenCalled();
   });
 
+  it('does not invite a duplicate when a send timed out after leaving: it could not confirm', async () => {
+    sendMail.mockRejectedValue(new EsiTimeoutError(15_000, true));
+    const user = userEvent.setup();
+    renderBox('reply');
+    await screen.findByText('Sender Sal');
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(await screen.findByText(/couldn't confirm the mail was sent/i)).toBeInTheDocument();
+    expect(screen.getByText(/check your sent folder/i)).toBeInTheDocument();
+    expect(screen.queryByText(/draft is saved/i)).not.toBeInTheDocument();
+  });
+
+  it('does not read a failure after the send as offline, and still finishes', async () => {
+    sendMail.mockResolvedValue(1);
+    drafts.clearDraft.mockRejectedValue(new TypeError('IndexedDB closed'));
+    const onSent = vi.fn();
+    const user = userEvent.setup();
+    renderBox('reply', onSent);
+    await screen.findByText('Sender Sal');
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => expect(onSent).toHaveBeenCalled());
+    expect(screen.queryByText(/offline/i)).not.toBeInTheDocument();
+  });
+
   it('disables Send while offline, with the reason in a tooltip, and sends nothing', async () => {
     const user = userEvent.setup();
     renderBox('reply');
@@ -316,10 +360,11 @@ describe('sending', () => {
 
     const send = screen.getByRole('button', { name: 'Send' });
     expect(send).toHaveAttribute('aria-disabled', 'true');
-    await user.hover(send);
-    expect((await screen.findAllByText('Needs a connection')).length).toBeGreaterThan(0);
+    fireEvent.pointerMove(send);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a connection');
     await user.click(send);
     expect(sendMail).not.toHaveBeenCalled();
+    expect(screen.getByText('Your draft is saved.')).toBeInTheDocument();
     // Local actions are untouched: the draft fields still take input.
     expect(screen.getByLabelText('Subject')).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();

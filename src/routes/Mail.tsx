@@ -1099,7 +1099,9 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                     className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
                     <EmptyState
-                      title={online ? t('mail.emptyTitle') : t('mail.bodyNotDownloaded')}
+                      title={
+                        online ? t('mail.bodyNotDownloadedOnline') : t('mail.bodyNotDownloaded')
+                      }
                       className="py-4"
                       action={
                         <Button

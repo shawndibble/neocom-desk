@@ -5,6 +5,7 @@
  * UI call (`esi-ui.open_window.v1`, the Open in EVE Permission), not a mail
  * send, so it needs no mail scope and counts against no mail cap.
  */
+import { isOfflineFailure } from '@/esi/client';
 import { EsiError } from '@/esi/errors';
 import { postOpenWindowNewMail } from '@/esi/endpoints';
 import type { EsiEndpointId } from '@/esi/registry';
@@ -28,6 +29,7 @@ export async function openNewMail(
     await postOpenWindowNewMail(characterId, draft);
     return { ok: true };
   } catch (err) {
+    if (isOfflineFailure(err)) return { ok: false, message: null, offline: true };
     const outcome = await reportWriteAuthFailure(characterId, err, 'postOpenWindowNewMail');
     const message = err instanceof EsiError && err.message !== '' ? err.message : null;
     return outcome === 'grant-needed'

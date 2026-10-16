@@ -3653,7 +3653,7 @@
     "errorSpent": "This login link has already been used, or it was opened in a different tab or window. Log in again.",
     "errorMismatch": "This login could not be verified. Another login may have started before this one finished. Log in again.",
     "errorDenied": "Login was cancelled on the EVE Online page. Nothing was added.",
-    "errorOffline": "Connection lost while signing in. Nothing was added. Reconnect, then try again.",
+    "errorOffline": "You're offline — the connection dropped while logging you in. Nothing was added. Reconnect, then try again.",
     "retry": "Try again"
   },
   "character": {
@@ -6265,10 +6265,13 @@
     "cancel": "Cancel",
     "sendErrorPrefix": "Couldn't send: {{message}} Try sending from the EVE client instead.",
     "sendNoRecipients": "Add at least one recipient before sending.",
+    "sendUnconfirmed": "Couldn't confirm the mail was sent. Check your Sent folder before sending it again.",
+    "draftSaved": "Your draft is saved.",
     "sendOffline": "You're offline — your draft is saved. Send it when you're back online.",
     "loadMoreOffline": "Couldn't load more — you're offline.",
     "loadMoreFailed": "Couldn't load more mail. Try again.",
     "recipientSearchOffline": "Search needs a connection.",
+    "bodyNotDownloadedOnline": "This mail hasn't been downloaded yet.",
     "bodyNotDownloaded": "This mail hasn't been downloaded yet — reconnect to read it."
   },
   "calendar": {
@@ -11124,6 +11127,7 @@
     }
   },
   "publicInfo": {
+    "loadFailedHint": "Couldn't look this up. Check your connection, then try again.",
     "title": "Public info",
     "tabsLabel": "Character, corporation, alliance, and employment",
     "characterTab": "Character",

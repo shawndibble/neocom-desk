@@ -6,6 +6,7 @@ import { Button } from '@/components/ui';
 import { OUTCOME_VISIBLE_MS } from '@/features/openInEve/useOpenInEve';
 import { OPEN_NEW_MAIL_ENDPOINTS, openNewMail } from '@/features/openInEve/sendOpenNewMail';
 import { permissionsForEndpoints } from '@/esi/registry';
+import { useOnline } from '@/stores/network';
 
 const MISSING_GROUPS = permissionsForEndpoints(OPEN_NEW_MAIL_ENDPOINTS);
 
@@ -39,6 +40,10 @@ export function MessageRequesterButton({
   const { t } = useTranslation();
   const reasonId = useId();
   const lacksScope = useCharacterLacksEndpoints(characterId, OPEN_NEW_MAIL_ENDPOINTS);
+  const online = useOnline();
+  /** Offline is the reason only when the missing Permission is not already. */
+  const offlineBlocked = !online && !lacksScope;
+  const blocked = lacksScope || offlineBlocked;
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
   /** `sending` lags a render behind; two quick presses must not both send. */
@@ -51,7 +56,7 @@ export function MessageRequesterButton({
   }, [outcome]);
 
   const send = async () => {
-    if (lacksScope || inFlight.current) return;
+    if (blocked || inFlight.current) return;
     inFlight.current = true;
     setSending(true);
     setOutcome(null);
@@ -59,6 +64,8 @@ export function MessageRequesterButton({
       const result = await openNewMail(characterId, { recipientId, subject, body });
       if (result.ok) {
         setOutcome({ tone: 'status', text: t('openInEve.opened') });
+      } else if (result.offline) {
+        setOutcome({ tone: 'alert', text: t('openInEve.offline') });
       } else if (!result.needsPermission) {
         setOutcome({
           tone: 'alert',
@@ -78,8 +85,8 @@ export function MessageRequesterButton({
       <Button
         size="sm"
         loading={sending}
-        aria-disabled={lacksScope || undefined}
-        aria-describedby={lacksScope ? reasonId : undefined}
+        aria-disabled={blocked || undefined}
+        aria-describedby={blocked ? reasonId : undefined}
         onClick={() => void send()}
       >
         {t('communities.board.message', { name })}
@@ -88,6 +95,11 @@ export function MessageRequesterButton({
         <span id={reasonId} className="text-xs text-text-dim">
           {t('communities.board.messageNeedsPermission')}{' '}
           <GrantMissingLink groups={MISSING_GROUPS} />
+        </span>
+      )}
+      {offlineBlocked && (
+        <span id={reasonId} className="text-xs text-text-dim">
+          {t('common.needsConnection')}
         </span>
       )}
       {outcome && (

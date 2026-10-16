@@ -171,14 +171,11 @@ export function SetWaypoints({
             </Select>
           )}
           {/* `aria-disabled`, not `disabled`: the blocked reason stays reachable in a tooltip. */}
-          {blockedReason === null ? (
-            sendButton
-          ) : (
-            <Tooltip content={blockedReason}>{sendButton}</Tooltip>
-          )}
+          {/* Always the Tooltip, so the button is not remounted when the reason comes and goes. */}
+          <Tooltip content={blockedReason}>{sendButton}</Tooltip>
         </div>
       </div>
-      {(characterId === null || (!online && !lacksScope)) && blockedReason !== null && (
+      {blockedReason !== null && !lacksScope && (
         <p className="text-text-dim sm:text-right">{blockedReason}</p>
       )}
       {lacksScope && characterId !== null && (

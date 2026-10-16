@@ -24,6 +24,7 @@ function Probe({ onSeed }: { onSeed: (text: string) => void }) {
     <>
       <p data-testid="search">{useLocation().search}</p>
       <p data-testid="failed">{String(seed.loadFailed)}</p>
+      <p data-testid="retrying">{String(seed.retrying)}</p>
       <button onClick={seed.retry}>retry</button>
       <button onClick={seed.dismiss}>dismiss</button>
     </>
@@ -94,6 +95,31 @@ describe('useSharedAppraisalSeed', () => {
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?hub=amarr'));
     expect(screen.getByTestId('search')).not.toHaveTextContent('share=');
     expect(screen.getByTestId('failed')).toHaveTextContent('false');
+  });
+
+  it('keeps loadFailed set while a retry runs, and across a repeat failure', async () => {
+    vi.mocked(loadShare).mockResolvedValueOnce({ ok: false, reason: 'failed' });
+    render(
+      <MemoryRouter initialEntries={['/market/appraisal?share=abc123XYZ']}>
+        <Probe onSeed={vi.fn()} />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId('failed')).toHaveTextContent('true'));
+
+    let settle!: (result: { ok: false; reason: 'failed' }) => void;
+    vi.mocked(loadShare).mockReturnValueOnce(
+      new Promise((resolve) => {
+        settle = resolve;
+      })
+    );
+    await act(async () => screen.getByText('retry').click());
+    expect(screen.getByTestId('retrying')).toHaveTextContent('true');
+    expect(screen.getByTestId('failed')).toHaveTextContent('true');
+
+    await act(async () => settle({ ok: false, reason: 'failed' }));
+    expect(screen.getByTestId('retrying')).toHaveTextContent('false');
+    expect(screen.getByTestId('failed')).toHaveTextContent('true');
+    expect(screen.getByTestId('search')).toHaveTextContent('share=abc123XYZ');
   });
 
   it('dismissing a failed load drops ?share=', async () => {

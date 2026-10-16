@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -286,8 +286,8 @@ describe('EventDetailModal', () => {
         const user = userEvent.setup();
         const accept = screen.getByRole('button', { name: 'Accept' });
         expect(accept).toHaveAttribute('aria-disabled', 'true');
-        await user.hover(accept);
-        expect((await screen.findAllByText('Needs a connection')).length).toBeGreaterThan(0);
+        fireEvent.pointerMove(accept);
+        expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a connection');
         await user.click(accept);
         expect(puts).toBe(0);
       } finally {

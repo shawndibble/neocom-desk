@@ -35,6 +35,8 @@ export function sharedAppraisalOpenInApp(view: AppraisalShareView, shareId: stri
 export interface SharedAppraisalSeed {
   /** The share could not be fetched (offline, a timeout): `?share=` is still in the URL. */
   loadFailed: boolean;
+  /** A `retry` is in flight; `loadFailed` stays true until it succeeds. */
+  retrying: boolean;
   /** Fetches the share again. */
   retry: () => void;
   /** Gives up on the failed load: drops `?share=` so a reload does not try again. */
@@ -59,6 +61,7 @@ export function useSharedAppraisalSeed(onSeed: (text: string) => void): SharedAp
   });
   const [attempt, setAttempt] = useState(0);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   // Not a cancellation flag: stripping the param re-runs this effect, and its
   // cleanup must not drop the load it just started.
   const handled = useRef<string | null>(null);
@@ -80,10 +83,12 @@ export function useSharedAppraisalSeed(onSeed: (text: string) => void): SharedAp
     if (handled.current === key) return;
     handled.current = key;
     void loadShare(shareId).then((result) => {
+      setRetrying(false);
       if (!result.ok && result.reason === 'failed') {
         setLoadFailed(true);
         return;
       }
+      setLoadFailed(false);
       if (result.ok && result.share.type === 'appraisal') {
         const snapshot = parseAppraisalSnapshot(result.share.payload);
         if (snapshot !== null) latestOnSeed.current(appraisalSnapshotPasteText(snapshot));
@@ -92,8 +97,9 @@ export function useSharedAppraisalSeed(onSeed: (text: string) => void): SharedAp
     });
   }, [shareId, attempt, strip]);
 
+  // `loadFailed` stays set while the retry runs, so the notice that offered it stays mounted.
   const retry = useCallback(() => {
-    setLoadFailed(false);
+    setRetrying(true);
     setAttempt((n) => n + 1);
   }, []);
   const dismiss = useCallback(() => {
@@ -101,5 +107,5 @@ export function useSharedAppraisalSeed(onSeed: (text: string) => void): SharedAp
     strip();
   }, [strip]);
 
-  return { loadFailed, retry, dismiss };
+  return { loadFailed, retrying, retry, dismiss };
 }

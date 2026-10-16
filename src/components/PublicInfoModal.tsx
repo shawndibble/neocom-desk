@@ -306,7 +306,7 @@ function TabStatus({
   return (
     <EmptyState
       title={t('common.loadFailedTitle')}
-      hint={t('common.loadFailedHint')}
+      hint={onRetry ? t('publicInfo.loadFailedHint') : t('common.loadFailedHint')}
       className="py-8"
       action={
         onRetry && (

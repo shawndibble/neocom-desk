@@ -249,7 +249,11 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
 
   return (
     <TooltipPrimitive.Provider delayDuration={0}>
-      <TooltipPrimitive.Root open={hoverOpen || touchOpen} onOpenChange={handleOpenChange}>
+      <TooltipPrimitive.Root
+        // No content, no bubble: a caller can keep the tree stable and pass content only when it has some.
+        open={(hoverOpen || touchOpen) && content != null && content !== false && content !== ''}
+        onOpenChange={handleOpenChange}
+      >
         <TooltipPrimitive.Trigger
           asChild
           ref={triggerRef}

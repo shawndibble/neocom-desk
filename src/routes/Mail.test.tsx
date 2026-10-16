@@ -659,7 +659,7 @@ describe('Mail', () => {
     render(<App />);
     await user.click(await screen.findByText('Fleet up!'));
 
-    expect(await screen.findByText('No mail cached')).toBeInTheDocument();
+    expect(await screen.findByText("This mail hasn't been downloaded yet.")).toBeInTheDocument();
     fail = false;
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Undock now.')).toBeInTheDocument();

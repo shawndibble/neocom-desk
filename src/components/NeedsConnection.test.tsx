@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { Button } from '@/components/ui';
@@ -47,8 +47,8 @@ describe('NeedsConnection', () => {
     expect(button).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(button);
     expect(onClick).not.toHaveBeenCalled();
-    await userEvent.hover(button);
-    expect((await screen.findAllByText('Needs a connection')).length).toBeGreaterThan(0);
+    fireEvent.pointerMove(button);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a connection');
 
     setOnline(true);
     expect(screen.getByRole('button', { name: 'Send' })).not.toHaveAttribute('aria-disabled');

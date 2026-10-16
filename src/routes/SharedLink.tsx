@@ -34,6 +34,45 @@ function dscanState(share: StoredShare): DscanShareState {
   return scan === null ? { status: 'invalid' } : { status: 'ready', rows: scan.rows };
 }
 
+/** The page a stored share's `type` names. */
+function SharedScreen({ share, shareId }: { share: StoredShare; shareId: string }) {
+  switch (share.type) {
+    case 'appraisal': {
+      const state = appraisalState(share);
+      return (
+        <AppraisalShareScreen
+          state={state}
+          expiresAt={share.expiresAt}
+          openInApp={
+            state.status === 'ready' ? sharedAppraisalOpenInApp(state.view, shareId) : undefined
+          }
+        />
+      );
+    }
+    case 'dscan': {
+      const state = dscanState(share);
+      return (
+        <DscanShareScreen
+          state={state}
+          expiresAt={share.expiresAt}
+          openInApp={state.status === 'ready' ? sharedDscanOpenInApp(shareId) : undefined}
+        />
+      );
+    }
+    case 'survey':
+      return <SurveyShareScreen shareId={shareId} />;
+    case 'fitting':
+      // Signed in, this redirects straight into the editor on the code; a
+      // malformed payload reads as an empty code, and so an invalid link.
+      return (
+        <FittingShareView
+          code={parseFittingSharePayload(share.payload)?.code ?? ''}
+          expiresAt={share.expiresAt}
+        />
+      );
+  }
+}
+
 /**
  * A stored **Share Link**, `/s/<id>`: reads the share from Firestore and
  * opens the page its `type` names, showing what was shared at the time it was
@@ -69,41 +108,13 @@ export function SharedLink() {
   );
 
   if (result?.ok) {
-    switch (result.share.type) {
-      case 'appraisal': {
-        const state = appraisalState(result.share);
-        return (
-          <AppraisalShareScreen
-            state={state}
-            expiresAt={result.share.expiresAt}
-            openInApp={
-              state.status === 'ready' ? sharedAppraisalOpenInApp(state.view, shareId) : undefined
-            }
-          />
-        );
-      }
-      case 'dscan': {
-        const state = dscanState(result.share);
-        return (
-          <DscanShareScreen
-            state={state}
-            expiresAt={result.share.expiresAt}
-            openInApp={state.status === 'ready' ? sharedDscanOpenInApp(shareId) : undefined}
-          />
-        );
-      }
-      case 'survey':
-        return <SurveyShareScreen shareId={shareId} />;
-      case 'fitting':
-        // Signed in, this redirects straight into the editor on the code; a
-        // malformed payload reads as an empty code, and so an invalid link.
-        return (
-          <FittingShareView
-            code={parseFittingSharePayload(result.share.payload)?.code ?? ''}
-            expiresAt={result.share.expiresAt}
-          />
-        );
-    }
+    // The same focus target as the loading and failed states below, so a
+    // retry that succeeds lands focus here instead of on <body>.
+    return (
+      <div ref={retryRef} tabIndex={-1} className="focus:outline-none">
+        <SharedScreen share={result.share} shareId={shareId} />
+      </div>
+    );
   }
 
   return (

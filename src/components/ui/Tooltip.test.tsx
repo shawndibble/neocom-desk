@@ -72,6 +72,19 @@ describe('Tooltip', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
+  it('shows no bubble when it has no content, so a caller can keep its tree stable', () => {
+    render(
+      <Tooltip content={null}>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.pointerMove(trigger);
+    fireEvent.focus(trigger);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
   it('reveals the tooltip on keyboard focus too, with no hover delay', () => {
     render(
       <Tooltip content="One-line explanation.">
