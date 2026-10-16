@@ -7,6 +7,8 @@ import type { MutaplasmidData } from '@/sde/types';
 import type { DynamicItemRecord } from '@/db';
 import { AbyssalItemDetail } from './AbyssalItemDetail';
 import { resetMutaplasmidLookupForTests } from './mutaplasmidData';
+import { loadTypeNames } from '@/features/character/typeNames';
+import { loadTypeDetail } from '@/features/skills/typeDetail';
 
 const GRAVID = 47831;
 const DECAYED = 47829;
@@ -143,6 +145,29 @@ describe('AbyssalItemDetail', () => {
     expect(within(cap).getByText('200')).toBeInTheDocument();
     expect(within(cap).getByText('170')).toBeInTheDocument();
     expect(within(cap).getByText('100%')).toBeInTheDocument();
+  });
+
+  it('still picks a base and shows the ranges when type names fail to load', async () => {
+    vi.mocked(loadTypeNames).mockRejectedValueOnce(new Error('offline'));
+    renderDetail(ABYSSAL_NEUT, { status: 'none' });
+    const table = await screen.findByRole('table', { name: new RegExp(`Type #${NEUT_II}`) });
+    expect(within(table).getByRole('row', { name: /Activation Cost/ })).toBeInTheDocument();
+  });
+
+  it('says so when an owned module has no rolls to show against its base', async () => {
+    vi.mocked(loadTypeDetail).mockResolvedValueOnce(null);
+    const record: DynamicItemRecord = {
+      itemId: 1,
+      typeId: ABYSSAL_NEUT,
+      createdBy: 9,
+      sourceTypeId: GREMLIN,
+      mutatorTypeId: DECAYED,
+      attributes: [[6, 170]],
+      savedAt: 0,
+    };
+    renderDetail(ABYSSAL_NEUT, { status: 'ready', record });
+    expect(await screen.findByText('No rolls to show for this module.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('falls back to the type’s ranges when the owned module’s rolls can’t be read', async () => {

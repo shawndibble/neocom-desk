@@ -109,18 +109,31 @@ export interface MultiplierRow {
   /** Signed percent change at the lowest multiplier (−20 for ×0.8). */
   lowPct: number;
   highPct: number;
-  /** A higher value of the attribute itself is better. */
+  /** A higher raw value is better — the multiplier's direction, not the shown figure's. */
   highIsGood: boolean;
+  /**
+   * The game shows this attribute backwards (a resonance as a resistance), so
+   * a higher multiplier is a lower shown figure. The percentages stay raw: the
+   * shown figure's change depends on the base value.
+   */
+  shownBackwards: boolean;
 }
 
-/** `mutaplasmid`'s rolls as signed percentages of the base module's own value, by attribute id. */
-export function multiplierPercentRows(mutaplasmid: Mutaplasmid): MultiplierRow[] {
-  return mutaplasmid.attributes.map((a) => ({
-    attributeId: a.id,
-    lowPct: (Math.min(a.min, a.max) - 1) * 100,
-    highPct: (Math.max(a.min, a.max) - 1) * 100,
-    highIsGood: a.highIsGood,
-  }));
+/** `mutaplasmid`'s rolls as signed percentages of the base module's own raw value, by attribute id. */
+export function multiplierPercentRows(
+  mutaplasmid: Mutaplasmid,
+  unitIdOf: UnitIdOf
+): MultiplierRow[] {
+  return mutaplasmid.attributes.map((a) => {
+    const unitId = unitIdOf(a.id);
+    return {
+      attributeId: a.id,
+      lowPct: (Math.min(a.min, a.max) - 1) * 100,
+      highPct: (Math.max(a.min, a.max) - 1) * 100,
+      highIsGood: a.highIsGood,
+      shownBackwards: shown(1, unitId) > shown(2, unitId),
+    };
+  });
 }
 
 /** One of an owned item's rolls against its base. */

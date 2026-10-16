@@ -73,24 +73,26 @@ function useAttributeDictionary(): AttributeDictionary | null {
   return dictionary;
 }
 
-/** Names for `typeIds`; an id not yet named reads as its fallback until it is. */
-function useTypeNames(typeIds: readonly number[]): Names {
+/** Names for `typeIds`, null while loading; a failed load leaves every id on its fallback. */
+function useTypeNames(typeIds: readonly number[]): Names | null {
   const key = typeIds.join(',');
-  const [names, setNames] = useState<Names>(new Map());
+  const [answer, setAnswer] = useState<{ key: string; names: Names } | null>(null);
   useEffect(() => {
     let live = true;
     const ids = key === '' ? [] : key.split(',').map(Number);
     loadTypeNames(ids).then(
       (loaded) => {
-        if (live) setNames(loaded);
+        if (live) setAnswer({ key, names: loaded });
       },
-      () => {}
+      () => {
+        if (live) setAnswer({ key, names: new Map() });
+      }
     );
     return () => {
       live = false;
     };
   }, [key]);
-  return names;
+  return answer?.key === key ? answer.names : null;
 }
 
 /** A type's own attribute values (baked shard, else cached ESI); null while loading. */
@@ -113,8 +115,8 @@ function useBaseAttributes(typeId: number | null): ReadonlyMap<number, number> |
   return state && state.typeId === typeId ? state.values : null;
 }
 
-function nameOf(names: Names, typeId: number): string {
-  return names.get(typeId) ?? `Type #${typeId}`;
+function nameOf(names: Names | null, typeId: number): string {
+  return names?.get(typeId) ?? `Type #${typeId}`;
 }
 
 export interface AbyssalItemDetailProps {
@@ -173,7 +175,7 @@ function SectionSpinner() {
 }
 
 /** An inline, wrapping list of Show info links. */
-function TypeLinks({ typeIds, names }: { typeIds: readonly number[]; names: Names }) {
+function TypeLinks({ typeIds, names }: { typeIds: readonly number[]; names: Names | null }) {
   return (
     <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
       {typeIds.map((id) => (
@@ -217,10 +219,12 @@ function AttributeCell({
   name,
   unit,
   highIsGood,
+  note,
 }: {
   name: string;
   unit: string | null;
   highIsGood: boolean;
+  note?: string;
 }) {
   const { t } = useTranslation();
   return (
@@ -234,6 +238,7 @@ function AttributeCell({
           ? t('market.itemDetail.abyssal.higherIsBetter')
           : t('market.itemDetail.abyssal.lowerIsBetter')}
       </span>
+      {note && <span className="text-[0.6875rem] text-text-dim">{note}</span>}
     </span>
   );
 }
@@ -291,7 +296,7 @@ function AbyssalTypeSection({
   );
   const [picked, setPicked] = useState<number | null>(null);
   // Waits for the names: the default base is picked by name.
-  const baseTypeId = picked ?? (names.size > 0 ? defaultBaseTypeId(bases) : null);
+  const baseTypeId = picked ?? (names ? defaultBaseTypeId(bases) : null);
   const baseAttributes = useBaseAttributes(baseTypeId);
   const strains = baseTypeId === null ? [] : mutaplasmidsMaking(lookup, typeId, baseTypeId);
   // Shortened across every maker, not just this base's, so a strain keeps one label whichever base is picked.
@@ -426,6 +431,9 @@ function OwnedRollsSection({
     {
       id: 'attribute',
       header: t('market.itemDetail.abyssal.attributeColumn'),
+      stickyStart: true,
+      stickyStartOnPanel: true,
+      className: 'min-w-36',
       render: (row) => {
         const { name, unit } = attributeLabel(row.attributeId, dictionary, lookup);
         return <AttributeCell name={name} unit={unit} highIsGood={row.range.highIsGood} />;
@@ -484,6 +492,8 @@ function OwnedRollsSection({
       </dl>
       {rows === null ? (
         <SectionSpinner />
+      ) : rows.length === 0 ? (
+        <p className="mt-2 text-xs text-text-dim">{t('market.itemDetail.abyssal.noRolls')}</p>
       ) : (
         <DataTable
           className="mt-2"
@@ -492,6 +502,7 @@ function OwnedRollsSection({
           rows={rows}
           rowKey={(row) => row.attributeId}
           density="compact"
+          responsive="table"
         />
       )}
     </Section>
@@ -529,12 +540,19 @@ function MutaplasmidSection({
           {t('market.itemDetail.abyssal.multipliersHint')}
         </p>
         <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
-          {multiplierPercentRows(mutaplasmid).map((row) => {
+          {multiplierPercentRows(mutaplasmid, (id) => dictionary[id]?.unitId).map((row) => {
             const { name } = attributeLabel(row.attributeId, dictionary, lookup);
             return (
               <div key={row.attributeId} className="contents">
                 <dt>
-                  <AttributeCell name={name} unit={null} highIsGood={row.highIsGood} />
+                  <AttributeCell
+                    name={name}
+                    unit={null}
+                    highIsGood={row.highIsGood}
+                    note={
+                      row.shownBackwards ? t('market.itemDetail.abyssal.shownBackwards') : undefined
+                    }
+                  />
                 </dt>
                 <dd className="text-right whitespace-nowrap text-text tabular-nums">
                   {t('market.itemDetail.abyssal.multiplierRange', {

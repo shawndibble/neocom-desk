@@ -173,7 +173,23 @@ export function ItemDetailModal({
   const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
 
   const mutaplasmids = useMutaplasmidLookup();
-  const abyssal = mutaplasmids?.isAbyssalType(typeId) ?? false;
+  const [mutaplasmidsFailed, setMutaplasmidsFailed] = useState(false);
+  useEffect(() => {
+    if (mutaplasmids) return;
+    let live = true;
+    loadMutaplasmidLookup().catch(() => {
+      if (live) setMutaplasmidsFailed(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [mutaplasmids]);
+  /** Null until known, so the market line and link don't flash in on an abyssal type; no data reads as not abyssal. */
+  const abyssal: boolean | null = mutaplasmids
+    ? mutaplasmids.isAbyssalType(typeId)
+    : mutaplasmidsFailed
+      ? false
+      : null;
   const dynamic = useDynamicItem(typeId, abyssal ? itemId : undefined);
   /** The owned module's own attributes, grouped as the type's are, for the record they were grouped from. */
   const [dynamicGrouped, setDynamicGrouped] = useState<{
@@ -324,7 +340,7 @@ export function ItemDetailModal({
         <>
           <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
           {/* No market order exists for an abyssal type. */}
-          {showOpenInMarket && !abyssal && (
+          {showOpenInMarket && abyssal === false && (
             <OpenInMarketLink typeId={typeId} onNavigate={leave} replace={onLeave !== undefined} />
           )}
         </>
@@ -360,39 +376,43 @@ export function ItemDetailModal({
               <p className="text-text-dim">
                 {t('market.itemDetail.volume', { volume: formatVolume(data.type.volume ?? 0) })}
               </p>
-              {abyssal
-                ? itemId !== undefined &&
-                  activeCharacterId !== null && (
-                    <AbyssalEstimateLine
-                      typeId={typeId}
-                      itemId={itemId}
-                      characterId={activeCharacterId}
-                    />
-                  )
-                : priceState.status !== 'error' && (
-                    <p className="flex gap-4 text-text-dim">
-                      <PriceFigure
-                        label={t('market.itemDetail.bestSell')}
-                        side="sell"
+              {abyssal === null
+                ? null
+                : abyssal
+                  ? itemId !== undefined &&
+                    activeCharacterId !== null && (
+                      <AbyssalEstimateLine
                         typeId={typeId}
-                        price={
-                          priceState.status === 'loading' ? undefined : priceState.summary.bestSell
-                        }
-                        onNavigate={leave}
-                        replace={onLeave !== undefined}
+                        itemId={itemId}
+                        characterId={activeCharacterId}
                       />
-                      <PriceFigure
-                        label={t('market.itemDetail.bestBuy')}
-                        side="buy"
-                        typeId={typeId}
-                        price={
-                          priceState.status === 'loading' ? undefined : priceState.summary.bestBuy
-                        }
-                        onNavigate={leave}
-                        replace={onLeave !== undefined}
-                      />
-                    </p>
-                  )}
+                    )
+                  : priceState.status !== 'error' && (
+                      <p className="flex gap-4 text-text-dim">
+                        <PriceFigure
+                          label={t('market.itemDetail.bestSell')}
+                          side="sell"
+                          typeId={typeId}
+                          price={
+                            priceState.status === 'loading'
+                              ? undefined
+                              : priceState.summary.bestSell
+                          }
+                          onNavigate={leave}
+                          replace={onLeave !== undefined}
+                        />
+                        <PriceFigure
+                          label={t('market.itemDetail.bestBuy')}
+                          side="buy"
+                          typeId={typeId}
+                          price={
+                            priceState.status === 'loading' ? undefined : priceState.summary.bestBuy
+                          }
+                          onNavigate={leave}
+                          replace={onLeave !== undefined}
+                        />
+                      </p>
+                    )}
               {data.type.description && (
                 <EveMarkupText markup={data.type.description} className="text-text" />
               )}

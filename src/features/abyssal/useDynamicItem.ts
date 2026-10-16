@@ -25,7 +25,11 @@ export function useDynamicItem(typeId: number, itemId: number | undefined): Dyna
         if (live) {
           setAnswer({
             key: asked,
-            state: record ? { status: 'ready', record } : { status: 'failed' },
+            // The cache is keyed by item id alone: a URL naming another type gets no rolls.
+            state:
+              record && record.typeId === typeId
+                ? { status: 'ready', record }
+                : { status: 'failed' },
           });
         }
       },

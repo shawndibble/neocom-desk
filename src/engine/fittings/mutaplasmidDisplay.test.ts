@@ -140,20 +140,40 @@ describe('strainRangeRows', () => {
 
 describe('multiplierPercentRows', () => {
   it('states each roll as a signed percentage of the base value', () => {
-    expect(multiplierPercentRows(lookup.mutaplasmid(GRAVID_HEAVY_NEUT)!)).toEqual([
+    expect(multiplierPercentRows(lookup.mutaplasmid(GRAVID_HEAVY_NEUT)!, unitIdOf)).toEqual([
       {
         attributeId: 6,
         lowPct: expect.closeTo(-20),
         highPct: expect.closeTo(30),
         highIsGood: false,
+        shownBackwards: false,
       },
       {
         attributeId: 54,
         lowPct: expect.closeTo(-20),
         highPct: expect.closeTo(30),
         highIsGood: true,
+        shownBackwards: false,
       },
     ]);
+  });
+
+  it('keeps a resonance roll as the raw multiplier and flags that it is shown backwards', () => {
+    // ×0.9 on a resonance is a higher resistance, by an amount that depends on the base.
+    expect(multiplierPercentRows(lookup.mutaplasmid(GRAVID_DC)!, unitIdOf)).toEqual([
+      {
+        attributeId: 974,
+        lowPct: expect.closeTo(-10),
+        highPct: expect.closeTo(10),
+        highIsGood: false,
+        shownBackwards: true,
+      },
+    ]);
+  });
+
+  it('does not flag a duration, which only rescales', () => {
+    const [, duration] = multiplierPercentRows(lookup.mutaplasmid(DECAYED_HEAVY_NEUT)!, unitIdOf);
+    expect(duration).toMatchObject({ attributeId: 73, shownBackwards: false });
   });
 });
 

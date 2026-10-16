@@ -76,7 +76,8 @@ afterEach(async () => {
 
 describe('ItemDetailModal', () => {
   it('offers View in Market only when asked, closing itself on the way', async () => {
-    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => new Promise(() => {})));
+    // Fails fast: a request left hanging would hold an ESI slot the next tests need.
+    server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
     mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
     const onClose = vi.fn();
     const { rerender } = render(
@@ -84,7 +85,8 @@ describe('ItemDetailModal', () => {
         <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={onClose} showOpenInMarket />
       </MemoryRouter>
     );
-    const link = screen.getByRole('link', { name: 'View in Market' });
+    // Waits for the mutaplasmid data: an abyssal type offers no View in Market.
+    const link = await screen.findByRole('link', { name: 'View in Market' });
     expect(link).toHaveAttribute('href', `/market/browser?type=${TYPE_ID}`);
     await userEvent.setup().click(link);
     expect(onClose).toHaveBeenCalledTimes(1);
