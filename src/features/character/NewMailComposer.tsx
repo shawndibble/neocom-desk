@@ -341,12 +341,9 @@ export function NewMailComposer({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col space-y-1">
-          <div className="flex items-baseline justify-between">
-            <label htmlFor={bodyId} className={labelClass}>
-              {t('mail.bodyLabel')}
-            </label>
-            <MailCounter id={bodyCountId} count={bodyLength} max={MAX_BODY_LENGTH} />
-          </div>
+          <label htmlFor={bodyId} className={labelClass}>
+            {t('mail.bodyLabel')}
+          </label>
           <BodyEditor
             id={bodyId}
             value={body}
@@ -355,6 +352,14 @@ export function NewMailComposer({
               setBody(next);
             }}
             aria-describedby={bodyCountId}
+            counter={
+              <MailCounter
+                id={bodyCountId}
+                count={bodyLength}
+                max={MAX_BODY_LENGTH}
+                warnFrom={0.9}
+              />
+            }
             aria-invalid={bodyOver}
             className={fullPane ? 'min-h-40 flex-1 resize-none' : 'min-h-64'}
           />

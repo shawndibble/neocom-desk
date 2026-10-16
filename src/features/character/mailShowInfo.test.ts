@@ -13,13 +13,18 @@ describe('resolveShowInfo', () => {
     expect(resolveShowInfo(0, 31000005)).toEqual({ kind: 'system', id: 31000005 });
   });
 
-  it('has no view for regions, stations or structures', () => {
+  it('opens a region, station or structure as a place', () => {
     expect(resolveShowInfo(3, 10000002)).toEqual({ kind: 'place', id: 10000002 });
     expect(resolveShowInfo(1529, 60003760)).toEqual({ kind: 'place', id: 60003760 });
     expect(resolveShowInfo(35832, 1_020_000_000_000)).toEqual({
       kind: 'place',
       id: 1_020_000_000_000,
     });
+  });
+
+  it('has no view for a constellation or faction', () => {
+    expect(resolveShowInfo(4, 20000020)).toEqual({ kind: 'noView' });
+    expect(resolveShowInfo(30, 500001)).toEqual({ kind: 'noView' });
   });
 
   it('treats a bare typeID, or an item instance, as an item type', () => {
