@@ -10,12 +10,8 @@
  * screen.
  */
 import { displayAttributeValue } from './attributeUnits';
-import {
-  rollQuality,
-  type Mutaplasmid,
-  type MutaplasmidLookup,
-  type RollRange,
-} from './mutaplasmids';
+import type { Mutaplasmid, MutaplasmidLookup, RollRange } from './mutaplasmids';
+import { rollRows } from './mutationEdit';
 import type { ItemMutation } from './types';
 
 /** An attribute's roll range as shown, `low <= high`. */
@@ -151,7 +147,7 @@ export interface RolledAttributeRow {
 
 /**
  * A Mutated module's rolls (`mutation`) beside its base module's values, one row
- * per attribute the mutaplasmid rolls, by attribute id. A roll the item
+ * per attribute the mutaplasmid rolls (`rollRows`), by its order. A roll the item
  * doesn't carry, or one the base has no value for, is left out.
  */
 export function rolledAttributeRows(
@@ -160,24 +156,23 @@ export function rolledAttributeRows(
   baseAttributes: ReadonlyMap<number, number>,
   unitIdOf: UnitIdOf
 ): RolledAttributeRow[] {
-  const mutaplasmid = lookup.mutaplasmid(mutation.mutaplasmidTypeId);
-  if (!mutaplasmid) return [];
-  const rows: RolledAttributeRow[] = [];
-  for (const { id } of mutaplasmid.attributes) {
-    const rolled = mutation.attributes[id];
-    const baseValue = baseAttributes.get(id);
-    if (rolled === undefined || baseValue === undefined) continue;
-    const range = lookup.rollRange(mutaplasmid.typeId, id, baseValue)!;
-    const unitId = unitIdOf(id);
-    rows.push({
-      attributeId: id,
-      base: shown(baseValue, unitId),
-      rolled: shown(rolled, unitId),
-      range: displayRollRange(range, unitId),
-      quality: rollQuality(rolled, range),
+  return rollRows(
+    mutation.mutaplasmidTypeId,
+    mutation.attributes,
+    (id) => baseAttributes.get(id),
+    lookup
+  )
+    .filter((row) => row.rolled)
+    .map(({ attributeId, range, value, quality }) => {
+      const unitId = unitIdOf(attributeId);
+      return {
+        attributeId,
+        base: shown(baseAttributes.get(attributeId)!, unitId),
+        rolled: shown(value, unitId),
+        range: displayRollRange(range, unitId),
+        quality,
+      };
     });
-  }
-  return rows;
 }
 
 /**

@@ -33,11 +33,12 @@ import {
 } from '@/engine/fittings/mutaplasmidDisplay';
 import type { ItemMutation } from '@/engine/fittings/types';
 import { shortCompareLabels } from '@/engine/market/compareLabels';
-import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import type { AttributeDictionary } from '@/sde/marketTypes';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { formatAttributeValue } from '@/features/market/format';
+import { useAttributeDictionary } from '@/features/fittings/useAttributeDictionary';
+import { groupMutaplasmidsByStrain } from '@/engine/fittings/mutationEdit';
 import { useMutaplasmidLookup } from './mutaplasmidData';
 import { mutationFromRecord } from './dynamicItems';
 import type { DynamicItemState } from './useDynamicItem';
@@ -51,25 +52,6 @@ const PERCENT = new Intl.NumberFormat('en', {
 });
 
 type Names = ReadonlyMap<number, string>;
-
-function useAttributeDictionary(): AttributeDictionary | null {
-  const [dictionary, setDictionary] = useState<AttributeDictionary | null>(null);
-  useEffect(() => {
-    let live = true;
-    loadAttributeDictionary().then(
-      (loaded) => {
-        if (live) setDictionary(loaded);
-      },
-      () => {
-        if (live) setDictionary({});
-      }
-    );
-    return () => {
-      live = false;
-    };
-  }, []);
-  return dictionary;
-}
 
 /** Names for `typeIds`, null while loading; a failed load leaves every id on its fallback. */
 function useTypeNames(typeIds: readonly number[]): Names | null {
@@ -312,25 +294,26 @@ function AbyssalTypeSection({
   // Waits for the names: the default base is picked by name.
   const baseTypeId = picked ?? (names ? defaultBaseTypeId(bases) : null);
   const baseAttributes = useBaseAttributes(baseTypeId);
-  const strains = baseTypeId === null ? [] : mutaplasmidsMaking(lookup, typeId, baseTypeId);
+  // In the game's strain order, as the Fittings mutaplasmid picker lists them.
+  const inStrainOrder = (ids: number[]) =>
+    groupMutaplasmidsByStrain(ids, (id) => nameOf(names, id)).flatMap((g) => g.typeIds);
+  const strainIds =
+    baseTypeId === null
+      ? []
+      : inStrainOrder(mutaplasmidsMaking(lookup, typeId, baseTypeId).map((m) => m.typeId));
   // Shortened across every maker, not just this base's, so a strain keeps one label whichever base is picked.
   const makerLabels = shortCompareLabels(makers.map((m) => nameOf(names, m.typeId))).labels;
   const labelOf = (typeId: number) =>
     makerLabels[makers.findIndex((m) => m.typeId === typeId)] ?? nameOf(names, typeId);
   const rows = baseAttributes
-    ? strainRangeRows(
-        lookup,
-        strains.map((m) => m.typeId),
-        baseAttributes,
-        (id) => dictionary[id]?.unitId
-      )
+    ? strainRangeRows(lookup, strainIds, baseAttributes, (id) => dictionary[id]?.unitId)
     : null;
 
   const columns: DataTableColumn<StrainRangeRow>[] = [
     ...attributeAndBaseColumns<StrainRangeRow>(t, dictionary, lookup, (row) => row.highIsGood),
-    ...strains.map((m, index): DataTableColumn<StrainRangeRow> => ({
-      id: `m${m.typeId}`,
-      header: labelOf(m.typeId),
+    ...strainIds.map((strainId, index): DataTableColumn<StrainRangeRow> => ({
+      id: `m${strainId}`,
+      header: labelOf(strainId),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => (
@@ -394,7 +377,7 @@ function AbyssalTypeSection({
         <TypeLinks typeIds={bases.map((b) => b.typeId)} names={names} />
       </Section>
       <Section title={t('market.itemDetail.abyssal.mutaplasmids')}>
-        <TypeLinks typeIds={makers.map((m) => m.typeId)} names={names} />
+        <TypeLinks typeIds={inStrainOrder(makers.map((m) => m.typeId))} names={names} />
       </Section>
     </div>
   );
