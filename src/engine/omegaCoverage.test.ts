@@ -27,6 +27,17 @@ describe('accountCost', () => {
   });
 });
 
+describe('accountCost for a window', () => {
+  it('scales the 30-day cost by days / 30', () => {
+    expect(accountCost(2_000_000, 500, 7)).toBeCloseTo((1_000_000_000 * 7) / 30);
+    expect(accountCost(2_000_000, 500, 90)).toBe(3_000_000_000);
+    expect(accountCost(2_000_000, 500, 30)).toBe(1_000_000_000);
+  });
+  it('is null for an unusable window', () => {
+    expect(accountCost(2_000_000, 500, 0)).toBeNull();
+  });
+});
+
 describe('accountsCovered and nextAccountGap', () => {
   it('rounds down and reports the gap to the next account', () => {
     expect(accountsCovered(1.2e9, 1e9)).toBe(1);
@@ -80,6 +91,23 @@ describe('omegaPeriods', () => {
     expect(periods[1]!.endMs).toBe(NOW);
     expect(periods[1]!.startMs).toBe(NOW - 30 * DAY);
     expect(periods[0]!.endMs).toBe(NOW - 30 * DAY);
+  });
+
+  it('buckets rolling windows of the chosen length', () => {
+    const rows = [row(0, 100), row(6, 50), row(8, 7), row(20, 3)];
+    const week = omegaPeriods(rows, NOW, [since(20)], 7);
+    expect(week.map((p) => p.net)).toEqual([3, 7, 150]);
+    expect(week[2]!.startMs).toBe(NOW - 7 * DAY);
+    expect(week[1]!.endMs).toBe(NOW - 7 * DAY);
+    const quarter = omegaPeriods(rows, NOW, [since(100)], 90);
+    expect(quarter).toHaveLength(2);
+    expect(quarter[1]!.startMs).toBe(NOW - 90 * DAY);
+    expect(quarter[1]!.net).toBe(160);
+  });
+
+  it('marks partial against the chosen window', () => {
+    const week = omegaPeriods([row(0, 1)], NOW, [since(10)], 7);
+    expect(week.map((p) => p.partial)).toEqual([true, false]);
   });
 
   it('leaves own-Character transfers and PLEX buys and sells out of net', () => {

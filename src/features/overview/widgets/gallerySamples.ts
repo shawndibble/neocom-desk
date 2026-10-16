@@ -431,8 +431,8 @@ function buildSamples(t: TFunction): Record<string, Sample> {
     },
     omega: {
       value: t('overview.widgets.data.omega.covers', { count: 2 }),
-      unit: t('overview.widgets.data.omega.figures', { net: '2.2B', cost: '1B' }),
-      note: t('overview.widgets.data.omega.next', { amount: '800M' }),
+      unit: t('overview.widgets.data.omega.figures', { days: 30, net: '2.2B', cost: '1B' }),
+      note: t('overview.widgets.data.omega.next', { days: 30, amount: '800M' }),
       rows: [],
       chart: {
         kind: 'omega',

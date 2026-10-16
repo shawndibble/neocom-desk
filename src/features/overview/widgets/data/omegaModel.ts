@@ -1,5 +1,5 @@
 /**
- * The Omega coverage widget's builder (issue #3920): net income per 30 days
+ * The Omega coverage widget's builder (issue #3920): net income per window (7, 30 or 90 days)
  * against what one Omega account costs in ISK, as a count of accounts the
  * income could keep on Omega, plus a bar per period with a line at each
  * account's cost. Pure, like every builder.
@@ -39,7 +39,7 @@ function periodTitle(t: Translate, p: OmegaPeriod): string {
 
 export const omega: Builder = (
   feeds,
-  { t, now, scopeAll, activeCharacterId, plexPer30Days = DEFAULT_PLEX_PER_30_DAYS }
+  { t, now, range, scopeAll, activeCharacterId, plexPer30Days = DEFAULT_PLEX_PER_30_DAYS }
 ) => {
   const feed = feeds.omega;
   const data = feed?.data ?? null;
@@ -54,7 +54,8 @@ export const omega: Builder = (
   const periods = omegaPeriods(
     rows,
     now,
-    ids.flatMap((id) => data.coverage[id] ?? [])
+    ids.flatMap((id) => data.coverage[id] ?? []),
+    range
   );
   const latest = periods[periods.length - 1];
 
@@ -71,7 +72,8 @@ export const omega: Builder = (
   if (!heldHere || latest === undefined) return base;
 
   const net = latest.net;
-  const cost = accountCost(data.plex?.price ?? null, plexPer30Days);
+  const cost = accountCost(data.plex?.price ?? null, plexPer30Days, range);
+  const days = { days: range };
   const caveats = [
     periods.some((p) => p.partial) ? t(`${C}.partial`) : '',
     data.truncated ? t(`${C}.truncated`) : '',
@@ -79,24 +81,24 @@ export const omega: Builder = (
   ].filter(Boolean);
   // The Number view's plain lines; the chart carries the same in its note.
   const numberNotes = [
-    latest.partial ? t(`${C}.partialLatest`) : '',
+    latest.partial ? t(`${C}.partialLatest`, days) : '',
     data.truncated ? t(`${C}.truncated`) : '',
   ].filter(Boolean);
 
   if (cost === null) {
-    const summary = t(`${C}.summaryNoPrice`, { net: formatIskCompact(net) });
+    const summary = t(`${C}.summaryNoPrice`, { ...days, net: formatIskCompact(net) });
     return {
       ...base,
       number: {
         value: t(`${D}.noPrice`),
-        unit: t(`${D}.netOnly`, { net: formatIskCompact(net) }),
+        unit: t(`${D}.netOnly`, { ...days, net: formatIskCompact(net) }),
         secondary: { text: t(`${D}.noPriceHint`) },
         notes: numberNotes,
         tone: 'clear',
       },
       summary,
       table: {
-        columns: tableColumns(t),
+        columns: tableColumns(t, range),
         rows: periodRows(t, periods, null),
       },
     };
@@ -111,6 +113,7 @@ export const omega: Builder = (
     )
   );
   const summary = t(`${C}.summary`, {
+    ...days,
     count: covered,
     net: formatIskCompact(net),
     cost: formatIskCompact(cost),
@@ -121,7 +124,7 @@ export const omega: Builder = (
   const chart: ChartModel = {
     kind: 'omega',
     summary,
-    note: [t(`${C}.note`), ...caveats].join(' '),
+    note: [t(`${C}.note`, days), ...caveats].join(' '),
     bars: periods.map((p) => {
       const n = accountsCovered(p.net, cost);
       return {
@@ -157,20 +160,28 @@ export const omega: Builder = (
       value: t(covered === 0 ? `${D}.coversNone` : `${D}.covers`, { count: covered }),
       ...(net > 0
         ? {
-            unit: t(`${D}.figures`, { net: formatIskCompact(net), cost: formatIskCompact(cost) }),
-            secondary: { text: t(`${D}.next`, { amount: formatIskCompact(gap) }) },
+            unit: t(`${D}.figures`, {
+              ...days,
+              net: formatIskCompact(net),
+              cost: formatIskCompact(cost),
+            }),
+            secondary: { text: t(`${D}.next`, { ...days, amount: formatIskCompact(gap) }) },
           }
         : {
-            unit: t(`${D}.shortBy`, { amount: formatIskCompact(gap) }),
+            unit: t(`${D}.shortBy`, { ...days, amount: formatIskCompact(gap) }),
             secondary: {
-              text: t(`${D}.figures`, { net: formatIskCompact(net), cost: formatIskCompact(cost) }),
+              text: t(`${D}.figures`, {
+                ...days,
+                net: formatIskCompact(net),
+                cost: formatIskCompact(cost),
+              }),
             },
           }),
       notes: numberNotes,
       tone: 'clear',
     },
     table: {
-      columns: tableColumns(t),
+      columns: tableColumns(t, range),
       rows: periodRows(t, periods, cost),
       footer: t(`${D}.plexPrice`, {
         price: formatIskCompact(data.plex!.price),
@@ -182,9 +193,9 @@ export const omega: Builder = (
   };
 };
 
-function tableColumns(t: Translate) {
+function tableColumns(t: Translate, range: number) {
   return [
-    { key: 'period', label: t(`${W}.col.period`), priority: 0 },
+    { key: 'period', label: t(`${W}.col.period`, { days: range }), priority: 0 },
     { key: 'net', label: t(`${W}.col.net`), align: 'end' as const, priority: 1 },
     { key: 'accounts', label: t(`${W}.col.accounts`), align: 'end' as const, priority: 2 },
   ];
