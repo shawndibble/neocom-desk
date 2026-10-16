@@ -807,6 +807,49 @@
       "more_one": "and {{count}} more",
       "more_other": "and {{count}} more"
     },
+    "abyssalRun": {
+      "title": "Plan an Abyssal run",
+      "tier": "Filament tier",
+      "tierOption": "T{{tier}} {{name}}",
+      "tierName": {
+        "0": "Tranquil",
+        "1": "Calm",
+        "2": "Agitated",
+        "3": "Fierce",
+        "4": "Raging",
+        "5": "Chaotic",
+        "6": "Cataclysmic"
+      },
+      "strengthNote": "T{{tier}} rolls −{{low}}% or −{{high}}%",
+      "strengthOff": "T{{tier}} never rolls this strength; pick another above.",
+      "security": "Activate in",
+      "securityOption": "{{value}} security",
+      "securityBelow": "Low or null security",
+      "hull": {
+        "cruiser": "Cruiser: flies alone.",
+        "destroyer": "Destroyer: up to 2 ships. Only a fleet can activate it, even flying alone; the activating ship carries both filaments.",
+        "frigate": "Frigate: up to 3 ships. Only a fleet can activate it, even flying alone; the activating ship carries all three filaments.",
+        "unconfirmed": "No source names this hull type; check in game.",
+        "tech3Cruiser": "Tech 3 cruisers can't enter Abyssal Deadspace.",
+        "tooLarge": "Too big: only cruisers and smaller can enter.",
+        "unlisted": "No Abyssal rule known for this hull; check in game."
+      },
+      "activation": {
+        "clear": "T{{tier}} activates here with no suspect flag.",
+        "suspect": "T{{tier}} here flags you suspect: anyone can shoot you without CONCORD response.",
+        "blocked": "T{{tier}} can't be activated here; only T0 works in 1.0 and 0.9.",
+        "unpoliced": "No suspect flag here, but no CONCORD either: anyone can attack you at the trace."
+      },
+      "timer": "{{minutes}} minutes per run across {{pockets}} pockets (about {{perPocket}} each). Staying past it destroys ship and pod.",
+      "buy_one": "Buy {{count}} filament:",
+      "buy_other": "Buy {{count}} filaments:",
+      "pickWeather": "Pick an Abyssal weather above to see what it does to this fit and which filament to buy.",
+      "working": "Working out this fit in the weather…",
+      "failed": "Couldn't work out this fit in the weather.",
+      "deltaHeading": "This fit in {{weather}}, against normal space",
+      "range": "{{weapon}}: optimal {{before}} → {{after}} km, falloff {{fallBefore}} → {{fallAfter}} km",
+      "source": "Tiers, strengths and flag rules: EVE University wiki and downthechain.net, 2026."
+    },
     "weather": {
       "label": "Abyssal weather",
       "none": "Normal space",

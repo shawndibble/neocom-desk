@@ -12,11 +12,12 @@
  * attributes, and level 3's penalty is larger than level 1's.
  */
 export type AbyssalWeatherKind = 'dark' | 'electrical' | 'exotic' | 'gamma' | 'firestorm';
+export type AbyssalLevel = 1 | 2 | 3;
 
 export interface AbyssalWeather {
   typeId: number;
   kind: AbyssalWeatherKind;
-  level: 1 | 2 | 3;
+  level: AbyssalLevel;
   /** Its level-scaled penalty, percent: to one damage type's resists, or Dark's turret range. */
   penaltyPercent: 30 | 50 | 70;
 }
@@ -53,4 +54,8 @@ export const ABYSSAL_WEATHER: readonly AbyssalWeather[] = ABYSSAL_WEATHER_KINDS.
 
 export function abyssalWeatherById(typeId: number): AbyssalWeather | undefined {
   return ABYSSAL_WEATHER.find((weather) => weather.typeId === typeId);
+}
+
+export function abyssalWeatherOf(kind: AbyssalWeatherKind, level: AbyssalLevel): AbyssalWeather {
+  return ABYSSAL_WEATHER.find((weather) => weather.kind === kind && weather.level === level)!;
 }
