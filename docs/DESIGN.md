@@ -1196,6 +1196,8 @@ A header action that opens a drawer for more input takes the "…" label (`Compa
 
 The Fittings editor header applies tier 3: Compare and Copy stats sit in its ⋮ menu on desktop, and on a phone that menu also holds Rename, the Fittings menu's items, Export and the Alpha/Omega and Mastery badges as text (the icon badges stay in the header from `md` up). Its Save is the one primary control, and says where it saves.
 
+A modal header's actions follow the same rule on a phone. Item Detail (Show info) carries "Open market in EVE" and "View in Market" as text buttons from `md` up; below `md`, when both show, they fold into one ⋮ (`RowMoreActions`, borderless like the Close beside it) with the same two items, so the item name keeps the header's room. A header with one action keeps it as its plain button at every width: one action never earns a ⋮.
+
 **The alerts bell** (`AlertsBell`) sits last in the header's control cluster on every page (`PageHeader`, and `CharacterHeader` / `FittingHeader`, which stand in for it). It opens the alerts panel (a popover on desktop, a sheet on a phone; `/alerts` only redirects to the Overview with the panel open) and draws dim at zero on a desktop and on the Overview (`showWhenEmpty`), but is hidden at zero in a phone page header elsewhere, which is laid out with other icons and has no room for it, an accent count badge while alerts wait, a red one while an unacknowledged danger Alert is among them. It is not one of the three tiers: it opens a panel, it is not an action on the page.
 
 ### Restraint: decide by what is already there
