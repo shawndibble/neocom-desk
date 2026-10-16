@@ -81,8 +81,12 @@ describe('recipients', () => {
   it('adds a searched corporation with its type shown', async () => {
     const { user } = setup();
     await user.type(await screen.findByRole('combobox'), 'acme');
-    await user.click(await screen.findByRole('option', { name: /Acme Corp/ }));
-    expect(screen.getByRole('list', { name: 'To' })).toHaveTextContent('Corporation');
+    const option = await screen.findByRole('option', { name: /Acme Corp/ });
+    expect(option.querySelector('img')?.src).toMatch(/\/corporations\/\d+\/logo/);
+    await user.click(option);
+    const chips = screen.getByRole('list', { name: 'To' });
+    expect(chips).toHaveTextContent('Corporation');
+    expect(chips.querySelector('img')?.src).toMatch(/\/corporations\/\d+\/logo/);
     expect(search).toHaveBeenCalledWith(CHAR_ID, 'acme', expect.anything());
   });
 
@@ -126,14 +130,21 @@ describe('limits', () => {
 describe('draft', () => {
   it('reopens the saved draft as left', async () => {
     drafts.loadNewMailDraft.mockResolvedValue({
-      recipients: [{ recipient_id: 5, recipient_type: 'mailing_list', name: 'Industry Chat' }],
+      recipients: [
+        { recipient_id: 5, recipient_type: 'mailing_list', name: 'Industry Chat' },
+        { recipient_id: 90000001, recipient_type: 'character', name: 'Ashken Archangel' },
+      ],
       subject: 'Hello',
       body: 'Saved body',
     });
     setup();
     expect(await screen.findByDisplayValue('Hello')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Saved body')).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'To' })).toHaveTextContent('Industry Chat');
+    const chips = screen.getByRole('list', { name: 'To' });
+    expect(chips).toHaveTextContent('Industry Chat');
+    expect(chips.querySelector('img')?.src).toBe(
+      'https://images.evetech.net/characters/90000001/portrait?size=64'
+    );
   });
 
   it('escapes a plain draft saved before the rich editor, so its < > & stay literal and are sent as entities', async () => {

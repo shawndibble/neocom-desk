@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner, TextArea } from '@/components/ui';
 import { markupPlainText, parseEveMarkup } from '@/engine/eveMarkup';
@@ -20,6 +20,11 @@ export interface MailBodyEditorProps {
   'aria-describedby'?: string;
   'aria-invalid'?: boolean;
   disabled?: boolean;
+  /**
+   * The body's character counter. The editor places it in its own frame's
+   * bottom-right corner (the composer no longer renders it beside the label).
+   */
+  counter?: ReactNode;
   /** The editor fills the space the composer gives it (full-pane compose is a flex column). */
   className?: string;
 }
@@ -30,14 +35,23 @@ export interface MailBodyEditorProps {
  * `< > &` stay literal and it can never put a tag into the markup. The simplest
  * implementation of the contract; the composers default to the rich editor.
  */
-export function PlainBodyEditor({ value, onChange, className, ...rest }: MailBodyEditorProps) {
+export function PlainBodyEditor({
+  value,
+  onChange,
+  className,
+  counter,
+  ...rest
+}: MailBodyEditorProps) {
   return (
-    <TextArea
-      {...rest}
-      value={markupPlainText(parseEveMarkup(value))}
-      onChange={(e) => onChange(plainTextToMarkup(e.target.value))}
-      className={`text-sm ${className ?? ''}`}
-    />
+    <>
+      <TextArea
+        {...rest}
+        value={markupPlainText(parseEveMarkup(value))}
+        onChange={(e) => onChange(plainTextToMarkup(e.target.value))}
+        className={`text-sm ${className ?? ''}`}
+      />
+      {counter && <div className="flex justify-end">{counter}</div>}
+    </>
   );
 }
 
@@ -56,6 +70,7 @@ export function MailBodyEditor(props: MailBodyEditorProps) {
           className={`flex min-h-40 flex-1 items-center justify-center gap-2 text-xs text-text-dim ${props.className ?? ''}`}
         >
           <Spinner size="sm" /> {t('mail.format.loading')}
+          {props.counter}
         </div>
       }
     >

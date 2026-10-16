@@ -28,6 +28,8 @@ export interface MailEditorCommands {
    * Source view has no such edit: it would have to untangle tags around the selection.
    */
   canReset: boolean;
+  /** Whether a link can be applied here; false inside a table cell (cells hold plain text). */
+  canLink: boolean;
   /** Source view has no "clear": it would have to untangle tags around the selection. */
   canClear: boolean;
 }

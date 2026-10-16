@@ -18,6 +18,7 @@ import {
   CharacterLink,
   CorporationLink,
   ItemInfoLink,
+  PlaceLink,
   SkillLink,
   SystemLink,
 } from '@/features/entities/EntityLink';
@@ -33,6 +34,10 @@ export const BASE_SIZE_PX = 12;
  * default text is `#bfffffff` (white at 75%). Not a theme token — it must stay
  * dark in light theme too (docs/DESIGN.md §1, "EVE mail surface").
  */
+export const EVE_MAIL_SURFACE_FRAME_CLASS =
+  'rounded-xs border border-line bg-[#0a0e14] text-white/75';
+
+/** The frame plus padding: a lone reading surface. */
 export const EVE_MAIL_SURFACE_CLASS =
   'rounded-xs border border-line bg-[#0a0e14] p-3 text-white/75';
 
@@ -94,7 +99,9 @@ function ShowInfoLink({ target, children }: { target: MarkupLinkTarget; children
       case 'item':
         return <ItemOrSkillLink typeId={info.typeId}>{children}</ItemOrSkillLink>;
       case 'place':
-        return <HintText content={t('mail.markup.placeSoon')}>{children}</HintText>;
+        return <PlaceLink id={info.id}>{children}</PlaceLink>;
+      case 'noView':
+        break;
     }
   }
   return <HintText content={t('mail.markup.openInEve')}>{children}</HintText>;

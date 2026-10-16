@@ -852,41 +852,48 @@ export function Contracts() {
                 />
               )
             ) : (
-              <DataTable
-                {...historyExport.tableProps}
-                label={t('contracts.title')}
-                columns={columns}
-                rows={filteredContracts}
-                rowKey={contractRowKey}
-                virtualize="auto"
-                rowMoreActions
-                rowContextMenu={(contract, tr) => (
-                  <RowActionsMenu
-                    name={`${t('contractDetail.contractIdLabel')} ${contract.contract_id}`}
-                    items={<OpenInEveMenuItem kind="contract" id={contract.contract_id} />}
-                  >
-                    {tr}
-                  </RowActionsMenu>
-                )}
-                highlightRowKey={highlightedContractId}
-                {...historySortProps}
-                stackLayout="dense"
-                // Issue days are sections on a phone, not folded duplicates:
-                // open, with members in line with the cards above them.
-                className="dt-flat-groups"
-                groupBy={{
-                  key: (contract) => formatDateOnly(new Date(contract.date_issued), timeZone),
-                  minSize: 1,
-                  defaultExpanded: () => true,
-                  renderHeader: (rows) => (
-                    <ContractDayHeader
-                      date={formatDateOnly(new Date(rows[0].date_issued), timeZone)}
-                      count={rows.length}
-                      timeZone={timeZone}
-                    />
-                  ),
-                }}
-              />
+              <div className="relative overflow-x-auto">
+                {/* The desktop table can be wider than the content column beside the
+                  nav rail (#3960): it scrolls inside this wrapper, never the page.
+                  `relative` keeps the cells' absolutely positioned `sr-only` text
+                  (the price's full ISK) inside the clip too, or its containing
+                  block resolves above the wrapper and still widens the page. */}
+                <DataTable
+                  {...historyExport.tableProps}
+                  label={t('contracts.title')}
+                  columns={columns}
+                  rows={filteredContracts}
+                  rowKey={contractRowKey}
+                  virtualize="auto"
+                  rowMoreActions
+                  rowContextMenu={(contract, tr) => (
+                    <RowActionsMenu
+                      name={`${t('contractDetail.contractIdLabel')} ${contract.contract_id}`}
+                      items={<OpenInEveMenuItem kind="contract" id={contract.contract_id} />}
+                    >
+                      {tr}
+                    </RowActionsMenu>
+                  )}
+                  highlightRowKey={highlightedContractId}
+                  {...historySortProps}
+                  stackLayout="dense"
+                  // Issue days are sections on a phone, not folded duplicates:
+                  // open, with members in line with the cards above them.
+                  className="dt-flat-groups"
+                  groupBy={{
+                    key: (contract) => formatDateOnly(new Date(contract.date_issued), timeZone),
+                    minSize: 1,
+                    defaultExpanded: () => true,
+                    renderHeader: (rows) => (
+                      <ContractDayHeader
+                        date={formatDateOnly(new Date(rows[0].date_issued), timeZone)}
+                        count={rows.length}
+                        timeZone={timeZone}
+                      />
+                    ),
+                  }}
+                />
+              </div>
             )}
           </Panel>
         )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPlaceId, placeKey } from './classify';
+import { classifyPlaceId, classifyPlaceInfoId, placeKey } from './classify';
 import { resolvePlace } from './resolve';
 import { memoryPlaceSource } from './testSource';
 
@@ -17,6 +17,23 @@ describe('classifyPlaceId', () => {
     expect(classifyPlaceId(60003760)).toBe('station');
     expect(classifyPlaceId(STRUCTURE)).toBe('structure');
     expect(classifyPlaceId(12345)).toBeNull();
+  });
+});
+
+describe('classifyPlaceInfoId', () => {
+  it('adds regions to the Place blocks', () => {
+    expect(classifyPlaceInfoId(10000002)).toBe('region');
+    expect(classifyPlaceInfoId(11000001)).toBe('region');
+    expect(classifyPlaceInfoId(12000001)).toBe('region');
+    expect(classifyPlaceInfoId(14000001)).toBe('region');
+    expect(classifyPlaceInfoId(60003760)).toBe('station');
+    expect(classifyPlaceInfoId(STRUCTURE)).toBe('structure');
+    expect(classifyPlaceInfoId(30000142)).toBe('solar_system');
+  });
+
+  it('is null for a constellation or any other id', () => {
+    expect(classifyPlaceInfoId(20000020)).toBeNull();
+    expect(classifyPlaceInfoId(500001)).toBeNull();
   });
 });
 
