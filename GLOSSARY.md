@@ -9,6 +9,10 @@ alphabetical position lands mid-file, so two agents adding terms at once do not
 collide the way appending to the end always did. Scope decisions do not belong
 here — they go one per file in `docs/context/decisions/`.
 
+- **Abyssal type**: The item type a **Mutaplasmid** makes — "Heavy Abyssal
+  Energy Neutralizer", "Light Mutated Drone". One abyssal type is made from
+  many base modules, so the type alone never says which base an item came
+  from, nor what it rolled: those belong to the **Mutated module** itself.
 - **Account**: UI-level grouping of a user's Characters. Has no storage, no
   sync and no server-side identity, because EVE SSO exposes no account
   identifier. Never surfaced to the user as a thing to manage.
@@ -348,7 +352,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Baseline Character**: The **Character** in a **Skill Comparison** every other column is measured against (`+2`, `−3`, `missing`). Defaults to the active Character; any selected Character can be set as it.
 - **Fitting Compare**: The Ships section's page showing up to three **Fitting**s side by side, their stats worked out for the active Character's skills. The whole comparison lives in the URL as **Fitting Share Code**s. Distinct from Market **Compare** / **Compare Set**, Appraisal's **Compare hubs**, and **Build Plan Compare**: it shares nothing with them.
 - **Fitting Share Code**: A **Fitting** compressed into its URL: hull,
-  modules and their state, charges, drones, cargo, and any implant set.
+  modules and their state, charges, drones, cargo, any implant set, and each
+  **Mutated module**'s base, mutaplasmid and **Roll**s.
   Permanent and stateless; nothing is stored. Opened with nobody logged in, it
   shows the Fitting at every skill level V. Distinct from a **Share Link**,
   the short, expiring kind.
@@ -399,6 +404,14 @@ here — they go one per file in `docs/context/decisions/`.
 - **ISK/m³**: What a public courier haul pays per cubic metre of cargo (reward divided by volume), the secondary rate beside **ISK/jump**. A haul stating no volume has none, never an infinite one. **Hauling Opportunities** carries the same rate for a trade run: profit per unit over the unit's hauled volume.
 - **ISK/run**: What a listed blueprint copy costs per use: the contract's asking price divided by every run that ask buys (quantity as well as runs). A **BPC Sourcing** column. A row with no asking price, or a copy stating zero runs, has none, never an infinite rate.
 - **Reverse Lane**: The way home from a public courier haul: the same region pair, run backwards, shown on the haul detail as a count that links to the swapped search. Paired region to region, not station to station. A haul with an end nothing local places has no lane to look up, never a count of zero.
+- **Roll**: The value one attribute of a **Mutated module** came out at:
+  the base module's own value times a uniform pick within that attribute's
+  **Roll range**. Stated as the absolute attribute value, as the game shows
+  it. A roll is good or bad in the attribute's own direction — a higher
+  activation cost is a worse roll.
+- **Roll range**: The span a **Mutaplasmid** lets one attribute roll in, as
+  multipliers of the base module's value (0.8 to 1.3 of its activation cost,
+  say).
 - **Route Safety**: Travel's view of a stargate route: every system on it, in order, with its security, region, last-hour jumps and ship, pod and NPC kills, zKillboard's last-hour player kills, and a mark on any **Gank Chokepoint**. States conditions, never a verdict: no system or route is called safe or not. A figure that could not be supplied is unknown, never zero.
 - **Route strip**: Route Safety's one-glance picture of a route: one cell per system, coloured by security, with each **Gank Chokepoint** and each system with recent kills marked.
 - **Quiet stretch**: A run of two or more consecutive middle systems on a route or **Leg** that Route Safety folds into one row: no ship, pod or player kills in the last hour, no **Gank Chokepoint**, and no J-space. A figure still loading or unavailable never counts as zero. Named for the figures, never a verdict on the systems.
@@ -439,6 +452,18 @@ here — they go one per file in `docs/context/decisions/`.
   account identity (see **Account**), so none is invented here.
 - **Mining Ledger Entry**: One row of the Moon Mining Tax ledger, derived (not stored) from ESI's personal mining ledger: every moon-goo row for one (character, EVE/UTC date, solar system), summed per ore type.
 - **Multi-Type Contract**: A public contract whose for-sale lines span more than one distinct item type. Its price is a real, indivisible ask for the whole contract, never attributed to any single line as that item's own price.
+- **Mutaplasmid**: The consumable that turns one base module or drone into a
+  **Mutated module**, irreversibly. Each applies to a fixed set of bases, makes
+  one **Abyssal type**, and gives each attribute it touches a **Roll range**.
+  Its strain (Decayed, Gravid, Unstable, their Glorified forms, Exigent,
+  Radical) sets how wide those ranges are.
+- **Mutated module**: One module or drone a **Mutaplasmid** was applied to:
+  an **Abyssal type** with its own base, mutaplasmid and **Roll**s. Each is a
+  unique item, never a stack. Its rolls are known only from the game itself
+  (ESI, by item id), a Pyfa EFT block or a **Fitting Share Code**; a
+  killmail, an **In-game Fitting** or a bare EFT line names the abyssal type
+  alone, and the app then states the module as unknown rather than guessing
+  its base.
 - **Need Book**: The marker on a skill in the Trained board that the Character's ESI skills do not list at all, so its skill book is still to buy and inject. Not shown for a skill ESI lists at level 0 (injected, untrained). Cannot tell a book the Character owns but has not injected from one it lacks; that needs assets.
 - **Notification Allow-List**: The closed set of EVE Notification `type` strings the app delivers. A type outside it is dropped at the poller.
 - **Notification Event**: One of a fixed catalog of character-state changes a user can be notified about — Skill Level Complete, Character Not Training, Industry Job Complete, New Mail, Planetary Extraction Done, Market Order Filled, New Calendar Event, Calendar Event Starting, Contract Accepted, Wallet Balance Changed. Each is independently toggleable per Character.

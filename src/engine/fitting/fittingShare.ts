@@ -22,7 +22,21 @@
  * encodes exactly as it did before they existed (and older builds still read
  * its link): `mode` — a Tactical Destroyer's mode type id, or empty — and
  * `boosterSideEffects` — the effect ids of the booster side effects switched
- * on, `,`-joined. That text is then deflated with the platform's native
+ * on, `,`-joined.
+ *
+ * Version 3 (mutated modules and drones) is version 2 plus a tenth section,
+ * `mutations`, written — with `mode` and `boosterSideEffects` present, empty
+ * or not, ahead of it — only when some module or drone carries an
+ * `ItemMutation`. A Fitting with none still encodes as version 2, byte for
+ * byte, so a build from before version 3 opens it; one with a mutation reads
+ * as "unsupported version" there rather than silently dropping the rolls.
+ * `mutations` is `,`-joined `target:base:mutaplasmid:rolls`: `target` names
+ * the item by its position — a rack letter (`h`,`m`,`l`,`r`,`s`) or `d` for
+ * a drone stack, then its base36 index in that section's own list — `base`
+ * and `mutaplasmid` are base36 type ids, and `rolls` is `;`-joined
+ * `attributeId=value` (id base36, value decimal, `quantiseRoll`ed), empty
+ * when the rolls are unknown. A mutated drone stack is always one drone.
+ * That text is then deflated with the platform's native
  * `CompressionStream('deflate-raw')` and base64url-encoded — no compression
  * library, per the Appraisal share decision this repo already follows
  * (`20260911-110045`).
@@ -44,6 +58,9 @@ export const FITTING_SHARE_VERSION = '2';
 /** The pre-name wire format; decode-only, never produced by `encodeFittingShare`. */
 export const LEGACY_FITTING_SHARE_VERSION = '1';
 
+/** Only for a Fitting with a mutated item; else `FITTING_SHARE_VERSION` (see the header). */
+export const MUTATED_FITTING_SHARE_VERSION = '3';
+
 /** A fit name past this is truncated on encode and rejected on decode. */
 export const MAX_FIT_NAME_LENGTH = 100;
 
@@ -64,17 +81,27 @@ const TOKEN_STATES: Record<string, ModuleState> = {
   '3': 'overload',
 };
 
+/** Wire twin of `ItemMutation`, restated so the codec imports nothing from the Fittings domain. */
+export interface ShareMutation {
+  baseTypeId: number;
+  mutaplasmidTypeId: number;
+  attributes: Readonly<Record<number, number>>;
+}
+
 export interface FittingModuleEntry {
   slotIndex: number;
   typeId: number;
   state: ModuleState;
   chargeTypeId?: number;
+  mutation?: ShareMutation;
 }
 
 export interface FittingDrone {
   typeId: number;
   count: number;
   active: number;
+  /** Only on a stack of one: each mutated drone is its own item. */
+  mutation?: ShareMutation;
 }
 
 export interface FittingFighter {
@@ -141,6 +168,38 @@ export const MAX_IMPLANTS = 10;
 export const MAX_BOOSTERS = 10;
 /** Four side effects a booster, a booster a slot. */
 export const MAX_BOOSTER_SIDE_EFFECTS = 40;
+/** Rolls on one mutated item; a mutaplasmid rolls at most a handful. */
+export const MAX_MUTATED_ATTRIBUTES = 32;
+
+/**
+ * A roll on the wire: 6 significant digits. The game shows at most 4–5, so the
+ * error (< 5e-7) never changes a shown figure or roll quality, and a roll
+ * costs a few characters rather than a float's 17.
+ */
+export function quantiseRoll(value: number): number {
+  return Number(value.toPrecision(6));
+}
+
+const RACK_TARGETS: Record<SlotCategory, string> = {
+  high: 'h',
+  mid: 'm',
+  low: 'l',
+  rig: 'r',
+  subsystem: 's',
+};
+const DRONE_TARGET = 'd';
+// Plain decimal or exponent notation, as `String(number)` writes a finite number.
+const ROLL_VALUE = /^-?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/;
+
+function encodeMutation(target: string, mutation: ShareMutation): string {
+  const rolls = Object.entries(mutation.attributes)
+    .map(([id, value]) => [Number(id), value] as const)
+    .filter(([id, value]) => id > 0 && Number.isInteger(id) && Number.isFinite(value))
+    .sort((a, b) => a[0] - b[0])
+    .map(([id, value]) => `${id.toString(36)}=${String(quantiseRoll(value))}`)
+    .join(';');
+  return `${target}:${mutation.baseTypeId.toString(36)}:${mutation.mutaplasmidTypeId.toString(36)}:${rolls}`;
+}
 
 /** A legitimate fit's body is well under 1KB even uncompressed; this only bounds a decompression bomb. */
 const MAX_DECOMPRESSED_BYTES = 65536;
@@ -277,6 +336,25 @@ export async function encodeFittingShare(
   if ((input.boosterSideEffects?.length ?? 0) > MAX_BOOSTER_SIDE_EFFECTS)
     return { ok: false, reason: 'too-large' };
 
+  const mutations: string[] = [];
+  for (const category of SLOT_CATEGORIES) {
+    input.modules[category].forEach((entry, index) => {
+      if (entry.mutation)
+        mutations.push(
+          encodeMutation(`${RACK_TARGETS[category]}${index.toString(36)}`, entry.mutation)
+        );
+    });
+  }
+  for (const [index, drone] of input.drones.entries()) {
+    if (!drone.mutation) continue;
+    if (drone.count !== 1) return { ok: false, reason: 'too-large' };
+    mutations.push(encodeMutation(`${DRONE_TARGET}${index.toString(36)}`, drone.mutation));
+  }
+  for (const entry of [...SLOT_CATEGORIES.flatMap((c) => input.modules[c]), ...input.drones]) {
+    if (entry.mutation && Object.keys(entry.mutation.attributes).length > MAX_MUTATED_ATTRIBUTES)
+      return { ok: false, reason: 'too-large' };
+  }
+
   const modulesSection = SLOT_CATEGORIES.map((category) =>
     input.modules[category]
       .map((entry) => {
@@ -316,13 +394,15 @@ export async function encodeFittingShare(
     encodeURIComponent(input.name?.trim().slice(0, MAX_FIT_NAME_LENGTH) ?? ''),
   ];
   const sideEffects = input.boosterSideEffects ?? [];
-  // Trailing sections only when there's something in them — see the header.
-  if (input.mode !== undefined || sideEffects.length > 0) {
+  const mutated = mutations.length > 0;
+  // Trailing sections only when non-empty, or when v3's mutations follow them — see the header.
+  if (input.mode !== undefined || sideEffects.length > 0 || mutated) {
     sections.push(input.mode === undefined ? '' : input.mode.toString(36));
   }
-  if (sideEffects.length > 0) {
+  if (sideEffects.length > 0 || mutated) {
     sections.push(sideEffects.map((id) => id.toString(36)).join(','));
   }
+  if (mutated) sections.push(mutations.join(','));
   const body = sections.join('|');
 
   const bodyBytes = new TextEncoder().encode(body);
@@ -333,7 +413,8 @@ export async function encodeFittingShare(
     null
   );
 
-  return { ok: true, payload: `${FITTING_SHARE_VERSION}.${base64urlEncode(compressed)}` };
+  const version = mutated ? MUTATED_FITTING_SHARE_VERSION : FITTING_SHARE_VERSION;
+  return { ok: true, payload: `${version}.${base64urlEncode(compressed)}` };
 }
 
 function parseDrones(raw: string): FittingDrone[] | null {
@@ -439,19 +520,75 @@ function parseMode(raw: string | undefined): number | undefined | null {
   return parseBase36Positive(raw);
 }
 
+function parseRolls(raw: string): Record<number, number> | null {
+  const rolls: Record<number, number> = {};
+  if (raw === '') return rolls;
+  const pairs = raw.split(';');
+  if (pairs.length > MAX_MUTATED_ATTRIBUTES) return null;
+  for (const pair of pairs) {
+    const eq = pair.indexOf('=');
+    if (eq === -1) return null;
+    const id = parseBase36Positive(pair.slice(0, eq));
+    const valueStr = pair.slice(eq + 1);
+    if (id === null || id in rolls || !ROLL_VALUE.test(valueStr)) return null;
+    const value = Number(valueStr);
+    if (!Number.isFinite(value)) return null;
+    rolls[id] = value;
+  }
+  return rolls;
+}
+
+/**
+ * Attaches the `mutations` section's entries to the items they name, in
+ * place. False on any malformed entry, an unknown or repeated target, or a
+ * mutation on a drone stack of more than one.
+ */
+function attachMutations(
+  raw: string,
+  modules: Record<SlotCategory, FittingModuleEntry[]>,
+  drones: FittingDrone[]
+): boolean {
+  if (raw === '') return true;
+  for (const entryStr of raw.split(',')) {
+    const fields = entryStr.split(':');
+    if (fields.length !== 4) return false;
+    const [target, baseStr, mutaStr, rollsStr] = fields as [string, string, string, string];
+    const baseTypeId = parseBase36Positive(baseStr);
+    const mutaplasmidTypeId = parseBase36Positive(mutaStr);
+    const index = parseBase36NonNegative(target.slice(1));
+    const attributes = parseRolls(rollsStr);
+    if (baseTypeId === null || mutaplasmidTypeId === null || index === null || attributes === null)
+      return false;
+    const mutation: ShareMutation = { baseTypeId, mutaplasmidTypeId, attributes };
+    const kind = target[0];
+    if (kind === DRONE_TARGET) {
+      const drone = drones[index];
+      if (!drone || drone.count !== 1 || drone.mutation) return false;
+      drone.mutation = mutation;
+      continue;
+    }
+    const category = SLOT_CATEGORIES.find((c) => RACK_TARGETS[c] === kind);
+    const entry = category === undefined ? undefined : modules[category][index];
+    if (!entry || entry.mutation) return false;
+    entry.mutation = mutation;
+  }
+  return true;
+}
+
 function parseBody(body: string, version: string): DecodeFittingShareResult {
   const parts = body.split('|');
   // Version 1: six sections. Version 2 adds the name, then the optional mode
-  // and booster side effects.
-  const named = version === FITTING_SHARE_VERSION;
+  // and booster side effects; version 3 the mutations after those.
+  const named = version !== LEGACY_FITTING_SHARE_VERSION;
   const base = named ? 7 : 6;
-  // Only version 2 carries the trailing sections; version 1 is exactly six.
-  const max = named ? base + 2 : base;
+  const trailing = version === MUTATED_FITTING_SHARE_VERSION ? 3 : named ? 2 : 0;
+  const max = base + trailing;
   if (parts.length < base || parts.length > max) return { ok: false, reason: 'invalid' };
   const [hullStr, modulesStr, dronesStr, fightersStr, cargoStr, implantsStr] = parts;
   const nameStr = named ? parts[6] : '';
   const modeStr = parts[base];
   const sideStr = parts[base + 1];
+  const mutationsStr = parts[base + 2];
 
   const hullTypeId = parseBase36Positive(hullStr);
   if (hullTypeId === null) return { ok: false, reason: 'invalid' };
@@ -504,6 +641,8 @@ function parseBody(body: string, version: string): DecodeFittingShareResult {
   if (mode === null) return { ok: false, reason: 'invalid' };
   const boosterSideEffects = parseTypeIdList(sideStr ?? '', MAX_BOOSTER_SIDE_EFFECTS);
   if (boosterSideEffects === null) return { ok: false, reason: 'invalid' };
+  if (!attachMutations(mutationsStr ?? '', modules, drones))
+    return { ok: false, reason: 'invalid' };
 
   return {
     ok: true,
@@ -527,7 +666,11 @@ export async function decodeFittingShare(payload: string): Promise<DecodeFitting
 
   const version = payload.slice(0, dotIndex);
   const encoded = payload.slice(dotIndex + 1);
-  if (version !== FITTING_SHARE_VERSION && version !== LEGACY_FITTING_SHARE_VERSION)
+  if (
+    version !== MUTATED_FITTING_SHARE_VERSION &&
+    version !== FITTING_SHARE_VERSION &&
+    version !== LEGACY_FITTING_SHARE_VERSION
+  )
     return { ok: false, reason: 'unsupported-version' };
   if (encoded === '') return { ok: false, reason: 'invalid' };
 
