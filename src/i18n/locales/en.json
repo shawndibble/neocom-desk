@@ -866,8 +866,7 @@
         "exotic": "Scan resolution +50% · kinetic resists −{{penalty}}%",
         "firestorm": "Armor HP +50% · thermal resists −{{penalty}}%",
         "gamma": "Shield HP +50% · explosive resists −{{penalty}}%"
-      },
-      "in": "in {{weather}}"
+      }
     },
     "phoneTabs": {
       "stats": "Stats",
