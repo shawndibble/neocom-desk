@@ -61,7 +61,7 @@ describe('SharedLink', () => {
       share: { type: 'dscan', payload: { v: 1, rows: [] }, expiresAt: Date.now() + 60_000 },
     });
     renderAt('/s/abc123XYZ');
-    expect(await screen.findByText(/saved copy from your last visit/i)).toBeInTheDocument();
+    expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
     expect(screen.getByText(/3h ago/)).toBeInTheDocument();
   });
 

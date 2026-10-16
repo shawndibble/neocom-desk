@@ -3,7 +3,7 @@ import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useMarkPublicRouteRendered } from '@/app/routeFocus';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Spinner } from '@/components/ui';
+import { Button, CachedNotice, EmptyState, Spinner } from '@/components/ui';
 import { parseAppraisalSnapshot } from '@/engine/market/appraisalSnapshot';
 import {
   AppraisalShareScreen,
@@ -113,10 +113,7 @@ export function SharedLink() {
     return (
       <div ref={retryRef} tabIndex={-1} className="focus:outline-none">
         {result.cachedAt !== undefined && (
-          <p className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 px-4 pt-3 text-xs text-text-dim">
-            {t('share.cachedCopy')}
-            <DataAgeBadge date={new Date(result.cachedAt)} alwaysVisible />
-          </p>
+          <CachedNotice fetchedAt={result.cachedAt} className="mx-auto max-w-5xl px-4 pt-3" />
         )}
         <SharedScreen share={result.share} shareId={shareId} />
       </div>
