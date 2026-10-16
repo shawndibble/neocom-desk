@@ -127,6 +127,19 @@ describe('FittingAffectedByPanel', () => {
     expect(screen.getByText('×0.8')).toBeInTheDocument();
   });
 
+  it('says nothing is changing when every attribute is filtered out', async () => {
+    render(
+      <FittingAffectedByPanel
+        explain={async () => [{ ...damage, base: 0, value: 0 }]}
+        moduleIndex={0}
+        typeName={typeName}
+      />
+    );
+    expect(
+      await screen.findByText("Nothing is changing this module's numbers right now.")
+    ).toBeInTheDocument();
+  });
+
   it('waits for the engine, and says when nothing changes the module', async () => {
     const { rerender } = render(
       <FittingAffectedByPanel explain={null} moduleIndex={0} typeName={typeName} />
@@ -136,7 +149,7 @@ describe('FittingAffectedByPanel', () => {
       <FittingAffectedByPanel explain={async () => []} moduleIndex={0} typeName={typeName} />
     );
     expect(
-      await screen.findByText("Nothing changes this module's attributes.")
+      await screen.findByText("Nothing is changing this module's numbers right now.")
     ).toBeInTheDocument();
   });
 });
