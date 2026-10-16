@@ -1,9 +1,12 @@
 import {
+  useLayoutEffect,
+  useRef,
   useState,
   type CSSProperties,
   type DragEvent,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MakeItFitTrigger } from './MakeItFitTrigger';
@@ -81,14 +84,61 @@ import { MODULE_STATE_STYLE } from './moduleStateStyle';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 
 /**
- * The ring grows with its column up to 48rem, where a tile is 48/648 of it —
- * about 57px — but never taller than the window leaves beside the tabs and
- * readouts (24rem covers the header, tabs, panel header and the whole
- * calibration / powergrid / CPU / sustained block, so the readouts end inside
- * the first viewport; past it the column scrolls); a short window (a
- * landscape phone) keeps at least 20rem.
+ * The column the Ring fits (the open Fitting's sticky editor column) carries
+ * this attribute, and from the desktop breakpoint sets `--ring-room` to the
+ * height it pins at.
  */
-const RING_MAX_WIDTH = 'max(20rem, min(48rem, calc(100dvh - 24rem)))';
+export const RING_ROOM_ATTR = 'data-ring-room';
+
+/** Under the cargo row: the panel's bottom padding (0.75rem) and border. */
+const PANEL_FOOT_PX = 13;
+
+/**
+ * The ring grows with its column up to 48rem, where a tile is 48/648 of it —
+ * about 57px. In a column that sets `--ring-room` it takes the room that
+ * leaves once `chrome` (px: the tabs and panel header above the ring, the
+ * readouts, legend and cargo under it) is out, so once the column pins the
+ * whole block is on screen. Elsewhere — the shared page, the Start preview,
+ * below the desktop breakpoint — the window less 24rem (header, tabs, panel
+ * header and the readouts) bounds it; `chrome` cancels out there. A short
+ * window (a landscape phone) keeps at least 20rem.
+ */
+function ringMaxWidth(chrome: number): string {
+  const px = `${Math.round(chrome)}px`;
+  return `max(20rem, min(48rem, calc(var(--ring-room, calc(100dvh - 24rem + ${px})) - ${px})))`;
+}
+
+/**
+ * The px `ringMaxWidth` leaves for the rest of the column: how far the ring
+ * sits below the top of its `RING_ROOM_ATTR` column, plus the block under it.
+ * Re-measured as the block or column resizes, never on scroll (offsets are
+ * taken from the column's content top); 0 outside such a column.
+ */
+function useRingChrome(
+  block: RefObject<HTMLDivElement | null>,
+  ring: RefObject<HTMLDivElement | null>
+): number {
+  const [chrome, setChrome] = useState(0);
+  useLayoutEffect(() => {
+    const blockEl = block.current;
+    const ringEl = ring.current;
+    const column = blockEl?.closest<HTMLElement>(`[${RING_ROOM_ATTR}]`);
+    if (!blockEl || !ringEl || !column) return;
+    const measure = () => {
+      const ringBox = ringEl.getBoundingClientRect();
+      const above = ringBox.top - column.getBoundingClientRect().top + column.scrollTop;
+      const below = blockEl.getBoundingClientRect().bottom - ringBox.bottom;
+      const next = Math.round(above + below + PANEL_FOOT_PX);
+      setChrome((prev) => (prev === next ? prev : next));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(blockEl);
+    observer.observe(column);
+    return () => observer.disconnect();
+  }, [block, ring]);
+  return chrome;
+}
 
 const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
@@ -920,6 +970,9 @@ export function FittingRing({
       : placed?.kind === 'load' && !!handlers.loadCharge;
   });
   const cargoTarget = useFittingDropTarget({ kind: 'cargo' });
+  const blockRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<HTMLDivElement>(null);
+  const ringWidth = ringMaxWidth(useRingChrome(blockRef, ringRef));
   const centre = RING_VIEW / 2;
   const nameOf = (typeId: number) => typeName?.(typeId) ?? `#${typeId}`;
 
@@ -1068,10 +1121,12 @@ export function FittingRing({
 
   return (
     <RingFrame bare={bare} title={t('fittings.ring.title')} actions={actions}>
-      <div className="space-y-3">
+      {/* The block keeps the ring's own width, so cargo and the legend sit under it on a wide panel. */}
+      <div ref={blockRef} className="mx-auto w-full max-w-[48rem] space-y-3">
         <div
+          ref={ringRef}
           className="relative mx-auto aspect-square w-full"
-          style={{ maxWidth: RING_MAX_WIDTH }}
+          style={{ maxWidth: ringWidth }}
           {...(compact ? {} : openSpace.props)}
         >
           <div
@@ -1178,10 +1233,7 @@ export function FittingRing({
 
         {/* Laid out as the rim is: calibration and powergrid on the left, bandwidth and CPU on the right. */}
         {!compact && (
-          <div
-            className="mx-auto grid grid-cols-2 gap-x-4 gap-y-2"
-            style={{ maxWidth: RING_MAX_WIDTH }}
-          >
+          <div className="mx-auto grid grid-cols-2 gap-x-4 gap-y-2" style={{ maxWidth: ringWidth }}>
             <Readout gauge="calibration" budget={budgets.calibration} align="start" />
             {dronesShown ? (
               <Readout gauge="droneBandwidth" budget={budgets.droneBandwidth} align="end" />
@@ -1201,10 +1253,7 @@ export function FittingRing({
 
         {/* The phone editor has no readouts under the ring, so the two budgets that gate a fit sit above the rack buttons. (The Start preview is compact too, but carries its own meters.) */}
         {compact && onRackOpen && (
-          <div
-            className="mx-auto grid grid-cols-2 gap-x-4 gap-y-1"
-            style={{ maxWidth: RING_MAX_WIDTH }}
-          >
+          <div className="mx-auto grid grid-cols-2 gap-x-4 gap-y-1" style={{ maxWidth: ringWidth }}>
             <Readout gauge="cpu" budget={budgets.cpu} align="start" />
             <Readout gauge="powergrid" budget={budgets.powergrid} align="end" />
             {/* Calibration can gate a fit too, but only earns a line on the phone when it is the one over. */}

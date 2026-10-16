@@ -175,6 +175,38 @@ describe('FittingRing', () => {
     ).toEqual(['Offline', 'Online', 'Active', 'Overheated']);
   });
 
+  it('sizes the ring from the column it fits, less the column’s other content', () => {
+    // Column top 0; the ring 100px down (tabs and panel header), 400px tall;
+    // the readouts, legend and cargo end 200px under it.
+    const rects = new Map<string, Partial<DOMRect>>([
+      ['column', { top: 0, bottom: 900 }],
+      ['ring', { top: 100, bottom: 500 }],
+      ['block', { top: 100, bottom: 700 }],
+    ]);
+    const spy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const role = this.hasAttribute('data-ring-room')
+          ? 'column'
+          : this.classList.contains('aspect-square')
+            ? 'ring'
+            : this.querySelector(':scope > .aspect-square')
+              ? 'block'
+              : '';
+        return { top: 0, bottom: 0, ...rects.get(role) } as DOMRect;
+      });
+    const { container } = render(
+      <div data-ring-room="">
+        <FittingRing fitting={fitting} stats={statsWith(10)} />
+      </div>
+    );
+    spy.mockRestore();
+    const ring = container.querySelector<HTMLElement>('.aspect-square')!;
+    // 100 above + 200 below + the panel's 13px bottom padding and border.
+    expect(ring.getAttribute('style')).toContain('- 313px');
+    expect(ring.getAttribute('style')).toContain('var(--ring-room');
+  });
+
   it('flags over-used calibration, not just CPU and powergrid', () => {
     render(
       <FittingRing
