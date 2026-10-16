@@ -260,6 +260,31 @@ describe('FittingMutationPanel', () => {
     expect(screen.getByRole('button', { name: 'Load rolls from my assets' })).toBeInTheDocument();
   });
 
+  it('hands focus to the picker once an owned item fills a module of unknown base', async () => {
+    const user = userEvent.setup();
+    const owned = {
+      baseTypeId: GREMLIN,
+      mutaplasmidTypeId: GRAVID,
+      attributes: { [CAP]: 85, [POWER]: 900 },
+    };
+    assets.loadCharacterAssets.mockResolvedValue({
+      cached: {
+        truncated: false,
+        data: [{ type_id: ABYSSAL, item_id: 501, quantity: 1, location_flag: 'Hangar' }],
+      },
+      needsReauth: false,
+    });
+    assets.mutationsForItems.mockResolvedValue(new Map([[501, owned]]));
+    const unknownBase = { ...plain, typeId: ABYSSAL };
+    const { after, show } = setup(unknownBase, 90000001);
+    await user.click(screen.getByRole('button', { name: 'Load rolls from my assets' }));
+    await user.click(await screen.findByRole('button', { name: /· Gravid/ }));
+    show(after());
+    await vi.waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Mutaplasmid' })).toHaveFocus()
+    );
+  });
+
   it('says so when the assets hold none', async () => {
     const user = userEvent.setup();
     assets.loadCharacterAssets.mockResolvedValue({

@@ -105,7 +105,7 @@ function MutationEditor({
 
   const apply = (next: ItemMutation | null) =>
     edit((f) => setModuleMutation(f, slot, slotIndex, next, lookup));
-  // Remove mutation and the base pick unmount the control that ran them; the
+  // Remove mutation, the base pick and an owned-item pick unmount the control that ran them; the
   // picker takes focus once enabled (it waits on the new base's values).
   const focusPicker = () =>
     focusAfterCommit(() => {
@@ -127,7 +127,10 @@ function MutationEditor({
       typeIds={assetTypes}
       lookup={lookup}
       nameOf={nameOf}
-      onApply={apply}
+      onApply={(owned) => {
+        apply(owned);
+        focusPicker();
+      }}
     />
   );
 
