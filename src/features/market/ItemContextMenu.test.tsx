@@ -13,8 +13,18 @@ const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
 ) as PiData;
 
+const GRAVID = 47831; // Gravid Heavy Energy Neutralizer Mutaplasmid: on the market
+const ABYSSAL_NEUT = 47832; // Heavy Abyssal Energy Neutralizer: no market
+
 vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => pi),
+  loadMutaplasmids: vi.fn(async () => ({
+    attributeNames: {},
+    mutaplasmids: {
+      [GRAVID]: { result: ABYSSAL_NEUT, bases: [12271], attributes: [] },
+    },
+    abyssalTypeIds: [ABYSSAL_NEUT],
+  })),
 }));
 
 const { ItemContextMenu, ItemMoreActions } = await import('./ItemContextMenu');
@@ -47,6 +57,39 @@ describe('ItemContextMenu — Open in EVE', () => {
 
     expect(await screen.findByRole('menuitem', { name: 'Open market in EVE' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Open in EVE' })).not.toBeInTheDocument();
+  });
+});
+
+describe('ItemContextMenu — Abyssal types', () => {
+  const MARKET_ONLY = [
+    'Add to Quickbar',
+    'Set price alert…',
+    'View in Market',
+    'Open market in EVE',
+  ];
+
+  it('leaves out the market-only actions for an Abyssal type: no order book exists for it', async () => {
+    renderMenu(ABYSSAL_NEUT, 'Heavy Abyssal Energy Neutralizer');
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Heavy Abyssal Energy Neutralizer' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    // Gone once the lookup answers, not just while it loads.
+    await vi.waitFor(() => {
+      for (const name of MARKET_ONLY)
+        expect(screen.queryByRole('menuitem', { name })).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps them for a Mutaplasmid, which trades on the market', async () => {
+    renderMenu(GRAVID, 'Gravid Heavy Energy Neutralizer Mutaplasmid');
+    fireEvent.contextMenu(
+      screen.getByRole('button', { name: 'Gravid Heavy Energy Neutralizer Mutaplasmid' })
+    );
+
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    for (const name of MARKET_ONLY)
+      expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
   });
 });
 

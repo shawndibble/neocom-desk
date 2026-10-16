@@ -98,6 +98,8 @@ import { hasItemRows } from '@/features/character/assetBrowserFormat';
 import { loadTypeVolumes } from '@/features/character/typeNames';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { addQuickbarItem } from '@/features/market/quickbar';
+import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
@@ -493,12 +495,21 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   function handleDeselectAll() {
     setSelectedIds(new Set());
   }
-  function handleBulkAddToQuickbar() {
-    for (const id of selectedIds) {
+  async function handleBulkAddToQuickbar() {
+    const picked = [...selectedIds];
+    // No market for an Abyssal type: the row's own menu doesn't offer Quickbar either.
+    const lookup = await loadMutaplasmidLookup().catch(() => null);
+    // One write: `quickbar.add` reads the list it rendered with, so a loop of them keeps only the last.
+    let items = itemActions.quickbar.items;
+    for (const id of picked) {
       const asset = assetsByItemId.get(id);
-      if (!asset) continue;
-      itemActions.quickbar.add(asset.type_id, typeDisplayName(asset.type_id, typeNames));
+      if (!asset || lookup?.isAbyssalType(asset.type_id)) continue;
+      items = addQuickbarItem(items, {
+        typeId: asset.type_id,
+        name: typeDisplayName(asset.type_id, typeNames),
+      });
     }
+    await itemActions.quickbar.write(items);
   }
   function handleBulkAddToCompare() {
     const addToCompare = useCompareSet.getState().add;
@@ -654,7 +665,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                     <Button
                       size="sm"
                       disabled={!itemActions.quickbar.available}
-                      onClick={handleBulkAddToQuickbar}
+                      onClick={() => void handleBulkAddToQuickbar()}
                     >
                       {t('assets.select.addToQuickbar')}
                     </Button>

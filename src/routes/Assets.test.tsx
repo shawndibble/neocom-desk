@@ -2099,6 +2099,46 @@ describe('multi-select and bulk actions (issue #90)', () => {
     });
   });
 
+  it('leaves an Abyssal module out of the bulk Quickbar add: it has no market', async () => {
+    await db.quickbars.clear(); // the test above leaves its two items there
+    abyssalEstimate.mockResolvedValue({
+      status: 'unknown',
+      value: null,
+      source: 'mutamarket',
+      fetchedAt: Date.now(),
+      valueUpdatedAt: null,
+      url: null,
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            { ...assetPage1[0], item_id: 1, type_id: 34 },
+            { ...assetPage1[0], item_id: 2, type_id: ABYSSAL_NEUT, is_singleton: true },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+    await screen.findByText('Tritanium');
+    await screen.findByText('Heavy Abyssal Energy Neutralizer');
+
+    await clickTool(user, 'Select');
+    await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select Heavy Abyssal Energy Neutralizer' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Add to Quickbar' }));
+
+    await waitFor(async () => {
+      const record = await db.quickbars.get(String(CHAR_ID));
+      expect(record?.items).toEqual([{ typeId: 34, name: 'Tritanium' }]);
+    });
+  });
+
   it('adds every selected item to the Compare set via the bulk action bar', async () => {
     const user = userEvent.setup();
     render(<App />);

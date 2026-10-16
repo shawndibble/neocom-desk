@@ -15,6 +15,7 @@ import type { CorporationAsset, CorporationDivisions } from '@/esi/endpoints';
 import * as boardData from '@/features/corp/boardData';
 import * as corpAssets from '@/features/corp/assets';
 import * as corpWallet from '@/features/corp/wallet';
+import { db } from '@/db';
 import { CorpAssets } from './CorpAssets';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -34,9 +35,15 @@ vi.mock('@/features/market/ItemDetailModal', () => ({
     <div role="dialog" aria-label={`Item detail: ${itemName}`} />
   ),
 }));
+const ABYSSAL_NEUT = 47832;
 vi.mock('@/sde/loadSde', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sde/loadSde')>()),
   loadBlueprints: vi.fn(async () => ({})),
+  loadMutaplasmids: vi.fn(async () => ({
+    attributeNames: {},
+    mutaplasmids: {},
+    abyssalTypeIds: [47832],
+  })),
 }));
 // Copy valuation reaches Firestore; these tests only need a copy's badge.
 vi.mock('@/features/character/assetCopyValues', () => ({
@@ -440,6 +447,47 @@ describe('row context menu (issue #420)', () => {
     // the blueprint catalog, so this must resolve instantly rather than
     // dangling in "checking…" forever.
     expect(screen.getByRole('menuitem', { name: 'No blueprint options' })).toBeInTheDocument();
+  });
+});
+
+describe('bulk Add to Quickbar', () => {
+  it('adds every selected item but an Abyssal module, which has no market', async () => {
+    await db.quickbars.clear();
+    mocked.loadCorporationAssets.mockResolvedValue(
+      cached([
+        asset({ item_id: 1 }),
+        asset({ item_id: 2, type_id: 35 }),
+        asset({ item_id: 3, type_id: ABYSSAL_NEUT, is_singleton: true }),
+      ])
+    );
+    mocked.loadCorpAssetLabels.mockResolvedValue({
+      types: new Map([
+        [34, 'Tritanium'],
+        [35, 'Pyerite'],
+        [ABYSSAL_NEUT, 'Heavy Abyssal Energy Neutralizer'],
+      ]),
+      locations: new Map([[60003760, 'Jita IV - Moon 4']]),
+    });
+    const user = userEvent.setup();
+    renderAssets();
+    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
+    await screen.findByText('Heavy Abyssal Energy Neutralizer');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Pyerite' }));
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select Heavy Abyssal Energy Neutralizer' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Add to Quickbar' }));
+
+    await waitFor(async () => {
+      const record = await db.quickbars.get(String(CHARACTER_ID));
+      expect(record?.items).toEqual([
+        { typeId: 34, name: 'Tritanium' },
+        { typeId: 35, name: 'Pyerite' },
+      ]);
+    });
   });
 });
 

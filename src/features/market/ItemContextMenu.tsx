@@ -24,6 +24,7 @@ import { useCompareSet } from './compareSet';
 import { useItemActions } from './itemActions';
 import { StockTargetDialog } from '@/features/stockTargets/StockTargetDialog';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
+import { useIsAbyssalType } from '@/features/abyssal/mutaplasmidData';
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
@@ -69,6 +70,18 @@ export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElemen
 /** Everything the menu's entries need — the props minus the trigger wiring. */
 type ItemMenuProps = Omit<ItemContextMenuProps, 'children'>;
 
+/**
+ * `children` unless `typeId` is an Abyssal type: no order book exists for one
+ * (Item Detail drops its market line and link the same way). Mutaplasmids
+ * trade, so they keep theirs. Shown while the lookup loads, so an ordinary
+ * item's entries never appear under a cursor already in the menu; the pages
+ * that list Abyssal types (Assets, Fittings, contracts) have it loaded.
+ * Mounts with the menu's entries, so only an opened menu loads the lookup.
+ */
+function MarketOnly({ typeId, children }: { typeId: number; children: ReactNode }) {
+  return useIsAbyssalType(typeId) === true ? null : children;
+}
+
 /** The item menu's "Show info" — also reused as-is by menus that aren't item menus (the Fittings editor's). */
 export function ShowInfoMenuItem({
   typeId,
@@ -98,7 +111,11 @@ export function ShowInfoMenuItem({
  * corporations and alliances, and silently ignores an inventory type.
  */
 export function OpenInEveItemMenuItems({ typeId }: { typeId: number }) {
-  return <OpenInEveMenuItem kind="marketDetails" id={typeId} />;
+  return (
+    <MarketOnly typeId={typeId}>
+      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
+    </MarketOnly>
+  );
 }
 
 /** The item menu's "View in Market", keeping the page's region or hub; reused as `ShowInfoMenuItem` is. */
@@ -107,14 +124,16 @@ export function ViewInMarketMenuItem({ typeId }: { typeId: number }) {
   const navigate = useNavigate();
   const location = useLocation();
   return (
-    <MenuItem
-      onSelect={() => {
-        const params = marketLinkParams(typeId, location.search);
-        navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-      }}
-    >
-      {t('market.contextMenu.viewInMarket')}
-    </MenuItem>
+    <MarketOnly typeId={typeId}>
+      <MenuItem
+        onSelect={() => {
+          const params = marketLinkParams(typeId, location.search);
+          navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+        }}
+      >
+        {t('market.contextMenu.viewInMarket')}
+      </MenuItem>
+    </MarketOnly>
   );
 }
 
@@ -170,7 +189,8 @@ export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
  * `PriceAlertDialog`.
  *
  * Add to Quickbar, set a price alert or a stock target, show info, add to Compare, view in
- * Market, copy name, jump to a Build Plan, jump to a PI Plan.
+ * Market, copy name, jump to a Build Plan, jump to a PI Plan. The market-only
+ * ones leave an Abyssal type's menu (`MarketOnly`).
  *
  * The PI action asks for itself rather than going through the page's Item
  * Actions the way `blueprintTypeID` does: `pi.json` is 15KB against
@@ -216,16 +236,22 @@ function useItemMenuItems(
 
   return (
     <>
-      {canAddToQuickbar ? (
-        <MenuItem onSelect={() => addToQuickbar(typeId, itemName)}>
-          {t('market.contextMenu.addToQuickbar')}
-        </MenuItem>
-      ) : (
-        <DisabledMenuItem reason={t('market.contextMenu.quickbarNoCharacter')}>
-          {t('market.contextMenu.addToQuickbar')}
-        </DisabledMenuItem>
-      )}
-      <PriceAlertMenuItem typeId={typeId} available={canAddToQuickbar} onSelect={onAlertRequest} />
+      <MarketOnly typeId={typeId}>
+        {canAddToQuickbar ? (
+          <MenuItem onSelect={() => addToQuickbar(typeId, itemName)}>
+            {t('market.contextMenu.addToQuickbar')}
+          </MenuItem>
+        ) : (
+          <DisabledMenuItem reason={t('market.contextMenu.quickbarNoCharacter')}>
+            {t('market.contextMenu.addToQuickbar')}
+          </DisabledMenuItem>
+        )}
+        <PriceAlertMenuItem
+          typeId={typeId}
+          available={canAddToQuickbar}
+          onSelect={onAlertRequest}
+        />
+      </MarketOnly>
       {!props.hideStockTarget && (
         <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
       )}
