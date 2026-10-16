@@ -52,7 +52,7 @@ import {
 import { CapacitorFacts, TankFacts } from './FittingTankStats';
 import { capacitorTone, type CapacitorTone } from './capacitorTone';
 import { FittingYourCharactersPanel } from './FittingYourCharactersPanel';
-import { canFlyHeadline, useCharacterGaps, type GapCharacter } from './useCharacterGaps';
+import { useCharacterGaps, type GapCharacter } from './useCharacterGaps';
 import { SupportFacts } from './FittingSupportStats';
 import { MiningFacts } from './FittingMiningStats';
 import { FleetBoostFacts } from './FittingFleetBoostStats';
@@ -355,7 +355,7 @@ function StatSection({
   );
 }
 
-/** The "Your Characters" row: its headline comes from whatever is worked out, the rows only while open. */
+/** The "Your Characters" row: the headline shows closed too; gaps are only worked out while open. */
 function YourCharactersSection({
   fitting,
   characters,
@@ -368,8 +368,7 @@ function YourCharactersSection({
   render: (meta: ReactNode, body: ReactNode) => ReactNode;
 }) {
   const { t } = useTranslation();
-  const rows = useCharacterGaps(fitting, characters, expanded);
-  const headline = canFlyHeadline(rows);
+  const { rows, headline } = useCharacterGaps(fitting, characters, expanded);
   return render(
     headline ? t('fittings.yourCharacters.headline', headline) : undefined,
     <FittingYourCharactersPanel rows={rows} />

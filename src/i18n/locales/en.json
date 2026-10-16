@@ -1133,6 +1133,11 @@
       "skills_one": "{{count}} skill",
       "skills_other": "{{count}} skills",
       "notLoaded": "Skills not loaded",
+      "notLoadedReason": "This Character's skills couldn't be read.",
+      "unconfirmed": "Can't confirm",
+      "unconfirmedHint": "Some skill requirements couldn't be loaded, so this can't be confirmed as flyable. They're looked up again when you're back online.",
+      "hasEverySkill": "Has every skill this Fitting needs.",
+      "filter": "Filter Characters",
       "prerequisite": "(prerequisite)"
     },
     "whatToTrain": {
