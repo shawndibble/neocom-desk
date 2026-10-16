@@ -997,7 +997,7 @@ export function BuildPlanDetail({
   const planSchedule = usePlanSchedule(plan.characterId, jobNodes);
   const planSeconds = planSchedule
     ? (planSchedule.schedule.finishMs - planSchedule.nowMs) / 1000
-    : null;
+    : undefined;
 
   /**
    * Make-or-buy verdict per material (GLOSSARY.md round 29), computed once for
@@ -1440,9 +1440,7 @@ export function BuildPlanDetail({
           nameForSkill={(typeID) => nameForType(catalog, typeID)}
           nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
           planSeconds={planSeconds}
-          slotLine={
-            planSchedule && <PlanScheduleLine plan={planSchedule} hasSubJobs={anySubBuilds} />
-          }
+          slotLine={planSchedule && <PlanScheduleLine plan={planSchedule} />}
         />
       )}
       {result && !error && result.revenue !== null && (
@@ -2002,7 +2000,11 @@ export function BuildPlanDetail({
                 label={t('industry.refresh')}
                 onClick={() => setRefreshTick((v) => v + 1)}
               />
-              {result && <span className="tabular-nums">{formatDuration(result.seconds)}</span>}
+              {result && (
+                <span className="tabular-nums">
+                  {formatDuration(planSeconds ?? result.seconds)}
+                </span>
+              )}
             </span>
           }
         >

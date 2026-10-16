@@ -34,8 +34,8 @@ export interface BreakdownContext {
   productQuantity: number | null;
   /** Product's lowest hub sell per unit; null when unpriced at this hub. */
   productUnitPrice: number | null;
-  /** The plan's wall-clock time on its character's free slots; null/absent without slot data. */
-  planSeconds?: number | null;
+  /** The plan's wall-clock time on its character's free slots; absent without slot data. */
+  planSeconds?: number;
 }
 
 interface CalculationBreakdownProps {
@@ -198,7 +198,7 @@ export function CalculationBreakdown({
               time: formatDuration(result.seconds),
             })}
           </p>
-          {context.planSeconds != null && (
+          {context.planSeconds !== undefined && (
             <p>
               {t('industry.breakdown.profitPlanTime', {
                 time: formatDuration(context.planSeconds),

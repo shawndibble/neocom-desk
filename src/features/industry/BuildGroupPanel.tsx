@@ -635,10 +635,7 @@ export function BuildGroupPanel({
           )}
           {plans.length > 0 && groupSchedule && (
             <div className="basis-full">
-              <PlanScheduleLine
-                plan={groupSchedule}
-                hasSubJobs={groupJobNodes.length > members.length}
-              />
+              <PlanScheduleLine plan={groupSchedule} />
             </div>
           )}
         </div>

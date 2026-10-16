@@ -21,8 +21,6 @@ import {
   toJobSlotJobs,
 } from '@/features/character/jobSlotSkills';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { eveClock, formatEveDateTime } from '@/lib/eveTime';
-import { useNow } from '@/lib/useNow';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterIndustryJobs } from './jobs';
 
@@ -30,6 +28,8 @@ export interface PlanJobSlotData {
   characterName: string;
   skills: JobSlotSkills;
   jobs: readonly JobSlotJob[];
+  /** When the jobs and skills were read: the schedule's "now". */
+  loadedAtMs: number;
 }
 
 /** The category a plan's own top-level job draws from. */
@@ -103,11 +103,18 @@ export function planStages(schedule: JobSchedule, nodes: readonly PlanJobNode[])
   });
 }
 
-const WEEK_MS = 7 * 86_400_000;
-
-/** "Thu 14:20" EVE time while the weekday is unambiguous (under a week out), else "10-23 14:20". */
-export function scheduleWhen(ms: number, nowMs: number): string {
-  return ms - nowMs < WEEK_MS ? eveClock(ms) : formatEveDateTime(new Date(ms));
+/** A Character's job-slot skills, queue-corrected; null when skills aren't known (never a guessed zero). */
+export async function loadJobSlotSkills(
+  characterId: number,
+  nowMs: number
+): Promise<JobSlotSkills | null> {
+  const corrected = await loadCorrectedSkills(characterId, nowMs, { skipQueueWithoutScope: true });
+  if (!corrected.skillsResult) return null;
+  return jobSlotSkillsFromCharacterSkills(
+    corrected.skillsResult.data.skills,
+    corrected.queueResult?.data ?? [],
+    nowMs
+  );
 }
 
 /**
@@ -123,6 +130,7 @@ export function usePlanJobSlots(characterId: number | null): PlanJobSlotData | n
     characterId: number;
     skills: JobSlotSkills;
     jobs: JobSlotJob[];
+    loadedAtMs: number;
   } | null>(null);
 
   useEffect(() => {
@@ -131,19 +139,16 @@ export function usePlanJobSlots(characterId: number | null): PlanJobSlotData | n
     void (async () => {
       try {
         const nowMs = Date.now();
-        const [jobs, corrected] = await Promise.all([
+        const [jobs, skills] = await Promise.all([
           loadCharacterIndustryJobs(characterId),
-          loadCorrectedSkills(characterId, nowMs, { skipQueueWithoutScope: true }),
+          loadJobSlotSkills(characterId, nowMs),
         ]);
-        if (cancelled || jobs.needsReauth || !jobs.cached || !corrected.skillsResult) return;
+        if (cancelled || jobs.needsReauth || !jobs.cached || !skills) return;
         setLoaded({
           characterId,
           jobs: toJobSlotJobs(jobs.cached.data),
-          skills: jobSlotSkillsFromCharacterSkills(
-            corrected.skillsResult.data.skills,
-            corrected.queueResult?.data ?? [],
-            nowMs
-          ),
+          skills,
+          loadedAtMs: nowMs,
         });
       } catch {
         // Unknown slot data reads as "no line", never a guessed zero.
@@ -159,7 +164,7 @@ export function usePlanJobSlots(characterId: number | null): PlanJobSlotData | n
     () =>
       characterName === undefined || !loaded || loaded.characterId !== characterId
         ? null
-        : { characterName, skills: loaded.skills, jobs: loaded.jobs },
+        : { ...loaded, characterName },
     [characterName, loaded, characterId]
   );
 }
@@ -168,10 +173,12 @@ export interface PlanScheduleResult {
   schedule: JobSchedule;
   stages: PlanStage[];
   nowMs: number;
+  /** Sub-jobs are timed at TE 0; the line only notes it when there are some. */
+  hasSubJobs: boolean;
 }
 
 /**
- * The plan (or group) tree scheduled on the character's slots right now, or
+ * The plan (or group) tree scheduled on the character's slots, or
  * null while slot data is unknown — the caller then falls back to job time
  * and draws no slot line.
  */
@@ -180,10 +187,18 @@ export function usePlanSchedule(
   nodes: readonly PlanJobNode[]
 ): PlanScheduleResult | null {
   const data = usePlanJobSlots(characterId);
-  const nowMs = useNow();
+  // Scheduled from when the slot data was read, not a ticking clock: the
+  // done-by is absolute either way, and a per-minute tick would re-render the
+  // whole plan page.
   return useMemo(() => {
     if (!data || nodes.length === 0) return null;
+    const nowMs = data.loadedAtMs;
     const schedule = scheduleJobs(nodes, data, nowMs);
-    return { schedule, stages: planStages(schedule, nodes), nowMs };
-  }, [data, nodes, nowMs]);
+    return {
+      schedule,
+      stages: planStages(schedule, nodes),
+      nowMs,
+      hasSubJobs: nodes.some((node) => node.kind !== 'final'),
+    };
+  }, [data, nodes]);
 }

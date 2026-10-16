@@ -14,6 +14,8 @@ test-results
 # (vite.config.ts's copyDogmaEngineAssets plugin) so they can be fetched
 # lazily at runtime instead of bundled — see src/features/fittings/dogmaFittingEngine.ts.
 public/vendor/dogma/
+# Same copy landing under a nested public/ when a dev task runs from a subdirectory.
+**/public/vendor/dogma/
 
 # Screenshots the Advisor spec captures for review. Artifacts, not fixtures.
 e2e-output/

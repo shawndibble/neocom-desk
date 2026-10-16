@@ -69,7 +69,7 @@ export function scheduleJobs(
   nodes.forEach((n, i) => n.deps.forEach((dep) => parents[index.get(dep)!].push(i)));
 
   const stage = new Array<number>(nodes.length);
-  const tail = new Array<number>(nodes.length);
+  const remainingPathSeconds = new Array<number>(nodes.length);
   const visiting = new Set<number>();
   const visitStage = (i: number): number => {
     if (stage[i] !== undefined) return stage[i];
@@ -81,7 +81,8 @@ export function scheduleJobs(
   };
   // Longest path (in seconds) from a job through its consumers to the root.
   const visitTail = (i: number): number =>
-    (tail[i] ??= nodes[i].seconds + parents[i].reduce((m, p) => Math.max(m, visitTail(p)), 0));
+    (remainingPathSeconds[i] ??=
+      nodes[i].seconds + parents[i].reduce((m, p) => Math.max(m, visitTail(p)), 0));
   nodes.forEach((_, i) => visitStage(i));
   nodes.forEach((_, i) => visitTail(i));
 
@@ -103,7 +104,10 @@ export function scheduleJobs(
       let slot = 0;
       for (let s = 1; s < pool.length; s++) if (pool[s] < pool[slot]) slot = s;
       const start = Math.max(ready, pool[slot]);
-      if (start < pickStart || (start === pickStart && tail[i] > tail[pick])) {
+      if (
+        start < pickStart ||
+        (start === pickStart && remainingPathSeconds[i] > remainingPathSeconds[pick])
+      ) {
         pick = i;
         pickStart = start;
         pickSlot = slot;

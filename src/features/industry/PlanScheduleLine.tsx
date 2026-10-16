@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret } from '@/components/ui';
-import { scheduleWhen, type PlanJobKind, type PlanScheduleResult } from './planJobSlots';
+import { eveWhen } from '@/lib/eveTime';
+import type { PlanJobKind, PlanScheduleResult } from './planJobSlots';
 
 const KIND_ORDER: readonly PlanJobKind[] = ['reaction', 'part', 'final'];
 
@@ -10,24 +11,15 @@ const KIND_ORDER: readonly PlanJobKind[] = ['reaction', 'part', 'final'];
  * job tree on its character's slots. Show plan expands in place to the stage
  * order: "Now: 4 reactions · Wed 09:00: 6 parts · Thu 02:00: final item".
  */
-export function PlanScheduleLine({
-  plan,
-  hasSubJobs,
-}: {
-  plan: PlanScheduleResult;
-  /** Sub-jobs are timed at TE 0; the note only matters when there are some. */
-  hasSubJobs: boolean;
-}) {
+export function PlanScheduleLine({ plan }: { plan: PlanScheduleResult }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const { schedule, stages, nowMs } = plan;
+  const { schedule, stages, nowMs, hasSubJobs } = plan;
   const stageText = stages
     .map((stage) =>
       t('industry.planSchedule.stage', {
         time:
-          stage.startMs <= nowMs
-            ? t('industry.planSchedule.now')
-            : scheduleWhen(stage.startMs, nowMs),
+          stage.startMs <= nowMs ? t('industry.planSchedule.now') : eveWhen(stage.startMs, nowMs),
         jobs: KIND_ORDER.filter((kind) => stage.counts[kind] > 0)
           .map((kind) => t(`industry.planSchedule.${kind}`, { count: stage.counts[kind] }))
           .join(' + '),
@@ -39,7 +31,7 @@ export function PlanScheduleLine({
       <p>
         {t('industry.planSchedule.line', {
           count: schedule.peakSlots,
-          time: scheduleWhen(schedule.finishMs, nowMs),
+          time: eveWhen(schedule.finishMs, nowMs),
         })}{' '}
         ·{' '}
         <button

@@ -23,3 +23,10 @@ const EVE_CLOCK = new Intl.DateTimeFormat('en-GB', {
 export function eveClock(ms: number): string {
   return EVE_CLOCK.format(new Date(ms)).replace(',', '');
 }
+
+const WEEK_MS = 7 * 86_400_000;
+
+/** `eveClock` while the weekday is unambiguous (under a week out), else `formatEveDateTime`'s "10-23 14:20". */
+export function eveWhen(ms: number, nowMs: number): string {
+  return ms - nowMs < WEEK_MS ? eveClock(ms) : formatEveDateTime(new Date(ms));
+}

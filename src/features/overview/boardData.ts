@@ -15,11 +15,8 @@ import { groupColoniesIntoBatches, type ColonyBatch } from '@/engine/pi/colonyBa
 import type { ColonyStatus } from '@/engine/pi/types';
 import { loadAllCharactersIndustryJobs, loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import type { JobSlotJob, JobSlotSkills } from '@/engine/industry/jobSlots';
-import {
-  jobSlotSkillsFromCharacterSkills,
-  toJobSlotJobs,
-} from '@/features/character/jobSlotSkills';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { toJobSlotJobs } from '@/features/character/jobSlotSkills';
+import { loadJobSlotSkills } from '@/features/industry/planJobSlots';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { IndustryJob } from '@/esi/endpoints';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -253,18 +250,12 @@ async function loadIndustrySlots(
     ESI_FANOUT_CONCURRENCY,
     async ({ entry, index }) => {
       try {
-        const corrected = await loadCorrectedSkills(entry.characterId, nowMs, {
-          skipQueueWithoutScope: true,
-        });
-        if (!corrected.skillsResult) return;
+        const skills = await loadJobSlotSkills(entry.characterId, nowMs);
+        if (!skills) return;
         slots[index] = {
           characterId: entry.characterId,
           characterName: entry.characterName,
-          skills: jobSlotSkillsFromCharacterSkills(
-            corrected.skillsResult.data.skills,
-            corrected.queueResult?.data ?? [],
-            nowMs
-          ),
+          skills,
           jobs: toJobSlotJobs(entry.jobs),
         };
       } catch {
@@ -288,9 +279,12 @@ export async function loadIndustryBoard(characterId: number): Promise<IndustryBo
       ? [{ ...entry, jobs: entry.result.cached.data }]
       : []
   );
-  const allJobs = ownEntry
-    ? known.flatMap((entry) => entry.jobs)
-    : [...jobs, ...known.flatMap((entry) => entry.jobs)];
+  // The header Character's jobs as its own view shows them (stale cache
+  // included), then everyone else's.
+  const allJobs = [
+    ...jobs,
+    ...known.filter((entry) => entry.characterId !== characterId).flatMap((entry) => entry.jobs),
+  ];
   const slots = await loadIndustrySlots(known);
 
   // Blueprint id as the fallback: research and copying jobs have no product,

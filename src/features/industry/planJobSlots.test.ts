@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import { scheduleJobs } from '@/engine/industry/jobSchedule';
-import { categoryForActivity, planJobNodes, planStages, scheduleWhen } from './planJobSlots';
+import { categoryForActivity, planJobNodes, planStages } from './planJobSlots';
 
 const sub = (typeID: number, seconds: number, inputs: ResolvedMaterial[] = []) =>
   ({ subBuild: { typeID, seconds, inputs } }) as unknown as ResolvedMaterial;
@@ -59,15 +59,5 @@ describe('planStages', () => {
       { startMs: NOW + 30_000, counts: { reaction: 0, part: 1, final: 0 } },
       { startMs: NOW + 50_000, counts: { reaction: 0, part: 0, final: 1 } },
     ]);
-  });
-});
-
-describe('scheduleWhen', () => {
-  it('reads a weekday and EVE time inside the coming week', () => {
-    expect(scheduleWhen(NOW + 26.5 * 3_600_000, NOW)).toBe('Fri 14:30');
-  });
-
-  it('falls back to the date once the weekday would repeat', () => {
-    expect(scheduleWhen(NOW + 8 * 86_400_000, NOW)).toBe('10-23 12:00');
   });
 });

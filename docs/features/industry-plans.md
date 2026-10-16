@@ -207,7 +207,7 @@ Modal "Import a fit" (`industry.fitImportTitle`) opened from toolbar icon or rou
 
 - Corner "More actions" + right-click item menu on product name `<h2>`; `SkillGateMarker` chip if no Character on the account can install the product blueprint (account-wide, #1231); "· N runs · profit after fees" (`heroTitle`).
 - Big figure = Sale Profitability: net profit after sales tax + broker (ADR 0006), tone-coded, `IskAmount` (tap shows exact). "Unknown" when unpriced; spinner while prices load; "No price data yet" hint.
-- Qualifier line: margin %, ISK/h, duration, break-even price (net, always). Duration = wall-clock from the schedule (done-by minus now); falls back to the plan's own job time without slot data. ISK/h stays profit / the plan's own top-level job time (per-slot earning).
+- Qualifier line: margin %, ISK/h, duration, break-even price (net, always). Duration = wall-clock from the schedule (done-by minus when the slot data was read; no ticking clock); falls back to the plan's own job time without slot data. ISK/h stays profit / the plan's own top-level job time (per-slot earning).
 - `PlanScheduleLine` (replaced `PlanSlotLine`): "Uses N slots - done by Thu 14:20 - Show plan". N = peak concurrent slots; time = weekday + EVE time under a week out, else MM-DD HH:MM. Show plan expands in place (leading rotating Caret): "Now: 4 reactions - Wed 09:00: 6 parts - Thu 02:00: final item", plus "Sub-jobs are timed at TE 0" when sub-jobs exist. Hidden without slot data (no jobs scope, no skills). Corp jobs are not counted as busy slots (follow-up).
 - Pills: Acquisition Verdict ("BUILD saves X ISK" / "BUY is cheaper by X ISK" / Unknown; no fees, ADR 0006). The use-or-sell verdict is not in the hero; it lives in the Costs panel.
 - `BpcCoverageWarning` when profit unknown because an owned BPC's runs < plan runs; one-click "Set runs to N".
@@ -246,7 +246,7 @@ Button "Match from in-game numbers" opens modal "Work out the rigs": steps text 
 
 ### 6.5 Materials panel (`BuildPlanDetail.tsx:1689`, `MaterialsTable.tsx`)
 
-Panel actions: `DataAgeBadge` (snapshot fetch time), Copy shopping list for multibuy, `TableActionsMenu` (CSV), Refresh, total job duration (`result.seconds`, the plan's own job time, not the wall-clock).
+Panel actions: `DataAgeBadge` (snapshot fetch time), Copy shopping list for multibuy, `TableActionsMenu` (CSV), Refresh, plan duration (same figure as the hero: schedule wall-clock, else `result.seconds`). The Results summary's "Main job time" row stays `result.seconds`.
 
 - Error / no result: danger text `industry.computeError` or engine error message.
 - `ImplantsAssumedNote` (non-reaction plans): time implants not counted without Character details scope.

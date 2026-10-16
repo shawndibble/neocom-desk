@@ -122,7 +122,7 @@ interface PlanVerdictHeroProps {
    * slots, sub-jobs in parallel; shown as the plan's time. Null without slot
    * data, when the plan's own job time stands in.
    */
-  planSeconds?: number | null;
+  planSeconds?: number;
   /** The plan's slot schedule line; omitted when the caller has none. */
   slotLine?: ReactNode;
   /**
@@ -169,7 +169,7 @@ export function PlanVerdictHero({
   skillGate,
   nameForSkill,
   nameForCharacter,
-  planSeconds = null,
+  planSeconds,
   slotLine,
   locationBlock,
 }: PlanVerdictHeroProps) {
