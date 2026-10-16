@@ -28,6 +28,7 @@ import {
   FilterBar,
   FilterField,
   Modal,
+  SlideOver,
   Panel,
   Select,
   SelectContent,
@@ -134,8 +135,14 @@ const TABLE_WIDTHS = {
   oneHub: { compact: 45, cards: 42.5 },
   anyHub: { compact: 50.5, cards: 48 },
 } as const;
-/** Rail 20rem + 1rem gap; rail only where table keeps full figures beside it. */
+/** Rail 20rem + 1rem gap. */
 const RAIL_REM = 21;
+/**
+ * Narrowest column left of the rail: a phone's card list (24rem). Beside the
+ * rail the table goes compact, then to cards, before the panel falls back to
+ * the phone layout (trip bar + sheets) — a laptop keeps the rail.
+ */
+const RAIL_MIN_COLUMN_REM = 24;
 const RAIL_GRID = { gridTemplateColumns: 'minmax(0, 1fr) 20rem' } as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
@@ -304,7 +311,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // measured on the whole panel, never on the table beside the rail, whose
   // width the rail itself decides.
   const [layoutRef, [layoutNarrow = false]] = useElementNarrowerThan<HTMLDivElement>([
-    widths.compact + RAIL_REM,
+    RAIL_MIN_COLUMN_REM + RAIL_REM,
   ]);
   const railShown = !isPhone && !layoutNarrow;
   // Narrow table → compact figures (full ones starve Item, scroll page); narrower still → cards.
@@ -971,6 +978,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       )}
     </div>
   );
+  // Without the rail the sheet is the selection's only sign: closing it clears both (§6c).
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setSelectedTypeId(null);
+  };
   const detail = (row: HaulingViewRow, showTitle: boolean) => (
     // Keyed, so a new row opens with its own folds closed ("Show the math").
     <HaulingItemDetail
@@ -1162,30 +1174,58 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               onOpenTrip={() => setTripOpen(true)}
               copyButton={copyButton('sm', 'shrink-0')}
             />
-            <Modal
-              open={tripOpen}
-              onClose={() => setTripOpen(false)}
-              title={t('market.hauling.rail.title')}
-              placement="sheet-full"
-            >
-              <div className="flex flex-col gap-4">
-                {tripView}
-                {tripFooter}
-              </div>
-            </Modal>
-            <Modal
-              open={detailOpen && selectedRow !== undefined}
-              // Without the rail the sheet is the selection's only sign: closing it clears both (§6c).
-              onClose={() => {
-                setDetailOpen(false);
-                setSelectedTypeId(null);
-              }}
-              title={selectedRow?.name ?? t('market.hauling.title')}
-              titleActions={selectedRow && <HaulingItemActions row={selectedRow} />}
-              placement="sheet-full"
-            >
-              {selectedRow && detail(selectedRow, false)}
-            </Modal>
+            {isPhone ? (
+              <>
+                <Modal
+                  open={tripOpen}
+                  onClose={() => setTripOpen(false)}
+                  title={t('market.hauling.rail.title')}
+                  placement="sheet-full"
+                >
+                  <div className="flex flex-col gap-4">
+                    {tripView}
+                    {tripFooter}
+                  </div>
+                </Modal>
+                <Modal
+                  open={detailOpen && selectedRow !== undefined}
+                  onClose={closeDetail}
+                  title={selectedRow?.name ?? t('market.hauling.title')}
+                  titleActions={selectedRow && <HaulingItemActions row={selectedRow} />}
+                  placement="sheet-full"
+                >
+                  {selectedRow && detail(selectedRow, false)}
+                </Modal>
+              </>
+            ) : (
+              // Too narrow for the rail but not a phone: the same views slide in over the right edge (§6c drawer).
+              <>
+                <SlideOver
+                  open={tripOpen}
+                  onClose={() => setTripOpen(false)}
+                  title={t('market.hauling.rail.title')}
+                >
+                  <div className="flex flex-col gap-4">
+                    {tripView}
+                    {tripFooter}
+                  </div>
+                </SlideOver>
+                <SlideOver
+                  open={detailOpen && selectedRow !== undefined}
+                  onClose={closeDetail}
+                  title={selectedRow?.name ?? t('market.hauling.title')}
+                >
+                  {selectedRow && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-end">
+                        <HaulingItemActions row={selectedRow} />
+                      </div>
+                      {detail(selectedRow, false)}
+                    </div>
+                  )}
+                </SlideOver>
+              </>
+            )}
           </>
         )}
       </div>
