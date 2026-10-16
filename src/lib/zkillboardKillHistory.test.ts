@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchPilotKillHistory, parseKillHistory, resetPilotKillHistoryCache } from './zkillboard';
 
+/** zKillboard is asked with no custom headers (no CORS preflight); the only init is the timeout's signal. */
+const NO_HEADERS = { signal: expect.any(AbortSignal) };
+
 const PILOT = 381203226;
 
 function entry(over: Record<string, unknown> = {}) {
@@ -80,7 +83,8 @@ describe('fetchPilotKillHistory', () => {
     expect(second).toEqual(first);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      `https://zkillboard.com/api/kills/characterID/${PILOT}/`
+      `https://zkillboard.com/api/kills/characterID/${PILOT}/`,
+      NO_HEADERS
     );
   });
 

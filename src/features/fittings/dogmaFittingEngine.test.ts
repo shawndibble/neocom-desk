@@ -35,7 +35,7 @@ const WASM_BYTES = new Uint8Array([1, 2, 3, 4]);
 const SDE_BYTES = new Uint8Array([5, 6, 7, 8, 9]);
 
 function stubNetwork() {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn<typeof fetch>(async (input) => {
     const url = String(input);
     if (url.includes('esf_dogma_engine_bg.wasm'))
       return fakeResponse(WASM_BYTES, WASM_BYTES.byteLength);
@@ -219,6 +219,106 @@ describe('loadDogmaEngine', () => {
 
     stubNetwork();
     await expect(loadDogmaEngine()).resolves.toBeDefined();
+  });
+});
+
+describe('loadDogmaEngine stall detection', () => {
+  const STALL_MS = 20_000;
+
+  beforeEach(() => {
+    wasmInitMock.mockClear();
+    loadSdeMock.mockClear();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** Rejects like a real aborted fetch: when its signal fires. */
+  function untilAborted(signal: AbortSignal | null | undefined): Promise<never> {
+    return new Promise((_resolve, reject) => {
+      signal?.addEventListener('abort', () => reject(signal.reason));
+    });
+  }
+
+  it('gives up on a request that never answers instead of downloading forever', async () => {
+    const { fetchMock } = stubNetwork();
+    fetchMock.mockImplementation((_input, init) => untilAborted(init?.signal));
+    const { loadDogmaEngine } = await freshModule();
+
+    const loading = expect(loadDogmaEngine()).rejects.toMatchObject({ name: 'TimeoutError' });
+    await vi.advanceTimersByTimeAsync(STALL_MS);
+    await loading;
+    expect(wasmInitMock).not.toHaveBeenCalled();
+  });
+
+  it('gives up on a body that stops arriving partway, and lets a later call retry', async () => {
+    const { fetchMock } = stubNetwork();
+    fetchMock.mockImplementation(async (_input, init) => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([1, 2]));
+          init?.signal?.addEventListener('abort', () => controller.error(init.signal?.reason));
+        },
+      });
+      return new Response(stream, { status: 200 });
+    });
+    const { loadDogmaEngine } = await freshModule();
+
+    const loading = expect(loadDogmaEngine()).rejects.toMatchObject({ name: 'TimeoutError' });
+    await vi.advanceTimersByTimeAsync(STALL_MS);
+    await loading;
+
+    stubNetwork();
+    await expect(loadDogmaEngine()).resolves.toBeDefined();
+  });
+
+  it('keeps a slow download alive while bytes keep arriving, past the stall window in total', async () => {
+    const { fetchMock } = stubNetwork();
+    fetchMock.mockImplementation(async (input, init) => {
+      const bytes = String(input).includes('.wasm') ? WASM_BYTES : SDE_BYTES;
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          for (const byte of bytes) {
+            await new Promise((resolve) => setTimeout(resolve, STALL_MS - 1_000));
+            if (init?.signal?.aborted) return;
+            controller.enqueue(new Uint8Array([byte]));
+          }
+          controller.close();
+        },
+      });
+      return new Response(stream, { status: 200 });
+    });
+    const { loadDogmaEngine } = await freshModule();
+
+    const loading = loadDogmaEngine();
+    await vi.advanceTimersByTimeAsync((STALL_MS - 1_000) * 10);
+    await expect(loading).resolves.toBeDefined();
+    expect(new Uint8Array(wasmInitMock.mock.calls[0][0].module_or_path)).toEqual(WASM_BYTES);
+  });
+});
+
+describe('warmDogmaEngineAssets stall detection', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('gives up quietly on a request that never answers', async () => {
+    const { fetchMock } = stubNetwork();
+    fetchMock.mockImplementation(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        })
+    );
+    const { warmDogmaEngineAssets } = await freshModule();
+
+    const warming = warmDogmaEngineAssets();
+    await vi.advanceTimersByTimeAsync(20_000);
+    await expect(warming).resolves.toBeUndefined();
   });
 });
 

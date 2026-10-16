@@ -11,6 +11,7 @@
  */
 import { sdeDataUrl } from './sdeDataUrl';
 import { currentWarmLevel } from '@/lib/lazyAssetWarmGate';
+import { fetchWithIdleTimeout } from '@/lib/idleTimeout';
 import { LAZY_SDE_FILES } from './lazySdeFiles';
 
 export { LAZY_SDE_FILES };
@@ -24,10 +25,9 @@ async function warmFile(file: string): Promise<boolean> {
   const url = sdeDataUrl(import.meta.env.BASE_URL, file);
   // Already cached (by use or an earlier warm): nothing to fetch.
   if (await caches.match(url)) return true;
-  const res = await fetch(url);
-  if (!res.ok) return false;
-  await res.arrayBuffer(); // drain so the SW finishes its cache write
-  return true;
+  // Read the body to the end so the SW finishes its cache write.
+  const { ok } = await fetchWithIdleTimeout(url, { drain: true });
+  return ok;
 }
 
 /**

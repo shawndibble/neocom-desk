@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import fixture from './__fixtures__/eveScoutSignatures.json';
@@ -126,5 +126,34 @@ describe('loadTheraConnections', () => {
     const good = await loadTheraConnections(0);
     status = 503;
     expect(await loadTheraConnections(10 * 60_000)).toBe(good);
+  });
+});
+
+describe('loadTheraConnections when EVE-Scout never answers', () => {
+  beforeEach(() => {
+    clearEveScoutCache();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('answers unavailable after the timeout, and the next ask makes a fresh request', async () => {
+    const hung = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        })
+    );
+    vi.stubGlobal('fetch', hung);
+    const first = loadTheraConnections(0);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await first).toEqual({ kind: 'unavailable' });
+
+    const second = loadTheraConnections(1);
+    expect(hung).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await second).toEqual({ kind: 'unavailable' });
   });
 });
