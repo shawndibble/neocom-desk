@@ -409,10 +409,16 @@ describe('Login', () => {
 
   it('scrolls a cold load straight to the section its hash names', async () => {
     const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
-    renderLogin('/login#login-faq');
-    const faq = await screen.findByRole('region', { name: /quick answers/i });
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(scrollIntoView.mock.contexts[0]).toBe(faq);
+    // The hook reads the hash off the address bar, as BrowserRouter's would be.
+    window.history.replaceState({}, '', '/login#login-faq');
+    try {
+      renderLogin('/login#login-faq');
+      const faq = await screen.findByRole('region', { name: /quick answers/i });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toBe(faq);
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
   });
 
   it('links the permissions note to the privacy policy', async () => {

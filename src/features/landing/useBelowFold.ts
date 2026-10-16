@@ -1,5 +1,4 @@
-import { startTransition, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { startTransition, useEffect, useLayoutEffect, useState } from 'react';
 import { LANDING_ANCHORS } from './landingAnchors';
 
 /** The landing section a URL `#hash` names, or null. Compared raw: the ids are plain ASCII, and decoding throws on a stray `%`. */
@@ -9,7 +8,7 @@ function anchorTarget(hash: string): string | null {
 }
 
 /**
- * Whether the landing page's sections below the hero are mounted (#3967).
+ * Whether the landing page's sections below the hero are mounted.
  *
  * The commit that takes over from the prerendered hero (`app/landingShell.ts`)
  * renders the header and hero only; the rest mounts in a transition right
@@ -22,21 +21,19 @@ function anchorTarget(hash: string): string | null {
  * A URL whose hash names a landing section (`/login#login-faq`) mounts
  * everything in that first commit and scrolls the section into view: the
  * browser's own jump to the fragment has given up long before React renders.
+ * The hash is read once from `window.location`, not the router, so a header
+ * anchor click does not re-render the page.
  */
 export function useBelowFold(ready: boolean): boolean {
-  const { hash } = useLocation();
-  const [target] = useState(() => anchorTarget(hash));
+  const [target] = useState(() => anchorTarget(window.location.hash));
   const [shown, setShown] = useState(target !== null);
 
   useEffect(() => {
     if (ready && !shown) startTransition(() => setShown(true));
   }, [ready, shown]);
 
-  const scrolled = useRef(false);
   useLayoutEffect(() => {
-    if (!ready || target === null || scrolled.current) return;
-    scrolled.current = true;
-    document.getElementById(target)?.scrollIntoView();
+    if (ready && target !== null) document.getElementById(target)?.scrollIntoView();
   }, [ready, target]);
 
   return shown;

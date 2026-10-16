@@ -1,7 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { useLayoutEffect } from 'react';
 import { render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { useBelowFold } from './useBelowFold';
 
 /** Records what each commit rendered: whether the below-the-fold sections were in it. */
@@ -14,14 +13,13 @@ function Probe({ ready, commits }: { ready: boolean; commits: boolean[] }) {
 }
 
 function renderProbe(ready: boolean, url = '/login') {
+  window.history.replaceState({}, '', url);
   const commits: boolean[] = [];
-  const view = render(
-    <MemoryRouter initialEntries={[url]}>
-      <Probe ready={ready} commits={commits} />
-    </MemoryRouter>
-  );
+  const view = render(<Probe ready={ready} commits={commits} />);
   return { commits, view };
 }
+
+afterEach(() => window.history.replaceState({}, '', '/'));
 
 describe('useBelowFold', () => {
   it('leaves the below-the-fold sections out of the first commit and mounts them after', () => {
@@ -32,11 +30,7 @@ describe('useBelowFold', () => {
   it('waits until the page is ready to render its hero', () => {
     const { commits, view } = renderProbe(false);
     expect(commits.every((shown) => !shown)).toBe(true);
-    view.rerender(
-      <MemoryRouter initialEntries={['/login']}>
-        <Probe ready commits={commits} />
-      </MemoryRouter>
-    );
+    view.rerender(<Probe ready commits={commits} />);
     expect(commits.at(-1)).toBe(true);
   });
 
