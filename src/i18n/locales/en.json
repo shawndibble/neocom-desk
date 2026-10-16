@@ -12373,7 +12373,7 @@
         "stateHighlighted": "Highlighted option",
         "stateDisabled": "Disabled",
         "offlineStrip": "Slim strip with a cloud-slash glyph: you're offline, saved data below",
-        "needsConnection": "Dimmed sign-in control with a \"Needs a connection\" tooltip",
+        "needsConnection": "Dimmed login control with a \"Needs a connection\" tooltip",
         "stateLoading": "Loading (Button loading)",
         "stateSelected": "Selected / on (aria-pressed)",
         "stateSelectedSegment": "Selected segment",

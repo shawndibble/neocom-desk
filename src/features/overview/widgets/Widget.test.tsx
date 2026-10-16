@@ -119,11 +119,12 @@ describe('Widget states', () => {
     expect(within(screen.getByRole('region', { name: 'Mail' })).getByText('4')).toBeInTheDocument();
   });
 
-  it('asks for the permission, with a Grant access action, when the grant lapsed', () => {
+  it('asks for the permission, with a Grant access action, when the grant lapsed and nothing was saved', () => {
     useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
     renderWidget(model(), (store) =>
       store.set('mail', {
-        data: { ...mailData(0, 0), needsReauth: true },
+        // Nothing was ever read (no `fetchedAt`): there is no saved mail to keep on screen.
+        data: { ...mailData(0, 0), needsReauth: true, fetchedAt: null },
         error: false,
         loading: false,
       })

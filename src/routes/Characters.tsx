@@ -40,7 +40,6 @@ import {
   STAT_CHIP_TONE_TEXT_CLASS,
   TextInput,
   Toast,
-  Tooltip,
   NeedsConnection,
   type DataTableColumn,
   type StatChipTone,
