@@ -1,11 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
-import {
-  PLEX_TYPE_ID,
-  classifyJournal,
-  journalCoverage,
-  type OwnedJournalEntry,
-} from './journalNetting';
+import { PLEX_TYPE_ID } from './contracts/contractOffers';
+import { classifyJournal, journalCoverage, type OwnedJournalEntry } from './journalNetting';
 
 const A = 1001;
 const B = 1002;

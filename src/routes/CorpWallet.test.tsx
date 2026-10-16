@@ -317,6 +317,22 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(screen.queryByText('My bounty')).toBeNull();
   });
 
+  it('keeps a Where the ISK went panel on the corp journal, with no own-Character netting', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Master division payout');
+
+    await user.click(screen.getByRole('button', { name: 'Where the ISK went' }));
+    const list = await screen.findByRole('table', { name: 'Where the ISK went' });
+    expect(within(list).getByText('Corporate reward payout')).toBeInTheDocument();
+    expect(
+      screen.getByText("Corp · Master Wallet · last 30 days · follows the Journal's filters")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/between your Characters/i)).toBeNull();
+    expect(screen.queryByText(/Characters loaded/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /^(All|This) characters?/ })).toBeNull();
+  });
+
   it('does not re-page the journal when the view is switched away and back (issue #413)', async () => {
     let journalRequests = 0;
     server.use(

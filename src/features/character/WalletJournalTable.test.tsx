@@ -32,17 +32,24 @@ const journal: JournalRow[] = [
 function Harness({
   filter = EMPTY_WALLET_JOURNAL_FILTER,
   rows = journal,
-  withPanel = true,
+  netted = true,
+  keyByCharacter = false,
+  highlightRowKey = null,
   onFilterChange = () => {},
 }: {
   filter?: WalletJournalFilter;
   rows?: JournalRow[];
-  withPanel?: boolean;
+  /** The personal journal: own-Character netting on. The corp journal passes false. */
+  netted?: boolean;
+  keyByCharacter?: boolean;
+  highlightRowKey?: string | number | null;
   onFilterChange?: (filter: WalletJournalFilter) => void;
 }) {
   const journalColumns = useJournalColumnsBuilder()(
     () => undefined,
-    () => ''
+    () => '',
+    undefined,
+    keyByCharacter ? (id) => `Pilot ${id}` : undefined
   );
   const tableExport = useTableExport({
     surface: 'wallet-journal',
@@ -62,11 +69,14 @@ function Harness({
         sort={{ columnId: 'date', direction: 'desc' }}
         onSortChange={() => {}}
         tableExport={tableExport}
-        panel={
-          withPanel
-            ? { open: true, onOpenChange: () => {}, scopeLabel: 'All characters' }
-            : undefined
-        }
+        keyByCharacter={keyByCharacter}
+        highlightRowKey={highlightRowKey}
+        panel={{
+          open: true,
+          onOpenChange: () => {},
+          scopeLabel: 'All characters',
+          coverage: netted ? { loaded: 2, total: 2, missing: [] } : undefined,
+        }}
       />
     </MemoryRouter>
   );
@@ -81,10 +91,44 @@ describe('JournalTable', () => {
     expect(screen.getAllByText('Between your Characters').length).toBeGreaterThan(0);
   });
 
-  it('shows no netting line on a journal without the panel (corp)', () => {
-    render(<Harness withPanel={false} rows={journal.slice(0, 2)} />);
+  it('keeps the breakdown panel on a corp journal, with no netting, coverage or Character filter', async () => {
+    render(<Harness netted={false} rows={journal.slice(0, 2)} />);
     expect(screen.queryByText(/between your Characters/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Where the ISK went' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Characters loaded/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Where the ISK went' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    const list = await screen.findByRole('table', { name: 'Where the ISK went' });
+    expect(within(list).getByText('Bounty prize')).toBeInTheDocument();
+  });
+
+  it('says the scope and the date range in the panel subtitle', () => {
+    const { rerender } = render(<Harness />);
+    expect(
+      screen.getByText("All characters · last 30 days · follows the Journal's filters")
+    ).toBeInTheDocument();
+    rerender(
+      <Harness
+        filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, startDate: '2026-10-01', endDate: '2026-10-07' }}
+      />
+    );
+    expect(
+      screen.getByText("All characters · 2026-10-01 – 2026-10-07 · follows the Journal's filters")
+    ).toBeInTheDocument();
+  });
+
+  it('keys rows per Character when two Characters carry the same entry id', () => {
+    const rows: JournalRow[] = [
+      { ...journal[0], characterId: 1 },
+      { ...journal[0], characterId: 2 },
+    ];
+    render(<Harness rows={rows} keyByCharacter highlightRowKey="2:1" />);
+    expect(document.querySelector('[data-row-key="1:1"]')).toBeInTheDocument();
+    const second = document.querySelector('[data-row-key="2:1"]');
+    expect(second).toBeInTheDocument();
+    expect(second?.className).toContain('row-pulse');
+    expect(document.querySelector('[data-row-key="1:1"]')?.className).not.toContain('row-pulse');
   });
 
   it('filters the Journal when a ref type is clicked in the panel', async () => {
@@ -99,17 +143,19 @@ describe('JournalTable', () => {
     });
   });
 
-  it('shows the active ref type as a removable chip', async () => {
+  it('shows the active ref type as a selected chip that a click clears', async () => {
     const onFilterChange = vi.fn();
     const user = userEvent.setup();
     render(
       <Harness
         filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, refType: 'bounty_prize' }}
         onFilterChange={onFilterChange}
-        withPanel={false}
+        netted={false}
       />
     );
-    await user.click(screen.getByRole('button', { name: /Type: Bounty prize ×/ }));
+    const chip = screen.getByRole('button', { name: 'Type: Bounty prize' });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await user.click(chip);
     expect(onFilterChange).toHaveBeenCalledWith(EMPTY_WALLET_JOURNAL_FILTER);
   });
 });

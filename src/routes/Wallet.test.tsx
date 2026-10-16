@@ -15,8 +15,15 @@ import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import type { TypeMap } from '@/sde/types';
 import { REQUIRED_SCOPES } from '@/features/netWorth/recordSnapshots';
+import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
+
+// Wraps the real read so a test can see what it was asked for, or make it throw.
+vi.mock('@/features/character/walletJournalAll', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/character/walletJournalAll')>();
+  return { ...actual, loadAllCharactersJournals: vi.fn(actual.loadAllCharactersJournals) };
+});
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -510,7 +517,7 @@ describe('Wallet', () => {
     const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
     await user.click(bountyRow);
     expect(screen.queryByText('Donation')).toBeNull();
-    expect(screen.getByRole('button', { name: /Type: Bounty prize ×/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Type: Bounty prize' })).toBeInTheDocument();
     // The breakdown ignores the ref-type filter, so every type is still listed.
     expect(within(breakdown).getAllByRole('row').length).toBeGreaterThan(2);
 
@@ -942,6 +949,69 @@ describe('Wallet', () => {
       ).not.toBeInTheDocument();
       expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
       expect(screen.queryByRole('table', { name: 'Balance by character' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('journal across Characters (issue #3908)', () => {
+    async function seedSecondWithJournal() {
+      await db.characters.put({ characterId: 92, name: 'Pilot Two', ownerHash: 'oh2', addedAt: 2 });
+      await db.tokens.put({
+        characterId: 92,
+        accessToken: 'access-token-b',
+        refreshToken: 'refresh-b',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: ['esi-wallet.read_character_wallet.v1'],
+      });
+      server.use(
+        // The same entry id as Pilot One's line 1.
+        http.get('https://esi.evetech.net/characters/92/wallet/journal', () =>
+          HttpResponse.json(journalPage1, { headers: { 'X-Pages': '1' } })
+        ),
+        http.get('https://esi.evetech.net/characters/92/wallet/transactions', () =>
+          HttpResponse.json([])
+        )
+      );
+    }
+
+    async function pickAllCharacters(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(await screen.findByRole('button', { name: 'This character' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
+    }
+
+    beforeEach(() => vi.mocked(loadAllCharactersJournals).mockClear());
+
+    it('fans out over the picked Characters, keys rows per Character and keeps the filter in the header', async () => {
+      await seedSecondWithJournal();
+      window.history.pushState({}, '', '/wallet/journal');
+      const user = userEvent.setup();
+      render(<App />);
+      await pickAllCharacters(user);
+
+      const table = await screen.findByRole('table', { name: 'Journal' });
+      await within(table).findAllByText('Pilot Two');
+      expect(document.querySelector('[data-row-key="91:1"]')).toBeInTheDocument();
+      expect(document.querySelector('[data-row-key="92:1"]')).toBeInTheDocument();
+      expect(vi.mocked(loadAllCharactersJournals)).toHaveBeenCalledWith([
+        { characterId: 91, name: 'Pilot One' },
+        { characterId: 92, name: 'Pilot Two' },
+      ]);
+      // In the panel's title bar beside the name, with the age of the data.
+      const header = screen.getByRole('heading', { name: 'Journal' }).closest('header');
+      expect(within(header!).getByRole('button', { name: /^All characters/ })).toBeInTheDocument();
+      expect(header!.textContent).toMatch(/ago|just now|now/i);
+    });
+
+    it('shows a load-failed state with Try again when the all-Characters read fails, and loads on retry', async () => {
+      await seedSecondWithJournal();
+      window.history.pushState({}, '', '/wallet/journal');
+      vi.mocked(loadAllCharactersJournals).mockRejectedValueOnce(new Error('boom'));
+      const user = userEvent.setup();
+      render(<App />);
+      await pickAllCharacters(user);
+
+      await user.click(await screen.findByRole('button', { name: 'Try again' }));
+      const table = await screen.findByRole('table', { name: 'Journal' });
+      expect(await within(table).findAllByText('Pilot Two')).not.toHaveLength(0);
     });
   });
 });

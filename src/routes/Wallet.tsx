@@ -11,6 +11,7 @@ import {
   InfoTooltip,
   PageHeader,
   Panel,
+  LoadFailedState,
   Spinner,
   RowCaret,
   TabPanel,
@@ -63,7 +64,7 @@ import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import { NetWorthPanel } from '@/features/netWorth/NetWorthPanel';
 import { loyaltyPointsCsvColumns } from '@/features/character/loyaltyPointsCsv';
-import { classifyJournal, journalCoverage, type OwnedJournalEntry } from '@/engine/journalNetting';
+import { classifyJournal, journalCoverage, type JournalLine } from '@/engine/journalNetting';
 import {
   loadAllCharactersJournals,
   loadWalletScopedCharacterIds,
@@ -98,7 +99,7 @@ const NO_NAMES: ReadonlyMap<number, string> = new Map();
 /** Stable identity, so a missing journal doesn't invalidate its dependent memos every render. */
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 /** Same, for the personal fills the journal links its market lines to. */
-const EMPTY_FILLS: readonly WalletTransactionCommon[] = [];
+const EMPTY_FILLS: readonly (WalletTransactionCommon & { characterId?: number })[] = [];
 
 /**
  * `?drill=<id>`: the Character the net worth view is drilled into; 0 = none. Not
@@ -233,7 +234,7 @@ export function Wallet() {
     viewedCharacterId === undefined ? walletCharacterFilter : 'current',
     activeCharacterId
   );
-  const showingAllWalletBalances =
+  const showingBeyondActive =
     resolvedWalletFilter === 'all' ||
     resolvedWalletFilter.size !== 1 ||
     !resolvedWalletFilter.has(activeCharacterId ?? -1);
@@ -324,7 +325,7 @@ export function Wallet() {
     useState<WalletBalancesSnapshot | null>(null);
   const [walletBalancesRefreshCount, setWalletBalancesRefreshCount] = useState(0);
   useEffect(() => {
-    if (!showingAllWalletBalances && !drilledCharacter) return;
+    if (!showingBeyondActive && !drilledCharacter) return;
     let cancelled = false;
     void loadAllCharactersWalletBalances().then((snapshot) => {
       if (!cancelled) setWalletBalancesSnapshot(snapshot);
@@ -332,7 +333,7 @@ export function Wallet() {
     return () => {
       cancelled = true;
     };
-  }, [showingAllWalletBalances, drilledCharacter, walletBalancesRefreshCount]);
+  }, [showingBeyondActive, drilledCharacter, walletBalancesRefreshCount]);
   const refreshWalletBalances = useCallback(
     () => setWalletBalancesRefreshCount((count) => count + 1),
     []
@@ -366,11 +367,14 @@ export function Wallet() {
     { name: 'wallet:personal-fills', characterId: activeCharacterId }
   );
   // The Journal's own Character filter reads the same `?char=` pick as the
-  // Balance tab. "All" fans the journal out across every tracked Character.
-  const showingAllJournal = showingAllWalletBalances;
-  const allJournals = useCorpSnapshot<AllJournalsSnapshot | null>(
-    tab === 'journal' && showingAllJournal ? 'all' : null,
-    loadAllCharactersJournals
+  // Balance tab; anything beyond the active Character fans the journal out
+  // across the picked Characters, and the pick is part of the snapshot's key.
+  const journalSelectionKey =
+    tab === 'journal' && showingBeyondActive && multiCharacters.length > 0
+      ? multiCharacters.map((c) => c.characterId).join(',')
+      : null;
+  const allJournals = useCorpSnapshot<AllJournalsSnapshot | null>(journalSelectionKey, () =>
+    loadAllCharactersJournals(multiCharacters)
   );
   const scopedCharacterIds = useLiveQuery(loadWalletScopedCharacterIds, [], undefined);
   // "Where the ISK went" side panel; the page shifts aside while it is open.
@@ -447,17 +451,36 @@ export function Wallet() {
   );
 
   // The fills that name an item or a PLEX line: this Character's, or every loaded Character's.
-  const allJournalsData = showingAllJournal ? allJournals.data : null;
-  const personalTransactions = useMemo<readonly WalletTransactionCommon[]>(
+  const allJournalsData = showingBeyondActive ? allJournals.data : null;
+  // Tagged with their Character in the multi view: two journals can carry the same ref id.
+  const personalTransactions = useMemo<
+    readonly (WalletTransactionCommon & { characterId?: number })[]
+  >(
     () =>
       allJournalsData
-        ? allJournalsData.loaded.flatMap((c) => c.transactions)
+        ? allJournalsData.loaded.flatMap((c) =>
+            c.transactions.map((txn) => ({ ...txn, characterId: c.characterId }))
+          )
         : (personalFills.data?.transactions ?? EMPTY_FILLS),
     [allJournalsData, personalFills.data]
   );
   const personalTypeNames =
     (allJournalsData ? allJournalsData.typeNames : personalFills.data?.typeNames) ?? NO_NAMES;
-  const itemNamesTruncated = personalFills.data?.truncated ?? false;
+  const itemNamesTruncated = allJournalsData
+    ? allJournalsData.loaded.some((c) => c.fillsTruncated)
+    : (personalFills.data?.truncated ?? false);
+  const journalIsTruncated = allJournalsData
+    ? allJournalsData.loaded.some((c) => c.truncated)
+    : journalTruncated;
+  const keyByCharacter = (allJournalsData?.loaded.length ?? 0) > 1;
+  // The stalest of the loaded journals, as the Balance tab does for its balances.
+  const allJournalsFetchedAt = useMemo(
+    () =>
+      allJournalsData && allJournalsData.loaded.length > 0
+        ? new Date(Math.min(...allJournalsData.loaded.map((c) => c.fetchedAt.getTime())))
+        : null,
+    [allJournalsData]
+  );
   const personalLinkFor = useMemo(
     () => journalTransactionLinks(personalTransactions),
     [personalTransactions]
@@ -499,14 +522,14 @@ export function Wallet() {
         personalLinkFor,
         personalNameFor,
         miningTaxHrefFor,
-        showingAllJournal ? characterNameFor : undefined
+        showingBeyondActive ? characterNameFor : undefined
       ),
     [
       buildJournalColumns,
       personalLinkFor,
       personalNameFor,
       miningTaxHrefFor,
-      showingAllJournal,
+      showingBeyondActive,
       characterNameFor,
     ]
   );
@@ -541,40 +564,47 @@ export function Wallet() {
     }
     return map;
   }, [walletBalancesSnapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
-  // Lines between the pilot's own Characters are netted against the Characters
-  // whose journals are in: all of them in the All view, those with the wallet
-  // permission in the This view (a missing one's transfers stay counted).
-  const journalRows = useMemo<OwnedJournalEntry[]>(
+  // Lines between the pilot's own Characters are netted against every Character
+  // with the wallet permission, picked or not: a donation from your own alt is
+  // internal even in the one-Character view.
+  const journalRows = useMemo<readonly JournalLine[]>(
     () =>
       allJournalsData
         ? allJournalsData.loaded.flatMap((c) =>
             c.journal.map((entry) => ({ ...entry, characterId: c.characterId }))
           )
-        : showingAllJournal || activeCharacterId === null
+        : showingBeyondActive || activeCharacterId === null
           ? []
-          : journal.map((entry) => ({ ...entry, characterId: activeCharacterId })),
-    [allJournalsData, showingAllJournal, journal, activeCharacterId]
+          : journal,
+    [allJournalsData, showingBeyondActive, journal, activeCharacterId]
   );
   const trackedIds = useMemo(() => {
-    if (allJournalsData) return new Set(allJournalsData.loaded.map((c) => c.characterId));
     const ids = new Set(scopedCharacterIds ?? []);
-    if (activeCharacterId !== null && !journalNeedsReauth) ids.add(activeCharacterId);
+    for (const c of allJournalsData?.loaded ?? []) ids.add(c.characterId);
+    if (!showingBeyondActive && activeCharacterId !== null && !journalNeedsReauth) {
+      ids.add(activeCharacterId);
+    }
     return ids;
-  }, [allJournalsData, scopedCharacterIds, activeCharacterId, journalNeedsReauth]);
+  }, [
+    allJournalsData,
+    scopedCharacterIds,
+    showingBeyondActive,
+    activeCharacterId,
+    journalNeedsReauth,
+  ]);
   const classifiedJournal = useMemo(
     () => classifyJournal(journalRows, { trackedIds, linkFor: personalLinkFor }),
     [journalRows, trackedIds, personalLinkFor]
   );
-  const journalCoverageInfo = useMemo(
-    () =>
-      (allCharacters?.length ?? 0) > 1
-        ? journalCoverage(
-            (allCharacters ?? []).map((c) => ({ characterId: c.characterId, name: c.name })),
-            trackedIds
-          )
-        : undefined,
-    [allCharacters, trackedIds]
-  );
+  const journalCoverageInfo = useMemo(() => {
+    if ((allCharacters?.length ?? 0) < 2) return undefined;
+    return allJournalsData
+      ? journalCoverage(multiCharacters, new Set(allJournalsData.loaded.map((c) => c.characterId)))
+      : journalCoverage(
+          (allCharacters ?? []).map((c) => ({ characterId: c.characterId, name: c.name })),
+          trackedIds
+        );
+  }, [allCharacters, allJournalsData, multiCharacters, trackedIds]);
   const { filteredJournal, breakdownJournal, refTypeOptions } = useJournalFilterResult(
     classifiedJournal,
     journalRowsFilter
@@ -583,12 +613,15 @@ export function Wallet() {
 
   // Each table's title-bar export button and its row menus export the same rows, in
   // the order the table shows them.
-  const journalCsvColumns = useMemo(() => walletJournalCsvColumns(t), [t]);
+  const journalCsvColumns = useMemo(
+    () => walletJournalCsvColumns(t, showingBeyondActive ? characterNameFor : undefined),
+    [t, showingBeyondActive, characterNameFor]
+  );
   const journalExport = useTableExport({
     surface: 'wallet-journal',
     rows: filteredJournal,
     columns: journalCsvColumns,
-    truncated: journalTruncated || (allJournalsData?.loaded.some((c) => c.truncated) ?? false),
+    truncated: journalIsTruncated,
   });
   const loyaltyCsvColumns = useMemo(
     () => loyaltyPointsCsvColumns(t, (id) => corporationNames.get(id) ?? `#${id}`),
@@ -599,6 +632,22 @@ export function Wallet() {
     rows: otherLoyalty,
     columns: loyaltyCsvColumns,
   });
+
+  const journalFetchedAt = showingBeyondActive
+    ? allJournalsFetchedAt
+    : (journalResult?.fetchedAt ?? null);
+  // An alert's entry id belongs to the active Character; the multi view keys rows per Character.
+  const journalHighlightKey =
+    keyByCharacter && highlightedEntryId !== null
+      ? `${activeCharacterId}:${highlightedEntryId}`
+      : highlightedEntryId;
+  const journalScopeLabel = !showingBeyondActive
+    ? t('character.filter.thisCharacter')
+    : multiCharacters.length === (allCharacters?.length ?? 0)
+      ? t('character.filter.allCharacters')
+      : multiCharacters.length === 1
+        ? t('character.scope.one', { name: multiCharacters[0].name })
+        : t('wallet.journalScopeSome', { count: multiCharacters.length });
 
   if (!hydrated) {
     return (
@@ -627,6 +676,7 @@ export function Wallet() {
       className={cx(
         'mx-auto max-w-6xl space-y-4',
         // The side panel is non-modal: the page shifts aside so no column is covered.
+        // 26rem = SlideOver's 25rem max width plus a 1rem gutter; change them together.
         tab === 'journal' && iskPanelOpen && 'md:mr-[26rem] md:ml-0'
       )}
     >
@@ -639,7 +689,7 @@ export function Wallet() {
             icon={<Icon.Refresh />}
             label={t('wallet.refresh')}
             onClick={handlePersonalRefresh}
-            disabled={loading || personalFills.loading}
+            disabled={loading || personalFills.loading || allJournals.loading}
           />
         }
       />
@@ -695,7 +745,7 @@ export function Wallet() {
                 onBack={leaveDrill}
                 headingRef={panelHeadingRef}
               />
-            ) : showingAllWalletBalances ? (
+            ) : showingBeyondActive ? (
               <NetWorthPanel
                 mode="multi"
                 characters={multiCharacters}
@@ -856,10 +906,14 @@ export function Wallet() {
           <Panel
             padded={false}
             title={t('wallet.journalTab')}
-            meta={<WalletOriginCrumb />}
+            meta={
+              <span className="flex flex-wrap items-center gap-2">
+                <WalletOriginCrumb />
+                {walletCharacterFilterMeta}
+              </span>
+            }
             actions={
               <span className="flex items-center gap-2">
-                {walletCharacterFilterMeta}
                 <Link
                   to="/market/history"
                   className={cx(
@@ -869,22 +923,24 @@ export function Wallet() {
                 >
                   {t('wallet.transactionsLink')}
                 </Link>
-                {(showingAllJournal ? allJournalsData : journalResult) && (
+                {journalFetchedAt && (
                   <>
                     <TableActionsMenu name={t('wallet.journalTab')} tableExport={journalExport} />
-                    {!showingAllJournal && journalResult && (
-                      <DataAgeBadge date={journalResult.fetchedAt} />
-                    )}
+                    <DataAgeBadge date={journalFetchedAt} />
                   </>
                 )}
               </span>
             }
           >
-            {showingAllJournal && !allJournalsData ? (
-              <div className="flex justify-center py-8">
-                <Spinner label={t('common.loading')} />
-              </div>
-            ) : !showingAllJournal && journalNeedsReauth ? (
+            {showingBeyondActive && !allJournalsData ? (
+              allJournals.loading || journalSelectionKey === null ? (
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              ) : (
+                <LoadFailedState onRetry={allJournals.refresh} className="py-8" />
+              )
+            ) : !showingBeyondActive && journalNeedsReauth ? (
               <div className="p-3">
                 <GrantBanner
                   characterId={activeCharacterId}
@@ -894,7 +950,7 @@ export function Wallet() {
                   actionLabel={t('wallet.reauthAction')}
                 />
               </div>
-            ) : !showingAllJournal && (!journalResult || journal.length === 0) ? (
+            ) : !showingBeyondActive && (!journalResult || journal.length === 0) ? (
               <CachedEmptyState
                 result={journalResult}
                 title={t('wallet.journalEmptyTitle')}
@@ -904,15 +960,14 @@ export function Wallet() {
               />
             ) : (
               <>
-                {!showingAllJournal && journalResult?.fromCache && (
+                {!showingBeyondActive && journalResult?.fromCache && (
                   <CachedNotice
                     className="px-3 pt-2"
                     fetchedAt={journalResult.fetchedAt}
                     refreshFailed={refreshCount > 0}
                   />
                 )}
-                {(journalTruncated ||
-                  (allJournalsData?.loaded.some((c) => c.truncated) ?? false)) && (
+                {journalIsTruncated && (
                   <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                     {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
                   </p>
@@ -937,16 +992,13 @@ export function Wallet() {
                   label={t('wallet.journalTab')}
                   sort={journalSortProps.sort}
                   onSortChange={journalSortProps.onSortChange}
-                  highlightRowKey={highlightedEntryId}
+                  highlightRowKey={journalHighlightKey}
+                  keyByCharacter={keyByCharacter}
                   tableExport={journalExport}
                   panel={{
                     open: iskPanelOpen,
                     onOpenChange: setIskPanelOpen,
-                    scopeLabel: t(
-                      showingAllJournal
-                        ? 'wallet.journalBreakdownScopeAll'
-                        : 'wallet.journalBreakdownScopeThis'
-                    ),
+                    scopeLabel: journalScopeLabel,
                     coverage: journalCoverageInfo,
                   }}
                 />

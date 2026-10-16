@@ -7,6 +7,7 @@
  */
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Button,
   ColumnPickerMenu,
@@ -15,6 +16,7 @@ import {
   EmptyState,
   FilterBar,
   FilterField,
+  IconButton,
   LiveStatus,
   SearchInput,
   Select,
@@ -25,8 +27,8 @@ import {
   type DataTableColumn,
   type DataTableSort,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
-import type { WalletJournalEntry } from '@/esi/endpoints';
 import type { JournalCoverage, JournalRow } from '@/engine/journalNetting';
 import { ActiveFilterRow } from '@/features/character/ActiveFilterRow';
 import { IskBreakdownPanel } from '@/features/character/IskBreakdownPanel';
@@ -125,27 +127,28 @@ interface JournalTableProps {
   filteredJournal: readonly JournalRow[];
   /** The journal under the date range and text filters only, for the panel's ref-type list. */
   breakdownJournal: readonly JournalRow[];
-  journalColumns: DataTableColumn<WalletJournalEntry>[];
+  journalColumns: DataTableColumn<JournalRow>[];
   label: string;
   /**
    * The journal line a wallet alert pointed at. Passed by `/wallet` only —
    * `walletBalanceChanged` is a character event, and the corp journal has its
-   * own rows with their own ids.
+   * own rows with their own ids. `${characterId}:${id}` when `keyByCharacter`.
    */
-  highlightRowKey?: number | null;
+  highlightRowKey?: string | number | null;
+  /** Rows come from more than one Character, whose entry ids can repeat: key them per Character. */
+  keyByCharacter?: boolean;
   sort: DataTableSort;
   onSortChange: (sort: DataTableSort) => void;
   /** The export the panel's title-bar export button drives, so row menus export the same rows. */
-  tableExport: UseTableExport<WalletJournalEntry>;
+  tableExport: UseTableExport<JournalRow>;
   /**
-   * "Where the ISK went": the side panel and the own-Character netting it
-   * reports. Passed by `/wallet` only — the corp journal has no panel, nets
-   * nothing and says nothing of Characters.
+   * "Where the ISK went": the side panel. Both journals have one; only
+   * `/wallet` passes `coverage`, which turns on own-Character netting.
    */
-  panel?: {
+  panel: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    /** The Character scope in words, e.g. "All characters". */
+    /** The scope in words: "All characters", or the corp division. */
     scopeLabel: string;
     coverage?: JournalCoverage;
     /** The daily chart (#3914) slots in here, under the In / Out / Net totals. */
@@ -154,7 +157,17 @@ interface JournalTableProps {
 }
 
 /** Module-level so the table's windowing and row memo see one stable function. */
-const journalRowKey = (entry: WalletJournalEntry) => entry.id;
+const journalRowKey = (entry: JournalRow) => entry.id;
+const characterRowKey = (entry: JournalRow) => `${entry.characterId}:${entry.id}`;
+
+/** The panel's date range in words: the journal's own window when no range is set. */
+function rangeLabel(filter: WalletJournalFilter, t: TFunction): string {
+  const { startDate: from, endDate: to } = filter;
+  if (from && to) return t('wallet.journalRangeBetween', { from, to });
+  if (from) return t('wallet.journalRangeFrom', { from });
+  if (to) return t('wallet.journalRangeTo', { to });
+  return t('wallet.journalRangeDefault');
+}
 
 /** Columns that are not in the picker's catalog and so are never hidden by it. */
 const ALWAYS_SHOWN_COLUMNS = new Set(['refType', 'character']);
@@ -169,6 +182,7 @@ export function JournalTable({
   journalColumns,
   label,
   highlightRowKey = null,
+  keyByCharacter = false,
   sort,
   onSortChange,
   tableExport,
@@ -189,7 +203,7 @@ export function JournalTable({
     () =>
       Object.fromEntries(journalColumns.map((column) => [column.id, column])) as Record<
         WalletJournalColumnId,
-        DataTableColumn<WalletJournalEntry>
+        DataTableColumn<JournalRow>
       >,
     [journalColumns]
   );
@@ -215,11 +229,13 @@ export function JournalTable({
         refTypeOptions={refTypeOptions}
         actions={
           <>
-            {panel && (
-              <Button aria-pressed={panel.open} onClick={() => panel.onOpenChange(!panel.open)}>
-                {t('wallet.journalBreakdownTitle')}
-              </Button>
-            )}
+            <IconButton
+              icon={<Icon.Orders />}
+              label={t('wallet.journalBreakdownTitle')}
+              visibleLabel={t('wallet.journalBreakdownTitle')}
+              pressed={panel.open}
+              onClick={() => panel.onOpenChange(!panel.open)}
+            />
             <ColumnPickerMenu
               available={WALLET_JOURNAL_COLUMN_IDS}
               visible={visible}
@@ -240,7 +256,7 @@ export function JournalTable({
           onChange={onFilterChange}
           totals={totals}
           entryCount={filteredJournal.length}
-          showInternal={panel !== undefined}
+          showInternal={panel.coverage !== undefined}
         />
       </div>
       <LiveStatus>
@@ -251,19 +267,18 @@ export function JournalTable({
             net: signedIsk(totals.net, 2),
           })}
       </LiveStatus>
-      {panel && (
-        <IskBreakdownPanel
-          open={panel.open}
-          onClose={() => panel.onOpenChange(false)}
-          scopeLabel={panel.scopeLabel}
-          totals={totals}
-          breakdown={breakdown}
-          selectedRefType={filter.refType}
-          onSelectRefType={(refType) => onFilterChange(toggleBreakdownRefType(filter, refType))}
-          coverage={panel.coverage}
-          chart={panel.chart}
-        />
-      )}
+      <IskBreakdownPanel
+        open={panel.open}
+        onClose={() => panel.onOpenChange(false)}
+        scopeLabel={panel.scopeLabel}
+        rangeLabel={rangeLabel(filter, t)}
+        totals={totals}
+        breakdown={breakdown}
+        selectedRefType={filter.refType}
+        onSelectRefType={(refType) => onFilterChange(toggleBreakdownRefType(filter, refType))}
+        coverage={panel.coverage}
+        chart={panel.chart}
+      />
       {filteredJournal.length === 0 ? (
         <EmptyState
           title={t('wallet.journalNoFilterMatches')}
@@ -284,7 +299,7 @@ export function JournalTable({
             label={label}
             columns={shownColumns}
             rows={filteredJournal}
-            rowKey={journalRowKey}
+            rowKey={keyByCharacter ? characterRowKey : journalRowKey}
             highlightRowKey={highlightRowKey}
             sort={sort}
             onSortChange={onSortChange}

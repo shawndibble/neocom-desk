@@ -15,27 +15,32 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import type { JournalCoverage } from '@/engine/journalNetting';
-import { iskToneClass } from '@/features/character/format';
+import { netToneClass } from '@/features/character/format';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
 import type {
   JournalBreakdown,
   RefTypeBreakdownRow,
 } from '@/features/character/walletJournalFilter';
 import { signedIsk } from '@/features/market/signedIsk';
-import { clampIskZero, formatIsk } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 
 interface IskBreakdownPanelProps {
   open: boolean;
   onClose: () => void;
   /** The Character scope in words, e.g. "All characters". */
   scopeLabel: string;
+  /** The date range in words, e.g. "last 30 days". */
+  rangeLabel: string;
   /** The Journal's filtered rows: the totals. */
   totals: JournalBreakdown;
   /** The Journal's rows without its ref-type filter: the list, so the picked row stays among the rest. */
   breakdown: JournalBreakdown;
   selectedRefType: string | null;
   onSelectRefType: (refType: string) => void;
-  /** Partial-coverage note data; absent for a one-Character account. */
+  /**
+   * Own-Character netting data (coverage note, "Between your Characters"):
+   * absent for the corp journal and a one-Character account, which net nothing.
+   */
   coverage?: JournalCoverage;
   /**
    * Where the daily chart (#3914) goes: under the In / Out / Net totals,
@@ -48,6 +53,7 @@ export function IskBreakdownPanel({
   open,
   onClose,
   scopeLabel,
+  rangeLabel,
   totals,
   breakdown,
   selectedRefType,
@@ -87,7 +93,7 @@ export function IskBreakdownPanel({
         header: t('wallet.journalBreakdownNet'),
         align: 'right',
         className: 'tabular-nums',
-        cellClassName: (row) => (clampIskZero(row.net, 0) === 0 ? '' : iskToneClass(row.net)),
+        cellClassName: (row) => netToneClass(row.net),
         render: (row) => (
           <>
             {signedIsk(row.net, 0)}
@@ -106,13 +112,12 @@ export function IskBreakdownPanel({
     ],
     [t, maxNet]
   );
-  const netTone = clampIskZero(totals.net, 0) === 0 ? '' : iskToneClass(totals.net);
   return (
     <SlideOver
       open={open}
       onClose={onClose}
       title={t('wallet.journalBreakdownTitle')}
-      subtitle={t('wallet.journalPanelSubtitle', { scope: scopeLabel })}
+      subtitle={t('wallet.journalPanelSubtitle', { scope: scopeLabel, range: rangeLabel })}
     >
       <div className="space-y-4">
         <StatChips>
@@ -127,7 +132,7 @@ export function IskBreakdownPanel({
           <StatChip
             label={t('wallet.journalBreakdownNet')}
             emphasis
-            value={<span className={netTone}>{signedIsk(totals.net, 0)}</span>}
+            value={<span className={netToneClass(totals.net)}>{signedIsk(totals.net, 0)}</span>}
           />
         </StatChips>
         {chart}

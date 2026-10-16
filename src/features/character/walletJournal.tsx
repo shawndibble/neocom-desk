@@ -6,9 +6,9 @@
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DataTableColumn } from '@/components/ui';
-import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
+import type { WalletTransactionCommon } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
-import { journalRefKey, type JournalRow } from '@/engine/journalNetting';
+import { journalRefKey, type JournalLine, type JournalRow } from '@/engine/journalNetting';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
 import { journalDescriptionText } from '@/features/character/dailyGoal';
 import { JournalDescriptionCell } from '@/features/character/JournalDescriptionCell';
@@ -71,31 +71,34 @@ export function useJournalFilterResult(
  * built per journal only because each links its lines to its own fills.
  */
 export function useJournalColumnsBuilder(): (
-  linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
+  linkFor: (entry: JournalLine) => WalletTransactionCommon | undefined,
   nameFor: (typeId: number) => string,
-  miningTaxHrefFor?: (entry: WalletJournalEntry) => string | undefined,
-  /** Set in the "All characters" view: adds a Character column. */
+  miningTaxHrefFor?: (entry: JournalLine) => string | undefined,
+  /** Set in the multi-Character view: adds a Character column. */
   characterNameFor?: (characterId: number) => string
-) => DataTableColumn<WalletJournalEntry>[] {
+) => DataTableColumn<JournalRow>[] {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   return useCallback(
     (
-      linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
+      linkFor: (entry: JournalLine) => WalletTransactionCommon | undefined,
       nameFor: (typeId: number) => string,
-      miningTaxHrefFor?: (entry: WalletJournalEntry) => string | undefined,
+      miningTaxHrefFor?: (entry: JournalLine) => string | undefined,
       characterNameFor?: (characterId: number) => string
-    ): DataTableColumn<WalletJournalEntry>[] => {
-      const row = (entry: WalletJournalEntry): JournalRow => entry;
-      const characterColumn: DataTableColumn<WalletJournalEntry>[] = characterNameFor
+    ): DataTableColumn<JournalRow>[] => {
+      const nameOf = (entry: JournalRow) =>
+        characterNameFor && entry.characterId !== undefined
+          ? characterNameFor(entry.characterId)
+          : '';
+      const characterColumn: DataTableColumn<JournalRow>[] = characterNameFor
         ? [
             {
               id: 'character',
-              header: t('wallet.characterCol'),
+              header: t('wallet.balanceCharacterColumn'),
               className: 'max-sm:px-1 sm:whitespace-nowrap',
               headerClassName: 'max-sm:px-1',
-              render: (entry) => characterNameFor(row(entry).characterId ?? 0),
-              sortValue: (entry) => characterNameFor(row(entry).characterId ?? 0),
+              render: nameOf,
+              sortValue: nameOf,
             },
           ]
         : [];
@@ -126,8 +129,8 @@ export function useJournalColumnsBuilder(): (
           // Wraps onto two lines on a phone so Amount stays on screen; one line from `sm` up.
           className: 'max-sm:px-1 sm:whitespace-nowrap',
           headerClassName: 'max-sm:px-1',
-          render: (entry) => journalRefLabel(journalRefKey(row(entry)), t),
-          sortValue: (entry) => journalRefLabel(journalRefKey(row(entry)), t),
+          render: (entry) => journalRefLabel(journalRefKey(entry), t),
+          sortValue: (entry) => journalRefLabel(journalRefKey(entry), t),
         },
         {
           id: 'description',
@@ -146,7 +149,7 @@ export function useJournalColumnsBuilder(): (
                   itemName={transaction ? nameFor(transaction.type_id) : ''}
                   miningTaxHref={miningTaxHrefFor?.(entry)}
                 />
-                {row(entry).internal && (
+                {entry.internal && (
                   <span className="block text-xs text-text-dim">
                     {t('wallet.journalBetweenMarker')}
                   </span>
@@ -163,7 +166,7 @@ export function useJournalColumnsBuilder(): (
           className: 'tabular-nums max-sm:px-1',
           headerClassName: 'max-sm:px-1',
           cellClassName: (entry) =>
-            row(entry).internal
+            entry.internal
               ? 'text-text-dim'
               : entry.amount !== undefined
                 ? iskToneClass(entry.amount)

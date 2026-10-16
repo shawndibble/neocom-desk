@@ -3,21 +3,23 @@
  * between the pilot's own Characters, and which market lines are PLEX.
  *
  * Pure: the caller supplies the tracked Character ids and the journal-to-fill
- * lookup. A line is internal when both parties are tracked Characters whose
- * journals are loaded, so a transfer to a Character with no loaded journal
- * stays counted (its other side would otherwise vanish from every total).
- * Corporation wallets are never Characters, so ISK moved through one is not netted.
+ * lookup. A line is internal when both parties are tracked Characters, i.e.
+ * any Character with the wallet permission, whether or not it is in the
+ * current Character pick: a donation from your own alt is internal even in the
+ * one-Character view. Corporation wallets are never Characters, so ISK moved
+ * through one is not netted.
  */
+import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
-
-/** The global PLEX market's type id. */
-export const PLEX_TYPE_ID = 44992;
 
 export const PLEX_BOUGHT_KEY = 'plex_bought';
 export const PLEX_SOLD_KEY = 'plex_sold';
 
 /** A journal line tagged with the Character whose wallet it came from. */
 export type OwnedJournalEntry = WalletJournalEntry & { characterId: number };
+
+/** A journal line, tagged with its Character in the multi-Character view. */
+export type JournalLine = WalletJournalEntry & { characterId?: number };
 
 /** A journal line plus what the Journal derives from it. */
 export type JournalRow = WalletJournalEntry & {
@@ -46,8 +48,8 @@ export function isInternalTransfer(entry: WalletJournalEntry, trackedIds: Readon
 
 /** PLEX bought or sold on the market: a `market_transaction` line whose linked fill is PLEX. */
 function plexKey(
-  entry: WalletJournalEntry,
-  linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined
+  entry: JournalLine,
+  linkFor: (entry: JournalLine) => WalletTransactionCommon | undefined
 ): string | undefined {
   if (entry.ref_type !== 'market_transaction') return undefined;
   const fill = linkFor(entry);
@@ -56,13 +58,13 @@ function plexKey(
 }
 
 export interface ClassifyContext {
-  /** Characters whose journals are loaded; a party outside it is not "yours". */
+  /** Wallet-scoped Characters; a party outside it is not "yours". */
   trackedIds: ReadonlySet<number>;
-  linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined;
+  linkFor: (entry: JournalLine) => WalletTransactionCommon | undefined;
 }
 
 export function classifyJournal(
-  entries: readonly (WalletJournalEntry & { characterId?: number })[],
+  entries: readonly JournalLine[],
   { trackedIds, linkFor }: ClassifyContext
 ): JournalRow[] {
   return entries.map((entry) => {

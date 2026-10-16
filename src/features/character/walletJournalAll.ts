@@ -1,6 +1,6 @@
 /**
- * The Journal's "All characters" read (issue #3908): every tracked Character's
- * wallet journal and recent fills, fanned out through `fanOutAllCharacters`
+ * The Journal's multi-Character read (issue #3908): the picked Characters'
+ * wallet journals and recent fills, fanned out through `fanOutAllCharacters`
  * (scope pre-check, ordering, concurrency). Kept apart from `wallet.ts`, which
  * holds the single-Character loaders.
  */
@@ -21,8 +21,11 @@ export interface CharacterJournal {
   name: string;
   journal: WalletJournalEntry[];
   transactions: WalletTransaction[];
-  /** Pages of the journal or of the fills were missing. */
+  /** Pages of the journal were missing. */
   truncated: boolean;
+  /** Pages of the fills were missing: some item names are unresolved. */
+  fillsTruncated: boolean;
+  fetchedAt: Date;
 }
 
 export interface AllJournalsSnapshot {
@@ -33,9 +36,13 @@ export interface AllJournalsSnapshot {
   typeNames: Map<number, string>;
 }
 
-export async function loadAllCharactersJournals(): Promise<AllJournalsSnapshot> {
+/** `characters` is the pick; omitted, every stored Character. */
+export async function loadAllCharactersJournals(
+  characters?: readonly FanOutCharacter[]
+): Promise<AllJournalsSnapshot> {
   const { entries, skipped } = await fanOutAllCharacters<CharacterJournal>({
     scope: JOURNAL_SCOPE,
+    characters,
     load: async ({ characterId, name }) => {
       const { cached, needsReauth } = await loadWalletJournalWithStatus(characterId);
       if (!cached || needsReauth) return null;
@@ -47,6 +54,8 @@ export async function loadAllCharactersJournals(): Promise<AllJournalsSnapshot> 
         journal: cached.data,
         transactions: fills?.data ?? [],
         truncated: cached.truncated ?? false,
+        fillsTruncated: fills?.truncated ?? false,
+        fetchedAt: cached.fetchedAt,
       };
     },
   });
