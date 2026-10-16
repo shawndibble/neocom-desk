@@ -8,10 +8,13 @@
  * (or vice versa) — they drifted once, leaving `market/systemPositions.json`
  * in neither. Paths are relative to `public/data/`, forward slashes.
  *
- * Pure data and no imports: `vite.config.ts` loads this file at config time.
+ * Pure data, importing only the import-free `typeInfoShard.ts`:
+ * `vite.config.ts` loads this file at config time (no `@/` alias there).
  * Everything in `public/data` NOT listed here is precached.
  */
-export const LAZY_SDE_FILES = [
+import { TYPE_INFO_SHARD_COUNT } from './typeInfoShard';
+
+export const LAZY_SDE_FILES: readonly string[] = [
   'masteries.json',
   'reprocessing.json',
   'marketWideTrees.json',
@@ -21,7 +24,11 @@ export const LAZY_SDE_FILES = [
   'market/types.json',
   'market/stations.json',
   'market/variations.json',
-] as const;
+  // Item Detail's description + attributes per type (issue #3882), ~12 MB in
+  // all, so one range-bucket shard per `typeInfoShard` slot. Every slot has a
+  // file (`{}` when empty), so this is a constant, not read from the build.
+  ...Array.from({ length: TYPE_INFO_SHARD_COUNT }, (_, n) => `typeInfo/${n}.json`),
+];
 
 /** `injectManifest.globIgnores` entries for {@link LAZY_SDE_FILES}. */
 export function lazySdeGlobIgnores(): string[] {

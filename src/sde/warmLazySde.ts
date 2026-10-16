@@ -4,10 +4,12 @@
  * that never opened them online. Fetch-only via `sdeDataUrl` (the exact URLs
  * the loaders use), so the service worker's CacheFirst `sde-data` route
  * stores them; the body is dropped rather than parsed and memoized, to keep
- * a ~16 MB parse and its heap off the main thread.
+ * a ~28 MB parse and its heap off the main thread.
  *
  * The list is `lazySdeFiles.ts`, shared with `vite.config.ts`'s precache
- * ignores. Entry budget in `sde-data` (maxEntries 64 in `sw.ts`): its length.
+ * ignores. Entry budget in `sde-data` (maxEntries 150 in `sw.ts`): ~2x its
+ * length (73: 9 files + 64 `typeInfo/` shards), so a deploy's stale `?v=`
+ * entries never evict a current one.
  */
 import { sdeDataUrl } from './sdeDataUrl';
 import { currentWarmLevel } from '@/lib/lazyAssetWarmGate';
