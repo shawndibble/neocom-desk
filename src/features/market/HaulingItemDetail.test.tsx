@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -51,6 +51,7 @@ function listRow(
       dailyVolume: 0.6,
       daysWithTrades: 20,
       recentSalePrice: 23_500_000,
+      latestDay: null,
       demand: 'most-days',
     },
     sale: {
@@ -151,6 +152,26 @@ describe('HaulingItemDetail — listing', () => {
     const prices = rows.map((r) => within(r).getAllByRole('cell')[0]!.textContent);
     expect(prices).toEqual(['23,170,000', '23,200,000your listing', '23,280,000', '23,290,000']);
     expect(within(rows[1]!).getAllByRole('cell')[1]).toHaveTextContent('4');
+  });
+
+  it('names the latest day’s two kinds of sale when they are far apart, and nothing when close', () => {
+    const split = listRow() as HaulingViewRow & ListHaulingScanRow;
+    split.demand = {
+      ...split.demand,
+      latestDay: { date: '2026-10-13', highest: 289_000_000, lowest: 25_310_000 },
+    };
+    renderDetail(split);
+    expect(
+      screen.getByText(
+        'Last sales (2026-10-13): 289,000,000 from a listing, 25,310,000 into a buy order.'
+      )
+    ).toBeInTheDocument();
+    cleanup();
+
+    const close = listRow() as HaulingViewRow & ListHaulingScanRow;
+    close.demand = { ...close.demand, latestDay: { date: '2026-10-13', highest: 100, lowest: 95 } };
+    renderDetail(close);
+    expect(screen.queryByText(/Last sales/)).toBeNull();
   });
 
   it('shows Days to Sell and how fast it sells', () => {

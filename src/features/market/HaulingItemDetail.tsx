@@ -10,7 +10,7 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Disclosure, TypeIcon } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { buttonClassName } from '@/components/ui/buttonClassName';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatMarketIsk, marketIskDecimals } from '@/lib/isk';
@@ -459,6 +459,7 @@ function ListingBody({
             {t('market.hauling.itemDetail.listedNear', { units: sale.unitsAhead.toLocaleString() })}
           </span>
         </p>
+        <LastSalesSplit row={row} />
       </div>
       <TheMath
         row={row}
@@ -536,24 +537,42 @@ function InstantBody({
 function Links({ row }: { row: HaulingViewRow }) {
   const { t } = useTranslation();
   return (
-    <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
-      <MarketItemLink typeId={row.typeId} hubId={row.toHub.id} className={inlineLinkClassName}>
+    <p className="flex flex-wrap gap-2">
+      <MarketItemLink typeId={row.typeId} hubId={row.toHub.id} className={LINK_BUTTON}>
         {t('market.hauling.itemDetail.priceHistory', { hub: row.toHub.systemName })}
       </MarketItemLink>
-      <Link
-        to={routeToHref(row.toHub.systemId, row.fromHub.systemId)}
-        className={inlineLinkClassName}
-      >
+      <Link to={routeToHref(row.toHub.systemId, row.fromHub.systemId)} className={LINK_BUTTON}>
         {t('market.hauling.itemDetail.routeSafety')}
       </Link>
-      {/* `!`: ItemInfoLink's entity recipe hides the underline at rest; here it matches its neighbours. */}
-      <ItemInfoLink
-        typeId={row.typeId}
-        itemName={row.name}
-        className={cx(inlineLinkClassName, '!decoration-current')}
-      >
+      <ItemInfoLink typeId={row.typeId} itemName={row.name} className={LINK_BUTTON}>
         {t('market.contextMenu.showInfo')}
       </ItemInfoLink>
+    </p>
+  );
+}
+
+/** Real links (they open a page or the item's info), drawn as ghost buttons; `buttonClassName`'s hover keys on `:enabled`, which an `<a>` never matches. */
+const LINK_BUTTON = buttonClassName({
+  variant: 'ghost',
+  size: 'sm',
+  className: 'hover:border-line-bright hover:bg-panel-2 active:bg-panel',
+});
+
+/** A day's highest and lowest fill this far apart are two kinds of sale — a listing bought, a dump into a buy order — not one price. */
+const SPLIT_RATIO = 0.8;
+
+/** The newest trading day's two kinds of sale, when they differ enough that its average would mislead. */
+function LastSalesSplit({ row }: { row: HaulingViewRow & ListHaulingScanRow }) {
+  const { t } = useTranslation();
+  const day = row.demand.latestDay;
+  if (!day || day.lowest >= day.highest * SPLIT_RATIO) return null;
+  return (
+    <p className="text-xs text-text-dim">
+      {t('market.hauling.itemDetail.lastSalesSplit', {
+        date: day.date,
+        high: formatMarketIsk(day.highest),
+        low: formatMarketIsk(day.lowest),
+      })}
     </p>
   );
 }

@@ -37,7 +37,13 @@ const SCAN_ROW: ListHaulingScanRow = {
   unitVolumeM3: 5,
   buyLadder: [{ price: 100, units: 10_000, orders: 3 }],
   destLadder: [{ price: 200, units: 50, orders: 3 }],
-  demand: { dailyVolume: 10, daysWithTrades: 25, recentSalePrice: 150, demand: 'most-days' },
+  demand: {
+    dailyVolume: 10,
+    daysWithTrades: 25,
+    recentSalePrice: 150,
+    latestDay: null,
+    demand: 'most-days',
+  },
   sale: {
     price: 150,
     lowestAsk: 200,

@@ -9566,12 +9566,13 @@
         "planUnits_one": "{{units}} unit",
         "planUnits_other": "{{units}} units",
         "whyLead": "Why {{price}}:",
-        "whyTick": "the lower of the recent sale ({{recent}}) and one tick under the cheapest listing ({{undercut}}).",
-        "whyTickRounded": "the lower of the recent sale ({{recent}}) and one tick under the cheapest listing ({{undercut}}), rounded down to a valid price.",
-        "whyAsk": "the lower of the recent sale ({{recent}}) and the cheapest listing ({{undercut}}).",
-        "whyAskRounded": "the lower of the recent sale ({{recent}}) and the cheapest listing ({{undercut}}), rounded down to a valid price.",
+        "whyTick": "the lower of what listings recently sold for ({{recent}}) and one tick under the cheapest listing ({{undercut}}).",
+        "whyTickRounded": "the lower of what listings recently sold for ({{recent}}) and one tick under the cheapest listing ({{undercut}}), rounded down to a valid price.",
+        "whyAsk": "the lower of what listings recently sold for ({{recent}}) and the cheapest listing ({{undercut}}).",
+        "whyAskRounded": "the lower of what listings recently sold for ({{recent}}) and the cheapest listing ({{undercut}}), rounded down to a valid price.",
         "priceHistory": "Price history and orders in {{hub}}",
-        "routeSafety": "Route safety"
+        "routeSafety": "Route safety",
+        "lastSalesSplit": "Last sales ({{date}}): {{high}} from a listing, {{low}} into a buy order."
       },
       "holds": {
         "general": "Cargo hold",
