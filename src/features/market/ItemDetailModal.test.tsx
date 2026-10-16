@@ -9,7 +9,9 @@ import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
 import { loadAttributeDictionary, loadGlobalMarkets } from '@/sde/loadMarketSde';
-import { loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
+import { loadMutaplasmids, loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
+import { resetMutaplasmidLookupForTests } from '@/features/abyssal/mutaplasmidData';
+import { resetDynamicItemFailuresForTests } from '@/features/abyssal/dynamicItems';
 import { loadTypeInfo } from '@/sde/loadTypeInfo';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
@@ -29,6 +31,11 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
+  loadMutaplasmids: vi.fn(async () => ({
+    attributeNames: {},
+    mutaplasmids: {},
+    abyssalTypeIds: [],
+  })),
 }));
 // Default: the baked shard doesn't carry the type, so the ESI handlers below
 // serve it through the cached-ESI fallback.
@@ -40,6 +47,7 @@ const mockedLoadSkills = vi.mocked(loadSkills);
 const mockedLoadPi = vi.mocked(loadPi);
 const mockedLoadSkillAttributeModifiers = vi.mocked(loadSkillAttributeModifiers);
 const mockedLoadTypeInfo = vi.mocked(loadTypeInfo);
+const mockedLoadMutaplasmids = vi.mocked(loadMutaplasmids);
 
 const TYPE_ID = 587;
 
@@ -56,6 +64,9 @@ afterEach(async () => {
   // leak a resolved name into the next test's "unresolvable" case.
   await db.esiCache.clear();
   await db.skillPlans.clear();
+  await db.dynamicItems.clear();
+  resetMutaplasmidLookupForTests();
+  resetDynamicItemFailuresForTests();
   // Order Book has its own 300s TTL cache, keyed by region+type — several
   // tests reuse TYPE_ID, and a real Date.now would let one test's response
   // leak into the next's.
@@ -972,5 +983,65 @@ describe('ItemDetailModal type info source (issue #3882)', () => {
     expect(await screen.findByText("Couldn't load item info")).toBeInTheDocument();
     expect(screen.getByText('Planetary production')).toBeInTheDocument();
     expect(screen.getByText('3,000 x Base Metals')).toBeInTheDocument();
+  });
+});
+
+describe('ItemDetailModal — an owned abyssal module', () => {
+  const ABYSSAL_TYPE = 47832;
+  const BASE_TYPE = 12271;
+  const MUTAPLASMID = 47831;
+  const ITEM_ID = 1040000000001;
+
+  it("shows the module's own attributes and no order-book prices", async () => {
+    mockedLoadMutaplasmids.mockResolvedValue({
+      attributeNames: { 9: 'hp' },
+      mutaplasmids: {
+        [MUTAPLASMID]: {
+          result: ABYSSAL_TYPE,
+          bases: [BASE_TYPE],
+          attributes: [{ id: 9, min: 0.8, max: 1.2, highIsGood: true }],
+        },
+      },
+      abyssalTypeIds: [ABYSSAL_TYPE],
+    });
+    mockedLoadDictionary.mockResolvedValue({
+      9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
+    });
+    // The abyssal type's own shard carries no hit points; the base's does.
+    mockedLoadTypeInfo.mockImplementation(async (typeId: number) => ({
+      description: '',
+      effects: [],
+      attributes: typeId === BASE_TYPE ? [[9, 1000]] : [],
+      volume: 5,
+    }));
+    server.use(
+      http.get(`${ESI_BASE_URL}/dogma/dynamic/items/${ABYSSAL_TYPE}/${ITEM_ID}`, () =>
+        HttpResponse.json({
+          created_by: 1,
+          mutator_type_id: MUTAPLASMID,
+          source_type_id: BASE_TYPE,
+          dogma_attributes: [{ attribute_id: 9, value: 1150 }],
+          dogma_effects: [],
+        })
+      ),
+      http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([]))
+    );
+
+    render(
+      <MemoryRouter>
+        <ItemDetailModal
+          typeId={ABYSSAL_TYPE}
+          itemId={ITEM_ID}
+          itemName="Heavy Abyssal Energy Neutralizer"
+          onClose={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    const rolls = await screen.findByRole('table', { name: "This module's rolls" });
+    expect(within(rolls).getByText('1,150')).toBeInTheDocument();
+    // The grouped attributes are the module's own (1,150 HP), not its type's empty shard.
+    expect(await screen.findByText('1,150 HP')).toBeInTheDocument();
+    expect(screen.queryByText('Best sell:')).not.toBeInTheDocument();
   });
 });

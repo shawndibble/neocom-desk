@@ -16,6 +16,13 @@
  * answer, and no dogma attribute carries it. Anything a blueprint or
  * reaction consumes gets "Used in" (`UsedInSection`), off the blueprint
  * catalog — the same SDE files Build Plan reads, not ESI.
+ *
+ * An abyssal (mutated) type or a mutaplasmid gets `AbyssalItemDetail`: its
+ * shard carries almost nothing, and no market order exists for an abyssal
+ * module, so its best sell/buy line gives way to MutaMarket's estimate when
+ * the modal is opened on one owned module (`itemId`) and to nothing
+ * otherwise. Opened on an owned module, its attributes are that module's
+ * own, from ESI's dynamic item, rather than the type's.
  */
 import { cx } from '@/lib/cx';
 import {
@@ -41,7 +48,11 @@ import {
   Tooltip,
   TypeIcon,
 } from '@/components/ui';
-import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
+import {
+  groupItemAttributes,
+  type AttributeDictionary,
+  type AttributeGroup,
+} from '@/engine/market/itemAttributes';
 import { EveMarkupText } from '@/components/EveMarkupText';
 import { marketItemUrl } from '@/engine/market/urlState';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
@@ -71,10 +82,21 @@ import {
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
 import { UsedInSection } from './UsedInSection';
+import { AbyssalItemDetail } from '@/features/abyssal/AbyssalItemDetail';
+import { AbyssalEstimateLine } from '@/features/abyssal/AbyssalEstimateLine';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
+import { useDynamicItem } from '@/features/abyssal/useDynamicItem';
+import type { DynamicItemRecord } from '@/db';
 import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
 
 export interface ItemDetailModalProps {
   typeId: number;
+  /**
+   * One owned item of the type (`?info=type-<typeId>-<itemId>`, an Assets
+   * row): for an abyssal module, its own rolls and MutaMarket estimate.
+   * Ignored for any other type.
+   */
+  itemId?: number;
   itemName: string;
   onClose: () => void;
   /**
@@ -109,6 +131,7 @@ interface DetailData {
   /** Every skill's name — the popover surfaces skills the item doesn't require, so `skillNames` above isn't enough. */
   allSkillNames: Readonly<Record<number, string>>;
   skillAttributeModifiers: SkillAttributeModifierMap;
+  dictionary: AttributeDictionary;
 }
 
 /**
@@ -123,6 +146,7 @@ type PriceState =
 /** Mounted only while open (ImportClipboardDialog's pattern) — mounting is the open signal. */
 export function ItemDetailModal({
   typeId,
+  itemId,
   itemName,
   onClose,
   location,
@@ -147,6 +171,15 @@ export function ItemDetailModal({
   const savedLocation = useSavedOrderBookLocation(location === undefined);
   const priceLocation = location ?? savedLocation;
   const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
+
+  const mutaplasmids = useMutaplasmidLookup();
+  const abyssal = mutaplasmids?.isAbyssalType(typeId) ?? false;
+  const dynamic = useDynamicItem(typeId, abyssal ? itemId : undefined);
+  /** The owned module's own attributes, grouped as the type's are, for the record they were grouped from. */
+  const [dynamicGrouped, setDynamicGrouped] = useState<{
+    record: DynamicItemRecord;
+    groups: AttributeGroup[];
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,6 +261,7 @@ export function ItemDetailModal({
           allSkillNames,
           skillAttributeModifiers,
           skillNames: names.types ?? {},
+          dictionary,
         });
       } catch {
         if (!cancelled) setError(true);
@@ -239,6 +273,32 @@ export function ItemDetailModal({
       cancelled = true;
     };
   }, [typeId]);
+
+  const dynamicRecord = dynamic.status === 'ready' ? dynamic.record : null;
+  useEffect(() => {
+    if (!data || !dynamicRecord) return;
+    let cancelled = false;
+    const attributes = dynamicRecord.attributes.map(([attribute_id, value]) => ({
+      attribute_id,
+      value,
+    }));
+    void loadAttributeReferenceNames([attributes], data.dictionary).then((names) => {
+      if (cancelled) return;
+      setDynamicGrouped({
+        record: dynamicRecord,
+        groups: groupItemAttributes(attributes, data.dictionary, names, {
+          omitSkillRequirementRows: true,
+        }),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [data, dynamicRecord]);
+  const attributeGroups =
+    (dynamicRecord && dynamicGrouped?.record === dynamicRecord ? dynamicGrouped.groups : null) ??
+    data?.groups ??
+    [];
 
   // Gates which attribute-modifier popovers can apply (empty while `data`
   // hasn't loaded yet).
@@ -272,6 +332,7 @@ export function ItemDetailModal({
             className="py-8"
           />
           {/* Local SDE data, so they outlive a type-info failure. */}
+          <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
           <PlanetaryProduction pi={pi} typeId={typeId} />
           <UsedInSection typeId={typeId} onNavigate={leave} />
         </div>
@@ -289,33 +350,46 @@ export function ItemDetailModal({
               <p className="text-text-dim">
                 {t('market.itemDetail.volume', { volume: formatVolume(data.type.volume ?? 0) })}
               </p>
-              {priceState.status !== 'error' && (
-                <p className="flex gap-4 text-text-dim">
-                  <PriceFigure
-                    label={t('market.itemDetail.bestSell')}
-                    side="sell"
-                    typeId={typeId}
-                    price={
-                      priceState.status === 'loading' ? undefined : priceState.summary.bestSell
-                    }
-                    onNavigate={leave}
-                    replace={onLeave !== undefined}
-                  />
-                  <PriceFigure
-                    label={t('market.itemDetail.bestBuy')}
-                    side="buy"
-                    typeId={typeId}
-                    price={priceState.status === 'loading' ? undefined : priceState.summary.bestBuy}
-                    onNavigate={leave}
-                    replace={onLeave !== undefined}
-                  />
-                </p>
-              )}
+              {abyssal
+                ? itemId !== undefined &&
+                  activeCharacterId !== null && (
+                    <AbyssalEstimateLine
+                      typeId={typeId}
+                      itemId={itemId}
+                      characterId={activeCharacterId}
+                    />
+                  )
+                : priceState.status !== 'error' && (
+                    <p className="flex gap-4 text-text-dim">
+                      <PriceFigure
+                        label={t('market.itemDetail.bestSell')}
+                        side="sell"
+                        typeId={typeId}
+                        price={
+                          priceState.status === 'loading' ? undefined : priceState.summary.bestSell
+                        }
+                        onNavigate={leave}
+                        replace={onLeave !== undefined}
+                      />
+                      <PriceFigure
+                        label={t('market.itemDetail.bestBuy')}
+                        side="buy"
+                        typeId={typeId}
+                        price={
+                          priceState.status === 'loading' ? undefined : priceState.summary.bestBuy
+                        }
+                        onNavigate={leave}
+                        replace={onLeave !== undefined}
+                      />
+                    </p>
+                  )}
               {data.type.description && (
                 <EveMarkupText markup={data.type.description} className="text-text" />
               )}
             </div>
           </div>
+
+          <AbyssalItemDetail typeId={typeId} dynamic={dynamic} />
 
           <RequiredSkillsSection
             requiredSkills={data.requiredSkills}
@@ -330,10 +404,10 @@ export function ItemDetailModal({
 
           <UsedInSection typeId={typeId} onNavigate={leave} />
 
-          {data.groups.length === 0 ? (
+          {attributeGroups.length === 0 ? (
             <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
           ) : (
-            data.groups.map((group) => (
+            attributeGroups.map((group) => (
               <div key={group.category}>
                 <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {group.category}
