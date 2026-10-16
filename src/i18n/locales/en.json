@@ -5390,9 +5390,11 @@
     "journalDayHeader": "{{day}} · EVE time",
     "range": {
       "label": "Range",
-      "days": "Last {{count}} days",
-      "months": "{{count}} months",
-      "year": "1 year",
+      "last7": "Last 7 days",
+      "last30": "Last 30 days",
+      "last90": "Last 3 months",
+      "last180": "Last 6 months",
+      "last365": "Last year",
       "all": "All history",
       "custom": "Custom"
     },

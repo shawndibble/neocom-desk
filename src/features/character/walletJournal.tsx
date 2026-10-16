@@ -15,9 +15,11 @@ import { JournalDescriptionCell } from '@/features/character/JournalDescriptionC
 import {
   filterWalletJournal,
   journalRefTypes,
+  resolveJournalFilter,
   type WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
 import { formatIsk } from '@/lib/isk';
+import { useNow } from '@/lib/useNow';
 import { useTimeZone } from '@/lib/timeFormat';
 import { splitTimestamp } from '@/lib/timestamp';
 
@@ -38,10 +40,16 @@ export function typeNameLookup(names: ReadonlyMap<number, string>): (typeId: num
   return (typeId) => names.get(typeId) ?? `Type #${typeId}`;
 }
 
+/** The stored filter with a range preset resolved against today, kept live past midnight UTC. */
+export function useResolvedJournalFilter(filter: WalletJournalFilter): WalletJournalFilter {
+  const now = useNow();
+  return useMemo(() => resolveJournalFilter(filter, now), [filter, now]);
+}
+
 /** Filter a journal, then memoize the result and the ref types its dropdown offers. */
 export function useJournalFilterResult(
   journal: readonly JournalRow[],
-  filter: WalletJournalFilter
+  storedFilter: WalletJournalFilter
 ): {
   filteredJournal: JournalRow[];
   /** Filtered by date range and text only: the ref-type breakdown ignores the ref-type filter. */
@@ -51,6 +59,7 @@ export function useJournalFilterResult(
   refTypeOptions: string[];
 } {
   const { t } = useTranslation();
+  const filter = useResolvedJournalFilter(storedFilter);
   const filteredJournal = useMemo(
     () => filterWalletJournal(journal, filter, (entry) => journalDescriptionText(entry, t)),
     [journal, filter, t]

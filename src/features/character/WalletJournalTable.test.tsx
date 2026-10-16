@@ -108,32 +108,17 @@ describe('JournalTable', () => {
       expect(await optionNames()).toEqual([
         'Last 7 days',
         'Last 30 days',
-        '3 months',
-        '6 months',
+        'Last 3 months',
+        'Last 6 months',
         'All history',
       ]);
     });
 
-    it('sets From to N days ago and clears To', async () => {
+    it('stores the preset as a relative range and clears both dates', async () => {
       const onFilterChange = vi.fn();
       render(
         <Harness
           archiveRanges={[90]}
-          filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, endDate: '2026-01-01' }}
-          onFilterChange={onFilterChange}
-        />
-      );
-      await userEvent.click(screen.getByRole('combobox', { name: 'Range' }));
-      await userEvent.click(screen.getByRole('option', { name: '3 months' }));
-      const [next] = onFilterChange.mock.calls[0] as [WalletJournalFilter];
-      expect(next.endDate).toBeNull();
-      expect(next.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    });
-
-    it('All history clears both dates', async () => {
-      const onFilterChange = vi.fn();
-      render(
-        <Harness
           filter={{
             ...EMPTY_WALLET_JOURNAL_FILTER,
             startDate: '2026-01-01',
@@ -143,12 +128,33 @@ describe('JournalTable', () => {
         />
       );
       await userEvent.click(screen.getByRole('combobox', { name: 'Range' }));
-      await userEvent.click(screen.getByRole('option', { name: 'All history' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Last 3 months' }));
       expect(onFilterChange).toHaveBeenCalledWith({
         ...EMPTY_WALLET_JOURNAL_FILTER,
+        range: 90,
         startDate: null,
         endDate: null,
       });
+    });
+
+    it('All history clears the range and both dates', async () => {
+      const onFilterChange = vi.fn();
+      render(
+        <Harness
+          filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, range: 7 }}
+          onFilterChange={onFilterChange}
+        />
+      );
+      await userEvent.click(screen.getByRole('combobox', { name: 'Range' }));
+      await userEvent.click(screen.getByRole('option', { name: 'All history' }));
+      expect(onFilterChange).toHaveBeenCalledWith(EMPTY_WALLET_JOURNAL_FILTER);
+    });
+
+    it('shows the preset, and a chip for it, even before the archive info loads', () => {
+      render(<Harness filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, range: 90 }} />);
+      expect(screen.getByRole('combobox', { name: 'Range' })).toHaveTextContent('Last 3 months');
+      expect(screen.getByRole('button', { name: /Last 3 months/ })).toBeInTheDocument();
+      expect(screen.queryByText(/^From:/)).not.toBeInTheDocument();
     });
 
     it('reads Custom for dates that match no preset', () => {

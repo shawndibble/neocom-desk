@@ -3,6 +3,7 @@
  * selected chip that a click turns off, then the filtered entry count with its In / Out / Net, then
  * how many lines between the pilot's own Characters were left out.
  */
+import { JOURNAL_RANGE_LABEL_KEYS } from '@/engine/wallet/journalRange';
 import { formatIsoDay } from '@/lib/formatDateTick';
 import { useTranslation } from 'react-i18next';
 import { FilterChip } from '@/components/ui';
@@ -40,7 +41,14 @@ export function ActiveFilterRow({
       label: t('wallet.journalChipType', { type: journalRefLabel(filter.refType, t) }),
       clear: { refType: null },
     });
-  if (filter.startDate !== null && filter.startDate === filter.endDate)
+  const presetKey = filter.range === null ? undefined : JOURNAL_RANGE_LABEL_KEYS[filter.range];
+  if (presetKey !== undefined)
+    chips.push({
+      key: 'range',
+      label: t(presetKey),
+      clear: { range: null, startDate: null, endDate: null },
+    });
+  else if (filter.startDate !== null && filter.startDate === filter.endDate)
     chips.push({
       key: 'day',
       label: t('wallet.journalChipDay', { date: formatIsoDay(filter.startDate) }),

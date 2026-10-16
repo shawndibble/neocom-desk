@@ -1,5 +1,6 @@
 import type { WalletJournalEntry } from '@/esi/endpoints';
-import { defineUrlFilter, nullableTextParam, textParam } from '@/lib/urlState';
+import { defineUrlFilter, nullableTextParam, optionalIntParam, textParam } from '@/lib/urlState';
+import { journalRangeStart } from '@/engine/wallet/journalRange';
 import { journalRefKey, type JournalRow } from '@/engine/journalNetting';
 import { bountyKillsOf } from './bountyKills';
 import { dailyGoalMessageIdOf } from './dailyGoal';
@@ -8,10 +9,13 @@ import { dailyGoalMessageIdOf } from './dailyGoal';
  * The journal filter bar's state (issue #413): a raw ESI `ref_type`, an
  * inclusive `YYYY-MM-DD` date range, and free text. `null` (or an empty
  * string for `text`) means that criterion is inactive — every field inactive
- * is the identity filter.
+ * is the identity filter. `range` is a "last N days" preset (#3933): kept
+ * relative so a bookmark or a tab left open past midnight UTC still means the
+ * last N days; `resolveJournalFilter` turns it into a `startDate` at read time.
  */
 export interface WalletJournalFilter {
   refType: string | null;
+  range: number | null;
   startDate: string | null;
   endDate: string | null;
   text: string;
@@ -19,6 +23,7 @@ export interface WalletJournalFilter {
 
 export const EMPTY_WALLET_JOURNAL_FILTER: WalletJournalFilter = {
   refType: null,
+  range: null,
   startDate: null,
   endDate: null,
   text: '',
@@ -36,10 +41,35 @@ export const {
   emptyParams: EMPTY_JOURNAL_FILTER_PARAMS,
 } = defineUrlFilter<WalletJournalFilter>({
   refType: { key: 'journal.refType', codec: nullableTextParam() },
+  range: { key: 'journal.range', codec: optionalIntParam({ min: 1 }) },
   startDate: { key: 'journal.start', codec: nullableTextParam() },
   endDate: { key: 'journal.end', codec: nullableTextParam() },
   text: { key: 'journal.q', codec: textParam() },
 });
+
+/** The filter with a `range` preset turned into its `startDate` for `nowMs`; any other filter as is. */
+export function resolveJournalFilter(
+  filter: WalletJournalFilter,
+  nowMs: number
+): WalletJournalFilter {
+  return filter.range === null
+    ? filter
+    : { ...filter, startDate: journalRangeStart(filter.range, nowMs) };
+}
+
+/**
+ * A filter edit made on the resolved filter, back to what is stored. Touching
+ * From/To drops the preset; any other edit keeps it and leaves its dates unstored.
+ */
+export function storeJournalFilterEdit(
+  stored: WalletJournalFilter,
+  resolved: WalletJournalFilter,
+  next: WalletJournalFilter
+): WalletJournalFilter {
+  if (next.startDate !== resolved.startDate || next.endDate !== resolved.endDate)
+    return { ...next, range: null };
+  return { ...next, startDate: stored.startDate, endDate: stored.endDate };
+}
 
 /**
  * Every active criterion is ANDed. String comparison on the `YYYY-MM-DD`
@@ -160,5 +190,7 @@ export function journalRefTypes(entries: readonly JournalRow[]): string[] {
  * behind it.
  */
 export function activeWalletJournalFilterCount(filter: WalletJournalFilter): number {
-  return [filter.refType, filter.startDate, filter.endDate].filter((v) => v !== null).length;
+  return [filter.refType, filter.range ?? filter.startDate, filter.endDate].filter(
+    (v) => v !== null
+  ).length;
 }

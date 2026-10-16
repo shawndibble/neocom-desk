@@ -2,8 +2,9 @@ import { useTranslation } from 'react-i18next';
 import type { WalletArchiveInfo } from '@/features/character/walletArchive';
 
 /**
- * The Journal's archive line: how far back the device holds history, any
- * stretch it never saw. Range presets live in the Journal's Range select. Renders nothing before the first stored row.
+ * The Journal's archive line: how far back the device holds history and any
+ * stretch it never saw. Range presets live in the Journal's Range select.
+ * Renders nothing before the first stored row.
  */
 export function WalletHistoryNote({ info }: { info: WalletArchiveInfo | undefined }) {
   const { t, i18n } = useTranslation();

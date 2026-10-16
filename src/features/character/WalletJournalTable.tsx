@@ -6,13 +6,13 @@
  * other.
  */
 import {
+  CUSTOM_RANGE,
+  JOURNAL_RANGE_LABEL_KEYS,
   journalRangeOptions,
-  journalRangeStart,
-  matchJournalRange,
   type JournalRange,
 } from '@/engine/wallet/journalRange';
 import { formatIsoDay } from '@/lib/formatDateTick';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -47,9 +47,11 @@ import {
   activeWalletJournalFilterCount,
   journalNet,
   journalRefTypeBreakdown,
+  storeJournalFilterEdit,
   toggleBreakdownRefType,
   type WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
+import { useResolvedJournalFilter } from '@/features/character/walletJournal';
 import { netToneClass } from '@/features/character/format';
 import {
   journalDayKey,
@@ -77,14 +79,13 @@ interface JournalFilterBarProps {
   actions?: ReactNode;
 }
 
-const CUSTOM_RANGE = 'custom';
 /** Module-level so the range options memo sees one stable array. */
 const NO_ARCHIVE_RANGES: readonly number[] = [];
 
 /**
- * The journal's "Range" select (#3933): a preset sets From to N EVE days ago
- * and clears To, All history clears both. Reads "Custom" when the Filters
- * panel's dates match no offered preset. Same filter the panel and chart follow.
+ * The journal's "Range" select (#3933): a preset is stored as `range` (days),
+ * so it stays "last N days" as the day turns; All history clears the range and
+ * both dates. Reads "Custom" when From/To were set by hand in Filters.
  */
 function JournalRangeSelect({
   filter,
@@ -96,26 +97,29 @@ function JournalRangeSelect({
   archiveRanges: readonly number[];
 }) {
   const { t } = useTranslation();
-  const [now] = useState(() => Date.now());
-  const options = useMemo(() => journalRangeOptions(archiveRanges), [archiveRanges]);
-  const current = matchJournalRange(filter, options, now);
-  const optionLabel = (range: JournalRange) => {
-    if (range === 'all') return t('wallet.range.all');
-    if (range === 365) return t('wallet.range.year');
-    return range % 30 === 0 && range > 30
-      ? t('wallet.range.months', { count: range / 30 })
-      : t('wallet.range.days', { count: range });
-  };
+  const options = useMemo(
+    () => journalRangeOptions(archiveRanges, filter.range),
+    [archiveRanges, filter.range]
+  );
+  const hand = filter.range !== null || filter.startDate !== null || filter.endDate !== null;
+  const current: JournalRange | typeof CUSTOM_RANGE =
+    filter.range !== null && options.includes(filter.range)
+      ? filter.range
+      : hand
+        ? CUSTOM_RANGE
+        : 'all';
   return (
     <Select
       value={String(current)}
-      onValueChange={(value) =>
+      onValueChange={(value) => {
+        const range = options.find((option) => String(option) === value) ?? 'all';
         onChange({
           ...filter,
-          startDate: journalRangeStart(value === 'all' ? 'all' : Number(value), now),
+          range: range === 'all' ? null : range,
+          startDate: null,
           endDate: null,
-        })
-      }
+        });
+      }}
     >
       <SelectTrigger aria-label={t('wallet.range.label')} className="w-40 shrink-0">
         <SelectValue />
@@ -128,7 +132,7 @@ function JournalRangeSelect({
         )}
         {options.map((range) => (
           <SelectItem key={range} value={String(range)}>
-            {optionLabel(range)}
+            {t(JOURNAL_RANGE_LABEL_KEYS[range])}
           </SelectItem>
         ))}
       </SelectContent>
@@ -282,8 +286,8 @@ const ALWAYS_SHOWN_COLUMNS = new Set(['refType', 'character']);
 
 /** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
 export function JournalTable({
-  filter,
-  onFilterChange,
+  filter: storedFilter,
+  onFilterChange: onStoredFilterChange,
   refTypeOptions,
   filteredJournal,
   archiveRanges = NO_ARCHIVE_RANGES,
@@ -299,6 +303,13 @@ export function JournalTable({
   panel,
 }: JournalTableProps) {
   const { t, i18n } = useTranslation();
+  // The preset resolved to its start day, live: the rows, panel and chart read this.
+  const filter = useResolvedJournalFilter(storedFilter);
+  const onFilterChange = useCallback(
+    (next: WalletJournalFilter) =>
+      onStoredFilterChange(storeJournalFilterEdit(storedFilter, filter, next)),
+    [onStoredFilterChange, storedFilter, filter]
+  );
   const isPhone = useIsPhone();
   const [tableRef, [tableNarrow = false]] = useElementNarrowerThan<HTMLDivElement>([
     JOURNAL_TABLE_CARDS_REM,
@@ -438,8 +449,8 @@ export function JournalTable({
         actions={
           <>
             <JournalRangeSelect
-              filter={filter}
-              onChange={onFilterChange}
+              filter={storedFilter}
+              onChange={onStoredFilterChange}
               archiveRanges={archiveRanges}
             />
             <IconButton
@@ -499,7 +510,7 @@ export function JournalTable({
           className="py-8"
           action={
             filterIsActive ? (
-              <Button size="sm" onClick={() => onFilterChange(EMPTY_WALLET_JOURNAL_FILTER)}>
+              <Button size="sm" onClick={() => onStoredFilterChange(EMPTY_WALLET_JOURNAL_FILTER)}>
                 {t('common.resetFilters')}
               </Button>
             ) : undefined

@@ -20,7 +20,7 @@ describe('WalletHistoryNote', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('states the reach and states the reach', () => {
+  it('states the reach', () => {
     render(
       <WalletHistoryNote
         info={{ since: NOW - 30 * DAY, gaps: [], ranges: [], unconfirmed: false }}

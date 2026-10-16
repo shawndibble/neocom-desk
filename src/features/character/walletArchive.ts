@@ -188,7 +188,7 @@ export interface WalletArchiveInfo {
   unconfirmed: boolean;
 }
 
-/** What the Journal's history line states: reach, gaps and offered ranges. */
+/** What the Journal's history line states (reach, gaps), plus the preset ranges its Range select offers. */
 export async function loadWalletArchiveInfo(
   characterId: number,
   nowMs: number = Date.now()

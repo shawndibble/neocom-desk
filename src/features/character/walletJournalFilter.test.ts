@@ -6,6 +6,8 @@ import {
   filterWalletJournal,
   journalNetTotal,
   journalRefTypeBreakdown,
+  resolveJournalFilter,
+  storeJournalFilterEdit,
   toggleBreakdownRefType,
   journalRefTypes,
   type WalletJournalFilter,
@@ -108,6 +110,7 @@ describe('filterWalletJournal', () => {
     ];
     const filter: WalletJournalFilter = {
       refType: 'bounty_prize',
+      range: null,
       startDate: '2026-08-02',
       endDate: null,
       text: 'x',
@@ -140,6 +143,7 @@ describe('activeWalletJournalFilterCount', () => {
     expect(
       activeWalletJournalFilterCount({
         refType: 'bounty_prizes',
+        range: null,
         startDate: '2026-01-01',
         endDate: null,
         text: '',
@@ -267,5 +271,39 @@ describe('journalRefTypeBreakdown netting', () => {
       },
     ]);
     expect(result.rows[0].refType).toBe('plex_bought');
+  });
+});
+
+describe('range preset', () => {
+  const NOW = Date.UTC(2026, 9, 16, 12);
+  const base = EMPTY_WALLET_JOURNAL_FILTER;
+
+  it('resolves to a start day counting today, and moves with the clock', () => {
+    expect(resolveJournalFilter({ ...base, range: 7 }, NOW).startDate).toBe('2026-10-10');
+    expect(resolveJournalFilter({ ...base, range: 7 }, NOW + 86_400_000).startDate).toBe(
+      '2026-10-11'
+    );
+  });
+  it('leaves a filter with no preset as is', () => {
+    const filter = { ...base, startDate: '2026-01-01' };
+    expect(resolveJournalFilter(filter, NOW)).toBe(filter);
+  });
+  it('drops the preset when From or To is edited', () => {
+    const stored = { ...base, range: 7 };
+    const resolved = resolveJournalFilter(stored, NOW);
+    expect(
+      storeJournalFilterEdit(stored, resolved, { ...resolved, startDate: '2026-10-01' })
+    ).toEqual({ ...base, startDate: '2026-10-01', range: null });
+  });
+  it('keeps the preset, unresolved, on any other edit', () => {
+    const stored = { ...base, range: 7 };
+    const resolved = resolveJournalFilter(stored, NOW);
+    expect(storeJournalFilterEdit(stored, resolved, { ...resolved, text: 'x' })).toEqual({
+      ...stored,
+      text: 'x',
+    });
+  });
+  it('counts the preset as one active criterion', () => {
+    expect(activeWalletJournalFilterCount({ ...base, range: 7, startDate: '2026-10-10' })).toBe(1);
   });
 });
