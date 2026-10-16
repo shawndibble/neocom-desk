@@ -1,0 +1,7 @@
+# Scope decisions — Offline detail prefetch and share copies
+
+_Recorded 2026-10-16._
+
+- **Bodies and event details are fetched ahead of being opened, in a small bounded window.** After a successful mail-header or calendar sync, the 20 newest mail bodies (unread first, own sent mail excluded) and up to 20 calendar events in the next 14 days get their detail rows cached, two requests at a time, in the background lane. Cached rows are never fetched again (a delivered body does not change). The bounds live in `features/character/detailPrefetch.ts`. Rules out: prefetching the whole mailbox, or fetching on a metered, save-data or slow connection (it reuses the lazy-asset warm gate and runs only at its unrestricted level).
+- **A Share Link payload is kept on the device until its `expiresAt`.** A live read always wins and refreshes the copy; the copy is served, labelled with its age, only when Firestore cannot be reached, and is purged once expired or once the server says the link is gone. It lives in `esiCache` under the sentinel Character (a share is public, owned by nobody). Rules out: serving a saved copy while online.
+- **A cached read shows the age of its row, not the time it was looked at.** The Overview Location widget reports the older of its location and ship rows; Pilot Lookup reports the affiliation row's age (the part that moves). Marking a mail read patches the cached header list without restamping its age.

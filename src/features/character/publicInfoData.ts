@@ -63,6 +63,14 @@ export async function loadPublicCharacterInfo(
   characterId: number,
   options: { staleAfterMs?: number } = {}
 ): Promise<PublicCharacterInfo | null> {
+  return (await loadPublicCharacterInfoWithAge(characterId, options))?.info ?? null;
+}
+
+/** `loadPublicCharacterInfo`, with when the record was actually read from ESI (a cache hit is older than the call). */
+export async function loadPublicCharacterInfoWithAge(
+  characterId: number,
+  options: { staleAfterMs?: number } = {}
+): Promise<{ info: PublicCharacterInfo; fetchedAt: Date } | null> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterPublicInfo(characterId, options)
   );
@@ -72,7 +80,9 @@ export async function loadPublicCharacterInfo(
     fetchLive,
     { staleAfterMs: options.staleAfterMs ?? STALE_AFTER.static, conditional }
   );
-  return result ? { ...result.data, character_id: characterId } : null;
+  return result
+    ? { info: { ...result.data, character_id: characterId }, fetchedAt: result.fetchedAt }
+    : null;
 }
 
 /**

@@ -5,9 +5,9 @@
  */
 import { getCharacterPublicInfo, postUniverseIds, type CharacterPublicInfo } from '@/esi/endpoints';
 import { EsiError } from '@/esi/errors';
-import { resolveAffiliations } from '@/features/character/affiliations';
+import { affiliationFetchedAt, resolveAffiliations } from '@/features/character/affiliations';
 import { resolveNames } from '@/features/character/names';
-import { loadPublicCharacterInfo } from '@/features/character/publicInfoData';
+import { loadPublicCharacterInfoWithAge } from '@/features/character/publicInfoData';
 
 export interface PilotSummary {
   characterId: number;
@@ -24,6 +24,12 @@ export interface PilotProfile {
   allianceName: string | null;
   /** Null when ESI left it out of the public record. */
   securityStatus: number | null;
+  /**
+   * When this was last read from ESI. The affiliation read when there is one,
+   * since that is the part that moves; else the public record's. A profile
+   * served from cache is as old as its rows, not as new as the lookup.
+   */
+  fetchedAt: Date;
 }
 
 /**
@@ -93,11 +99,15 @@ async function publicInfoOrNull(characterId: number): Promise<CharacterPublicInf
  */
 export async function loadPilotProfile(characterId: number): Promise<PilotProfile | null> {
   const [cached, affiliations] = await Promise.all([
-    loadPublicCharacterInfo(characterId),
+    loadPublicCharacterInfoWithAge(characterId),
     resolveAffiliations([characterId]),
   ]);
-  const info = cached ?? (await publicInfoOrNull(characterId));
+  const info = cached?.info ?? (await publicInfoOrNull(characterId));
   if (info === null) return null;
+  const affiliationAt = affiliations.has(characterId)
+    ? await affiliationFetchedAt(characterId)
+    : null;
+  const fetchedAt = affiliationAt ?? cached?.fetchedAt ?? new Date();
   const affiliation = affiliations.get(characterId);
   const corporationId = affiliation?.corporation_id ?? info.corporation_id;
   const allianceId = (affiliation ? affiliation.alliance_id : info.alliance_id) ?? null;
@@ -113,5 +123,6 @@ export async function loadPilotProfile(characterId: number): Promise<PilotProfil
     allianceId,
     allianceName: allianceId === null ? null : (names.get(allianceId) ?? null),
     securityStatus: info.security_status ?? null,
+    fetchedAt,
   };
 }

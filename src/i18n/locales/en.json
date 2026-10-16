@@ -10185,7 +10185,8 @@
     "unsupportedTitle": "This link needs a newer Neocom Desk",
     "unsupportedHint": "Reload the page to update, then open the link again.",
     "failedTitle": "Couldn't load this link",
-    "failedHint": "Check your connection and try again."
+    "failedHint": "Check your connection and try again.",
+    "cachedCopy": "Saved copy from your last visit. The server couldn't be reached."
   },
   "fittingShare": {
     "title": "Shared fitting",

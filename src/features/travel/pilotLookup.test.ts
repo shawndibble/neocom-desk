@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getCharacterPublicInfo: vi.fn(),
   loadPublicCharacterInfo: vi.fn(),
   resolveAffiliations: vi.fn(),
+  affiliationFetchedAt: vi.fn(),
   resolveNames: vi.fn(),
 }));
 
@@ -13,10 +14,11 @@ vi.mock('@/esi/endpoints', () => ({
   getCharacterPublicInfo: mocks.getCharacterPublicInfo,
 }));
 vi.mock('@/features/character/publicInfoData', () => ({
-  loadPublicCharacterInfo: mocks.loadPublicCharacterInfo,
+  loadPublicCharacterInfoWithAge: mocks.loadPublicCharacterInfo,
 }));
 vi.mock('@/features/character/affiliations', () => ({
   resolveAffiliations: mocks.resolveAffiliations,
+  affiliationFetchedAt: mocks.affiliationFetchedAt,
 }));
 vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
 
@@ -78,16 +80,25 @@ describe('resolvePilotByName', () => {
   });
 });
 
+const INFO_AT = new Date('2026-10-14T08:00:00Z');
+const AFFILIATION_AT = new Date('2026-10-15T09:30:00Z');
+
 describe('loadPilotProfile', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.affiliationFetchedAt.mockResolvedValue(null);
+  });
 
   it('joins public info with the live affiliation and its names', async () => {
     mocks.loadPublicCharacterInfo.mockResolvedValue({
-      character_id: 42,
-      name: 'Some Pilot',
-      birthday: '2010-01-01T00:00:00Z',
-      corporation_id: 100,
-      security_status: -2.345,
+      info: {
+        character_id: 42,
+        name: 'Some Pilot',
+        birthday: '2010-01-01T00:00:00Z',
+        corporation_id: 100,
+        security_status: -2.345,
+      },
+      fetchedAt: INFO_AT,
     });
     mocks.resolveAffiliations.mockResolvedValue(
       new Map([[42, { character_id: 42, corporation_id: 200, alliance_id: 300 }]])
@@ -107,16 +118,20 @@ describe('loadPilotProfile', () => {
       allianceId: 300,
       allianceName: 'Some Alliance',
       securityStatus: -2.345,
+      fetchedAt: INFO_AT,
     });
     expect(mocks.resolveNames).toHaveBeenCalledWith([200, 300]);
   });
 
   it('leaves security status null when ESI omits it', async () => {
     mocks.loadPublicCharacterInfo.mockResolvedValue({
-      character_id: 42,
-      name: 'Some Pilot',
-      birthday: '2010-01-01T00:00:00Z',
-      corporation_id: 100,
+      info: {
+        character_id: 42,
+        name: 'Some Pilot',
+        birthday: '2010-01-01T00:00:00Z',
+        corporation_id: 100,
+      },
+      fetchedAt: INFO_AT,
     });
     mocks.resolveAffiliations.mockResolvedValue(new Map());
     mocks.resolveNames.mockResolvedValue(new Map());
@@ -125,10 +140,13 @@ describe('loadPilotProfile', () => {
 
   it('falls back to the public record when no affiliation came back', async () => {
     mocks.loadPublicCharacterInfo.mockResolvedValue({
-      character_id: 42,
-      name: 'Some Pilot',
-      birthday: '2010-01-01T00:00:00Z',
-      corporation_id: 100,
+      info: {
+        character_id: 42,
+        name: 'Some Pilot',
+        birthday: '2010-01-01T00:00:00Z',
+        corporation_id: 100,
+      },
+      fetchedAt: INFO_AT,
     });
     mocks.resolveAffiliations.mockResolvedValue(new Map());
     mocks.resolveNames.mockResolvedValue(new Map());
@@ -138,6 +156,24 @@ describe('loadPilotProfile', () => {
       allianceId: null,
       allianceName: null,
     });
+  });
+
+  it('reports the affiliation read as the data age, the part that moves, when there is one', async () => {
+    mocks.loadPublicCharacterInfo.mockResolvedValue({
+      info: {
+        character_id: 42,
+        name: 'Some Pilot',
+        birthday: '2010-01-01T00:00:00Z',
+        corporation_id: 100,
+      },
+      fetchedAt: INFO_AT,
+    });
+    mocks.resolveAffiliations.mockResolvedValue(
+      new Map([[42, { character_id: 42, corporation_id: 200 }]])
+    );
+    mocks.affiliationFetchedAt.mockResolvedValue(AFFILIATION_AT);
+    mocks.resolveNames.mockResolvedValue(new Map());
+    expect((await loadPilotProfile(42))?.fetchedAt).toEqual(AFFILIATION_AT);
   });
 
   it('is null when ESI knows no such character', async () => {

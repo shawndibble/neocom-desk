@@ -460,7 +460,7 @@ function PilotResult({
         setProfile(
           loaded === null
             ? { kind: 'unknown' }
-            : { kind: 'ready', profile: loaded, fetchedAt: new Date() }
+            : { kind: 'ready', profile: loaded, fetchedAt: loaded.fetchedAt }
         );
         if (loaded !== null) onResolved({ characterId, name: loaded.name });
       })

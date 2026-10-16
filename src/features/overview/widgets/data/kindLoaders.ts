@@ -277,8 +277,18 @@ export interface LocationWidgetData {
   system: { id: number; name: string | null; security: number | null } | null;
   shipTypeId: number | null;
   shipName: string | null;
-  /** When the read landed; null when none was made (the grant is missing). */
+  /**
+   * When ESI last answered for what is shown (the older of the location and ship
+   * reads, so a cache hit reports its row's age, not the time of the call); null
+   * when none was made (the grant is missing, or nothing could be read).
+   */
   fetchedAt: Date | null;
+}
+
+/** The earliest of the dates that exist; null when none do (nothing was read). */
+function oldestOf(...dates: Array<Date | null>): Date | null {
+  const present = dates.filter((date): date is Date => date !== null);
+  return present.length === 0 ? null : new Date(Math.min(...present.map((date) => date.getTime())));
 }
 
 export async function loadLocationWidget(characterId: number): Promise<LocationWidgetData> {
@@ -288,20 +298,22 @@ export async function loadLocationWidget(characterId: number): Promise<LocationW
     return { needsReauth: true, system: null, shipTypeId: null, shipName: null, fetchedAt: null };
   }
   const [
-    { loadCharacterSolarSystemId },
-    { loadCharacterShipTypeId },
+    { loadCharacterSolarSystemRead },
+    { loadCharacterShipTypeRead },
     { loadSystemNameAndSecurity },
   ] = await Promise.all([
     import('@/features/character/location'),
     import('@/features/character/ship'),
     import('@/features/character/systemSecurity'),
   ]);
-  const [systemId, shipTypeId] = await Promise.all([
-    loadCharacterSolarSystemId(characterId),
+  const [location, ship] = await Promise.all([
+    loadCharacterSolarSystemRead(characterId),
     scopes.includes(ESI_REGISTRY.getCharacterShip.scope)
-      ? loadCharacterShipTypeId(characterId)
-      : Promise.resolve(null),
+      ? loadCharacterShipTypeRead(characterId)
+      : Promise.resolve({ typeId: null, fetchedAt: null }),
   ]);
+  const systemId = location.systemId;
+  const shipTypeId = ship.typeId;
   const [system, shipName] = await Promise.all([
     systemId === null ? null : loadSystemNameAndSecurity(systemId).catch(() => null),
     shipTypeId === null
@@ -319,7 +331,8 @@ export async function loadLocationWidget(characterId: number): Promise<LocationW
         : { id: systemId, name: system?.name ?? null, security: system?.security ?? null },
     shipTypeId,
     shipName,
-    fetchedAt: new Date(),
+    // The older of the two reads: the widget is only as current as its stalest half.
+    fetchedAt: oldestOf(location.fetchedAt, ship.fetchedAt),
   };
 }
 

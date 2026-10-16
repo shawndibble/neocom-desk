@@ -1,4 +1,4 @@
-import { loadMailHeaders } from '@/features/character/mail';
+import { loadMailHeaders, prefetchMailBodies } from '@/features/character/mail';
 import type { MailHeader } from '@/esi/endpoints';
 import type {
   MailHeaderSnapshot,
@@ -35,6 +35,8 @@ export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificatio
   load: async (characterId) => {
     const result = await loadMailHeaders(characterId);
     if (result.needsReauth || result.cached === null) return null;
+    // The sync landed: keep the newest mail bodies ready to read offline.
+    void prefetchMailBodies(characterId, result.cached.data);
     return result.cached.data;
   },
   toSnapshot: (headers, nowMs) => ({ entries: headers.map(toMailHeaderSnapshot), nowMs }),

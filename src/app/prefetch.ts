@@ -47,8 +47,8 @@ import {
 import { KEY as ASSETS_KEY, loadCharacterAssets } from '@/features/character/assets';
 import { KEYS as ORDER_KEYS, loadOrders, loadOrderHistory } from '@/features/character/orders';
 import { KEY as CONTRACTS_KEY, loadContracts } from '@/features/character/contracts';
-import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
-import { loadCalendarEvents } from '@/features/character/calendar';
+import { loadMailHeaders, loadMailLabels, prefetchMailBodies } from '@/features/character/mail';
+import { loadCalendarEvents, prefetchCalendarEventDetails } from '@/features/character/calendar';
 import { loadContacts } from '@/features/character/contacts';
 import { loadCharacterStandings } from '@/features/character/standings';
 import { loadCharacterClones } from '@/features/character/clones';
@@ -133,12 +133,25 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
   {
     id: 'mail-headers',
     endpoints: ['getCharacterMailHeaders'],
-    run: loadMailHeaders,
+    run: async (characterId) => {
+      const result = await loadMailHeaders(characterId);
+      // Not awaited: the bodies are a trickle behind the boot progress, not part of it.
+      if (!result.needsReauth && result.cached !== null) {
+        void prefetchMailBodies(characterId, result.cached.data);
+      }
+      return result;
+    },
   },
   {
     id: 'calendar',
     endpoints: ['getCharacterCalendar'],
-    run: loadCalendarEvents,
+    run: async (characterId) => {
+      const result = await loadCalendarEvents(characterId);
+      if (!result.needsReauth && result.cached !== null) {
+        void prefetchCalendarEventDetails(characterId, result.cached.data);
+      }
+      return result;
+    },
   },
   {
     id: 'clones',

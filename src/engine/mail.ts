@@ -309,3 +309,28 @@ export function skippedMailCharacters(
 ): string[] {
   return characters.filter((c) => !c.granted || !c.hasHeaders).map((c) => c.name);
 }
+
+/**
+ * Which mail bodies are worth fetching ahead of being opened, so the reader
+ * works offline: the `limit` newest headers (unread first, then read, each
+ * newest first by mail id, which ESI hands out in order) minus those already
+ * cached and the Character's own sent mail. The window is cut before the
+ * cached ones are dropped, so each sync adds at most what newly entered the
+ * window instead of walking back through the whole mailbox.
+ */
+export function selectMailBodiesToPrefetch(
+  headers: ReadonlyArray<{ mail_id: number; from?: number; is_read?: boolean }>,
+  options: { ownerId: number; cachedIds: ReadonlySet<number>; limit: number }
+): number[] {
+  const ordered = headers
+    .filter((header) => header.from !== options.ownerId)
+    .sort((a, b) => {
+      const unreadA = a.is_read === true ? 1 : 0;
+      const unreadB = b.is_read === true ? 1 : 0;
+      return unreadA - unreadB || b.mail_id - a.mail_id;
+    });
+  return ordered
+    .slice(0, Math.max(0, options.limit))
+    .map((header) => header.mail_id)
+    .filter((id) => !options.cachedIds.has(id));
+}

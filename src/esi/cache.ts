@@ -1073,6 +1073,25 @@ export async function isCacheFresh(
   }
 }
 
+/**
+ * Which of `keys` this character has a cached row for, regardless of age, read
+ * from primary keys only so no value is deserialized. Null while a cache purge
+ * is pending, when nothing may be read or written for the character — a caller
+ * deciding what to prefetch skips the run rather than guess.
+ */
+export async function cachedKeySet(
+  characterId: number,
+  keys: readonly string[]
+): Promise<Set<string> | null> {
+  if (await isCachePurgePending(characterId)) return null;
+  if (keys.length === 0) return new Set();
+  const found = await db.esiCache
+    .where(':id')
+    .anyOf(keys.map((key): [number, string] => [characterId, key]))
+    .primaryKeys();
+  return new Set(found.map(([, key]) => key));
+}
+
 /** Primary-key count: "is the value there?" without deserializing it. */
 async function hasValueRow(id: [number, string]): Promise<boolean> {
   return (await db.esiCache.where(':id').equals(id).count()) > 0;

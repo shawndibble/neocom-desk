@@ -14,6 +14,7 @@ import {
   prefixSubject,
   quoteMailBody,
   resolveMailTab,
+  selectMailBodiesToPrefetch,
   unreadCountsByTab,
   MAIL_FOLDERS,
 } from './mail';
@@ -393,5 +394,53 @@ describe('skippedMailCharacters', () => {
 
   it('is empty when every Character is covered', () => {
     expect(skippedMailCharacters([{ name: 'A', granted: true, hasHeaders: true }])).toEqual([]);
+  });
+});
+
+describe('selectMailBodiesToPrefetch', () => {
+  const OWNER = 90000001;
+  const header = (mail_id: number, extra: { is_read?: boolean; from?: number } = {}) => ({
+    mail_id,
+    from: 90000002,
+    ...extra,
+  });
+  const pick = (
+    headers: ReturnType<typeof header>[],
+    options: { cached?: number[]; limit?: number } = {}
+  ) =>
+    selectMailBodiesToPrefetch(headers, {
+      ownerId: OWNER,
+      cachedIds: new Set(options.cached ?? []),
+      limit: options.limit ?? 20,
+    });
+
+  it('takes the newest first, by mail id', () => {
+    expect(pick([header(5), header(9), header(7)])).toEqual([9, 7, 5]);
+  });
+
+  it('puts unread ahead of read, newest first within each', () => {
+    expect(
+      pick([header(9, { is_read: true }), header(5), header(7, { is_read: false })], {
+        limit: 3,
+      })
+    ).toEqual([7, 5, 9]);
+  });
+
+  it('bounds the window before it drops what is cached, so repeated syncs do not walk the whole mailbox', () => {
+    const headers = [10, 9, 8, 7, 6].map((id) => header(id));
+    expect(pick(headers, { limit: 3, cached: [10] })).toEqual([9, 8]);
+  });
+
+  it('never asks again for a body already cached', () => {
+    expect(pick([header(3), header(2)], { cached: [3, 2] })).toEqual([]);
+  });
+
+  it('skips mail the Character sent: their own words are not what they open offline', () => {
+    expect(pick([header(4, { from: OWNER }), header(3)])).toEqual([3]);
+  });
+
+  it('is empty for a limit of zero or an empty mailbox', () => {
+    expect(pick([header(1)], { limit: 0 })).toEqual([]);
+    expect(pick([])).toEqual([]);
   });
 });

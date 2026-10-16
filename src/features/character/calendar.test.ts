@@ -3,7 +3,12 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCalendarEvents, loadCalendarEvent, respondToCalendarEvent } from './calendar';
+import {
+  loadCalendarEvents,
+  loadCalendarEvent,
+  prefetchCalendarEventDetails,
+  respondToCalendarEvent,
+} from './calendar';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { calendarDomain } from '@/features/notifications/pollDomains/calendar';
 import type { CalendarSnapshot } from '@/engine/notificationDiffs';
@@ -24,6 +29,58 @@ afterEach(() => {
   vi.useRealTimers();
 });
 afterAll(() => server.close());
+
+describe('prefetchCalendarEventDetails', () => {
+  const NOW = Date.UTC(2026, 9, 16, 12);
+  const DAY = 24 * 60 * 60_000;
+  const summary = (event_id: number, startMs: number) => ({
+    event_id,
+    event_date: new Date(startMs).toISOString(),
+    title: `Event ${event_id}`,
+    importance: 1,
+    event_response: 'not_responded' as const,
+  });
+  const requested: number[] = [];
+
+  beforeEach(() => {
+    requested.length = 0;
+    vi.stubGlobal('navigator', { onLine: true });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/:eventId`, ({ params }) => {
+        requested.push(Number(params.eventId));
+        return HttpResponse.json({ event_id: Number(params.eventId), title: 'Detail' });
+      })
+    );
+  });
+
+  it('caches details for events in the next 14 days, skipping cached ones and far-off ones', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'calendar:2',
+      value: { event_id: 2, title: 'Already here' },
+      fetchedAt: 1,
+    });
+
+    await prefetchCalendarEventDetails(
+      CHAR_ID,
+      [summary(1, NOW + DAY), summary(2, NOW + 2 * DAY), summary(3, NOW + 30 * DAY)],
+      NOW
+    );
+
+    expect(requested).toEqual([1]);
+    expect(await db.esiCache.get([CHAR_ID, 'calendar:1'])).toBeDefined();
+  });
+
+  it('does nothing while offline', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    await prefetchCalendarEventDetails(CHAR_ID, [summary(1, NOW + DAY)], NOW);
+    expect(requested).toEqual([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+});
 
 describe('loadCalendarEvents', () => {
   it('fetches events and caches them', async () => {

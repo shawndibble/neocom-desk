@@ -23,8 +23,14 @@ const CACHE_KEY = 'characterShip';
 export const SHIP_STALE_AFTER_MS = 90_000;
 const SHIP_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterShip'];
 
-/** The type id of the ship the character is flying, or null if unresolvable (missing grant, offline, or uncached). */
-export async function loadCharacterShipTypeId(characterId: number): Promise<number | null> {
+/** A read of the flown hull, with when ESI last said so. */
+export interface ShipTypeRead {
+  typeId: number | null;
+  /** The cached row's own age (a cache hit is older than the call); null when nothing was read. */
+  fetchedAt: Date | null;
+}
+
+export async function loadCharacterShipTypeRead(characterId: number): Promise<ShipTypeRead> {
   const result = await loadWithCache(
     characterId,
     CACHE_KEY,
@@ -34,7 +40,12 @@ export async function loadCharacterShipTypeId(characterId: number): Promise<numb
       detectAuthFailure: isCredentialFailure,
     }
   );
-  return result?.data ?? null;
+  return { typeId: result?.data ?? null, fetchedAt: result?.fetchedAt ?? null };
+}
+
+/** The type id of the ship the character is flying, or null if unresolvable (missing grant, offline, or uncached). */
+export async function loadCharacterShipTypeId(characterId: number): Promise<number | null> {
+  return (await loadCharacterShipTypeRead(characterId)).typeId;
 }
 
 export type CharacterShipStatus = 'loading' | 'ready' | 'needsScope' | 'unavailable';

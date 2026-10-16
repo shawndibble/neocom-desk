@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ensureAnySession } from '@/sync/syncAuth';
+import { db } from '@/db';
 import {
   createShareLink,
   existingShareLink,
@@ -36,8 +37,9 @@ vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => 'char:1'
 
 const NOW = Date.UTC(2026, 9, 2, 12);
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
+  await db.esiCache.clear();
   getDoc.mockReset();
   setDoc.mockReset();
   vi.mocked(ensureAnySession).mockClear();
@@ -119,6 +121,54 @@ describe('loadShare', () => {
 
     getDoc.mockRejectedValueOnce(Object.assign(new Error('offline'), { code: 'unavailable' }));
     expect(await loadShare('abc123XYZ')).toEqual({ ok: false, reason: 'failed' });
+  });
+});
+
+describe('loadShare offline copy', () => {
+  const live = () =>
+    stored({
+      type: 'dscan',
+      payload: { v: 1 },
+      expiresAt: FakeTimestamp.fromMillis(NOW + 60_000),
+    });
+  const offline = () => Object.assign(new Error('offline'), { code: 'unavailable' });
+
+  it('keeps a loaded share and serves it, labelled with when it was saved, when Firestore is unreachable', async () => {
+    getDoc.mockResolvedValueOnce(live());
+    await loadShare('abc123XYZ');
+
+    vi.setSystemTime(NOW + 30_000);
+    getDoc.mockRejectedValueOnce(offline());
+    expect(await loadShare('abc123XYZ')).toEqual({
+      ok: true,
+      share: { type: 'dscan', payload: { v: 1 }, expiresAt: NOW + 60_000 },
+      cachedAt: NOW,
+    });
+  });
+
+  it('does not serve the saved copy once the share has expired, and drops it', async () => {
+    getDoc.mockResolvedValueOnce(live());
+    await loadShare('abc123XYZ');
+
+    vi.setSystemTime(NOW + 60_000);
+    getDoc.mockRejectedValueOnce(offline());
+    expect(await loadShare('abc123XYZ')).toEqual({ ok: false, reason: 'failed' });
+    expect(await db.esiCache.count()).toBe(0);
+  });
+
+  it('drops the saved copy when the server says the share is gone', async () => {
+    getDoc.mockResolvedValueOnce(live());
+    await loadShare('abc123XYZ');
+    getDoc.mockResolvedValueOnce(stored(null));
+    expect(await loadShare('abc123XYZ')).toEqual({ ok: false, reason: 'not-found' });
+    expect(await db.esiCache.count()).toBe(0);
+  });
+
+  it('keeps only the one id it was asked for', async () => {
+    getDoc.mockResolvedValueOnce(live());
+    await loadShare('abc123XYZ');
+    getDoc.mockRejectedValueOnce(offline());
+    expect(await loadShare('zzz999ABC')).toEqual({ ok: false, reason: 'failed' });
   });
 });
 

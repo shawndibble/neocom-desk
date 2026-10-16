@@ -54,6 +54,17 @@ afterEach(() => {
 });
 
 describe('SharedLink', () => {
+  it('says so when the share on screen is the copy kept from an earlier visit', async () => {
+    vi.mocked(loadShare).mockResolvedValue({
+      ok: true,
+      cachedAt: Date.now() - 3 * 60 * 60_000,
+      share: { type: 'dscan', payload: { v: 1, rows: [] }, expiresAt: Date.now() + 60_000 },
+    });
+    renderAt('/s/abc123XYZ');
+    expect(await screen.findByText(/saved copy from your last visit/i)).toBeInTheDocument();
+    expect(screen.getByText(/3h ago/)).toBeInTheDocument();
+  });
+
   it('shows a Shared Appraisal at the prices it was shared with, and when it expires', async () => {
     const expiresAt = Date.UTC(2026, 9, 9, 14, 2);
     vi.mocked(loadShare).mockResolvedValue({

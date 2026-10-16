@@ -77,6 +77,7 @@ const PROFILE = {
   allianceId: 300,
   allianceName: 'Some Alliance',
   securityStatus: -2.345,
+  fetchedAt: new Date(Date.now() - 5 * 60_000),
 };
 
 const STATS = {
@@ -466,6 +467,17 @@ describe('PilotLookupPanel', () => {
     expect(screen.getByRole('link', { name: 'Some Alliance' }).getAttribute('href')).toContain(
       'info=alliance-300'
     );
+  });
+
+  it('shows how old the profile really is, not when it was looked at', async () => {
+    mocks.loadPilotProfile.mockResolvedValue({
+      ...PROFILE,
+      fetchedAt: new Date(Date.now() - 3 * 60 * 60_000),
+    });
+    renderTab('/travel/pilot?pilot=42');
+    expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+    // Hours, whatever the shared clock reads: never the "just now" of a fresh stamp.
+    expect(screen.getByText(/^\dh ago$/)).toBeTruthy();
   });
 
   it('shows the unknown-pilot state when ESI has no such character', async () => {

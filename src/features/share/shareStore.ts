@@ -16,6 +16,8 @@
  * itself as well.
  */
 import { doc, getDoc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore/lite';
+import { db } from '@/db';
+import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { generateShareId, isShareId } from '@/engine/share/shareId';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureAnySession } from '@/sync/syncAuth';
@@ -36,7 +38,17 @@ export interface StoredShare {
 }
 
 export type LoadShareResult =
-  { ok: true; share: StoredShare } | { ok: false; reason: 'not-found' | 'unsupported' | 'failed' };
+  | {
+      ok: true;
+      share: StoredShare;
+      /**
+       * Epoch millis this copy was saved on this device. Set only when Firestore
+       * could not be reached and the copy kept from an earlier visit is served
+       * instead: absent means the share was just read live.
+       */
+      cachedAt?: number;
+    }
+  | { ok: false; reason: 'not-found' | 'unsupported' | 'failed' };
 
 export function shareUrl(id: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -116,6 +128,54 @@ function isShareType(value: unknown): value is ShareType {
   return (SHARE_TYPES as readonly unknown[]).includes(value);
 }
 
+/**
+ * A loaded share is kept in `esiCache` under the sentinel Character (a share
+ * is public, owned by nobody) until its own `expiresAt`, so a link opened once
+ * still opens with no connection. A share never changes under its id, so the
+ * copy is only a fallback: a live read always wins, and replaces it. The
+ * daily `esiCache` prune does not know this key, so expiry is enforced here.
+ */
+function shareCacheKey(id: string): string {
+  return `share:${id}`;
+}
+
+async function forgetShare(id: string): Promise<void> {
+  try {
+    await db.esiCache.delete([GLOBAL_CACHE_CHARACTER_ID, shareCacheKey(id)]);
+  } catch {
+    // Best effort: a row that stays is dropped by the next read past its expiry.
+  }
+}
+
+async function rememberShare(id: string, share: StoredShare): Promise<void> {
+  try {
+    await db.esiCache.put({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: shareCacheKey(id),
+      value: share,
+      fetchedAt: Date.now(),
+    });
+  } catch {
+    // Quota or a blocked store: the live read already succeeded; only the offline copy is lost.
+  }
+}
+
+/** The kept copy while it is unexpired; an expired one is purged here. */
+async function recallShare(id: string): Promise<LoadShareResult | null> {
+  try {
+    const row = await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, shareCacheKey(id)]);
+    if (row === undefined) return null;
+    const share = row.value as StoredShare;
+    if (!isShareType(share?.type) || !(share.expiresAt > Date.now())) {
+      await forgetShare(id);
+      return null;
+    }
+    return { ok: true, share, cachedAt: row.fetchedAt };
+  } catch {
+    return null;
+  }
+}
+
 export async function loadShare(id: string): Promise<LoadShareResult> {
   if (!isShareId(id)) return { ok: false, reason: 'not-found' };
   let snapshot;
@@ -125,13 +185,25 @@ export async function loadShare(id: string): Promise<LoadShareResult> {
     // The rules refuse an expired doc, and refuse a missing one too (their
     // expiry check has no `resource` to read) — both are "this link is gone".
     const code = (error as { code?: unknown }).code;
-    return { ok: false, reason: code === 'permission-denied' ? 'not-found' : 'failed' };
+    if (code === 'permission-denied') {
+      await forgetShare(id);
+      return { ok: false, reason: 'not-found' };
+    }
+    return (await recallShare(id)) ?? { ok: false, reason: 'failed' };
   }
-  if (!snapshot.exists()) return { ok: false, reason: 'not-found' };
+  if (!snapshot.exists()) {
+    await forgetShare(id);
+    return { ok: false, reason: 'not-found' };
+  }
   const data = snapshot.data();
   const expiresAt =
     data.expiresAt instanceof Timestamp ? data.expiresAt.toMillis() : Number.NEGATIVE_INFINITY;
-  if (expiresAt <= Date.now()) return { ok: false, reason: 'not-found' };
+  if (expiresAt <= Date.now()) {
+    await forgetShare(id);
+    return { ok: false, reason: 'not-found' };
+  }
   if (!isShareType(data.type)) return { ok: false, reason: 'unsupported' };
-  return { ok: true, share: { type: data.type, payload: data.payload, expiresAt } };
+  const share: StoredShare = { type: data.type, payload: data.payload, expiresAt };
+  await rememberShare(id, share);
+  return { ok: true, share };
 }
