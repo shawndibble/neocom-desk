@@ -403,13 +403,16 @@ export function HaulingFillList({
       m3: formatTripM3(runningFreeM3 ?? freeM3),
     });
     body = (
-      <div className="flex items-center gap-2 text-xs text-text-dim">
-        <Spinner size="sm" label={running} />
-        <span aria-hidden="true" className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="tabular-nums">{running}</span>
-          {progressText && <span>{progressText}</span>}
-        </span>
-        <Button onClick={onStop}>{t('market.hauling.fill.stop')}</Button>
+      <div className="flex flex-col gap-1 text-xs text-text-dim">
+        <div className="flex items-center gap-2">
+          <Spinner size="sm" label={running} />
+          <span aria-hidden="true" className="min-w-0 flex-1 tabular-nums">
+            {running}
+          </span>
+          <Button onClick={onStop}>{t('market.hauling.fill.stop')}</Button>
+        </div>
+        {/* Its own line, the rail's full width: beside Stop it wrapped. */}
+        {progressText && <span aria-hidden="true">{progressText}</span>}
       </div>
     );
   } else {
