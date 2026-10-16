@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
+    "check:case": "node scripts/check-case-collisions.mjs",
     "test": "vitest",
     "test:run": "vitest run",
     "test:rules": "npx --yes firebase-tools@14.27.0 emulators:exec --only firestore --project demo-neocom-rules \"vitest run --config vitest.rules.config.ts\"",
