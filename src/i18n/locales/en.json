@@ -4178,8 +4178,6 @@
           "note": "Net income per 30 days. Lines mark what 1, 2... accounts cost.",
           "partial": "Lighter bars are partial: your journal history starts inside them or has a gap there.",
           "partialLatest": "Partial: your journal history has a gap in the last 30 days, so this may be short.",
-          "ages": "PLEX price read {{plex}}, journal read {{journal}}.",
-          "agesNoPlex": "PLEX price unavailable, journal read {{journal}}.",
           "summaryPeriod": "to {{date}} {{net}}",
           "truncated": "Some journal pages were missing.",
           "skipped_one": "{{count}} Character's journal could not be read.",
@@ -4284,10 +4282,7 @@
           "noPrice": "No PLEX price",
           "netOnly": "net {{net}} ISK / 30 days",
           "noPriceHint": "Can't count accounts without PLEX's price. Try Refresh.",
-          "plexSpent": "Spent on PLEX in the last 30 days: {{amount}} ISK.",
-          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account.",
-          "footer": "{{spent}} {{price}} {{ages}}",
-          "footerNoPrice": "{{spent}} {{ages}}"
+          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account."
         }
       },
       "training": {

@@ -19,7 +19,7 @@ import {
 } from '@/engine/omegaCoverage';
 import { formatIskCompact } from '@/lib/isk';
 import type { ChartModel } from '../charts/types';
-import { ageText, blank, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { dayTitle } from './chartTips';
 import type { KindView, TableRowModel, Translate } from './types';
 
@@ -35,14 +35,6 @@ const lastDay = (p: OmegaPeriod) => isoDay(p.endMs - 1);
 
 function periodTitle(t: Translate, p: OmegaPeriod): string {
   return t(`${W}.period`, { from: dayTitle(isoDay(p.startMs)), to: dayTitle(lastDay(p)) });
-}
-
-/** Both reads' ages, in every view: the price and the oldest journal in scope. */
-function ageLine(t: Translate, now: number, journalAt: number | null, plexAt: number | null) {
-  const journal = ageText(t, now, journalAt);
-  return plexAt === null
-    ? t(`${C}.agesNoPlex`, { journal })
-    : t(`${C}.ages`, { plex: ageText(t, now, plexAt), journal });
 }
 
 export const omega: Builder = (
@@ -80,8 +72,6 @@ export const omega: Builder = (
 
   const net = latest.net;
   const cost = accountCost(data.plex?.price ?? null, plexPer30Days);
-  const spent = t(`${D}.plexSpent`, { amount: formatIskCompact(latest.plexSpent) });
-  const agesText = ageLine(t, now, journalAt, data.plex?.fetchedAt ?? null);
   const caveats = [
     periods.some((p) => p.partial) ? t(`${C}.partial`) : '',
     data.truncated ? t(`${C}.truncated`) : '',
@@ -89,9 +79,7 @@ export const omega: Builder = (
   ].filter(Boolean);
   // The Number view's plain lines; the chart carries the same in its note.
   const numberNotes = [
-    spent,
     latest.partial ? t(`${C}.partialLatest`) : '',
-    agesText,
     data.truncated ? t(`${C}.truncated`) : '',
   ].filter(Boolean);
 
@@ -110,7 +98,6 @@ export const omega: Builder = (
       table: {
         columns: tableColumns(t),
         rows: periodRows(t, periods, null),
-        footer: t(`${D}.footerNoPrice`, { spent, ages: agesText }),
       },
     };
   }
@@ -134,7 +121,7 @@ export const omega: Builder = (
   const chart: ChartModel = {
     kind: 'omega',
     summary,
-    note: [t(`${C}.note`), ...caveats, agesText].join(' '),
+    note: [t(`${C}.note`), ...caveats].join(' '),
     bars: periods.map((p) => {
       const n = accountsCovered(p.net, cost);
       return {
@@ -185,13 +172,9 @@ export const omega: Builder = (
     table: {
       columns: tableColumns(t),
       rows: periodRows(t, periods, cost),
-      footer: t(`${D}.footer`, {
-        spent,
-        price: t(`${D}.plexPrice`, {
-          price: formatIskCompact(data.plex!.price),
-          plex: plexPer30Days,
-        }),
-        ages: agesText,
+      footer: t(`${D}.plexPrice`, {
+        price: formatIskCompact(data.plex!.price),
+        plex: plexPer30Days,
       }),
     },
     summary,

@@ -1203,13 +1203,11 @@ describe('omega coverage', () => {
     expect(build(old, { scopeAll: true }).fetchedAt?.getTime()).toBe(NOW - 9 * HOUR);
   });
 
-  it('shows both ages in the number, chart and table views', () => {
+  it('keeps read ages and PLEX spent out of the number, chart and table text', () => {
     const view = build(data());
-    const ages = 'overview.widgets.chart.omega.ages';
-    expect(view.number.notes?.join(' ')).toContain(ages);
-    expect(view.chart?.note).toContain(ages);
-    expect(view.table?.footer).toContain(ages);
-    expect(view.number.notes?.join(' ')).toContain('data.omega.plexSpent');
+    const text = [view.number.notes?.join(' '), view.chart?.note, view.table?.footer].join(' ');
+    expect(text).not.toContain('.ages');
+    expect(text).not.toContain('plexSpent');
   });
 
   it('a gap in the newest period marks it partial', () => {
