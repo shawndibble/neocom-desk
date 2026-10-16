@@ -187,6 +187,46 @@ function pickHaulingFilter(source: StoredHaulingFilter): StoredHaulingFilter {
   };
 }
 
+/** Every remembered field as the URL holds it: the stored filter plus Max spend. */
+type RememberedHaulingParams = StoredHaulingFilter & { spend: number | null };
+
+function pickRememberedParams(source: RememberedHaulingParams): RememberedHaulingParams {
+  return { ...pickHaulingFilter(source), spend: source.spend };
+}
+
+/**
+ * The remembered defaults behind the URL (a link's own value wins): the
+ * filters in `haulingFilterPref.ts`, Max spend in the Trip Plan budget's own
+ * store. The one place that knows `spend` lives apart.
+ */
+function useRememberedHaulingFilter(): RememberedDefaults<ReturnType<typeof haulingUrl>> {
+  const filterPref = useHaulingFilterPref((s) => s.value);
+  const hydrateFilterPref = useHaulingFilterPref((s) => s.hydrate);
+  const storedBudget = useHaulingBudget((s) => s.value);
+  const hydrateBudget = useHaulingBudget((s) => s.hydrate);
+  useEffect(() => {
+    void hydrateFilterPref();
+    void hydrateBudget();
+  }, [hydrateFilterPref, hydrateBudget]);
+  return useMemo(
+    () => ({
+      values: pickRememberedParams({
+        ...filterPref,
+        // Whole ISK, as the link holds it: the old budget field could save a fraction.
+        spend: storedBudget === null ? null : Math.round(storedBudget) || null,
+      }),
+      // Called with only the remembered fields that changed.
+      remember: ({ spend, ...filter }: Partial<HaulingUrlValues>) => {
+        if (spend !== undefined) void useHaulingBudget.getState().setValue(spend);
+        if (Object.keys(filter).length === 0) return;
+        const { value, setValue } = useHaulingFilterPref.getState();
+        void setValue(pickHaulingFilter({ ...value, ...filter }));
+      },
+    }),
+    [filterPref, storedBudget]
+  );
+}
+
 const useIntroDismissed = createLocalSetting<boolean>({
   key: 'haulingIntroDismissed',
   defaultValue: false,
@@ -275,32 +315,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   }, [hydrateDefaultHub]);
   const haulingSchema = useMemo(() => haulingUrl(defaultHubId), [defaultHubId]);
 
-  // Remembered: the filters in `haulingFilterPref.ts`, Max spend in the Trip Plan budget's store. A link's own value wins.
-  const haulingFilterPref = useHaulingFilterPref((s) => s.value);
-  const hydrateHaulingFilterPref = useHaulingFilterPref((s) => s.hydrate);
-  const storedBudget = useHaulingBudget((s) => s.value);
-  const hydrateBudget = useHaulingBudget((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateHaulingFilterPref();
-    void hydrateBudget();
-  }, [hydrateHaulingFilterPref, hydrateBudget]);
-  const rememberedFilter: RememberedDefaults<ReturnType<typeof haulingUrl>> = useMemo(
-    () => ({
-      values: {
-        ...pickHaulingFilter(haulingFilterPref),
-        // Whole ISK, as the link holds it: the old budget field could save a fraction.
-        spend: storedBudget === null ? null : Math.round(storedBudget) || null,
-      },
-      // Called with only the remembered fields that changed.
-      remember: ({ spend, ...filter }: Partial<HaulingUrlValues>) => {
-        if (spend !== undefined) void useHaulingBudget.getState().setValue(spend);
-        if (Object.keys(filter).length === 0) return;
-        const { value, setValue } = useHaulingFilterPref.getState();
-        void setValue(pickHaulingFilter({ ...value, ...filter }));
-      },
-    }),
-    [haulingFilterPref, storedBudget]
-  );
+  const rememberedFilter = useRememberedHaulingFilter();
   const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
   /** Max spend. */
   const budget = params.spend;
@@ -912,13 +927,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // Only when Max price hid something does the hidden line name it.
   const hiddenKeySuffix = hidden.tooDear > 0 ? 'MaxPrice' : '';
   // Category and mode ride along so the narrow sheet can edit them as part of
-  // its draft; only `rememberedFilter`'s fields are remembered.
-  const filterValue = {
-    ...pickHaulingFilter(params),
-    spend: params.spend,
-    cat: categoryId,
-    mode,
-  };
+  // its draft; only the remembered params are remembered.
+  const filterValue = { ...pickRememberedParams(params), cat: categoryId, mode };
 
   // With Any hub at an end each row has its own lane: no one label, no one jump count.
   const laneLabel =
@@ -1495,6 +1505,9 @@ function HubField({
   );
 }
 
+/** A typed ISK cap not yet committed: none, a whole figure (null = no limit), or a fraction that can't commit. */
+type HeldIsk = 'none' | 'partial' | { amount: number | null };
+
 /**
  * An ISK cap in the filters — Max price per item, Max spend. Blank is no
  * limit. Only a whole, positive figure commits: the URL holds whole ISK.
@@ -1517,28 +1530,36 @@ function IskCapField({
   const hintId = useId();
   // Inline the field has no caption, so its placeholder names it; in the sheet the caption does.
   const inSheet = useFilterSurface() === 'sheet';
-  // What `IskInput` last committed, unrounded, handed back as its `value`: a
+  // `IskInput`'s own last parse, unrounded, handed back as its `value`: a
   // rounded figure (`2.01m` = 2009999.99… → 2010000) would read as an outside
-  // change and reset the typed text. Only a value this field did not send
-  // (Reset, a link) replaces it. The URL lands in a transition, so `value` lags.
-  const [raw, setRaw] = useState<string | null>(null);
-  const [sent, setSent] = useState<number | null>(value);
-  const [seen, setSeen] = useState(value);
-  // The typed figure not yet committed inline; undefined when there is none.
-  const [pending, setPending] = useState<number | null | undefined>(undefined);
-  if (seen !== value) {
-    setSeen(value);
-    if (value !== sent) {
-      setRaw(null);
-      setPending(undefined);
+  // change and reset the typed text. The URL lands in a transition, so `value` lags.
+  const [typedText, setTypedText] = useState<string | null>(null);
+  // What the typed text says, not yet committed: a whole figure (or null, no
+  // limit) waiting for blur/Enter inline, or a fraction that can't commit.
+  const [held, setHeld] = useState<HeldIsk>('none');
+  const [lastSent, setLastSent] = useState<number | null>(value);
+  const [prevValue, setPrevValue] = useState(value);
+  // A value this field did not send (Reset, a link) replaces what was typed.
+  if (prevValue !== value) {
+    setPrevValue(value);
+    if (value !== lastSent) {
+      setTypedText(null);
+      setHeld('none');
     }
   }
-  const shown = raw ?? (value === null ? '' : String(value));
+  const shown = typedText ?? (value === null ? '' : String(value));
   function commit(next: number | null) {
-    setPending(undefined);
+    setHeld('none');
     if (next === value) return;
-    setSent(next);
+    setLastSent(next);
     onChange(next);
+  }
+  /** Blur/Enter: commit a held figure; a fraction reverts to the committed value. */
+  function settle() {
+    if (held === 'partial') {
+      setTypedText(null);
+      setHeld('none');
+    } else if (held !== 'none') commit(held.amount);
   }
   return (
     <FilterField label={label}>
@@ -1550,22 +1571,20 @@ function IskCapField({
         className="w-40"
         value={shown}
         onChange={(text) => {
-          setRaw(text);
+          setTypedText(text);
           const amount = Number(text);
           const whole = text === '' ? null : Math.round(amount);
           // Shorthand's float noise rounds away; a real fraction (`1.5`, on its way to `1.5b`) waits.
           const usable =
             whole === null ||
             (Math.abs(amount - whole) < 0.001 && Number.isSafeInteger(whole) && whole > 0);
-          if (!usable) setPending(undefined);
+          if (!usable) setHeld('partial');
           else if (inSheet) commit(whole);
-          else setPending(whole);
+          else setHeld({ amount: whole });
         }}
-        onBlur={() => {
-          if (pending !== undefined) commit(pending);
-        }}
+        onBlur={settle}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && pending !== undefined) commit(pending);
+          if (event.key === 'Enter') settle();
         }}
       />
       {hint !== undefined && (
