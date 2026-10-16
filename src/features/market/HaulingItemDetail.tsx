@@ -1,7 +1,6 @@
 /**
  * One Hauling row's detail, shown in the trip rail (desktop) or a full-height
- * sheet (phone) when the row is selected (it replaced the row's inline
- * expand, #3878). Leads with what a hauler checks — the most to pay, the
+ * sheet (phone) when the row is selected. Leads with what a hauler checks — the most to pay, the
  * destination's sell orders with the user's own listing among them, Days to
  * Sell — and folds the price derivation and fee math behind "Show the math".
  * Its header carries the item's `ItemMoreActions` ⋮, the home of every

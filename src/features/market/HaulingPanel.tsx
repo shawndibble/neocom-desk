@@ -57,7 +57,7 @@ import {
   type TripOverride,
 } from '@/engine/market/haulingPlan';
 import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
-import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
+import { clampIskZero, formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -133,14 +133,10 @@ import {
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
 /**
- * The table widths (rem) the layout changes at, measured in Chrome beside a
- * 20rem rail: below `compact` the figures go compact (`12.08M`; the
- * full columns need about 35.8rem, and a long Item name needs about 9rem to
- * wrap to two lines at most), and below `cards` the rows become the phone's
- * cards (the compact columns need about 34.3rem, plus the Item column's
- * 7rem floor and a rem of headroom). The headers' sort and help marks set
- * most columns' widths, not the figures, which is why the two sit close.
- * Any hub's Hub column needs about 5.3rem more of each.
+ * Table widths (rem), measured in Chrome: below `compact` figures go compact
+ * (full columns ~35.8rem + ~9rem for a two-line Item), below `cards` rows
+ * become cards (compact columns ~34.3rem + Item's 7rem floor). Header marks,
+ * not figures, set most widths, so the two sit close. Hub adds ~5.3rem.
  */
 const TABLE_WIDTHS = {
   oneHub: { compact: 45, cards: 42.5 },
@@ -779,11 +775,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       header: t('market.hauling.columns.item'),
       headerClassName: 'whitespace-nowrap',
       primary: true,
-      // The column that gives way: it takes the table's spare width and a
-      // long name wraps to a second line, rather than the longest name
-      // setting the table's minimum and scrolling the page sideways (the
-      // card has its own rules). Never below a short name's width, though:
-      // past that the table scrolls in its own wrapper instead.
+      // Takes the spare width and wraps a long name, so the longest name never
+      // sets the table's minimum; below `min-w-28` the table scrolls in its wrapper.
       className: cards ? undefined : 'w-full max-w-0 min-w-28',
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => {
@@ -1055,7 +1048,17 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           done: progress.done,
           total: progress.total,
         });
-  const copyDisabled = plan.totals.items === 0;
+  const copyButton = (size: 'sm' | 'md', className: string) => (
+    <Button
+      variant="primary"
+      size={size}
+      className={className}
+      disabled={plan.totals.items === 0}
+      onClick={() => void copyMultibuy()}
+    >
+      {t('market.hauling.copyMultibuy')}
+    </Button>
+  );
   const tripMenu = (
     <TableActionsMenu name={t('market.hauling.title')} tableExport={tableExport} size="md">
       <MenuItem disabled={overrides.size === 0} onSelect={() => setOverrides(NO_OVERRIDES)}>
@@ -1072,19 +1075,17 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     <div className="flex flex-col gap-2">
       <p className="flex items-baseline gap-2 text-sm tabular-nums">
         {cargoSet && <b>{t('market.hauling.tripBar.free', { m3: formatTripM3(freeM3) })}</b>}
-        <span className={cx('ml-auto font-semibold', plan.totals.profit > 0 && 'text-success')}>
+        <span
+          className={cx(
+            'ml-auto font-semibold',
+            clampIskZero(plan.totals.profit, 0) > 0 && 'text-success'
+          )}
+        >
           {signedIsk(plan.totals.profit, 0)}
         </span>
       </p>
       <div className="flex items-center gap-2">
-        <Button
-          variant="primary"
-          className="flex-1 justify-center"
-          disabled={copyDisabled}
-          onClick={() => void copyMultibuy()}
-        >
-          {t('market.hauling.copyMultibuy')}
-        </Button>
+        {copyButton('md', 'flex-1 justify-center')}
         {tripMenu}
       </div>
     </div>
@@ -1205,7 +1206,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   } else {
     const table = (
       <Panel padded={false}>
-        {/* Select all, and how much of the list the trip holds. */}
         <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5 text-xs text-text-dim tabular-nums">
           <label className={touchCheckboxLabelClassName}>
             <Checkbox
@@ -1217,8 +1217,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           {t('market.hauling.inTrip', { selected: selectedCount, total: tableRows.length })}
         </div>
 
-        {/* The list Copy multibuy list copies, on request — and on its own
-            when the clipboard refused, so it can be copied by hand. */}
+        {/* The multibuy text, on request, or opened by a refused copy to copy by hand. */}
         {listShown && (
           <div
             ref={listRef}
@@ -1289,7 +1288,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         {table}
         {railShown ? (
           <>
-            {/* The rail repaints in place; a sheet would announce itself (#1490). */}
+            {/* The rail repaints in place; a sheet would announce itself. */}
             <p aria-live="polite" className="sr-only">
               {detailOpen && selectedRow
                 ? t('market.hauling.selectedAnnouncement', { name: selectedRow.name })
@@ -1316,17 +1315,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               freeM3={cargoSet ? freeM3 : null}
               profit={plan.totals.profit}
               onOpenTrip={() => setTripOpen(true)}
-              copyButton={
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="shrink-0"
-                  disabled={copyDisabled}
-                  onClick={() => void copyMultibuy()}
-                >
-                  {t('market.hauling.copyMultibuy')}
-                </Button>
-              }
+              copyButton={copyButton('sm', 'shrink-0')}
             />
             <Modal
               open={tripOpen}
