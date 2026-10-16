@@ -5,6 +5,17 @@ import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import RichMailBodyEditor from './RichMailBodyEditor';
 
+// jsdom has no layout: ProseMirror's scroll-into-view asks a Range for its rects.
+if (!Range.prototype.getClientRects) {
+  Range.prototype.getClientRects = () =>
+    ({
+      length: 0,
+      item: () => null,
+      [Symbol.iterator]: [][Symbol.iterator],
+    }) as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => new DOMRect();
+}
+
 function Harness({ initial = '', onValue }: { initial?: string; onValue?: (v: string) => void }) {
   const [value, setValue] = useState(initial);
   return (
@@ -105,5 +116,62 @@ describe('RichMailBodyEditor', () => {
     await editor();
     rerender(<RichMailBodyEditor id="b" value="<i>two</i>" onChange={() => undefined} />);
     await waitFor(() => expect(document.querySelector('.ProseMirror em')?.textContent).toBe('two'));
+  });
+
+  it('keeps exactly one element with the id, the visible control, in both views', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <label htmlFor="body">Message</label>
+        <Harness initial="hi" />
+      </>
+    );
+    const pm = await editor();
+    await waitFor(() => expect(pm).toHaveAttribute('id', 'body'));
+    expect(document.querySelectorAll('#body')).toHaveLength(1);
+    await user.click(screen.getByText('Message'));
+    await waitFor(() => expect(pm).toHaveFocus());
+    await user.click(screen.getByRole('button', { name: 'Source' }));
+    expect(document.querySelectorAll('#body')).toHaveLength(1);
+    expect(document.getElementById('body')).toBe(
+      screen.getByRole('textbox', { name: 'Message source (EVE markup)' })
+    );
+    await user.click(screen.getByText('Message'));
+    expect(document.getElementById('body')).toHaveFocus();
+  });
+
+  it('warns while Source holds markup that will be removed', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await editor();
+    await user.click(screen.getByRole('button', { name: 'Source' }));
+    const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
+    fireEvent.change(src, { target: { value: 'a<script>x</script>' } });
+    expect(screen.getByRole('status')).toHaveTextContent('will be removed');
+  });
+
+  it('converts a pasted markdown pipe table, and nothing else markdown', async () => {
+    render(<Harness />);
+    const pm = await editor();
+    const paste = (text: string) =>
+      fireEvent.paste(pm, {
+        clipboardData: {
+          getData: (t: string) => (t === 'text/plain' ? text : ''),
+          types: ['text/plain'],
+        },
+      });
+    paste('| a | b |\n|---|---|\n| 1 | 2 |');
+    await waitFor(() => expect(pm.querySelectorAll('tr')).toHaveLength(2));
+    expect(screen.getByTestId('value').textContent).toBe('| a | b |\n|---|---|\n| 1 | 2 |');
+  });
+
+  it('never shows a bar button as pressed or a no-op reset control in Source', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="x" />);
+    await editor();
+    await user.click(screen.getByRole('button', { name: 'Source' }));
+    await user.click(screen.getByRole('textbox', { name: 'Message source (EVE markup)' }));
+    await user.click(screen.getByRole('button', { name: 'Text colour' }));
+    expect(await screen.findByRole('button', { name: 'Default colour' })).toBeDisabled();
   });
 });

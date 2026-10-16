@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner, TextArea } from '@/components/ui';
+import { markupPlainText, parseEveMarkup } from '@/engine/eveMarkup';
+import { plainTextToMarkup } from '@/engine/mailEditorDoc';
 
 /**
  * The seam between the New Mail composer and whatever edits its body. The
@@ -22,13 +24,18 @@ export interface MailBodyEditorProps {
   className?: string;
 }
 
-/** A plain text area, kept for tests and as the simplest implementation of the contract. */
+/**
+ * A plain text area over the body's text: formatting is not shown and is lost
+ * on edit, but whatever is typed goes back out through `plainTextToMarkup`, so
+ * `< > &` stay literal and it can never put a tag into the markup. The simplest
+ * implementation of the contract; the composers default to the rich editor.
+ */
 export function PlainBodyEditor({ value, onChange, className, ...rest }: MailBodyEditorProps) {
   return (
     <TextArea
       {...rest}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
+      value={markupPlainText(parseEveMarkup(value))}
+      onChange={(e) => onChange(plainTextToMarkup(e.target.value))}
       className={`text-sm ${className ?? ''}`}
     />
   );

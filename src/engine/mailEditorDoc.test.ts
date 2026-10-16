@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { classifyMarkupLink } from './eveMarkup';
 import {
   droppedMarkup,
   docToMarkup,
@@ -147,5 +148,56 @@ describe('droppedMarkup', () => {
     expect(droppedMarkup('<b></b>')).toBe(true);
     expect(droppedMarkup('<b>ok</b> <font color="#ffff0000">red</font>')).toBe(false);
     expect(droppedMarkup('no tags, a < b')).toBe(false);
+  });
+});
+
+describe('entity escaping stays single through the table and Source round trips', () => {
+  it('a literal &amp; typed in a table cell is escaped once and reloads unchanged', () => {
+    const doc: EditorDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'table',
+          content: [
+            {
+              type: 'tableRow',
+              content: [
+                { type: 'tableHeader', content: [{ type: 'text', text: '&amp;' }] },
+                { type: 'tableHeader', content: [{ type: 'text', text: 'b' }] },
+              ],
+            },
+            {
+              type: 'tableRow',
+              content: [
+                { type: 'tableCell', content: [{ type: 'text', text: '<' }] },
+                { type: 'tableCell', content: [{ type: 'text', text: 'x' }] },
+              ],
+            },
+          ],
+        },
+        { type: 'paragraph' },
+      ],
+    };
+    const once = docToMarkup(doc);
+    expect(once).toBe('| &amp;amp; | b |\n|---|---|\n| &lt; | x |');
+    expect(docToMarkup(markupToDoc(once))).toBe(once);
+    expect(docToMarkup(markupToDoc(docToMarkup(markupToDoc(once))))).toBe(once);
+  });
+
+  it('Source -> Preview -> draft reload keeps `&amp;` single-escaped', () => {
+    const source = '| a &amp; b | c |\n|---|---|\n| 1 | 2 |';
+    const sent = sanitizeMarkup(source);
+    expect(sent).toBe(source);
+    expect(docToMarkup(markupToDoc(sent))).toBe(source);
+    expect(markupToDoc(sent).content[0].content?.[0].content?.[0].content).toEqual([
+      { type: 'text', text: 'a & b' },
+    ]);
+  });
+});
+
+describe('links', () => {
+  it('rejects javascript: hrefs at the classifier and drops them from the tree', () => {
+    expect(classifyMarkupLink('javascript:alert(1)')).toBeNull();
+    expect(sanitizeMarkup('<a href="javascript:alert(1)">x</a>')).toBe('x');
   });
 });

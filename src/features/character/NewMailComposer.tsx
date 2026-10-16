@@ -39,10 +39,11 @@ import {
   validateNewMail,
   type ComposeRecipient,
 } from '@/engine/mailCompose';
-import { draftMarkupBody } from '@/engine/mailEditorDoc';
+import { draftMarkupBody, sanitizeMarkup } from '@/engine/mailEditorDoc';
 import { sendMail } from './mail';
 import { clearNewMailDraft, loadNewMailDraft, saveNewMailDraft } from './mailDrafts';
 import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
+import { MailCounter } from './MailCounter';
 import { NewMailRecipientPicker } from './NewMailRecipientPicker';
 
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
@@ -219,7 +220,8 @@ export function NewMailComposer({
           characterId,
           recipients.map(({ recipient_id, recipient_type }) => ({ recipient_id, recipient_type })),
           subject,
-          body
+          // Whatever the editor produced, only the safe subset is ever sent.
+          sanitizeMarkup(body)
         );
       } catch (err) {
         const neverSent =
@@ -250,6 +252,8 @@ export function NewMailComposer({
 
   function onSectionKeyDown(e: KeyboardEvent<HTMLElement>) {
     if (e.key !== 'Escape' || !fullPane || confirmingDiscard || sendingRef.current) return;
+    // Escape inside a sheet or dialog (format bar, discard) closes that, not the composer.
+    if (e.defaultPrevented || (e.target instanceof Element && e.target.closest('dialog'))) return;
     e.preventDefault();
     void handleClose();
   }
@@ -262,8 +266,6 @@ export function NewMailComposer({
   }
 
   const labelClass = 'block text-[0.6875rem] text-text-dim';
-  const counterClass = (over: boolean) =>
-    cx('text-[0.6875rem] tabular-nums', over ? 'text-danger' : 'text-text-dim');
   const subjectOver = subject.length > MAX_SUBJECT_LENGTH;
   const bodyOver = bodyLength > MAX_BODY_LENGTH;
 
@@ -348,9 +350,7 @@ export function NewMailComposer({
             <label htmlFor={subjectId} className={labelClass}>
               {t('mail.subjectLabel')}
             </label>
-            <span className={counterClass(subjectOver)}>
-              {t('mail.counter', { count: subject.length, max: MAX_SUBJECT_LENGTH })}
-            </span>
+            <MailCounter count={subject.length} max={MAX_SUBJECT_LENGTH} />
           </div>
           <TextInput
             id={subjectId}
@@ -369,9 +369,7 @@ export function NewMailComposer({
             <label htmlFor={bodyId} className={labelClass}>
               {t('mail.bodyLabel')}
             </label>
-            <span id={bodyCountId} className={counterClass(bodyOver)}>
-              {t('mail.counter', { count: bodyLength, max: MAX_BODY_LENGTH })}
-            </span>
+            <MailCounter id={bodyCountId} count={bodyLength} max={MAX_BODY_LENGTH} />
           </div>
           <BodyEditor
             id={bodyId}

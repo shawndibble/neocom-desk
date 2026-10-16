@@ -56,5 +56,6 @@ and every other route pay nothing until a composer opens.
   and the route chunks either way.
 - Chunk isolation: the only static importers of `mailEditor/*` are tests;
   `MailBodyEditor.tsx` reaches it through `lazy(() => import(...))`.
+- Every `@tiptap/*` package is pinned to the exact same version (`3.32.0`) on purpose: they are released in lockstep, mixing versions breaks the shared `@tiptap/core` types and extension API. Bump them all together.
 - Upgrading Tiptap is a deliberate step: the custom marks and the markdown rule
   overrides depend on its extension API.

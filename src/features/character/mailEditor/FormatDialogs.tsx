@@ -16,16 +16,18 @@ import {
   normalizeLinkInput,
   sizePresetOf,
 } from '@/engine/mailFormat';
-import { EVE_MAIL_SURFACE_CLASS } from '../MailBodyView';
+import { BASE_SIZE_PX, EVE_MAIL_SURFACE_CLASS } from '../MailBodyView';
 
 interface SheetProps {
   open: boolean;
   onClose: () => void;
-  /** Phone: a bottom sheet. Wide screens: a centred dialog. */
-  sheet: boolean;
+  /** Phone layout: a bottom sheet. Wide screens: a centred dialog. */
+  phone: boolean;
+  /** Whether "back to default" is offered as a live control (not in Source). */
+  canReset: boolean;
 }
 
-const placement = (sheet: boolean) => (sheet ? 'sheet' : 'center');
+const placement = (phone: boolean) => (phone ? 'sheet' : 'center');
 
 // --- Colour ----------------------------------------------------------------
 
@@ -35,7 +37,7 @@ interface ColorDialogProps extends SheetProps {
   onPick: (color: string | null) => void;
 }
 
-export function ColorDialog({ open, onClose, sheet, current, onPick }: ColorDialogProps) {
+export function ColorDialog({ open, onClose, phone, canReset, current, onPick }: ColorDialogProps) {
   const { t } = useTranslation();
   const [hex, setHex] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -59,7 +61,7 @@ export function ColorDialog({ open, onClose, sheet, current, onPick }: ColorDial
       open={open}
       onClose={onClose}
       title={t('mail.format.colorTitle')}
-      placement={placement(sheet)}
+      placement={placement(phone)}
     >
       <div className="space-y-4">
         {/* Swatches sit on the EVE mail surface so a colour looks as it will in game. */}
@@ -78,7 +80,7 @@ export function ColorDialog({ open, onClose, sheet, current, onPick }: ColorDial
             </button>
           ))}
         </div>
-        <Button size="md" onClick={() => pick(null)}>
+        <Button size="md" onClick={() => pick(null)} disabled={!canReset}>
           {t('mail.format.colorDefault')}
         </Button>
         <form onSubmit={submitHex} className="space-y-1">
@@ -127,7 +129,7 @@ interface SizeDialogProps extends SheetProps {
   onPick: (px: number | null) => void;
 }
 
-export function SizeDialog({ open, onClose, sheet, current, onPick }: SizeDialogProps) {
+export function SizeDialog({ open, onClose, phone, canReset, current, onPick }: SizeDialogProps) {
   const { t } = useTranslation();
   const active = current === 'mixed' ? null : sizePresetOf(current);
   return (
@@ -135,7 +137,7 @@ export function SizeDialog({ open, onClose, sheet, current, onPick }: SizeDialog
       open={open}
       onClose={onClose}
       title={t('mail.format.sizeTitle')}
-      placement={placement(sheet)}
+      placement={placement(phone)}
     >
       <ul className="space-y-1">
         {MAIL_SIZE_PRESETS.map((p) => (
@@ -143,16 +145,18 @@ export function SizeDialog({ open, onClose, sheet, current, onPick }: SizeDialog
             <button
               type="button"
               aria-pressed={active === p.id}
+              disabled={p.px === null && !canReset}
               onClick={() => {
                 onPick(p.px);
                 onClose();
               }}
               className={cx(
                 'flex min-h-11 w-full items-center justify-between rounded-xs border px-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-                active === p.id ? 'border-accent bg-accent/10' : 'border-line hover:bg-panel-2'
+                active === p.id ? 'border-accent bg-accent/10' : 'border-line hover:bg-panel-2',
+                'disabled:cursor-not-allowed disabled:opacity-40'
               )}
             >
-              <span style={{ fontSize: `${(p.px ?? 12) / 12}em` }}>
+              <span style={{ fontSize: `${(p.px ?? BASE_SIZE_PX) / BASE_SIZE_PX}em` }}>
                 {t(`mail.format.sizes.${p.id}`)}
               </span>
               {active === p.id && <Icon.Done />}
@@ -178,7 +182,7 @@ export function LinkDialog(props: LinkDialogProps) {
   return props.open ? <LinkDialogBody {...props} /> : null;
 }
 
-function LinkDialogBody({ onClose, sheet, current, onApply, onRemove }: LinkDialogProps) {
+function LinkDialogBody({ onClose, phone, canReset, current, onApply, onRemove }: LinkDialogProps) {
   const { t } = useTranslation();
   const existing = current !== null && current !== 'mixed' ? current : '';
   const [url, setUrl] = useState(existing);
@@ -201,7 +205,7 @@ function LinkDialogBody({ onClose, sheet, current, onApply, onRemove }: LinkDial
       open
       onClose={onClose}
       title={t('mail.format.linkTitle')}
-      placement={placement(sheet)}
+      placement={placement(phone)}
       initialFocusRef={inputRef}
     >
       <form onSubmit={submit} noValidate className="space-y-3">
@@ -231,7 +235,7 @@ function LinkDialogBody({ onClose, sheet, current, onApply, onRemove }: LinkDial
           )}
         </div>
         <div className="flex justify-end gap-2">
-          {existing !== '' && (
+          {existing !== '' && canReset && (
             <Button
               size="md"
               onClick={() => {
@@ -255,7 +259,7 @@ function LinkDialogBody({ onClose, sheet, current, onApply, onRemove }: LinkDial
 
 const TABLE_LIMITS = { minRows: 2, maxRows: 10, minCols: 2, maxCols: 6 } as const;
 
-interface TableDialogProps extends SheetProps {
+interface TableDialogProps extends Omit<SheetProps, 'canReset'> {
   onInsert: (rows: number, cols: number) => void;
 }
 
@@ -297,7 +301,7 @@ function Stepper({
   );
 }
 
-export function TableDialog({ open, onClose, sheet, onInsert }: TableDialogProps) {
+export function TableDialog({ open, onClose, phone, onInsert }: TableDialogProps) {
   const { t } = useTranslation();
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(3);
@@ -306,7 +310,7 @@ export function TableDialog({ open, onClose, sheet, onInsert }: TableDialogProps
       open={open}
       onClose={onClose}
       title={t('mail.format.tableTitle')}
-      placement={placement(sheet)}
+      placement={placement(phone)}
     >
       <div className="space-y-4">
         <Stepper

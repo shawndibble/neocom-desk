@@ -15,7 +15,6 @@ import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { markupColorToCss } from '@/engine/eveMarkup';
-import { keyboardInset, useVisualViewportBox } from '@/lib/useVisualViewportBox';
 import type { MailEditorCommands } from './commands';
 import { ColorDialog, LinkDialog, SizeDialog, TableDialog } from './FormatDialogs';
 
@@ -26,17 +25,31 @@ const keepFocus = (e: PointerEvent) => e.preventDefault();
 
 interface MailFormatBarProps {
   commands: MailEditorCommands;
-  /** Phone placement: fixed above the keyboard instead of in the flow. */
-  docked: boolean;
+  /** Phone layout: the sheets are bottom sheets. */
+  phone: boolean;
+  /** `keyboard`: fixed above the on-screen keyboard. `inline`: in the flow above the surface. */
+  dock: 'keyboard' | 'inline';
+  /** Hidden while the writing surface has no focus (a sheet that is open keeps it shown). */
+  visible: boolean;
+  /** The keyboard's height over the layout viewport; where a `keyboard` dock sits. */
+  keyboardInset?: number;
   disabled?: boolean;
   className?: string;
 }
 
-export function MailFormatBar({ commands, docked, disabled, className }: MailFormatBarProps) {
+export function MailFormatBar({
+  commands,
+  phone,
+  dock,
+  visible,
+  keyboardInset = 0,
+  disabled,
+  className,
+}: MailFormatBarProps) {
   const { t } = useTranslation();
-  const viewport = useVisualViewportBox(docked);
   const [sheet, setSheet] = useState<'color' | 'size' | 'link' | 'table' | null>(null);
   const { state } = commands;
+  const shown = visible || sheet !== null;
 
   const button = (
     key: string,
@@ -81,10 +94,11 @@ export function MailFormatBar({ commands, docked, disabled, className }: MailFor
       <div
         role="toolbar"
         aria-label={t('mail.format.barLabel')}
-        style={docked ? { bottom: keyboardInset(window.innerHeight, viewport) } : undefined}
+        style={dock === 'keyboard' ? { bottom: keyboardInset } : undefined}
         className={cx(
-          'flex gap-1 bg-panel',
-          docked
+          shown ? 'flex' : 'hidden',
+          'gap-1 bg-panel',
+          dock === 'keyboard'
             ? 'fixed inset-x-0 z-40 overflow-x-auto border-t border-line px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]'
             : 'flex-wrap border border-line px-1 py-1',
           className
@@ -128,29 +142,32 @@ export function MailFormatBar({ commands, docked, disabled, className }: MailFor
       <ColorDialog
         open={sheet === 'color'}
         onClose={() => setSheet(null)}
-        sheet={docked}
+        phone={phone}
         current={state.color}
+        canReset={commands.canReset}
         onPick={commands.setColor}
       />
       <SizeDialog
         open={sheet === 'size'}
         onClose={() => setSheet(null)}
-        sheet={docked}
+        phone={phone}
         current={state.size}
+        canReset={commands.canReset}
         onPick={commands.setSize}
       />
       <LinkDialog
         open={sheet === 'link'}
         onClose={() => setSheet(null)}
-        sheet={docked}
+        phone={phone}
         current={state.link}
+        canReset={commands.canReset}
         onApply={commands.setLink}
         onRemove={() => commands.setLink(null)}
       />
       <TableDialog
         open={sheet === 'table'}
         onClose={() => setSheet(null)}
-        sheet={docked}
+        phone={phone}
         onInsert={commands.insertTable}
       />
     </>

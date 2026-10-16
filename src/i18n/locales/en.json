@@ -6577,6 +6577,7 @@
       "source": "Source",
       "sourceLabel": "Message source (EVE markup)",
       "sourceDropped": "Some markup was removed because EVE can't show it.",
+      "sourceWillDrop": "Some markup here can't be sent and will be removed.",
       "loading": "Loading editor…",
       "colorTitle": "Text colour",
       "colorDefault": "Default colour",

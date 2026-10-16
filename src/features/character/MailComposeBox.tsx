@@ -25,6 +25,7 @@ import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
 import { loadContacts } from './contacts';
 import { resolveNames } from './names';
+import { MailCounter } from './MailCounter';
 import { NewMailRecipientPicker } from './NewMailRecipientPicker';
 import {
   MAX_BODY_LENGTH,
@@ -249,7 +250,8 @@ export function MailComposeBox({
           characterId,
           recipients.map(({ recipient_id, recipient_type }) => ({ recipient_id, recipient_type })),
           subject,
-          body
+          // Whatever the editor produced, only the safe subset is ever sent.
+          sanitizeMarkup(body)
         );
       } catch (err) {
         // Only the send itself is classified: a failure below is not "offline".
@@ -367,12 +369,7 @@ export function MailComposeBox({
           <label htmlFor={bodyId} className={labelClass}>
             {t('mail.bodyLabel')}
           </label>
-          <span
-            id={bodyCountId}
-            className={`text-[0.6875rem] tabular-nums ${bodyOver ? 'text-danger' : 'text-text-dim'}`}
-          >
-            {t('mail.counter', { count: bodyLength, max: MAX_BODY_LENGTH })}
-          </span>
+          <MailCounter id={bodyCountId} count={bodyLength} max={MAX_BODY_LENGTH} />
         </div>
         <BodyEditor
           id={bodyId}

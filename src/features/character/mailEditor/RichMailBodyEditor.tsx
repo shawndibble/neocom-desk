@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { SegmentedControl, TextArea } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useKeyboardInset } from '@/lib/useVisualViewportBox';
 import {
   droppedMarkup,
   docToMarkup,
@@ -57,7 +58,10 @@ export default function RichMailBodyEditor({
   className,
 }: MailBodyEditorProps) {
   const { t } = useTranslation();
-  const docked = !useIsDesktop();
+  const phone = !useIsDesktop();
+  const [focused, setFocused] = useState(false);
+  const keyboardInset = useKeyboardInset(phone && focused);
+  const keyboardUp = keyboardInset > 0;
   const [mode, setMode] = useState<Mode>('preview');
   const [source, setSource] = useState(value);
   const [dropped, setDropped] = useState(false);
@@ -83,7 +87,6 @@ export default function RichMailBodyEditor({
     },
     editorProps: {
       attributes: {
-        id,
         role: 'textbox',
         'aria-multiline': 'true',
         'aria-label': t('mail.bodyLabel'),
@@ -108,6 +111,21 @@ export default function RichMailBodyEditor({
   useEffect(() => {
     editorRef.current = editor;
   }, [editor]);
+  // The composer's <label for> must land on whichever control is showing: the editor
+  // surface in Preview (a div cannot be labelled natively, so a click on the label
+  // focuses it), the textarea in Source. Exactly one element carries the id.
+  useEffect(() => {
+    if (!editor || editor.isDestroyed || mode !== 'preview') return;
+    const dom = editor.view.dom;
+    dom.setAttribute('id', id);
+    const labels = Array.from(document.querySelectorAll<HTMLElement>(`label[for="${id}"]`));
+    const focusEditor = () => void editor.commands.focus();
+    labels.forEach((l) => l.addEventListener('click', focusEditor));
+    return () => {
+      labels.forEach((l) => l.removeEventListener('click', focusEditor));
+      dom.removeAttribute('id');
+    };
+  }, [editor, id, mode]);
   useEffect(() => {
     editor?.setEditable(!disabled);
   }, [editor, disabled]);
@@ -169,6 +187,7 @@ export default function RichMailBodyEditor({
   const previewCommands: MailEditorCommands = {
     state: previewState,
     canClear: true,
+    canReset: true,
     toggleMark: (mark) => void editor?.chain().focus().toggleMark(mark).run(),
     setColor: (color) => {
       const chain = editor?.chain().focus();
@@ -202,6 +221,7 @@ export default function RichMailBodyEditor({
   const sourceCommands: MailEditorCommands = {
     state: emptyFormatState,
     canClear: false,
+    canReset: false,
     toggleMark: (mark) => wrap(SOURCE_TAG[mark]),
     setColor: (color) => color !== null && wrap({ kind: 'color', color }),
     setSize: (px) => px !== null && wrap({ kind: 'size', px }),
@@ -221,13 +241,21 @@ export default function RichMailBodyEditor({
   };
 
   const inSource = mode === 'source';
+  const barVisible = !phone || focused;
+  const dock = phone && keyboardUp ? 'keyboard' : 'inline';
+  const reserveSpace = dock === 'keyboard' && barVisible;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-2"
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
+      }}
+    >
       <div className="flex items-center justify-between gap-2">
         <SegmentedControl
           label={t('mail.format.viewLabel')}
-          size="sm"
           options={[
             { value: 'preview', label: t('mail.format.preview') },
             { value: 'source', label: t('mail.format.source') },
@@ -235,24 +263,31 @@ export default function RichMailBodyEditor({
           value={mode}
           onChange={switchMode}
         />
-        {dropped && !inSource && (
-          <p role="status" className="text-xs text-text-dim">
-            {t('mail.format.sourceDropped')}
-          </p>
-        )}
       </div>
-      {!docked && (
-        <MailFormatBar
-          commands={inSource ? sourceCommands : previewCommands}
-          docked={false}
-          disabled={disabled}
-        />
+      {dropped && !inSource && (
+        <p role="status" className="text-xs text-text-dim">
+          {t('mail.format.sourceDropped')}
+        </p>
       )}
+      {inSource && droppedMarkup(source) && (
+        <p role="status" className="text-xs text-text-dim">
+          {t('mail.format.sourceWillDrop')}
+        </p>
+      )}
+      {/* One bar: `fixed` over the keyboard on a phone, otherwise in the flow right here. */}
+      <MailFormatBar
+        commands={inSource ? sourceCommands : previewCommands}
+        phone={phone}
+        dock={dock}
+        visible={barVisible}
+        keyboardInset={keyboardInset}
+        disabled={disabled}
+      />
       <div
         className={cx(
           EVE_MAIL_SURFACE_CLASS,
           'min-h-0 flex-1 overflow-y-auto text-xs leading-normal break-words whitespace-pre-wrap',
-          docked && DOCKED_BAR_SPACE_CLASS,
+          reserveSpace && DOCKED_BAR_SPACE_CLASS,
           inSource && 'hidden',
           className
         )}
@@ -275,14 +310,7 @@ export default function RichMailBodyEditor({
           spellCheck={false}
           autoCapitalize="none"
           autoCorrect="off"
-          className={cx('font-mono text-xs', docked && DOCKED_BAR_SPACE_CLASS, className)}
-        />
-      )}
-      {docked && (
-        <MailFormatBar
-          commands={inSource ? sourceCommands : previewCommands}
-          docked
-          disabled={disabled}
+          className={cx('font-mono text-xs', reserveSpace && DOCKED_BAR_SPACE_CLASS, className)}
         />
       )}
     </div>

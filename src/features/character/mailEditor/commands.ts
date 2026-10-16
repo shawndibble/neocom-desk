@@ -19,6 +19,11 @@ export interface MailEditorCommands {
   setLink: (href: string | null) => void;
   insertTable: (rows: number, cols: number) => void;
   clearFormatting: () => void;
+  /**
+   * Whether "back to default" (default colour, normal size, remove link) does anything.
+   * Source view has no such edit: it would have to untangle tags around the selection.
+   */
+  canReset: boolean;
   /** Source view has no "clear": it would have to untangle tags around the selection. */
   canClear: boolean;
 }

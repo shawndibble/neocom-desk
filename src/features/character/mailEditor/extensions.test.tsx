@@ -77,4 +77,11 @@ describe('mail editor schema', () => {
     ed.commands.insertContent({ type: 'text', text: 'a <b> & c' });
     expect(markupOf(ed)).toBe('a &lt;b&gt; &amp; c');
   });
+
+  it('clear formatting over a table selection leaves the table intact', () => {
+    const ed = make('<b>intro</b>\n| a | b |\n|---|---|\n| 1 | 2 |');
+    ed.commands.selectAll();
+    ed.commands.unsetAllMarks();
+    expect(markupOf(ed)).toBe('intro\n| a | b |\n|---|---|\n| 1 | 2 |');
+  });
 });

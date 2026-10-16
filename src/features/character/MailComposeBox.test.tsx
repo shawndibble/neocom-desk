@@ -154,7 +154,7 @@ describe('Reply defaults', () => {
 
     expect(screen.getByLabelText('Subject')).toHaveValue('RE: Ratting fleet up');
     expect(screen.getByLabelText('Message')).toHaveValue(
-      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n&gt; Original body text'
+      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n> Original body text'
     );
   });
 
@@ -167,6 +167,37 @@ describe('Reply defaults', () => {
 
     expect(screen.queryByText('CC Cara')).not.toBeInTheDocument();
     expect(screen.getByText('Sender Sal')).toBeInTheDocument();
+  });
+});
+
+describe('send path', () => {
+  it('sanitizes the body before sending, whatever the editor emitted', async () => {
+    function Rogue({ onChange, id }: { onChange: (v: string) => void; id: string }) {
+      return (
+        <button id={id} aria-label="emit" onClick={() => onChange('<script>x</script><b>ok</b>')}>
+          emit
+        </button>
+      );
+    }
+    const user = userEvent.setup();
+    render(
+      <MailComposeBox
+        characterId={CHAR_ID}
+        kind="reply"
+        header={HEADER}
+        bodyText="Original body text"
+        bodyEditor={Rogue as never}
+        senderName="Sender Sal"
+        formattedTimestamp="Sep 21, 2026 03:14"
+        resolveRecipientName={resolveRecipientName}
+        onClose={vi.fn()}
+        onSent={vi.fn()}
+      />
+    );
+    await user.click(await screen.findByRole('button', { name: 'emit' }));
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(sendMail).toHaveBeenCalled());
+    expect(sendMail.mock.calls[0][3]).toBe('x<b>ok</b>');
   });
 });
 

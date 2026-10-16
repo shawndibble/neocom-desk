@@ -15,3 +15,7 @@ _Recorded 2026-10-16._
 - **Drafts carry `format: 'markup'`.** A row without it was saved by the plain editor; it is escaped on load so `< > &` in it never turn into tags.
 
 - **Reply/Forward now show the live counter and block Send past 10,000**, as New Mail does.
+
+- **The format bar shows only while the body editor has focus** (and while a sheet is open). On a phone it is fixed above the keyboard only when the keyboard is up; otherwise it sits in the flow above the surface, so it never covers Subject, recipients or the bottom tab bar.
+
+- **Source view disables the "back to default" controls** (Default colour, Normal size, Remove link, Clear formatting) rather than faking them, and shows a live note while the markup contains something the safe subset will remove. Send is not blocked; the sent body is the sanitized one.
