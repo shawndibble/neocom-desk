@@ -75,6 +75,20 @@ describe('routing guard', () => {
     expect(window.location.pathname).toBe('/login');
   });
 
+  it('keeps a landing section hash when it redirects / to /login', async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    window.history.pushState({}, '', '/#login-faq');
+    try {
+      render(<App />);
+      await screen.findAllByRole('button', { name: /log in with eve online/i });
+      expect(window.location.pathname).toBe('/login');
+      expect(window.location.hash).toBe('#login-faq');
+    } finally {
+      // jsdom has no scrollIntoView of its own.
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
   it('redirects / to /overview when a character is already active', async () => {
     await db.characters.put({
       characterId: 91,
