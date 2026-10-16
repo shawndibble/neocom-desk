@@ -52,6 +52,14 @@ import { loadCalendarEvents, prefetchCalendarEventDetails } from '@/features/cha
 import { loadContacts } from '@/features/character/contacts';
 import { loadCharacterStandings } from '@/features/character/standings';
 import { detailPrefetchAllowed } from '@/features/character/detailPrefetch';
+import { KEY as LOYALTY_KEY, loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
+import { KEYS as MINING_KEYS, loadMiningLedger } from '@/features/miningTax/ledger';
+import {
+  warmImplantTypes,
+  warmLoyaltyStores,
+  warmNames,
+  warmStructureNames,
+} from '@/features/character/lookupPrefetch';
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadEmploymentHistory } from '@/features/character/employmentHistory';
 import { KEY as BLUEPRINTS_KEY, loadCharacterBlueprints } from '@/features/industry/data';
@@ -187,6 +195,21 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
     run: loadContracts,
   },
   {
+    // Also the list the LP Store and name warm-ups below start from.
+    id: 'loyalty',
+    cacheKey: LOYALTY_KEY,
+    endpoints: ['getCharacterLoyaltyPoints'],
+    run: loadCharacterLoyaltyPoints,
+  },
+  {
+    // The raw ledger only: the Mining Tax page folds the device-kept history
+    // in itself when opened, and that merge is not a fetch.
+    id: 'mining',
+    cacheKey: MINING_KEYS.ledger,
+    endpoints: ['getCharacterMining'],
+    run: loadMiningLedger,
+  },
+  {
     id: 'order-history',
     cacheKey: ORDER_KEYS.history,
     endpoints: ['getCharacterOrderHistory'],
@@ -232,6 +255,39 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
     cacheKey: ASSETS_KEY,
     endpoints: ['getCharacterAssets'],
     run: loadCharacterAssets,
+  },
+];
+
+/**
+ * The second phase: lookups *derived from* what the first phase cached (names
+ * for the ids on the lists, citadel names, LP Stores, implant types). They run
+ * only after every list task has finished, read their ids from the cache
+ * rather than fetching a list again, and are optional traffic: each skips
+ * itself on a metered, Data Saver or slow link (`detailPrefetchAllowed`).
+ * Gated on the same scopes as the list they read, so nothing here can raise a
+ * re-auth notice; the endpoints they hit themselves (`/universe/names`,
+ * `/universe/structures`, LP offers, types) need no more than that.
+ */
+export const DERIVED_PREFETCH_TASKS: readonly PrefetchTask[] = [
+  {
+    id: 'names',
+    endpoints: [],
+    run: warmNames,
+  },
+  {
+    id: 'structure-names',
+    endpoints: ['getUniverseStructure'],
+    run: warmStructureNames,
+  },
+  {
+    id: 'loyalty-stores',
+    endpoints: ['getCharacterLoyaltyPoints'],
+    run: warmLoyaltyStores,
+  },
+  {
+    id: 'implant-types',
+    endpoints: ['getCharacterImplants'],
+    run: warmImplantTypes,
   },
 ];
 
@@ -317,7 +373,8 @@ export interface PrefetchSignal {
 export async function prefetchCharacterData(
   characterId: number,
   signal: PrefetchSignal = { cancelled: false },
-  table: readonly PrefetchTask[] = PREFETCH_TASKS
+  table: readonly PrefetchTask[] = PREFETCH_TASKS,
+  derivedTable: readonly PrefetchTask[] = DERIVED_PREFETCH_TASKS
 ): Promise<void> {
   const token = await db.tokens.get(characterId);
   // No token row is no session for this Character at all, so there is nothing
@@ -330,9 +387,10 @@ export async function prefetchCharacterData(
   // `useGrantedScopes` gives it.
   const tasks = prefetchTasksFor(token.scopes, table);
   if (signal.cancelled || tasks.length === 0) return;
+  const derived = prefetchTasksFor(token.scopes, derivedTable);
 
   const { begin, advance, finish } = usePrefetch.getState();
-  begin(tasks.length);
+  begin(tasks.length + derived.length);
   try {
     await mapWithConcurrencyLimit(tasks, PREFETCH_CONCURRENCY, async (task) => {
       if (signal.cancelled) return;
@@ -344,6 +402,15 @@ export async function prefetchCharacterData(
         if (!fresh) await inBackgroundLane(() => task.run(characterId));
       } catch {
         // Swallowed by design; see the doc comment above.
+      }
+      advance();
+    });
+    await mapWithConcurrencyLimit(derived, PREFETCH_CONCURRENCY, async (task) => {
+      if (signal.cancelled) return;
+      try {
+        if (detailPrefetchAllowed()) await inBackgroundLane(() => task.run(characterId));
+      } catch {
+        // Warm-up only; the page resolves what it needs when opened.
       }
       advance();
     });
