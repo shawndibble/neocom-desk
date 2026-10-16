@@ -203,8 +203,45 @@ describe('JournalTable filtered summary status', () => {
       const headers = document.querySelectorAll('.dt-group-header');
       expect(headers).toHaveLength(2);
       // 5,000 - 2,000; the 900 own-Character transfer is left out.
+      expect(headers[0]).toHaveTextContent('Wed 7 Oct · EVE time');
       expect(headers[0]).toHaveTextContent('+3,000');
       expect(headers[1]).toHaveTextContent('+700');
+    });
+
+    it('opens only the newest three days', () => {
+      phone.value = true;
+      const many = [1, 2, 3, 4, 5].map((n) => ({
+        id: 100 + n,
+        date: `2026-09-0${n}T10:00:00Z`,
+        ref_type: 'bounty_prize',
+        amount: 10,
+        description: 'd',
+      }));
+      render(<Harness rows={many} />);
+      expect(document.querySelectorAll('.dt-group-header')).toHaveLength(5);
+      expect(document.querySelector('[data-row-key="103"]')).toBeInTheDocument();
+      expect(document.querySelector('[data-row-key="102"]')).not.toBeInTheDocument();
+      expect(document.querySelector('[data-row-key="105"]')).toBeInTheDocument();
+      expect(document.querySelector('[data-row-key="101"]')).not.toBeInTheDocument();
+    });
+
+    it('opens the day a highlighted line is on', () => {
+      phone.value = true;
+      const many = [1, 2, 3, 4, 5].map((n) => ({
+        id: 100 + n,
+        date: `2026-09-0${n}T10:00:00Z`,
+        ref_type: 'bounty_prize',
+        amount: 10,
+        description: 'd',
+      }));
+      render(<Harness rows={many} highlightRowKey={101} />);
+      expect(document.querySelector('[data-row-key="101"]')).toBeInTheDocument();
+    });
+
+    it('falls back to Date for a sort the cards lack', () => {
+      phone.value = true;
+      render(<Harness rows={days} sort={{ columnId: 'description', direction: 'asc' }} />);
+      expect(document.querySelectorAll('.dt-group-header')).toHaveLength(2);
     });
 
     it('folds a day away', async () => {

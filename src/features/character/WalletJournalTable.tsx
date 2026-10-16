@@ -37,6 +37,7 @@ import { journalRefLabel } from '@/features/character/journalRefLabel';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
+  journalNet,
   journalRefTypeBreakdown,
   toggleBreakdownRefType,
   type WalletJournalFilter,
@@ -45,7 +46,7 @@ import { netToneClass } from '@/features/character/format';
 import {
   journalDayKey,
   journalDayLabel,
-  journalDayNet,
+  newestJournalDays,
 } from '@/features/character/walletJournalDays';
 import { signedIsk } from '@/features/market/signedIsk';
 import { useColumnVisibility } from '@/lib/columnVisibility';
@@ -193,6 +194,9 @@ function rangeLabel(filter: WalletJournalFilter, t: TFunction): string {
  */
 const CARD_SORT_COLUMNS = new Set(['date', 'amount', 'refType']);
 
+/** Days a phone journal starts unfolded, newest first. */
+const OPEN_DAYS = 3;
+
 /** Columns that are not in the picker's catalog and so are never hidden by it. */
 const ALWAYS_SHOWN_COLUMNS = new Set(['refType', 'character']);
 
@@ -212,7 +216,7 @@ export function JournalTable({
   tableExport,
   panel,
 }: JournalTableProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isPhone = useIsPhone();
   const [tableRef, [tableNarrow = false]] = useElementNarrowerThan<HTMLDivElement>([
     JOURNAL_TABLE_CARDS_REM,
@@ -245,13 +249,24 @@ export function JournalTable({
     () =>
       journalColumns.filter(
         (column) =>
-          ALWAYS_SHOWN_COLUMNS.has(column.id) || isVisible(column.id as WalletJournalColumnId)
+          ALWAYS_SHOWN_COLUMNS.has(column.id) ||
+          // Cards print the time on the Date column and sort by it, so it can't be hidden.
+          (cards && column.id === 'date') ||
+          isVisible(column.id as WalletJournalColumnId)
       ),
-    [journalColumns, isVisible]
+    [journalColumns, isVisible, cards]
   );
-  // Day headers only under the Date sort: under Amount or Type a day's rows
-  // would be scattered, so the list is flat and each line carries its own date.
-  const grouped = cards && sort.columnId === 'date';
+  // A URL sort on a column the cards don't offer would leave the picker blank.
+  const cardsSort = useMemo<DataTableSort>(
+    () =>
+      cards && !CARD_SORT_COLUMNS.has(sort.columnId)
+        ? { columnId: 'date', direction: 'desc' }
+        : sort,
+    [cards, sort]
+  );
+  // Phone only; the beside-the-panel cards stay flat. Day headers only under the
+  // Date sort: under Amount or Type a day's rows would be scattered.
+  const grouped = isPhone && cardsSort.columnId === 'date';
   const cardColumns = useMemo(
     () =>
       shownColumns.map((column): DataTableColumn<JournalRow> => {
@@ -260,8 +275,8 @@ export function JournalTable({
           case 'date':
             return {
               ...column,
-              // Under a day header only the time; a flat list needs the date too. The
-              // header's day is UTC, so the time is, or a line could sit under the wrong day.
+              // Under a day header only the time, in UTC like the day (see timeFormat.ts);
+              // a flat list needs the date and follows the time-format preference.
               render: (entry) =>
                 grouped
                   ? formatTimeOfDay(new Date(entry.date), 'UTC')
@@ -293,26 +308,41 @@ export function JournalTable({
       }),
     [shownColumns, grouped, timeZone, t]
   );
+  // Folded groups mount nothing and grouping turns windowing off, so a year of
+  // archive opens only its newest days (and the day a ?highlight link points at).
+  const openDays = useMemo(() => {
+    const days = new Set(newestJournalDays(filteredJournal, OPEN_DAYS));
+    if (highlightRowKey !== null) {
+      const key = keyByCharacter ? characterRowKey : journalRowKey;
+      const target = filteredJournal.find((entry) => key(entry) === highlightRowKey);
+      const day = target ? journalDayKey(target) : null;
+      if (day) days.add(day);
+    }
+    return days;
+  }, [filteredJournal, highlightRowKey, keyByCharacter]);
   const groupBy = useMemo<DataTableGroupBy<JournalRow> | undefined>(
     () =>
       grouped
         ? {
             key: journalDayKey,
             minSize: 1,
-            defaultExpanded: () => true,
+            defaultExpanded: (rows) => openDays.has(journalDayKey(rows[0] as JournalRow) ?? ''),
             renderHeader: (rows) => {
-              const net = journalDayNet(rows);
-              const day = journalDayKey(rows[0] as JournalRow);
+              const net = journalNet(rows);
+              // DataTable never renders a header for a null key.
+              const day = journalDayKey(rows[0] as JournalRow) as string;
               return (
                 <span className="flex w-full items-baseline justify-between gap-4 tabular-nums">
-                  <span>{day ? journalDayLabel(day) : t('common.unknown')}</span>
+                  <span>
+                    {t('wallet.journalDayHeader', { day: journalDayLabel(day, i18n.language) })}
+                  </span>
                   <span className={netToneClass(net)}>{signedIsk(net, 0)}</span>
                 </span>
               );
             },
           }
         : undefined,
-    [grouped, t]
+    [grouped, openDays, t, i18n.language]
   );
   // A filter with no criteria active still runs (it's the identity filter), so
   // "is a filter active" is asked separately here rather than read off the result.
@@ -397,14 +427,14 @@ export function JournalTable({
             rows={filteredJournal}
             rowKey={keyByCharacter ? characterRowKey : journalRowKey}
             highlightRowKey={highlightRowKey}
-            sort={sort}
+            sort={cardsSort}
             onSortChange={onSortChange}
             // A wide table on a desktop. On a phone, and beside the open panel where
             // the table is narrower than its columns, two-line cards grouped by day.
             responsive={cards ? 'stack' : 'table'}
             stacked={cards}
             stackLayout="dense"
-            mobileSort
+            mobileSort={isPhone}
             groupBy={groupBy}
             // Every page of the journal, uncapped: thousands of rows for an
             // active trader.

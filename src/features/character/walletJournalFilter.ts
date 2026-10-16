@@ -98,6 +98,11 @@ export interface JournalBreakdown {
   internalCount: number;
 }
 
+/** The net of lines that move ISK: own-Character transfers are out, a missing amount is zero. */
+export function journalNet(entries: readonly JournalRow[]): number {
+  return entries.reduce((sum, entry) => (entry.internal ? sum : sum + (entry.amount ?? 0)), 0);
+}
+
 /** Where the ISK came from and went: income, expense and net per `ref_type` (issue #2858). A missing `amount` counts as zero. */
 export function journalRefTypeBreakdown(entries: readonly JournalRow[]): JournalBreakdown {
   const byType = new Map<string, RefTypeBreakdownRow>();
@@ -127,7 +132,7 @@ export function journalRefTypeBreakdown(entries: readonly JournalRow[]): Journal
   );
   const totalIn = rows.reduce((sum, row) => sum + row.income, 0);
   const totalOut = rows.reduce((sum, row) => sum + row.expense, 0);
-  return { totalIn, totalOut, net: totalIn - totalOut, rows, internalCount };
+  return { totalIn, totalOut, net: journalNet(entries), rows, internalCount };
 }
 
 /** A breakdown row click: select that ref type, or clear it when it is already the one selected. */

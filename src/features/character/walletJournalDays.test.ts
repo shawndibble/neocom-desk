@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { JournalRow } from '@/engine/journalNetting';
-import { journalDayKey, journalDayLabel, journalDayNet } from './walletJournalDays';
+import { journalDayKey, journalDayLabel, newestJournalDays } from './walletJournalDays';
 
 const row = (over: Partial<JournalRow>): JournalRow => ({
   id: 1,
@@ -18,19 +18,14 @@ describe('walletJournalDays', () => {
     expect(journalDayKey(row({ date: 'nope' }))).toBeNull();
   });
 
-  it('sums a day without own-Character transfers', () => {
-    expect(
-      journalDayNet([
-        row({ amount: 500 }),
-        row({ amount: -200 }),
-        row({ amount: 9_000, internal: true }),
-        row({ amount: undefined }),
-      ])
-    ).toBe(300);
+  it('picks the newest distinct days', () => {
+    const rows = ['2026-10-01', '2026-10-03', '2026-10-03', '2026-10-02'].map((d, id) =>
+      row({ id, date: `${d}T05:00:00Z` })
+    );
+    expect(newestJournalDays(rows, 2)).toEqual(['2026-10-03', '2026-10-02']);
   });
 
   it('labels a day with weekday, day and month', () => {
-    expect(journalDayLabel('2026-10-16')).toMatch(/Fri/);
-    expect(journalDayLabel('2026-10-16')).toMatch(/16/);
+    expect(journalDayLabel('2026-10-15', 'en')).toBe('Thu 15 Oct');
   });
 });

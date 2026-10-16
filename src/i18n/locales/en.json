@@ -5275,6 +5275,7 @@
     "journalBreakdownShare": "{{type}} share",
     "journalPanelSubtitle": "{{scope}} · {{range}} · follows the Journal's filters",
     "journalRangeDefault": "last 30 days",
+    "journalDayHeader": "{{day}} · EVE time",
     "journalRangeBetween": "{{from}} – {{to}}",
     "journalRangeFrom": "from {{from}}",
     "journalRangeTo": "until {{to}}",
