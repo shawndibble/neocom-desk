@@ -9,12 +9,18 @@
  *
  * 1. **Prices.** Fuzzwork aggregates at both hub stations (`getHubPrices`,
  *    batched and cached). Keep items dearer at the destination by a wide
- *    enough gap, best gaps first, capped at `MAX_PRICED_CANDIDATES`.
+ *    enough gap, most a trip could earn first (`priceScore`: the gap after a
+ *    rough fee times the units listed at both ends), capped at
+ *    `MAX_PRICED_CANDIDATES`.
  * 2. **History.** The destination region's daily history per survivor
  *    (`loadPriceHistory`, cached until ESI's own daily rollover). This is
  *    where a dead market drops out — a huge listed gap on an item that never
- *    sells is the trap. Keep the `MAX_BOOK_CANDIDATES` best by what they
- *    recently sold for against the origin price.
+ *    sells is the trap. Keep the `MAX_BOOK_CANDIDATES` best by what a lot
+ *    could earn at the recent sale price (`historyScore`).
+ *
+ * Both orders come from `engine/market/haulingRank` and rank by trip profit,
+ * not price ratio: a 3x gap on two units listed fills no hold. The minimum-gap
+ * filters still decide what is looked at.
  * 3. **Order books.** The two hubs' books for those few, station-filtered,
  *    turned into ladders and estimated by `engine/market/haulingMarket`.
  *
@@ -26,12 +32,13 @@
  * In `instant` mode (sell straight into the destination's buy orders) pass 1
  * compares the origin's lowest sell with the destination's highest *buy*,
  * pass 2 is skipped — a buy order already standing is the demand, and Days to
- * Sell does not apply — and pass 3 reads the destination's buy ladder at the
- * hub station.
+ * Sell does not apply; the shortlist keeps pass 1's order, scored against the
+ * destination's buy-side volume — and pass 3 reads the destination's buy
+ * ladder at the hub station.
  *
  * One end may be _Any hub_ (`ANY_HUB`): pass 1 then prices every hub's
  * aggregates (one cheap call per hub) and keeps each item on its single best
- * lane by that pass's gap; passes 2 and 3 read that lane's hubs. The caps stay
+ * lane by that pass's score; passes 2 and 3 read that lane's hubs. The caps stay
  * overall, not per lane — at most `MAX_BOOK_CANDIDATES` items reach the
  * order-book pass whichever hubs they use — and each row says its lane.
  */
@@ -42,6 +49,7 @@ import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { expandHaulingLane, haulingEndId, type HaulingEnd, type HubLane } from './haulingHubs';
+import { historyScore, priceScore, ROUGH_FEE_FACTOR } from '@/engine/market/haulingRank';
 import {
   estimateSale,
   hubLadders,
@@ -64,8 +72,7 @@ export const MIN_LISTED_GAP = 1.1;
 export const MIN_INSTANT_GAP = 1.035;
 export const MAX_PRICED_CANDIDATES = 80;
 export const MAX_BOOK_CANDIDATES = 40;
-/** Fees are not known here, so the history pass keeps anything that could clear a rough cut. */
-const ROUGH_FEE_FACTOR = 0.94;
+/** The history pass keeps anything whose recent sale price, after the rough fee, could clear this gap. */
 const MIN_RECENT_GAP = 1.03;
 /** Books and history are 1 request each per item: stay well under `ESI_FANOUT_CONCURRENCY`. */
 const SCAN_CONCURRENCY = 4;
@@ -189,6 +196,32 @@ async function stationLadders(
   return hubLadders(orders, hub.stationId);
 }
 
+interface Ranked {
+  typeId: number;
+  /** What a trip could earn on it (`engine/market/haulingRank`): the order. */
+  score: number;
+  /** The price ratio the pass read — a tiebreak only, where scores tie (e.g. nothing listed scores 0). */
+  gap: number;
+}
+
+interface PricedCandidate extends Ranked {
+  lane: HubLane;
+  buy: number;
+  /** Units for sale at the origin hub: what a lot can buy at most. */
+  originListed: number;
+}
+
+interface ShortlistCandidate extends Ranked {
+  lane: HubLane;
+  buy: number;
+  demand: DemandSummary | null;
+}
+
+/** Best first: by score, then gap, then type id, so equal scores never order by fetch timing. */
+function byRank(a: Ranked, b: Ranked): number {
+  return b.score - a.score || b.gap - a.gap || a.typeId - b.typeId;
+}
+
 export async function runHaulingScan(request: HaulingScanRequest): Promise<HaulingScan> {
   const { from, to, typeIds, types, onProgress, signal } = request;
   const today = request.today ?? new Date().toISOString().slice(0, 10);
@@ -229,36 +262,37 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   // Each item keeps only its best lane: the plan and the table are keyed by item.
   const pricedAll = ids
     .flatMap((typeId) => {
-      let best: { typeId: number; lane: HubLane; buy: number; gap: number } | null = null;
+      let best: PricedCandidate | null = null;
       for (const lane of lanes) {
-        const buy = pricesAt.get(lane.from.id)?.get(typeId)?.sellMin ?? null;
+        const origin = pricesAt.get(lane.from.id)?.get(typeId);
         const dest = pricesAt.get(lane.to.id)?.get(typeId);
+        const buy = origin?.sellMin ?? null;
         const sell = (mode === 'instant' ? dest?.buyMax : dest?.sellMin) ?? null;
         if (buy === null || sell === null || buy <= 0) continue;
         const gap = sell / buy;
-        if (gap >= minGap && (best === null || gap > best.gap)) best = { typeId, lane, buy, gap };
+        if (gap < minGap) continue;
+        const originListed = origin?.sellVolume ?? 0;
+        const destListed = (mode === 'instant' ? dest?.buyVolume : dest?.sellVolume) ?? 0;
+        const score = priceScore({ buy, sell, originListed, destListed });
+        const candidate = { typeId, lane, buy, originListed, score, gap };
+        if (best === null || byRank(candidate, best) < 0) best = candidate;
       }
       return best === null ? [] : [best];
     })
-    .sort((a, b) => b.gap - a.gap);
+    .sort(byRank);
   const priced = pricedAll.slice(0, MAX_PRICED_CANDIDATES);
 
   // 2. History: drop what never sells or only sold below the origin price.
   // An instant sale skips it: the standing buy order is the demand.
-  const withHistory: {
-    typeId: number;
-    lane: HubLane;
-    buy: number;
-    demand: DemandSummary | null;
-    proxy: number;
-  }[] =
+  const withHistory: ShortlistCandidate[] =
     mode === 'instant'
       ? priced.map((c) => ({
           typeId: c.typeId,
           lane: c.lane,
           buy: c.buy,
           demand: null,
-          proxy: c.gap,
+          score: c.score,
+          gap: c.gap,
         }))
       : [];
   let historyDone = 0;
@@ -270,14 +304,20 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
       const { points } = await loadPriceHistory(candidate.lane.to.regionId, candidate.typeId);
       const demand = summarizeDemand(points, today);
       if (demand.recentSalePrice !== null && demand.dailyVolume > 0) {
-        const proxy = (demand.recentSalePrice * ROUGH_FEE_FACTOR) / candidate.buy;
-        if (proxy >= MIN_RECENT_GAP) {
+        const recentGap = (demand.recentSalePrice * ROUGH_FEE_FACTOR) / candidate.buy;
+        if (recentGap >= MIN_RECENT_GAP) {
           withHistory.push({
             typeId: candidate.typeId,
             lane: candidate.lane,
             buy: candidate.buy,
             demand,
-            proxy,
+            score: historyScore({
+              buy: candidate.buy,
+              recentSalePrice: demand.recentSalePrice,
+              dailyVolume: demand.dailyVolume,
+              originListed: candidate.originListed,
+            }),
+            gap: recentGap,
           });
         }
       }
@@ -287,7 +327,8 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     historyDone += 1;
     onProgress?.({ stage: 'history', done: historyDone, total: priced.length });
   });
-  withHistory.sort((a, b) => b.proxy - a.proxy);
+  // History lands in completion order: the sort's tiebreaks make the shortlist independent of it.
+  withHistory.sort(byRank);
   const shortlist = withHistory.slice(0, MAX_BOOK_CANDIDATES);
 
   // 3. Order books, then hauled volume, for the shortlist only.

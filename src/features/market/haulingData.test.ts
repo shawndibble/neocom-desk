@@ -22,6 +22,7 @@ const {
   evictHaulingScan,
   haulingScanCacheKey,
   MAX_BOOK_CANDIDATES,
+  MAX_PRICED_CANDIDATES,
   runHaulingScan,
 } = await import('./haulingData');
 
@@ -29,8 +30,13 @@ const FROM = TRADE_HUBS.find((h) => h.id === 'jita')!;
 const TO = TRADE_HUBS.find((h) => h.id === 'amarr')!;
 const TYPES = { '34': { name: 'Tritanium', volume: 0.01 } } as never;
 
-function aggregate(sellMin: number | null, buyMax: number | null) {
-  return { sellMin, buyMax, sellVolume: 100, buyVolume: 100 };
+function aggregate(
+  sellMin: number | null,
+  buyMax: number | null,
+  sellVolume = 100,
+  buyVolume = 100
+) {
+  return { sellMin, buyMax, sellVolume, buyVolume };
 }
 
 beforeEach(() => {
@@ -156,6 +162,70 @@ describe('runHaulingScan, selling into buy orders', () => {
       mode: 'instant',
     });
     expect(instant.rows).toHaveLength(1);
+  });
+});
+
+describe('runHaulingScan, shortlist order', () => {
+  const TODAY = '2026-10-15';
+  /** More high-ratio, thin items than the price pass keeps, and one bulk steady seller at a lower ratio. */
+  const THIN = Array.from({ length: MAX_PRICED_CANDIDATES + 5 }, (_, i) => 2000 + i);
+  const BULK = 5000;
+
+  function history(price: number, volume: number) {
+    return Array.from({ length: 30 }, (_, day) => ({
+      date: new Date(Date.parse(`${TODAY}T00:00:00Z`) - day * 86_400_000)
+        .toISOString()
+        .slice(0, 10),
+      average: price,
+      highest: price,
+      lowest: price,
+      volume,
+      orderCount: 10,
+    }));
+  }
+
+  beforeEach(() => {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => {
+          if (id === BULK)
+            return [id, atOrigin ? aggregate(100, 90, 50_000) : aggregate(120, 110, 30_000)];
+          // 3x the price, two units for sale at the origin.
+          return [id, atOrigin ? aggregate(100, 90, 2) : aggregate(300, 250, 500)];
+        })
+      );
+    });
+    loadPriceHistory.mockImplementation(async (_region: number, typeId: number) => ({
+      points: typeId === BULK ? history(120, 5_000) : history(300, 1),
+    }));
+    getOrderBook.mockImplementation(async (regionId: number, typeId: number) => {
+      const hub = regionId === FROM.regionId ? FROM : TO;
+      const price = hub === FROM ? 100 : typeId === BULK ? 120 : 300;
+      return {
+        orders: [{ price, volume_remain: 50_000, is_buy_order: false, location_id: hub.stationId }],
+      };
+    });
+  });
+
+  it('shortlists a bulk steady seller over high-ratio items with thin stock', async () => {
+    const typeIds = [...THIN, BULK];
+    const types = Object.fromEntries(
+      typeIds.map((id) => [String(id), { name: `T${id}`, volume: 1 }])
+    );
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 4,
+      types: types as never,
+      today: TODAY,
+    });
+    // Ranked by price ratio it was cut at the price pass, behind every thin item.
+    expect(loadPriceHistory).toHaveBeenCalledWith(TO.regionId, BULK);
+    expect(getOrderBook).toHaveBeenCalledWith(TO.regionId, BULK);
+    expect(scan.rows.map((r) => r.typeId)).toContain(BULK);
+    expect(scan.capped).toBe(true);
   });
 });
 
