@@ -25,6 +25,7 @@ import { WORMHOLE_GROUP_ID, bakeShipMass, bakeWormholeMass } from './lib/jumpMas
 import { bakeOreAndIceTypeIds } from './lib/oreTypeIds.mjs';
 import { bakeSystemPositions } from './lib/systemPositions.mjs';
 import { bakeTypeInfoShards, typeInfoBucketOf } from './lib/typeInfo.mjs';
+import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
 import { ccpBuildFromSdeJsonl, fetchFuzzworkDump, FUZZWORK_DUMP_URL } from './lib/sdeBuild.mjs';
 
 // The build this bake used, for the nightly refresh's "is there a newer one"
@@ -662,6 +663,8 @@ async function main() {
       'groups.jsonl',
       'types.jsonl',
       'typeDogma.jsonl',
+      'dynamicItemAttributes.jsonl',
+      'dogmaAttributes.jsonl',
     ],
     ESI_USER_AGENT
   );
@@ -2072,6 +2075,20 @@ async function main() {
   // --- typeInfo shards (issue #3882); see lib/typeInfo.mjs ---
   const typeInfoShards = bakeTypeInfoShards(ccpTypes, parseJsonl(ccpStaticData['typeDogma.jsonl']));
 
+  // --- mutaplasmids.json: what each mutaplasmid rolls; see lib/mutaplasmids.mjs ---
+  const mutaplasmids = bakeMutaplasmids(
+    parseJsonl(ccpStaticData['dynamicItemAttributes.jsonl']),
+    dogmaAttributeInfo(parseJsonl(ccpStaticData['dogmaAttributes.jsonl']))
+  );
+  if (
+    Object.keys(mutaplasmids.mutaplasmids).length < 400 ||
+    mutaplasmids.abyssalTypeIds.length < 90
+  ) {
+    throw new Error(
+      'mutaplasmids.json looks wrong: expected 400+ mutaplasmids and 90+ abyssal types'
+    );
+  }
+
   // --- typeNames.json: every type name, published or not; see lib/typeNames.mjs ---
   const typeNames = bakeTypeNames([...types.values()].map((t) => t.name));
 
@@ -2142,6 +2159,7 @@ async function main() {
     ['shipTree.json', shipTree],
     // Only the Workbench's out-of-date check reads it (~1.7 MB), so it loads on demand.
     ['typeNames.json', typeNames],
+    ['mutaplasmids.json', mutaplasmids],
     ['wormholeMass.json', wormholeMass],
     ['shipMass.json', shipMass],
   ];
