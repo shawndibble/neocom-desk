@@ -27,9 +27,10 @@ const loadCharacterSkillQueue =
 // both have something to say.
 vi.mock('@/market/prices', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/market/prices')>()),
-  getHubPrices: vi.fn(async (_hub: unknown, ids: readonly number[]) => {
-    return new Map(ids.filter((id) => id === 10).map((id) => [id, { sellMin: 1_500_000 }]));
-  }),
+  getHubPricesWithStatus: vi.fn(async (_hub: unknown, ids: readonly number[]) => ({
+    prices: new Map(ids.filter((id) => id === 10).map((id) => [id, { sellMin: 1_500_000 }])),
+    unreachable: false,
+  })),
   getRegionSellPrices: vi.fn(async () => new Map<number, number | null>()),
 }));
 

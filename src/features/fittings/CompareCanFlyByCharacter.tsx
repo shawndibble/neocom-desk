@@ -32,7 +32,7 @@ function CharacterRows({
     let cancelled = false;
     for (const { characterId } of characters) {
       canFlyForCharacter(fitting, characterId)
-        .then((flies): RowState => flies)
+        .then((flies): RowState => flies ?? 'failed')
         .catch((): RowState => 'failed')
         .then((state) => {
           if (!cancelled) setRows((prev) => new Map(prev).set(characterId, state));

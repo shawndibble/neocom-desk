@@ -64,7 +64,7 @@ describe('MyShipsView with unreadable assets', () => {
   it('shows "couldn\'t load" with Retry, not "No ships found", when every Character was skipped', async () => {
     read.skipped = [{ characterId: 1, name: 'Alice' }];
     renderShips([1]);
-    expect(await screen.findAllByText("Couldn't load — try again")).not.toHaveLength(0);
+    expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
     expect(screen.queryByText('No ships found')).not.toBeInTheDocument();
 
     read.entries = [{ characterId: 1, name: 'Alice', assets: [] }];

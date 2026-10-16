@@ -94,7 +94,7 @@ describe('ContactsStandings header', () => {
     });
     renderTab();
 
-    expect(await screen.findAllByText("Couldn't load — try again")).not.toHaveLength(0);
+    expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
     expect(screen.queryByText('No NPC standings yet')).toBeNull();
 
     loadMock.mockResolvedValueOnce({

@@ -334,7 +334,6 @@ export function Market() {
   // as [] rather than requiring an active character — Market Browser itself
   // needs none — so Add to Quickbar is disabled with nobody active.
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const online = useOnline();
   // Item Actions (issue #2041): every item menu's Quickbar add, Show info (the
   // one Item Detail modal, priced at `orderBookLocation`) and the lazy
   // blueprint catalog behind Build Plan.
@@ -399,6 +398,7 @@ export function Market() {
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width.
   const isDesktop = useIsDesktop();
+  const online = useOnline();
 
   const {
     groups,
@@ -969,7 +969,7 @@ export function Market() {
                 {catalogueError ? (
                   <EmptyState
                     title={t('market.loadFailedTitle')}
-                    hint={t('market.loadFailedHint')}
+                    hint={online ? t('market.loadFailedHint') : t('market.loadFailedOfflineHint')}
                     className="py-8"
                   />
                 ) : catalogueLoading ? (

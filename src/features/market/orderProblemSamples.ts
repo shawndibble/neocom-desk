@@ -21,6 +21,12 @@ export interface OrderProblemReading {
   orderId: number;
   characterId: number;
   problem: OrderProblem;
+  /**
+   * Competition was never checked for this order (its station prices could
+   * not be fetched), so `problem` is not a real reading: the order stays open
+   * for pruning but no sample is recorded.
+   */
+  unchecked?: boolean;
 }
 
 /**
@@ -98,6 +104,7 @@ export async function recordOrderProblemSamples(
 
     const updates: OrderProblemSampleRecord[] = [];
     for (const reading of readings) {
+      if (reading.unchecked) continue;
       const row = byOrderId.get(reading.orderId);
       const samples = appendOrderProblemSample(row?.samples ?? [], {
         at: nowMs,

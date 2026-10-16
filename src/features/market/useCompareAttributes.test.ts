@@ -90,6 +90,33 @@ describe('useCompareAttributes', () => {
     expect(result.current.data).toBeNull();
   });
 
+  it('serves stale cached types when ESI is unreachable', async () => {
+    for (const typeId of [587, 588]) {
+      await db.esiCache.put({
+        characterId: 0,
+        key: `universeType:${typeId}`,
+        value: {
+          type_id: typeId,
+          name: 'Cached',
+          description: '',
+          group_id: 25,
+          published: true,
+          dogma_attributes: [{ attribute_id: 9, value: typeId }],
+        },
+        fetchedAt: 1,
+      });
+    }
+    server.use(http.get(`${ESI_BASE_URL}/universe/types/:typeId`, () => HttpResponse.error()));
+    mockedLoadDictionary.mockResolvedValue({});
+    mockedLoadSkills.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useCompareAttributes(ITEMS, true));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe(false);
+    expect(result.current.data?.dogmaByTypeId.get(588)).toEqual([{ attribute_id: 9, value: 588 }]);
+  });
+
   it('refetches only when the id set actually changes, not on an unrelated re-render', async () => {
     let calls = 0;
     server.use(
@@ -120,8 +147,9 @@ describe('useCompareAttributes', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(calls).toBe(callsAfterFirstFetch);
 
-    // A genuinely different id set must refetch.
-    rerender({ items: [ITEMS[0]] });
+    // A genuinely different id set must refetch. Types already read are
+    // served from the esiCache row, so the new set needs an id not yet seen.
+    rerender({ items: [ITEMS[0], { typeId: 589, itemName: 'Another' }] });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(calls).toBeGreaterThan(callsAfterFirstFetch);
   });

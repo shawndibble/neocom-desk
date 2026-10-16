@@ -5,7 +5,6 @@ import {
   Button,
   EmptyState,
   LiveStatus,
-  LoadFailedState,
   MenuItem,
   RowActionsMenu,
   RowMoreActions,
@@ -14,7 +13,7 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
-import { useRetryFocus } from '@/lib/useRetryFocus';
+import { DataGate } from '@/components/DataGate';
 import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
 import { shipItemsEditLocation } from '@/features/fittings/assetShipLocation';
@@ -371,11 +370,6 @@ export function MyShipsView({
     state.status === 'ready' && state.data.skipped.length > 0
       ? t('assets.skippedCharacters', { names: state.data.skipped.map((c) => c.name).join(', ') })
       : '';
-  // Retry unmounts into the spinner: focus waits on the always-mounted wrapper.
-  const [bodyRef, , holdRetryFocus] = useRetryFocus(
-    state.status === 'loading' ? 'busy' : allSkipped || state.status === 'error' ? 'failed' : 'ok',
-    idsKey
-  );
   const rows = useMemo(() => (state.status === 'ready' ? state.data.rows : []), [state]);
   const places = usePlaces(rows, activeCharacterId, route);
   const groupIds = useMemo(
@@ -462,108 +456,104 @@ export function MyShipsView({
             className="w-full sm:ml-auto sm:w-64"
           />
         </div>
-        <h2 ref={bodyRef} tabIndex={-1} className="sr-only focus:outline-none">
-          {t('assets.myShips.title')}
-        </h2>
-        <LiveStatus>
-          {state.status === 'ready' && state.data.skipped.length > 0
-            ? allSkipped
-              ? t('common.couldntLoad')
-              : skippedMessage
-            : ''}
-        </LiveStatus>
-        {state.status === 'loading' && (
-          <div className="flex justify-center py-10">
-            <Spinner size="md" label={t('assets.myShips.loading')} />
-          </div>
-        )}
-        {state.status === 'error' && <EmptyState title={t('assets.myShips.error')} />}
-        {state.status === 'ready' && !allSkipped && state.data.skipped.length > 0 && (
-          <p className="text-[0.6875rem] text-warning uppercase">{skippedMessage}</p>
-        )}
-        {allSkipped && (
-          // Every chosen Character was skipped: "No ships found" would be a guess.
-          <LoadFailedState
-            hint={t('assets.skippedAllHint')}
-            onRetry={() => {
-              holdRetryFocus();
-              setRetryTick((n) => n + 1);
-            }}
-          />
-        )}
-        {state.status === 'ready' && sorted.length === 0 && !allSkipped && (
-          <EmptyState
-            title={t('assets.myShips.emptyTitle')}
-            hint={query.trim() ? t('assets.myShips.noMatches') : t('assets.myShips.emptyHint')}
-            action={
-              !query.trim() &&
-              onShowAllCharacters && (
-                <Button size="sm" onClick={onShowAllCharacters}>
-                  {t('assets.myShips.showAllCharacters')}
-                </Button>
-              )
-            }
-          />
-        )}
-        {state.status === 'ready' && sorted.length > 0 && (
-          <div role="table" aria-label={t('assets.myShips.title')}>
-            <div
-              role="row"
-              className={`${rowGrid} border-b border-line px-3 py-1 text-[0.6875rem] tracking-widest text-text-dim uppercase max-sm:hidden`}
-            >
-              {columns.map((column) => {
-                const active = sort.column === column;
-                const SortGlyph = !active
-                  ? Icon.Sort
-                  : sort.direction === 'asc'
-                    ? Icon.Ascending
-                    : Icon.Descending;
-                return (
-                  <span
-                    key={column}
-                    role="columnheader"
-                    aria-sort={
-                      active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'
-                    }
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(column)}
-                      className={`inline-flex items-center gap-1 tracking-widest uppercase hover:text-text ${focusRingClassName}`}
+        <DataGate
+          status={
+            state.status === 'loading'
+              ? 'busy'
+              : allSkipped || state.status === 'error'
+                ? 'failed'
+                : 'ok'
+          }
+          // Every chosen Character skipped (or the read threw): "No ships found" would be a guess.
+          title={state.status === 'error' ? t('assets.myShips.error') : t('common.couldntLoad')}
+          hint={allSkipped ? t('assets.skippedAllHint') : undefined}
+          onRetry={() => setRetryTick((n) => n + 1)}
+          resetKey={idsKey}
+          className="flex flex-col gap-3"
+          busy={
+            <div className="flex justify-center py-10">
+              <Spinner size="md" label={t('assets.myShips.loading')} />
+            </div>
+          }
+        >
+          <LiveStatus>{!allSkipped ? skippedMessage : ''}</LiveStatus>
+          {state.status === 'ready' && !allSkipped && state.data.skipped.length > 0 && (
+            <p className="text-[0.6875rem] text-warning uppercase">{skippedMessage}</p>
+          )}
+          {state.status === 'ready' && sorted.length === 0 && !allSkipped && (
+            <EmptyState
+              title={t('assets.myShips.emptyTitle')}
+              hint={query.trim() ? t('assets.myShips.noMatches') : t('assets.myShips.emptyHint')}
+              action={
+                !query.trim() &&
+                onShowAllCharacters && (
+                  <Button size="sm" onClick={onShowAllCharacters}>
+                    {t('assets.myShips.showAllCharacters')}
+                  </Button>
+                )
+              }
+            />
+          )}
+          {state.status === 'ready' && sorted.length > 0 && (
+            <div role="table" aria-label={t('assets.myShips.title')}>
+              <div
+                role="row"
+                className={`${rowGrid} border-b border-line px-3 py-1 text-[0.6875rem] tracking-widest text-text-dim uppercase max-sm:hidden`}
+              >
+                {columns.map((column) => {
+                  const active = sort.column === column;
+                  const SortGlyph = !active
+                    ? Icon.Sort
+                    : sort.direction === 'asc'
+                      ? Icon.Ascending
+                      : Icon.Descending;
+                  return (
+                    <span
+                      key={column}
+                      role="columnheader"
+                      aria-sort={
+                        active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'
+                      }
                     >
-                      {t(`assets.myShips.columns.${column}`)}
-                      <SortGlyph
-                        aria-hidden="true"
-                        size={Icon.ICON_SIZE.sm}
-                        className={active ? 'text-accent' : 'text-text-faint'}
-                      />
-                    </button>
-                  </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(column)}
+                        className={`inline-flex items-center gap-1 tracking-widest uppercase hover:text-text ${focusRingClassName}`}
+                      >
+                        {t(`assets.myShips.columns.${column}`)}
+                        <SortGlyph
+                          aria-hidden="true"
+                          size={Icon.ICON_SIZE.sm}
+                          className={active ? 'text-accent' : 'text-text-faint'}
+                        />
+                      </button>
+                    </span>
+                  );
+                })}
+                <span />
+              </div>
+              {sorted.map((row) => {
+                const place = places.get(placeKey(row));
+                return (
+                  <ShipRowView
+                    key={row.itemId}
+                    row={row}
+                    data={state.data}
+                    rowGrid={rowGrid}
+                    showCharacter={showCharacter}
+                    placeName={place?.name}
+                    systemId={typeof place?.systemId === 'number' ? place.systemId : null}
+                    security={typeof place?.systemId === 'number' ? place.security : null}
+                    jumps={place?.jumps}
+                    shipClass={shipClasses.get(state.data.groupIdByType.get(row.typeId) ?? -1)}
+                    locationHref={hrefFor(row.locationId)}
+                    preference={route.rules.preference}
+                  />
                 );
               })}
-              <span />
             </div>
-            {sorted.map((row) => {
-              const place = places.get(placeKey(row));
-              return (
-                <ShipRowView
-                  key={row.itemId}
-                  row={row}
-                  data={state.data}
-                  rowGrid={rowGrid}
-                  showCharacter={showCharacter}
-                  placeName={place?.name}
-                  systemId={typeof place?.systemId === 'number' ? place.systemId : null}
-                  security={typeof place?.systemId === 'number' ? place.security : null}
-                  jumps={place?.jumps}
-                  shipClass={shipClasses.get(state.data.groupIdByType.get(row.typeId) ?? -1)}
-                  locationHref={hrefFor(row.locationId)}
-                  preference={route.rules.preference}
-                />
-              );
-            })}
-          </div>
-        )}
+          )}
+        </DataGate>
       </div>
     </section>
   );

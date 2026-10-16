@@ -9,14 +9,16 @@
  * one, no status is computed until its skills have been read — until then
  * the tree renders dim rather than guessing from an empty skill sheet.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { hullStatuses } from '@/engine/shipTree/status';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import type { Attributes, CloneState, Implants, TrainedSkill } from '@/engine/types';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import type { SkillCatalog } from '@/features/skills/skillMap';
-import { loadMasteries, loadShipTree } from '@/sde/loadSde';
+import { loadShipTree } from '@/sde/loadSde';
+import { onReconnect } from '@/stores/network';
+import { useMasteries } from '../useMasteries';
 import type { MasteryMap, ShipTreeData } from '@/sde/types';
 import { shipTreeSkillCatalog } from './shipTreeCatalogs';
 
@@ -27,6 +29,10 @@ const NO_MASTERIES: MasteryMap = {};
 export interface ShipTreeSource {
   data: ShipTreeData;
   masteries: MasteryMap;
+  /** Whether `masteries` is the real file (`loaded`), still on its way, or could not be loaded (then it is empty, and a hull's lack of an entry means nothing). */
+  masteriesStatus: 'loading' | 'loaded' | 'unavailable';
+  /** Tries `masteries.json` again after `unavailable`. */
+  retryMasteries: () => void;
   catalog: SkillCatalog;
   characterId: number | null;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
@@ -41,11 +47,23 @@ export interface ShipTreeSource {
   cloneState: CloneState;
 }
 
-/** Null until the tree and the skill catalog have both loaded; `'failed'` when either can't be. */
-export function useShipTreeData(characterId: number | null): ShipTreeSource | null | 'failed' {
+/**
+ * `source` is null until the tree and the skill catalog have both loaded;
+ * `'failed'` when either can't be, and then `retry` loads them again (so does
+ * the connection coming back).
+ */
+export function useShipTreeData(characterId: number | null): {
+  source: ShipTreeSource | null | 'failed';
+  retry: () => void;
+} {
   const [data, setData] = useState<ShipTreeData | null>(null);
   const [failed, setFailed] = useState(false);
-  const [masteries, setMasteries] = useState<MasteryMap>(NO_MASTERIES);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const masteriesState = useMasteries();
+  const masteries = masteriesState.status === 'loaded' ? masteriesState.masteries : NO_MASTERIES;
+  const masteriesStatus = masteriesState.status;
+  const retryMasteries = masteriesState.retry;
   const [catalog, setCatalog] = useState<SkillCatalog | null>(null);
   const editor = usePlanEditorData(characterId);
   const cloneStates = useCloneStates((state) => state.value);
@@ -54,6 +72,8 @@ export function useShipTreeData(characterId: number | null): ShipTreeSource | nu
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a retry, not a render-time derivation
+    setFailed(false);
     Promise.all([loadShipTree(), shipTreeSkillCatalog()])
       .then(([tree, skills]) => {
         if (cancelled) return;
@@ -63,16 +83,11 @@ export function useShipTreeData(characterId: number | null): ShipTreeSource | nu
       .catch(() => {
         if (!cancelled) setFailed(true);
       });
-    loadMasteries()
-      .then((m) => {
-        if (!cancelled) setMasteries(m);
-      })
-      // Masteries only add the badges; without them the tree still reads.
-      .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
+  useEffect(() => (failed ? onReconnect(retry) : undefined), [failed, retry]);
   useEffect(() => {
     void hydrateCloneStates();
   }, [hydrateCloneStates]);
@@ -100,6 +115,8 @@ export function useShipTreeData(characterId: number | null): ShipTreeSource | nu
     return {
       data,
       masteries,
+      masteriesStatus,
+      retryMasteries,
       catalog,
       characterId,
       trainedSkills,
@@ -114,6 +131,8 @@ export function useShipTreeData(characterId: number | null): ShipTreeSource | nu
   }, [
     data,
     masteries,
+    masteriesStatus,
+    retryMasteries,
     catalog,
     characterId,
     trainedSkills,
@@ -122,5 +141,5 @@ export function useShipTreeData(characterId: number | null): ShipTreeSource | nu
     implants,
     cloneState,
   ]);
-  return failed ? 'failed' : source;
+  return { source: failed ? 'failed' : source, retry };
 }

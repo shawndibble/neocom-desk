@@ -58,6 +58,8 @@ function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities
     capabilities: { ...NO_CORP_CAPABILITIES, ...capabilities },
     missingScopes: [],
     roles: [],
+    readFailed: false,
+    retry: () => {},
   };
 }
 
@@ -164,8 +166,20 @@ describe('access (AC1)', () => {
   it('waits rather than deciding while corp access is still resolving', () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     renderMembers();
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+  });
+
+  it('says the roles could not be checked, with a Try again, instead of waiting for good', async () => {
+    const retry = vi.fn();
+    mockedAccess.mockReturnValue({ ...accessOf('unknown', {}), readFailed: true, retry });
+    renderMembers();
+    expect(
+      screen.getAllByText("Can't check your corporation roles right now").length
+    ).toBeGreaterThan(0);
+    expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   /**
@@ -317,7 +331,7 @@ describe('the roster table', () => {
   it('says it could not load, not "no member activity", when the tracking read failed (offline)', async () => {
     mocked.loadCorporationMemberTracking.mockResolvedValue({ cached: null, needsReauth: false });
     renderMembers();
-    expect(await screen.findAllByText("Couldn't load — try again")).not.toHaveLength(0);
+    expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
     expect(screen.queryByText('No member activity')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     // The join/leave baseline is not consumed while the page cannot show the change.

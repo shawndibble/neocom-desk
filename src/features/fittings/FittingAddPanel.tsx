@@ -45,6 +45,7 @@ import { endFittingDrag, startFittingDrag } from './fittingDrag';
 import { useFittingItemActions } from './fittingItemActions';
 import type { FittingContext } from './fittingContext';
 import { useHullFit } from './useHullFit';
+import { CatalogueLoadingNote, ShipDataWaitingNote } from './FittingDataNotices';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 type BrowserTab = 'modules' | 'charges' | 'drones' | 'cargo';
@@ -599,9 +600,7 @@ export function FittingAddPanel({
               </NativeSelect>
             </div>
 
-            {context === null && (
-              <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>
-            )}
+            {context === null && <ShipDataWaitingNote />}
             {context !== null && hullFit === null && (
               <p className="text-xs text-text-dim">{t('fittings.add.checkingHull')}</p>
             )}
@@ -610,7 +609,7 @@ export function FittingAddPanel({
             )}
 
             {catalogue === null ? (
-              <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>
+              <CatalogueLoadingNote />
             ) : trimmed !== '' ? (
               results.length === 0 ? (
                 <>
@@ -724,7 +723,7 @@ function ChargesTab({
   };
 
   if (groups === null) {
-    return <p className="text-xs text-warning">{t('fittings.add.waitingForShipData')}</p>;
+    return <ShipDataWaitingNote />;
   }
   if (groups.length === 0) {
     return <p className="text-xs text-text-dim">{t('fittings.add.noChargeTakers')}</p>;
@@ -895,7 +894,7 @@ function CargoTab({
         />
       </label>
       {catalogue === null ? (
-        <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>
+        <CatalogueLoadingNote />
       ) : trimmed === '' ? (
         <p className="text-xs text-text-dim">{t('fittings.add.cargoHint')}</p>
       ) : results.length === 0 ? (

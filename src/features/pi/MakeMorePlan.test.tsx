@@ -126,7 +126,7 @@ describe('MakeMorePlan', () => {
         <MakeMorePlan snapshot={snapshot} characterId={1} onFindBest={vi.fn()} />
       </MemoryRouter>
     );
-    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
   });
 
   it('with prices down keeps the wins that need no price, with no gain and no other figure', () => {
@@ -143,7 +143,7 @@ describe('MakeMorePlan', () => {
     } as unknown as PlanAdvice;
     mockState = { status: 'prices-failed', advice: unpriced };
     const { container } = renderPlan();
-    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
     const panel = screen.getByRole('heading', { name: /Quick wins/ }).closest('section')!;
     expect(within(panel).getAllByRole('checkbox')).toHaveLength(2);
     expect(panel).not.toHaveTextContent(/ISK/);
@@ -158,7 +158,7 @@ describe('MakeMorePlan', () => {
       advice: { ...fixtureAdvice, colonies: [] } as unknown as PlanAdvice,
     };
     renderPlan();
-    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    expect(screen.getByText('Prices unavailable right now')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /Quick wins/ })).not.toBeInTheDocument();
   });
 

@@ -7,6 +7,7 @@ import wasmInit, {
   type Projection,
   type Violation,
 } from '@eveshipfit/dogma-engine';
+import { setDogmaEngineStatus } from './dogmaEngineStatus';
 import { createIdleGuard, drainBodyWithGuard, readBodyWithGuard } from '@/lib/idleTimeout';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import type { PlanEntry } from '@/engine/types';
@@ -178,6 +179,8 @@ let enginePromise: Promise<DogmaEngine> | null = null;
 /** Set once `loadDogmaEngine` has resolved; the only way to the synchronous fit checks. */
 let readyEngine: DogmaEngine | null = null;
 const readyListeners = new Set<() => void>();
+const progressListeners = new Set<(progress: DogmaAssetProgress) => void>();
+let lastProgress: DogmaAssetProgress | null = null;
 
 /** The ready engine, or null until `loadDogmaEngine` has resolved. Never starts a load. */
 export function readyDogmaEngine(): DogmaEngine | null {
@@ -205,8 +208,17 @@ export function subscribeDogmaEngine(listener: () => void): () => void {
 export function loadDogmaEngine(
   onProgress?: (progress: DogmaAssetProgress) => void
 ): Promise<DogmaEngine> {
+  // Every caller's callback hears the one running load, however late it joins
+  // (a Retry or a start screen may have begun it before the stats asked), and
+  // the latest figure is replayed so a late joiner does not wait for the next chunk.
+  if (onProgress && !readyEngine) {
+    progressListeners.add(onProgress);
+    if (lastProgress) onProgress(lastProgress);
+  }
   if (!enginePromise) {
+    lastProgress = null;
     void deleteStaleAssetCaches();
+    setDogmaEngineStatus('loading');
     enginePromise = (async () => {
       let wasmLoaded = 0;
       let sdeLoaded = 0;
@@ -214,7 +226,8 @@ export function loadDogmaEngine(
       let sdeTotal: number | null = null;
       const report = () => {
         const totalBytes = wasmTotal === null || sdeTotal === null ? null : wasmTotal + sdeTotal;
-        onProgress?.({ loadedBytes: wasmLoaded + sdeLoaded, totalBytes });
+        lastProgress = { loadedBytes: wasmLoaded + sdeLoaded, totalBytes };
+        for (const listener of [...progressListeners]) listener(lastProgress);
       };
 
       const [wasmBytes, sdeBytes] = await Promise.all([
@@ -233,16 +246,32 @@ export function loadDogmaEngine(
       await wasmInit({ module_or_path: wasmBytes });
       load_sde(new Uint8Array(sdeBytes));
       readyEngine = dogmaEngine;
+      progressListeners.clear();
+      setDogmaEngineStatus('ready');
       for (const listener of readyListeners) listener();
       return dogmaEngine;
     })().catch((error: unknown) => {
       // A failed load (offline on first visit, a bad response, …) must not
       // wedge every later attempt behind the same rejected promise.
       enginePromise = null;
+      progressListeners.clear();
+      setDogmaEngineStatus('failed');
       throw error;
     });
   }
   return enginePromise;
+}
+
+/**
+ * Starts the engine download if it is not under way and swallows the outcome:
+ * for a Retry, a reconnect, or a screen that just wants the data coming. The
+ * status (`dogmaEngineStatus`) and whoever awaits `loadDogmaEngine` report
+ * how it went. Not `warmDogmaEngineAssets`, which only fills the cache.
+ */
+export function warmDogmaEngine(): void {
+  void loadDogmaEngine().catch(() => {
+    // Reported through the status.
+  });
 }
 
 /**

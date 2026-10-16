@@ -5,10 +5,11 @@
  * scope and the fields shown (name, ticker, bio) rarely change, so the
  * `STALE_AFTER.static` window applies here too.
  *
- * Deliberately separate from `stores/publicInfo.ts`, which only caches the
- * signed-in Character's own `{ corporationName, allianceName }` strings for
- * `CharacterHeader` — this module needs the full record (ticker, member
- * count, CEO) for a Character that need not be one already known locally.
+ * `stores/publicInfo.ts` reads through these loaders too, so the
+ * `{ corporationName, allianceName }` strings `CharacterHeader` shows survive
+ * a cold start offline; this module also serves the full record (ticker,
+ * member count, CEO) for a Character that need not be one already known
+ * locally.
  */
 import {
   getCharacterPublicInfo,
@@ -52,8 +53,15 @@ export interface PublicAllianceInfo extends AlliancePublicInfo {
   alliance_id: number;
 }
 
+/**
+ * `staleAfterMs` defaults to the long static window. A caller that must notice
+ * the character *changing corporation* (`stores/publicInfo`, issue #293) passes
+ * a short one, so online it reads live and a lapsed row is only the offline
+ * fallback.
+ */
 export async function loadPublicCharacterInfo(
-  characterId: number
+  characterId: number,
+  options: { staleAfterMs?: number } = {}
 ): Promise<PublicCharacterInfo | null> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCharacterPublicInfo(characterId, options)
@@ -62,14 +70,18 @@ export async function loadPublicCharacterInfo(
     GLOBAL_CACHE_CHARACTER_ID,
     `public-character:${characterId}`,
     fetchLive,
-    { staleAfterMs: STALE_AFTER.static, conditional }
+    { staleAfterMs: options.staleAfterMs ?? STALE_AFTER.static, conditional }
   );
   return result ? { ...result.data, character_id: characterId } : null;
 }
 
-export async function loadPublicCorporationInfo(
+/**
+ * The corporation's own public record, without resolving its CEO / creator
+ * names — for a caller (the corp name in a header) that needs only the record.
+ */
+export async function loadPublicCorporationRecord(
   corporationId: number
-): Promise<PublicCorporationInfo | null> {
+): Promise<(CorporationPublicInfo & { corporation_id: number }) | null> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCorporationPublicInfo(corporationId, options)
   );
@@ -79,13 +91,19 @@ export async function loadPublicCorporationInfo(
     fetchLive,
     { staleAfterMs: STALE_AFTER.static, conditional }
   );
-  if (!result) return null;
-  const names = await resolveNames([...new Set([result.data.ceo_id, result.data.creator_id])]);
+  return result ? { ...result.data, corporation_id: corporationId } : null;
+}
+
+export async function loadPublicCorporationInfo(
+  corporationId: number
+): Promise<PublicCorporationInfo | null> {
+  const record = await loadPublicCorporationRecord(corporationId);
+  if (!record) return null;
+  const names = await resolveNames([...new Set([record.ceo_id, record.creator_id])]);
   return {
-    ...result.data,
-    corporation_id: corporationId,
-    ceoName: names.get(result.data.ceo_id) ?? null,
-    creatorName: names.get(result.data.creator_id) ?? null,
+    ...record,
+    ceoName: names.get(record.ceo_id) ?? null,
+    creatorName: names.get(record.creator_id) ?? null,
   };
 }
 

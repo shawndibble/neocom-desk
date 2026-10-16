@@ -18,6 +18,7 @@ import { usePilotProfile } from './fittingPilotProfile';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import { useCompareFittings } from './useCompareFittings';
 import { useCompareStats } from './useCompareStats';
+import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import type { LibraryRow } from './useLibraryFittings';
 
 interface FittingPreviewProps {
@@ -114,12 +115,22 @@ export function FittingPreview({
 }: FittingPreviewProps) {
   const { t } = useTranslation();
   const fitting = usePreviewFitting(row);
-  const { profile } = usePilotProfile(characterId);
+  const {
+    profile,
+    failed: profileFailed,
+    skillsKnown,
+    retry: retryProfile,
+  } = usePilotProfile(characterId);
   const fittings = useMemo(() => [fitting], [fitting]);
   const compared = useCompareStats(fittings, profile);
   const shareCode = useShareCode(row, fitting);
 
   const stats = compared.values[0];
+  const needsConnection = useShipDataNeedsConnection();
+  // No numbers will come: the pilot's skills could not be read, or the calculation failed.
+  const statsGaveUp = !stats && (profileFailed || compared.failed[0]);
+  const retryStats = profileFailed ? retryProfile : compared.retry;
+  const noStatsText = (key: string) => (statsGaveUp ? t('fittings.stats.unavailable') : t(key));
   const unreadable = row.source === 'saved' && row.hull === null;
   const notes = rowNotes(row);
   const typeName = (typeId: number) => catalogueTypeName(catalogue, typeId);
@@ -192,17 +203,36 @@ export function FittingPreview({
               <div className="min-w-0 space-y-4">
                 {stats ? (
                   <FitMeters stats={stats} />
-                ) : compared.failed[0] ? (
-                  <p className="text-xs text-warning">{t('fittings.start.preview.statsFailed')}</p>
+                ) : statsGaveUp ? (
+                  <div
+                    role="alert"
+                    className="flex flex-wrap items-center gap-2 text-xs text-warning"
+                  >
+                    <span>
+                      {t(
+                        profileFailed
+                          ? 'fittings.stats.errorSkills'
+                          : needsConnection
+                            ? 'fittings.stats.errorOffline'
+                            : 'fittings.start.preview.statsFailed'
+                      )}
+                    </span>
+                    <Button size="sm" onClick={retryStats}>
+                      {t('common.retry')}
+                    </Button>
+                  </div>
                 ) : (
                   <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>
+                )}
+                {stats && !skillsKnown && (
+                  <p className="text-xs text-warning">{t('fittings.stats.skillsUnknown')}</p>
                 )}
                 <Section title={t('fittings.start.preview.sectionOffense')}>
                   {stats ? (
                     <OffensePanel stats={stats} typeName={typeName} />
                   ) : (
                     <p className="text-xs text-text-dim">
-                      {t('fittings.start.preview.calculating')}
+                      {noStatsText('fittings.start.preview.calculating')}
                     </p>
                   )}
                 </Section>
@@ -211,7 +241,7 @@ export function FittingPreview({
                     <DefensePanel stats={stats} />
                   ) : (
                     <p className="text-xs text-text-dim">
-                      {t('fittings.start.preview.calculating')}
+                      {noStatsText('fittings.start.preview.calculating')}
                     </p>
                   )}
                 </Section>

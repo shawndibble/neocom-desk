@@ -22,7 +22,6 @@ import {
   DataTable,
   EmptyState,
   LiveStatus,
-  LoadFailedState,
   InfoTooltip,
   IskAmount,
   Modal,
@@ -42,7 +41,7 @@ import {
   MenuItem,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { useRetryFocus } from '@/lib/useRetryFocus';
+import { DataGate } from '@/components/DataGate';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
@@ -298,11 +297,7 @@ export function OpportunitiesPanel({
   } = blueprintsState;
   /** Every selected Character came back with nothing: "no blueprints" would be a guess. */
   const allBlueprintsFailed = characterIds.length > 0 && failedCount === characterIds.length;
-  // Retry unmounts into the spinner: focus waits on the always-mounted body wrapper.
-  const [bodyRef, , holdRetryFocus] = useRetryFocus(
-    blueprintsLoading ? 'busy' : allBlueprintsFailed ? 'failed' : 'ok',
-    characterIdsKey
-  );
+
   const oldestFetchedMs = oldestFetchedAt?.getTime() ?? null;
   useEffect(() => {
     onDataAgeChange?.(oldestFetchedMs === null ? null : new Date(oldestFetchedMs));
@@ -820,91 +815,92 @@ export function OpportunitiesPanel({
         </span>
       }
     >
-      <h3 ref={bodyRef} tabIndex={-1} className="sr-only focus:outline-none">
-        {t('industry.opportunitiesTitle')}
-      </h3>
-      <LiveStatus>
-        {!blueprintsLoading && failedCount > 0
-          ? allBlueprintsFailed
-            ? t('common.couldntLoad')
-            : t('industry.opportunitiesSomeFailed', { count: failedCount })
-          : ''}
-      </LiveStatus>
-      {!blueprintsLoading && !allBlueprintsFailed && (anyFromCache || failedCount > 0) && (
-        <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-          {failedCount > 0
+      <DataGate
+        status={
+          blueprintsLoading
+            ? 'busy'
+            : candidates.length === 0 && allBlueprintsFailed
+              ? 'failed'
+              : 'ok'
+        }
+        title={t('common.couldntLoad')}
+        hint={t('industry.opportunitiesLoadFailedHint')}
+        onRetry={() => setRetryTick((n) => n + 1)}
+        resetKey={characterIdsKey}
+        busy={
+          <div className="flex justify-center py-8">
+            <Spinner label={t('common.loading')} />
+          </div>
+        }
+      >
+        <LiveStatus>
+          {failedCount > 0 && !allBlueprintsFailed
             ? t('industry.opportunitiesSomeFailed', { count: failedCount })
-            : t('common.offlineTitle')}
-        </p>
-      )}
-      {blueprintsLoading ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : candidates.length === 0 && allBlueprintsFailed ? (
-        <LoadFailedState
-          className="py-8"
-          hint={t('industry.opportunitiesLoadFailedHint')}
-          onRetry={() => {
-            holdRetryFocus();
-            setRetryTick((n) => n + 1);
-          }}
-        />
-      ) : candidates.length === 0 ? (
-        <EmptyState
-          title={t('industry.opportunitiesEmptyTitle')}
-          hint={t('industry.opportunitiesEmptyHint')}
-          className="py-8"
-        />
-      ) : needsRefresh ? (
-        <EmptyState
-          title={t('industry.opportunitiesNeedsRefreshTitle')}
-          hint={t('industry.opportunitiesNeedsRefreshHint')}
-          className="py-8"
-        />
-      ) : stockFilter !== 'any' && rows.length === 0 && allRows.length > 0 ? (
-        <EmptyState
-          title={t('industry.opportunitiesStockEmptyTitle')}
-          hint={t('industry.opportunitiesStockEmptyHint')}
-          action={
-            <Button size="sm" onClick={() => setStockFilter('any')}>
-              {t('common.resetFilters')}
-            </Button>
-          }
-          className="py-8"
-        />
-      ) : isDesktop ? (
-        <div className="overflow-x-auto">
-          <DataTable
-            {...opportunitiesExport.tableProps}
-            columns={shownColumns}
-            rows={rows}
-            rowKey={opportunityRowKey}
-            virtualize="auto"
-            label={t('industry.opportunitiesTitle')}
-            onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
-            rowContextMenu={rowContextMenu}
-            rowMoreActions
-            {...sortProps}
+            : ''}
+        </LiveStatus>
+        {!allBlueprintsFailed && (anyFromCache || failedCount > 0) && (
+          <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+            {failedCount > 0
+              ? t('industry.opportunitiesSomeFailed', { count: failedCount })
+              : t('common.offlineTitle')}
+          </p>
+        )}
+        {candidates.length === 0 ? (
+          <EmptyState
+            title={t('industry.opportunitiesEmptyTitle')}
+            hint={t('industry.opportunitiesEmptyHint')}
+            className="py-8"
           />
-        </div>
-      ) : (
-        <MobileOpportunityList
-          rows={rows}
-          showCharacterColumn={showCharacterColumn}
-          selectedIds={selectedIds}
-          onToggleSelected={toggleSelected}
-          onClearSelected={() => setSelectedIds(new Set())}
-          onCompare={onAddToCompare}
-          onStartPlan={onStartPlan}
-          onViewHistory={(typeId, itemName, regionId) =>
-            setHistoryItem({ typeId, itemName, regionId })
-          }
-          skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
-          nameForSkill={(typeID) => nameForType(catalog, typeID)}
-          nameForCharacter={(id) => characterNames.get(id) ?? unknown}
-        />
-      )}
+        ) : needsRefresh ? (
+          <EmptyState
+            title={t('industry.opportunitiesNeedsRefreshTitle')}
+            hint={t('industry.opportunitiesNeedsRefreshHint')}
+            className="py-8"
+          />
+        ) : stockFilter !== 'any' && rows.length === 0 && allRows.length > 0 ? (
+          <EmptyState
+            title={t('industry.opportunitiesStockEmptyTitle')}
+            hint={t('industry.opportunitiesStockEmptyHint')}
+            action={
+              <Button size="sm" onClick={() => setStockFilter('any')}>
+                {t('common.resetFilters')}
+              </Button>
+            }
+            className="py-8"
+          />
+        ) : isDesktop ? (
+          <div className="overflow-x-auto">
+            <DataTable
+              {...opportunitiesExport.tableProps}
+              columns={shownColumns}
+              rows={rows}
+              rowKey={opportunityRowKey}
+              virtualize="auto"
+              label={t('industry.opportunitiesTitle')}
+              onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
+              rowContextMenu={rowContextMenu}
+              rowMoreActions
+              {...sortProps}
+            />
+          </div>
+        ) : (
+          <MobileOpportunityList
+            rows={rows}
+            showCharacterColumn={showCharacterColumn}
+            selectedIds={selectedIds}
+            onToggleSelected={toggleSelected}
+            onClearSelected={() => setSelectedIds(new Set())}
+            onCompare={onAddToCompare}
+            onStartPlan={onStartPlan}
+            onViewHistory={(typeId, itemName, regionId) =>
+              setHistoryItem({ typeId, itemName, regionId })
+            }
+            skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
+            nameForSkill={(typeID) => nameForType(catalog, typeID)}
+            nameForCharacter={(id) => characterNames.get(id) ?? unknown}
+          />
+        )}
+      </DataGate>
       {historyItem && (
         <Modal
           open

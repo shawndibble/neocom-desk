@@ -25,7 +25,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LiveStatus, Panel } from '@/components/ui';
-import { useOnline } from '@/stores/network';
 import {
   disabledClassName,
   focusRingClassName,
@@ -106,12 +105,9 @@ interface CorpKindCardsProps {
 /** A permitted kind whose read failed: its title, and one line saying so. */
 function UnreadableCard({ kind }: { kind: CorpCardKind }) {
   const { t } = useTranslation();
-  const online = useOnline();
   return (
     <Panel title={t(TITLE_FOR_KIND[kind])} padded={false} className="min-w-0">
-      <p className="px-3 py-2.5 text-xs text-text-dim">
-        {t(online ? 'common.couldntLoad' : 'common.couldntLoadOffline')}
-      </p>
+      <p className="px-3 py-2.5 text-xs text-text-dim">{t('common.couldntLoad')}</p>
     </Panel>
   );
 }

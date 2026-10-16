@@ -28,8 +28,6 @@ import {
   FilterChip,
   FilterField,
   IconButton,
-  LiveStatus,
-  LoadFailedState,
   PageHeader,
   Panel,
   SearchInput,
@@ -42,6 +40,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
+import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
@@ -76,7 +75,7 @@ import {
 } from '@/engine/corp/members';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { useRetryFocus } from '@/lib/useRetryFocus';
+import { DataGate } from '@/components/DataGate';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
@@ -302,11 +301,6 @@ function CorpMembersView() {
   // answer as a roster EVE reported empty, so it never reaches the table's
   // "no member activity" line.
   const loadFailed = data === null || data.members === null;
-  // Retry can unmount into the spinner: focus waits on the always-mounted wrapper.
-  const [resultRef, , holdRetryFocus] = useRetryFocus(
-    snapshot.loading ? 'busy' : loadFailed ? 'failed' : 'ok',
-    snapshot.activeCharacterId
-  );
 
   if (!snapshot.hydrated) return <Spinner />;
 
@@ -337,23 +331,14 @@ function CorpMembersView() {
         }
       />
 
-      <h2 ref={resultRef} tabIndex={-1} className="sr-only focus:outline-none">
-        {t('corp.members.title')}
-      </h2>
-      <LiveStatus>{!snapshot.loading && loadFailed ? t('common.couldntLoad') : ''}</LiveStatus>
-      {snapshot.loading && data === null ? (
-        <Spinner />
-      ) : loadFailed ? (
-        <Panel>
-          <LoadFailedState
-            hint={t('corp.members.loadFailedHint')}
-            onRetry={() => {
-              holdRetryFocus();
-              snapshot.refresh();
-            }}
-          />
-        </Panel>
-      ) : (
+      <DataGate
+        status={snapshot.loading && data === null ? 'busy' : loadFailed ? 'failed' : 'ok'}
+        title={t('common.couldntLoad')}
+        hint={t('corp.members.loadFailedHint')}
+        onRetry={snapshot.refresh}
+        resetKey={snapshot.activeCharacterId}
+        busy={<Spinner />}
+      >
         <div className="space-y-2">
           <FilterBar
             value={rosterFilter}
@@ -453,7 +438,7 @@ function CorpMembersView() {
             )}
           </Panel>
         </div>
-      )}
+      </DataGate>
     </div>
   );
 }
@@ -462,10 +447,8 @@ export function CorpMembers() {
   const { t } = useTranslation();
   const gate = useCorpRouteGate((capabilities) => capabilities.canReadMembers);
 
-  if (gate.status === 'loading') return <Spinner />;
-
-  if (gate.status === 'denied') {
-    return (
+  const content =
+    gate.status === 'denied' ? (
       <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader title={t('corp.members.title')} />
         <CorpDenied
@@ -474,8 +457,9 @@ export function CorpMembers() {
           hint={t('corp.members.noAccessHint')}
         />
       </div>
-    );
-  }
+    ) : gate.status === 'ready' ? (
+      <CorpMembersView />
+    ) : null;
 
-  return <CorpMembersView />;
+  return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;
 }

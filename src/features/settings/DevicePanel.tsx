@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, Checkbox, Field, Fields, Modal, Panel } from '@/components/ui';
@@ -6,6 +6,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { logoutAllCharacters } from '@/features/character/logoutAll';
+import { UnsyncedChangesWarning } from '@/features/character/UnsyncedChangesWarning';
 import { RemoveSharedOption } from '@/features/communities/RemoveSharedOption';
 import {
   deleteAllLocalData,
@@ -40,6 +41,7 @@ export function DevicePanel() {
   const [communities, setCommunities] = useState<CharacterCommunity[] | null>(null);
   const [leaveCommunities, setLeaveCommunities] = useState(true);
   const syncConfigured = isSyncConfigured();
+  const cancelLogoutRef = useRef<HTMLButtonElement>(null);
 
   function openDialog(next: Dialog) {
     setFailed(false);
@@ -148,6 +150,7 @@ export function DevicePanel() {
           if (!working) setDialog(null);
         }}
         title={t('settings.deviceLogoutConfirmTitle')}
+        initialFocusRef={cancelLogoutRef}
       >
         <p className="text-xs text-text-dim">
           {t('settings.deviceLogoutConfirm', { count: loggedIn })}
@@ -157,21 +160,25 @@ export function DevicePanel() {
           checked={removeShared}
           onChange={setRemoveShared}
         />
+        <UnsyncedChangesWarning
+          characterIds={(characters ?? []).map((character) => character.characterId)}
+          syncConfigured={syncConfigured}
+        />
         {failed && (
           <p role="alert" className="mt-2 text-xs text-danger">
             {t('settings.deviceLogoutFailed')}
           </p>
         )}
         <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" disabled={working} onClick={() => setDialog(null)}>
-            {t('characters.cancel')}
-          </Button>
           <Button
-            variant="danger"
+            ref={cancelLogoutRef}
             size="sm"
             disabled={working}
-            onClick={() => void confirmLogout()}
+            onClick={() => setDialog(null)}
           >
+            {t('characters.cancel')}
+          </Button>
+          <Button variant="danger" size="sm" loading={working} onClick={() => void confirmLogout()}>
             {t('settings.deviceLogoutAction')}
           </Button>
         </div>

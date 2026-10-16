@@ -5,8 +5,6 @@ import {
   DataTable,
   EmptyState,
   IconButton,
-  LiveStatus,
-  LoadFailedState,
   Panel,
   SearchInput,
   Spinner,
@@ -24,7 +22,7 @@ import {
   filterNpcStandingRows,
   type NpcStandingRow,
 } from '@/features/character/npcStandingsRows';
-import { useRetryFocus } from '@/lib/useRetryFocus';
+import { DataGate } from '@/components/DataGate';
 import { useUrlSort } from '@/lib/useUrlState';
 
 const STANDINGS_SORT = { columnId: 'standing', direction: 'desc' } as const;
@@ -128,15 +126,13 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
 
   const unreadable =
     state !== null && state.characterId === characterId && (state.failed || !state.available);
-  // Retry unmounts into the spinner: focus waits on the always-mounted content wrapper.
-  const [contentRef, , holdRetryFocus] = useRetryFocus(
-    !state || state.characterId !== characterId || refreshing
-      ? 'busy'
-      : unreadable
-        ? 'failed'
-        : 'ok',
-    characterId
-  );
+  // A refresh keeps the rows on screen (the button is disabled meanwhile); only the
+  // "couldn't load" state, which has no rows to keep, shows a spinner while it retries.
+  const spinning =
+    !state ||
+    state.characterId !== characterId ||
+    (refreshing && (state.failed || !state.available));
+  const status = lacksScope ? 'ok' : spinning ? 'busy' : unreadable ? 'failed' : 'ok';
 
   const rows = useMemo(() => filterNpcStandingRows(state?.rows ?? [], text), [state?.rows, text]);
   const columns = useMemo<DataTableColumn<NpcStandingRow>[]>(
@@ -189,29 +185,10 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
         actionLabel={t('contacts.reauthAction')}
       />
     );
-  } else if (
-    !state ||
-    state.characterId !== characterId ||
-    // A refresh keeps the rows on screen (the button is disabled meanwhile); only
-    // the "couldn't load" state, which has no rows to keep, shows a spinner.
-    (refreshing && (state.failed || !state.available))
-  ) {
-    content = (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
-  } else if (state.failed || !state.available) {
-    // Nothing was loaded, so "no NPC standings" would be a guess: say so, with Retry.
-    content = (
-      <LoadFailedState
-        hint={t('contacts.standingsUnavailableHint')}
-        onRetry={() => {
-          holdRetryFocus();
-          refresh();
-        }}
-      />
-    );
+  } else if (!state || status !== 'ok') {
+    // Shown by the `DataGate` below: its spinner, or "couldn't load" with Retry —
+    // "no NPC standings" would be a guess when nothing was loaded.
+    content = null;
   } else if (state.rows.length === 0) {
     content = (
       <div className="space-y-3">
@@ -272,12 +249,20 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     meta,
     actions,
     content: (
-      <div ref={contentRef} tabIndex={-1} className="focus:outline-none">
-        <LiveStatus>
-          {!lacksScope && unreadable && !refreshing ? t('common.couldntLoad') : ''}
-        </LiveStatus>
+      <DataGate
+        status={status}
+        title={t('common.couldntLoad')}
+        hint={t('contacts.standingsUnavailableHint')}
+        onRetry={refresh}
+        resetKey={characterId}
+        busy={
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        }
+      >
         {content}
-      </div>
+      </DataGate>
     ),
   };
 }

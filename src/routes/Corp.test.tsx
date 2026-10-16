@@ -92,6 +92,8 @@ function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities
     capabilities: { ...NO_CORP_CAPABILITIES, ...capabilities },
     missingScopes: [],
     roles: [],
+    readFailed: false,
+    retry: () => {},
   };
 }
 
@@ -274,7 +276,7 @@ describe('per-panel capability gating (AC3)', () => {
 
     renderCorp();
 
-    expect(await screen.findAllByText("Couldn't load — try again")).not.toHaveLength(0);
+    expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
     expect(screen.getByText('Vitals')).toBeInTheDocument();
     expect(screen.queryByText('Division 1')).not.toBeInTheDocument();
     expect(screen.queryByText('Runway')).not.toBeInTheDocument();
@@ -625,7 +627,7 @@ describe('a failed read', () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadStructures: true }));
     mocked.loadCorporationStructures.mockResolvedValue({ cached: null, needsReauth: false });
     renderCorp();
-    await waitFor(() => expect(screen.getAllByText("Couldn't load — try again")).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText("Couldn't load")).toHaveLength(2));
     expect(screen.queryByText('Every structure is fuelled.')).not.toBeInTheDocument();
     expect(screen.queryByText('No structure is on a timer.')).not.toBeInTheDocument();
     expect(screen.queryByText(/Nothing due/)).not.toBeInTheDocument();
@@ -643,9 +645,7 @@ describe('an unknown corporation', () => {
     mocked.loadCorporationId.mockResolvedValue(null);
     renderCorp();
     // Nothing was read, so the card says it could not load rather than "nothing due".
-    await waitFor(() =>
-      expect(screen.getAllByText("Couldn't load — try again").length).toBeGreaterThan(0)
-    );
+    await waitFor(() => expect(screen.getAllByText("Couldn't load").length).toBeGreaterThan(0));
     expect(screen.queryByText(/Nothing due/)).not.toBeInTheDocument();
     expect(screen.queryByText('Every structure is fuelled.')).not.toBeInTheDocument();
     expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();

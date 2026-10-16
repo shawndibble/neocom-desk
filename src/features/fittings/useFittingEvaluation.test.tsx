@@ -195,6 +195,19 @@ describe('useFittingEvaluation', () => {
     expect(result.current.statsError).toBe(false);
   });
 
+  it('calculates again by itself when the connection returns after a failure', async () => {
+    engine.computeFittingStats.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const { result } = render({ fitting: RIFTER });
+    await waitFor(() => expect(result.current.statsError).toBe(true));
+
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    await waitFor(() => expect(result.current.stats).not.toBeNull());
+    expect(result.current.statsError).toBe(false);
+  });
+
   it('keeps the stats and price through a same-hull edit, and drops them at once for a new hull', async () => {
     const { result, rerender } = render({ fitting: RIFTER });
     await waitFor(() => expect(result.current.stats).not.toBeNull());

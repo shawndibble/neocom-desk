@@ -17,10 +17,10 @@
  * degrades unreachable Fuzzwork to per-type nulls, not a throw).
  */
 import {
-  getHubPrices,
+  getHubPricesWithStatus,
   getAdjustedPrices,
   HUB_PRICE_TTL_MS,
-  type HubAggregate,
+  type PricesWithStatus,
 } from '@/market/prices';
 import { fetchSystemCostIndices, systemCostIndexByActivity } from '@/market/cost-index';
 import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@/esi/cache';
@@ -60,6 +60,14 @@ export interface MarketSnapshot {
   systemCostIndex: number | null;
   /** True only when ESI answered but has no index for the system — never for the offline null. */
   systemCostIndexMissing?: boolean;
+  /**
+   * True when the Fuzzwork hub lookup failed. Every hub price above is then
+   * "unknown", not "no orders": a view says "Prices unavailable" instead of
+   * "no price" / "0 ISK" copy. Deliberately not set when only the ESI adjusted
+   * prices failed (`adjustedPrices === null` says that), so a view that needs
+   * only hub prices is not told they are missing.
+   */
+  hubPricesUnreachable?: boolean;
 }
 
 /** Reuses the hub-price TTL: both are "how often do market conditions change" caches. */
@@ -209,9 +217,9 @@ export function loadMarketSnapshots(
     for (const typeId of request.typeIds) group.typeIds.add(typeId);
   }
 
-  const hubBatches = new Map<number, Promise<Map<number, HubAggregate>>>();
+  const hubBatches = new Map<number, Promise<PricesWithStatus>>();
   for (const [stationId, group] of byStation) {
-    hubBatches.set(stationId, getHubPrices(group.hub, [...group.typeIds]));
+    hubBatches.set(stationId, getHubPricesWithStatus(group.hub, [...group.typeIds]));
   }
 
   const adjustedPrices = loadAdjustedPrices();
@@ -226,7 +234,7 @@ export function loadMarketSnapshots(
   }
 
   return requests.map(async (request) => {
-    const hubAggregates = await hubBatches.get(request.hub.stationId)!;
+    const { prices: hubAggregates, unreachable } = await hubBatches.get(request.hub.stationId)!;
     const hubPrices: HubPrices = {};
     const hubBuyPrices: HubPrices = {};
     const hubSellVolumes: HubPrices = {};
@@ -243,13 +251,15 @@ export function loadMarketSnapshots(
     const systemCostIndexMissing = indices != null && found === undefined;
     const systemCostIndex = indices == null ? null : (found ?? 0);
 
+    const adjusted = await adjustedPrices;
     return {
       hubPrices,
       hubBuyPrices,
       hubSellVolumes,
-      adjustedPrices: await adjustedPrices,
+      adjustedPrices: adjusted,
       systemCostIndex,
       systemCostIndexMissing,
+      hubPricesUnreachable: unreachable,
     };
   });
 }

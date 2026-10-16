@@ -13,7 +13,7 @@
  * `sellTotal` instead, so it reflects only the side this feature prices.
  */
 import { buildAppraisal, type AppraisalItem } from '@/engine/market/appraisal';
-import { getHubPrices } from '@/market/prices';
+import { getHubPricesWithStatus } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 
 export interface ContractMarketValue {
@@ -21,6 +21,11 @@ export interface ContractMarketValue {
   total: number;
   /** Lines with no sell-order price at this hub, left out of `total`. */
   unpriced: number;
+  /**
+   * The price source could not be reached, so a 0 `total` means "unknown", not
+   * "worth nothing": the row shows a placeholder when no line priced.
+   */
+  unreachable: boolean;
 }
 
 /**
@@ -44,7 +49,7 @@ export async function loadContractMarketValue(
   typeNames: ReadonlyMap<number, string>,
   sellOverrides: ReadonlyMap<number, number> = new Map()
 ): Promise<ContractMarketValue> {
-  const prices = await getHubPrices(
+  const { prices, unreachable } = await getHubPricesWithStatus(
     hub,
     items.map((item) => item.type_id)
   );
@@ -59,5 +64,6 @@ export async function loadContractMarketValue(
   return {
     total: totals.sell,
     unpriced: rows.filter((row) => row.sellTotal === null).length,
+    unreachable,
   };
 }

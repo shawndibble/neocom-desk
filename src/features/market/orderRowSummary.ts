@@ -33,6 +33,7 @@ export type OrderAdviceInput = Pick<
   | 'price'
   | 'costBasis'
   | 'frequentlyUndercut'
+  | 'competitionUnchecked'
   | 'volumeRemain'
 >;
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import type { SolarSystemResolution } from '@/features/character/systemLookup';
 import { afterEach, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -51,10 +52,13 @@ vi.mock('./marketData', () => ({ loadMarketSnapshot }));
 // The build-system field resolves a typed name through ESI. Mocked here for the
 // same reason as the snapshot: the panel under test needs an answer, not a network.
 const resolveSolarSystem = vi.hoisted(() =>
-  vi.fn(async (name: string) =>
+  vi.fn(async (name: string): Promise<SolarSystemResolution> =>
     name.trim().toLowerCase() === 'badivefi'
-      ? { id: 30003888, name: 'Badivefi', security: 'highsec' as const }
-      : null
+      ? {
+          status: 'found',
+          system: { id: 30003888, name: 'Badivefi', security: 'highsec' as const },
+        }
+      : { status: 'notFound' }
   )
 );
 vi.mock('@/features/character/systemLookup', () => ({ resolveSolarSystem }));
@@ -1100,6 +1104,21 @@ describe('BuildPlanDetail build system', () => {
     expect(valueOf(systemInput())).toBe('Notasystem');
   });
 
+  it('says it could not check, not "no such system", when the lookup is unavailable', async () => {
+    resolveSolarSystem.mockResolvedValueOnce({ status: 'unavailable' });
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness onUpdate={onUpdate} />);
+    await openOverride(user);
+
+    await user.type(systemInput(), 'Badivefi');
+    await user.tab();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't check that name");
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(valueOf(systemInput())).toBe('Badivefi');
+  });
+
   it('clears back to the hub system when the field is emptied', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
@@ -1367,6 +1386,26 @@ describe('BuildPlanDetail remembers the location it sets', () => {
       reactionBuildLocationName: 'Hek - Refinery',
     });
     expect(await db.settings.get(REACTION_FACILITY_DEFAULTS_SETTING_KEY)).toBeUndefined();
+  });
+});
+
+describe('BuildPlanDetail with an unreachable price source (offline)', () => {
+  it('keeps the materials and says prices are unavailable offline, instead of pricing them as missing', async () => {
+    const user = userEvent.setup();
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: {},
+      hubBuyPrices: {},
+      adjustedPrices: {},
+      systemCostIndex: 0.05,
+      hubPricesUnreachable: true,
+    });
+    render(<Harness />);
+    await openSetup(user);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect((await screen.findAllByText('Prices unavailable right now')).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/have no price on the chosen side/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Try again shortly/)).not.toBeInTheDocument();
   });
 });
 

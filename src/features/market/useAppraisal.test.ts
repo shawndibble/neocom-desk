@@ -31,10 +31,13 @@ function outcome(sell: number): AppraisalOutcome {
     refinesOreOrIce: false,
     accountingLevel: null,
     brokerRelationsLevel: null,
+    pricesUnreachable: false,
   };
 }
 
-const COMPARE_ROWS: HubComparisonRow[] = [{ hub: DEFAULT_TRADE_HUB, buy: 90, sell: 100 }];
+const COMPARE_ROWS: HubComparisonRow[] = [
+  { hub: DEFAULT_TRADE_HUB, buy: 90, sell: 100, unreachable: false },
+];
 
 beforeEach(() => {
   appraisePaste.mockReset();

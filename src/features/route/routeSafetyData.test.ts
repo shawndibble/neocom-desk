@@ -126,4 +126,18 @@ describe('loadRouteRegionNames', () => {
 
     expect(names.has(10000042)).toBe(false);
   });
+
+  it('names a region offline once it has been read, from the esiCache row', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([{ id: 10000042, name: 'Metropolis', category: 'region' }])
+      )
+    );
+    await loadRouteRegionNames([10000042]);
+
+    server.use(http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()));
+    const names = await loadRouteRegionNames([10000042]);
+
+    expect(names.get(10000042)).toBe('Metropolis');
+  });
 });

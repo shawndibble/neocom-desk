@@ -183,7 +183,22 @@ beforeEach(() => {
   mockedNpcStations.mockResolvedValue([
     { id: STATION_A, name: 'Jita IV - Moon 4', systemId: 30000142 },
   ]);
-  mockedStationPrices.mockResolvedValue(new Map());
+  // The real loader returns an entry (null prices = no orders) for every type
+  // of each station it reached; an absent entry means the station's fetch failed.
+  mockedStationPrices.mockImplementation(
+    async (requests) =>
+      new Map(
+        requests.flatMap(({ stationId, typeIds }) =>
+          typeIds.map(
+            (typeId) =>
+              [
+                stationPriceKey(stationId, typeId),
+                { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 },
+              ] as const
+          )
+        )
+      )
+  );
   mockedCostBases.mockResolvedValue(new Map());
   mockedSkills.mockResolvedValue(
     skillsFixture([
@@ -565,6 +580,34 @@ describe('OpenOrdersPanel', () => {
     expect(csv).toContain('"Tritanium","Sell",500,');
     expect(csv).toContain(`"${TYPE_NAMES.get(EXPIRING_ORDER.type_id)}","Sell",`);
     spy.mockRestore();
+  });
+
+  it('files an order under Not checked, not Healthy, when station prices could not be fetched', async () => {
+    mockedStationPrices.mockResolvedValue(new Map());
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [NO_COST_BASIS_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+
+    renderPanel();
+
+    // Not behind the Healthy fold, and the Healthy heading is not there at all.
+    const group = await screen.findByTestId('order-group-notChecked');
+    expect(screen.queryByTestId('order-group-healthy')).not.toBeInTheDocument();
+    expect(within(group).getByText(/Not checked · 1/)).toBeInTheDocument();
+    expect(within(group).getByText(/Market prices couldn't be loaded/)).toBeInTheDocument();
+    expect(within(group).queryByText(/Nobody beats your price/)).not.toBeInTheDocument();
+    const row = within(group).getByRole('row', { name: /Pyerite/ });
+    expect(within(row).getByText('Not checked')).toBeInTheDocument();
+    expect(within(row).queryByText('Best price')).not.toBeInTheDocument();
   });
 
   it('all-healthy: no "0 of N orders match" line, and the healthy sentence shows once', async () => {

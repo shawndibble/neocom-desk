@@ -145,7 +145,7 @@ describe('OpportunitiesPanel', () => {
       loadCharacterBlueprints.mockResolvedValue({ cached: null, needsReauth: false });
       renderPanel();
 
-      expect(await screen.findAllByText("Couldn't load — try again")).not.toHaveLength(0);
+      expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
       expect(screen.queryByText('No manufacturing blueprints found')).toBeNull();
 
       loadCharacterBlueprints.mockResolvedValue({ cached: { data: [], fetchedAt: new Date() } });

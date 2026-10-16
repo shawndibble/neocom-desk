@@ -18,21 +18,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Offline: the device has no connection and nothing is saved here yet. */
-export const Offline: Story = {
-  args: {
-    offline: true,
-    hint: 'This is not saved on this device yet. It loads when you reconnect.',
-  },
-};
-
-/** @summary Online but the read failed: generic wording with Retry. */
-export const Failed: Story = { args: { offline: false } };
+/** @summary Default copy: "Try again" online, "Connect once" offline (follows the browser). */
+export const Default: Story = { args: {} };
 
 /** @summary A named source that could not be reached. */
 export const NamedSource: Story = {
   args: {
-    offline: false,
     title: "Couldn't reach the contract index",
     hint: 'Nothing is cached yet.',
   },

@@ -14,7 +14,8 @@ import {
   loadWithCache,
   type CachedResult,
 } from '@/esi/cache';
-import { getUniverseSystemJumps, getUniverseSystemKills, postUniverseNames } from '@/esi/endpoints';
+import { getUniverseSystemJumps, getUniverseSystemKills } from '@/esi/endpoints';
+import { resolveNames } from '@/features/character/names';
 import {
   indexSystemJumps,
   indexSystemKills,
@@ -74,8 +75,9 @@ export async function loadPodKills(): Promise<ReadonlyMap<number, number> | null
 
 /**
  * Region names for a route. `regions.json` carries only regions that hold a
- * market, so ESI names the rest in one batched call; a region neither can
- * name is simply absent, and the row shows a dash.
+ * market, so the rest go through the cached `resolveNames` (one batched call
+ * the first time, none after, and the last names seen offline); a region
+ * neither can name is simply absent, and the row shows a dash.
  */
 export async function loadRouteRegionNames(
   regionIds: readonly number[]
@@ -90,8 +92,8 @@ export async function loadRouteRegionNames(
     else names.set(regionId, name);
   }
   if (missing.length > 0) {
-    const resolved = await postUniverseNames(missing).catch(() => []);
-    for (const entry of resolved) names.set(entry.id, entry.name);
+    const resolved = await resolveNames(missing).catch(() => new Map<number, string>());
+    for (const [id, name] of resolved) names.set(id, name);
   }
   return names;
 }

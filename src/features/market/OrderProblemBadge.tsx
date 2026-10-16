@@ -24,7 +24,8 @@ export type OrderBadgeKind =
   | 'frequentlyUndercut'
   | 'best'
   | 'topBid'
-  | 'noCostBasis';
+  | 'noCostBasis'
+  | 'notChecked';
 
 type BadgeTone = 'danger-strong' | 'danger' | 'warning' | 'accent' | 'success' | 'neutral';
 
@@ -49,6 +50,7 @@ const KIND_TONE: Record<OrderBadgeKind, BadgeTone> = {
   best: 'success',
   topBid: 'success',
   noCostBasis: 'neutral',
+  notChecked: 'neutral',
 };
 
 interface OrderProblemBadgeProps {

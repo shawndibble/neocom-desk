@@ -10,7 +10,7 @@
  * above — see `EMPTY_VARIATION_INDEX` for what a slow or failed load falls
  * back to.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   loadMarketGroups,
   loadMarketTypes,
@@ -27,6 +27,7 @@ import type {
   MarketRegionEntry,
   VariationData,
 } from '@/sde/marketTypes';
+import { onReconnect } from '@/stores/network';
 import { buildVariationIndex, type VariationIndex } from '@/engine/market/variations';
 
 /**
@@ -115,10 +116,13 @@ export function useMarketCatalogue(): MarketCatalogue {
     };
   }, []);
 
-  function retry() {
+  const retry = useCallback(() => {
     setCatalogueError(false);
     setCatalogueTick((n) => n + 1);
-  }
+  }, []);
+  // The catalogue is a lazy download, so offline it may simply not be on the
+  // device yet: load it again the moment the connection returns.
+  useEffect(() => (catalogueError ? onReconnect(retry) : undefined), [catalogueError, retry]);
 
   // One pass over `groups` builds both lookups this route needs — by id (URL
   // param validation and the ancestor walk) and by parent (the tree's own

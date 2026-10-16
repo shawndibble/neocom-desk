@@ -7,15 +7,10 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  DataTable,
-  IskAmount,
-  Panel,
-  Spinner,
-  type DataTableColumn,
-} from '@/components/ui';
+import { Button, DataTable, IskAmount, Panel, type DataTableColumn } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
+import { DataGate } from '@/components/DataGate';
+import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { db } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { runsToCover, timePerRunAtTe } from '@/engine/stockTargets/builder';
@@ -55,6 +50,13 @@ export function StockBuilderView({
   const navigate = useNavigate();
   const { showInfo } = useItemActions();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
+  const {
+    failed: catalogFailed,
+    attempt: catalogAttempt,
+    fail: failCatalog,
+    clear: clearCatalogFailure,
+    retry: retryCatalog,
+  } = useRetryableLoad();
   const [blueprints, setBlueprints] = useState<CharacterBlueprint[] | null>(null);
   const [naming, setNaming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -71,9 +73,15 @@ export function StockBuilderView({
     void hydrateMe();
     void hydrateTe();
     let cancelled = false;
-    void loadBlueprintCatalog().then((c) => {
-      if (!cancelled) setCatalog(c);
-    });
+    clearCatalogFailure();
+    loadBlueprintCatalog().then(
+      (c) => {
+        if (!cancelled) setCatalog(c);
+      },
+      () => {
+        if (!cancelled) failCatalog();
+      }
+    );
     const owned =
       activeCharacterId === null
         ? Promise.resolve<CharacterBlueprint[]>([])
@@ -86,7 +94,15 @@ export function StockBuilderView({
     return () => {
       cancelled = true;
     };
-  }, [activeCharacterId, hydrateBuildGroups, hydrateMe, hydrateTe]);
+  }, [
+    activeCharacterId,
+    hydrateBuildGroups,
+    hydrateMe,
+    hydrateTe,
+    catalogAttempt,
+    failCatalog,
+    clearCatalogFailure,
+  ]);
 
   const split = useMemo(() => {
     if (!catalog || !blueprints) return null;
@@ -116,8 +132,15 @@ export function StockBuilderView({
     };
   }, [catalog, blueprints, rows]);
 
+  // One DataGate in either return keeps its focus region mounted across them.
   if (!split) {
-    return <Spinner label={t('common.loading')} />;
+    return (
+      <DataGate
+        status={catalogFailed && !catalog ? 'failed' : 'busy'}
+        title={t('industry.catalogUnavailable')}
+        onRetry={retryCatalog}
+      />
+    );
   }
 
   async function addToBuildGroup(name: string) {
@@ -278,51 +301,55 @@ export function StockBuilderView({
   };
 
   return (
-    <div className="space-y-3">
-      {split.buildable.length === 0 && split.needs.length === 0 ? (
-        <p className="rounded-xs border border-dashed border-line px-3 py-3 text-sm text-text-dim">
-          {t('stockTargets.builder.nothingShort')}
-        </p>
-      ) : (
-        <>
-          <section aria-labelledby={`${headingId}-can`} className="space-y-2">
-            {/* Desktop: on the heading line. Phone: full width under the lists. */}
-            <div className="flex items-end gap-2">
-              <h3 id={`${headingId}-can`} className={cx('flex-1', sectionHeadingClassName)}>
-                {t('stockTargets.builder.canBuild', { count: split.buildable.length })}
-              </h3>
-              {split.buildable.length > 0 && <div className="hidden sm:block">{addButton('')}</div>}
-            </div>
-            {split.buildable.length > 0 ? (
-              table(split.buildable, t('stockTargets.builder.canBuildLabel'), true)
-            ) : (
-              <p className="text-sm text-text-dim">
-                <HintText content={t('stockTargets.builder.noneBuildableHint')}>
-                  {t('stockTargets.builder.noneBuildable')}
-                </HintText>
-              </p>
-            )}
-          </section>
-          {split.needs.length > 0 && (
-            <section aria-labelledby={`${headingId}-needs`} className="space-y-2">
-              <h3 id={`${headingId}-needs`} className={sectionHeadingClassName}>
-                {t('stockTargets.builder.needs', { count: split.needs.length })}
-              </h3>
-              {table(split.needs, t('stockTargets.builder.needsLabel'), false)}
+    <DataGate status="ok" title={t('industry.catalogUnavailable')}>
+      <div className="space-y-3">
+        {split.buildable.length === 0 && split.needs.length === 0 ? (
+          <p className="rounded-xs border border-dashed border-line px-3 py-3 text-sm text-text-dim">
+            {t('stockTargets.builder.nothingShort')}
+          </p>
+        ) : (
+          <>
+            <section aria-labelledby={`${headingId}-can`} className="space-y-2">
+              {/* Desktop: on the heading line. Phone: full width under the lists. */}
+              <div className="flex items-end gap-2">
+                <h3 id={`${headingId}-can`} className={cx('flex-1', sectionHeadingClassName)}>
+                  {t('stockTargets.builder.canBuild', { count: split.buildable.length })}
+                </h3>
+                {split.buildable.length > 0 && (
+                  <div className="hidden sm:block">{addButton('')}</div>
+                )}
+              </div>
+              {split.buildable.length > 0 ? (
+                table(split.buildable, t('stockTargets.builder.canBuildLabel'), true)
+              ) : (
+                <p className="text-sm text-text-dim">
+                  <HintText content={t('stockTargets.builder.noneBuildableHint')}>
+                    {t('stockTargets.builder.noneBuildable')}
+                  </HintText>
+                </p>
+              )}
             </section>
-          )}
-          {split.buildable.length > 0 && addButton('w-full sm:hidden')}
-        </>
-      )}
-      {naming && (
-        <StockListNameDialog
-          title={t('stockTargets.builder.groupTitle')}
-          confirmLabel={t('stockTargets.builder.groupConfirm')}
-          initialName={listName}
-          onSubmit={(name) => void addToBuildGroup(name)}
-          onClose={() => setNaming(false)}
-        />
-      )}
-    </div>
+            {split.needs.length > 0 && (
+              <section aria-labelledby={`${headingId}-needs`} className="space-y-2">
+                <h3 id={`${headingId}-needs`} className={sectionHeadingClassName}>
+                  {t('stockTargets.builder.needs', { count: split.needs.length })}
+                </h3>
+                {table(split.needs, t('stockTargets.builder.needsLabel'), false)}
+              </section>
+            )}
+            {split.buildable.length > 0 && addButton('w-full sm:hidden')}
+          </>
+        )}
+        {naming && (
+          <StockListNameDialog
+            title={t('stockTargets.builder.groupTitle')}
+            confirmLabel={t('stockTargets.builder.groupConfirm')}
+            initialName={listName}
+            onSubmit={(name) => void addToBuildGroup(name)}
+            onClose={() => setNaming(false)}
+          />
+        )}
+      </div>
+    </DataGate>
   );
 }

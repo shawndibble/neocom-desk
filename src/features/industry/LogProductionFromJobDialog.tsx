@@ -42,7 +42,8 @@ export function LogProductionFromJobDialog({
   async function handleCreate() {
     setCreating(true);
     setCreateFailed(false);
-    const planId = await onCreatePlan();
+    // A catalog that won't load rejects here; it reads as the same failure as "not in the catalog".
+    const planId = await onCreatePlan().catch(() => null);
     if (planId) {
       onResolved(planId);
     } else {
