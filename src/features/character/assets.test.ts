@@ -3,7 +3,12 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadAllCharactersAssets, loadCharacterAssets, loadOtherCharactersAssets } from './assets';
+import {
+  loadAllCharactersAssets,
+  loadCharacterAssets,
+  loadOtherCharactersAssets,
+  loadOtherCharactersAssetsDetailed,
+} from './assets';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -165,6 +170,42 @@ describe('loadOtherCharactersAssets (issue #85)', () => {
     const results = await loadOtherCharactersAssets([OTHER_ID, THIRD_ID]);
 
     expect(results).toEqual([{ characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] }]);
+  });
+});
+
+describe('loadOtherCharactersAssetsDetailed', () => {
+  const OTHER_ID = 92;
+  const THIRD_ID = 93;
+
+  beforeEach(async () => {
+    await db.characters.bulkPut([
+      { characterId: OTHER_ID, name: 'Alt Pilot', ownerHash: 'oh2', addedAt: 2 },
+      { characterId: THIRD_ID, name: 'Offline Pilot', ownerHash: 'oh3', addedAt: 3 },
+    ]);
+  });
+
+  it('names the Characters whose assets could not be read instead of dropping them silently', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () => HttpResponse.error())
+    );
+
+    const { entries, skipped } = await loadOtherCharactersAssetsDetailed([OTHER_ID, THIRD_ID]);
+
+    expect(entries).toEqual([{ characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] }]);
+    expect(skipped).toEqual([{ characterId: THIRD_ID, name: 'Offline Pilot' }]);
+  });
+
+  it('skips nobody when every Character loads', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    const { skipped } = await loadOtherCharactersAssetsDetailed([OTHER_ID]);
+    expect(skipped).toEqual([]);
   });
 });
 

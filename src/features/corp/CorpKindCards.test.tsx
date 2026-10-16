@@ -1,5 +1,5 @@
 /** A card caps at three rows and its footer expands in place to every row, in order. */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -180,5 +180,70 @@ describe('CorpKindCards', () => {
     );
     expect(screen.getByText('Structure 1')).toBeInTheDocument();
     expect(screen.getByText(/Nothing due: Structure timers/)).toBeInTheDocument();
+  });
+
+  it('says "couldn\'t load" for a permitted kind whose read failed, never "every structure is fuelled"', () => {
+    render(
+      withItemActions(
+        <MemoryRouter>
+          <CorpKindCards
+            grouped={new Map()}
+            capabilities={
+              {
+                canReadStructures: true,
+                canReadMoonExtractions: true,
+                canReadIndustry: true,
+              } as CorpCapabilities
+            }
+            unreadable={
+              new Set<CorpBoardItemKind>(['structureFuel', 'structureTimer', 'jobDelivery'])
+            }
+          />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+    expect(screen.queryByText('Every structure is fuelled.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No structure is on a timer.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No job is waiting.')).not.toBeInTheDocument();
+    // Three failed cards, each with its title and the load-failed line.
+    expect(screen.getAllByText("Couldn't load — try again")).toHaveLength(3);
+    expect(screen.getByRole('heading', { name: 'Fuel' })).toBeInTheDocument();
+    // The one kind that did load and is empty keeps its own honest empty line.
+    expect(screen.getByText('No moon drill is running.')).toBeInTheDocument();
+  });
+
+  it('says offline when the browser is offline', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    render(
+      withItemActions(
+        <MemoryRouter>
+          <CorpKindCards
+            grouped={new Map()}
+            capabilities={{ canReadIndustry: true } as CorpCapabilities}
+            unreadable={new Set<CorpBoardItemKind>(['jobDelivery'])}
+          />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+    expect(screen.getByText("Couldn't load — you're offline")).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
+  it('shows no card for an unpermitted kind even if its read is marked unreadable', () => {
+    render(
+      withItemActions(
+        <MemoryRouter>
+          <CorpKindCards
+            grouped={new Map()}
+            capabilities={{ canReadStructures: true } as CorpCapabilities}
+            unreadable={new Set<CorpBoardItemKind>(['jobDelivery'])}
+          />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+    expect(screen.queryByRole('heading', { name: 'Industry jobs' })).not.toBeInTheDocument();
   });
 });

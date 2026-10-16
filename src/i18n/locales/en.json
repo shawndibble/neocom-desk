@@ -3153,6 +3153,9 @@
       "unknown": "Unknown"
     },
     "opportunitiesUnlimitedRuns": "Unlimited",
+    "opportunitiesLoadFailedHint": "Your blueprints aren't saved on this device yet, so there is nothing to rank. They load once ESI answers.",
+    "opportunitiesSomeFailed_one": "Couldn't load blueprints for {{count}} character — their blueprints are missing here",
+    "opportunitiesSomeFailed_other": "Couldn't load blueprints for {{count}} characters — their blueprints are missing here",
     "opportunitiesEmptyTitle": "No manufacturing blueprints found",
     "opportunitiesEmptyHint": "Own a blueprint original or copy, then refresh — reaction blueprints are not ranked here.",
     "opportunitiesProgress": "{{done}} of {{total}} calculated",
@@ -4962,6 +4965,10 @@
     },
     "loadFailedTitle": "Could not load",
     "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
+    "couldntLoad": "Couldn't load — try again",
+    "couldntLoadOffline": "Couldn't load — you're offline",
+    "contractIndexUnreachableTitle": "Couldn't reach the contract index — nothing cached yet",
+    "contractIndexUnreachableHint": "Public contracts show once the index answers. Try again when you're back online.",
     "retry": "Try again",
     "spaceOption": {
       "highsec": "Highsec",
@@ -5905,6 +5912,8 @@
       "ships": "Ships",
       "move": "Move"
     },
+    "skippedCharacters": "Couldn't load assets for {{names}} — they are missing here.",
+    "skippedAllHint": "Your characters' assets aren't saved on this device yet. They load once ESI answers.",
     "movePlan": {
       "title": "Plan a move",
       "loading": "Reading the assets…",
@@ -7902,6 +7911,7 @@
     "detailItemName": "Name",
     "detailQuantity": "Qty",
     "detailNoItems": "No item data for this contract",
+    "detailItemsFailedHint": "This contract's items aren't saved on this device yet.",
     "detailMarketValue": "Market value at {{hub}} (sell orders)",
     "detailMarketValueUnpriced_one": "({{count}} item unpriced)",
     "detailMarketValueUnpriced_other": "({{count}} items unpriced)",
@@ -8684,6 +8694,7 @@
     "standingsUsedForFees": "Broker fees",
     "standingsUsedForFeesYes": "Used for fees",
     "standingsFeesNote": "Broker fees use your standing with each Trade Hub's owning corporation and faction. Other NPC stations use their own owner, and agents never count.",
+    "standingsUnavailableHint": "Your NPC standings aren't saved on this device yet. They load once ESI answers.",
     "standingsEmptyTitle": "No NPC standings yet",
     "standingsEmptyHint": "EVE lists a standing once you have earned or lost one with a faction, corporation or agent.",
     "standingsNoResultsHint": "Clear the search to see every standing.",
@@ -9203,6 +9214,7 @@
     "emptyFiltersHint": "No orders match the filters. Loosen them to see more.",
     "orderBookFailedTitle": "Couldn't load the order book",
     "orderBookFailedHint": "ESI didn't answer — it may be limiting requests right now. This doesn't mean nobody is trading the item.",
+    "orderBookFailedOfflineHint": "You're offline, and this order book isn't saved on this device. This doesn't mean nobody is trading the item.",
     "orderBookFailedRetry": "Try again",
     "price": "Price",
     "quantity": "Quantity",
@@ -11004,6 +11016,7 @@
       "left_other": "{{count}} left:",
       "empty": "No member activity",
       "emptyHint": "EVE reported no tracking rows for this corporation.",
+      "loadFailedHint": "The member list isn't saved on this device yet, so there is nothing to show. It loads once EVE answers.",
       "noFilterMatches": "No members match your search or filters.",
       "noFilterMatchesHint": "Clear the search or reset the dark-only, ship and location filters to see every member.",
       "noAccessTitle": "Member tracking needs Director",
@@ -11084,6 +11097,8 @@
     },
     "cards": {
       "fuel": "Fuel",
+      "loadFailedAnnounce_one": "{{count}} corp card couldn't load",
+      "loadFailedAnnounce_other": "{{count}} corp cards couldn't load",
       "fuelEmpty": "Every structure is fuelled.",
       "timers": "Structure timers",
       "timersEmpty": "No structure is on a timer.",
@@ -11353,6 +11368,7 @@
     "routeExposureChokepoints": "Route runs through {{systems}}, where haulers are most often killed."
   },
   "jumpRange": {
+    "systemsFailed": "System list couldn't load",
     "label": "Distance",
     "option": {
       "3": "Within 3 jumps",
@@ -12106,6 +12122,7 @@
       "chokepointsNone": "None"
     },
     "jumpDrive": {
+      "unavailable": "Jump-drive range data isn't available offline yet, so this route has no jump legs.",
       "enabled": "Allow jump drive legs",
       "hint": "Uses the hull's range and fuel with Jump Drive Calibration and Jump Fuel Conservation at V.",
       "range": "Longest single jump",

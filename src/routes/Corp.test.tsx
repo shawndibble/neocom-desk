@@ -592,6 +592,18 @@ describe('the board (AC2, AC5, AC6)', () => {
   });
 });
 
+describe('a failed read', () => {
+  it('says "couldn\'t load" for a structures read that returned nothing, never "every structure is fuelled"', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadStructures: true }));
+    mocked.loadCorporationStructures.mockResolvedValue({ cached: null, needsReauth: false });
+    renderCorp();
+    await waitFor(() => expect(screen.getAllByText("Couldn't load — try again")).toHaveLength(2));
+    expect(screen.queryByText('Every structure is fuelled.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No structure is on a timer.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nothing due/)).not.toBeInTheDocument();
+  });
+});
+
 describe('an unknown corporation', () => {
   /**
    * Every corp cache key folds the corporation id in (#293). Without one there
@@ -602,7 +614,12 @@ describe('an unknown corporation', () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadStructures: true }));
     mocked.loadCorporationId.mockResolvedValue(null);
     renderCorp();
-    await waitFor(() => expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument());
+    // Nothing was read, so the card says it could not load rather than "nothing due".
+    await waitFor(() =>
+      expect(screen.getAllByText("Couldn't load — try again").length).toBeGreaterThan(0)
+    );
+    expect(screen.queryByText(/Nothing due/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Every structure is fuelled.')).not.toBeInTheDocument();
     expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();
   });
 });

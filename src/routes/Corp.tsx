@@ -32,6 +32,7 @@ import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
 import { CorpStanding } from '@/features/corp/CorpStanding';
 import { CorpKindCards } from '@/features/corp/CorpKindCards';
+import { unreadableCardKinds } from '@/features/corp/cardReadability';
 import { CorpOfflineServices } from '@/features/corp/CorpOfflineServices';
 import { CorpPeopleRail } from '@/features/corp/CorpPeopleRail';
 import { LOOSEST_DARK_AFTER_DAYS } from '@/features/corp/darkThreshold';
@@ -376,6 +377,9 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
    * on this page.
    */
   const grouped = useMemo(() => groupBoardByKind(items), [items]);
+  // Per kind, a read that failed: those cards say "couldn't load" rather than
+  // "nothing due".
+  const unreadable = useMemo(() => unreadableCardKinds(data), [data]);
   const clocks = useMemo(
     () =>
       data === null || !canReadAnything
@@ -454,13 +458,14 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
 
             {/*
             AC3's harder half, unchanged in substance from the flat board it
-            replaces. "Cannot read" and "read fine, nothing due" are different
-            answers and must look different: a card exists only for a kind whose
-            own capability is held, and only then does an empty one say "nothing
-            due". Collapsing them would put "No moon chunks" in front of someone
-            who was never allowed to ask.
+            replaces. "Not permitted", "read failed" and "read fine, nothing due"
+            are different answers and must look different: a card exists only for
+            a kind whose own capability is held; a failed read there says
+            "couldn't load", and only a successful empty one says "nothing due".
+            Collapsing them would put "No moon chunks" in front of someone who
+            was never allowed to ask, or whose read never came back.
           */}
-            <CorpKindCards grouped={grouped} capabilities={capabilities} />
+            <CorpKindCards grouped={grouped} capabilities={capabilities} unreadable={unreadable} />
 
             {/*
             The board's one untimed kind, on the one surface that suits it. Absent

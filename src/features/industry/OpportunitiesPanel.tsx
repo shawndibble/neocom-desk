@@ -21,6 +21,8 @@ import {
   Button,
   DataTable,
   EmptyState,
+  LiveStatus,
+  LoadFailedState,
   InfoTooltip,
   IskAmount,
   Modal,
@@ -40,6 +42,7 @@ import {
   MenuItem,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
@@ -228,7 +231,18 @@ export function OpportunitiesPanel({
     loading: boolean;
     /** Oldest fetch across every fetched Character — reported up through `onDataAgeChange`. */
     oldestFetchedAt: Date | null;
-  }>({ ownedByCharacter: new Map(), loading: true, oldestFetchedAt: null });
+    /** Selected Characters whose blueprint read came back with nothing (offline, ESI down, nothing cached). */
+    failedCount: number;
+    /** At least one Character's blueprints are a cached copy rather than a fresh read. */
+    anyFromCache: boolean;
+  }>({
+    ownedByCharacter: new Map(),
+    loading: true,
+    oldestFetchedAt: null,
+    failedCount: 0,
+    anyFromCache: false,
+  });
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     if (characterIds.length === 0) {
@@ -236,7 +250,13 @@ export function OpportunitiesPanel({
       // Character is selected, so there is nothing to fetch and the panel's
       // empty state should say so immediately.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBlueprintsState({ ownedByCharacter: new Map(), loading: false, oldestFetchedAt: null });
+      setBlueprintsState({
+        ownedByCharacter: new Map(),
+        loading: false,
+        oldestFetchedAt: null,
+        failedCount: 0,
+        anyFromCache: false,
+      });
       return;
     }
     let cancelled = false;
@@ -245,19 +265,44 @@ export function OpportunitiesPanel({
       if (cancelled) return;
       const map = new Map<number, CharacterBlueprint[]>();
       let oldestFetchedAt: Date | null = null;
+      let failedCount = 0;
+      let anyFromCache = false;
       results.forEach((result, index) => {
         map.set(characterIds[index]!, result.cached?.data ?? []);
+        // `null` is "nothing came back", which is not the same as a Character
+        // who owns no blueprints (`[]`).
+        if (result.cached === null) failedCount += 1;
+        else if (result.cached.fromCache) anyFromCache = true;
         const fetchedAt = result.cached?.fetchedAt;
         if (fetchedAt && (!oldestFetchedAt || fetchedAt < oldestFetchedAt))
           oldestFetchedAt = fetchedAt;
       });
-      setBlueprintsState({ ownedByCharacter: map, loading: false, oldestFetchedAt });
+      setBlueprintsState({
+        ownedByCharacter: map,
+        loading: false,
+        oldestFetchedAt,
+        failedCount,
+        anyFromCache,
+      });
     });
     return () => {
       cancelled = true;
     };
-  }, [characterIds]);
-  const { ownedByCharacter, loading: blueprintsLoading, oldestFetchedAt } = blueprintsState;
+  }, [characterIds, retryTick]);
+  const {
+    ownedByCharacter,
+    loading: blueprintsLoading,
+    oldestFetchedAt,
+    failedCount,
+    anyFromCache,
+  } = blueprintsState;
+  /** Every selected Character came back with nothing: "no blueprints" would be a guess. */
+  const allBlueprintsFailed = characterIds.length > 0 && failedCount === characterIds.length;
+  // Retry unmounts into the spinner: focus waits on the always-mounted body wrapper.
+  const [bodyRef, , holdRetryFocus] = useRetryFocus(
+    blueprintsLoading ? 'busy' : allBlueprintsFailed ? 'failed' : 'ok',
+    characterIdsKey
+  );
   const oldestFetchedMs = oldestFetchedAt?.getTime() ?? null;
   useEffect(() => {
     onDataAgeChange?.(oldestFetchedMs === null ? null : new Date(oldestFetchedMs));
@@ -775,10 +820,34 @@ export function OpportunitiesPanel({
         </span>
       }
     >
+      <div ref={bodyRef} tabIndex={-1} className="sr-only" />
+      <LiveStatus>
+        {!blueprintsLoading && failedCount > 0
+          ? allBlueprintsFailed
+            ? t('common.couldntLoad')
+            : t('industry.opportunitiesSomeFailed', { count: failedCount })
+          : ''}
+      </LiveStatus>
+      {!blueprintsLoading && !allBlueprintsFailed && (anyFromCache || failedCount > 0) && (
+        <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+          {failedCount > 0
+            ? t('industry.opportunitiesSomeFailed', { count: failedCount })
+            : t('common.offlineTitle')}
+        </p>
+      )}
       {blueprintsLoading ? (
         <div className="flex justify-center py-8">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : candidates.length === 0 && allBlueprintsFailed ? (
+        <LoadFailedState
+          className="py-8"
+          hint={t('industry.opportunitiesLoadFailedHint')}
+          onRetry={() => {
+            holdRetryFocus();
+            setRetryTick((n) => n + 1);
+          }}
+        />
       ) : candidates.length === 0 ? (
         <EmptyState
           title={t('industry.opportunitiesEmptyTitle')}
@@ -834,6 +903,7 @@ export function OpportunitiesPanel({
           nameForCharacter={(id) => characterNames.get(id) ?? unknown}
         />
       )}
+
       {historyItem && (
         <Modal
           open

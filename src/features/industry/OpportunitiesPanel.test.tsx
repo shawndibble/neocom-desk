@@ -123,6 +123,51 @@ describe('OpportunitiesPanel', () => {
     expect(loadCharacterBlueprints.mock.calls.length).toBe(settled);
   });
 
+  describe('when blueprints could not be loaded', () => {
+    const renderPanel = () =>
+      render(
+        withItemActions(
+          <OpportunitiesPanel
+            catalog={CATALOG}
+            pi={null}
+            facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+            activeCharacterId={CHARACTER_ID}
+            ownedStockSnapshot={SNAPSHOT}
+            assumedMe={0}
+            onAddToCompare={() => {}}
+            onStartPlan={() => Promise.resolve(false)}
+          />
+        ),
+        { wrapper: MemoryRouter }
+      );
+
+    it('says it could not load, not "No manufacturing blueprints found", and retries', async () => {
+      loadCharacterBlueprints.mockResolvedValue({ cached: null, needsReauth: false });
+      renderPanel();
+
+      expect(await screen.findAllByText("Couldn't load — try again")).not.toHaveLength(0);
+      expect(screen.queryByText('No manufacturing blueprints found')).toBeNull();
+
+      loadCharacterBlueprints.mockResolvedValue({ cached: { data: [], fetchedAt: new Date() } });
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(await screen.findByText('No manufacturing blueprints found')).toBeInTheDocument();
+    });
+
+    it('still says "No manufacturing blueprints found" for a successful empty read', async () => {
+      renderPanel();
+      expect(await screen.findByText('No manufacturing blueprints found')).toBeInTheDocument();
+      expect(screen.queryByText(/Couldn't load/)).toBeNull();
+    });
+
+    it('labels blueprints served from cache', async () => {
+      loadCharacterBlueprints.mockResolvedValue({
+        cached: { data: [], fetchedAt: new Date(), fromCache: true },
+      });
+      renderPanel();
+      expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    });
+  });
+
   describe('item context menu', () => {
     function entry(productTypeID: number | null, name: string) {
       return {

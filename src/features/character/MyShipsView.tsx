@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   EmptyState,
+  LiveStatus,
+  LoadFailedState,
   MenuItem,
   RowActionsMenu,
   RowMoreActions,
@@ -12,6 +14,7 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
 import { shipItemsEditLocation } from '@/features/fittings/assetShipLocation';
@@ -27,7 +30,7 @@ import { findShips, type OwnedAsset, type ShipRow } from '@/engine/myShips';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
-import { loadOtherCharactersAssets } from './assets';
+import { loadOtherCharactersAssetsDetailed, type SkippedCharacterAssets } from './assets';
 import { loadCharacterSolarSystemId } from './location';
 import { placeKey, usePlaceDetails } from '@/features/places';
 import { loadGroupNames } from '@/features/market/groupNames';
@@ -47,14 +50,18 @@ interface ShipData {
   holderNames: ReadonlyMap<number, string>;
   /** What sits directly in each ship (slots, bays, cargo), by ship item id: the fitting the menu opens. */
   contentsByShip: ReadonlyMap<number, ShipAssetItem[]>;
+  /** Chosen Characters whose assets could not be read: their ships are missing, not absent. */
+  skipped: readonly SkippedCharacterAssets[];
+  /** How many Characters' assets were read; zero with some skipped means nothing loaded at all. */
+  loadedCount: number;
 }
 
 type ShipsState = { status: 'loading' } | { status: 'ready'; data: ShipData } | { status: 'error' };
 
 /** SDE-backed ship lookup plus every chosen Character's ships. Cache-or-live, like the page's own cross-character read. */
 async function loadShipData(characterIds: readonly number[]): Promise<ShipData> {
-  const [entries, types, groupCategories] = await Promise.all([
-    loadOtherCharactersAssets(characterIds),
+  const [{ entries, skipped }, types, groupCategories] = await Promise.all([
+    loadOtherCharactersAssetsDetailed(characterIds),
     loadTypes(),
     // Without it no type reads as a ship: an empty list beats a wrong one.
     loadGroupCategories().catch(() => ({}) as Record<string, number>),
@@ -99,6 +106,8 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
     characterNames: new Map(entries.map((e) => [e.characterId, e.name])),
     holderNames,
     contentsByShip,
+    skipped,
+    loadedCount: entries.length,
   };
 }
 
@@ -338,6 +347,7 @@ export function MyShipsView({
   const { t } = useTranslation();
   const idsKey = [...characterIds].sort((a, b) => a - b).join(',');
   const [state, setState] = useState<ShipsState>({ status: 'loading' });
+  const [retryTick, setRetryTick] = useState(0);
   useEffect(() => {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a new filter restarts the read
@@ -353,8 +363,15 @@ export function MyShipsView({
     return () => {
       cancelled = true;
     };
-  }, [idsKey]);
+  }, [idsKey, retryTick]);
 
+  const allSkipped =
+    state.status === 'ready' && state.data.skipped.length > 0 && state.data.loadedCount === 0;
+  // Retry unmounts into the spinner: focus waits on the always-mounted wrapper.
+  const [bodyRef, , holdRetryFocus] = useRetryFocus(
+    state.status === 'loading' ? 'busy' : allSkipped || state.status === 'error' ? 'failed' : 'ok',
+    idsKey
+  );
   const rows = useMemo(() => (state.status === 'ready' ? state.data.rows : []), [state]);
   const places = usePlaces(rows, activeCharacterId, route);
   const groupIds = useMemo(
@@ -441,13 +458,40 @@ export function MyShipsView({
             className="w-full sm:ml-auto sm:w-64"
           />
         </div>
+        <div ref={bodyRef} tabIndex={-1} className="sr-only" />
+        <LiveStatus>
+          {state.status === 'ready' && state.data.skipped.length > 0
+            ? allSkipped
+              ? t('common.couldntLoad')
+              : t('assets.skippedCharacters', {
+                  names: state.data.skipped.map((c) => c.name).join(', '),
+                })
+            : ''}
+        </LiveStatus>
         {state.status === 'loading' && (
           <div className="flex justify-center py-10">
             <Spinner size="md" label={t('assets.myShips.loading')} />
           </div>
         )}
         {state.status === 'error' && <EmptyState title={t('assets.myShips.error')} />}
-        {state.status === 'ready' && sorted.length === 0 && (
+        {state.status === 'ready' && !allSkipped && state.data.skipped.length > 0 && (
+          <p className="text-[0.6875rem] text-warning uppercase">
+            {t('assets.skippedCharacters', {
+              names: state.data.skipped.map((c) => c.name).join(', '),
+            })}
+          </p>
+        )}
+        {allSkipped && (
+          // Every chosen Character was skipped: "No ships found" would be a guess.
+          <LoadFailedState
+            hint={t('assets.skippedAllHint')}
+            onRetry={() => {
+              holdRetryFocus();
+              setRetryTick((n) => n + 1);
+            }}
+          />
+        )}
+        {state.status === 'ready' && sorted.length === 0 && !allSkipped && (
           <EmptyState
             title={t('assets.myShips.emptyTitle')}
             hint={query.trim() ? t('assets.myShips.noMatches') : t('assets.myShips.emptyHint')}

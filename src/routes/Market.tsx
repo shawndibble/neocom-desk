@@ -29,6 +29,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useOnline } from '@/stores/network';
+import { orderBookFailedOffline } from '@/features/market/orderBookView';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
@@ -332,6 +334,7 @@ export function Market() {
   // as [] rather than requiring an active character — Market Browser itself
   // needs none — so Add to Quickbar is disabled with nobody active.
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const online = useOnline();
   // Item Actions (issue #2041): every item menu's Quickbar add, Show info (the
   // one Item Detail modal, priced at `orderBookLocation`) and the lazy
   // blueprint catalog behind Build Plan.
@@ -1153,7 +1156,11 @@ export function Market() {
                         // blueprint BPC hint, just the failure and a way to retry.
                         <EmptyState
                           title={t('market.orderBookFailedTitle')}
-                          hint={t('market.orderBookFailedHint')}
+                          hint={t(
+                            orderBookFailedOffline(orderBookView, online)
+                              ? 'market.orderBookFailedOfflineHint'
+                              : 'market.orderBookFailedHint'
+                          )}
                           className="py-8"
                           action={
                             <Button size="sm" onClick={handleRefresh}>

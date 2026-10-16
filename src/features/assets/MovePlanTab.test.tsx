@@ -25,15 +25,24 @@ const JITA = 60003760;
 const AMARR = 60008494;
 const SYSTEM_JITA = 30000142;
 
+const skippedCharacters = vi.hoisted(() => ({
+  list: [] as { characterId: number; name: string }[],
+  noEntries: false,
+}));
 vi.mock('@/features/character/assets', () => ({
-  loadOtherCharactersAssets: () =>
-    Promise.resolve([
-      {
-        characterId: 1,
-        name: 'Alice',
-        assets: [asset(1, 34, JITA), asset(2, 34, AMARR), asset(3, 35, AMARR, 5)],
-      },
-    ]),
+  loadOtherCharactersAssetsDetailed: () =>
+    Promise.resolve({
+      entries: skippedCharacters.noEntries
+        ? []
+        : [
+            {
+              characterId: 1,
+              name: 'Alice',
+              assets: [asset(1, 34, JITA), asset(2, 34, AMARR), asset(3, 35, AMARR, 5)],
+            },
+          ],
+      skipped: skippedCharacters.list,
+    }),
 }));
 const failing = vi.hoisted(() => ({ name: false, system: false }));
 vi.mock('@/features/character/stations', () => ({
@@ -97,6 +106,28 @@ describe('MovePlanTab', () => {
   beforeEach(() => {
     failing.name = false;
     failing.system = false;
+    skippedCharacters.list = [];
+    skippedCharacters.noEntries = false;
+  });
+
+  it('names the Characters whose assets did not load instead of dropping them silently', async () => {
+    skippedCharacters.list = [{ characterId: 2, name: 'Bob' }];
+    await open();
+    expect(
+      screen.getAllByText("Couldn't load assets for Bob — they are missing here.")
+    ).not.toHaveLength(0);
+  });
+
+  it("does not say there is nothing to move when no Character's assets loaded", async () => {
+    skippedCharacters.list = [{ characterId: 1, name: 'Alice' }];
+    skippedCharacters.noEntries = true;
+    render(
+      <MemoryRouter>
+        <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText(/assets aren't saved on this device yet/)).toBeInTheDocument();
+    expect(screen.queryByText('No loose stock or ships to move.')).not.toBeInTheDocument();
   });
 
   it('keeps the pickup system and its Route Safety link when the name read fails', async () => {

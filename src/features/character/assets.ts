@@ -84,19 +84,40 @@ async function loadFannedOutAssets(character: {
 export async function loadOtherCharactersAssets(
   characterIds: readonly number[]
 ): Promise<OtherCharacterAssets[]> {
+  return (await loadOtherCharactersAssetsDetailed(characterIds)).entries;
+}
+
+/** The Characters whose assets were read, and those that could not be (named, so a view can say who is missing). */
+export interface OtherCharactersAssetsRead {
+  entries: OtherCharacterAssets[];
+  skipped: SkippedCharacterAssets[];
+}
+
+/**
+ * `loadOtherCharactersAssets`, keeping who was skipped. A Character with no
+ * cached assets and no live answer (offline, ESI down, no scope) drops out of
+ * `entries`; without `skipped` a view cannot tell "owns no ships" from "their
+ * assets didn't load", and says the first.
+ */
+export async function loadOtherCharactersAssetsDetailed(
+  characterIds: readonly number[]
+): Promise<OtherCharactersAssetsRead> {
   const ids = new Set(characterIds);
   const characters = await db.characters.toArray();
   const matching = characters.filter((c) => ids.has(c.characterId));
   // Intentionally NO `scope`: the player explicitly picked these Characters in
   // the filter, so a live 403 (and its re-auth banner) is the answer they asked
   // for, unlike the unprompted Build Plan fan-out below.
-  const { entries } = await fanOutAllCharacters({
+  const { entries, skipped } = await fanOutAllCharacters({
     characters: matching,
     load: loadFannedOutAssets,
   });
   // Narrowed back to this function's own shape: the filter has no use for the
   // completeness detail, and its callers compare these objects wholesale.
-  return entries.map(({ characterId, name, assets }) => ({ characterId, name, assets }));
+  return {
+    entries: entries.map(({ characterId, name, assets }) => ({ characterId, name, assets })),
+    skipped,
+  };
 }
 
 /**

@@ -26,6 +26,17 @@ export interface CharacterStandingsResult {
   entries: CharacterStanding[];
   /** When the list was last fetched; null when nothing was loaded (no scope, or no cache and no live answer). */
   fetchedAt: Date | null;
+  /**
+   * The list is a cached copy (offline, or ESI did not answer), not a fresh fetch.
+   * Only meaningful when `available`.
+   */
+  fromCache: boolean;
+  /**
+   * Whether any list was loaded at all. False means no scope, or no cache and no
+   * live answer: `entries` is `[]` because we do not know, not because the
+   * Character has no standings. A view must not say "no standings" for it.
+   */
+  available: boolean;
 }
 
 /** `force` is a manual Refresh: it bypasses the cache freshness window for a live fetch. */
@@ -36,7 +47,7 @@ export async function loadCharacterStandingsResult(
   const token = await db.tokens.get(characterId);
   // `scopes` post-dates the tokens table (app/useGrantedScopes.ts), so an old row may lack it.
   if (token && !(token.scopes ?? []).includes(STANDINGS_SCOPE)) {
-    return { entries: [], fetchedAt: null };
+    return { entries: [], fetchedAt: null, fromCache: false, available: false };
   }
   if (options.force) invalidateFreshness();
   const { fetchLive, conditional } = conditionalFetch((fetchOptions) =>
@@ -46,7 +57,12 @@ export async function loadCharacterStandingsResult(
     detectAuthFailure: () => false,
     conditional,
   });
-  return { entries: result?.data ?? [], fetchedAt: result?.fetchedAt ?? null };
+  return {
+    entries: result?.data ?? [],
+    fetchedAt: result?.fetchedAt ?? null,
+    fromCache: result?.fromCache ?? false,
+    available: result !== null,
+  };
 }
 
 export async function loadCharacterStandings(characterId: number): Promise<CharacterStanding[]> {

@@ -276,6 +276,35 @@ describe('ContractDetailModal', () => {
     expect(within(requested).getByText('1')).toBeInTheDocument();
   });
 
+  it('says it could not load the items, not "no item data", when the read failed, and retries', async () => {
+    let fail = true;
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () =>
+        HttpResponse.json({ station_id: 60003760, name: 'Jita', type_id: 1, system_id: 2 })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        fail
+          ? HttpResponse.error()
+          : HttpResponse.json([
+              { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+            ])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(await screen.findAllByText("Couldn't load — try again")).not.toHaveLength(0);
+    expect(screen.queryByText('No item data for this contract')).not.toBeInTheDocument();
+
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    const included = await screen.findByRole('table', { name: 'Included' });
+    expect(within(included).getByText('744')).toBeInTheDocument();
+  });
+
   /*
    * Two short columns (icon + name, quantity) fit a 390px screen unaided, so
    * the stacked card layout would only add a "QUANTITY" gutter label to a

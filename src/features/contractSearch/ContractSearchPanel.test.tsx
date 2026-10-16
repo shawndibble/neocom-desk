@@ -711,6 +711,20 @@ describe('ContractSearchPanel', () => {
 
     expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
   });
+
+  it('says the index could not be reached, not "synced yet", when the read returned nothing', async () => {
+    loadPublicContractOffers.mockResolvedValue({ cached: null, revalidating: false });
+    renderWithRouter();
+
+    expect(
+      await screen.findAllByText("Couldn't reach the contract index — nothing cached yet")
+    ).not.toHaveLength(0);
+    expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
+
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([]));
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
+  });
 });
 
 describe('ContractSearchPanel — zero-price (barter) offers (issue #1080)', () => {

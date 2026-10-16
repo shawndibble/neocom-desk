@@ -4,7 +4,10 @@ import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
 import { planMove, type MoveHull, type PackHold } from '@/engine/assets/movePlan';
-import { loadOtherCharactersAssets } from '@/features/character/assets';
+import {
+  loadOtherCharactersAssetsDetailed,
+  type SkippedCharacterAssets,
+} from '@/features/character/assets';
 import { resolvePlace } from '@/features/places';
 import { loadTypeNames, loadTypePackagedVolumes } from '@/features/character/typeNames';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
@@ -57,11 +60,13 @@ interface Loaded {
   hues: Map<number, number>;
   /** Rigs fitted to each assembled ship, by itemID. */
   rigs: Map<number, number>;
+  /** Chosen Characters whose assets could not be read: their stock is missing from the picker. */
+  skipped: SkippedCharacterAssets[];
 }
 
 async function load(characterIds: readonly number[]): Promise<Loaded> {
-  const [sources, types, groupCategories] = await Promise.all([
-    loadOtherCharactersAssets(characterIds),
+  const [{ entries: sources, skipped }, types, groupCategories] = await Promise.all([
+    loadOtherCharactersAssetsDetailed(characterIds),
     loadTypes(),
     loadGroupCategories().catch(() => ({}) as Record<string, number>),
   ]);
@@ -99,7 +104,7 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
   );
   const hues = pickupHues(stacks.map((s) => s.locationId));
   const rigs = fittedRigCounts(sources);
-  return { sources, shipTypeIds, stacks, typeNames, unitM3, places, systems, hues, rigs };
+  return { sources, shipTypeIds, stacks, typeNames, unitM3, places, systems, hues, rigs, skipped };
 }
 
 interface MovePlanTabProps {
@@ -359,7 +364,15 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
       <div className="flex min-h-full flex-col gap-3 text-sm">
         <HullSource characterId={activeCharacterId} intoRef={hullSource} />
         <LiveStatus>
-          {failed ? t('assets.movePlan.failed') : planFailed ? t('assets.movePlan.planFailed') : ''}
+          {failed
+            ? t('assets.movePlan.failed')
+            : planFailed
+              ? t('assets.movePlan.planFailed')
+              : loaded && loaded.skipped.length > 0
+                ? t('assets.skippedCharacters', {
+                    names: loaded.skipped.map((c) => c.name).join(', '),
+                  })
+                : ''}
         </LiveStatus>
         {failed ? (
           <p className="text-text-dim">{t('assets.movePlan.failed')}</p>
@@ -456,9 +469,19 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
                   </span>
                 )}
               </div>
-              {loaded.stacks.length === 0 && (
-                <p className="text-text-dim">{t('assets.movePlan.noItems')}</p>
+              {loaded.skipped.length > 0 && (
+                <p className="text-xs text-warning">
+                  {t('assets.skippedCharacters', {
+                    names: loaded.skipped.map((c) => c.name).join(', '),
+                  })}
+                </p>
               )}
+              {loaded.stacks.length === 0 &&
+                (loaded.sources.length === 0 && loaded.skipped.length > 0 ? (
+                  <p className="text-text-dim">{t('assets.skippedAllHint')}</p>
+                ) : (
+                  <p className="text-text-dim">{t('assets.movePlan.noItems')}</p>
+                ))}
               <PickerList
                 grouped={grouped}
                 characterName={(id) => loaded.sources.find((s) => s.characterId === id)?.name ?? ''}

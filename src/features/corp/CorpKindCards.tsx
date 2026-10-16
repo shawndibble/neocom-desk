@@ -13,13 +13,19 @@
  * in here decides urgency.
  *
  * **A card is gated on the capability that opens its own source.** "Read fine,
- * nothing due" earns an empty state; "cannot read" earns no card. Collapsing
+ * nothing due" earns an empty state; "not permitted" earns no card. Collapsing
  * the two would put "No moon chunks" in front of a Character who was never
  * allowed to ask (AC3).
+ *
+ * **A permitted kind whose read failed is a third answer** (offline, ESI down):
+ * it gets a "Couldn't load" card, never the empty line. `unreadable` carries
+ * that, from `cardReadability.ts`; "Every structure is fuelled" about a
+ * structure list that never arrived is the lie this exists to stop.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel } from '@/components/ui';
+import { LiveStatus, Panel } from '@/components/ui';
+import { useOnline } from '@/stores/network';
 import {
   disabledClassName,
   focusRingClassName,
@@ -90,6 +96,24 @@ const EMPTY_FOR_KIND: Readonly<Record<CorpCardKind, string>> = {
 interface CorpKindCardsProps {
   grouped: ReadonlyMap<CorpBoardItemKind, CorpBoardItem[]>;
   capabilities: CorpCapabilities;
+  /**
+   * Kinds the Character may read whose read did not produce data. Left out,
+   * every permitted kind is taken to have loaded.
+   */
+  unreadable?: ReadonlySet<CorpBoardItemKind>;
+}
+
+/** A permitted kind whose read failed: its title, and one line saying so. */
+function UnreadableCard({ kind }: { kind: CorpCardKind }) {
+  const { t } = useTranslation();
+  const online = useOnline();
+  return (
+    <Panel title={t(TITLE_FOR_KIND[kind])} padded={false} className="min-w-0">
+      <p className="px-3 py-2.5 text-xs text-text-dim">
+        {t(online ? 'common.couldntLoad' : 'common.couldntLoadOffline')}
+      </p>
+    </Panel>
+  );
 }
 
 function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoardItem[] }) {
@@ -164,21 +188,27 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
   );
 }
 
-export function CorpKindCards({ grouped, capabilities }: CorpKindCardsProps) {
+export function CorpKindCards({ grouped, capabilities, unreadable }: CorpKindCardsProps) {
   const { t } = useTranslation();
-  const readable = CARD_KINDS.filter((kind) => capabilities[CAPABILITY_FOR_KIND[kind]]);
-  if (readable.length === 0) return null;
+  const permitted = CARD_KINDS.filter((kind) => capabilities[CAPABILITY_FOR_KIND[kind]]);
+  if (permitted.length === 0) return null;
+  const failed = (kind: CorpCardKind) => unreadable?.has(kind) === true;
+  const readable = permitted.filter((kind) => !failed(kind));
 
-  // Only kinds that were readable and came back empty can fold: an unreadable
-  // kind never reaches `readable`, so "could not read" is never summarised away
-  // as "nothing due". One empty card keeps its own quiet line; the summary is
-  // for two or more (issue #3142).
+  // Only kinds that were read and came back empty can fold: a kind whose read
+  // failed never reaches `readable`, so "couldn't load" is never summarised
+  // away as "nothing due". One empty card keeps its own quiet line; the summary
+  // is for two or more (issue #3142).
   const empty = readable.filter((kind) => (grouped.get(kind) ?? []).length === 0);
   const folded = empty.length >= 2 ? empty : [];
-  const cards = readable.filter((kind) => !folded.includes(kind));
+  const cards = permitted.filter((kind) => !folded.includes(kind));
 
+  const failedCount = permitted.filter(failed).length;
   return (
     <div className="grid min-w-0 gap-3">
+      <LiveStatus>
+        {failedCount > 0 ? t('corp.cards.loadFailedAnnounce', { count: failedCount }) : ''}
+      </LiveStatus>
       {cards.length > 0 && (
         // One column on a phone, two from `sm`, all four across only from `2xl`.
         // The sidebar leaves ~1030px of content at 1280, so four columns there are
@@ -190,9 +220,13 @@ export function CorpKindCards({ grouped, capabilities }: CorpKindCardsProps) {
         // which is the thing this rework exists to remove (DESIGN.md: density over
         // whitespace).
         <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-          {cards.map((kind) => (
-            <KindCard key={kind} kind={kind} items={grouped.get(kind) ?? []} />
-          ))}
+          {cards.map((kind) =>
+            failed(kind) ? (
+              <UnreadableCard key={kind} kind={kind} />
+            ) : (
+              <KindCard key={kind} kind={kind} items={grouped.get(kind) ?? []} />
+            )
+          )}
         </div>
       )}
       {folded.length > 0 && (
