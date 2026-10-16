@@ -70,7 +70,7 @@ export function MailFormatBar({
     icon: ReactNode,
     label: string,
     onClick: () => void,
-    extra: { pressed?: boolean; disabled?: boolean; tooltip?: string } = {}
+    extra: { pressed?: boolean; unavailable?: boolean; tooltip?: string } = {}
   ) => (
     <IconButton
       key={key}
@@ -78,7 +78,9 @@ export function MailFormatBar({
       label={label}
       tooltip={extra.tooltip}
       pressed={extra.pressed}
-      disabled={disabled || extra.disabled}
+      disabled={disabled}
+      // `aria-disabled`, not native: a native-disabled button fires no hover/focus, so its reason would never show.
+      aria-disabled={extra.unavailable || undefined}
       onClick={onClick}
       onPointerDown={keepFocus}
       onMouseDown={(e) => e.preventDefault()}
@@ -113,55 +115,63 @@ export function MailFormatBar({
         style={dock === 'keyboard' ? { bottom: keyboardInset } : undefined}
         className={cx(
           shown ? 'flex' : 'hidden',
-          'gap-0.5',
-          // Phone: one row that scrolls sideways (the cut-off button is the cue, as in Tabs).
-          phone ? 'tab-scroller flex-nowrap overflow-x-auto' : 'flex-wrap',
+          'items-center',
           dock === 'keyboard'
             ? 'fixed inset-x-0 z-40 border-t border-line bg-panel px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]'
             : 'border-b border-line px-1 py-0.5',
           className
         )}
       >
-        {button(
-          'bold',
-          <Icon.FormatBold />,
-          t('mail.format.bold'),
-          () => commands.toggleMark('bold'),
-          {
-            pressed: state.bold,
-          }
-        )}
-        {button(
-          'italic',
-          <Icon.FormatItalic />,
-          t('mail.format.italic'),
-          () => commands.toggleMark('italic'),
-          { pressed: state.italic }
-        )}
-        {button(
-          'underline',
-          <Icon.FormatUnderline />,
-          t('mail.format.underline'),
-          () => commands.toggleMark('underline'),
-          { pressed: state.underline }
-        )}
-        <Divider />
-        {button('color', colorDot, t('mail.format.color'), () => setSheet('color'))}
-        {button('size', <Icon.FormatSize />, t('mail.format.size'), () => setSheet('size'))}
-        <Divider />
-        {button('link', <Icon.FormatLink />, t('mail.format.link'), () => setSheet('link'), {
-          pressed: state.link !== null,
-          disabled: !commands.canLink,
-          tooltip: commands.canLink ? undefined : t('mail.format.linkInTable'),
-        })}
-        {button('table', <Icon.TableView />, t('mail.format.table'), () => setSheet('table'))}
-        <Divider />
-        {button('clear', <Icon.FormatClear />, t('mail.format.clear'), commands.clearFormatting, {
-          disabled: !commands.canClear,
-          tooltip: commands.canClear ? undefined : t('mail.format.clearUnavailable'),
-        })}
+        <div
+          className={cx(
+            'flex min-w-0 flex-1 gap-0.5',
+            // Phone: one row that scrolls sideways (the cut-off button is the cue, as in Tabs).
+            phone ? 'tab-scroller flex-nowrap overflow-x-auto' : 'flex-wrap'
+          )}
+        >
+          {button(
+            'bold',
+            <Icon.FormatBold />,
+            t('mail.format.bold'),
+            () => commands.toggleMark('bold'),
+            {
+              pressed: state.bold,
+            }
+          )}
+          {button(
+            'italic',
+            <Icon.FormatItalic />,
+            t('mail.format.italic'),
+            () => commands.toggleMark('italic'),
+            { pressed: state.italic }
+          )}
+          {button(
+            'underline',
+            <Icon.FormatUnderline />,
+            t('mail.format.underline'),
+            () => commands.toggleMark('underline'),
+            { pressed: state.underline }
+          )}
+          <Divider />
+          {button('color', colorDot, t('mail.format.color'), () => setSheet('color'))}
+          {button('size', <Icon.FormatSize />, t('mail.format.size'), () => setSheet('size'))}
+          <Divider />
+          {button('link', <Icon.FormatLink />, t('mail.format.link'), () => setSheet('link'), {
+            pressed: state.link !== null,
+            unavailable: !commands.canLink,
+            tooltip: commands.canLink ? undefined : t('mail.format.linkInTable'),
+          })}
+          {button('table', <Icon.TableView />, t('mail.format.table'), () => setSheet('table'))}
+          <Divider />
+          {button('clear', <Icon.FormatClear />, t('mail.format.clear'), commands.clearFormatting, {
+            unavailable: !commands.canClear,
+            tooltip: commands.canClear ? undefined : t('mail.format.clearUnavailable'),
+          })}
+        </div>
         {onToggleSource && (
-          <span className="ml-auto flex shrink-0 items-center pl-1">
+          // Outside the scroller, so the way back to Preview never scrolls out of reach.
+          <span className="flex shrink-0 items-center pl-1">
+            <Divider />
             {button('source', <Icon.OpenSource />, t('mail.format.source'), onToggleSource, {
               pressed: sourceActive,
             })}

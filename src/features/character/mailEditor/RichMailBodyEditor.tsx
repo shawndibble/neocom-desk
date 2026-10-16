@@ -152,15 +152,24 @@ export default function RichMailBodyEditor({
     }
   }, [source]);
 
-  const previewState = useEditorState({
+  const { fmt: previewState, inTable } = useEditorState({
     editor,
-    selector: ({ editor: ed }) => (ed ? formatStateOfEditor(ed) : emptyFormatState),
+    selector: ({ editor: ed }) => ({
+      fmt: ed ? formatStateOfEditor(ed) : emptyFormatState,
+      inTable: ed ? ed.isActive('table') : false,
+    }),
   });
 
-  const inTable = useEditorState({
-    editor,
-    selector: ({ editor: ed }) => (ed ? ed.isActive('table') : false),
-  });
+  // Switching moves focus into the new surface, so the focus-gated bar (and the toggle) stays.
+  const switched = useRef(false);
+  useEffect(() => {
+    if (!switched.current) {
+      switched.current = true;
+      return;
+    }
+    if (mode === 'source') sourceRef.current?.focus();
+    else editor?.commands.focus();
+  }, [mode, editor]);
 
   function switchMode(next: Mode) {
     if (next === mode) return;
@@ -338,6 +347,8 @@ export default function RichMailBodyEditor({
         </div>
         {inSource && (
           <TextArea
+            bare
+            mono
             ref={sourceRef}
             id={id}
             aria-label={t('mail.format.sourceLabel')}
@@ -349,14 +360,14 @@ export default function RichMailBodyEditor({
             spellCheck={false}
             autoCapitalize="none"
             autoCorrect="off"
-            className="min-h-0 flex-1 resize-none rounded-none! border-0! bg-transparent! p-3 font-mono text-xs text-white/75"
+            className="min-h-0 flex-1 resize-none p-3 text-xs"
           />
         )}
         {(counter || reserveSpace) && (
           <div
             className={cx(
-              'flex shrink-0 justify-end px-3 pb-1.5 text-[0.6875rem]',
-              reserveSpace && DOCKED_BAR_SPACE_CLASS
+              'flex shrink-0 justify-end px-3',
+              reserveSpace ? DOCKED_BAR_SPACE_CLASS : 'pb-1.5'
             )}
           >
             {counter}

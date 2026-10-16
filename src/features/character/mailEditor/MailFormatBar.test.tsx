@@ -53,7 +53,7 @@ describe('MailFormatBar', () => {
     expect(c.toggleMark).toHaveBeenCalledWith('bold');
   });
 
-  it('disables clear formatting with a reason in Source', () => {
+  it('disables clear formatting with a reason in Source', async () => {
     render(
       <MailFormatBar
         commands={commands({}, { canClear: false })}
@@ -62,7 +62,12 @@ describe('MailFormatBar', () => {
         visible
       />
     );
-    expect(screen.getByRole('button', { name: 'Clear formatting' })).toBeDisabled();
+    const clear = screen.getByRole('button', { name: 'Clear formatting' });
+    expect(clear).toHaveAttribute('aria-disabled', 'true');
+    const user = userEvent.setup();
+    await user.click(clear);
+    clear.focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Not available in Source view');
   });
 
   it('applies a swatch, always opaque', async () => {
@@ -240,6 +245,43 @@ describe('MailFormatBar placement and Source', () => {
     await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: 'Text size' }));
     expect(await screen.findByRole('button', { name: 'Normal' })).toBeDisabled();
+  });
+});
+
+describe('bar structure', () => {
+  it('is borderless, grouped by three hairlines, with Source pinned outside the scroller', () => {
+    const { container } = render(
+      <MailFormatBar
+        commands={commands()}
+        phone
+        dock="inline"
+        visible
+        sourceActive={false}
+        onToggleSource={() => undefined}
+      />
+    );
+    const bold = screen.getByRole('button', { name: 'Bold' });
+    expect(bold.className).not.toMatch(/(^|\s)border(\s|$)/);
+    const toolbar = screen.getByRole('toolbar');
+    // Three dividers between the four groups inside the scroller, one before the pinned Source.
+    const scroller = bold.closest('.overflow-x-auto') as HTMLElement;
+    expect(scroller.querySelectorAll('span[aria-hidden].w-px')).toHaveLength(3);
+    const source = screen.getByRole('button', { name: 'Edit source' });
+    expect(scroller.contains(source)).toBe(false);
+    expect(toolbar.contains(source)).toBe(true);
+    expect(container).toBeTruthy();
+  });
+
+  it('keeps the Link click a no-op and explains why while it is aria-disabled', async () => {
+    const c = commands({}, { canLink: false });
+    const user = userEvent.setup();
+    render(<MailFormatBar commands={c} phone={false} dock="inline" visible />);
+    const link = screen.getByRole('button', { name: 'Link' });
+    expect(link).toHaveAttribute('aria-disabled', 'true');
+    await user.click(link);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    link.focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent("can't carry a link");
   });
 });
 

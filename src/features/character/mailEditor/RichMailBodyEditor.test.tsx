@@ -102,7 +102,10 @@ describe('RichMailBodyEditor', () => {
     (src as HTMLTextAreaElement).setSelectionRange(6, 11);
     await user.click(screen.getByRole('button', { name: 'Bold' }));
     expect(src).toHaveValue('hello <b>world</b>');
-    expect(screen.getByRole('button', { name: 'Clear formatting' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Clear formatting' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('inserts a table from the dialog and emits pipe rows', async () => {
@@ -291,7 +294,9 @@ describe('RichMailBodyEditor', () => {
     const pm = await editor();
     const cell = firstText(pm.querySelectorAll('th')[1]);
     await selectIn(pm, user, [cell, 1], [cell, 3]);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Link' })).toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Link' })).toHaveAttribute('aria-disabled', 'true')
+    );
   });
 
   it('has no Preview/Source SegmentedControl; one pressed-state toggle switches modes', async () => {
@@ -314,6 +319,23 @@ describe('RichMailBodyEditor', () => {
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('keeps the bar and toggle available after switching to Source, and back', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="x" />);
+    await editor();
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
+    const src = screen.getByRole('textbox', { name: 'Message source (EVE markup)' });
+    expect(src).toHaveFocus();
+    expect(screen.getByRole('toolbar')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Edit source' }));
+    expect(screen.getByRole('toolbar')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Edit source' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await waitFor(() => expect(document.querySelector('.ProseMirror')).toHaveFocus());
+  });
+
   it('puts the counter inside the card', async () => {
     render(
       <RichMailBodyEditor
@@ -325,6 +347,8 @@ describe('RichMailBodyEditor', () => {
     );
     await editor();
     const card = document.querySelector('[data-mail-card]') as HTMLElement;
-    expect(within(card).getByText('1 / 10000')).toBeInTheDocument();
+    const counter = within(card).getByText('1 / 10000');
+    expect(counter.parentElement).toHaveClass('justify-end');
+    expect(card.lastElementChild).toBe(counter.parentElement);
   });
 });
