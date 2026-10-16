@@ -53,6 +53,10 @@ describe('composeBodyLength', () => {
   it('counts raw characters', () => {
     expect(composeBodyLength('abc')).toBe(3);
   });
+
+  it('counts markup, tags included', () => {
+    expect(composeBodyLength('<b>hi</b>')).toBe(9);
+  });
 });
 
 describe('validateNewMail', () => {

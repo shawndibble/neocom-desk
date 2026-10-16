@@ -4,6 +4,7 @@
  * go to, the ESI limits, and what an empty draft is. Pure — the composer, the
  * draft store and the recipient picker all lean on this.
  */
+import { eveMarkupLength } from './eveMarkup';
 
 /** ESI's cap on recipients per mail. */
 export const MAX_RECIPIENTS = 50;
@@ -33,12 +34,9 @@ export function recipientKey(r: Pick<ComposeRecipient, 'recipient_id' | 'recipie
   return `${r.recipient_type}:${r.recipient_id}`;
 }
 
-/**
- * Body length against `MAX_BODY_LENGTH`. Raw characters for now; the shared
- * EVE-markup length function replaces this one body when it lands.
- */
+/** Body length against `MAX_BODY_LENGTH`: EVE markup as sent, tags included. */
 export function composeBodyLength(body: string): number {
-  return body.length;
+  return eveMarkupLength(body);
 }
 
 export type AddRecipientResult =

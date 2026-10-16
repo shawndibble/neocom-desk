@@ -230,6 +230,12 @@ Added with the Fittings section — see
 | `mastery-elite` | `#e8b84a` | Mastery V, and nothing else: tile, badge, dot, legend. |
 | `omega`         | `#d9a72c` | The Ω "needs an Omega clone" mark, and nothing else.   |
 
+**EVE mail surface.** The mail reader draws a body on a fixed dark surface
+(`#0a0e14`, default text white at 75%, the game's `#bfffffff`) in every theme,
+a documented exception to the theme tokens: senders choose colours against the
+game's dark mail window, so a colour only reads as sent on that ground. It is one
+constant in `MailBodyView.tsx`, used for nothing else.
+
 The Ship Tree (Ships › Tree) is a replica of the in-game one (ISIS), drawn
 from in-game screenshots — a game-art surface, and a documented exception to
 this palette and to §3 and §6, for the same reason as damage types: players
