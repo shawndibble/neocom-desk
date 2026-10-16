@@ -89,15 +89,22 @@ function schematicKey(schematicId: number): string {
  * Works offline and on a device that has never called ESI. Empty on any
  * load failure, so the ESI path stays the fallback.
  */
+const localNamesByPi = new WeakMap<object, Map<number, string>>();
+
 async function localSchematicNames(): Promise<Map<number, string>> {
   try {
     const pi = await loadPi();
-    const names = new Map<number, string>();
-    for (const schematic of Object.values(pi.schematics)) {
-      names.set(schematic.schematicId, schematic.name);
+    let names = localNamesByPi.get(pi);
+    if (!names) {
+      names = new Map();
+      for (const schematic of Object.values(pi.schematics)) {
+        names.set(schematic.schematicId, schematic.name);
+      }
+      localNamesByPi.set(pi, names);
     }
     return names;
   } catch {
+    // Local data unavailable: the caller falls back to ESI, which reports its own failure.
     return new Map();
   }
 }
