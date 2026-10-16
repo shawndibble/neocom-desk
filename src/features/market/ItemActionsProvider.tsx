@@ -24,7 +24,9 @@ export function ItemActionsProvider({
       {children}
       {shown && (
         <ItemDetailModal
+          key={`${shown.typeId}-${shown.itemId ?? ''}`}
           typeId={shown.typeId}
+          itemId={shown.itemId}
           itemName={shown.itemName}
           location={detailLocation}
           showOpenInMarket={detailLocation === undefined}

@@ -9,6 +9,8 @@ import { getEntityInfoNavigator } from './entityInfoNavigator';
 
 export interface ItemInfoRequest {
   typeId: number;
+  /** One owned item of the type (`?info=type-<typeId>-<itemId>`): an abyssal module's own rolls. */
+  itemId?: number;
   /** Absent when the URL was opened cold; the host then looks the name up. */
   itemName?: string;
 }
@@ -18,7 +20,7 @@ interface ItemInfoModalState {
   /** A link click's name: the URL carries the type but not what it is called. */
   staged: { typeId: number; itemName: string } | null;
   /** Moves the URL to `?info=type-<typeId>` (`EntityInfoRoute` then shows it). */
-  open: (typeId: number, itemName?: string) => void;
+  open: (typeId: number, itemName?: string, itemId?: number) => void;
   /** Takes `info` off the URL. */
   close: () => void;
   stage: (typeId: number, itemName?: string) => void;
@@ -30,14 +32,14 @@ interface ItemInfoModalState {
 export const useItemInfoModalStore = create<ItemInfoModalState>((set, get) => ({
   request: null,
   staged: null,
-  open: (typeId, itemName) => {
+  open: (typeId, itemName, itemId) => {
     const navigator = getEntityInfoNavigator();
     if (!navigator) {
-      set({ request: { typeId, itemName } });
+      set({ request: { typeId, itemName, ...(itemId === undefined ? {} : { itemId }) } });
       return;
     }
     get().stage(typeId, itemName);
-    navigator.open({ kind: 'type', id: typeId });
+    navigator.open({ kind: 'type', id: typeId, ...(itemId === undefined ? {} : { itemId }) });
   },
   close: () => {
     const navigator = getEntityInfoNavigator();
@@ -55,6 +57,6 @@ export function itemInfoIsUrlBacked(): boolean {
 }
 
 /** Direct call for event handlers and menus outside render. */
-export function openItemInfo(typeId: number, itemName?: string): void {
-  useItemInfoModalStore.getState().open(typeId, itemName);
+export function openItemInfo(typeId: number, itemName?: string, itemId?: number): void {
+  useItemInfoModalStore.getState().open(typeId, itemName, itemId);
 }

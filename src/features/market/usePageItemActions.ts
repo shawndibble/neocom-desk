@@ -31,6 +31,7 @@ export interface PageItemActionsOptions {
 export interface ShownItem {
   typeId: number;
   itemName: string;
+  itemId?: number;
 }
 
 export interface PageItemActions {
@@ -66,9 +67,9 @@ export function usePageItemActions({
     () => ({
       canAddToQuickbar,
       addToQuickbar: (typeId, itemName) => latestAdd.current(typeId, itemName),
-      showInfo: (typeId, itemName) => {
-        if (!localInfo && itemInfoIsUrlBacked()) openItemInfo(typeId, itemName);
-        else setShown({ typeId, itemName });
+      showInfo: (typeId, itemName, itemId) => {
+        if (!localInfo && itemInfoIsUrlBacked()) openItemInfo(typeId, itemName, itemId);
+        else setShown({ typeId, itemName, ...(itemId === undefined ? {} : { itemId }) });
       },
       blueprints,
       blueprintFor: (typeId) => (lazyBlueprints ? blueprintTypeIdFor(blueprints, typeId) : null),

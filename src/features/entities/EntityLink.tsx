@@ -111,14 +111,18 @@ export const ItemInfoLink = forwardRef<
     typeId: number;
     /** The item's name for the modal title; looked up from the type when omitted. */
     itemName?: string;
+    /** One owned item of the type: Item Detail then shows that item's own rolls (an abyssal module). */
+    itemId?: number;
   }
->(function ItemInfoLink({ typeId, itemName, onClick, ...rest }, ref) {
+>(function ItemInfoLink({ typeId, itemName, itemId, onClick, ...rest }, ref) {
   const stage = useItemInfoModalStore((state) => state.stage);
   return (
     <InfoLink
       {...rest}
       ref={ref}
-      entity={{ kind: 'type', id: typeId }}
+      entity={
+        itemId === undefined ? { kind: 'type', id: typeId } : { kind: 'type', id: typeId, itemId }
+      }
       onClick={(event: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(event);
         if (!isPlainPrimaryClick(event)) return;
