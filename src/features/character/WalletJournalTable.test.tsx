@@ -112,7 +112,7 @@ describe('JournalTable', () => {
   it('says the scope and the date range in the panel subtitle', () => {
     const { rerender } = render(<Harness />);
     expect(
-      screen.getByText("All characters · since 2026-10-07 · follows the Journal's filters")
+      screen.getByText("All characters · since 10/7/2026 · follows the Journal's filters")
     ).toBeInTheDocument();
     rerender(
       <Harness
@@ -120,7 +120,7 @@ describe('JournalTable', () => {
       />
     );
     expect(
-      screen.getByText("All characters · 2026-10-01 – 2026-10-07 · follows the Journal's filters")
+      screen.getByText("All characters · 10/1/2026 – 10/7/2026 · follows the Journal's filters")
     ).toBeInTheDocument();
   });
 

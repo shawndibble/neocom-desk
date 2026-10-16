@@ -5,6 +5,7 @@
  * and one column-visibility store, so hiding a column on one hides it on the
  * other.
  */
+import { formatIsoDay } from '@/lib/formatDateTick';
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -186,8 +187,9 @@ function rangeLabel(
   rows: readonly JournalRow[],
   t: TFunction
 ): string {
-  const { startDate: from, endDate: to } = filter;
-  if (from && to) return t('wallet.journalRangeBetween', { from, to });
+  const from = filter.startDate && formatIsoDay(filter.startDate);
+  const to = filter.endDate && formatIsoDay(filter.endDate);
+  if (from && to) return from === to ? from : t('wallet.journalRangeBetween', { from, to });
   if (from) return t('wallet.journalRangeFrom', { from });
   if (to) return t('wallet.journalRangeTo', { to });
   const first = rows.reduce<string | null>(
@@ -196,7 +198,7 @@ function rangeLabel(
   );
   return first === null
     ? t('wallet.journalRangeAll')
-    : t('wallet.journalRangeSince', { since: first.slice(0, 10) });
+    : t('wallet.journalRangeSince', { since: formatIsoDay(first.slice(0, 10)) });
 }
 
 /**
