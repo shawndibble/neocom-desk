@@ -9,10 +9,10 @@ const config: StorybookConfig = {
   // `/manifests/components.json` — the component catalogue agents read.
   features: { componentsManifest: true },
   // Reuses vite.config.ts (alias, Tailwind, define) so a story renders as the
-  // app does. The PWA, Sentry and Pages-fallback plugins are build-pipeline
+  // app does. The PWA, Sentry, Pages-fallback and landing-shell plugins are build-pipeline
   // concerns of the app, not of a catalogue.
   viteFinal: (viteConfig) => {
-    const appOnly = /^(vite-plugin-pwa|neocom-spa-fallback|sentry-)/;
+    const appOnly = /^(vite-plugin-pwa|neocom-spa-fallback|neocom-landing-shell|sentry-)/;
     const strip = (plugins: unknown): unknown =>
       Array.isArray(plugins)
         ? plugins
