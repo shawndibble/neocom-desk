@@ -117,7 +117,10 @@ describe('MailFormatBar', () => {
     await user.type(text, 'new');
     await user.clear(url);
     await user.type(url, 'example.com/x{Enter}');
-    expect(c.setLink).toHaveBeenCalledWith({ text: 'new', href: 'https://example.com/x' });
+    expect(c.setLink).toHaveBeenCalledWith(expect.objectContaining({ from: 1, to: 4 }), {
+      text: 'new',
+      href: 'https://example.com/x',
+    });
   });
 
   it('prefills the selected text, focuses Text for a bare caret, and refuses other schemes', async () => {
@@ -144,7 +147,7 @@ describe('MailFormatBar', () => {
     expect(within(dialog).getByLabelText('Text')).toHaveValue('');
     expect(within(dialog).getByLabelText('Text')).toHaveFocus();
     await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
-    expect(caret.setLink).toHaveBeenCalledWith({
+    expect(caret.setLink).toHaveBeenCalledWith(expect.anything(), {
       text: 'https://example.com',
       href: 'https://example.com',
     });
@@ -164,7 +167,39 @@ describe('MailFormatBar', () => {
     expect(within(dialog).getByRole('alert')).toHaveTextContent('under 200');
     expect(c.setLink).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole('button', { name: 'Remove link' }));
-    expect(c.removeLink).toHaveBeenCalled();
+    expect(c.removeLink).toHaveBeenCalledWith(expect.objectContaining({ from: 1, to: 4 }));
+  });
+
+  it('leaves an over-long prefilled selection alone and links it by address', async () => {
+    const long = 'a'.repeat(300);
+    const c = commands({}, { linkTarget: () => ({ from: 1, to: 301, text: long, href: null }) });
+    const user = userEvent.setup();
+    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
+    expect(c.setLink).toHaveBeenCalledWith(expect.anything(), {
+      text: long,
+      href: 'https://example.com',
+    });
+  });
+
+  it('locks Text when the selection spans blocks, applying the link to the address only', async () => {
+    const c = commands(
+      {},
+      { linkTarget: () => ({ from: 1, to: 9, text: '', href: null, markOnly: true }) }
+    );
+    const user = userEvent.setup();
+    render(<MailFormatBar commands={c} phone dock="inline" visible />);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Text')).toBeDisabled();
+    expect(within(dialog).getByText(/spans paragraphs/)).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
+    expect(c.setLink).toHaveBeenCalledWith(expect.objectContaining({ markOnly: true }), {
+      text: 'https://example.com',
+      href: 'https://example.com',
+    });
   });
 
   it('inserts a table of the chosen size', async () => {

@@ -6594,6 +6594,7 @@
       },
       "linkTitle": "Link",
       "linkText": "Text",
+      "linkTextLocked": "The selection spans paragraphs or table cells, so its text stays as it is and only gets the link.",
       "linkTextTooLong": "Keep the text under {{max}} characters.",
       "linkUrl": "Web address",
       "linkInvalid": "Enter a web address starting with http:// or https://.",

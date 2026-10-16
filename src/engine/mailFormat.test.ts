@@ -10,7 +10,6 @@ import {
   MAIL_LINK_TEXT_MAX,
   normalizeLinkInput,
   linkDraftOf,
-  planLinkEdit,
   planSourceLink,
   sourceLinkAt,
   validateLinkForm,
@@ -217,25 +216,21 @@ describe('link dialog', () => {
     });
   });
 
-  it('plans a replacement of the selection, the caret, or the whole link', () => {
-    const form = { text: 'new', href: 'https://a.example/' };
-    expect(planLinkEdit({ from: 3, to: 8, text: 'hello', href: null }, form)).toEqual({
-      from: 3,
-      to: 8,
-      ...form,
+  it('skips the length check for a prefill left unchanged', () => {
+    const long = 'a'.repeat(MAIL_LINK_TEXT_MAX + 50);
+    expect(validateLinkForm({ text: long, url: 'a.b' }, long)).toEqual({
+      ok: true,
+      text: long,
+      href: 'https://a.b',
     });
-    expect(planLinkEdit({ from: 4, to: 4, text: '', href: null }, form)).toEqual({
-      from: 4,
-      to: 4,
-      ...form,
+    expect(validateLinkForm({ text: long + 'x', url: 'a.b' }, long).ok).toBe(false);
+  });
+
+  it('prefills no text when only the mark can be applied', () => {
+    expect(linkDraftOf({ from: 1, to: 9, text: 'a b', href: null, markOnly: true })).toEqual({
+      text: '',
+      url: '',
     });
-    expect(planLinkEdit({ from: 2, to: 9, text: 'old', href: 'https://o.example/' }, form)).toEqual(
-      {
-        from: 2,
-        to: 9,
-        ...form,
-      }
-    );
   });
 });
 
@@ -263,12 +258,9 @@ describe('source-mode link', () => {
       text: 'here & there',
       href: 'https://x.example/?a=1&b=2',
     });
-    expect(sourceLinkAt(src, from, to - 1)).toEqual({
-      from,
-      to: to - 1,
-      text: src.slice(from, to - 1),
-      href: null,
-    });
+    expect(sourceLinkAt('x a &amp; b y', 2, 11).text).toBe('a & b');
+    expect(sourceLinkAt('x a &lt; b y', 2, 10).text).toBe('a < b');
+    expect(sourceLinkAt('x <b>x</b> y', 2, 10)).toMatchObject({ text: 'x', href: null });
     expect(sourceLinkAt('abc', 1, 1)).toEqual({ from: 1, to: 1, text: '', href: null });
   });
 

@@ -17,10 +17,10 @@ export interface MailEditorCommands {
   setSize: (px: number | null) => void;
   /** What a link edit would replace now: the selection, the caret, or the link under either. */
   linkTarget: () => LinkTarget;
-  /** Replaces `linkTarget()` with `text` carrying the (already validated) http(s) `href`. */
-  setLink: (edit: { text: string; href: string }) => void;
-  /** Removes the link under the caret/selection, keeping its text. */
-  removeLink: () => void;
+  /** Replaces `target` (what `linkTarget()` returned when the sheet opened) with `text` carrying the (already validated) http(s) `href`. */
+  setLink: (target: LinkTarget, edit: { text: string; href: string }) => void;
+  /** Removes the link in `target`, keeping its text. Absent where that cannot be done (Source). */
+  removeLink?: (target: LinkTarget) => void;
   insertTable: (rows: number, cols: number) => void;
   clearFormatting: () => void;
   /**

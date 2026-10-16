@@ -33,6 +33,12 @@ function Harness({ initial = '', onValue }: { initial?: string; onValue?: (v: st
   );
 }
 
+function firstText(el: Node): Node {
+  const node = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode();
+  if (!node) throw new Error('no text node');
+  return node;
+}
+
 async function editor() {
   return waitFor(() => {
     const el = document.querySelector('.ProseMirror');
@@ -209,7 +215,7 @@ describe('RichMailBodyEditor', () => {
     const anchor = pm.querySelector('a')!;
     await user.click(pm);
     const sel = window.getSelection()!;
-    sel.setBaseAndExtent(anchor.firstChild!, 1, anchor.firstChild!, 1);
+    sel.setBaseAndExtent(firstText(anchor), 1, firstText(anchor), 1);
     fireEvent(document, new Event('selectionchange'));
     await user.click(screen.getByRole('button', { name: 'Link' }));
     const dialog = await screen.findByRole('dialog');
@@ -224,5 +230,69 @@ describe('RichMailBodyEditor', () => {
         'x <a href="https://new.example/"><b>fresh</b></a> y'
       )
     );
+  });
+
+  async function selectIn(
+    pm: HTMLElement,
+    user: ReturnType<typeof userEvent.setup>,
+    a: [Node, number],
+    b: [Node, number]
+  ) {
+    await user.click(pm);
+    window.getSelection()!.setBaseAndExtent(a[0], a[1], b[0], b[1]);
+    fireEvent(document, new Event('selectionchange'));
+  }
+
+  it('Preview: a caret at the edge of a link starts a new link; one inside edits it', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={'a <a href="https://o.example/">old</a> b'} />);
+    const pm = await editor();
+    const text = firstText(pm.querySelector('a')!);
+    for (const [offset, edit] of [
+      [0, false],
+      [3, false],
+      [1, true],
+    ] as const) {
+      await selectIn(pm, user, [text, offset], [text, offset]);
+      await user.click(screen.getByRole('button', { name: 'Link' }));
+      const dialog = await screen.findByRole('dialog');
+      await waitFor(() =>
+        expect(within(dialog).getByLabelText('Text')).toHaveValue(edit ? 'old' : '')
+      );
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    }
+  });
+
+  it('Preview: a selection across two paragraphs only gains the link mark', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={'one\ntwo'} />);
+    const pm = await editor();
+    const ps = pm.querySelectorAll('p');
+    expect(ps).toHaveLength(2);
+    await selectIn(pm, user, [firstText(ps[0]), 1], [firstText(ps[1]), 2]);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Text')).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
+    await waitFor(() => expect(pm.querySelectorAll('p')).toHaveLength(2));
+    expect(pm.querySelectorAll('a')).toHaveLength(2);
+    expect(pm.textContent).toBe('onetwo');
+  });
+
+  it('Preview: a selection inside one table cell prefills its text and leaves the table intact', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={'| a | bcd |\n|---|---|\n| 1 | 2 |'} />);
+    const pm = await editor();
+    const cell = firstText(pm.querySelectorAll('th')[1]);
+    await selectIn(pm, user, [cell, 1], [cell, 3]);
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Text')).toHaveValue('cd');
+    await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
+    await waitFor(() => expect(pm.querySelectorAll('tr')).toHaveLength(2));
+    // Cells hold plain text (no marks), so the cell keeps its text; the table is unharmed.
+    expect(pm.querySelectorAll('th')).toHaveLength(2);
+    expect(pm.querySelectorAll('th')[1].textContent).toBe('bcd');
   });
 });

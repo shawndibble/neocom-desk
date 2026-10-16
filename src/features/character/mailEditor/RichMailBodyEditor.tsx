@@ -29,7 +29,6 @@ import {
   buildPipeTableLines,
   emptyFormatState,
   parsePastedPipeTable,
-  planLinkEdit,
   planSourceLink,
   sourceLinkAt,
   sourceTagPair,
@@ -204,24 +203,42 @@ export default function RichMailBodyEditor({
     },
     linkTarget: () =>
       editor ? linkTargetOfEditor(editor) : { from: 0, to: 0, text: '', href: null },
-    setLink: (edit) => {
+    setLink: (target, edit) => {
       if (!editor) return;
-      const plan = planLinkEdit(linkTargetOfEditor(editor), edit);
+      if (target.markOnly) {
+        // Spans blocks or cells: add the mark, leave the text and structure alone.
+        const link = editor.schema.marks.link.create({ href: edit.href });
+        const { tr } = editor.state;
+        for (const [from, to] of target.ranges ?? [[target.from, target.to]]) {
+          tr.addMark(from, to, link);
+        }
+        editor.view.dispatch(tr);
+        editor.commands.focus();
+        return;
+      }
       // Keep the other marks (bold, colour, size) of the first character replaced.
       const marks = [
-        ...linkCarryMarks(editor, plan.from),
-        { type: 'link', attrs: { href: plan.href } },
+        ...linkCarryMarks(editor, target.from),
+        { type: 'link', attrs: { href: edit.href } },
       ];
       editor
         .chain()
         .focus()
-        .insertContentAt({ from: plan.from, to: plan.to }, { type: 'text', text: plan.text, marks })
+        .insertContentAt(
+          { from: target.from, to: target.to },
+          { type: 'text', text: edit.text, marks }
+        )
         .run();
     },
-    removeLink: () => {
+    removeLink: (target) => {
       if (!editor) return;
-      const { from, to } = linkTargetOfEditor(editor);
-      editor.chain().focus().setTextSelection({ from, to }).unsetLink().run();
+      const link = editor.schema.marks.link;
+      const { tr } = editor.state;
+      for (const [from, to] of target.ranges ?? [[target.from, target.to]]) {
+        tr.removeMark(from, to, link);
+      }
+      editor.view.dispatch(tr);
+      editor.commands.focus();
     },
     insertTable: (rows, cols) =>
       void editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run(),
@@ -243,16 +260,10 @@ export default function RichMailBodyEditor({
         el?.selectionEnd ?? source.length
       );
     },
-    setLink: (edit) => {
-      const target = sourceLinkAt(
-        source,
-        sourceRef.current?.selectionStart ?? source.length,
-        sourceRef.current?.selectionEnd ?? source.length
-      );
+    setLink: (target, edit) => {
       const result = planSourceLink(source, target.from, target.to, edit);
       editSource(result.value, [result.start, result.end]);
     },
-    removeLink: () => undefined,
     insertTable: (rows, cols) => {
       const el = sourceRef.current;
       const at = el?.selectionStart ?? source.length;

@@ -1,5 +1,6 @@
 import { getMarkRange, type Editor } from '@tiptap/core';
 import type { Mark } from '@tiptap/pm/model';
+import { CellSelection } from '@tiptap/pm/tables';
 import {
   formatStateOfRuns,
   type FormatRun,
@@ -33,13 +34,18 @@ export function formatStateOfEditor(editor: Editor): FormatState {
   return formatStateOfRuns(runs);
 }
 
-/** The selection, the caret, or the whole link either sits in. */
+/**
+ * The selection, the caret, or the whole link they sit in. A caret at a link's
+ * edge is outside it (the mark is non-inclusive, as `formatStateOfEditor` reads
+ * it); a selection counts as in the link only when wholly within its range.
+ */
 export function linkTargetOfEditor(editor: Editor): LinkTarget {
   const { selection, doc } = editor.state;
   const { from, to, empty } = selection;
   const type = editor.schema.marks.link;
   const range = type ? getMarkRange(doc.resolve(from), type) : undefined;
-  if (range && (empty || to <= range.to)) {
+  const inside = range && (empty ? from > range.from && from < range.to : to <= range.to);
+  if (range && inside) {
     const href = doc.nodeAt(range.from)?.marks.find((m) => m.type === type)?.attrs.href;
     return {
       from: range.from,
@@ -48,7 +54,18 @@ export function linkTargetOfEditor(editor: Editor): LinkTarget {
       href: typeof href === 'string' ? href : '',
     };
   }
-  return { from, to, text: empty ? '' : doc.textBetween(from, to, ' '), href: null };
+  const markOnly =
+    !empty &&
+    (selection instanceof CellSelection || selection.$from.parent !== selection.$to.parent);
+  return {
+    from,
+    to,
+    text: empty || markOnly ? '' : doc.textBetween(from, to, ' '),
+    href: null,
+    ...(markOnly
+      ? { markOnly, ranges: selection.ranges.map((r) => [r.$from.pos, r.$to.pos] as const) }
+      : {}),
+  };
 }
 
 /** The marks (minus any link) of the first character of the range, or at the caret. */

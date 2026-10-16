@@ -176,8 +176,8 @@ export function SizeDialog({ open, onClose, phone, canReset, current, onPick }: 
 interface LinkDialogProps extends SheetProps {
   /** What the link edit would replace; read once, when the sheet opens. */
   getTarget: () => LinkTarget;
-  onApply: (edit: { text: string; href: string }) => void;
-  onRemove: () => void;
+  onApply: (target: LinkTarget, edit: { text: string; href: string }) => void;
+  onRemove?: (target: LinkTarget) => void;
 }
 
 export function LinkDialog(props: LinkDialogProps) {
@@ -204,12 +204,12 @@ function LinkDialogBody({
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const result = validateLinkForm({ text, url });
+    const result = validateLinkForm({ text, url }, draft.text);
     if (!result.ok) {
       setErrors(result.errors);
       return;
     }
-    onApply({ text: result.text, href: result.href });
+    onApply(target, { text: result.text, href: result.href });
     onClose();
   }
 
@@ -234,10 +234,22 @@ function LinkDialogBody({
               setText(e.target.value);
               setErrors((x) => ({ ...x, text: undefined }));
             }}
+            disabled={target.markOnly === true}
             aria-invalid={errors.text === true}
-            aria-describedby={errors.text ? 'mail-link-text-error' : undefined}
+            aria-describedby={
+              target.markOnly
+                ? 'mail-link-text-hint'
+                : errors.text
+                  ? 'mail-link-text-error'
+                  : undefined
+            }
             className="w-full"
           />
+          {target.markOnly && (
+            <p id="mail-link-text-hint" className="text-xs text-text-dim">
+              {t('mail.format.linkTextLocked')}
+            </p>
+          )}
           {errors.text && (
             <FieldError id="mail-link-text-error">
               {t('mail.format.linkTextTooLong', { max: MAIL_LINK_TEXT_MAX })}
@@ -270,11 +282,11 @@ function LinkDialogBody({
           )}
         </div>
         <div className="flex justify-end gap-2">
-          {target.href !== null && canReset && (
+          {target.href !== null && canReset && onRemove && (
             <Button
               size="md"
               onClick={() => {
-                onRemove();
+                onRemove(target);
                 onClose();
               }}
             >

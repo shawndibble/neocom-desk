@@ -93,6 +93,13 @@ export interface LinkTarget {
   to: number;
   text: string;
   href: string | null;
+  /**
+   * The selection spans blocks or table cells, so replacing it with one text node
+   * would merge blocks or mangle the table: only the link mark is applied, to
+   * `ranges` (or `[from, to]`), and the text is left alone.
+   */
+  markOnly?: boolean;
+  ranges?: readonly (readonly [number, number])[];
 }
 
 export interface LinkDraft {
@@ -102,35 +109,21 @@ export interface LinkDraft {
 
 /** What the two fields start with. */
 export function linkDraftOf(target: LinkTarget): LinkDraft {
-  return { text: target.text, url: target.href ?? '' };
+  return { text: target.markOnly ? '' : target.text, url: target.href ?? '' };
 }
 
 export type LinkFormResult =
   { ok: true; text: string; href: string } | { ok: false; errors: { url?: true; text?: true } };
 
 /** Checks the fields; empty text falls back to the address as the visible text. */
-export function validateLinkForm(form: LinkDraft): LinkFormResult {
+export function validateLinkForm(form: LinkDraft, prefilledText?: string): LinkFormResult {
   const href = normalizeLinkInput(form.url);
   const errors: { url?: true; text?: true } = {};
   if (href === null) errors.url = true;
-  if (form.text.length > MAIL_LINK_TEXT_MAX) errors.text = true;
+  // A long selection prefilled and left alone must still link by address alone.
+  if (form.text.length > MAIL_LINK_TEXT_MAX && form.text !== prefilledText) errors.text = true;
   if (href === null || errors.text) return { ok: false, errors };
   return { ok: true, text: form.text.trim() === '' ? href : form.text, href };
-}
-
-export interface LinkEditPlan {
-  from: number;
-  to: number;
-  text: string;
-  href: string;
-}
-
-/** Replace `[from, to)` with `text` carrying the link. */
-export function planLinkEdit(
-  target: LinkTarget,
-  form: { text: string; href: string }
-): LinkEditPlan {
-  return { from: target.from, to: target.to, text: form.text, href: form.href };
 }
 
 function linkTagOf(form: { text: string; href: string }): string {
@@ -159,7 +152,8 @@ export function sourceLinkAt(source: string, from: number, to: number): LinkTarg
   ) {
     return { from: lo, to: hi, text: markupPlainText(only.children), href: only.href };
   }
-  return { from: lo, to: hi, text: selected, href: null };
+  // The visible text, so the serializer escaping it again on apply does not double-escape.
+  return { from: lo, to: hi, text: markupPlainText(nodes), href: null };
 }
 
 /** Source view: write `<a href="URL">TEXT</a>` over the range, the tag selected after. */
