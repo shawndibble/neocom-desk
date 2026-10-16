@@ -76,3 +76,16 @@ async function fetchAffiliations(
   }
   return resolved;
 }
+
+/**
+ * When this character's affiliation row was last read from ESI, or null when
+ * there is none. For a view that shows the age of what `resolveAffiliations`
+ * handed back: a cache hit is only as new as its row, not as new as the call.
+ */
+export async function affiliationFetchedAt(characterId: number): Promise<Date | null> {
+  const rows = await readCachedEntries<CharacterAffiliation>(GLOBAL_CACHE_CHARACTER_ID, [
+    cacheKey(characterId),
+  ]);
+  const row = rows.get(cacheKey(characterId));
+  return row === undefined ? null : new Date(row.fetchedAt);
+}

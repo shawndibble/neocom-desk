@@ -4,12 +4,14 @@ import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { db } from '@/db';
+import { resetDetailPrefetchForTests } from './detailPrefetch';
 import {
   loadMailHeaders,
   loadMailBody,
   loadMailLabels,
   loadMoreMailHeaders,
   markMailReadOnEsi,
+  prefetchMailBodies,
   sendMail,
 } from './mail';
 
@@ -197,6 +199,84 @@ describe('loadMailBody', () => {
   });
 });
 
+describe('prefetchMailBodies', () => {
+  const headers = [
+    { mail_id: 30, from: 90000002, subject: 'New', is_read: false },
+    { mail_id: 20, from: 90000002, subject: 'Cached', is_read: false },
+    { mail_id: 10, from: 90000002, subject: 'Old', is_read: true },
+  ];
+  const requested: number[] = [];
+
+  beforeEach(() => {
+    requested.length = 0;
+    vi.stubGlobal('navigator', { onLine: true });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/:mailId`, ({ params }) => {
+        requested.push(Number(params.mailId));
+        return HttpResponse.json({ from: 90000002, subject: 'S', body: 'Text', read: false });
+      })
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetDetailPrefetchForTests();
+  });
+
+  it('caches the bodies of the newest mail so the reader has them offline, skipping cached ones', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:20',
+      value: { from: 1, subject: 'Cached', body: 'Already here', read: true },
+      fetchedAt: 1,
+    });
+
+    await prefetchMailBodies(CHAR_ID, headers);
+
+    expect(requested.sort()).toEqual([10, 30]);
+    expect(await db.esiCache.get([CHAR_ID, 'mail:30'])).toBeDefined();
+    expect((await db.esiCache.get([CHAR_ID, 'mail:20']))?.value).toMatchObject({
+      body: 'Already here',
+    });
+  });
+
+  it('does nothing while offline', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    await prefetchMailBodies(CHAR_ID, headers);
+    expect(requested).toEqual([]);
+  });
+
+  it('does nothing on a save-data connection', async () => {
+    vi.stubGlobal('navigator', { onLine: true, connection: { saveData: true } });
+    await prefetchMailBodies(CHAR_ID, headers);
+    expect(requested).toEqual([]);
+  });
+
+  it('does not ask again, this session, for a body that failed (deleted mail, a 403 or 404)', async () => {
+    let hits = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/30`, () => {
+        hits += 1;
+        return HttpResponse.json({ error: 'gone' }, { status: 404 });
+      })
+    );
+
+    await prefetchMailBodies(CHAR_ID, headers);
+    await prefetchMailBodies(CHAR_ID, headers);
+
+    expect(hits).toBe(1);
+    // The others were cached by the first run and are not asked for again either.
+    expect(requested.sort()).toEqual([10, 20]);
+  });
+
+  it('never rejects when a body cannot be fetched, and carries on with the rest', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/30`, () => HttpResponse.error())
+    );
+    await expect(prefetchMailBodies(CHAR_ID, headers)).resolves.toBeUndefined();
+    expect(await db.esiCache.get([CHAR_ID, 'mail:20'])).toBeDefined();
+  });
+});
+
 describe('markMailReadOnEsi', () => {
   it('PUTs {read:true} to the mail endpoint', async () => {
     let capturedBody: unknown;
@@ -312,6 +392,26 @@ describe('markMailReadOnEsi', () => {
       { mail_id: 7, subject: 'Hi', is_read: true },
       { mail_id: 8, subject: 'Other', is_read: false },
     ]);
+  });
+
+  it('keeps the header list at the age it was fetched, rather than restamping it as fresh', async () => {
+    const fetchedAt = Date.now() - 3 * 60 * 60_000;
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:headers',
+      value: [{ mail_id: 7, subject: 'Hi', is_read: false }],
+      fetchedAt,
+    });
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`,
+        () => new HttpResponse(null, { status: 204 })
+      )
+    );
+
+    await markMailReadOnEsi(CHAR_ID, 7);
+
+    expect((await db.esiCache.get([CHAR_ID, 'mail:headers']))?.fetchedAt).toBe(fetchedAt);
   });
 
   it('leaves the cached header list alone when the write fails', async () => {

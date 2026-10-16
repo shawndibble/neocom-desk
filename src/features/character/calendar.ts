@@ -11,6 +11,8 @@ import { loadWithCacheStatus, readCached, writeCached, type StatusResult } from 
 import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { parseInstant } from '@/engine/esiInstant';
+import { selectCalendarEventsToPrefetch } from '@/engine/character/calendarPrefetch';
+import { CALENDAR_PREFETCH_DAYS, CALENDAR_PREFETCH_LIMIT, prefetchMissing } from './detailPrefetch';
 import { stillRunning, type CalendarRetentionEntry } from '@/engine/character/calendarRetention';
 
 const KEYS = {
@@ -157,6 +159,33 @@ export function loadCalendarEvent(
     KEYS.event(eventId),
     async () => (await getCharacterCalendarEvent(characterId, eventId)).data
   );
+}
+
+/**
+ * After a calendar load that reached ESI: fetches and caches the details of
+ * events in the next `CALENDAR_PREFETCH_DAYS` days that are not cached yet, so
+ * the detail modal opens offline. Bounds, gate and failure memory:
+ * `detailPrefetch.ts`.
+ */
+export function prefetchCalendarEventDetails(
+  characterId: number,
+  events: readonly CalendarEventSummary[],
+  nowMs: number = Date.now()
+): Promise<void> {
+  return prefetchMissing({
+    kind: 'calendar-event',
+    characterId,
+    allIds: events.map((event) => event.event_id),
+    keyOf: KEYS.event,
+    select: (skip) =>
+      selectCalendarEventsToPrefetch(events, {
+        nowMs,
+        horizonMs: CALENDAR_PREFETCH_DAYS * 24 * 60 * 60_000,
+        cachedIds: skip,
+        limit: CALENDAR_PREFETCH_LIMIT,
+      }),
+    load: (eventId) => loadCalendarEvent(characterId, eventId),
+  });
 }
 
 /** What an RSVP write came to: accepted, never sent (offline), or refused. */

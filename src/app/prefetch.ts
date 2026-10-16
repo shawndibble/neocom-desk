@@ -47,10 +47,11 @@ import {
 import { KEY as ASSETS_KEY, loadCharacterAssets } from '@/features/character/assets';
 import { KEYS as ORDER_KEYS, loadOrders, loadOrderHistory } from '@/features/character/orders';
 import { KEY as CONTRACTS_KEY, loadContracts } from '@/features/character/contracts';
-import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
-import { loadCalendarEvents } from '@/features/character/calendar';
+import { loadMailHeaders, loadMailLabels, prefetchMailBodies } from '@/features/character/mail';
+import { loadCalendarEvents, prefetchCalendarEventDetails } from '@/features/character/calendar';
 import { loadContacts } from '@/features/character/contacts';
 import { loadCharacterStandings } from '@/features/character/standings';
+import { detailPrefetchAllowed } from '@/features/character/detailPrefetch';
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadEmploymentHistory } from '@/features/character/employmentHistory';
 import { KEY as BLUEPRINTS_KEY, loadCharacterBlueprints } from '@/features/industry/data';
@@ -133,12 +134,26 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
   {
     id: 'mail-headers',
     endpoints: ['getCharacterMailHeaders'],
-    run: loadMailHeaders,
+    run: async (characterId) => {
+      const result = await loadMailHeaders(characterId);
+      // Not awaited: the bodies are a trickle behind the boot progress, not part of it.
+      // Only after a read that reached ESI; see `features/character/detailPrefetch.ts`.
+      if (!result.needsReauth && result.cached !== null && !result.cached.fromCache) {
+        void prefetchMailBodies(characterId, result.cached.data);
+      }
+      return result;
+    },
   },
   {
     id: 'calendar',
     endpoints: ['getCharacterCalendar'],
-    run: loadCalendarEvents,
+    run: async (characterId) => {
+      const result = await loadCalendarEvents(characterId);
+      if (!result.needsReauth && result.cached !== null && !result.cached.fromCache) {
+        void prefetchCalendarEventDetails(characterId, result.cached.data);
+      }
+      return result;
+    },
   },
   {
     id: 'clones',
@@ -235,6 +250,51 @@ export function prefetchTasksFor(
 }
 
 /**
+ * Mail bodies and calendar details for every *other* Character that holds the
+ * scope. Mail aggregates all Characters, but the task table above warms only
+ * the active one, and the poll domains cover the rest only with notifications
+ * on. Sequential and bounded like the active Character's (the limits are
+ * `features/character/detailPrefetch.ts`'s), in the background lane; each list
+ * load is a cache hit inside its freshness window, which prefetches nothing.
+ * Never rejects.
+ */
+export async function prefetchRosterDetails(
+  activeCharacterId: number,
+  signal: PrefetchSignal = { cancelled: false }
+): Promise<void> {
+  try {
+    // Header lists for other Characters are only worth loading for the sake of the prefetch.
+    if (!detailPrefetchAllowed()) return;
+    const tokens = await db.tokens.toArray();
+    for (const token of tokens) {
+      if (signal.cancelled) return;
+      if (token.characterId === activeCharacterId) continue;
+      const held = new Set(token.scopes);
+      const characterId = token.characterId;
+      try {
+        if (grantCovers(held, ['getCharacterMailHeaders', 'getCharacterMail'])) {
+          const result = await inBackgroundLane(() => loadMailHeaders(characterId));
+          if (!result.needsReauth && result.cached !== null && !result.cached.fromCache) {
+            await prefetchMailBodies(characterId, result.cached.data);
+          }
+        }
+        if (signal.cancelled) return;
+        if (grantCovers(held, ['getCharacterCalendar', 'getCharacterCalendarEvent'])) {
+          const result = await inBackgroundLane(() => loadCalendarEvents(characterId));
+          if (!result.needsReauth && result.cached !== null && !result.cached.fromCache) {
+            await prefetchCalendarEventDetails(characterId, result.cached.data);
+          }
+        }
+      } catch {
+        // One Character failing must not stop the rest.
+      }
+    }
+  } catch {
+    // Warm-up only.
+  }
+}
+
+/**
  * Tasks in flight at once. Deliberately below `ESI_FANOUT_CONCURRENCY`: a
  * warm-up is background work, and at the shared cap it held most of the
  * app-wide ESI permits while the route the user is actually looking at queued
@@ -290,4 +350,5 @@ export async function prefetchCharacterData(
   } finally {
     finish();
   }
+  if (!signal.cancelled) await prefetchRosterDetails(characterId, signal);
 }

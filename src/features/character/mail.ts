@@ -17,7 +17,7 @@ import {
   conditionalFetch,
   loadWithCache,
   loadWithCacheStatus,
-  readCached,
+  readCachedEntries,
   readCachedRows,
   writeCached,
   STALE_AFTER,
@@ -27,7 +27,12 @@ import {
 import { isAuthFailure, isOfflineFailure } from '@/esi/client';
 import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
-import { mergeMailHeaderPage, MAIL_HEADERS_PAGE_SIZE } from '@/engine/mail';
+import {
+  mergeMailHeaderPage,
+  selectMailBodiesToPrefetch,
+  MAIL_HEADERS_PAGE_SIZE,
+} from '@/engine/mail';
+import { MAIL_BODY_PREFETCH_LIMIT, prefetchMissing } from './detailPrefetch';
 
 const KEYS = {
   headers: 'mail:headers',
@@ -185,6 +190,31 @@ export function loadMailBody(
 }
 
 /**
+ * After a header load that reached ESI: fetches and caches the bodies of the
+ * newest mail (unread first) that are not cached yet, so the reader shows
+ * them offline. A delivered body does not change, so a cached one is never
+ * fetched again. Bounds, gate and failure memory: `detailPrefetch.ts`.
+ */
+export function prefetchMailBodies(
+  characterId: number,
+  headers: readonly MailHeader[]
+): Promise<void> {
+  return prefetchMissing({
+    kind: 'mail-body',
+    characterId,
+    allIds: headers.map((header) => header.mail_id),
+    keyOf: KEYS.body,
+    select: (skip) =>
+      selectMailBodiesToPrefetch(headers, {
+        ownerId: characterId,
+        cachedIds: skip,
+        limit: MAIL_BODY_PREFETCH_LIMIT,
+      }),
+    load: (mailId) => loadMailBody(characterId, mailId),
+  });
+}
+
+/**
  * Pushes the "read" write to ESI, alongside the session-local mark-read that
  * always happens regardless. Errors are otherwise swallowed — nothing for a
  * caller to react to, just another chance next time this mail reopens — but
@@ -209,13 +239,17 @@ export async function markMailReadOnEsi(characterId: number, mailId: number): Pr
     await reportWriteAuthFailure(characterId, err, 'putCharacterMail');
     return;
   }
-  const headers = await readCached<MailHeader[]>(characterId, KEYS.headers);
-  if (!headers) return;
+  const row = (await readCachedEntries<MailHeader[]>(characterId, [KEYS.headers])).get(
+    KEYS.headers
+  );
+  if (!row) return;
   await writeCached(
     characterId,
     KEYS.headers,
-    headers.map((header) => (header.mail_id === mailId ? { ...header, is_read: true } : header)),
-    Date.now()
+    row.value.map((header) => (header.mail_id === mailId ? { ...header, is_read: true } : header)),
+    // The row's own age, not now: the read flag is patched in, but the list was not re-read
+    // from ESI, and restamping it would show a days-old list as just fetched.
+    row.fetchedAt
   );
 }
 

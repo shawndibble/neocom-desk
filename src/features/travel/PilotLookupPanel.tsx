@@ -438,7 +438,7 @@ type ProfileState =
   | { kind: 'loading' }
   | { kind: 'unknown' }
   | { kind: 'failed' }
-  | { kind: 'ready'; profile: PilotProfile; fetchedAt: Date };
+  | { kind: 'ready'; profile: PilotProfile };
 
 /** Mounted per pilot (keyed by id), so each lookup starts from `loading` with nothing stale. */
 function PilotResult({
@@ -457,11 +457,7 @@ function PilotResult({
     void loadPilotProfile(characterId)
       .then((loaded) => {
         if (cancelled) return;
-        setProfile(
-          loaded === null
-            ? { kind: 'unknown' }
-            : { kind: 'ready', profile: loaded, fetchedAt: new Date() }
-        );
+        setProfile(loaded === null ? { kind: 'unknown' } : { kind: 'ready', profile: loaded });
         if (loaded !== null) onResolved({ characterId, name: loaded.name });
       })
       .catch(() => {
@@ -516,7 +512,7 @@ function PilotResult({
     );
   }
   return wrap(
-    <Panel actions={<DataAgeBadge date={profile.fetchedAt} alwaysVisible />}>
+    <Panel actions={<DataAgeBadge date={profile.profile.fetchedAt} alwaysVisible />}>
       <PilotProfileView profile={profile.profile} />
     </Panel>
   );

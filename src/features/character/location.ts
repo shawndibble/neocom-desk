@@ -17,8 +17,14 @@ function cacheKey(): string {
   return 'characterLocation';
 }
 
-/** The character's current solar system id, or null if unresolvable (missing grant, offline, or uncached). */
-export async function loadCharacterSolarSystemId(characterId: number): Promise<number | null> {
+/** A read of the current solar system, with when ESI last said so. */
+export interface SolarSystemRead {
+  systemId: number | null;
+  /** The cached row's own age (a cache hit is older than the call); null when nothing was read. */
+  fetchedAt: Date | null;
+}
+
+export async function loadCharacterSolarSystemRead(characterId: number): Promise<SolarSystemRead> {
   const result = await loadWithCache(
     characterId,
     cacheKey(),
@@ -27,5 +33,10 @@ export async function loadCharacterSolarSystemId(characterId: number): Promise<n
       detectAuthFailure: isCredentialFailure,
     }
   );
-  return result?.data ?? null;
+  return { systemId: result?.data ?? null, fetchedAt: result?.fetchedAt ?? null };
+}
+
+/** The character's current solar system id, or null if unresolvable (missing grant, offline, or uncached). */
+export async function loadCharacterSolarSystemId(characterId: number): Promise<number | null> {
+  return (await loadCharacterSolarSystemRead(characterId)).systemId;
 }

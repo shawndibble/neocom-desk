@@ -21,6 +21,7 @@ import {
   GLOBAL_CACHE_CHARACTER_ID,
   CORP_CACHE_KEY_PREFIX,
   corpCacheKey,
+  cachedKeySet,
 } from './cache';
 import { clearCachePurgePending, purgeCharacterCacheOrSuppress } from './cachePurge';
 import { onEsiAuthFailure } from './authFailureSignal';
@@ -50,6 +51,17 @@ beforeEach(async () => {
 describe('GLOBAL_CACHE_CHARACTER_ID', () => {
   it('is the sentinel row 0', () => {
     expect(GLOBAL_CACHE_CHARACTER_ID).toBe(0);
+  });
+});
+
+describe('cachedKeySet', () => {
+  it('names the keys that have a row, whatever their age, for this character only', async () => {
+    await writeCached(CHAR_ID, 'a', 1, 1);
+    await writeCached(CHAR_ID, 'b', 2, Date.now());
+    await writeCached(CHAR_ID + 1, 'c', 3, Date.now());
+
+    expect(await cachedKeySet(CHAR_ID, ['a', 'b', 'c', 'd'])).toEqual(new Set(['a', 'b']));
+    expect(await cachedKeySet(CHAR_ID, [])).toEqual(new Set());
   });
 });
 

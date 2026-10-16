@@ -3,7 +3,7 @@ import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useMarkPublicRouteRendered } from '@/app/routeFocus';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Spinner } from '@/components/ui';
+import { Button, CachedNotice, EmptyState, Spinner } from '@/components/ui';
 import { parseAppraisalSnapshot } from '@/engine/market/appraisalSnapshot';
 import {
   AppraisalShareScreen,
@@ -112,6 +112,12 @@ export function SharedLink() {
     // retry that succeeds lands focus here instead of on <body>.
     return (
       <div ref={retryRef} tabIndex={-1} className="focus:outline-none">
+        {result.cachedAt !== undefined && (
+          <CachedNotice
+            fetchedAt={result.cachedAt}
+            className="mx-auto max-w-3xl px-2 pt-2 sm:px-6 sm:pt-4"
+          />
+        )}
         <SharedScreen share={result.share} shareId={shareId} />
       </div>
     );

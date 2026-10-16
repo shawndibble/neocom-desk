@@ -1,4 +1,7 @@
-import { loadCalendarEvents as loadCharacterCalendarEvents } from '@/features/character/calendar';
+import {
+  loadCalendarEvents as loadCharacterCalendarEvents,
+  prefetchCalendarEventDetails,
+} from '@/features/character/calendar';
 import { projectCalendar } from '@/engine/projection';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
@@ -61,6 +64,10 @@ export const calendarDomain = defineDomain<
   load: async (characterId) => {
     const result = await loadCharacterCalendarEvents(characterId);
     if (result.needsReauth || result.cached === null) return null;
+    // Only after a read that reached ESI (a cache hit or an offline fallback
+    // proves nothing landed); see `detailPrefetch.ts` for the triggers.
+    if (!result.cached.fromCache)
+      void prefetchCalendarEventDetails(characterId, result.cached.data);
     return result.cached.data;
   },
   toSnapshot: (events, nowMs) => ({
