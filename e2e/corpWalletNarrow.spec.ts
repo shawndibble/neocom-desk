@@ -100,29 +100,23 @@ test.describe('Corp Wallet narrow tables', () => {
     await expect(page.getByText(CORPORATION_NAME).first()).toBeVisible();
   });
 
-  test('journal is a plain table at 390px (no sort picker), sorted from its header', async ({
-    page,
-  }) => {
+  test('journal is day-grouped cards at 390px, sorted from the picker', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./corp/wallet');
 
     // One division: nothing to fold, so no caret.
     await expect(page.getByRole('button', { name: 'Show all divisions' })).toBeHidden();
-    // The shared journal table (also `/wallet`): Balance is shed below `sm`,
-    // Description stays, and the header sort buttons stay.
+    // The shared journal table (also `/wallet`): dense cards under EVE-day headers,
+    // sorted from the phone picker rather than a header row.
     const table = page.getByRole('table', { name: 'Journal' });
-    const firstAmount = table
-      .locator('tbody tr:not(.dt-spacer)')
-      .first()
-      .locator('td[data-label="Amount"]');
+    const rows = table.locator('tbody tr[data-row-key]');
+    await expect(rows.first()).toBeVisible();
+    const firstAmount = rows.first().locator('td[data-label="Amount"]');
     await expect(firstAmount).toContainText('900');
-    await expect(table.getByRole('columnheader', { name: /Description/ })).toBeVisible();
+    await expect(table.locator('.dt-group-header').first()).toContainText('EVE time');
 
-    const amountHeader = table.getByRole('button', { name: /Amount/ });
-    await amountHeader.click();
-    if (!(await firstAmount.textContent())?.includes('123,456,789,012,345')) {
-      await amountHeader.click();
-    }
+    await page.getByRole('combobox', { name: 'Sort by' }).selectOption('amount:desc');
+    await expect(table.locator('.dt-group-header')).toHaveCount(0);
     await expect(firstAmount).toContainText('123,456,789,012,345');
     await expectNoPageOverflow(page);
   });
