@@ -529,8 +529,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     [owners, ownerById, loadedHeaders]
   );
 
-  // Folder, then search, then Hide read, each kept: when the list comes up
-  // empty, the first stage that emptied it names the way out (issue #3972).
+  // Folder, then search, then Hide read, kept per stage for `listState` below.
   const folderRows = useMemo(
     () => rows.filter((row) => folders.includes(row.tab)),
     [rows, folders]
