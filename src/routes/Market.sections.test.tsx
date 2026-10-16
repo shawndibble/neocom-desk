@@ -104,7 +104,11 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, ({ request }) => {
     const fromId = new URL(request.url).searchParams.get('from_id');
     return HttpResponse.json(fromId === null ? transactions : []);
-  })
+  }),
+  // Open Orders prices each order's station; an answer with no orders for the
+  // type reads as checked-and-healthy. Left unanswered, the order would land
+  // in "Not checked" instead (competition never read).
+  http.get('https://market.fuzzwork.co.uk/aggregates/', () => HttpResponse.json({}))
 );
 
 beforeAll(async () => {

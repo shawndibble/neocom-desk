@@ -3,11 +3,15 @@
  * groups, their summaries, whether the match-count line shows, and whether
  * a given group is folded. One testable shape for the panel to render.
  */
-import { groupOpenOrders, summariseOrderGroup } from './openOrdersModel';
-import type { OpenOrderGroupSummary, OpenOrderRow, OrderGroup } from './openOrdersModel';
+import { groupOpenOrders, orderGroupKey, summariseOrderGroup } from './openOrdersModel';
+import type {
+  OpenOrderGroupSummary,
+  OpenOrderRow,
+  OrderGroup,
+  OrderGroupKey,
+} from './openOrdersModel';
 import { filterOpenOrders, sortOpenOrders } from './openOrdersFilter';
 import type { OpenOrdersFilter } from './openOrdersFilter';
-import type { OrderProblem } from '@/engine/market/orderProblems';
 
 export interface OpenOrdersView {
   /** Every row matching the filter as given, sorted. What the match-count line counts. */
@@ -20,7 +24,7 @@ export interface OpenOrdersView {
    */
   groupingRows: OpenOrderRow[];
   groups: OrderGroup[];
-  groupSummaries: Map<OrderProblem, OpenOrderGroupSummary>;
+  groupSummaries: Map<OrderGroupKey, OpenOrderGroupSummary>;
   /** False only when rows are hidden by the healthy fold alone — that's not a failed match (issue #2032). */
   matchCountVisible: boolean;
 }
@@ -45,12 +49,12 @@ export function buildOpenOrdersView(
 
 /** The highlighted row's own group always wins over either fold mechanism (decision `20260924-...`, step 9). */
 export function isGroupFolded(
-  problem: OrderProblem,
+  problem: OrderGroupKey,
   highlightedRow: OpenOrderRow | null,
   filter: OpenOrdersFilter,
-  collapsedGroups: ReadonlySet<OrderProblem>
+  collapsedGroups: ReadonlySet<OrderGroupKey>
 ): boolean {
-  if (problem === highlightedRow?.problem) return false;
+  if (highlightedRow !== null && problem === orderGroupKey(highlightedRow)) return false;
   if (problem === 'healthy') return filter.hideHealthy;
   return collapsedGroups.has(problem);
 }

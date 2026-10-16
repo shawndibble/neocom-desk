@@ -12,6 +12,7 @@
  * store's "Change store" link returns to it (`/wallet/lp-store` with no
  * corporation is the landing state).
  */
+import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
@@ -514,6 +515,7 @@ export function LoyaltyStore() {
 
 function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const { t } = useTranslation();
+  const pricesUnavailableLabel = usePricesUnavailableLabel();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const tabsId = useTabsId();
@@ -570,6 +572,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     playerLp,
     hub,
     ready,
+    pricesUnreachable,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
   } = useLoyaltyStoreOffers(corporationId);
@@ -825,6 +828,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         />
       ) : (
         <>
+          {pricesUnreachable && (
+            <p
+              role="status"
+              className="border-b border-line px-3 py-1.5 text-[0.6875rem] text-text-dim"
+            >
+              {pricesUnavailableLabel}
+            </p>
+          )}
           {lpBasis === 'concord' && !concordPending && (
             <p className="border-b border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
               {concord

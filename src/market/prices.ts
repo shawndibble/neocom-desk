@@ -157,7 +157,32 @@ export async function getStationPrices(
   typeIds: number[],
   now: Clock = Date.now
 ): Promise<Map<number, HubAggregate>> {
+  return (await getStationPricesWithStatus(stationId, typeIds, now)).prices;
+}
+
+/** A price lookup plus whether the price source could not be reached for it. */
+export interface PricesWithStatus {
+  prices: Map<number, HubAggregate>;
+  /**
+   * True when at least one requested type got a null aggregate because the
+   * Fuzzwork fetch failed, not because the market has no orders. Lets a
+   * caller show "prices unavailable" rather than "no orders" / "0 ISK".
+   */
+  unreachable: boolean;
+}
+
+/**
+ * `getStationPrices` with the failure made visible: a failed fetch is still
+ * served as a null aggregate (nothing cached), but flagged `unreachable` so
+ * the caller can tell it from a genuinely empty market.
+ */
+export async function getStationPricesWithStatus(
+  stationId: number,
+  typeIds: number[],
+  now: Clock = Date.now
+): Promise<PricesWithStatus> {
   const result = new Map<number, HubAggregate>();
+  let unreachable = false;
   const nowMs = now();
 
   const readMemory = (typeId: number): boolean => {
@@ -168,7 +193,7 @@ export async function getStationPrices(
   };
 
   const notInMemory = typeIds.filter((typeId) => !readMemory(typeId));
-  if (notInMemory.length === 0) return result;
+  if (notInMemory.length === 0) return { prices: result, unreachable };
 
   // A reload inside the TTL: the rows the last session wrote.
   const generation = persistedGeneration;
@@ -191,7 +216,12 @@ export async function getStationPrices(
     if (readMemory(typeId)) continue;
     const inFlight = hubPricesInFlight.get(hubCacheKey(stationId, typeId));
     if (inFlight) {
-      pending.push(inFlight.then((value) => void result.set(typeId, value ?? NULL_AGGREGATE)));
+      pending.push(
+        inFlight.then((value) => {
+          if (!value) unreachable = true;
+          result.set(typeId, value ?? NULL_AGGREGATE);
+        })
+      );
     } else {
       toFetch.push(typeId);
     }
@@ -208,12 +238,17 @@ export async function getStationPrices(
       void perType.finally(() => {
         if (hubPricesInFlight.get(key) === perType) hubPricesInFlight.delete(key);
       });
-      pending.push(perType.then((value) => void result.set(typeId, value ?? NULL_AGGREGATE)));
+      pending.push(
+        perType.then((value) => {
+          if (!value) unreachable = true;
+          result.set(typeId, value ?? NULL_AGGREGATE);
+        })
+      );
     }
   }
 
   await Promise.all(pending);
-  return result;
+  return { prices: result, unreachable };
 }
 
 /**
@@ -260,6 +295,15 @@ export async function getHubPrices(
   now: Clock = Date.now
 ): Promise<Map<number, HubAggregate>> {
   return getStationPrices(hub.stationId, typeIds, now);
+}
+
+/** `getHubPrices` with the unreachable flag; see `getStationPricesWithStatus`. */
+export async function getHubPricesWithStatus(
+  hub: TradeHub,
+  typeIds: number[],
+  now: Clock = Date.now
+): Promise<PricesWithStatus> {
+  return getStationPricesWithStatus(hub.stationId, typeIds, now);
 }
 
 /**
