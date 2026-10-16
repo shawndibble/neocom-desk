@@ -1884,6 +1884,56 @@
       "turnInUnbuyable_other": "need {{count}}× {{name}}, nobody sells it",
       "turnInToBuy_one": "buy {{count}}× {{name}} ({{isk}} ISK, included)",
       "turnInToBuy_other": "buy {{count}}× {{name}} ({{isk}} ISK, included)"
+    },
+    "mutation": {
+      "menu": "Mutate…",
+      "title": "Mutation",
+      "loading": "Loading mutaplasmids…",
+      "mutaplasmid": "Mutaplasmid",
+      "pickMutaplasmid": "Apply a mutaplasmid",
+      "pickMadeBy": "Which mutaplasmid made it?",
+      "noMutaplasmids": "No mutaplasmid takes this module.",
+      "base": "Base module",
+      "pickBase": "Pick its base module",
+      "baseIs": "Mutated from {{name}}.",
+      "strain": {
+        "decayed": "Decayed",
+        "gravid": "Gravid",
+        "unstable": "Unstable",
+        "glorified": "Glorified",
+        "exigent": "Exigent",
+        "radical": "Radical",
+        "other": "Other"
+      },
+      "rollsLabel": "Rolls",
+      "quality": "{{pct}}% roll",
+      "baseValue": "base value",
+      "valueText": "{{value}}, {{pct}}% roll",
+      "worst": "Worst {{value}}",
+      "best": "Best {{value}}",
+      "remove": "Remove mutation",
+      "baseValuesFailed": "Couldn't read the base module's values, so its rolls can't be set here.",
+      "rollsUnknownNote": "Rolls unknown: the stats use the base module's own values. Move a slider, or load the rolls from your assets.",
+      "baseUnknownNote": "Base module unknown: this module adds nothing to the stats until you say which mutaplasmid and base module made it, or load it from your assets.",
+      "fromAssets": "Load rolls from my assets",
+      "fromAssetsFailed": "Couldn't read your assets, so it's not known whether you own one.",
+      "fromAssetsNone": "None of your assets is this module.",
+      "fromAssetsCount_one": "{{count}} in your assets. Pick one to use its rolls:",
+      "fromAssetsCount_other": "{{count}} in your assets. Pick one to use its rolls:",
+      "fromAssetsUnread_one": "{{count}} more couldn't be read.",
+      "fromAssetsUnread_other": "{{count}} more couldn't be read.",
+      "fromAssetsTruncated": "Your asset list was cut short, so some may be missing.",
+      "fromAssetsNeedsPermission": "Loading rolls from your assets needs the Assets Permission.",
+      "ownedItem": "{{base}} · {{mutaplasmid}}",
+      "ownedQuality": "avg {{pct}}%",
+      "badge": {
+        "rollsUnknown": "Rolls unknown",
+        "baseUnknown": "Base unknown",
+        "rollsUnknownTip": "Its rolls aren't known, so the stats use its base's own values.",
+        "baseUnknownTip": "What it was mutated from isn't known, so it adds nothing to the stats.",
+        "rollsUnknownFix": "Set them with Mutate… in its menu.",
+        "baseUnknownFix": "Say what made it with Mutate… in its menu."
+      }
     }
   },
   "skills": {
@@ -6357,7 +6407,8 @@
         "location": "Location",
         "security": "Sec",
         "jumps": "Jumps"
-      }
+      },
+      "openingFitting": "Opening the fitting…"
     },
     "minValue": {
       "label": "Minimum value",

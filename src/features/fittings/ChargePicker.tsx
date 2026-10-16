@@ -10,6 +10,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Slider,
   TypeIcon,
 } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
@@ -123,15 +124,15 @@ export function ChargePickerControls({ settings, onChange, maxKm }: ControlsProp
       {settings.fightingAt && (
         <div className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
           <label htmlFor="charge-picker-distance">{t('fittings.chargePicker.targetAt')}</label>
-          <input
+          <Slider
             id="charge-picker-distance"
-            type="range"
             min={1}
             max={Math.max(5, maxKm)}
             step={1}
             value={Math.min(settings.distanceKm, Math.max(5, maxKm))}
+            valueText={t('fittings.chargePicker.km', { km: settings.distanceKm })}
             onChange={(event) => set({ distanceKm: Number(event.target.value) })}
-            className="h-2 min-w-0 flex-1 cursor-pointer accent-accent"
+            className="flex-1"
           />
           <span className="w-12 text-right text-text tabular-nums">
             {t('fittings.chargePicker.km', { km: settings.distanceKm })}

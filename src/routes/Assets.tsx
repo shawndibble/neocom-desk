@@ -1916,8 +1916,11 @@ export function Assets() {
                         <Button
                           size="md"
                           className="shrink-0"
+                          loading={openInFittings.pending}
                           onClick={() =>
-                            openInFittings(() => assetShipEditLocation(deepest, nodeLabel(deepest)))
+                            openInFittings.open(() =>
+                              assetShipEditLocation(deepest, nodeLabel(deepest))
+                            )
                           }
                         >
                           {t('assets.openInFittings')}
