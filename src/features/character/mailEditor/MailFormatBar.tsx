@@ -27,7 +27,7 @@ const keepFocus = (e: PointerEvent) => e.preventDefault();
 
 interface MailFormatBarProps {
   commands: MailEditorCommands;
-  /** Phone layout: the sheets are bottom sheets. */
+  /** Phone layout: one row that scrolls sideways, and the sheets are bottom sheets. */
   phone: boolean;
   disabled?: boolean;
   /** Source toggle at the right end; absent = no toggle. */

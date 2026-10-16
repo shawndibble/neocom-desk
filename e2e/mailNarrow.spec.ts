@@ -160,3 +160,28 @@ test('New Mail: a tap in the empty middle of the message box focuses the editor 
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(dialog.getByRole('textbox', { name: 'Message' })).toBeFocused();
 });
+
+test('Reply: the editable fills the message box, so a tap anywhere in it lands in it at 390px', async ({
+  page,
+}) => {
+  await seedLongMail(page);
+  await page.setViewportSize(PHONE);
+  await signInAndGoto(page, './mail');
+
+  await page.getByText('A very long mail').click();
+  await page.getByRole('button', { name: 'Reply' }).click();
+  const card = page.locator('[data-mail-card]');
+  await expect(card.getByRole('toolbar')).toBeVisible();
+  const editor = card.getByRole('textbox', { name: 'Message' });
+  // Empty it: the quoted long mail would fill the box on its own.
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Backspace');
+
+  // The editable reaches the bottom of the card's surface: no dead wrapper below it.
+  const gap = await editor.evaluate((el) => {
+    const surface = el.parentElement!.parentElement!;
+    return surface.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom;
+  });
+  expect(gap).toBeLessThan(16);
+});

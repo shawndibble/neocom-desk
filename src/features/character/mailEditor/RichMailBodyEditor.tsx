@@ -325,16 +325,19 @@ export default function RichMailBodyEditor({
         <div
           className={cx(
             'min-h-0 flex-1 overflow-y-auto p-3 text-xs leading-normal break-words whitespace-pre-wrap',
-            inSource && 'hidden'
+            inSource ? 'hidden' : 'flex flex-col'
           )}
-          // The editable fills the box, so a tap anywhere lands in it natively (the
-          // keyboard opens); this only catches the padding around it.
+          // The editable fills the box (flex, not `min-h-full`: Reply's card has no
+          // definite height), so a tap lands in it natively and the keyboard opens.
+          // This only catches the padding, and leaves a drag-selection alone.
           onClick={(e) => {
-            if (!editor || editor.isDestroyed) return;
-            if (!editor.view.dom.contains(e.target as Node)) editor.commands.focus('end');
+            if (!editor || editor.isDestroyed || !(e.target instanceof Node)) return;
+            if (editor.view.dom.contains(e.target)) return;
+            if (editor.view.hasFocus() && !editor.state.selection.empty) return;
+            editor.commands.focus('end');
           }}
         >
-          <EditorContent editor={editor} className="flex min-h-full flex-col" />
+          <EditorContent editor={editor} className="flex flex-1 flex-col" />
         </div>
         {inSource && (
           <TextArea
