@@ -34,7 +34,7 @@ import {
 } from '@/engine/mail';
 import { MAIL_BODY_PREFETCH_LIMIT, prefetchMissing } from './detailPrefetch';
 
-const KEYS = {
+export const KEYS = {
   headers: 'mail:headers',
   labels: 'mail:labels',
   lists: 'mail:lists',
