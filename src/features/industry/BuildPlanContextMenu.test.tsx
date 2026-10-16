@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { BuildPlanContextMenu } from './BuildPlanContextMenu';
 import type { BlueprintMap } from '@/sde/types';
 
 const loadBlueprints = vi.fn();
+const ABYSSAL_NEUT = vi.hoisted(() => 47832);
 vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: () => loadBlueprints() as Promise<BlueprintMap>,
+  loadMutaplasmids: async () => ({
+    attributeNames: {},
+    mutaplasmids: {},
+    abyssalTypeIds: [ABYSSAL_NEUT],
+  }),
 }));
 
 const BLUEPRINTS: BlueprintMap = {
@@ -145,6 +151,24 @@ describe('BuildPlanContextMenu', () => {
 
     expect(await screen.findByRole('menuitem', { name: /Build Plan/ })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'View in Market' })).not.toBeInTheDocument();
+  });
+
+  it('drops View in Market for an Abyssal type, which has no order book', async () => {
+    render(
+      <MemoryRouter>
+        <BuildPlanContextMenu
+          typeId={ABYSSAL_NEUT}
+          itemName="Heavy Abyssal Energy Neutralizer"
+          trigger={<button type="button">Heavy Abyssal Energy Neutralizer</button>}
+        />
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Heavy Abyssal Energy Neutralizer' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('menuitem', { name: 'View in Market' })).not.toBeInTheDocument()
+    );
   });
 
   it('adds the name-bearing actions once the surface knows what the row is called', async () => {

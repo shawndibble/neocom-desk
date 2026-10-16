@@ -1441,7 +1441,8 @@ export function Assets() {
     let items = itemActions.quickbar.items;
     for (const id of selectedIds) {
       const asset = assetsByItemId.get(id);
-      if (!asset) continue;
+      // Abyssal: no market; the row menu skips Quickbar too.
+      if (!asset || abyssal.isAbyssalType?.(asset.type_id)) continue;
       const name = mergedTypeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
       items = addQuickbarItem(items, { typeId: asset.type_id, name });
     }

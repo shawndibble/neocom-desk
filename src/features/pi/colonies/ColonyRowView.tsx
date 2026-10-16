@@ -18,11 +18,8 @@ import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { HintText } from '@/components/ui/HintText';
 import { SystemLink } from '@/features/entities';
 import { PiProductLink } from '../PiProductLink';
-import {
-  OpenInEveItemMenuItems,
-  ShowInfoMenuItem,
-  ViewInMarketMenuItem,
-} from '@/features/market/ItemContextMenu';
+import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
+import { ViewInMarketMenuItem } from '@/features/market/ViewInMarketMenuItem';
 import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { formatIsk, formatIskCompact } from '@/lib/isk';

@@ -18,6 +18,7 @@ import {
   abyssalFilamentTypeId,
   abyssalHullRule,
   abyssalTierLevels,
+  abyssalTiersRolling,
   weaponReachChange,
   type AbyssalSecurity,
   type WeaponReachChange,
@@ -98,8 +99,6 @@ export function AbyssalRunPlanner({
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   const setWeather = useAbyssalWeather((state) => state.setWeather);
   const weather = weatherTypeId === null ? undefined : abyssalWeatherById(weatherTypeId);
-  const levels = abyssalTierLevels(tier);
-  const onTier = weather !== undefined && levels.includes(weather.level);
   const delta = useRunDelta(expanded ? compare : null, weather?.typeId ?? null);
 
   const hull = abyssalHullRule(hullGroupId);
@@ -171,17 +170,7 @@ export function AbyssalRunPlanner({
         </StatFields>
 
         <ul className="space-y-1 text-xs">
-          {weather && (
-            <li className={onTier ? 'text-text-dim' : 'text-warning'}>
-              {onTier
-                ? t('fittings.abyssalRun.strengthNote', {
-                    tier,
-                    low: abyssalWeatherOf(weather.kind, levels[0]).penaltyPercent,
-                    high: abyssalWeatherOf(weather.kind, levels[1]).penaltyPercent,
-                  })
-                : t('fittings.abyssalRun.strengthOff', { tier })}
-            </li>
-          )}
+          {weather && <StrengthNote tier={tier} weather={weather} />}
           {hullGroupId !== undefined && (
             <li className={hull.eligible ? 'text-text' : 'text-warning'}>
               {t(`fittings.abyssalRun.hull.${hull.eligible ? hull.shipClass : hull.reason}`)}
@@ -216,6 +205,33 @@ export function AbyssalRunPlanner({
         <StatNote>{t('fittings.abyssalRun.source')}</StatNote>
       </div>
     </Disclosure>
+  );
+}
+
+/**
+ * A filament fixes tier and kind; the site rolls the strength. An off-tier pick
+ * keeps its filament and names the tiers that roll it; the stats stay at the pick.
+ */
+function StrengthNote({ tier, weather }: { tier: AbyssalTier; weather: AbyssalWeather }) {
+  const { t } = useTranslation();
+  const levels = abyssalTierLevels(tier);
+  const range = {
+    tier,
+    low: abyssalWeatherOf(weather.kind, levels[0]).penaltyPercent,
+    high: abyssalWeatherOf(weather.kind, levels[1]).penaltyPercent,
+  };
+  if (levels.includes(weather.level))
+    return <li className="text-text-dim">{t('fittings.abyssalRun.strengthNote', range)}</li>;
+  const rolling = abyssalTiersRolling(weather.level);
+  return (
+    <li className="text-warning">
+      {t('fittings.abyssalRun.strengthOff', {
+        ...range,
+        picked: weather.penaltyPercent,
+        from: rolling[0],
+        to: rolling[rolling.length - 1],
+      })}
+    </li>
   );
 }
 

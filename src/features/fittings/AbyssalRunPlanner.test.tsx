@@ -53,6 +53,20 @@ describe('AbyssalRunPlanner', () => {
     expect(compare).toHaveBeenCalledWith(47382);
   });
 
+  it('names the tier-and-kind filament for a strength the tier never rolls, and the tiers that do', async () => {
+    useAbyssalWeather.setState({ weatherTypeId: 47383 }); // Electrical 3: −70%
+    const compare = vi.fn().mockResolvedValue({ before: stats(1000), after: stats(900) });
+    const user = setup(26, compare);
+    await user.click(screen.getByRole('button', { name: /Plan an Abyssal run/ }));
+    expect(await screen.findByRole('link', { name: 'Fierce Electrical Filament' })).toBeTruthy();
+    expect(
+      screen.getByText(
+        'T3 rolls −30% or −50%, never −70% (T4–T6 do). The numbers below are for −70%.'
+      )
+    ).toBeTruthy();
+    expect(screen.queryByText(/pick another/)).toBeNull();
+  });
+
   it('says so when the engine fails, rather than working forever', async () => {
     useAbyssalWeather.setState({ weatherTypeId: 47382 });
     const user = setup(26, vi.fn().mockRejectedValue(new Error('offline')));
