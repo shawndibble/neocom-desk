@@ -34,7 +34,6 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      HUSKY: '0'
     steps:
       - name: Require the refresh token
         env:
@@ -97,7 +96,8 @@ jobs:
           git config user.email "$(gh api user --jq .id)+$login@users.noreply.github.com"
           git switch -c "$BRANCH"
           git add -A public/data functions/src/data scripts/sde-build.json
-          git commit -m "chore(sde): rebake game data for build $BUILD"
+          # Data only, gated by the PR's CI; the local hook would rerun lint and typecheck.
+          git commit --no-verify -m "chore(sde): rebake game data for build $BUILD"
           git push "https://x-access-token:$GH_TOKEN@github.com/$GH_REPO.git" "HEAD:refs/heads/$BRANCH"
           {
             echo "Nightly SDE refresh: $REASON."
