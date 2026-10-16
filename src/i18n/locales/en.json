@@ -2363,6 +2363,7 @@
   },
   "industry": {
     "catalogUnavailable": "Blueprint data couldn't load",
+    "catalogUnavailableOwnedHint": "Your blueprints loaded, but they need the blueprint catalog to show. Connect once to download it. We'll try again when you're back online.",
     "marketWideTreesUnavailable": "Market-wide build data hasn't been downloaded yet",
     "csvCharacter": "Character",
     "csvAvgMarginPct": "Avg margin (%)",
@@ -4965,8 +4966,9 @@
     "loadFailedTitle": "Could not load",
     "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
     "retry": "Try again",
+    "loadFailedRetryHint": "Something went wrong loading this. Try again.",
     "needsConnection": "Needs a connection",
-    "connectOnceHint": "This data is downloaded the first time it's needed. Connect once and it will be kept on this device. We'll try again when you're back online.",
+    "connectOnceHint": "This is downloaded the first time it's needed. Connect once and it will be kept on this device. We'll try again when you're back online.",
     "spaceOption": {
       "highsec": "Highsec",
       "lowsec": "Lowsec",
@@ -6170,6 +6172,7 @@
       "title": "What to do with {{name}} (x{{count}})",
       "loading": "Pricing this ore…",
       "loadFailed": "Reprocessing data isn't downloaded yet",
+      "loadFailedGeneric": "Couldn't price this ore",
       "noRecipe": "This item does not refine into anything.",
       "sellRawCard": "Sell raw",
       "sellRawHint": "{{hub}} buy price, less sales tax",
@@ -12539,6 +12542,7 @@
     },
     "add": {
       "searchUnavailable": "Item search needs a one-time download. Connect once to use it.",
+      "pasteUnavailable": "Item names need a one-time download before a list can be matched. Connect once to use this.",
       "open": "Add items…",
       "label": "One item per line, with how many to keep listed",
       "placeholder": "Catalyst 40\nAntimatter Charge M x 20000\nNanite Repair Paste\t1500",

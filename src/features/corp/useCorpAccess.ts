@@ -122,9 +122,11 @@ export function useCorpAccess(): CorpAccess {
     const fail = () => {
       if (!cancelled) setFailedFor(activeCharacterId);
     };
-    void loadCharacterRoles(activeCharacterId).then(({ cached }) => {
+    void loadCharacterRoles(activeCharacterId).then(({ cached, needsReauth }) => {
       if (cached) settle(corpWideRoles(cached.data));
-      else fail();
+      // A refused login is not "offline, try again": the app-wide re-login
+      // notice (`AuthFailureNotice`) owns that case, so no retry is offered.
+      else if (!needsReauth) fail();
     }, fail);
     return () => {
       cancelled = true;

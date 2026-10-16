@@ -17,6 +17,7 @@ const load = (characterId: number): WorkspaceLoad => ({
   ownedBlueprints: [],
   blueprintsNeedsReauth: false,
   modifiers: { skills: {} } as unknown as CharacterModifiers,
+  characterLoaded: true,
 });
 
 beforeEach(() => resetRouteSnapshots());
@@ -70,6 +71,7 @@ describe('patchWorkspaceLoad', () => {
   it('starts an empty load when there is none, with no catalog', () => {
     const patched = patchWorkspaceLoad(1, { pi: null });
     expect(patched.catalog).toBeNull();
+    expect(patched.characterLoaded).toBe(false);
     expect(patched.ownedBlueprints).toEqual([]);
     expect(lastWorkspaceLoad(1)).toBe(patched);
   });

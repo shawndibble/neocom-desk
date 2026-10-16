@@ -170,6 +170,15 @@ describe('useCorpAccess — a roles read that could not complete', () => {
     expect(result.current.state).toBe('unknown');
   });
 
+  it('does not offer a retry when the login itself was refused', async () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    mockedLoadRoles.mockResolvedValue({ cached: null, needsReauth: true });
+    const { result } = renderHook(() => useCorpAccess());
+    await act(async () => {});
+    expect(result.current.state).toBe('unknown');
+    expect(result.current.readFailed).toBe(false);
+  });
+
   it('reads again on retry, and resolves once the read succeeds', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles

@@ -27,7 +27,7 @@ import { DataAgeBadge, IconButton, PageHeader, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
-import { DataUnavailable } from '@/components/DataUnavailable';
+import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
@@ -516,30 +516,18 @@ export function Corp() {
   const { t } = useTranslation();
   const gate = useCorpRouteGate();
 
-  // Still resolving. This is the one place corp UI treats `unknown` as its own
-  // state rather than as `none`: the nav hides so it cannot flicker, but
-  // bouncing a Director who deep-linked before their roles read landed would
-  // simply be a bug. See `useCorpRouteGate`.
-  if (gate.status === 'loading') return <Spinner />;
-
-  // The roles read failed (offline, nothing cached): say so, rather than a spinner for good.
-  if (gate.status === 'failed') {
-    return (
-      <DataUnavailable
-        title={t('corp.rolesUnavailable')}
-        hint={t('corp.rolesUnavailableHint')}
-        onRetry={gate.retry}
-      />
-    );
-  }
-
-  // Reached the URL without the access for it. A bare explanation, not the
-  // section's shell drawn over nothing — that would be a lock, and corp UI
+  // `CorpRolesGate` holds the page while the roles resolve. This is the one
+  // place corp UI treats `unknown` as its own state rather than as `none`: the
+  // nav hides so it cannot flicker, but bouncing a Director who deep-linked
+  // before their roles read landed would simply be a bug. See `useCorpRouteGate`.
+  //
+  // Denied: reached the URL without the access for it. A bare explanation, not
+  // the section's shell drawn over nothing — that would be a lock, and corp UI
   // hides rather than locks (GLOSSARY.md round 35). The copy says roles only
   // change in game; a Character that holds a role but lacks the grant can fix
   // that from Settings' Corporation Permission row.
-  if (gate.status === 'denied') {
-    return (
+  const content =
+    gate.status === 'denied' ? (
       <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader title={t('corp.title')} />
         <CorpDenied
@@ -548,8 +536,9 @@ export function Corp() {
           hint={t('corp.noAccessHint')}
         />
       </div>
-    );
-  }
+    ) : gate.status === 'ready' ? (
+      <CorpBoardView capabilities={gate.capabilities} />
+    ) : null;
 
-  return <CorpBoardView capabilities={gate.capabilities} />;
+  return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;
 }

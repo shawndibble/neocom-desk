@@ -3,8 +3,8 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { DataUnavailable } from '@/components/DataUnavailable';
-import { onReconnect } from '@/stores/network';
+import { DataGate } from '@/components/DataGate';
+import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import {
   Button,
   DataAgeBadge,
@@ -105,6 +105,7 @@ export function Industry() {
     hydrated,
     catalog,
     catalogFailed,
+    characterLoaded,
     retryCatalog,
     pi,
     ownedBlueprints,
@@ -123,31 +124,28 @@ export function Industry() {
   // input (issue #819). Not part of `useIndustryWorkspace`: only this index's
   // Opportunities tab needs it, never the plan/group detail pages.
   const [marketWideTrees, setMarketWideTrees] = useState<MarketWideTreeMap | null>(null);
-  const [marketWideTreesFailed, setMarketWideTreesFailed] = useState(false);
-  const [marketWideTreesAttempt, setMarketWideTreesAttempt] = useState(0);
-  const retryMarketWideTrees = useCallback(() => {
-    setMarketWideTreesFailed(false);
-    setMarketWideTreesAttempt((attempt) => attempt + 1);
-  }, []);
+  const {
+    failed: marketWideTreesFailed,
+    attempt: marketWideTreesAttempt,
+    fail: failMarketWideTrees,
+    clear: clearMarketWideTreesFailure,
+    retry: retryMarketWideTrees,
+  } = useRetryableLoad();
   useEffect(() => {
     let cancelled = false;
+    clearMarketWideTreesFailure();
     loadMarketWideTrees().then(
       (trees) => {
         if (!cancelled) setMarketWideTrees(trees);
       },
       () => {
-        if (!cancelled) setMarketWideTreesFailed(true);
+        if (!cancelled) failMarketWideTrees();
       }
     );
     return () => {
       cancelled = true;
     };
-  }, [marketWideTreesAttempt]);
-  // The scan's input is a lazy download: fetch it again when the connection returns.
-  useEffect(
-    () => (marketWideTreesFailed ? onReconnect(retryMarketWideTrees) : undefined),
-    [marketWideTreesFailed, retryMarketWideTrees]
-  );
+  }, [marketWideTreesAttempt, failMarketWideTrees, clearMarketWideTreesFailure]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = usePageTab(INDUSTRY_TABS);
@@ -746,98 +744,116 @@ export function Industry() {
         />
 
         <TabPanel tabsId={INDUSTRY_TABS_ID} tabId={tab} className="space-y-4">
-          {/* BPC Sourcing needs neither the catalog nor the plans, so it stays usable when the catalog can't load. */}
+          {/* BPC Sourcing needs neither the catalog nor the plans, so it stays usable when the catalog can't load; it waits only for the Character's own reads (the Owned source, the re-login banner). */}
           {tab === 'sourcing' ? (
-            <BpcSourcingPanel onHeaderChange={setBpcSourcingHeader} />
-          ) : catalogFailed ? (
-            <DataUnavailable title={t('industry.catalogUnavailable')} onRetry={retryCatalog} />
-          ) : !plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
-            <div className="flex justify-center py-16">
-              <Spinner label={t('common.loading')} />
-            </div>
+            characterLoaded ? (
+              <BpcSourcingPanel onHeaderChange={setBpcSourcingHeader} />
+            ) : (
+              <div className="flex justify-center py-16">
+                <Spinner label={t('common.loading')} />
+              </div>
+            )
           ) : (
-            <>
-              {tab === 'opportunities' ? (
-                <div className="flex flex-col gap-4">
-                  {/* "What's profitable" (the market-wide scan) always leads,
+            <DataGate
+              status={
+                catalogFailed
+                  ? 'failed'
+                  : !plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated
+                    ? 'busy'
+                    : 'ok'
+              }
+              title={t('industry.catalogUnavailable')}
+              hint={
+                ownedBlueprints.length > 0 ? t('industry.catalogUnavailableOwnedHint') : undefined
+              }
+              onRetry={retryCatalog}
+              resetKey={activeCharacterId}
+            >
+              {plans && catalog && buildGroupsHydrated && expandedGroupsHydrated && (
+                <>
+                  {tab === 'opportunities' ? (
+                    <div className="flex flex-col gap-4">
+                      {/* "What's profitable" (the market-wide scan) always leads,
                     open; the owned-blueprint ranking follows it. */}
-                  {opportunitiesPanels}
-                </div>
-              ) : tab === 'logs' ? (
-                <ProductionLogPanel
-                  characterId={activeCharacterId}
-                  catalog={catalog}
-                  skills={modifiers.skills}
-                  plans={plans}
-                  onOpenRun={openRunFromRecords}
-                />
-              ) : comparing ? (
-                comparePlans.length >= 2 ? (
-                  <BuildPlanCompare
-                    plans={comparePlans}
-                    catalog={catalog}
-                    pi={pi}
-                    ownedBlueprints={ownedBlueprints}
-                    modifiers={modifiers}
-                    pricingInputs={pricingInputs}
-                    onDone={exitCompare}
-                    onOpenPlan={(planId) => {
-                      exitCompare();
-                      navigate(`/industry/plans/${planId}`);
-                    }}
-                  />
-                ) : (
-                  <EmptyState
-                    title={t('industry.compareNeedMore')}
-                    hint={t('industry.compareNeedMoreHint')}
-                    action={
-                      <Button size="sm" onClick={exitCompare}>
-                        {t('industry.compareDone')}
-                      </Button>
-                    }
-                  />
-                )
-              ) : (
-                <BuildPlanList
-                  note={
-                    (plans?.length ?? 0) > 0 && (
-                      <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
+                      {opportunitiesPanels}
+                    </div>
+                  ) : tab === 'logs' ? (
+                    <ProductionLogPanel
+                      characterId={activeCharacterId}
+                      catalog={catalog}
+                      skills={modifiers.skills}
+                      plans={plans}
+                      onOpenRun={openRunFromRecords}
+                    />
+                  ) : comparing ? (
+                    comparePlans.length >= 2 ? (
+                      <BuildPlanCompare
+                        plans={comparePlans}
+                        catalog={catalog}
+                        pi={pi}
+                        ownedBlueprints={ownedBlueprints}
+                        modifiers={modifiers}
+                        pricingInputs={pricingInputs}
+                        onDone={exitCompare}
+                        onOpenPlan={(planId) => {
+                          exitCompare();
+                          navigate(`/industry/plans/${planId}`);
+                        }}
+                      />
+                    ) : (
+                      <EmptyState
+                        title={t('industry.compareNeedMore')}
+                        hint={t('industry.compareNeedMoreHint')}
+                        action={
+                          <Button size="sm" onClick={exitCompare}>
+                            {t('industry.compareDone')}
+                          </Button>
+                        }
+                      />
                     )
-                  }
-                  plans={plans}
-                  catalog={catalog}
-                  selectedId={null}
-                  onSelect={(id) => navigate(`/industry/plans/${id}`)}
-                  // Stays on the index, same as duplicate — the search box adds
-                  // a row to manage, it doesn't presume the pilot wants to edit
-                  // it immediately. `void`: `onCreate` only takes the entry.
-                  onCreate={(entry) => void createPlan(entry)}
-                  onDuplicate={(id) => void handleDuplicate(id)}
-                  onDelete={setDeletingPlanId}
-                  onRename={(id, name) => void handleRename(id, name)}
-                  compareMode={compareMode}
-                  compareSelectedIds={compareSelectedIds}
-                  onToggleCompareMode={toggleCompareMode}
-                  onToggleCompareSelected={toggleCompareSelected}
-                  onOpenCompare={() => setComparing(true)}
-                  groups={groups}
-                  expandedGroupIds={expandedGroupIds}
-                  selectedGroupId={null}
-                  onToggleGroup={(groupId) =>
-                    void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
-                  }
-                  onSelectGroup={(groupId) => navigate(`/industry/groups/${groupId}`)}
-                  onCreateGroup={() => void handleCreateGroup()}
-                  onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
-                  onDeleteGroup={requestDeleteGroup}
-                  onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
-                  onOpenFitImport={() => setFitImportOpen(true)}
-                  statsByPlanId={statsByPlanId}
-                  ownedBlueprints={ownedBlueprints}
-                  statsByGroupId={statsByGroupId}
-                />
+                  ) : (
+                    <BuildPlanList
+                      note={
+                        (plans?.length ?? 0) > 0 && (
+                          <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
+                        )
+                      }
+                      plans={plans}
+                      catalog={catalog}
+                      selectedId={null}
+                      onSelect={(id) => navigate(`/industry/plans/${id}`)}
+                      // Stays on the index, same as duplicate — the search box adds
+                      // a row to manage, it doesn't presume the pilot wants to edit
+                      // it immediately. `void`: `onCreate` only takes the entry.
+                      onCreate={(entry) => void createPlan(entry)}
+                      onDuplicate={(id) => void handleDuplicate(id)}
+                      onDelete={setDeletingPlanId}
+                      onRename={(id, name) => void handleRename(id, name)}
+                      compareMode={compareMode}
+                      compareSelectedIds={compareSelectedIds}
+                      onToggleCompareMode={toggleCompareMode}
+                      onToggleCompareSelected={toggleCompareSelected}
+                      onOpenCompare={() => setComparing(true)}
+                      groups={groups}
+                      expandedGroupIds={expandedGroupIds}
+                      selectedGroupId={null}
+                      onToggleGroup={(groupId) =>
+                        void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
+                      }
+                      onSelectGroup={(groupId) => navigate(`/industry/groups/${groupId}`)}
+                      onCreateGroup={() => void handleCreateGroup()}
+                      onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
+                      onDeleteGroup={requestDeleteGroup}
+                      onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
+                      onOpenFitImport={() => setFitImportOpen(true)}
+                      statsByPlanId={statsByPlanId}
+                      ownedBlueprints={ownedBlueprints}
+                      statsByGroupId={statsByGroupId}
+                    />
+                  )}
+                </>
               )}
-            </>
+            </DataGate>
           )}
         </TabPanel>
 

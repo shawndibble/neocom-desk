@@ -84,7 +84,7 @@ import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
 import { walletDivisions, type WalletDivision } from '@/features/corp/divisions';
 import { useActiveCorporationIdState } from '@/features/corp/owner';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
-import { DataUnavailable } from '@/components/DataUnavailable';
+import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import {
   loadCorporationDivisions,
@@ -603,21 +603,8 @@ export function CorpWallet() {
   const { t } = useTranslation();
   const gate = useCorpRouteGate((capabilities) => capabilities.canReadWallet);
 
-  if (gate.status === 'loading') return <Spinner />;
-
-  // The roles read failed (offline, nothing cached): say so, rather than a spinner for good.
-  if (gate.status === 'failed') {
-    return (
-      <DataUnavailable
-        title={t('corp.rolesUnavailable')}
-        hint={t('corp.rolesUnavailableHint')}
-        onRetry={gate.retry}
-      />
-    );
-  }
-
-  if (gate.status === 'denied') {
-    return (
+  const content =
+    gate.status === 'denied' ? (
       <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader title={t('corp.wallet.title')} />
         <CorpDenied
@@ -626,8 +613,9 @@ export function CorpWallet() {
           hint={t('corp.wallet.noAccessHint')}
         />
       </div>
-    );
-  }
+    ) : gate.status === 'ready' ? (
+      <CorpWalletView />
+    ) : null;
 
-  return <CorpWalletView />;
+  return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;
 }

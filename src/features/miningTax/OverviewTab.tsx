@@ -23,12 +23,14 @@ import {
   EmptyState,
   IconButton,
   IskAmount,
+  LiveStatus,
   PageHeader,
   Panel,
   Spinner,
   type DataTableColumn,
   TabPanel,
 } from '@/components/ui';
+import { onReconnect } from '@/stores/network';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -210,6 +212,11 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   // refined side is left out and said to be unavailable rather than shown as zero.
   const refiningUnavailable = showRefining && (data?.refiningUnavailable ?? false);
   const refining = showRefining && !refiningUnavailable;
+  // The recipes are fetched again, and the refined side restored, when the connection returns.
+  useEffect(
+    () => (refiningUnavailable ? onReconnect(refresh) : undefined),
+    [refiningUnavailable, refresh]
+  );
   const availableColumnIds = availableOverviewColumns(refining, showCharacterColumn);
   // `id` is already known available here, so this is just "is it checked" —
   // `visibleAvailableColumns` (below, `handleToggleColumn`'s own
@@ -506,7 +513,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     () =>
       yieldOverviewCsvColumns(t, {
         showCharacter: showCharacterColumn,
-        refining,
+        showRefining: refining,
         systemNames: data?.systemNames ?? new Map(),
         typeNames: data?.typeNames ?? new Map(),
         typeVolumes: data?.typeVolumes ?? new Map(),
@@ -605,10 +612,12 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
             )}
 
             {refiningUnavailable && (
-              <p role="status" className="text-xs text-warning">
-                {t('miningTax.overview.refiningUnavailable')}
-              </p>
+              <p className="text-xs text-warning">{t('miningTax.overview.refiningUnavailable')}</p>
             )}
+            {/* Always mounted, so the note is announced when it appears (DESIGN.md §7). */}
+            <LiveStatus>
+              {refiningUnavailable ? t('miningTax.overview.refiningUnavailable') : null}
+            </LiveStatus>
 
             {data && data.reauthCharacters.length > 0 && (
               <div

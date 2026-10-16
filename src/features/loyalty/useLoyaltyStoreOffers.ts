@@ -9,6 +9,7 @@
  * uses) for the per-offer "use my own materials" toggle.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
@@ -76,6 +77,13 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const [offersFromCache, setOffersFromCache] = useState(false);
   const [offersError, setOffersError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // A catalog that couldn't load lists offers without build-versus-buy figures
+  // until the connection returns, when it is fetched again.
+  const {
+    attempt: catalogAttempt,
+    fail: failCatalog,
+    clear: clearCatalogFailure,
+  } = useRetryableLoad();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   const [playerLp, setPlayerLp] = useState(0);
   const [skills, setSkills] = useState<SkillLevels>({});
@@ -104,19 +112,22 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
 
   useEffect(() => {
     let cancelled = false;
+    clearCatalogFailure();
     loadBlueprintCatalog().then(
       (cat) => {
         if (!cancelled) setCatalog(cat);
       },
       // Offers still list; they just carry no build-vs-buy figures.
       () => {
-        if (!cancelled) setCatalog(EMPTY_BLUEPRINT_CATALOG);
+        if (cancelled) return;
+        setCatalog(EMPTY_BLUEPRINT_CATALOG);
+        failCatalog();
       }
     );
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [catalogAttempt, failCatalog, clearCatalogFailure]);
 
   useEffect(() => {
     if (activeCharacterId === null) return;

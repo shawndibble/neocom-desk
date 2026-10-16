@@ -29,6 +29,12 @@ export interface WorkspaceLoad {
   ownedBlueprints: CharacterBlueprint[];
   blueprintsNeedsReauth: boolean;
   modifiers: CharacterModifiers;
+  /**
+   * The Character's own reads (blueprints, skills) have settled. A load without
+   * it is the catalog alone: pages must not price from it, or they would price
+   * with no skills and then jump.
+   */
+  characterLoaded: boolean;
 }
 
 const SNAPSHOT_NAME = 'industryWorkspace';
@@ -59,6 +65,7 @@ export function patchWorkspaceLoad(
       ownedBlueprints: [],
       blueprintsNeedsReauth: false,
       modifiers: NO_CHARACTER_MODIFIERS,
+      characterLoaded: false,
     }),
     ...patch,
   };

@@ -37,7 +37,7 @@ import {
   type StatChipTone,
   STAT_CHIP_TONE_TEXT_CLASS,
 } from '@/components/ui';
-import { DataUnavailable } from '@/components/DataUnavailable';
+import { DataGate } from '@/components/DataGate';
 import { useOnline } from '@/stores/network';
 import { db } from '@/db';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
@@ -318,9 +318,8 @@ export function MarketWideOpportunitiesPanel({
   const scanButton = (
     <Button
       size="sm"
-      onClick={() => online && scan(filter)}
-      disabled={!trees || !catalog}
-      aria-disabled={loading || !online || undefined}
+      onClick={() => online && trees && catalog && scan(filter)}
+      aria-disabled={loading || !online || !trees || !catalog || undefined}
     >
       {loading
         ? t('industry.marketOpportunitiesScanning')
@@ -336,7 +335,7 @@ export function MarketWideOpportunitiesPanel({
       !sameMembers(next.categories, filter.categories) ||
       !sameMembers(next.sources, filter.sources);
     // Mid-scan too: otherwise the scan already running lands with the old filters.
-    if ((hasRun || loading) && rescan) scan(next);
+    if ((hasRun || loading) && rescan && online) scan(next);
   };
   const accountSkills = useAccountSkillLevels(characterIds);
 
@@ -784,119 +783,120 @@ export function MarketWideOpportunitiesPanel({
         </span>
       }
     >
-      {loading ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('industry.marketOpportunitiesScanning')} />
-        </div>
-      ) : error ? (
-        <EmptyState
-          title={t('industry.marketOpportunitiesErrorTitle')}
-          hint={t('industry.marketOpportunitiesErrorHint')}
-          action={
-            <Button size="sm" onClick={() => scan(filter)}>
-              {t('industry.marketOpportunitiesRetry')}
-            </Button>
-          }
-          className="py-8"
-        />
-      ) : !hasRun && treesFailed && !trees ? (
-        <DataUnavailable
-          title={t('industry.marketWideTreesUnavailable')}
-          onRetry={onRetryTrees}
-          className="py-8"
-        />
-      ) : !hasRun ? (
-        <EmptyState
-          title={t('industry.marketOpportunitiesEmptyTitle')}
-          hint={t('industry.marketOpportunitiesEmptyHint')}
-          className="py-8"
-        />
-      ) : rows.length === 0 ? (
-        <div className="flex flex-col gap-2">
+      <DataGate
+        status={!hasRun && treesFailed && !trees ? 'failed' : 'ok'}
+        title={t('industry.marketWideTreesUnavailable')}
+        onRetry={onRetryTrees}
+        className="py-8"
+      >
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Spinner label={t('industry.marketOpportunitiesScanning')} />
+          </div>
+        ) : error ? (
           <EmptyState
-            title={t('industry.marketOpportunitiesNoResultsTitle')}
-            hint={t('industry.marketOpportunitiesNoResultsHint')}
+            title={t('industry.marketOpportunitiesErrorTitle')}
+            hint={t('industry.marketOpportunitiesErrorHint')}
+            action={
+              <Button size="sm" onClick={() => scan(filter)}>
+                {t('industry.marketOpportunitiesRetry')}
+              </Button>
+            }
             className="py-8"
           />
-          {unavailableNote}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {unavailableNote}
-          <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
-          {dailySales.pending > 0 && (
-            <p className="text-[0.6875rem] text-text-dim">
-              {t('industry.marketOpportunitiesCheckingSales', { count: dailySales.pending })}
-            </p>
-          )}
-          {isDesktop ? (
-            <div className="overflow-x-auto">
-              <DataTable
-                {...marketWideExport.tableProps}
-                columns={shownColumns}
-                rows={shownRows}
-                rowKey={(row) => row.productTypeID}
-                onRowClick={startPlanFromRow}
-                rowContextMenu={rowContextMenu}
-                rowMoreActions
-                rowClickable={(row) => Boolean(catalog?.byProductTypeID.has(row.productTypeID))}
-                label={t('industry.marketOpportunitiesTitle')}
-                {...sortProps}
-              />
-            </div>
-          ) : (
-            <MobileMarketWideList
-              rows={shownRows}
-              salesShare={filter.salesShare}
-              total={visibleRows.length}
-              {...sortProps}
-              skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
-              nameForSkill={(typeID) => (catalog ? nameForType(catalog, typeID) : unknownName)}
-              nameForCharacter={(id) => characterNames.get(id) ?? unknownName}
-              onStartPlan={startPlanFor}
-            />
-          )}
-          {remaining > 0 && (
-            // A full-width bar under the cards; beside the count with a pointer.
-            <div className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <p className="text-center text-[0.6875rem] text-text-dim tabular-nums lg:text-left">
-                {t('industry.marketOpportunitiesShowing', {
-                  shown: shownRows.length,
-                  total: visibleRows.length,
-                })}
-              </p>
-              {/* `sm` only beside the count with a pointer: alone on a phone it is a thumb target. */}
-              <Button
-                size={isDesktop ? 'sm' : undefined}
-                onClick={() => setShownLimit((limit) => limit + MARKET_WIDE_PAGE_SIZE)}
-              >
-                {remaining > MARKET_WIDE_PAGE_SIZE
-                  ? t('industry.marketOpportunitiesShowNext', { count: MARKET_WIDE_PAGE_SIZE })
-                  : t('industry.marketOpportunitiesShowLast', { count: remaining })}
-              </Button>
-            </div>
-          )}
-          {gatedCount > 0 && (
-            <p className="text-[0.6875rem] text-text-dim">
-              {t('industry.marketOpportunitiesSkillGateRule')}
-            </p>
-          )}
-        </div>
-      )}
-      {historyItem && (
-        <Modal
-          open
-          onClose={() => setHistoryItem(null)}
-          title={t('industry.opportunitiesPriceHistoryTitle', { name: historyItem.itemName })}
-          placement="wide"
-        >
-          <PriceHistoryPanel
-            regionId={hub.regionId}
-            typeId={historyItem.typeId}
-            itemName={historyItem.itemName}
+        ) : !hasRun ? (
+          <EmptyState
+            title={t('industry.marketOpportunitiesEmptyTitle')}
+            hint={t('industry.marketOpportunitiesEmptyHint')}
+            className="py-8"
           />
-        </Modal>
-      )}
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col gap-2">
+            <EmptyState
+              title={t('industry.marketOpportunitiesNoResultsTitle')}
+              hint={t('industry.marketOpportunitiesNoResultsHint')}
+              className="py-8"
+            />
+            {unavailableNote}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {unavailableNote}
+            <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
+            {dailySales.pending > 0 && (
+              <p className="text-[0.6875rem] text-text-dim">
+                {t('industry.marketOpportunitiesCheckingSales', { count: dailySales.pending })}
+              </p>
+            )}
+            {isDesktop ? (
+              <div className="overflow-x-auto">
+                <DataTable
+                  {...marketWideExport.tableProps}
+                  columns={shownColumns}
+                  rows={shownRows}
+                  rowKey={(row) => row.productTypeID}
+                  onRowClick={startPlanFromRow}
+                  rowContextMenu={rowContextMenu}
+                  rowMoreActions
+                  rowClickable={(row) => Boolean(catalog?.byProductTypeID.has(row.productTypeID))}
+                  label={t('industry.marketOpportunitiesTitle')}
+                  {...sortProps}
+                />
+              </div>
+            ) : (
+              <MobileMarketWideList
+                rows={shownRows}
+                salesShare={filter.salesShare}
+                total={visibleRows.length}
+                {...sortProps}
+                skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
+                nameForSkill={(typeID) => (catalog ? nameForType(catalog, typeID) : unknownName)}
+                nameForCharacter={(id) => characterNames.get(id) ?? unknownName}
+                onStartPlan={startPlanFor}
+              />
+            )}
+            {remaining > 0 && (
+              // A full-width bar under the cards; beside the count with a pointer.
+              <div className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <p className="text-center text-[0.6875rem] text-text-dim tabular-nums lg:text-left">
+                  {t('industry.marketOpportunitiesShowing', {
+                    shown: shownRows.length,
+                    total: visibleRows.length,
+                  })}
+                </p>
+                {/* `sm` only beside the count with a pointer: alone on a phone it is a thumb target. */}
+                <Button
+                  size={isDesktop ? 'sm' : undefined}
+                  onClick={() => setShownLimit((limit) => limit + MARKET_WIDE_PAGE_SIZE)}
+                >
+                  {remaining > MARKET_WIDE_PAGE_SIZE
+                    ? t('industry.marketOpportunitiesShowNext', { count: MARKET_WIDE_PAGE_SIZE })
+                    : t('industry.marketOpportunitiesShowLast', { count: remaining })}
+                </Button>
+              </div>
+            )}
+            {gatedCount > 0 && (
+              <p className="text-[0.6875rem] text-text-dim">
+                {t('industry.marketOpportunitiesSkillGateRule')}
+              </p>
+            )}
+          </div>
+        )}
+        {historyItem && (
+          <Modal
+            open
+            onClose={() => setHistoryItem(null)}
+            title={t('industry.opportunitiesPriceHistoryTitle', { name: historyItem.itemName })}
+            placement="wide"
+          >
+            <PriceHistoryPanel
+              regionId={hub.regionId}
+              typeId={historyItem.typeId}
+              itemName={historyItem.itemName}
+            />
+          </Modal>
+        )}
+      </DataGate>
     </CollapsiblePanel>
   );
 }

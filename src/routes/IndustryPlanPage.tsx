@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { DataUnavailable } from '@/components/DataUnavailable';
+import { DataGate } from '@/components/DataGate';
 import { Spinner, TabPanel } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
@@ -131,31 +131,35 @@ export function IndustryPlanPage() {
             hang (`buildPlanPricingInputs.ts`'s own doc comment), so this
             never becomes a real wait. */}
         <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans" className="space-y-4">
-          {catalogFailed ? (
-            <DataUnavailable title={t('industry.catalogUnavailable')} onRetry={retryCatalog} />
-          ) : !catalog || !pricingInputs.hydrated ? (
-            <div className="flex justify-center py-16">
-              <Spinner label={t('common.loading')} />
-            </div>
-          ) : (
-            <BuildPlanDetail
-              key={plan.id}
-              plan={plan}
-              catalog={catalog}
-              pi={pi}
-              ownedBlueprints={ownedBlueprints}
-              modifiers={modifiers}
-              ownedStockSnapshot={ownedStockSnapshot}
-              corpOwnedStock={corpOwnedStock}
-              pricingInputs={pricingInputs}
-              onChange={(change) => void applyBuildPlanChange(plan.id, change)}
-              groupSnapshot={groupSnapshot}
-              group={planGroup}
-              onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}
-              pendingLogProduction={pendingLogProduction}
-              pendingLogProductionKey={location.key}
-            />
-          )}
+          <DataGate
+            status={catalogFailed ? 'failed' : !catalog || !pricingInputs.hydrated ? 'busy' : 'ok'}
+            title={t('industry.catalogUnavailable')}
+            hint={
+              ownedBlueprints.length > 0 ? t('industry.catalogUnavailableOwnedHint') : undefined
+            }
+            onRetry={retryCatalog}
+            resetKey={activeCharacterId}
+          >
+            {catalog && pricingInputs.hydrated && (
+              <BuildPlanDetail
+                key={plan.id}
+                plan={plan}
+                catalog={catalog}
+                pi={pi}
+                ownedBlueprints={ownedBlueprints}
+                modifiers={modifiers}
+                ownedStockSnapshot={ownedStockSnapshot}
+                corpOwnedStock={corpOwnedStock}
+                pricingInputs={pricingInputs}
+                onChange={(change) => void applyBuildPlanChange(plan.id, change)}
+                groupSnapshot={groupSnapshot}
+                group={planGroup}
+                onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}
+                pendingLogProduction={pendingLogProduction}
+                pendingLogProductionKey={location.key}
+              />
+            )}
+          </DataGate>
         </TabPanel>
       </div>
     </ItemActionsProvider>

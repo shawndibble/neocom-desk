@@ -10,6 +10,7 @@
  * matches a dozen items prices a dozen items rather than every store.
  */
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -73,6 +74,13 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
   const [balances, setBalances] = useState<CharacterLoyaltyPoints[]>([]);
   const [itemNames, setItemNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [systemNames, setSystemNames] = useState<ReadonlyMap<number, string>>(new Map());
+  // A catalog that couldn't load lists offers without build-versus-buy figures
+  // until the connection returns, when it is fetched again.
+  const {
+    attempt: catalogAttempt,
+    fail: failCatalog,
+    clear: clearCatalogFailure,
+  } = useRetryableLoad();
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   const [skills, setSkills] = useState<SkillLevels>({});
 
@@ -106,19 +114,29 @@ export function useLpStoreSearch(query: string): LpStoreSearchState {
       if (cancelled || !byId) return;
       setSystemNames(new Map([...byId].map(([id, entry]) => [id, entry.name])));
     });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    clearCatalogFailure();
     loadBlueprintCatalog().then(
       (cat) => {
         if (!cancelled) setCatalog(cat);
       },
       // Search still lists matches; they just carry no build-vs-buy figures.
       () => {
-        if (!cancelled) setCatalog(EMPTY_BLUEPRINT_CATALOG);
+        if (cancelled) return;
+        setCatalog(EMPTY_BLUEPRINT_CATALOG);
+        failCatalog();
       }
     );
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [catalogAttempt, failCatalog, clearCatalogFailure]);
 
   // Keyed on the Character, so a switch never lists the previous one's stores.
   const [balancesFor, setBalancesFor] = useState(activeCharacterId);

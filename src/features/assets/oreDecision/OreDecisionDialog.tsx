@@ -8,7 +8,7 @@
  * Market Hub's buy price less sales tax, both exits taxed alike so they compare
  * like with like. The refining facility is an assumption the dialog states.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { cx } from '@/lib/cx';
@@ -26,8 +26,8 @@ import {
   textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
-import { DataUnavailable } from '@/components/DataUnavailable';
-import { onReconnect } from '@/stores/network';
+import { DataGate } from '@/components/DataGate';
+import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { db } from '@/db';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -153,25 +153,36 @@ export function OreDecisionDialog({
     void useOreRefiningStructureRate.getState().hydrate();
   }, []);
 
-  // Whether what the dialog needs couldn't load, rather than a spinner for good.
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [loadAttempt, setLoadAttempt] = useState(0);
-  const retryLoad = useCallback(() => {
-    setLoadFailed(false);
-    setLoadAttempt((attempt) => attempt + 1);
-  }, []);
-  useEffect(() => (loadFailed ? onReconnect(retryLoad) : undefined), [loadFailed, retryLoad]);
+  // What couldn't load, rather than a spinner for good: the reprocessing data
+  // is a lazy download that can be missing offline; anything else is a plain failure.
+  const {
+    failed: loadFailed,
+    attempt: loadAttempt,
+    fail: failLoad,
+    clear: clearLoadFailure,
+    retry: retryLoad,
+  } = useRetryableLoad();
+  const [reprocessingMissing, setReprocessingMissing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    clearLoadFailure();
     void (async () => {
       const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-      const [reprocessing, modifiers] = await Promise.all([
-        loadReprocessing(),
+      let reprocessing: Awaited<ReturnType<typeof loadReprocessing>>;
+      try {
+        reprocessing = await loadReprocessing();
+      } catch {
+        if (!cancelled) {
+          setReprocessingMissing(true);
+          failLoad();
+        }
+        return;
+      }
+      const modifiers =
         activeCharacterId === null
-          ? Promise.resolve(NO_CHARACTER_MODIFIERS)
-          : loadCharacterModifiers(activeCharacterId, Date.now()),
-      ]);
+          ? NO_CHARACTER_MODIFIERS
+          : await loadCharacterModifiers(activeCharacterId, Date.now());
       const entry = reprocessing[String(typeId)];
       const recipe: OreRecipe | null = entry
         ? {
@@ -189,13 +200,15 @@ export function OreDecisionDialog({
       }
       if (!cancelled) setData({ recipe, modifiers, hub, buyPrices, names });
     })().catch(() => {
-      // Reprocessing data is a lazy download, so offline it can be missing.
-      if (!cancelled) setLoadFailed(true);
+      if (!cancelled) {
+        setReprocessingMissing(false);
+        failLoad();
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [typeId, hubId, activeCharacterId, loadAttempt]);
+  }, [typeId, hubId, activeCharacterId, loadAttempt, failLoad, clearLoadFailure]);
 
   // Plans: resolved exactly as the Industry index resolves them.
   const workspace = useIndustryWorkspace();
@@ -368,174 +381,182 @@ export function OreDecisionDialog({
       title={t('assets.oreDecision.title', { name: itemName, count: quantity })}
     >
       <div className="space-y-3 text-sm">
-        {data === null && loadFailed ? (
-          <DataUnavailable title={t('assets.oreDecision.loadFailed')} onRetry={retryLoad} />
-        ) : data === null || exits === null ? (
-          <p className="text-text-dim">
-            {data === null ? t('assets.oreDecision.loading') : t('assets.oreDecision.noRecipe')}
-          </p>
-        ) : (
-          <>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Card
-                label={t('assets.oreDecision.sellRawCard')}
-                suggested={suggestedKey === 'raw'}
-                hint={t('assets.oreDecision.sellRawHint', { hub: data.hub.name })}
-              >
-                {sellRaw > 0 ? <IskAmount value={sellRaw} decimals={0} /> : '—'}
-              </Card>
-              <Card
-                label={t('assets.oreDecision.refineCard')}
-                suggested={suggestedKey === 'refine'}
-                hint={t('assets.oreDecision.refineHint', {
-                  efficiency: percentText,
-                  facility: facilityLabel,
-                })}
-              >
-                {refine > 0 ? <IskAmount value={refine} decimals={0} /> : '—'}
-              </Card>
-              <Card
-                label={t('assets.oreDecision.useInPlanCard')}
-                suggested={suggestedKey === 'plan'}
-                hint={
-                  chosen
-                    ? t('assets.oreDecision.useInPlanHint', { plan: chosen.row.planName })
-                    : t('assets.oreDecision.useInPlanNone')
-                }
-              >
-                {inPlan && useValue > 0 ? <IskAmount value={useValue} decimals={0} /> : '—'}
-              </Card>
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-2">
-              <div className="overflow-hidden rounded-xs border border-line">
-                <p className={TABLE_TITLE_TEXT}>{t('assets.oreDecision.refinesIntoTitle')}</p>
-                {refinedRows.length === 0 ? (
-                  <p className="px-2.5 py-2 text-xs text-text-dim">
-                    {t('assets.oreDecision.refinesIntoNone')}
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <DataTable
-                      columns={refinedColumns}
-                      rows={refinedRows}
-                      rowKey={(r) => r.typeId}
-                      label={t('assets.oreDecision.refinesIntoTitle')}
-                      responsive="table"
-                    />
-                  </div>
-                )}
-                {exits.unitsLeftOver > 0 && (
-                  <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">
-                    {t('assets.oreDecision.leftOverHint', {
-                      units: exits.unitsLeftOver.toLocaleString(),
-                    })}
-                  </p>
-                )}
+        <DataGate
+          status={data === null && loadFailed ? 'failed' : 'ok'}
+          title={
+            reprocessingMissing
+              ? t('assets.oreDecision.loadFailed')
+              : t('assets.oreDecision.loadFailedGeneric')
+          }
+          onRetry={retryLoad}
+        >
+          {data === null || exits === null ? (
+            <p className="text-text-dim">
+              {data === null ? t('assets.oreDecision.loading') : t('assets.oreDecision.noRecipe')}
+            </p>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Card
+                  label={t('assets.oreDecision.sellRawCard')}
+                  suggested={suggestedKey === 'raw'}
+                  hint={t('assets.oreDecision.sellRawHint', { hub: data.hub.name })}
+                >
+                  {sellRaw > 0 ? <IskAmount value={sellRaw} decimals={0} /> : '—'}
+                </Card>
+                <Card
+                  label={t('assets.oreDecision.refineCard')}
+                  suggested={suggestedKey === 'refine'}
+                  hint={t('assets.oreDecision.refineHint', {
+                    efficiency: percentText,
+                    facility: facilityLabel,
+                  })}
+                >
+                  {refine > 0 ? <IskAmount value={refine} decimals={0} /> : '—'}
+                </Card>
+                <Card
+                  label={t('assets.oreDecision.useInPlanCard')}
+                  suggested={suggestedKey === 'plan'}
+                  hint={
+                    chosen
+                      ? t('assets.oreDecision.useInPlanHint', { plan: chosen.row.planName })
+                      : t('assets.oreDecision.useInPlanNone')
+                  }
+                >
+                  {inPlan && useValue > 0 ? <IskAmount value={useValue} decimals={0} /> : '—'}
+                </Card>
               </div>
 
-              <div className="overflow-hidden rounded-xs border border-line">
-                <div className={cx(TABLE_TITLE_TEXT, 'flex items-center justify-between gap-2')}>
-                  <span>
-                    {chosen
-                      ? t('assets.oreDecision.coversTitle', { plan: chosen.row.planName })
-                      : t('assets.oreDecision.coversTitleNone')}
-                  </span>
-                  {eligible.length > 1 && chosen && (
-                    <Select value={chosen.row.planId} onValueChange={setPlanId}>
-                      <SelectTrigger size="sm" aria-label={t('assets.oreDecision.planPicker')}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {eligible.map((p) => (
-                          <SelectItem key={p.row.planId} value={p.row.planId}>
-                            {p.row.planName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-                {inPlan ? (
-                  <>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="overflow-hidden rounded-xs border border-line">
+                  <p className={TABLE_TITLE_TEXT}>{t('assets.oreDecision.refinesIntoTitle')}</p>
+                  {refinedRows.length === 0 ? (
+                    <p className="px-2.5 py-2 text-xs text-text-dim">
+                      {t('assets.oreDecision.refinesIntoNone')}
+                    </p>
+                  ) : (
                     <div className="overflow-x-auto">
                       <DataTable
-                        columns={coverColumns}
-                        rows={inPlan.coverage}
+                        columns={refinedColumns}
+                        rows={refinedRows}
                         rowKey={(r) => r.typeId}
-                        label={t('assets.oreDecision.coversTitleNone')}
+                        label={t('assets.oreDecision.refinesIntoTitle')}
                         responsive="table"
                       />
                     </div>
-                    <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-text-dim">
-                      {t('assets.oreDecision.notUsedHint', {
-                        units: inPlan.unitsNotUsed.toLocaleString(),
+                  )}
+                  {exits.unitsLeftOver > 0 && (
+                    <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">
+                      {t('assets.oreDecision.leftOverHint', {
+                        units: exits.unitsLeftOver.toLocaleString(),
                       })}
                     </p>
-                  </>
-                ) : (
-                  <p className="px-2.5 py-2 text-xs text-text-dim">
-                    {t('assets.oreDecision.noPlanNeeds')}
-                  </p>
-                )}
-              </div>
-            </div>
+                  )}
+                </div>
 
-            <div className="overflow-hidden rounded-xs border border-line">
-              <p className={TABLE_TITLE_TEXT}>{t('assets.oreDecision.pricingTitle')}</p>
-              <div className="space-y-1.5 px-2.5 py-2 text-[0.6875rem] leading-relaxed text-text-dim">
-                <p>
-                  {t('assets.oreDecision.pricingBasis', {
-                    hub: data.hub.name,
-                    tax: taxPct.toFixed(2),
-                  })}
-                </p>
-                <p className="flex flex-wrap items-center gap-2">
-                  <span>
-                    {t('assets.oreDecision.yieldAssumption', {
-                      efficiency: percentText,
-                      facility: facilityLabel,
-                    })}
-                  </span>
-                  <button
-                    type="button"
-                    className={textActionClassName()}
-                    onClick={() => setEditingYield((v) => !v)}
-                    aria-expanded={editingYield}
-                  >
-                    {t('assets.oreDecision.editYield')}
-                  </button>
-                </p>
-                {editingYield && (
-                  <label className="flex flex-wrap items-center gap-2">
-                    <span>{t('assets.oreDecision.structureRateLabel')}</span>
-                    <TextInput
-                      size="sm"
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      max={100}
-                      step={0.1}
-                      className="w-24"
-                      defaultValue={structureRate > 0 ? (structureRate * 100).toFixed(1) : ''}
-                      placeholder="50"
-                      onChange={(e) => {
-                        const pct = Number(e.target.value);
-                        void setStructureRate(
-                          Number.isFinite(pct) && pct > 0 && e.target.value !== '' ? pct / 100 : 0
-                        );
-                      }}
-                    />
-                    <span>{t('assets.oreDecision.structureRateHint')}</span>
-                  </label>
-                )}
-                {!exits.pricedAll && (
-                  <p className="text-warning">{t('assets.oreDecision.partialPricing')}</p>
-                )}
+                <div className="overflow-hidden rounded-xs border border-line">
+                  <div className={cx(TABLE_TITLE_TEXT, 'flex items-center justify-between gap-2')}>
+                    <span>
+                      {chosen
+                        ? t('assets.oreDecision.coversTitle', { plan: chosen.row.planName })
+                        : t('assets.oreDecision.coversTitleNone')}
+                    </span>
+                    {eligible.length > 1 && chosen && (
+                      <Select value={chosen.row.planId} onValueChange={setPlanId}>
+                        <SelectTrigger size="sm" aria-label={t('assets.oreDecision.planPicker')}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {eligible.map((p) => (
+                            <SelectItem key={p.row.planId} value={p.row.planId}>
+                              {p.row.planName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  {inPlan ? (
+                    <>
+                      <div className="overflow-x-auto">
+                        <DataTable
+                          columns={coverColumns}
+                          rows={inPlan.coverage}
+                          rowKey={(r) => r.typeId}
+                          label={t('assets.oreDecision.coversTitleNone')}
+                          responsive="table"
+                        />
+                      </div>
+                      <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-text-dim">
+                        {t('assets.oreDecision.notUsedHint', {
+                          units: inPlan.unitsNotUsed.toLocaleString(),
+                        })}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="px-2.5 py-2 text-xs text-text-dim">
+                      {t('assets.oreDecision.noPlanNeeds')}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          </>
-        )}
+
+              <div className="overflow-hidden rounded-xs border border-line">
+                <p className={TABLE_TITLE_TEXT}>{t('assets.oreDecision.pricingTitle')}</p>
+                <div className="space-y-1.5 px-2.5 py-2 text-[0.6875rem] leading-relaxed text-text-dim">
+                  <p>
+                    {t('assets.oreDecision.pricingBasis', {
+                      hub: data.hub.name,
+                      tax: taxPct.toFixed(2),
+                    })}
+                  </p>
+                  <p className="flex flex-wrap items-center gap-2">
+                    <span>
+                      {t('assets.oreDecision.yieldAssumption', {
+                        efficiency: percentText,
+                        facility: facilityLabel,
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      className={textActionClassName()}
+                      onClick={() => setEditingYield((v) => !v)}
+                      aria-expanded={editingYield}
+                    >
+                      {t('assets.oreDecision.editYield')}
+                    </button>
+                  </p>
+                  {editingYield && (
+                    <label className="flex flex-wrap items-center gap-2">
+                      <span>{t('assets.oreDecision.structureRateLabel')}</span>
+                      <TextInput
+                        size="sm"
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        className="w-24"
+                        defaultValue={structureRate > 0 ? (structureRate * 100).toFixed(1) : ''}
+                        placeholder="50"
+                        onChange={(e) => {
+                          const pct = Number(e.target.value);
+                          void setStructureRate(
+                            Number.isFinite(pct) && pct > 0 && e.target.value !== '' ? pct / 100 : 0
+                          );
+                        }}
+                      />
+                      <span>{t('assets.oreDecision.structureRateHint')}</span>
+                    </label>
+                  )}
+                  {!exits.pricedAll && (
+                    <p className="text-warning">{t('assets.oreDecision.partialPricing')}</p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </DataGate>
       </div>
     </Modal>
   );

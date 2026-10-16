@@ -9,12 +9,12 @@
  * and refreshes behind it, so opening a plan never waits on loads the index
  * just finished.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { hydrateActivityFacilityDefaults, useFacilityDefaults } from './facilityDefaults';
 import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { onReconnect } from '@/stores/network';
+import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
@@ -40,6 +40,8 @@ export interface IndustryWorkspace {
   facilityDefaults: ActivityFacilityDefaults;
   catalog: BlueprintCatalog | null;
   /** The catalog couldn't load (no copy on this device and no connection). `retryCatalog` tries again. */
+  /** The Character's own reads (blueprints, skills) have settled, whether or not they succeeded. */
+  characterLoaded: boolean;
   catalogFailed: boolean;
   retryCatalog: () => void;
   pi: PiData | null;
@@ -108,21 +110,26 @@ export function useIndustryWorkspace(): IndustryWorkspace {
   // Character's own, so one failing never discards the other: before this a
   // rejected catalog threw away the owned blueprints and modifiers with it and
   // left every Industry page on a spinner.
-  const [catalogFailed, setCatalogFailed] = useState(false);
-  const [catalogAttempt, setCatalogAttempt] = useState(0);
-  const retryCatalog = useCallback(() => {
-    setCatalogFailed(false);
-    setCatalogAttempt((attempt) => attempt + 1);
-  }, []);
-  // A catalog that couldn't load is fetched again the moment the connection returns.
-  useEffect(
-    () => (catalogFailed ? onReconnect(retryCatalog) : undefined),
-    [catalogFailed, retryCatalog]
+  const {
+    failed: catalogFailed,
+    attempt: catalogAttempt,
+    fail: failCatalog,
+    clear: clearCatalogFailure,
+    retry: retryCatalog,
+  } = useRetryableLoad();
+  // Pages price from `catalog`, so it stays hidden until the Character's own
+  // reads have settled too: otherwise a catalog that lands first (it often
+  // resolves in a microtask) prices everything with no skills or blueprints,
+  // and the numbers jump when they arrive.
+  const [characterLoadedFor, setCharacterLoadedFor] = useState<number | null>(
+    initial?.characterLoaded ? activeCharacterId : null
   );
+  const characterLoaded = characterLoadedFor !== null && characterLoadedFor === activeCharacterId;
 
   useEffect(() => {
     if (activeCharacterId === null) return;
     let cancelled = false;
+    clearCatalogFailure();
     void (async () => {
       const [cat, planetary] = await Promise.allSettled([
         loadBlueprintCatalog(),
@@ -132,7 +139,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
       ]);
       if (cancelled) return;
       if (cat.status === 'rejected') {
-        setCatalogFailed(true);
+        failCatalog();
         return;
       }
       const load = patchWorkspaceLoad(activeCharacterId, {
@@ -145,7 +152,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
     return () => {
       cancelled = true;
     };
-  }, [activeCharacterId, catalogAttempt]);
+  }, [activeCharacterId, catalogAttempt, failCatalog, clearCatalogFailure]);
 
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -165,7 +172,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
       // changed nothing keeps each value's identity and doesn't re-price. A
       // read that failed keeps what the page already has.
       const previous = lastWorkspaceLoad(activeCharacterId);
-      const patch: Parameters<typeof patchWorkspaceLoad>[1] = {};
+      const patch: Parameters<typeof patchWorkspaceLoad>[1] = { characterLoaded: true };
       if (owned.status === 'fulfilled') {
         patch.ownedBlueprints = reuseIfUnchanged(
           previous?.ownedBlueprints,
@@ -180,6 +187,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
       setOwnedBlueprints(load.ownedBlueprints);
       setBlueprintsNeedsReauth(load.blueprintsNeedsReauth);
       setModifiers(load.modifiers);
+      setCharacterLoadedFor(activeCharacterId);
     })();
     return () => {
       cancelled = true;
@@ -190,7 +198,8 @@ export function useIndustryWorkspace(): IndustryWorkspace {
     hydrated,
     activeCharacterId,
     facilityDefaults,
-    catalog,
+    characterLoaded,
+    catalog: characterLoaded ? catalog : null,
     catalogFailed: catalogFailed && catalog === null,
     retryCatalog,
     pi,

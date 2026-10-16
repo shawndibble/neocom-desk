@@ -40,7 +40,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
-import { DataUnavailable } from '@/components/DataUnavailable';
+import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
@@ -428,21 +428,8 @@ export function CorpMembers() {
   const { t } = useTranslation();
   const gate = useCorpRouteGate((capabilities) => capabilities.canReadMembers);
 
-  if (gate.status === 'loading') return <Spinner />;
-
-  // The roles read failed (offline, nothing cached): say so, rather than a spinner for good.
-  if (gate.status === 'failed') {
-    return (
-      <DataUnavailable
-        title={t('corp.rolesUnavailable')}
-        hint={t('corp.rolesUnavailableHint')}
-        onRetry={gate.retry}
-      />
-    );
-  }
-
-  if (gate.status === 'denied') {
-    return (
+  const content =
+    gate.status === 'denied' ? (
       <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader title={t('corp.members.title')} />
         <CorpDenied
@@ -451,8 +438,9 @@ export function CorpMembers() {
           hint={t('corp.members.noAccessHint')}
         />
       </div>
-    );
-  }
+    ) : gate.status === 'ready' ? (
+      <CorpMembersView />
+    ) : null;
 
-  return <CorpMembersView />;
+  return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;
 }

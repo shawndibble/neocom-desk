@@ -63,6 +63,24 @@ describe('useIndustryWorkspace', () => {
     expect(result.current.catalogFailed).toBe(false);
   });
 
+  it('keeps the catalog hidden until the Character’s own reads have landed, so nothing prices with no skills', async () => {
+    let release: (value: unknown) => void = () => {};
+    loadCharacterModifiers.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    const { result } = renderHook(() => useIndustryWorkspace());
+    // Let the catalog resolve and the pending reads settle as far as they can.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(loadBlueprintCatalog).toHaveBeenCalled();
+    expect(result.current.catalog).toBeNull();
+    expect(result.current.catalogFailed).toBe(false);
+
+    await act(async () => release(MODIFIERS));
+    await waitFor(() => expect(result.current.catalog).toBe(CATALOG));
+    expect(result.current.modifiers).toBe(MODIFIERS);
+    expect(result.current.ownedBlueprints).toEqual(OWNED);
+  });
+
   it('flags a failed catalog without discarding the Character’s blueprints and skills', async () => {
     loadBlueprintCatalog.mockRejectedValue(new Error('offline'));
     const { result } = renderHook(() => useIndustryWorkspace());
