@@ -313,6 +313,7 @@ function AbyssalTypeSection({
       header: t('market.itemDetail.abyssal.attributeColumn'),
       stickyStart: true,
       stickyStartOnPanel: true,
+      className: 'min-w-36',
       render: (row) => {
         const { name, unit } = attributeLabel(row.attributeId, dictionary, lookup);
         return <AttributeCell name={name} unit={unit} highIsGood={row.highIsGood} />;
@@ -345,12 +346,6 @@ function AbyssalTypeSection({
       {rollsUnreadable && (
         <p className="text-xs text-text-dim">{t('market.itemDetail.abyssal.rollsUnreadable')}</p>
       )}
-      <Section title={t('market.itemDetail.abyssal.mutatedFrom')}>
-        <TypeLinks typeIds={bases.map((b) => b.typeId)} names={names} />
-      </Section>
-      <Section title={t('market.itemDetail.abyssal.mutaplasmids')}>
-        <TypeLinks typeIds={makers.map((m) => m.typeId)} names={names} />
-      </Section>
       <Section title={t('market.itemDetail.abyssal.rangesTitle')}>
         {bases.length > 1 && (
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
@@ -392,6 +387,12 @@ function AbyssalTypeSection({
             />
           </>
         )}
+      </Section>
+      <Section title={t('market.itemDetail.abyssal.mutatedFrom')}>
+        <TypeLinks typeIds={bases.map((b) => b.typeId)} names={names} />
+      </Section>
+      <Section title={t('market.itemDetail.abyssal.mutaplasmids')}>
+        <TypeLinks typeIds={makers.map((m) => m.typeId)} names={names} />
       </Section>
     </div>
   );
@@ -523,9 +524,6 @@ function MutaplasmidSection({
       <Section title={t('market.itemDetail.abyssal.makes')}>
         <TypeLinks typeIds={[mutaplasmid.resultTypeId]} names={names} />
       </Section>
-      <Section title={t('market.itemDetail.abyssal.appliesTo')}>
-        <TypeLinks typeIds={bases} names={names} />
-      </Section>
       <Section title={t('market.itemDetail.abyssal.multipliersTitle')}>
         <p className="mt-1 text-xs text-text-dim">
           {t('market.itemDetail.abyssal.multipliersHint')}
@@ -548,6 +546,9 @@ function MutaplasmidSection({
             );
           })}
         </dl>
+      </Section>
+      <Section title={t('market.itemDetail.abyssal.appliesTo')}>
+        <TypeLinks typeIds={bases} names={names} />
       </Section>
     </div>
   );

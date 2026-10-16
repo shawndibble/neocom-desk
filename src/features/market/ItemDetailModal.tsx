@@ -84,7 +84,7 @@ import { skillNameOrFallback } from './skillNameOrFallback';
 import { UsedInSection } from './UsedInSection';
 import { AbyssalItemDetail } from '@/features/abyssal/AbyssalItemDetail';
 import { AbyssalEstimateLine } from '@/features/abyssal/AbyssalEstimateLine';
-import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
+import { loadMutaplasmidLookup, useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { useDynamicItem } from '@/features/abyssal/useDynamicItem';
 import type { DynamicItemRecord } from '@/db';
 import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
@@ -206,6 +206,13 @@ export function ItemDetailModal({
     let cancelled = false;
     void (async () => {
       setPriceState({ status: 'loading' });
+      // No market order exists for an abyssal type: don't ask ESI for a book
+      // that can't have any (the line gives way to MutaMarket's estimate).
+      const abyssalType = await loadMutaplasmidLookup().then(
+        (lookup) => lookup.isAbyssalType(typeId),
+        () => false
+      );
+      if (cancelled || abyssalType) return;
       // Never rejects: a failure is its own status. A nice-to-have fetch, same
       // as the PI schematic below — it costs the price row, never the modal.
       const view = await loadOrderBookView(typeId, priceLocation);
@@ -310,11 +317,14 @@ export function ItemDetailModal({
       onClose={onClose}
       // The URL-backed host already owns the history entry (`?info`).
       closeOnBack={onLeave === undefined}
+      // An abyssal type's roll table has a column per mutaplasmid, up to eight.
+      placement={abyssal ? 'wide' : 'center'}
       title={itemName}
       titleActions={
         <>
           <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
-          {showOpenInMarket && (
+          {/* No market order exists for an abyssal type. */}
+          {showOpenInMarket && !abyssal && (
             <OpenInMarketLink typeId={typeId} onNavigate={leave} replace={onLeave !== undefined} />
           )}
         </>

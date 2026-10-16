@@ -993,6 +993,7 @@ describe('ItemDetailModal — an owned abyssal module', () => {
   const ITEM_ID = 1040000000001;
 
   it("shows the module's own attributes and no order-book prices", async () => {
+    let orderReads = 0;
     mockedLoadMutaplasmids.mockResolvedValue({
       attributeNames: { 9: 'hp' },
       mutaplasmids: {
@@ -1024,7 +1025,11 @@ describe('ItemDetailModal — an owned abyssal module', () => {
           dogma_effects: [],
         })
       ),
-      http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([]))
+      http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([])),
+      http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () => {
+        orderReads += 1;
+        return HttpResponse.json([]);
+      })
     );
 
     render(
@@ -1034,6 +1039,7 @@ describe('ItemDetailModal — an owned abyssal module', () => {
           itemId={ITEM_ID}
           itemName="Heavy Abyssal Energy Neutralizer"
           onClose={() => {}}
+          showOpenInMarket
         />
       </MemoryRouter>
     );
@@ -1043,5 +1049,8 @@ describe('ItemDetailModal — an owned abyssal module', () => {
     // The grouped attributes are the module's own (1,150 HP), not its type's empty shard.
     expect(await screen.findByText('1,150 HP')).toBeInTheDocument();
     expect(screen.queryByText('Best sell:')).not.toBeInTheDocument();
+    // No market order exists for an abyssal type: no book is read, no Market link offered.
+    expect(orderReads).toBe(0);
+    expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
   });
 });
