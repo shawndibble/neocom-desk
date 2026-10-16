@@ -36,6 +36,7 @@ describe('loadRequirementsForTypes', () => {
       typeId === BAKED
         ? {
             description: '',
+            effects: [],
             attributes: [
               [182, GUNNERY],
               [277, 3],

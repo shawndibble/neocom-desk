@@ -24,6 +24,7 @@ describe('useOrderRowSkills', () => {
   it("reads the item's required skills from the baked shard, without asking ESI", async () => {
     vi.mocked(loadTypeInfo).mockResolvedValue({
       description: '',
+      effects: [],
       attributes: [
         [182, GUNNERY],
         [277, 1],

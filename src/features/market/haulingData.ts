@@ -37,7 +37,7 @@
  * overall, not per lane — at most `MAX_BOOK_CANDIDATES` items reach the
  * order-book pass whichever hubs they use — and each row says its lane.
  */
-import { loadUniverseTypeOnce } from '@/features/skills/data';
+import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { getOrderBook } from '@/features/market/orderBook';
 import { loadPriceHistory } from '@/features/market/priceHistory';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -215,13 +215,9 @@ async function resolveVolume(
   const known = types[String(typeId)];
   const fromCatalogue = known ? (known.packagedVolume ?? known.volume) : undefined;
   if (fromCatalogue !== undefined) return fromCatalogue > 0 ? fromCatalogue : null;
-  try {
-    const data = (await loadUniverseTypeOnce(typeId))?.data;
-    const volume = data?.packaged_volume ?? data?.volume;
-    return volume !== undefined && volume > 0 ? volume : null;
-  } catch {
-    return null;
-  }
+  const type = await loadTypeDetail(typeId);
+  const volume = type?.packaged_volume ?? type?.volume;
+  return volume !== undefined && volume > 0 ? volume : null;
 }
 
 async function stationLadders(

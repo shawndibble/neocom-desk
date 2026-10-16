@@ -83,6 +83,7 @@ describe('useCompareAttributes', () => {
   it('reads baked attributes offline, without asking ESI', async () => {
     vi.mocked(loadTypeInfo).mockImplementation(async (typeId) => ({
       description: '',
+      effects: [],
       attributes: [[9, typeId === 587 ? 1200 : 1300]],
     }));
     mockedLoadDictionary.mockResolvedValue({});

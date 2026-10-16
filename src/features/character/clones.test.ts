@@ -125,6 +125,7 @@ describe('loadImplantDetails', () => {
   it('reads a baked implant offline, without asking ESI', async () => {
     vi.mocked(loadTypeInfo).mockResolvedValue({
       description: '+5 <b>Memory</b>',
+      effects: [],
       attributes: [
         [177, 5],
         [331, 2],

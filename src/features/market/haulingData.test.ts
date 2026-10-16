@@ -18,6 +18,9 @@ const loadUniverseTypeOnce = vi.fn();
 vi.mock('@/features/skills/data', () => ({
   loadUniverseTypeOnce: (...a: unknown[]) => loadUniverseTypeOnce(...a),
 }));
+// Default: the baked shard lacks the type, so reads take the ESI fallback.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
+const { loadTypeInfo } = await import('@/sde/loadTypeInfo');
 const loadMarketTypes = vi.fn();
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketTypes: (...a: unknown[]) => loadMarketTypes(...a),
@@ -128,6 +131,26 @@ describe('runHaulingScan, selling into buy orders', () => {
     });
     expect(loadUniverseTypeOnce).toHaveBeenCalledWith(34);
     expect(scan.rows[0]).toMatchObject({ unitVolumeM3: 0.01 });
+  });
+
+  it('reads a baked packaged volume for a type no catalogue carries, without asking ESI', async () => {
+    vi.mocked(loadTypeInfo).mockResolvedValueOnce({
+      description: '',
+      attributes: [],
+      effects: [],
+      volume: 16_500,
+      packagedVolume: 2_500,
+    });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: { '34': { name: 'Unlisted hull' } } as never,
+      mode: 'instant',
+    });
+    expect(loadUniverseTypeOnce).not.toHaveBeenCalled();
+    expect(scan.rows[0]).toMatchObject({ unitVolumeM3: 2_500 });
   });
 
   it("hauls a container at the market catalogue's packaged volume, not types.json's assembled one", async () => {
