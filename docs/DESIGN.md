@@ -1139,9 +1139,11 @@ Rows:
 - **A detail pane beside a table** (Hauling's trip rail): where the panel
   is wide enough by its own width (ADR 0017) it is a sticky column beside
   the table, and a back crumb in it (Hauling's "‹ Trip") leaves the detail
-  without clearing the selection; narrower, a row click opens the same
-  detail as a sheet (`sheet-full` for a long one), and closing the sheet
-  clears the selection, since nothing else would show it. Where the row's ⋮ would hold only the
+  without clearing the selection; the column beside it may drop to compact
+  figures, then cards, before the pane gives way. Narrower than that, a row
+  click opens the same detail in a right `SlideOver` (a full-height sheet,
+  `sheet-full`, on a phone), and closing it clears the selection, since
+  nothing else would show it. Where the row's ⋮ would hold only the
   item's own actions, the row drops it and its right-click menu, and they
   move to an `ItemMoreActions` ⋮ in the detail's header.
 - **A row with a menu** shows the ⋮ (`rowMoreActions`) only if the menu

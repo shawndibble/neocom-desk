@@ -139,6 +139,14 @@ vi.mock('./useHubJumps', () => ({
 
 let phone = false;
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => phone }));
+/** The panel's measured width (rem): every `useElementNarrowerThan` reads it. jsdom measures nothing, so wide by default. */
+let panelRem = Infinity;
+vi.mock('@/lib/useElementNarrowerThan', () => ({
+  useElementNarrowerThan: (rems: readonly number[]) => [
+    () => {},
+    rems.map((rem) => panelRem < rem),
+  ],
+}));
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketGroups: vi.fn(async () => [
@@ -183,6 +191,7 @@ beforeEach(() => {
   fillRefresh.mockClear();
   jumpCalls.length = 0;
   phone = false;
+  panelRem = Infinity;
 });
 afterEach(() => {
   useHaulingCargo.setState({ value: null });
@@ -534,6 +543,36 @@ describe('HaulingPanel on a phone', () => {
     await user.click(within(bar).getByRole('button', { name: /Trip details/ }));
     const trip = screen.getByRole('dialog', { name: 'Trip' });
     expect(within(trip).getByText('Profit')).toBeInTheDocument();
+  });
+});
+
+describe('HaulingPanel too narrow for the rail, not a phone', () => {
+  it('keeps the rail down to a phone-wide column beside it', () => {
+    panelRem = 50;
+    renderPanel();
+    expect(screen.getByText('Select an item to see its price math.')).toBeInTheDocument();
+  });
+
+  it('slides the detail and the trip in over the right edge instead of a sheet', async () => {
+    panelRem = 40;
+    const user = userEvent.setup();
+    renderPanel();
+    expect(screen.queryByText('Select an item to see its price math.')).toBeNull();
+    const bar = screen.getByRole('region', { name: 'Trip' });
+
+    await user.click(row());
+    const panel = screen.getByRole('dialog', { name: 'Damage Control II' });
+    expect(panel).not.toHaveAttribute('aria-modal', 'true');
+    expect(
+      within(panel).getAllByRole('button', { name: 'More actions for Damage Control II' })
+    ).toHaveLength(1);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await user.click(within(bar).getByRole('button', { name: /Trip details/ }));
+    expect(
+      within(screen.getByRole('dialog', { name: 'Trip' })).getByText('Profit')
+    ).toBeInTheDocument();
   });
 });
 
