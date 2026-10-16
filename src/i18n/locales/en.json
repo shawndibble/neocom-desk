@@ -11884,11 +11884,10 @@
     "kind": {
       "region": "Region",
       "station": "Station",
-      "structure": "Structure",
-      "solar_system": "Solar system"
+      "structure": "Structure"
     },
     "structureUnreadable": "Can't read this structure",
-    "structureUnreadableHint": "Only a character with docking access can see a structure's name and system. Switch to one that can dock there.",
+    "structureUnreadableHint": "Only a character with docking access can see a structure's name and system.",
     "unknown": "Can't find this place",
     "unknownHint": "Neocom Desk has no record of this location."
   },

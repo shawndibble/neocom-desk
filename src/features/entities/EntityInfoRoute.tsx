@@ -88,20 +88,13 @@ export function EntityInfoRoute() {
     const skill = useSkillDetailModalStore.getState();
     const item = useItemInfoModalStore.getState();
     const place = usePlaceInfoModalStore.getState();
-    if (kind === null || id === null) {
-      publicInfo.clear();
-      skill.clear();
-      item.clear();
-      place.clear();
-    } else if (kind === 'place') {
-      publicInfo.clear();
-      skill.clear();
-      item.clear();
-      place.show({ id });
-    } else if (kind === 'type') {
-      publicInfo.clear();
-      skill.clear();
-      place.clear();
+    // Only the modal `info` names stays open.
+    if (kind !== 'character' && kind !== 'corporation' && kind !== 'alliance') publicInfo.clear();
+    if (kind !== 'skill') skill.clear();
+    if (kind !== 'type') item.clear();
+    if (kind !== 'place') place.clear();
+    if (kind === null || id === null) return;
+    if (kind === 'type') {
       const staged = item.staged;
       item.show({
         typeId: id,
@@ -110,17 +103,13 @@ export function EntityInfoRoute() {
       });
       item.stage(id, undefined);
     } else if (kind === 'skill') {
-      publicInfo.clear();
-      item.clear();
-      place.clear();
       const staged = skill.staged?.typeID === id ? skill.staged.planEntries : undefined;
       skill.show({ typeID: id, planEntries: staged });
       // Consumed: a later open must not inherit them.
       skill.stage(id, undefined);
+    } else if (kind === 'place') {
+      place.show({ id });
     } else {
-      skill.clear();
-      item.clear();
-      place.clear();
       publicInfo.show({ kind, id });
     }
   }, [kind, id, itemId]);

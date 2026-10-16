@@ -2,33 +2,42 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { memoryPlaceSource } from '@/features/places/testSource';
-import { useActiveCharacter } from '@/stores/activeCharacter';
-import { PlaceInfoDialog, type PlaceInfoSource } from './PlaceInfoDialog';
 
 const STRUCTURE = 1_030_000_000_000;
 
-const source: PlaceInfoSource = {
-  place: memoryPlaceSource({
-    stations: {
-      60003760: { name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: 30000142 },
-    },
-    structures: {
-      [`7:${STRUCTURE}`]: { name: 'Perimeter - Tranquility Trading Tower', systemId: 30000144 },
-    },
-    systems: {
-      30000142: { name: 'Jita', security: 0.95 },
-      30000144: { name: 'Perimeter', security: 0.9 },
-    },
-  }),
-  regionName: async (id) => (id === 10000002 ? 'The Forge' : null),
-  systemRegionId: async () => 10000002,
-};
+vi.mock('@/features/character/stations', () => ({
+  loadStationName: vi.fn(async (id: number) =>
+    id === 60003760 ? 'Jita IV - Moon 4 - Caldari Navy Assembly Plant' : null
+  ),
+  loadStationSystemId: vi.fn(async (id: number) => (id === 60003760 ? 30000142 : null)),
+}));
+// Character 7 can dock at the structure; any other cannot read it.
+vi.mock('@/features/character/structures', () => ({
+  loadStructureName: vi.fn(async (characterId: number) =>
+    characterId === 7 ? 'Perimeter - Tranquility Trading Tower' : null
+  ),
+  loadStructureSystemId: vi.fn(async (characterId: number) =>
+    characterId === 7 ? 30000144 : null
+  ),
+}));
+vi.mock('@/features/character/systemSecurity', () => ({
+  loadSystemName: vi.fn(
+    async (id: number) => ({ 30000142: 'Jita', 30000144: 'Perimeter' })[id] ?? null
+  ),
+  loadSystemSecurity: vi.fn(async () => 0.9),
+}));
+vi.mock('@/features/places/regions', () => ({
+  loadRegionName: vi.fn(async (id: number) => (id === 10000002 ? 'The Forge' : null)),
+  loadSystemRegionId: vi.fn(async () => 10000002),
+}));
+
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { PlaceInfoDialog } from './PlaceInfoDialog';
 
 function renderPlace(id: number) {
   return render(
     <MemoryRouter>
-      <PlaceInfoDialog id={id} onClose={vi.fn()} source={source} />
+      <PlaceInfoDialog id={id} onClose={vi.fn()} />
     </MemoryRouter>
   );
 }
@@ -48,7 +57,10 @@ describe('PlaceInfoDialog', () => {
       'href',
       expect.stringMatching(/30000142/)
     );
-    expect(await screen.findByText('The Forge')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'The Forge' })).toHaveAttribute(
+      'href',
+      '/?info=place-10000002'
+    );
     expect(screen.getByRole('button', { name: /Set destination/ })).toBeInTheDocument();
   });
 
@@ -74,8 +86,13 @@ describe('PlaceInfoDialog', () => {
     expect(screen.queryByRole('button', { name: /Set destination/ })).toBeNull();
   });
 
-  it('says it cannot find an id that is no place', async () => {
+  it('says it cannot find a constellation or a solar system', async () => {
     renderPlace(20000020);
+    expect(await screen.findByText("Can't find this place")).toBeInTheDocument();
+  });
+
+  it('is not a view of a solar system: those open Route Safety', async () => {
+    renderPlace(30000142);
     expect(await screen.findByText("Can't find this place")).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { classifyPlaceInfoId } from '@/features/places/classify';
+import { classifyPlaceInfoId } from '@/features/places';
 import { SHIP_CATEGORY_ID, SKILL_CATEGORY_ID } from '@/sde/categories';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 

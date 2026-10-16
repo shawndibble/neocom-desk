@@ -11,7 +11,8 @@ bullets still stand._
 
 - **Mobile compose is a full-pane takeover; wide screens keep it inline.** A
   floating Compose button over the list opens it (Gmail/Outlook pattern). Close
-  top-left, Send top-right. The format bar docks above the keyboard as one
+  top-left, Send top-right (superseded: see
+  `20261016-150102-mail-composer-action-layout.md`). The format bar docks above the keyboard as one
   horizontally scrolling row; colour and size open a sheet (swatches, size
   steps) rather than crowding the row.
 
@@ -43,10 +44,10 @@ bullets still stand._
   colour and links, from one shared parse/sanitize/serialize module used by
   both composer and reader. Show-info links to a character, corporation,
   alliance, item, skill or ship open the app's own modal; a system uses
-  **Route Safety**; a region, station or structure opens **Place Info**
-  (`?info=place-<id>`, #3958). Constellation and faction links, and `fitting:`,
-  `contract:`, `killReport:`, `joinChannel:`, `localsvc:`, render as styled,
-  inert text with a tooltip.
+  **Route Safety**. Region, station and structure links render as styled text
+  until a Place Info modal ships (own ticket). `fitting:`, `contract:`,
+  `killReport:`, `joinChannel:`, `localsvc:` render as styled, inert text with a
+  tooltip.
 
 - **Quotes: Reply keeps plain `> ` lines (formatting stripped); Forward carries
   the original with its formatting** under a header.

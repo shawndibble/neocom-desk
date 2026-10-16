@@ -25,6 +25,7 @@ describe('classifyPlaceInfoId', () => {
     expect(classifyPlaceInfoId(10000002)).toBe('region');
     expect(classifyPlaceInfoId(11000001)).toBe('region');
     expect(classifyPlaceInfoId(12000001)).toBe('region');
+    expect(classifyPlaceInfoId(14000001)).toBe('region');
     expect(classifyPlaceInfoId(60003760)).toBe('station');
     expect(classifyPlaceInfoId(STRUCTURE)).toBe('structure');
     expect(classifyPlaceInfoId(30000142)).toBe('solar_system');

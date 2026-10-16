@@ -5,31 +5,23 @@
  * Station, system and region names come from the bundled tables, so a
  * station or region reads offline. A structure is read as the active
  * Character; one it cannot dock at has no name or system for it, and says so.
+ * A solar system is not a target: systems open Route Safety (§6c).
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { EmptyState, Modal, Spinner } from '@/components/ui';
+import { loadSystemName } from '@/features/character/systemSecurity';
 import { SetDestinationButton } from '@/features/market/SetDestinationButton';
-import { classifyPlaceInfoId, placeKey, usePlaceDetails } from '@/features/places';
-import { loadRegionName, loadSystemRegionId } from '@/features/places/regions';
-import { productionPlaceSource } from '@/features/places/resolve';
-import type { PlaceSource } from '@/features/places/types';
+import {
+  classifyPlaceInfoId,
+  loadRegionName,
+  loadSystemRegionId,
+  placeKey,
+  usePlaceDetails,
+} from '@/features/places';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { SystemLink } from './EntityLink';
-
-/** Every read Place Info makes; a test hands in its own. */
-export interface PlaceInfoSource {
-  place: PlaceSource;
-  regionName(regionId: number): Promise<string | null>;
-  systemRegionId(systemId: number): Promise<number | null>;
-}
-
-const productionSource: PlaceInfoSource = {
-  place: productionPlaceSource,
-  regionName: loadRegionName,
-  systemRegionId: loadSystemRegionId,
-};
+import { PlaceLink, SystemLink } from './EntityLink';
 
 /** One async read by id: `undefined` while pending, `null` for no id or no answer. */
 function useLookup<T>(
@@ -53,37 +45,31 @@ function useLookup<T>(
   return state?.id === id ? state.value : undefined;
 }
 
-export function PlaceInfoDialog({
-  id,
-  onClose,
-  source = productionSource,
-}: {
-  id: number;
-  onClose: () => void;
-  source?: PlaceInfoSource;
-}) {
+export function PlaceInfoDialog({ id, onClose }: { id: number; onClose: () => void }) {
   const { t } = useTranslation();
-  const kind = classifyPlaceInfoId(id);
+  const classified = classifyPlaceInfoId(id);
+  const kind = classified === 'solar_system' ? null : classified;
   const hydrated = useActiveCharacter((s) => s.hydrated);
   const scopeId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
-  const isPlace = kind !== null && kind !== 'region';
-  const refs = useMemo(() => (isPlace ? [{ locationId: id }] : []), [id, isPlace]);
+  const isLocation = kind === 'station' || kind === 'structure';
+  const refs = useMemo(() => (isLocation ? [{ locationId: id }] : []), [id, isLocation]);
   const details = usePlaceDetails(refs, {
     scopeId,
-    enabled: hydrated && isPlace,
+    enabled: hydrated && isLocation,
     origin: null,
     basis: null,
-    source: source.place,
   });
-  const detail = isPlace ? details.get(placeKey({ locationId: id, characterId: scopeId })) : null;
+  const detail = isLocation
+    ? details.get(placeKey({ locationId: id, characterId: scopeId }))
+    : undefined;
 
-  const systemId = detail === null ? null : detail?.systemId;
-  const systemName = useLookup(kind === 'solar_system' ? null : systemId, source.place.systemName);
-  const regionOfSystem = useLookup(systemId, source.systemRegionId);
+  // `undefined` = still reading, `null` = none.
+  const systemId = isLocation ? detail?.systemId : null;
+  const systemName = useLookup(systemId, loadSystemName);
+  const regionOfSystem = useLookup(systemId, loadSystemRegionId);
   const regionId = kind === 'region' ? id : regionOfSystem;
-  const regionName = useLookup(regionId, source.regionName);
+  const regionName = useLookup(regionId, loadRegionName);
   const name = kind === 'region' ? regionName : detail?.name;
-  const shownSystemName = kind === 'solar_system' ? name : systemName;
 
   let body;
   if (kind === null || name === null) {
@@ -104,25 +90,25 @@ export function PlaceInfoDialog({
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
           <dt className="text-text-dim">{t('placeInfo.type')}</dt>
           <dd>{t(`placeInfo.kind.${kind}`)}</dd>
-          {systemId != null && shownSystemName && (
+          {systemId != null && systemName && (
             <>
               <dt className="text-text-dim">{t('placeInfo.system')}</dt>
               <dd className="flex items-baseline gap-2">
-                <SystemLink systemId={systemId}>{shownSystemName}</SystemLink>
+                <SystemLink systemId={systemId}>{systemName}</SystemLink>
                 {detail?.security != null && <SecurityStatus security={detail.security} />}
               </dd>
             </>
           )}
-          {kind !== 'region' && regionName && (
+          {kind !== 'region' && regionId != null && regionName && (
             <>
               <dt className="text-text-dim">{t('placeInfo.region')}</dt>
-              <dd>{regionName}</dd>
+              <dd>
+                <PlaceLink id={regionId}>{regionName}</PlaceLink>
+              </dd>
             </>
           )}
         </dl>
-        {(kind === 'station' || kind === 'structure') && (
-          <SetDestinationButton locationId={id} placeName={name} />
-        )}
+        {isLocation && <SetDestinationButton locationId={id} placeName={name} />}
       </div>
     );
   }

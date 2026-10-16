@@ -18,9 +18,9 @@ export function classifyPlaceId(locationId: number): PlaceKind | null {
   return null;
 }
 
-/** CCP's region id block: 10,000,000–12,999,999 (k-space, w-space, Abyssal). */
+/** CCP's region id block: 10,000,000–19,999,999 (k-space, w-space, Abyssal, void). */
 function isRegionId(id: number): boolean {
-  return id >= 10_000_000 && id < 13_000_000;
+  return id >= 10_000_000 && id < 20_000_000;
 }
 
 /** What Place Info can show: a Place, or a region. */
