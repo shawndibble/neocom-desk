@@ -42,6 +42,13 @@ describe('requestPersistenceOnce', () => {
     expect(s.persist).not.toHaveBeenCalled();
   });
 
+  it('asks only once when two callers race', async () => {
+    const s = storage(false);
+    const results = await Promise.all([requestPersistenceOnce(s), requestPersistenceOnce(s)]);
+    expect(results.sort()).toEqual(['granted', 'skipped']);
+    expect(s.persist).toHaveBeenCalledOnce();
+  });
+
   it('does nothing, and records nothing, where the API is missing', async () => {
     await expect(requestPersistenceOnce(undefined)).resolves.toBe('unsupported');
     expect(await db.settings.get(PERSIST_ASKED_KEY)).toBeUndefined();

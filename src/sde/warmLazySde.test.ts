@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LAZY_SDE_FILES, cachedLazySdeFiles, warmLazySde } from './warmLazySde';
+import {
+  ENGINE_ITEM,
+  LAZY_ASSET_TOTAL,
+  LAZY_SDE_FILES,
+  cachedLazySdeFiles,
+  warmLazySde,
+} from './warmLazySde';
 
 const warmDogma = vi.fn(async () => {});
 vi.mock('@/features/fittings/dogmaFittingEngine', () => ({ warmDogmaEngineAssets: warmDogma }));
@@ -99,12 +105,31 @@ describe('warmLazySde force', () => {
     expect(warmDogma).toHaveBeenCalledOnce();
   });
 
-  it('still does nothing offline or without a controlling service worker', async () => {
+  it('still does nothing offline', async () => {
     env({ online: false });
     await warmLazySde({ cancelled: false }, { force: true });
-    env({ controller: false });
-    await warmLazySde({ cancelled: false }, { force: true });
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(warmDogma).not.toHaveBeenCalled();
+  });
+
+  it('without a controlling service worker skips the files but still fetches the engine', async () => {
+    env({ controller: false });
+    const onProgress = vi.fn();
+    await warmLazySde({ cancelled: false }, { force: true, onProgress });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(warmDogma).toHaveBeenCalledOnce();
+    expect(onProgress).toHaveBeenLastCalledWith(LAZY_ASSET_TOTAL, LAZY_ASSET_TOTAL);
+  });
+
+  it('stops when cancelled', async () => {
+    env({});
+    const signal = { cancelled: false };
+    fetchMock.mockImplementationOnce(async () => {
+      signal.cancelled = true;
+      return new Response('{}', { status: 200 });
+    });
+    await warmLazySde(signal, { force: true });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(warmDogma).not.toHaveBeenCalled();
   });
 
@@ -112,7 +137,7 @@ describe('warmLazySde force', () => {
     env({});
     const onProgress = vi.fn();
     await warmLazySde({ cancelled: false }, { force: true, onProgress });
-    const total = LAZY_SDE_FILES.length + 1;
+    const total = LAZY_ASSET_TOTAL;
     expect(onProgress).toHaveBeenCalledTimes(total);
     expect(onProgress).toHaveBeenNthCalledWith(1, 1, total);
     expect(onProgress).toHaveBeenLastCalledWith(total, total);
@@ -135,5 +160,29 @@ describe('cachedLazySdeFiles', () => {
   it('reports nothing cached when Cache Storage is unavailable', async () => {
     vi.stubGlobal('caches', undefined);
     expect((await cachedLazySdeFiles()).size).toBe(0);
+  });
+});
+
+describe('overlapping passes', () => {
+  it('fetch each file once when the background warm and a forced pass run together', async () => {
+    env({});
+    await Promise.all([
+      warmLazySde({ cancelled: false }),
+      warmLazySde({ cancelled: false }, { force: true }),
+    ]);
+    const fetched = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(fetched).toHaveLength(LAZY_SDE_FILES.length);
+    expect(new Set(fetched).size).toBe(LAZY_SDE_FILES.length);
+  });
+});
+
+describe('engine import failure', () => {
+  it('reports the engine as failed and still finishes the progress', async () => {
+    env({});
+    warmDogma.mockRejectedValueOnce(new Error('chunk failed'));
+    const onProgress = vi.fn();
+    const failed = await warmLazySde({ cancelled: false }, { onProgress });
+    expect(failed).toEqual([ENGINE_ITEM]);
+    expect(onProgress).toHaveBeenLastCalledWith(LAZY_ASSET_TOTAL, LAZY_ASSET_TOTAL);
   });
 });

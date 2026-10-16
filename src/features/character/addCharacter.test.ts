@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   scheduleSync: vi.fn(),
   requestPersistenceOnce: vi.fn(async () => 'granted'),
 }));
-vi.mock('@/features/settings/persistStorage', () => ({
+vi.mock('@/lib/persistStorage', () => ({
   requestPersistenceOnce: mocks.requestPersistenceOnce,
 }));
 vi.mock('@/auth/session', () => ({ completeLogin: mocks.completeLogin }));

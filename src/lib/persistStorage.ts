@@ -4,7 +4,7 @@
  * under storage pressure, which would take the offline copy with it.
  *
  * Asked once automatically after the first Character is added
- * (`addCharacter.ts`) and never again on its own — a browser that prompts
+ * (`features/character/addCharacter.ts`) and never again on its own — a browser that prompts
  * (Firefox) must not be nagged. The Offline data panel's button asks on demand.
  */
 import { db } from '@/db';
@@ -60,8 +60,13 @@ export async function requestPersistenceOnce(
 ): Promise<PersistResult> {
   if (!storage) return 'unsupported';
   try {
-    if ((await db.settings.get(PERSIST_ASKED_KEY))?.value === true) return 'skipped';
-    await db.settings.put({ key: PERSIST_ASKED_KEY, value: true });
+    // One transaction, so two callers (two tabs) cannot both see "not asked yet".
+    const alreadyAsked = await db.transaction('rw', db.settings, async () => {
+      if ((await db.settings.get(PERSIST_ASKED_KEY))?.value === true) return true;
+      await db.settings.put({ key: PERSIST_ASKED_KEY, value: true });
+      return false;
+    });
+    if (alreadyAsked) return 'skipped';
   } catch {
     // Dexie unavailable: asking again later is not worth a prompt loop.
     return 'skipped';

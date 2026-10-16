@@ -1396,6 +1396,19 @@ describe('Settings defaults', () => {
     expect(screen.getByRole('heading', { name: /say thanks/i })).toBeInTheDocument();
   });
 
+  it('renders the Offline data section at /settings/offline', async () => {
+    window.history.pushState({}, '', '/settings/offline');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    expect(
+      await within(settingsNav()).findByRole('link', { name: /offline data/i })
+    ).toHaveAttribute('aria-current', 'page');
+    expect(await screen.findByRole('heading', { name: 'Offline data' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Download everything for offline' })
+    ).toBeInTheDocument();
+  });
+
   it('shows the shortcut list from the ? shortcut, even from another section', async () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings/activity');

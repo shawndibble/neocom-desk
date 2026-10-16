@@ -3,17 +3,32 @@ import { useTranslation } from 'react-i18next';
 import { Button, Field, Fields, LiveStatus, Panel, ProgressBar } from '@/components/ui';
 import { NeedsConnection } from '@/components/ui/NeedsConnection';
 import { useRetryFocus } from '@/lib/useRetryFocus';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import { onReconnect, useOnline } from '@/stores/network';
+import { readPersisted, requestPersistence } from '@/lib/persistStorage';
 import { formatBytes } from './offlinePacks';
 import {
+  cancelDownload,
   downloadEverything,
   readOfflineStatus,
   readStorageEstimate,
+  type DownloadOutcome,
   type OfflineStatus,
   type StorageEstimate,
 } from './offlineStatus';
-import { readPersisted, requestPersistence } from './persistStorage';
 
 type Run = { phase: 'idle' } | { phase: 'running'; done: number; total: number };
+
+/** What the last download ended in, for the line under the button; `null` before one has run. */
+type Result =
+  | { kind: 'complete' }
+  | { kind: 'failed'; count: number }
+  | { kind: 'cancelled' }
+  | { kind: 'noServiceWorker' }
+  | null;
+
+/** The pack lines catch up this often while a download runs. */
+const REFRESH_EVERY_FILES = 8;
 
 /**
  * Settings → Offline data. What the app has stored for use with no
@@ -25,19 +40,20 @@ type Run = { phase: 'idle' } | { phase: 'running'; done: number; total: number }
  */
 export function OfflineDataPanel() {
   const { t, i18n } = useTranslation();
+  const online = useOnline();
   const [status, setStatus] = useState<OfflineStatus | null>(null);
   const [estimate, setEstimate] = useState<StorageEstimate | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [persistDenied, setPersistDenied] = useState(false);
+  const [persisting, setPersisting] = useState(false);
   const [run, setRun] = useState<Run>({ phase: 'idle' });
-  /** Items still missing after the last download; `null` before the pilot has run one. */
-  const [failed, setFailed] = useState<number | null>(null);
+  const [result, setResult] = useState<Result>(null);
   const [announcement, setAnnouncement] = useState('');
   const [announceKey, setAnnounceKey] = useState(0);
   const mounted = useRef(true);
   const persistRef = useRef<HTMLDivElement>(null);
-  /** The Protect button leaves once granted: focus moves to its wrapper, not `<body>`. */
-  const focusPersist = useRef(false);
+  const persistingRef = useRef(false);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
@@ -57,33 +73,23 @@ export function OfflineDataPanel() {
     return nextStatus;
   }, []);
 
-  useEffect(() => {
-    mounted.current = true;
-    void refresh();
-    return () => {
-      mounted.current = false;
-    };
-  }, [refresh]);
-
-  useEffect(() => {
-    if (!focusPersist.current || persisted !== true) return;
-    focusPersist.current = false;
-    persistRef.current?.focus({ preventScroll: true });
-  }, [persisted]);
-
   const running = run.phase === 'running';
   const [focusRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
-    running ? 'busy' : failed ? 'failed' : 'ok',
+    running ? 'busy' : result?.kind === 'failed' ? 'failed' : 'ok',
     null
   );
 
-  async function download() {
-    if (running) return;
-    setFailed(null);
-    setRun({ phase: 'running', done: 0, total: status?.total ?? 0 });
+  const download = useCallback(async () => {
+    setResult(null);
+    setRun({ phase: 'running', done: 0, total: 0 });
+    announce(t('settings.offline.starting'));
+    let outcome: DownloadOutcome = 'done';
     try {
-      await downloadEverything((done, total) => {
-        if (mounted.current) setRun({ phase: 'running', done, total });
+      outcome = await downloadEverything((done, total) => {
+        if (!mounted.current) return;
+        setRun({ phase: 'running', done, total });
+        // Pack lines move as the files land, not only at the end.
+        if (done % REFRESH_EVERY_FILES === 0) void refresh();
       });
     } catch {
       // Whatever did not arrive shows in the re-read status below.
@@ -92,26 +98,58 @@ export function OfflineDataPanel() {
     if (!mounted.current) return;
     const missing = after.total - after.totalCached;
     setRun({ phase: 'idle' });
-    setFailed(missing);
+    const next: NonNullable<Result> =
+      outcome === 'cancelled'
+        ? { kind: 'cancelled' }
+        : outcome === 'no-service-worker'
+          ? { kind: 'noServiceWorker' }
+          : missing > 0
+            ? { kind: 'failed', count: missing }
+            : { kind: 'complete' };
+    setResult(next);
     announce(
-      missing > 0
-        ? t('settings.offline.failed', { count: missing })
-        : t('settings.offline.complete')
+      next.kind === 'failed'
+        ? t('settings.offline.failed', { count: next.count })
+        : t(`settings.offline.${next.kind}`)
     );
-  }
+  }, [announce, refresh, t]);
+
+  useEffect(() => {
+    mounted.current = true;
+    void refresh();
+    const unsubscribe = onReconnect(() => void refresh());
+    return () => {
+      mounted.current = false;
+      unsubscribe();
+      // Leaving the page stops the pass after the file in flight; a hung file costs up to its idle timeout.
+      cancelDownload();
+    };
+  }, [refresh]);
 
   async function protect() {
-    focusPersist.current = true;
-    const result = await requestPersistence();
-    const now = await readPersisted();
-    if (!mounted.current) return;
-    focusPersist.current = now === true;
-    setPersisted(now);
-    setPersistDenied(result !== 'granted');
-    if (result === 'granted') announce(t('settings.offline.persistGranted'));
+    if (persistingRef.current) return;
+    persistingRef.current = true;
+    setPersisting(true);
+    try {
+      const outcome = await requestPersistence();
+      const now = await readPersisted();
+      if (!mounted.current) return;
+      // The Protect button leaves once storage is persisted: focus its wrapper, not `<body>`.
+      if (outcome === 'granted') focusAfterCommit(persistRef);
+      setPersisted(outcome === 'granted' ? true : now);
+      setPersistDenied(outcome !== 'granted');
+      announce(
+        t(
+          outcome === 'granted'
+            ? 'settings.offline.persistGranted'
+            : 'settings.offline.persistDenied'
+        )
+      );
+    } finally {
+      persistingRef.current = false;
+      if (mounted.current) setPersisting(false);
+    }
   }
-
-  const packLabel = (id: string) => t(`settings.offline.packs.${id}`);
 
   return (
     <Panel title={t('settings.offline.title')}>
@@ -125,7 +163,7 @@ export function OfflineDataPanel() {
                 {status.packs.map((pack) => (
                   <li key={pack.id}>
                     {t('settings.offline.packLine', {
-                      name: packLabel(pack.id),
+                      name: t(`settings.offline.packs.${pack.id}`),
                       count: pack.total,
                       cached: pack.cached,
                       total: pack.total,
@@ -161,7 +199,7 @@ export function OfflineDataPanel() {
                   : t(persisted ? 'settings.offline.persistedYes' : 'settings.offline.persistedNo')}
               </p>
               {persisted === false && (
-                <Button size="sm" onClick={() => void protect()}>
+                <Button size="sm" loading={persisting} onClick={() => void protect()}>
                   {t('settings.offline.persistAction')}
                 </Button>
               )}
@@ -177,36 +215,56 @@ export function OfflineDataPanel() {
             note={t('settings.offline.downloadHint')}
           >
             <div ref={focusRef} tabIndex={-1} className="space-y-1.5 outline-none">
-              <NeedsConnection>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  loading={running}
-                  onClick={() => void download()}
-                >
-                  {t('settings.offline.downloadAction')}
-                </Button>
-              </NeedsConnection>
+              <div className="flex flex-wrap items-center gap-2">
+                <NeedsConnection>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    loading={running}
+                    onClick={() => {
+                      if (!running) void download();
+                    }}
+                  >
+                    {t('settings.offline.downloadAction')}
+                  </Button>
+                </NeedsConnection>
+                {running && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      holdFocus();
+                      cancelDownload();
+                    }}
+                  >
+                    {t('settings.offline.cancel')}
+                  </Button>
+                )}
+              </div>
+              {!online && (
+                <p className="text-xs text-text-dim">{t('settings.offline.needsConnection')}</p>
+              )}
               {run.phase === 'running' && (
                 <div className="max-w-xs space-y-1">
                   <ProgressBar
                     label={t('settings.offline.downloadAction')}
-                    value={run.done}
+                    value={run.total > 0 ? run.done : null}
                     max={Math.max(run.total, 1)}
                   />
                   <p className="text-xs text-text-dim">
-                    {t('settings.offline.progress', { done: run.done, total: run.total })}
+                    {run.total > 0
+                      ? t('settings.offline.progress', { done: run.done, total: run.total })
+                      : t('settings.offline.starting')}
                   </p>
                 </div>
               )}
-              {!running && failed !== null && (
+              {!running && result && (
                 <p className="text-xs text-text-dim">
-                  {failed > 0
-                    ? t('settings.offline.failed', { count: failed })
-                    : t('settings.offline.complete')}
+                  {result.kind === 'failed'
+                    ? t('settings.offline.failed', { count: result.count })
+                    : t(`settings.offline.${result.kind}`)}
                 </p>
               )}
-              {!running && failed !== null && failed > 0 && (
+              {!running && result?.kind === 'failed' && (
                 <NeedsConnection>
                   <Button
                     size="sm"

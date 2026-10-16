@@ -3,7 +3,14 @@
  * storage estimate, and the forced download. The grouping is `offlinePacks.ts`.
  */
 import { LAZY_SDE_FILES } from '@/sde/lazySdeFiles';
-import { cachedLazySdeFiles, warmLazySde } from '@/sde/warmLazySde';
+import {
+  LAZY_ASSET_TOTAL,
+  cachedLazySdeFiles,
+  hasControllingServiceWorker,
+  warmLazySde,
+  type WarmSignal,
+} from '@/sde/warmLazySde';
+import { dogmaEngineAssetsCached } from '@/features/fittings/dogmaEngineAssets';
 import { summarizePacks, type PackSummary } from './offlinePacks';
 
 export interface OfflineStatus {
@@ -16,18 +23,14 @@ export interface OfflineStatus {
 }
 
 export async function readOfflineStatus(): Promise<OfflineStatus> {
-  // Dynamic, like the warm: the engine module drags in the WASM glue.
   const [cachedFiles, engine] = await Promise.all([
     cachedLazySdeFiles(),
-    import('@/features/fittings/dogmaFittingEngine').then(
-      (module) => module.dogmaEngineAssetsCached(),
-      () => false
-    ),
+    dogmaEngineAssetsCached(),
   ]);
   return {
     packs: summarizePacks(LAZY_SDE_FILES, cachedFiles),
     engine,
-    total: LAZY_SDE_FILES.length + 1,
+    total: LAZY_ASSET_TOTAL,
     totalCached: cachedFiles.size + (engine ? 1 : 0),
   };
 }
@@ -51,13 +54,77 @@ export async function readStorageEstimate(): Promise<StorageEstimate | null> {
   }
 }
 
+export type DownloadOutcome =
+  /** The pass ran to the end; what is still missing is read back with `readOfflineStatus`. */
+  | 'done'
+  /** No service worker controls the page yet, so the SDE files could not be cached (the engine was still tried). */
+  | 'no-service-worker'
+  | 'cancelled';
+
+type ProgressListener = (done: number, total: number) => void;
+
+interface ActiveDownload {
+  promise: Promise<DownloadOutcome>;
+  signal: WarmSignal;
+  listeners: Set<ProgressListener>;
+  last: [number, number] | null;
+}
+
+/** The one forced download under way, shared by every panel instance (a remount joins it). */
+let active: ActiveDownload | null = null;
+
+/** Whether a download the pilot started is running (a cancelled one still winding down is not). */
+export function isDownloading(): boolean {
+  return active !== null && !active.signal.cancelled;
+}
+
+/** Asks the running download to stop after the file in flight. */
+export function cancelDownload(): void {
+  if (active) active.signal.cancelled = true;
+}
+
+function startDownload(): ActiveDownload {
+  const signal: WarmSignal = { cancelled: false };
+  const listeners = new Set<ProgressListener>();
+  const run: ActiveDownload = { signal, listeners, last: null, promise: undefined as never };
+  run.promise = (async (): Promise<DownloadOutcome> => {
+    try {
+      await warmLazySde(signal, {
+        force: true,
+        onProgress: (done, total) => {
+          run.last = [done, total];
+          for (const listener of [...listeners]) listener(done, total);
+        },
+      });
+    } catch {
+      // Whatever did not arrive shows in the re-read status.
+    }
+    if (signal.cancelled) return 'cancelled';
+    return hasControllingServiceWorker() ? 'done' : 'no-service-worker';
+  })().finally(() => {
+    if (active === run) active = null;
+  });
+  return run;
+}
+
 /**
  * Downloads every lazy SDE file and the engine, past the cellular / Save-Data
  * gate the background warm respects (the pilot asked). The same code as the
- * warm; what did not arrive is read back with `readOfflineStatus`.
+ * warm; what did not arrive is read back with `readOfflineStatus`. At most one
+ * runs at a time: a call while one is under way joins it (and hears its
+ * progress), so a remounted panel or a second tab-press never starts a second
+ * pass. After `cancelDownload` the next call waits for the stopped pass, then
+ * starts a fresh one.
  */
-export async function downloadEverything(
-  onProgress: (done: number, total: number) => void
-): Promise<void> {
-  await warmLazySde({ cancelled: false }, { force: true, onProgress });
+export async function downloadEverything(onProgress: ProgressListener): Promise<DownloadOutcome> {
+  while (active?.signal.cancelled) await active.promise;
+  active ??= startDownload();
+  const run = active;
+  run.listeners.add(onProgress);
+  if (run.last) onProgress(...run.last);
+  try {
+    return await run.promise;
+  } finally {
+    run.listeners.delete(onProgress);
+  }
 }

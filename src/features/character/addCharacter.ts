@@ -8,12 +8,16 @@
 // 7's fan-out writes one row per Character *known on this device at the time*,
 // which leaves a Character added later without the account-wide Editable Data
 // everyone else has. This is the one moment that gap can be closed.
+//
+// A side effect lives here for the same "one moment" reason: after the first
+// Character ever added, it asks the browser once for persistent storage
+// (`@/lib/persistStorage`), so the offline copy is not evicted.
 
 import { completeLogin } from '@/auth/session';
 import type { CharacterRecord } from '@/db';
 import { db } from '@/db';
 import { backfillAccountWideData, scheduleSync } from '@/sync';
-import { requestPersistenceOnce } from '@/features/settings/persistStorage';
+import { requestPersistenceOnce } from '@/lib/persistStorage';
 
 /**
  * Complete the SSO callback, then give a Character new to this device the

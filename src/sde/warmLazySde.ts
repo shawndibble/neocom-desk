@@ -46,56 +46,92 @@ export async function cachedLazySdeFiles(): Promise<Set<string>> {
   return cached;
 }
 
+/** What `warmLazySde` reports in its failed list when the fitting engine could not be warmed (it is not a file). */
+export const ENGINE_ITEM = 'engine';
+
+/** Every downloadable item: the lazy SDE files plus the fitting engine (one item). */
+export const LAZY_ASSET_TOTAL = LAZY_SDE_FILES.length + 1;
+
+/**
+ * Files being fetched right now, by file. The background warm and a pilot's
+ * "Download everything" can run at once (and in lockstep, both walking the
+ * list from the top): a second asker joins the fetch under way instead of
+ * starting its own.
+ */
+const inFlight = new Map<string, Promise<boolean>>();
+
 /** Resolves `false` when the file could not be fetched (a non-2xx counts). */
-async function warmFile(file: string): Promise<boolean> {
-  const url = lazySdeFileUrl(file);
-  // Already cached (by use or an earlier warm): nothing to fetch.
-  if (await caches.match(url)) return true;
-  // Read the body to the end so the SW finishes its cache write.
-  const { ok } = await fetchWithIdleTimeout(url, { drain: true });
-  return ok;
+function warmFile(file: string): Promise<boolean> {
+  const running = inFlight.get(file);
+  if (running) return running;
+  const started = (async () => {
+    const url = lazySdeFileUrl(file);
+    // Already cached (by use or an earlier warm): nothing to fetch.
+    if (await caches.match(url)) return true;
+    // Read the body to the end so the SW finishes its cache write.
+    const { ok } = await fetchWithIdleTimeout(url, { drain: true });
+    return ok;
+  })().finally(() => inFlight.delete(file));
+  inFlight.set(file, started);
+  return started;
 }
 
 export interface WarmOptions {
   /**
    * A pilot asked for everything ("Download everything for offline"): skip the
-   * cellular / Save-Data / slow-network gate. Being online is still required.
+   * cellular / Save-Data / slow-network gate, and try the engine even without
+   * a controlling service worker (it uses the Cache API, not the SW). Being
+   * online is still required.
    */
   force?: boolean;
   /** Called after each file and after the engine: `done` of `total` (files + the engine). */
   onProgress?: (done: number, total: number) => void;
 }
 
+/** Whether a service worker controls this page, i.e. a fetch of an SDE file is cached by the `sde-data` route. */
+export function hasControllingServiceWorker(): boolean {
+  return 'serviceWorker' in navigator && !!navigator.serviceWorker.controller;
+}
+
 /**
- * Sequential, silent, single pass. Needs a controlling service worker (a
- * fetch before it claims the page would not be cached) and re-checks the
- * connection before each file and before the engine. One file failing (a
- * dropped request, a 404) does not abandon the rest; resolves with the files
- * that failed, so a caller or test can see what the pass did not cache.
+ * Sequential, silent, single pass. The SDE files need a controlling service
+ * worker (a fetch before it claims the page would not be cached); the
+ * connection is re-checked before each file and before the engine. One file
+ * failing (a dropped request, a 404) does not abandon the rest; resolves with
+ * the items that failed (`ENGINE_ITEM` for the engine), so a caller or test can
+ * see what the pass did not cache. A forced pass without a controlling worker skips the files (callers
+ * check `hasControllingServiceWorker` to say so) but still fetches the engine.
  */
 export async function warmLazySde(
   signal: WarmSignal,
   { force = false, onProgress }: WarmOptions = {}
 ): Promise<string[]> {
   const failed: string[] = [];
-  const total = LAZY_SDE_FILES.length + 1;
   let done = 0;
   const level = () => (force ? (navigator.onLine ? 'all' : 'none') : currentWarmLevel());
   try {
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return failed;
-    for (const file of LAZY_SDE_FILES) {
-      if (signal.cancelled || level() === 'none') return failed;
-      try {
-        if (!(await warmFile(file))) failed.push(file);
-      } catch {
-        failed.push(file);
+    const controlled = hasControllingServiceWorker();
+    if (!controlled && !force) return failed;
+    if (controlled) {
+      for (const file of LAZY_SDE_FILES) {
+        if (signal.cancelled || level() === 'none') return failed;
+        try {
+          if (!(await warmFile(file))) failed.push(file);
+        } catch {
+          failed.push(file);
+        }
+        onProgress?.(++done, LAZY_ASSET_TOTAL);
       }
-      onProgress?.(++done, total);
     }
     if (signal.cancelled || level() !== 'all') return failed;
-    const { warmDogmaEngineAssets } = await import('@/features/fittings/dogmaFittingEngine');
-    await warmDogmaEngineAssets();
-    onProgress?.(++done, total);
+    try {
+      const { warmDogmaEngineAssets } = await import('@/features/fittings/dogmaFittingEngine');
+      await warmDogmaEngineAssets();
+    } catch {
+      // A chunk that would not load (offline mid-deploy): the engine is reported, never retry-looped.
+      failed.push(ENGINE_ITEM);
+    }
+    onProgress?.(LAZY_ASSET_TOTAL, LAZY_ASSET_TOTAL);
   } catch {
     // The engine import or warm failed: lose it, never retry-loop.
   }
