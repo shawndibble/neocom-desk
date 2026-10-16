@@ -12,8 +12,6 @@ export const ARCHIVE_DAYS = 365;
 export const ESI_WALLET_WINDOW_DAYS = 30;
 /** ESI may serve a wallet list cached up to this long, so a fetch proves nothing newer. */
 export const ESI_WALLET_CACHE_MS = 3_600_000;
-/** Journal date-range presets, in days, offered once coverage reaches back that far. */
-export const ARCHIVE_RANGE_DAYS = [90, ARCHIVE_DAYS] as const;
 
 /** `[fromMs, toMs]`, inclusive. */
 export type CoverageWindow = readonly [number, number];
@@ -90,11 +88,4 @@ export function archiveGaps(
     if (nowMs - end > 2 * ESI_WALLET_CACHE_MS) gaps.push([end, nowMs]);
   }
   return gaps;
-}
-
-/** The preset ranges (days) the archive reaches back far enough to fill. */
-export function archiveRanges(windows: readonly CoverageWindow[], nowMs: number): number[] {
-  const since = archiveSince(windows);
-  if (since === null) return [];
-  return ARCHIVE_RANGE_DAYS.filter((days) => since <= nowMs - days * DAY_MS);
 }

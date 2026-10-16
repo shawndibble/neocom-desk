@@ -5,7 +5,6 @@ import {
   ESI_WALLET_WINDOW_DAYS,
   addCoverage,
   archiveGaps,
-  archiveRanges,
   archiveSince,
   fetchWindow,
 } from './archiveCoverage';
@@ -91,11 +90,5 @@ describe('archive reach', () => {
   it('lists the uncovered stretch between windows', () => {
     expect(archiveGaps(cov)).toEqual([[NOW - 70 * DAY, NOW - 30 * DAY]]);
     expect(archiveGaps([[0, 1]])).toEqual([]);
-  });
-  it('offers a range only when covered back that far', () => {
-    expect(archiveRanges([[NOW - 91 * DAY, NOW]], NOW)).toEqual([90]);
-    expect(archiveRanges([[NOW - 89 * DAY, NOW]], NOW)).toEqual([]);
-    expect(archiveRanges([[NOW - 366 * DAY, NOW]], NOW)).toEqual([90, 365]);
-    expect(archiveRanges([], NOW)).toEqual([]);
   });
 });
