@@ -100,8 +100,8 @@ export function runwayDays(balance: number, outgoingsPerDay: number): number | n
 export interface VitalsFigures {
   /** Every readable division added up. */
   total: number;
-  /** Income minus spending over the window. */
-  net: number;
+  /** Income minus spending over the window; `null` when the journal could not be read (unknown, not zero). */
+  net: number | null;
   /** Days `journalDivision`'s own balance covers, or `null` — see `runwayDays`. */
   runwayDays: number | null;
 }
@@ -126,7 +126,8 @@ export function vitalsFigures(
   // nothing else — but the runway has to pick one division out of the seven, so
   // this one function needs the number alongside it.
   divisions: readonly (VitalsDivisionBalance & { division: number })[],
-  journal: readonly VitalsJournalEntry[],
+  /** `null` when the journal read failed: net and runway are then unknown rather than 0. */
+  journal: readonly VitalsJournalEntry[] | null,
   journalDivision: number,
   nowMs: number
 ): VitalsFigures {
@@ -134,7 +135,8 @@ export function vitalsFigures(
     divisions.find((division) => division.division === journalDivision)?.balance ?? 0;
   return {
     total: totalBalance(divisions),
-    net: netOverWindow(journal, nowMs),
-    runwayDays: runwayDays(journalBalance, dailyOutgoings(journal, nowMs)),
+    net: journal === null ? null : netOverWindow(journal, nowMs),
+    runwayDays:
+      journal === null ? null : runwayDays(journalBalance, dailyOutgoings(journal, nowMs)),
   };
 }

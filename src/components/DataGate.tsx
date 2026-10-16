@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, LiveStatus, Spinner } from '@/components/ui';
+import { LiveStatus, LoadFailedState, Spinner } from '@/components/ui';
 import { useRetryFocus } from '@/lib/useRetryFocus';
-import { useOnline } from '@/stores/network';
 
 interface DataGateProps {
   /** Where the load stands: still running, failed, or in and ready for `children`. */
@@ -44,27 +43,21 @@ export function DataGate({
   children,
 }: DataGateProps) {
   const { t } = useTranslation();
-  const online = useOnline();
   const [regionRef, , holdRetryFocus] = useRetryFocus<HTMLDivElement>(status, resetKey);
   return (
     <div ref={regionRef} tabIndex={-1} className={`focus:outline-none ${className ?? ''}`.trim()}>
       <LiveStatus>{status === 'failed' ? title : null}</LiveStatus>
       {status === 'failed' ? (
-        <EmptyState
+        <LoadFailedState
           title={title}
-          hint={hint ?? (online ? t('common.loadFailedRetryHint') : t('common.connectOnceHint'))}
-          action={
-            onRetry ? (
-              <Button
-                size="sm"
-                onClick={() => {
+          hint={hint}
+          onRetry={
+            onRetry
+              ? () => {
                   holdRetryFocus();
                   onRetry();
-                }}
-              >
-                {t('common.retry')}
-              </Button>
-            ) : undefined
+                }
+              : undefined
           }
         />
       ) : status === 'busy' ? (

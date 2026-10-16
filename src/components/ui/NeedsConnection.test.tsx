@@ -29,7 +29,7 @@ describe('NeedsConnection', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('disables a Button while offline, keeps it focusable and names why on hover', async () => {
+  it('disables a Button while offline, keeps it focusable and names why', async () => {
     go(false);
     const onClick = vi.fn();
     render(
@@ -42,7 +42,12 @@ describe('NeedsConnection', () => {
     expect(button).not.toBeDisabled();
     await userEvent.click(button);
     expect(onClick).not.toHaveBeenCalled();
-    await userEvent.hover(button);
+    // Reach it by keyboard: focus opens the reason with no hover timing involved
+    // (a click leaves pointer focus, which the tooltip deliberately ignores; the
+    // hover path is covered by the tooltip-merge test below).
+    act(() => button.blur());
+    await userEvent.tab();
+    expect(button).toHaveFocus();
     expect((await screen.findAllByText('Needs a connection')).length).toBeGreaterThan(0);
   });
 

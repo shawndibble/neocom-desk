@@ -75,28 +75,41 @@ async function loadFannedOutAssets(character: {
   };
 }
 
+/** The Characters whose assets were read, and those that could not be (named, so a view can say who is missing). */
+export interface OtherCharactersAssetsRead {
+  entries: OtherCharacterAssets[];
+  skipped: SkippedCharacterAssets[];
+}
+
 /**
  * The given Characters' assets, for the Assets page's cross-character
  * `CharacterFilterControl` (issue #746, replacing issue #85's all-or-nothing
  * toggle) — a Character degrades individually rather than failing the whole
  * fetch.
+ *
+ * A Character with no cached assets and no live answer (offline, ESI down, no
+ * scope) drops out of `entries` and is named in `skipped`; without that a view
+ * cannot tell "owns no ships" from "their assets didn't load", and says the first.
  */
-export async function loadOtherCharactersAssets(
+export async function loadOtherCharactersAssetsDetailed(
   characterIds: readonly number[]
-): Promise<OtherCharacterAssets[]> {
+): Promise<OtherCharactersAssetsRead> {
   const ids = new Set(characterIds);
   const characters = await db.characters.toArray();
   const matching = characters.filter((c) => ids.has(c.characterId));
   // Intentionally NO `scope`: the player explicitly picked these Characters in
   // the filter, so a live 403 (and its re-auth banner) is the answer they asked
   // for, unlike the unprompted Build Plan fan-out below.
-  const { entries } = await fanOutAllCharacters({
+  const { entries, skipped } = await fanOutAllCharacters({
     characters: matching,
     load: loadFannedOutAssets,
   });
   // Narrowed back to this function's own shape: the filter has no use for the
   // completeness detail, and its callers compare these objects wholesale.
-  return entries.map(({ characterId, name, assets }) => ({ characterId, name, assets }));
+  return {
+    entries: entries.map(({ characterId, name, assets }) => ({ characterId, name, assets })),
+    skipped,
+  };
 }
 
 /**
