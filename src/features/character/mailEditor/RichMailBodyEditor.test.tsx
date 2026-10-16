@@ -16,6 +16,11 @@ if (!Range.prototype.getClientRects) {
   Range.prototype.getBoundingClientRect = () => new DOMRect();
 }
 
+// ...and no hit testing: ProseMirror's mousedown handler calls posAtCoords.
+if (!document.elementFromPoint) {
+  document.elementFromPoint = () => null;
+}
+
 function Harness({ initial = '', onValue }: { initial?: string; onValue?: (v: string) => void }) {
   const [value, setValue] = useState(initial);
   return (
