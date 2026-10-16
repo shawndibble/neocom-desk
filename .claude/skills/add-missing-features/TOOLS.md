@@ -321,8 +321,9 @@ UNDER-warning. #3908 NARROW — Journal breakdown gains This/All Characters and
 nets own-Character transfers into one line (N of M loaded note; corp journal
 untouched); PLEX bought as one row. #3909 SHIP — wallet journal +
 transactions archived 365 days device-only, poll-fed, gaps shown. #3910 NARROW
-— all-Characters Can-fly list adds missing-skill count + training time, opens
-from a saved Fitting.
+— "Your Characters" stats section on an open Fitting: can fly, missing
+skills, training time; chips + search for 20+ Characters (owner: a popover
+was the wrong place).
 
 ## Killed / dropped candidates (never filed)
 

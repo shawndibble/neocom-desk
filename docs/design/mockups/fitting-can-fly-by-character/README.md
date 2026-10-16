@@ -1,8 +1,8 @@
-# Fittings: Can fly for every Character, with what each one is missing
+# Fittings: Your Characters section, built for 20+ Characters
 
-Issue: #3910. Source: `src/mockups/FittingCanFlyByCharacter.stories.tsx` (`mockups-fittingcanflybycharacter--proposed`). Sample data; the ticket text wins over the picture.
+Issue: #3910. Source: `src/mockups/FittingCanFlyByCharacter.stories.tsx` (`mockups-fittingcanflybycharacter--proposed`). Sample data (20 Characters); the ticket text wins over the picture.
 
-New component: `CanFlyGapRow` (missing-skill count and training time under a Character that can't fly). The trigger is the existing inline link and the list is the existing Fitting Compare popover's list, here opened from a saved Fitting's header. Today's Fittings page renders under the proposal.
+New component: `YourCharactersSection` (the section body). It sits in the real stats column of an open Fitting, right under "What to train", as one more collapsible section. The section row, `DataTable` (sortable, expand-in-place rows), `FilterChip` and `SearchInput` are existing.
 
 | | 1440 | 390 |
 |---|---|---|
