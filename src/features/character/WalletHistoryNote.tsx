@@ -21,7 +21,9 @@ export function WalletHistoryNote({
   filter: WalletJournalFilter;
   onFilterChange: (next: WalletJournalFilter) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // EVE days, written the way the journal's own dates are.
+  const day = (ms: number) => new Date(ms).toLocaleDateString(i18n.language, { timeZone: 'UTC' });
   const [now] = useState(() => Date.now());
   if (!info || (info.since === null && !info.unconfirmed)) return null;
   return (
@@ -30,7 +32,7 @@ export function WalletHistoryNote({
         <span>
           {info.since === null
             ? t('wallet.history.unconfirmed')
-            : t('wallet.history.since', { date: utcDay(info.since) })}
+            : t('wallet.history.since', { date: day(info.since) })}
         </span>
         {info.ranges.map((days) => {
           const startDate = utcDay(now - days * DAY_MS);
@@ -53,7 +55,7 @@ export function WalletHistoryNote({
         <p className="text-warning">
           {t('wallet.history.gap', {
             ranges: info.gaps.map(([from, to]) =>
-              t('wallet.history.gapRange', { from: utcDay(from), to: utcDay(to) })
+              t('wallet.history.gapRange', { from: day(from), to: day(to) })
             ),
           })}
         </p>

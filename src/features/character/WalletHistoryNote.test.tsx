@@ -34,7 +34,9 @@ describe('WalletHistoryNote', () => {
         onFilterChange={vi.fn()}
       />
     );
-    expect(screen.getByText(/History since 2026-09-16 · kept on this device only\./)).toBeVisible();
+    expect(
+      screen.getByText(/History since 9\/16\/2026 · kept on this device only\./)
+    ).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
   });
 
@@ -52,7 +54,7 @@ describe('WalletHistoryNote', () => {
         onFilterChange={onChange}
       />
     );
-    expect(screen.getByText(/Not recorded: 2026-08-17 – 2026-09-16/)).toBeVisible();
+    expect(screen.getByText(/Not recorded: 8\/17\/2026 – 9\/16\/2026/)).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: '90 days' }));
     expect(onChange).toHaveBeenCalledWith({
       ...EMPTY_WALLET_JOURNAL_FILTER,
@@ -88,6 +90,8 @@ describe('WalletHistoryNote', () => {
         onFilterChange={vi.fn()}
       />
     );
-    expect(screen.getByText(/2026-08-17 – 2026-08-27 and 2026-09-26 – 2026-10-06/)).toBeVisible();
+    expect(
+      screen.getByText(/8\/17\/2026 – 8\/27\/2026 and 9\/26\/2026 – 10\/6\/2026/)
+    ).toBeVisible();
   });
 });
