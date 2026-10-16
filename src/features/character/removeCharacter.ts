@@ -10,6 +10,7 @@
 // a Character they still hold — there is no signal to detect it from, so it
 // needs its own explicit entry point.
 
+import { clearWalletArchive } from '@/features/character/walletArchive';
 import { deleteCommunitySnapshots } from '@/features/communities/communityCache';
 import { deleteShareSelections } from '@/features/communities/shareSelection';
 import { db } from '@/db';
@@ -121,6 +122,9 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       db.mailDrafts,
       db.miningLedgerHistory,
       db.industryJobHistory,
+      db.walletJournalArchive,
+      db.walletTransactionArchive,
+      db.walletArchiveCoverage,
       db.notificationFeed,
       db.settings,
     ],
@@ -134,6 +138,7 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await db.mailDrafts.where('characterId').equals(characterId).delete();
       await db.miningLedgerHistory.delete(characterId);
       await db.industryJobHistory.delete(characterId);
+      await clearWalletArchive(characterId);
       // Orphaned feed rows are invisible in the UI (both the bell panel and the
       // other-character counts skip ids with no Character) but `refreshAppBadge`
       // counts the whole table — leaving an app-icon count nothing can dismiss.

@@ -14,7 +14,7 @@ import type {
 import type { TradeHub } from '@/market/hubs';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 import type { MiningLedgerRow } from '@/engine/miningTax/types';
-import type { IndustryJob } from '@/esi/endpoints';
+import type { IndustryJob, WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import type { SnapshotDay } from '@/engine/miningTax/priceBasis';
 
 export interface CharacterRecord {
@@ -1038,6 +1038,29 @@ export interface MiningLedgerHistoryRecord {
 }
 
 /**
+ * One wallet journal entry kept past ESI's 30-day window (issue #3909), up to
+ * 365 days. A row per ESI entry id per Character, upserted by every journal
+ * fetch. Own table, not an `esiCache` row: that row is replaced whole on each
+ * fetch and wiped by "clear cache". Device-local, not synced, not in the backup.
+ */
+export type WalletJournalArchiveRecord = WalletJournalEntry & { characterId: number };
+
+/** One wallet transaction kept the same way as `WalletJournalArchiveRecord`. */
+export type WalletTransactionArchiveRecord = WalletTransaction & { characterId: number };
+
+/**
+ * Which windows of a Character's wallet history the archive has seen in full
+ * (`engine/wallet/archiveCoverage.ts`), so the Journal can show its real
+ * reach and the gaps. One row per Character and kind.
+ */
+export interface WalletArchiveCoverageRecord {
+  characterId: number;
+  kind: 'journal' | 'transactions';
+  /** Merged `[fromMs, toMs]` windows, oldest first. */
+  windows: Array<[number, number]>;
+}
+
+/**
  * One day's Jita buy/sell snapshot for every type the Mining Overview prices
  * (issue #1279) — the ore's pricing type (its Compressed form where one
  * exists) and each reprocessing material. ESI history only has a daily
@@ -1105,6 +1128,9 @@ export const db = new Dexie('neocom') as Dexie & {
   orderProblemSamples: EntityTable<OrderProblemSampleRecord, 'orderId'>;
   mailDrafts: EntityTable<MailDraftRecord, 'id'>;
   miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
+  walletJournalArchive: Dexie.Table<WalletJournalArchiveRecord, [number, number]>;
+  walletTransactionArchive: Dexie.Table<WalletTransactionArchiveRecord, [number, number]>;
+  walletArchiveCoverage: Dexie.Table<WalletArchiveCoverageRecord, [number, string]>;
   industryJobHistory: EntityTable<IndustryJobHistoryRecord, 'characterId'>;
   netWorthSnapshots: EntityTable<NetWorthSnapshotRecord, 'id'>;
   jitaPriceSnapshots: EntityTable<JitaPriceSnapshotRecord, 'date'>;
@@ -1629,4 +1655,38 @@ db.version(23).stores({
   industryJobHistory: 'characterId',
   netWorthSnapshots: 'id, characterId',
   productionLosses: 'id, characterId, runId',
+});
+
+// Adds the wallet journal and transaction archives and their coverage (issue #3909).
+db.version(24).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  esiCacheMeta: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
+  hullFitCache: 'key, savedAt',
+  ansiblexGates: 'id',
+  industryJobHistory: 'characterId',
+  netWorthSnapshots: 'id, characterId',
+  productionLosses: 'id, characterId, runId',
+  walletJournalArchive: '[characterId+id], characterId, [characterId+date]',
+  walletTransactionArchive: '[characterId+transaction_id], characterId, [characterId+date]',
+  walletArchiveCoverage: '[characterId+kind], characterId',
 });
