@@ -1,7 +1,8 @@
 /** Application id of the Bubblewrap-built Trusted Web Activity; matches public/.well-known/assetlinks.json. */
 export const PLAY_STORE_PACKAGE = 'com.neocomdesk.app';
 
-const STORAGE_KEY = 'playStoreApp';
+/** sessionStorage flag a TWA launch leaves for the rest of the session; `index.html`'s landing-shell boot script reads it too. */
+export const PLAY_STORE_FLAG_KEY = 'playStoreApp';
 
 /**
  * Chrome won't open Android's settings screens from a page, so the shell ships
@@ -25,14 +26,14 @@ interface FlagStore {
 /** A TWA launch sets the referrer to android-app://<package>; see docs/ANDROID-TWA.md. */
 export function detectPlayStoreApp(referrer: string, store: FlagStore): boolean {
   try {
-    if (store.getItem(STORAGE_KEY) === '1') return true;
+    if (store.getItem(PLAY_STORE_FLAG_KEY) === '1') return true;
   } catch {
     // blocked storage: rely on the referrer alone
   }
   const fromApp = referrer.startsWith(`android-app://${PLAY_STORE_PACKAGE}`);
   if (fromApp) {
     try {
-      store.setItem(STORAGE_KEY, '1');
+      store.setItem(PLAY_STORE_FLAG_KEY, '1');
     } catch {
       // best effort
     }
