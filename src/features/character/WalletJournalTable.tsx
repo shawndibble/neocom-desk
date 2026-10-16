@@ -32,6 +32,7 @@ import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { JournalCoverage, JournalRow } from '@/engine/journalNetting';
 import { ActiveFilterRow } from '@/features/character/ActiveFilterRow';
+import { IskFlowChart } from '@/features/character/IskFlowChart';
 import { IskBreakdownPanel } from '@/features/character/IskBreakdownPanel';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
 import {
@@ -170,8 +171,6 @@ interface JournalTableProps {
     /** The scope in words: "All characters", or the corp division. */
     scopeLabel: string;
     coverage?: JournalCoverage;
-    /** The daily chart (#3914) slots in here, under the In / Out / Net totals. */
-    chart?: ReactNode;
   };
 }
 
@@ -403,7 +402,9 @@ export function JournalTable({
         selectedRefType={filter.refType}
         onSelectRefType={(refType) => onFilterChange(toggleBreakdownRefType(filter, refType))}
         coverage={panel.coverage}
-        chart={panel.chart}
+        chart={
+          <IskFlowChart rows={filteredJournal} filter={filter} onFilterChange={onFilterChange} />
+        }
       />
       {filteredJournal.length === 0 ? (
         <EmptyState
