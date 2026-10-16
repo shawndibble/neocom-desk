@@ -1,14 +1,15 @@
-import { TextArea } from '@/components/ui';
+import { lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Spinner, TextArea } from '@/components/ui';
 
 /**
  * The seam between the New Mail composer and whatever edits its body. The
  * composer owns the body as one controlled string and never assumes it is
- * plain text; a rich editor (WYSIWYG + format bar, EVE markup) drops in by
- * implementing this contract and being passed as `NewMailComposer`'s
- * `bodyEditor`.
+ * plain text; an editor implements this contract and is passed as
+ * `NewMailComposer`'s `bodyEditor`.
  */
 export interface MailBodyEditorProps {
-  /** The body as it goes on the wire. */
+  /** The body as it goes on the wire: EVE markup. */
   value: string;
   onChange: (value: string) => void;
   /** Id for the editing surface, so the composer's visible label can point at it. */
@@ -21,7 +22,7 @@ export interface MailBodyEditorProps {
   className?: string;
 }
 
-/** The body editor until the rich one lands: a plain text area. */
+/** A plain text area, kept for tests and as the simplest implementation of the contract. */
 export function PlainBodyEditor({ value, onChange, className, ...rest }: MailBodyEditorProps) {
   return (
     <TextArea
@@ -30,5 +31,28 @@ export function PlainBodyEditor({ value, onChange, className, ...rest }: MailBod
       onChange={(e) => onChange(e.target.value)}
       className={`text-sm ${className ?? ''}`}
     />
+  );
+}
+
+// The rich editor (Tiptap + ProseMirror) is its own chunk: nothing loads until a composer opens.
+const RichMailBodyEditor = lazy(() => import('./mailEditor/RichMailBodyEditor'));
+
+/** The mail body editor: WYSIWYG with a format bar and a Source view, loaded on first use. */
+export function MailBodyEditor(props: MailBodyEditorProps) {
+  const { t } = useTranslation();
+  return (
+    <Suspense
+      fallback={
+        <div
+          role="status"
+          aria-busy
+          className={`flex min-h-40 flex-1 items-center justify-center gap-2 text-xs text-text-dim ${props.className ?? ''}`}
+        >
+          <Spinner size="sm" /> {t('mail.format.loading')}
+        </div>
+      }
+    >
+      <RichMailBodyEditor {...props} />
+    </Suspense>
   );
 }

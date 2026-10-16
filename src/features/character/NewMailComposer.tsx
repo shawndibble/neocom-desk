@@ -39,9 +39,10 @@ import {
   validateNewMail,
   type ComposeRecipient,
 } from '@/engine/mailCompose';
+import { draftMarkupBody } from '@/engine/mailEditorDoc';
 import { sendMail } from './mail';
 import { clearNewMailDraft, loadNewMailDraft, saveNewMailDraft } from './mailDrafts';
-import { PlainBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
+import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
 import { NewMailRecipientPicker } from './NewMailRecipientPicker';
 
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
@@ -63,7 +64,7 @@ interface NewMailComposerProps {
   characterId: number;
   /** Phone placement: covers the whole viewport instead of sitting in the reading pane. */
   fullPane: boolean;
-  /** Swap point for the rich editor; defaults to a plain text area. */
+  /** Swap point for the body editor; defaults to the rich (WYSIWYG + Source) one. */
   bodyEditor?: ComponentType<MailBodyEditorProps>;
   onClose: (reason: NewMailCloseReason) => void;
   onSent: () => void;
@@ -72,7 +73,7 @@ interface NewMailComposerProps {
 export function NewMailComposer({
   characterId,
   fullPane,
-  bodyEditor: BodyEditor = PlainBodyEditor,
+  bodyEditor: BodyEditor = MailBodyEditor,
   onClose,
   onSent,
 }: NewMailComposerProps) {
@@ -132,7 +133,7 @@ export function NewMailComposer({
           }))
         );
         setSubject(draft.subject);
-        setBody(draft.body);
+        setBody(draftMarkupBody(draft));
       }
       setReady(true);
     });

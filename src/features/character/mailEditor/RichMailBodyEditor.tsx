@@ -1,0 +1,290 @@
+/**
+ * The rich mail body editor: Tiptap (ProseMirror) over a schema that can only
+ * say what EVE markup can, a format bar, and a Preview ⇄ Source switch.
+ * Loaded lazily (`MailBodyEditor.tsx`) so the Mail page pays nothing for it
+ * until a composer opens. docs/adr/0022-tiptap-for-the-mail-body-editor.md.
+ *
+ * `value` and `onChange` are EVE markup. Every value this component emits has
+ * gone through `sanitizeMarkup`/`docToMarkup`, i.e. `eveMarkup.ts`, so the
+ * composer, the draft and the wire only ever see the safe subset. Mobile soft
+ * keyboards and IME composition are ProseMirror's own; nothing here touches
+ * composition events.
+ */
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
+import type { Editor } from '@tiptap/core';
+import { useTranslation } from 'react-i18next';
+import { SegmentedControl, TextArea } from '@/components/ui';
+import { cx } from '@/lib/cx';
+import { useIsDesktop } from '@/lib/useIsDesktop';
+import {
+  droppedMarkup,
+  docToMarkup,
+  markupToDoc,
+  sanitizeMarkup,
+  type EditorDoc,
+} from '@/engine/mailEditorDoc';
+import {
+  buildPipeTableLines,
+  emptyFormatState,
+  parsePastedPipeTable,
+  sourceTagPair,
+  wrapSourceSelection,
+  type SourceTag,
+} from '@/engine/mailFormat';
+import { EVE_MAIL_SURFACE_CLASS } from '../MailBodyView';
+import type { MailBodyEditorProps } from '../MailBodyEditor';
+import type { MailEditorCommands, ToggleMark } from './commands';
+import { mailEditorExtensions } from './extensions';
+import { formatStateOfEditor } from './editorState';
+import { DOCKED_BAR_SPACE_CLASS, MailFormatBar } from './MailFormatBar';
+
+type Mode = 'preview' | 'source';
+
+const SOURCE_TAG: Record<ToggleMark, SourceTag> = {
+  bold: { kind: 'bold' },
+  italic: { kind: 'italic' },
+  underline: { kind: 'underline' },
+};
+
+export default function RichMailBodyEditor({
+  value,
+  onChange,
+  id,
+  'aria-describedby': describedBy,
+  'aria-invalid': invalid,
+  disabled,
+  className,
+}: MailBodyEditorProps) {
+  const { t } = useTranslation();
+  const docked = !useIsDesktop();
+  const [mode, setMode] = useState<Mode>('preview');
+  const [source, setSource] = useState(value);
+  const [dropped, setDropped] = useState(false);
+  const sourceRef = useRef<HTMLTextAreaElement>(null);
+  const pendingSelection = useRef<[number, number] | null>(null);
+  // What this editor last handed up; a different `value` came from outside (a draft loaded).
+  const lastEmitted = useRef(value);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  const editorRef = useRef<Editor | null>(null);
+  const extensions = useMemo(() => mailEditorExtensions(), []);
+
+  const editor = useEditor({
+    extensions,
+    content: markupToDoc(value),
+    editable: !disabled,
+    onUpdate: ({ editor: ed }) => {
+      const markup = docToMarkup(ed.getJSON() as EditorDoc);
+      lastEmitted.current = markup;
+      onChangeRef.current(markup);
+    },
+    editorProps: {
+      attributes: {
+        id,
+        role: 'textbox',
+        'aria-multiline': 'true',
+        'aria-label': t('mail.bodyLabel'),
+        ...(describedBy ? { 'aria-describedby': describedBy } : {}),
+        ...(invalid ? { 'aria-invalid': 'true' } : {}),
+        class: 'min-h-full outline-none',
+      },
+      // Pasted HTML is parsed through the schema above (only the safe subset
+      // exists in it). A markdown pipe table is the one markdown we read.
+      handlePaste: (_view, event) => {
+        const ed = editorRef.current;
+        const text = event.clipboardData?.getData('text/plain') ?? '';
+        const rows = parsePastedPipeTable(text);
+        if (!ed || !rows || ed.isActive('table')) return false;
+        const nodes = markupToDoc(buildPipeTableLines(rows).join('\n')).content;
+        event.preventDefault();
+        ed.chain().focus().insertContent(nodes).run();
+        return true;
+      },
+    },
+  });
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+  useEffect(() => {
+    editor?.setEditable(!disabled);
+  }, [editor, disabled]);
+
+  // A value the editor did not produce replaces what it shows.
+  useEffect(() => {
+    if (value === lastEmitted.current) return;
+    lastEmitted.current = value;
+    setSource(value);
+    editor?.commands.setContent(markupToDoc(value), { emitUpdate: false });
+  }, [value, editor]);
+
+  useLayoutEffect(() => {
+    const sel = pendingSelection.current;
+    const el = sourceRef.current;
+    if (sel && el) {
+      pendingSelection.current = null;
+      el.focus();
+      el.setSelectionRange(sel[0], sel[1]);
+    }
+  }, [source]);
+
+  const previewState = useEditorState({
+    editor,
+    selector: ({ editor: ed }) => (ed ? formatStateOfEditor(ed) : emptyFormatState),
+  });
+
+  function switchMode(next: Mode) {
+    if (next === mode) return;
+    if (next === 'preview') {
+      const clean = sanitizeMarkup(source);
+      setDropped(droppedMarkup(source));
+      lastEmitted.current = clean;
+      onChangeRef.current(clean);
+      editor?.commands.setContent(markupToDoc(clean), { emitUpdate: false });
+    } else {
+      setSource(value);
+      setDropped(false);
+    }
+    setMode(next);
+  }
+
+  function editSource(next: string, selection?: [number, number]) {
+    const clean = sanitizeMarkup(next);
+    lastEmitted.current = clean;
+    pendingSelection.current = selection ?? null;
+    setSource(next);
+    onChangeRef.current(clean);
+  }
+
+  function wrap(tag: SourceTag) {
+    const el = sourceRef.current;
+    const from = el?.selectionStart ?? source.length;
+    const to = el?.selectionEnd ?? source.length;
+    const edit = wrapSourceSelection(source, from, to, sourceTagPair(tag));
+    editSource(edit.value, [edit.start, edit.end]);
+  }
+
+  const previewCommands: MailEditorCommands = {
+    state: previewState,
+    canClear: true,
+    toggleMark: (mark) => void editor?.chain().focus().toggleMark(mark).run(),
+    setColor: (color) => {
+      const chain = editor?.chain().focus();
+      void (
+        color === null ? chain?.unsetMark('eveColor') : chain?.setMark('eveColor', { color })
+      )?.run();
+    },
+    setSize: (px) => {
+      const chain = editor?.chain().focus();
+      void (px === null ? chain?.unsetMark('eveSize') : chain?.setMark('eveSize', { px }))?.run();
+    },
+    setLink: (href) => {
+      if (!editor) return;
+      if (href === null) {
+        editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      } else if (editor.state.selection.empty && !editor.isActive('link')) {
+        editor
+          .chain()
+          .focus()
+          .insertContent({ type: 'text', text: href, marks: [{ type: 'link', attrs: { href } }] })
+          .run();
+      } else {
+        editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+      }
+    },
+    insertTable: (rows, cols) =>
+      void editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run(),
+    clearFormatting: () => void editor?.chain().focus().unsetAllMarks().run(),
+  };
+
+  const sourceCommands: MailEditorCommands = {
+    state: emptyFormatState,
+    canClear: false,
+    toggleMark: (mark) => wrap(SOURCE_TAG[mark]),
+    setColor: (color) => color !== null && wrap({ kind: 'color', color }),
+    setSize: (px) => px !== null && wrap({ kind: 'size', px }),
+    setLink: (href) => href !== null && wrap({ kind: 'link', href }),
+    insertTable: (rows, cols) => {
+      const el = sourceRef.current;
+      const at = el?.selectionStart ?? source.length;
+      const grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => ''));
+      const lead = at > 0 && source[at - 1] !== '\n' ? '\n' : '';
+      const insert = `${lead}${buildPipeTableLines(grid).join('\n')}\n`;
+      editSource(source.slice(0, at) + insert + source.slice(at), [
+        at + insert.length,
+        at + insert.length,
+      ]);
+    },
+    clearFormatting: () => undefined,
+  };
+
+  const inSource = mode === 'source';
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <SegmentedControl
+          label={t('mail.format.viewLabel')}
+          size="sm"
+          options={[
+            { value: 'preview', label: t('mail.format.preview') },
+            { value: 'source', label: t('mail.format.source') },
+          ]}
+          value={mode}
+          onChange={switchMode}
+        />
+        {dropped && !inSource && (
+          <p role="status" className="text-xs text-text-dim">
+            {t('mail.format.sourceDropped')}
+          </p>
+        )}
+      </div>
+      {!docked && (
+        <MailFormatBar
+          commands={inSource ? sourceCommands : previewCommands}
+          docked={false}
+          disabled={disabled}
+        />
+      )}
+      <div
+        className={cx(
+          EVE_MAIL_SURFACE_CLASS,
+          'min-h-0 flex-1 overflow-y-auto text-xs leading-normal break-words whitespace-pre-wrap',
+          docked && DOCKED_BAR_SPACE_CLASS,
+          inSource && 'hidden',
+          className
+        )}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) editor?.commands.focus('end');
+        }}
+      >
+        <EditorContent editor={editor} className="min-h-full" />
+      </div>
+      {inSource && (
+        <TextArea
+          ref={sourceRef}
+          id={id}
+          aria-label={t('mail.format.sourceLabel')}
+          aria-describedby={describedBy}
+          aria-invalid={invalid}
+          value={source}
+          disabled={disabled}
+          onChange={(e) => editSource(e.target.value)}
+          spellCheck={false}
+          autoCapitalize="none"
+          autoCorrect="off"
+          className={cx('font-mono text-xs', docked && DOCKED_BAR_SPACE_CLASS, className)}
+        />
+      )}
+      {docked && (
+        <MailFormatBar
+          commands={inSource ? sourceCommands : previewCommands}
+          docked
+          disabled={disabled}
+        />
+      )}
+    </div>
+  );
+}

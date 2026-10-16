@@ -1237,6 +1237,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                         kind={composeKind}
                         header={selectedRow.header}
                         bodyText={bodyText}
+                        bodyMarkup={body?.data.body ?? undefined}
                         senderName={selectedSender}
                         formattedTimestamp={
                           selectedRow.header.timestamp

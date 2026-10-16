@@ -42,6 +42,11 @@ function useDesktopViewport(): void {
   };
 }
 
+// These tests are about the page, not the rich editor: its lazy chunk (Tiptap) is slow to load cold.
+vi.mock('@/features/character/mailEditor/RichMailBodyEditor', async () => ({
+  default: (await import('@/features/character/MailBodyEditor')).PlainBodyEditor,
+}));
+
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
     needRefresh: [false, vi.fn()],

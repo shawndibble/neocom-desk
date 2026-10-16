@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EsiOfflineError } from '@/esi/errors';
 import { NewMailComposer } from './NewMailComposer';
+import { PlainBodyEditor } from './MailBodyEditor';
 
 const sendMail = vi.hoisted(() => vi.fn());
 const loadMailingLists = vi.hoisted(() => vi.fn());
@@ -49,7 +50,14 @@ function setup(props: Partial<React.ComponentProps<typeof NewMailComposer>> = {}
   const onClose = vi.fn();
   const onSent = vi.fn();
   render(
-    <NewMailComposer characterId={CHAR_ID} fullPane onClose={onClose} onSent={onSent} {...props} />
+    <NewMailComposer
+      characterId={CHAR_ID}
+      fullPane
+      bodyEditor={PlainBodyEditor}
+      onClose={onClose}
+      onSent={onSent}
+      {...props}
+    />
   );
   return { onClose, onSent, user: userEvent.setup() };
 }
@@ -109,6 +117,29 @@ describe('draft', () => {
     expect(await screen.findByDisplayValue('Hello')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Saved body')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'To' })).toHaveTextContent('Industry Chat');
+  });
+
+  it('escapes a plain draft saved before the rich editor, so its < > & stay literal', async () => {
+    drafts.loadNewMailDraft.mockResolvedValue({
+      recipients: [],
+      subject: '',
+      body: 'if a < b && <b>x</b>',
+    });
+    setup();
+    expect(
+      await screen.findByDisplayValue('if a &lt; b &amp;&amp; &lt;b&gt;x&lt;/b&gt;')
+    ).toBeInTheDocument();
+  });
+
+  it('keeps a markup draft as saved', async () => {
+    drafts.loadNewMailDraft.mockResolvedValue({
+      recipients: [],
+      subject: '',
+      body: '<b>bold</b>',
+      format: 'markup',
+    });
+    setup();
+    expect(await screen.findByDisplayValue('<b>bold</b>')).toBeInTheDocument();
   });
 
   it('closing keeps the draft and reports it', async () => {

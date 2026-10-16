@@ -10,6 +10,7 @@ import { act, render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EsiError, EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
+import { PlainBodyEditor } from './MailBodyEditor';
 import { MailComposeBox } from './MailComposeBox';
 import type { MailHeader } from '@/esi/endpoints';
 
@@ -81,6 +82,7 @@ function renderBox(kind: 'reply' | 'forward', onSent = vi.fn(), onClose = vi.fn(
       kind={kind}
       header={HEADER}
       bodyText="Original body text"
+      bodyEditor={PlainBodyEditor}
       senderName="Sender Sal"
       formattedTimestamp="Sep 21, 2026 03:14"
       resolveRecipientName={resolveRecipientName}
@@ -152,7 +154,7 @@ describe('Reply defaults', () => {
 
     expect(screen.getByLabelText('Subject')).toHaveValue('RE: Ratting fleet up');
     expect(screen.getByLabelText('Message')).toHaveValue(
-      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n> Original body text'
+      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n&gt; Original body text'
     );
   });
 
@@ -302,7 +304,7 @@ describe('sending', () => {
         { recipient_id: 300, recipient_type: 'character' },
       ],
       'RE: Ratting fleet up',
-      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n> Original body text'
+      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n&gt; Original body text'
     );
     expect(drafts.clearDraft).toHaveBeenCalledWith(CHAR_ID, 7);
     expect(onSent).toHaveBeenCalled();

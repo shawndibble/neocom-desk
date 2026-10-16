@@ -5,12 +5,13 @@
  * while a pilot has Reply or Forward open; `Mail.tsx` unmounts it on Cancel,
  * on send, or when the selected mail changes.
  */
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton, NeedsConnection, Spinner, TextArea, TextInput } from '@/components/ui';
+import { Button, IconButton, NeedsConnection, Spinner, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   buildReplyAllRecipients,
+  forwardMailBody,
   prefixSubject,
   quoteMailBody,
   type ComposeKind,
@@ -19,11 +20,18 @@ import { isOfflineFailure } from '@/esi/client';
 import { EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
 import { isOnline, useOnline } from '@/stores/network';
 import { sendMail } from './mail';
+import { draftMarkupBody, plainTextToMarkup, sanitizeMarkup } from '@/engine/mailEditorDoc';
+import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
 import { loadContacts } from './contacts';
 import { resolveNames } from './names';
 import { NewMailRecipientPicker } from './NewMailRecipientPicker';
-import { addRecipient, type ComposeRecipient } from '@/engine/mailCompose';
+import {
+  MAX_BODY_LENGTH,
+  addRecipient,
+  composeBodyLength,
+  type ComposeRecipient,
+} from '@/engine/mailCompose';
 import type { MailHeader } from '@/esi/endpoints';
 
 /** One chip in the recipient row — a name is always resolved before it is added, so the row never shows a bare id. */
@@ -45,6 +53,10 @@ interface MailComposeBoxProps {
   header: MailHeader;
   /** The reading pane's own already-stripped body text — quoted verbatim, never re-fetched or re-stripped here. */
   bodyText: string;
+  /** The mail's raw body, so a Forward keeps its formatting; Reply quotes `bodyText` plain. */
+  bodyMarkup?: string;
+  /** Swap point for tests; defaults to the rich editor. */
+  bodyEditor?: ComponentType<MailBodyEditorProps>;
   senderName: string;
   /** Already formatted in the pilot's chosen timezone, same string the reading pane shows. */
   formattedTimestamp: string;
@@ -58,6 +70,8 @@ export function MailComposeBox({
   kind,
   header,
   bodyText,
+  bodyMarkup,
+  bodyEditor: BodyEditor = MailBodyEditor,
   senderName,
   formattedTimestamp,
   resolveRecipientName,
@@ -81,6 +95,7 @@ export function MailComposeBox({
   const recipientSearchId = `${fieldId}-recipient-search`;
   const subjectId = `${fieldId}-subject`;
   const bodyId = `${fieldId}-body`;
+  const bodyCountId = `${fieldId}-body-count`;
 
   // First-field focus (issue #1485): Forward's recipient picker is the real
   // first field (it sits above Subject) and focuses itself (`autoFocus`);
@@ -123,7 +138,7 @@ export function MailComposeBox({
           }))
         );
         setSubject(draft.subject);
-        setBody(draft.body);
+        setBody(draftMarkupBody(draft));
       } else if (kind === 'reply') {
         setRecipients(
           buildReplyAllRecipients(header, characterId).map((r) => ({
@@ -132,11 +147,20 @@ export function MailComposeBox({
           }))
         );
         setSubject(prefixSubject('reply', header.subject ?? ''));
-        setBody(quoteMailBody(senderName, formattedTimestamp, bodyText));
+        // The quote is plain `> ` lines: formatting stripped, `< > &` escaped to stay literal.
+        setBody(plainTextToMarkup(quoteMailBody(senderName, formattedTimestamp, bodyText)));
       } else {
         setRecipients([]);
         setSubject(prefixSubject('forward', header.subject ?? ''));
-        setBody(quoteMailBody(senderName, formattedTimestamp, bodyText));
+        // The original travels with its formatting, editable, under a header.
+        setBody(
+          forwardMailBody(
+            senderName,
+            formattedTimestamp,
+            header.subject ?? '',
+            bodyMarkup === undefined ? plainTextToMarkup(bodyText) : sanitizeMarkup(bodyMarkup)
+          )
+        );
       }
       setReady(true);
     })();
@@ -256,6 +280,8 @@ export function MailComposeBox({
   }
 
   const headingKey = kind === 'reply' ? 'mail.composeReplyHeading' : 'mail.composeForwardHeading';
+  const bodyLength = composeBodyLength(body);
+  const bodyOver = bodyLength > MAX_BODY_LENGTH;
   const noRecipientsError = error !== null && recipients.length === 0;
   // Plain stacked labels, not the `Fields`/`Field` label-column primitive: a
   // side label column would take width from the 8-row message box in the
@@ -337,18 +363,28 @@ export function MailComposeBox({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor={bodyId} className={labelClass}>
-          {t('mail.bodyLabel')}
-        </label>
-        <TextArea
+        <div className="flex items-baseline justify-between">
+          <label htmlFor={bodyId} className={labelClass}>
+            {t('mail.bodyLabel')}
+          </label>
+          <span
+            id={bodyCountId}
+            className={`text-[0.6875rem] tabular-nums ${bodyOver ? 'text-danger' : 'text-text-dim'}`}
+          >
+            {t('mail.counter', { count: bodyLength, max: MAX_BODY_LENGTH })}
+          </span>
+        </div>
+        <BodyEditor
           id={bodyId}
           value={body}
-          onChange={(e) => {
+          onChange={(next) => {
             touchedRef.current = true;
-            setBody(e.target.value);
+            setBody(next);
           }}
-          rows={8}
-          className="text-sm"
+          disabled={sending}
+          aria-describedby={bodyCountId}
+          aria-invalid={bodyOver}
+          className="min-h-48"
         />
       </div>
 
@@ -360,7 +396,12 @@ export function MailComposeBox({
 
       <div className="flex items-center gap-2">
         <NeedsConnection>
-          <Button variant="primary" size="sm" onClick={() => void handleSend()} disabled={sending}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => void handleSend()}
+            disabled={sending || bodyOver}
+          >
             {sending ? (
               <span className="flex items-center gap-1.5">
                 <Spinner size="sm" /> {t('mail.sending')}
