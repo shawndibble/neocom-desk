@@ -3,7 +3,10 @@
  * that something changed, from its base to its value, with every modifier
  * the engine applied — which skill, hull bonus, module, charge, projected
  * effect or fleet boost, how it changes it, and any stacking penalty. Worked
- * out on demand, under exactly what the stats are (`explainModule`).
+ * out on demand, under exactly what the stats are (`explainModule`). Only what
+ * moves a number is listed: an attribute that reads the same before and after
+ * (a launcher's 0 HP damage — the charge carries it) and a source that isn't
+ * running are left out.
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,13 +32,12 @@ function SourceLine({
       ? typeName(source.typeId)
       : t(`fittings.affectedBy.kind.${source.kind}`, { id: source.buffId });
   return (
-    <li className={`flex justify-between gap-2 ${source.applied ? '' : 'text-text-dim'}`}>
+    <li className="flex justify-between gap-2">
       <span className="min-w-0">
         <span className="text-text-dim">
           {t(`fittings.affectedBy.kind.${source.kind}`, { id: source.buffId })}
         </span>{' '}
         {source.typeId !== null && who}
-        {!source.applied && ` · ${t('fittings.affectedBy.notApplied')}`}
       </span>
       <span className="shrink-0 text-right tabular-nums">
         {t(`fittings.affectedBy.operator.${source.operator}`, {
@@ -90,34 +92,35 @@ export function FittingAffectedByPanel({
   if (rows === null || dictionary === null)
     return <p className="text-xs text-text-dim">{t('fittings.affectedBy.loading')}</p>;
   // Published attributes only: one the dictionary can't name isn't one the game shows.
-  const named = rows.filter((row) => dictionary[row.attributeId] !== undefined);
-  if (named.length === 0)
+  const shownRows = rows.flatMap((row) => {
+    const entry = dictionary[row.attributeId];
+    if (entry === undefined) return [];
+    const base = attributeValueText(row.base, entry);
+    const value = attributeValueText(row.value, entry);
+    const sources = row.sources.filter((source) => source.applied);
+    if (base === value || sources.length === 0) return [];
+    return [{ row, entry, base, value, sources }];
+  });
+  if (shownRows.length === 0)
     return <p className="text-xs text-text-dim">{t('fittings.affectedBy.none')}</p>;
 
   return (
-    <ul className="space-y-2 text-xs">
-      {named.map((row) => {
-        const entry = dictionary[row.attributeId]!;
-        const shown = (value: number) => attributeValueText(value, entry);
-        return (
-          <li key={row.attributeId} className="space-y-1 rounded-xs bg-panel-2 p-2">
-            <div className="flex justify-between gap-2 font-semibold">
-              <span className="min-w-0">{entry.name}</span>
-              <span className="shrink-0 tabular-nums">
-                {t('fittings.affectedBy.change', {
-                  base: shown(row.base),
-                  value: shown(row.value),
-                })}
-              </span>
-            </div>
-            <ul className="space-y-0.5">
-              {row.sources.map((source, index) => (
-                <SourceLine key={index} source={source} unitId={entry.unitId} typeName={typeName} />
-              ))}
-            </ul>
-          </li>
-        );
-      })}
+    <ul className="space-y-3 text-xs">
+      {shownRows.map(({ row, entry, base, value, sources }) => (
+        <li key={row.attributeId} className="rounded-xs border border-line bg-panel-2">
+          <div className="flex justify-between gap-2 border-b border-line px-3 py-1.5 font-semibold">
+            <span className="min-w-0">{entry.name}</span>
+            <span className="shrink-0 tabular-nums">
+              {t('fittings.affectedBy.change', { base, value })}
+            </span>
+          </div>
+          <ul className="space-y-0.5 px-3 py-1.5">
+            {sources.map((source, index) => (
+              <SourceLine key={index} source={source} unitId={entry.unitId} typeName={typeName} />
+            ))}
+          </ul>
+        </li>
+      ))}
     </ul>
   );
 }
