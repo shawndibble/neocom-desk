@@ -41,13 +41,13 @@ export interface HaulingFillInput {
   from: HaulingEnd;
   to: HaulingEnd;
   mode: HaulMode;
-  /** The route, category and mode as one key: a new one (or a new Max price) drops the fill and its added rows. */
+  /** The route, category and mode as one key: a new one drops the fill and its added rows. */
   laneKey: string;
   feesAt: HaulingFeesAt;
   /** The panel's own row filters: the fill shows and sizes only what the table would. */
   filters: HaulingFilters;
   groups: readonly MarketGroupNode[] | null;
-  /** Every type id the category scan returned: the fill never scans them again. */
+  /** Every type id the category scan returned or examined: the fill never scans them again. */
   scannedTypeIds: readonly number[];
 }
 
@@ -80,7 +80,7 @@ export function useHaulingFill({
     addedRef.current = addedIds;
   }, [addedIds]);
 
-  /** Scan rows as the table shows them: the one filter the panel applies to its own rows. */
+  /** Scan rows as the table shows them. */
   const viewOf = useCallback(
     (scanRows: readonly HaulingScanRow[]) =>
       filterHaulingRows(toViewRows(scanRows, feesAt), filters).shown,
@@ -208,7 +208,8 @@ export function useHaulingFillOffer(
   { offered, current, overrides, before, base, categoryName, pin }: HaulingFillOfferInput
 ) {
   // A failed batch keeps what earlier batches found on offer: only a running one hides it.
-  const settled = fill.state.status === 'ready' || fill.state.status === 'error';
+  const { state } = fill;
+  const settled = state.status === 'ready' || state.status === 'error';
   const extras = useMemo(
     () => (offered && settled ? fill.rows.filter((r) => !fill.addedIds.has(r.typeId)) : []),
     [offered, settled, fill.rows, fill.addedIds]
@@ -277,13 +278,12 @@ export function useHaulingFillOffer(
     pin(lines);
   };
 
-  const { state } = fill;
   /** The plan once every offered item is in: what "Filled" reports and Find more is judged on. */
   const afterOffer = offer?.after ?? before;
   const freeAfterOffer = shownFreeM3(afterOffer.holds);
   const reason = state.status === 'ready' ? state.reason : null;
   const list: Omit<HaulingFillListProps, 'freeM3' | 'progressText'> = {
-    status: fill.state.status,
+    status: state.status,
     batch: state.status === 'loading' ? state.batch : 0,
     runningFreeM3: state.status === 'loading' ? state.freeM3 : null,
     reason,

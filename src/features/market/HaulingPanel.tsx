@@ -5,13 +5,13 @@
  *
  * The first view needs nothing from the user: a route and a category are
  * preset and the list works with no ship chosen. Choosing Cargo Space (and,
- * optionally, a budget) adds the hold meter and lets the Trip Plan stop at
+ * optionally, Max spend) adds the hold meter and lets the Trip Plan stop at
  * what fits. The plan is a suggestion — every row starts ticked at a suggested
  * quantity, and unticking or typing a number re-sizes the rest through the
  * same `planTrip` the suggestion came from.
  *
  * The Trip Plan lives in a rail beside the table: its totals, the
- * offer to fill the free space from other categories, and Copy multibuy. A
+ * fill offer, and Copy multibuy. A
  * row click selects the row and shows its detail in the rail. Where the
  * panel is too narrow for the rail (by its own width, ADR 0017), a sticky bar
  * carries the trip instead, and the trip and the detail open as sheets.
@@ -157,7 +157,7 @@ const HAULING_URL_FILTERS = {
   demand: enumParam(['steady', 'any'] as const, DEFAULT_HAULING_FILTER.demand),
   /** Max price per item, whole ISK; absent is no limit. */
   maxprice: optionalIntParam({ min: 1 }),
-  /** Max spend: the Trip Plan's ISK budget, whole ISK; absent is no limit. Remembered in `useHaulingBudget`, not with the filters. */
+  /** Max spend: the Trip Plan's ISK budget, whole ISK; absent is no limit. */
   spend: optionalIntParam({ min: 1 }),
 };
 
@@ -212,7 +212,7 @@ function useRememberedHaulingFilter(): RememberedDefaults<ReturnType<typeof haul
     () => ({
       values: pickRememberedParams({
         ...filterPref,
-        // Whole ISK, as the link holds it: the old budget field could save a fraction.
+        // Whole ISK, as the link holds it: a stored budget may be a fraction.
         spend: storedBudget === null ? null : Math.round(storedBudget) || null,
       }),
       // Called with only the remembered fields that changed.
@@ -317,8 +317,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   const rememberedFilter = useRememberedHaulingFilter();
   const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
-  /** Max spend. */
-  const budget = params.spend;
+  const maxSpend = params.spend;
   // Stable references (a hub from `TRADE_HUBS`, or the Any string): the scans key their effects on them.
   const from = haulingEnd(params.from);
   const to = haulingEnd(params.to);
@@ -465,8 +464,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setDetailOpen(false);
   }
 
+  // What the category scan returned or examined: the fill never spends a batch on them again.
   const scannedTypeIds = useMemo(
-    () => (state.status === 'ready' ? state.scan.rows.map((r) => r.typeId) : []),
+    () =>
+      state.status === 'ready'
+        ? [...state.scan.rows.map((r) => r.typeId), ...state.scan.examinedTypeIds]
+        : [],
     [state]
   );
   const fill = useHaulingFill({
@@ -501,8 +504,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   // Every candidate carries its own destination's fees; `fees` here is only the fallback.
   const planBase = useMemo(
-    () => ({ holds: cargo?.holds ?? null, budgetIsk: budget, fees: fees.at(TRADE_HUBS[0]!) }),
-    [cargo, budget, fees]
+    () => ({ holds: cargo?.holds ?? null, budgetIsk: maxSpend, fees: fees.at(TRADE_HUBS[0]!) }),
+    [cargo, maxSpend, fees]
   );
   const plan = useMemo(
     () => planTrip({ ...planBase, candidates: tableCandidates, overrides }),
@@ -916,8 +919,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         (columnVisibility.isVisible(column.id) || (cards && column.id === 'margin')))
   );
 
-  // Selling into buy orders reads neither days nor demand, so only the
-  // margin, max price and max spend count there.
+  // Selling into buy orders reads neither days nor demand.
   const activeFilterCount =
     (!instant && params.days !== DEFAULT_HAULING_FILTER.days ? 1 : 0) +
     (params.margin !== DEFAULT_HAULING_FILTER.margin ? 1 : 0) +
@@ -929,8 +931,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const hiddenCount = dear + (instant ? 0 : hidden.thin + hidden.slow) + hidden.lowMargin;
   // Only when Max price hid something does the hidden line name it.
   const hiddenKeySuffix = dear > 0 ? 'MaxPrice' : '';
-  // Category and mode ride along so the narrow sheet can edit them as part of
-  // its draft; only the remembered params are remembered.
+  // Category and mode ride along so the narrow sheet can edit them in its draft; neither is remembered.
   const filterValue = { ...pickRememberedParams(params), cat: categoryId, mode };
 
   // With Any hub at an end each row has its own lane: no one label, no one jump count.

@@ -22,6 +22,7 @@ import { useStickyClearance } from '@/lib/useStickyClearance';
 import { formatTripM3, shownUsedM3 } from './format';
 import { HaulingHoldMeters } from './HaulingHoldMeters';
 import { iskGains, signedIsk } from './signedIsk';
+import type { HaulingFillScanState } from './useHaulingFillScan';
 import { useHubJumps } from './useHubJumps';
 
 const isk = (value: number) => formatIsk(value, 0);
@@ -235,7 +236,7 @@ export interface HaulingFillItem {
   profit: number;
 }
 
-export type HaulingFillStatus = 'idle' | 'loading' | 'ready' | 'error';
+export type HaulingFillStatus = HaulingFillScanState['status'];
 
 /** Literal keys, so the locale split finds them. */
 const STOP_KEYS = {
@@ -264,13 +265,13 @@ export interface HaulingFillListProps {
   progressText?: string;
   /** Why the batches stopped, once `ready`. */
   reason: HaulingFillStopReason | null;
-  /** A Max price is set: "nothing else" is said of what is under it. */
+  /** A Max price is set. */
   underMaxPrice: boolean;
   /** Free m³ once every offered item is in: "Filled: 120 m³ left." */
   leftM3: number;
   /** Offers Find more: the hold is not full and something may be left. */
   canFindMore: boolean;
-  /** What the last Add loaded; it replaces the stop reason until the next Find. */
+  /** What the last Add loaded; it replaces the stop reason until the next Find or Find more. */
   added: { count: number; volumeM3: number } | null;
   /** Best profit per m³ first. */
   items: readonly HaulingFillItem[];

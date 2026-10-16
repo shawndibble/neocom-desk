@@ -487,6 +487,22 @@ describe('HaulingPanel fill the free space', () => {
     expect(fillInput!.measure([FILL_ROW], new Set())).toMatchObject({ newLines: 0 });
   });
 
+  it('never spends a batch on what the category scan examined either', () => {
+    setCargo(1000);
+    mainState = {
+      status: 'ready',
+      scan: {
+        rows: [SCAN_ROW],
+        scanned: 3,
+        examinedTypeIds: [2048, 77],
+        overMaxPrice: 0,
+        fetchedAt: 0,
+      },
+    };
+    renderPanel();
+    expect(new Set(fillInput!.excludeIds())).toEqual(new Set([2048, 77]));
+  });
+
   it('sizes only rows the user’s filters let through', async () => {
     setCargo(1000);
     renderPanel('from=jita&to=amarr&margin=90');

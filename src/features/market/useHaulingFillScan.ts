@@ -6,7 +6,7 @@
  *
  * Runs only when asked (`find`, `more`), never by itself: each batch costs a
  * scan's ESI budget. Batches run one after another, never side by side. A
- * route/category/mode change aborts → idle, dropping what was found.
+ * route, category, mode or Max price change aborts → idle, dropping what was found.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -144,6 +144,8 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
       });
     };
 
+    // Every Hauling category's ids, read once per press from the SDE the first batch loads.
+    let everyId: number[] | null = null;
     void (async () => {
       for (let batchInPress = 1; ; batchInPress += 1) {
         const batchNumber = lane.batches + 1;
@@ -168,10 +170,10 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
               mode,
               scope,
               maxUnitPrice,
-              typeIds: (groups, marketTypes) =>
-                typeIdsInHaulingCategory(EVERYTHING_CATEGORY_ID, groups, marketTypes).filter(
-                  (id) => !skip.has(id)
-                ),
+              typeIds: (groups, marketTypes) => {
+                everyId ??= typeIdsInHaulingCategory(EVERYTHING_CATEGORY_ID, groups, marketTypes);
+                return everyId.filter((id) => !skip.has(id));
+              },
             },
             signal,
             loading
@@ -184,13 +186,12 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
         // A cached batch answers at once, without looking at the signal.
         if (signal.aborted) return;
         lane.cacheKeys.add(haulingScanCacheKey({ from, to, scope, mode, maxUnitPrice }));
-        const kept = scan.rows.filter((row) => !skip.has(row.typeId));
-        lane.rows = [...lane.rows, ...kept];
+        lane.rows = [...lane.rows, ...scan.rows];
         for (const id of scan.examinedTypeIds) lane.examined.add(id);
         lane.batches = batchNumber;
         let measured: HaulingFillMeasure | null;
         try {
-          measured = latest.current.measure(lane.rows, new Set(kept.map((r) => r.typeId)));
+          measured = latest.current.measure(lane.rows, new Set(scan.rows.map((r) => r.typeId)));
         } catch {
           show({ status: 'error', rows: lane.rows, batches: lane.batches });
           return;
@@ -202,8 +203,8 @@ export function useHaulingFillScan(input: HaulingFillScanInput) {
             freeM3: Number.POSITIVE_INFINITY,
             capacityM3: 0,
             binding: null,
-            newLines: kept.length,
-            batchRows: kept.length,
+            newLines: scan.rows.length,
+            batchRows: scan.rows.length,
           }),
           batchInPress,
           capped: scan.capped ?? false,

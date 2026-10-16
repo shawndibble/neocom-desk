@@ -19,9 +19,6 @@
  * 3. **Order books.** The two hubs' books for those few, station-filtered,
  *    turned into ladders and estimated by `engine/market/haulingMarket`.
  *
- * Passes 1 and 2 order by trip profit, not price ratio
- * (`engine/market/haulingRank`); the minimum gaps still decide what is looked at.
- *
  * Demand is read from the destination's whole *region* history (ESI has no
  * per-station history) while the ladders are the hub *station's*; the popover
  * says so. Pure decisions live in the engine — this module only fetches and
@@ -139,10 +136,8 @@ export interface HaulingScan {
   /** True when the price or order-book cap cut the shortlist, so better-than-shown rows may exist unlooked-at. */
   capped?: boolean;
   /**
-   * Every id looked at past pass 1 and not worth another look: dropped by the
-   * history pass, or given its order books (a row or not). Ids cut by a cap
-   * before their next pass, or whose history read failed, are left out: a
-   * later scan should reach them.
+   * Ids past pass 1 not worth another look: dropped by history, or given books.
+   * Cap-cut or history-read-failed ids stay out, so a later scan reaches them.
    */
   examinedTypeIds: number[];
   /** Items pass 1 would have kept but for Max price: the "cost more than your max price" count. */
@@ -173,11 +168,6 @@ const scanCache = new Map<string, { scan: HaulingScan; expiresAt: number }>();
 
 export function clearHaulingScanCache(): void {
   scanCache.clear();
-}
-
-/** Test-only: how many scans the cache holds, expired ones included. */
-export function haulingScanCacheSize(): number {
-  return scanCache.size;
 }
 
 function writeScanCache(key: string, scan: HaulingScan): void {
