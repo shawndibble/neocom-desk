@@ -754,6 +754,30 @@ describe('ItemDetailModal best sell/buy price', () => {
     expect(screen.getByText('420,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
+  it('treats every type as ordinary when the mutaplasmid data fails to load', async () => {
+    mockedLoadMutaplasmids.mockRejectedValue(new Error('offline'));
+    serveRifter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${JITA_REGION_ID}/orders`, () =>
+        HttpResponse.json([order({ order_id: 1, is_buy_order: false, price: 450_000 })])
+      )
+    );
+
+    render(
+      <MemoryRouter>
+        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} showOpenInMarket />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole('link', { name: 'View in Market' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /best sell 450,000 ISK/i })).toBeInTheDocument();
+    mockedLoadMutaplasmids.mockResolvedValue({
+      attributeNames: {},
+      mutaplasmids: {},
+      abyssalTypeIds: [],
+    });
+  });
+
   it('links best sell and best buy to the item in the Market, keeping the hub', async () => {
     serveRifter();
     server.use(
