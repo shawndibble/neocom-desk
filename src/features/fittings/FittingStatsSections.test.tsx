@@ -1480,12 +1480,11 @@ describe('FittingStatsSections — column and side panels', () => {
   it('switches one open panel to the other trigger’s content, and Escape closes it', async () => {
     const user = userEvent.setup();
     renderSections(stats());
-    const before = window.history.length;
-    await openPanel('Pilot');
+    const panel = await openPanel('Pilot');
     await user.click(screen.getByRole('button', { name: /^Situation/ }));
-    // Still the one panel's history entry: the switch pushed no second one for Back to step through.
-    expect(window.history.length).toBe(before + 1);
-    expect(await screen.findByRole('dialog', { name: 'Situation' })).toBeInTheDocument();
+    // The same panel, not a remount: a remount sends focus back to the Pilot
+    // trigger and leaves its history entry behind for Back to step through.
+    expect(await screen.findByRole('dialog', { name: 'Situation' })).toBe(panel);
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
     expect(screen.getByRole('checkbox', { name: 'Overheat all' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Implants & skills' })).toBeNull();
