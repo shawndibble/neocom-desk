@@ -11,6 +11,7 @@ import {
   SearchInput,
   Spinner,
   TypeIcon,
+  CachedNotice,
 } from '@/components/ui';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { DataGate } from '@/components/DataGate';
@@ -53,13 +54,15 @@ interface ShipData {
   skipped: readonly SkippedCharacterAssets[];
   /** How many Characters' assets were read; zero with some skipped means nothing loaded at all. */
   loadedCount: number;
+  /** When the oldest saved-copy list was read (ms); null when every list came from ESI. */
+  cachedAt: number | null;
 }
 
 type ShipsState = { status: 'loading' } | { status: 'ready'; data: ShipData } | { status: 'error' };
 
 /** SDE-backed ship lookup plus every chosen Character's ships. Cache-or-live, like the page's own cross-character read. */
 async function loadShipData(characterIds: readonly number[]): Promise<ShipData> {
-  const [{ entries, skipped }, types, groupCategories] = await Promise.all([
+  const [{ entries, skipped, cachedAt }, types, groupCategories] = await Promise.all([
     loadOtherCharactersAssetsDetailed(characterIds),
     loadTypes(),
     // Without it no type reads as a ship: an empty list beats a wrong one.
@@ -107,6 +110,7 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
     contentsByShip,
     skipped,
     loadedCount: entries.length,
+    cachedAt: cachedAt ?? null,
   };
 }
 
@@ -477,6 +481,9 @@ export function MyShipsView({
           }
         >
           <LiveStatus>{!allSkipped ? skippedMessage : ''}</LiveStatus>
+          {state.status === 'ready' && state.data.cachedAt !== null && (
+            <CachedNotice fetchedAt={state.data.cachedAt} />
+          )}
           {state.status === 'ready' && !allSkipped && state.data.skipped.length > 0 && (
             <p className="text-[0.6875rem] text-warning uppercase">{skippedMessage}</p>
           )}

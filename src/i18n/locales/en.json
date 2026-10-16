@@ -1869,7 +1869,6 @@
     "attributeBreakdownBoth": "{{base}} base + {{implant}} implant + {{booster}} booster = {{effective}}",
     "emptyTitle": "No skill data cached",
     "emptyHint": "Couldn't load this character's trained skills yet. Try again shortly.",
-    "offlineTitle": "Showing cached data",
     "sp": "{{value}} SP",
     "trainingChip": "Training → {{level}} · {{time}}",
     "board": {

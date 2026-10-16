@@ -107,6 +107,15 @@ function cached<T>(data: T): StatusResult<T> {
   return { cached: result, needsReauth: false };
 }
 
+/** A read that fell back to its saved copy, three hours old. */
+function savedCopy<T>(data: T): StatusResult<T> {
+  const result = cached(data).cached!;
+  return {
+    cached: { ...result, fromCache: true, fetchedAt: new Date(NOW - 3 * 3_600_000) },
+    needsReauth: false,
+  };
+}
+
 /** Fails the test if the route ever calls a loader the capabilities did not open. */
 function forbidden(name: string) {
   return vi.fn(() => {
@@ -619,6 +628,30 @@ describe('the board (AC2, AC5, AC6)', () => {
     resolveSecondFetch(cached([]));
     await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalledTimes(2));
     expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument();
+  });
+});
+
+describe('the cached data notice', () => {
+  beforeEach(() => {
+    mockedAccess.mockReturnValue(
+      accessOf('ready', { canReadStructures: true, canReadMoonExtractions: true })
+    );
+    mocked.loadCorporationStructures.mockResolvedValue(cached([]));
+    mocked.loadCorporationMiningExtractions.mockResolvedValue(cached([]));
+  });
+
+  it('says nothing while every read is fresh', async () => {
+    renderCorp();
+    await waitFor(() => expect(mocked.loadCorporationMiningExtractions).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull());
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
+  it('shows it, dated by the saved copy, when any one panel read is cached', async () => {
+    mocked.loadCorporationMiningExtractions.mockResolvedValue(savedCopy([]));
+    renderCorp();
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('3h ago', { selector: 'p time' })).toBeInTheDocument();
   });
 });
 

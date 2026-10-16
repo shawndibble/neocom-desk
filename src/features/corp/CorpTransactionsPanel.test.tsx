@@ -50,7 +50,7 @@ function renderPanel(overrides: Partial<Parameters<typeof CorpTransactionsPanel>
           onSortChange={vi.fn()}
           nameFor={() => 'Damage Control II'}
           divisionQualifier={undefined}
-          offlineTitleKey="common.offlineTitle"
+          refreshFailed={false}
           {...overrides}
         />
       </MemoryRouter>,

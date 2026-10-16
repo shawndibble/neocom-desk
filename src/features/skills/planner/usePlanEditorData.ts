@@ -66,6 +66,8 @@ export interface PlanEditorData {
    * /skills and queue reads (`loadCorrectedSkills`), null until either was read.
    */
   fetchedAt: Date | null;
+  /** Either of those two reads is the saved copy: ESI could not be reached. */
+  fromCache: boolean;
   /**
    * Re-runs the load, reaching ESI rather than a freshness-window hit (the
    * same bypass as `useRouteSnapshot`'s `refresh`). The previous answer
@@ -100,6 +102,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   const [totalSp, setTotalSp] = useState<number | null>(null);
   const [unallocatedSp, setUnallocatedSp] = useState<number | null>(null);
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
+  const [fromCache, setFromCache] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const reload = useCallback(() => {
     invalidateFreshness();
@@ -127,6 +130,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
       setTotalSp(null);
       setUnallocatedSp(null);
       setFetchedAt(null);
+      setFromCache(false);
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a retry clears the last failure, not a render-time derivation
     setCatalogFailed(false);
@@ -163,6 +167,10 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
         setTotalSp(corrected.totalSp);
         setUnallocatedSp(corrected.skillsResult?.data.unallocated_sp ?? null);
         setFetchedAt(corrected.fetchedAt);
+        setFromCache(
+          (corrected.skillsResult?.fromCache ?? false) ||
+            (corrected.queueResult?.fromCache ?? false)
+        );
       }
       // Without the implants the baseline can't be worked out; the attributes
       // alone are kept, as ESI reported them.
@@ -206,6 +214,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     totalSp,
     unallocatedSp,
     fetchedAt,
+    fromCache,
     reload,
   };
 }

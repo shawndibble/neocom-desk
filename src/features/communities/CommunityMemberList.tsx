@@ -6,6 +6,8 @@ import {
   RowActionsMenu,
   RowMoreActions,
   SearchInput,
+  NeedsConnection,
+  Button,
 } from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { isLibraryStale } from '@/engine/communities/sharedLibrary';
@@ -13,7 +15,6 @@ import { formatAge } from '@/lib/age';
 import { characterIdForUid } from '@/sync/uid';
 import { useOnline } from '@/stores/network';
 import { communityBadgeClassName } from './communityBadge';
-import { NeedsConnectionButton } from './NeedsConnectionButton';
 import type { CommunityMember } from './communityStore';
 
 /** Above this many Members a name filter earns its row; a short roster is read at a glance. */
@@ -134,9 +135,11 @@ export function CommunityMemberList({
           <p className="min-w-0 flex-1 basis-48 text-xs text-text-dim">
             {t('communities.leaveHint')}
           </p>
-          <NeedsConnectionButton variant="danger" size="sm" onClick={onLeave}>
-            {t('communities.leave')}
-          </NeedsConnectionButton>
+          <NeedsConnection>
+            <Button variant="danger" size="sm" onClick={onLeave}>
+              {t('communities.leave')}
+            </Button>
+          </NeedsConnection>
         </section>
       )}
     </div>

@@ -25,6 +25,7 @@ import {
   Spinner,
   Toast,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
@@ -1311,9 +1312,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       ) : (
         <div className="space-y-2">
           {fromCacheAny && (
-            <p className="text-[0.6875rem] text-warning uppercase">
-              {listRefreshCount > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
-            </p>
+            <CachedNotice fetchedAt={dataAgeDate} refreshFailed={listRefreshCount > 0} />
           )}
           <div className="flex flex-wrap items-center gap-1.5">
             {(showActivityFilter || showStatusFilter) && (

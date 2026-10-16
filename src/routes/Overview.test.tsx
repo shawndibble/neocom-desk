@@ -305,6 +305,30 @@ describe('Overview widget grid', () => {
     expect(screen.queryByText('New')).not.toBeInTheDocument();
   });
 
+  it('says nothing about cached data while every read is fresh, and names it once one is cached', async () => {
+    await seedLayout(widget('a', 'wallet', { size: 'S' }), widget('n', 'netWorth', { size: 'S' }));
+    const { unmount } = render(<App />);
+    await widgetCard('Wallet');
+    expect(await screen.findByRole('button', { name: /Data updated/ })).toBeInTheDocument();
+    // A Net Worth widget reads recorded history, which is not a cached read.
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+    unmount();
+
+    // The saved balance answers when ESI cannot.
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:balance',
+      value: 1_000_000,
+      fetchedAt: Date.now() - 3 * 3_600_000,
+    });
+    server.use(
+      http.get('https://esi.evetech.net/characters/:id/wallet', () => HttpResponse.error())
+    );
+    render(<App />);
+    await widgetCard('Wallet');
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+  });
+
   it('offers the training finish as the header Next deadline', async () => {
     await seedLayout(widget('b', 'training', { size: 'S' }));
     render(<App />);

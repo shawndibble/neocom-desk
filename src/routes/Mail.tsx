@@ -19,6 +19,7 @@ import {
   SearchInput,
   Spinner,
   Tooltip,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
@@ -763,9 +764,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
               endpoints={['getCharacterMailHeaders']}
             />
           )}
-          {offline && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-          )}
+          {offline && <CachedNotice fetchedAt={fetchedAt} />}
 
           {(isDesktop || selectedKey === null) && (
             // A toggle-button group, not a tablist: `aria-selected` on a tab

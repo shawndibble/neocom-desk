@@ -38,6 +38,7 @@ import {
   Tabs,
   TabPanel,
   useTabsId,
+  CachedNotice,
 } from '@/components/ui';
 import { usePageTab } from '@/lib/usePageTab';
 import { tabBarTabs } from '@/lib/pageTabs';
@@ -1767,11 +1768,7 @@ export function Assets() {
                   endpoints={['getCharacterAssets']}
                 />
               )}
-              {assetsResult.fromCache && (
-                <p className="text-[0.6875rem] text-warning uppercase">
-                  {t('common.offlineTitle')}
-                </p>
-              )}
+              {assetsResult.fromCache && <CachedNotice fetchedAt={assetsResult.fetchedAt} />}
               {assetsTruncated && (
                 <p className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-warning uppercase">
                   <span>

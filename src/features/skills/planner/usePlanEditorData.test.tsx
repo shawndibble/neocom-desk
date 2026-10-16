@@ -60,6 +60,45 @@ describe('usePlanEditorData', () => {
     expect(result.current.fetchedAt).toEqual(at);
   });
 
+  describe('fromCache', () => {
+    const at = new Date('2026-10-04T10:00:00Z');
+    const read = (fromCache: boolean) => ({ data: [], fetchedAt: at, fromCache });
+    const withReads = (skills: boolean | null, queue: boolean | null): CorrectedSkills => ({
+      ...corrected(at, 3),
+      skillsResult: (skills === null
+        ? null
+        : read(skills)) as unknown as CorrectedSkills['skillsResult'],
+      queueResult: (queue === null
+        ? null
+        : read(queue)) as unknown as CorrectedSkills['queueResult'],
+    });
+
+    it.each([
+      ['skills', true, false, true],
+      ['queue', false, true, true],
+      ['both', true, true, true],
+      ['neither', false, false, false],
+      ['neither read at all', null, null, false],
+    ] as const)('%s cached: %s/%s -> %s', async (_name, skills, queue, expected) => {
+      loadCorrectedSkills.mockResolvedValue(withReads(skills, queue));
+      const { result } = renderHook(() => usePlanEditorData(7));
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      expect(result.current.fromCache).toBe(expected);
+    });
+
+    it("does not carry the previous Character's flag over to the next", async () => {
+      loadCorrectedSkills.mockResolvedValueOnce(withReads(true, false));
+      const { result, rerender } = renderHook(({ id }) => usePlanEditorData(id), {
+        initialProps: { id: 7 },
+      });
+      await waitFor(() => expect(result.current.fromCache).toBe(true));
+      loadCorrectedSkills.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      rerender({ id: 8 });
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      expect(result.current.fromCache).toBe(false);
+    });
+  });
+
   it('is null before /skills has ever been read', async () => {
     loadCorrectedSkills.mockResolvedValue(corrected(null, 0));
     const { result } = renderHook(() => usePlanEditorData(7));

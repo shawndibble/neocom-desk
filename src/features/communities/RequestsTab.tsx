@@ -12,6 +12,7 @@ import {
   SearchInput,
   Spinner,
   type DataTableColumn,
+  NeedsConnection,
 } from '@/components/ui';
 import { permissionsForEndpoints } from '@/esi/registry';
 import {
@@ -31,7 +32,6 @@ import { jumpRangeLimit, type JumpRange } from '@/engine/route/jumpRange';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
 import { ComposeRequestDialog } from './ComposeRequestDialog';
-import { NeedsConnectionButton } from './NeedsConnectionButton';
 import { MyPledgesPanel } from './MyPledgesPanel';
 import { PledgeBar } from './PledgeBar';
 import { RequestPanel } from './RequestPanel';
@@ -257,9 +257,11 @@ export function RequestsTab({
     />
   );
   const newRequest = (
-    <NeedsConnectionButton size="sm" variant="primary" onClick={() => setComposing(true)}>
-      {t('communities.board.new')}
-    </NeedsConnectionButton>
+    <NeedsConnection>
+      <Button size="sm" variant="primary" onClick={() => setComposing(true)}>
+        {t('communities.board.new')}
+      </Button>
+    </NeedsConnection>
   );
 
   if (requests.length === 0) {

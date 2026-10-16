@@ -12,6 +12,7 @@ import {
   Spinner,
   Tooltip,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
@@ -107,10 +108,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
   const highlightTypeId = useHighlightParam();
-  // A manual Refresh that still falls back to cache is a more alarming case
-  // than the initial load finding cache first — same banner, different copy.
-  const offlineTitleKey = refreshCount > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle';
-
   const transactionsResult = data?.transactionsResult ?? null;
   const transactionsNeedsReauth = data?.transactionsNeedsReauth ?? false;
   const transactionsTruncated = data?.transactionsTruncated ?? false;
@@ -332,9 +329,11 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         ) : (
           <>
             {transactionsResult.fromCache && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t(offlineTitleKey)}
-              </p>
+              <CachedNotice
+                className="px-3 pt-2"
+                fetchedAt={transactionsResult.fetchedAt}
+                refreshFailed={refreshCount > 0}
+              />
             )}
             {transactionsTruncated && (
               <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">

@@ -16,6 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  CachedNotice,
+  NeedsConnection,
 } from '@/components/ui';
 import { focusRingClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { db } from '@/db';
@@ -34,7 +36,6 @@ import {
   type CommunitySummary,
 } from '@/features/communities/communityStore';
 import { loadWithSnapshot, pruneCommunitySnapshots } from '@/features/communities/communityCache';
-import { NeedsConnectionButton } from '@/features/communities/NeedsConnectionButton';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useReconnectCount } from '@/stores/network';
 
@@ -160,13 +161,15 @@ export function Communities() {
         actions={
           // Primary only while it is the one thing to do; once in a Community it
           // steps back. Always md: level with the alerts bell beside it.
-          <NeedsConnectionButton
-            variant={communities?.length === 0 ? 'primary' : 'ghost'}
-            aria-label={t('communities.createLabel')}
-            onClick={() => setCreating(true)}
-          >
-            {t('communities.create')}
-          </NeedsConnectionButton>
+          <NeedsConnection>
+            <Button
+              variant={communities?.length === 0 ? 'primary' : 'ghost'}
+              aria-label={t('communities.createLabel')}
+              onClick={() => setCreating(true)}
+            >
+              {t('communities.create')}
+            </Button>
+          </NeedsConnection>
         }
       />
       {/* Inside a Community its own card says what it is; the intro is for the list. */}
@@ -174,9 +177,7 @@ export function Communities() {
 
       {cached && (
         <div className="flex flex-wrap items-center gap-2">
-          <p role="status" className="text-[0.6875rem] text-warning uppercase">
-            {t('common.offlineTitle')}
-          </p>
+          <CachedNotice fetchedAt={null} />
           <Button size="sm" onClick={refresh}>
             {t('common.retry')}
           </Button>

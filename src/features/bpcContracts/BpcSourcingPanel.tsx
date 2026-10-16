@@ -41,6 +41,7 @@ import {
   sortRows,
   textActionClassName,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
@@ -1750,9 +1751,7 @@ export function BpcSourcingPanel({
         ) : (
           <>
             {contractsResult?.fromCache && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('common.offlineTitle')}
-              </p>
+              <CachedNotice className="px-3 pt-2" fetchedAt={contractsResult.fetchedAt} />
             )}
             {contractsResult === null && (
               // Owned blueprints still list, but no public offers came back.

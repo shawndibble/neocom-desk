@@ -79,6 +79,24 @@ export function loadAllCharactersWalletBalances(): Promise<WalletBalancesSnapsho
   });
 }
 
+/**
+ * When the oldest saved-copy balance among the given Characters was read (ms),
+ * or null when none of them is a saved copy. A total over several Characters is
+ * only as fresh as its stalest cached part; a Character outside the list
+ * (filtered out of the view) does not age it.
+ */
+export function oldestCachedBalanceAt(
+  entries: readonly CharacterWalletBalance[],
+  characterIds: ReadonlySet<number>
+): number | null {
+  const times = entries.flatMap((entry) =>
+    characterIds.has(entry.characterId) && entry.balanceResult?.fromCache
+      ? [entry.balanceResult.fetchedAt.getTime()]
+      : []
+  );
+  return times.length > 0 ? Math.min(...times) : null;
+}
+
 /** Sum of every entry that actually has a usable balance — a needsReauth or never-fetched entry is simply absent from the total, not counted as zero. */
 export function totalWalletBalance(entries: readonly CharacterWalletBalance[]): number {
   return entries.reduce(

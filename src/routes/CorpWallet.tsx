@@ -42,6 +42,7 @@ import {
   Tooltip,
   type DataTableColumn,
   type DataTableSort,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -166,7 +167,7 @@ interface CorpDivisionsPanelProps {
   selected: number;
   onSelect: (division: number) => void;
   divisionLabel: (entry: WalletDivision) => string;
-  offlineTitleKey: string;
+  refreshFailed: boolean;
 }
 
 /**
@@ -180,7 +181,7 @@ function CorpDivisionsPanel({
   selected,
   onSelect,
   divisionLabel,
-  offlineTitleKey,
+  refreshFailed,
 }: CorpDivisionsPanelProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -193,7 +194,11 @@ function CorpDivisionsPanel({
   // nothing worth folding.
   const foldable = isPhone && !loading && !!walletsResult && divisions.length > 1;
   const offlineNote = walletsResult?.fromCache ? (
-    <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
+    <CachedNotice
+      className="mt-3"
+      fetchedAt={walletsResult.fetchedAt}
+      refreshFailed={refreshFailed}
+    />
   ) : null;
   return (
     <CollapsiblePanel
@@ -286,7 +291,7 @@ interface CorpJournalPanelProps {
   sort: DataTableSort;
   onSortChange: (sort: DataTableSort) => void;
   divisionQualifier: string | undefined;
-  offlineTitleKey: string;
+  refreshFailed: boolean;
 }
 
 function CorpJournalPanel({
@@ -300,7 +305,7 @@ function CorpJournalPanel({
   sort,
   onSortChange,
   divisionQualifier,
-  offlineTitleKey,
+  refreshFailed,
 }: CorpJournalPanelProps) {
   const { t } = useTranslation();
   const { filteredJournal, breakdownJournal, refTypeOptions } = useJournalFilterResult(
@@ -352,9 +357,11 @@ function CorpJournalPanel({
       ) : (
         <>
           {journalResult.fromCache && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t(offlineTitleKey)}
-            </p>
+            <CachedNotice
+              className="px-3 pt-2"
+              fetchedAt={journalResult.fetchedAt}
+              refreshFailed={refreshFailed}
+            />
           )}
           {journalResult.truncated && (
             <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
@@ -542,9 +549,7 @@ function CorpWalletView() {
           selected={effectiveDivision}
           onSelect={setDivision}
           divisionLabel={divisionLabel}
-          offlineTitleKey={
-            corpBalances.refreshCount > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle'
-          }
+          refreshFailed={corpBalances.refreshCount > 0}
         />
 
         {/* A view switch, not a second tab bar: the Corp sub-nav is the one level of tabs. */}
@@ -571,9 +576,7 @@ function CorpWalletView() {
             sort={journalSortProps.sort}
             onSortChange={journalSortProps.onSortChange}
             divisionQualifier={divisionQualifier}
-            offlineTitleKey={
-              corpJournal.refreshCount > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle'
-            }
+            refreshFailed={corpJournal.refreshCount > 0}
           />
         ) : (
           <CorpTransactionsPanel
@@ -587,11 +590,7 @@ function CorpWalletView() {
             onSortChange={transactionsSortProps.onSortChange}
             nameFor={nameForType}
             divisionQualifier={divisionQualifier}
-            offlineTitleKey={
-              corpTransactions.refreshCount > 0
-                ? 'common.refreshFailedTitle'
-                : 'common.offlineTitle'
-            }
+            refreshFailed={corpTransactions.refreshCount > 0}
           />
         )}
       </div>

@@ -9,6 +9,7 @@ import {
   PageHeader,
   Panel,
   Spinner,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
@@ -422,9 +423,7 @@ export function Calendar() {
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : (
         <>
-          {data?.fromCache && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-          )}
+          {data?.fromCache && <CachedNotice fetchedAt={data.oldestFetchedAt} />}
           {/*
             The page no longer gates on one scope, so a refused source has to
             announce itself somewhere the pilot will actually look. Naming the

@@ -188,6 +188,8 @@ describe('EventDetailModal', () => {
       expect(
         screen.queryByRole('button', { name: 'Log in again with EVE Online' })
       ).not.toBeInTheDocument();
+      // The saved copy says so, rather than passing as current.
+      expect(screen.getByText('Showing cached data')).toBeInTheDocument();
     });
   });
 

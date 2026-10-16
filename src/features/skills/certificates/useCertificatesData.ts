@@ -53,6 +53,8 @@ export function useCertificatesData(characterId: number | null) {
     cloneState,
     /** When the queue-corrected skills were read, for the header's `DataAgeBadge`. */
     fetchedAt: editor.fetchedAt,
+    /** Those skills are the saved copy: ESI could not be reached. */
+    fromCache: editor.fromCache,
     /** Re-reads skills and re-grades in place; the rows stay up meanwhile. */
     refresh: editor.reload,
   };
