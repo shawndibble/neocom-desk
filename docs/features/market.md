@@ -360,7 +360,7 @@ Concept: scan one market category (or Everything) for items cheaper at origin hu
 Controls (`FilterBar` in `HaulingPanel.tsx`)
 
 - From and To hub selects (5 hubs + Any hub; one end only; both Any = EmptyState `bothAny`; same hub = `sameHub` EmptyState). Defaults: From = device default hub, To = Jita (Amarr if From is Jita) (`haulingHubs.ts`). Picking Any on one side forces the other off Any (`pickHaulingHub`).
-- Category select: Everything + Ammunition & Charges (default, id 11), Ship Equipment, Drones, Implants & Boosters, Trade Goods, Ship and Module Modifications, Planetary Infrastructure; ships excluded (packaged volume mismatch) (`haulingCategories.ts`).
+- Category select: Everything + Ammunition & Charges (default, id 11), Ship Equipment, Drones, Implants & Boosters, Trade Goods, Ship and Module Modifications, Planetary Infrastructure, Manufacture & Research, Structures, Structure Modifications, Structure Equipment; ships excluded (packaged volume mismatch), as are Blueprints & Reactions, Skills, Ship SKINs, Apparel, Personalization, Special Edition Assets, Pilot's Services (`haulingCategories.ts`; #3894).
 - Mode select: `list` (list at destination, default) / `instant` (sell into destination buy orders) (`HAUL_MODES`, `haulingData.ts:86`).
 - Category and Mode sit in the route row on desktop; below the narrow breakpoint (`useIsNarrow`) they move into the filter sheet and a one-line "category · mode" summary shows under the bar.
 - Filters (FilterBar funnel popover on desktop, sheet on narrow; draft model, Apply commits): Sells within (7/14/30 days/any), Margin over (0/3/5/10%), Demand (steady / any); days and demand list mode only (hidden in instant, not counted in the active-filter badge). Fees line shows Accounting/Broker levels (instant shows Accounting only).
@@ -386,7 +386,7 @@ CSV (`haulingCsv.ts`, surface via `useTableExport`): Item, [Hub], Buy, Expected/
 
 Multibuy: `multibuyText(plan.lines)` -> clipboard; list shown on demand.
 
-Data sources (`haulingData.ts`): pass 1 Fuzzwork aggregates once per hub the lanes touch (`getHubPrices`; list: dest lowest sell >= 1.10x origin lowest sell; instant: dest highest buy >= 1.035x), each item keeps only its best lane (matters with Any hub), top 80 by gap (`MAX_PRICED_CANDIDATES`); pass 2 (list only) ESI destination-region history for all 80 (`loadPriceHistory`): drops items with no recent price/volume or whose recent price x 0.94 / buy < 1.03, shortlist top 40 by that proxy (`MAX_BOOK_CANDIDATES`); instant skips history and takes the top 40 by gap; pass 3 ESI order books for the shortlist at both hub stations (`getOrderBook`, ADR 0003). Prices unavailable at every origin = error state. Fees from active character skills (`useHaulingFees`); no scope required.
+Data sources (`haulingData.ts`): pass 1 Fuzzwork aggregates once per hub the lanes touch (`getHubPrices`; list: dest lowest sell >= 1.10x origin lowest sell; instant: dest highest buy >= 1.035x), each item keeps only its best lane (matters with Any hub), top 80 by `priceScore` (`MAX_PRICED_CANDIDATES`; `engine/market/haulingRank.ts`: (sell x 0.94 - buy) x min(origin listed, dest listed), instant: dest listed = buy-side volume and 0.94 becomes 1 - Accounting V sales tax; the best lane is chosen by the same score); pass 2 (list only) ESI destination-region history for all 80 (`loadPriceHistory`): drops items with no recent price/volume or whose recent price x 0.94 / buy < 1.03, shortlist top 40 by `historyScore` (`MAX_BOOK_CANDIDATES`; (recent price x 0.94 - buy) x min(floor(daily volume x 7 x 25%), origin listed)); instant skips history and takes the top 40 by `priceScore`; ties break by gap, then type id. Ranking by trip profit, not ratio: scope decision `20261015-224700` (#3894); pass 3 ESI order books for the shortlist at both hub stations (`getOrderBook`, ADR 0003); unit volume = market catalogue packaged volume (`loadMarketTypesById`, loaded only when a shortlist exists), else `types.json`, else ESI type; name falls back to the market catalogue when `types.json` lacks the type (group then unknown: general hold only). Prices unavailable at every origin = error state. Fees from active character skills (`useHaulingFees`); no scope required.
 
 Engine
 
@@ -395,7 +395,7 @@ Engine
 
 Observed gaps
 
-- Category list is hard-coded seven market groups; ships excluded (`haulingCategories.ts` header).
+- Category list is hard-coded eleven market groups; ships excluded (`haulingCategories.ts` header).
 - Both ends Any hub unsupported (v1, 20 lanes would blow request budget, `haulingHubs.ts`).
 - Demand read from region-wide history while ladders are hub-station (popover says so); no per-station history in ESI.
 - Scan caps (80 priced, 40 with books) mean results are a top-N, not exhaustive; footer reports scanned count only.
