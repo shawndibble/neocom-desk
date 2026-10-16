@@ -26,6 +26,14 @@ export function abyssalTierLevels(tier: AbyssalTier): readonly [AbyssalLevel, Ab
   return tier <= 3 ? [1, 2] : [2, 3];
 }
 
+/**
+ * The tiers that roll `level`, lowest first: where to send a pilot whose
+ * picked strength their tier never rolls. Always a run of adjacent tiers.
+ */
+export function abyssalTiersRolling(level: AbyssalLevel): readonly AbyssalTier[] {
+  return ABYSSAL_TIERS.filter((tier) => abyssalTierLevels(tier).includes(level));
+}
+
 /** Type ids from the SDE (the ranges interleave and skip 56135, so listed outright). */
 const FILAMENT_IDS: Readonly<Record<AbyssalTier, Readonly<Record<AbyssalWeatherKind, number>>>> = {
   0: { electrical: 56131, dark: 56132, exotic: 56133, firestorm: 56134, gamma: 56136 },

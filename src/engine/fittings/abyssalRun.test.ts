@@ -6,6 +6,7 @@ import {
   abyssalFilamentTypeId,
   abyssalHullRule,
   abyssalTierLevels,
+  abyssalTiersRolling,
   weaponReachChange,
 } from './abyssalRun';
 import { ABYSSAL_WEATHER_KINDS } from './abyssalWeather';
@@ -17,6 +18,14 @@ describe('abyssalTierLevels', () => {
     expect(abyssalTierLevels(3)).toEqual([1, 2]);
     expect(abyssalTierLevels(4)).toEqual([2, 3]);
     expect(abyssalTierLevels(6)).toEqual([2, 3]);
+  });
+});
+
+describe('abyssalTiersRolling', () => {
+  it('names the tiers that roll a strength, lowest first', () => {
+    expect(abyssalTiersRolling(1)).toEqual([0, 1, 2, 3]);
+    expect(abyssalTiersRolling(2)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(abyssalTiersRolling(3)).toEqual([4, 5, 6]);
   });
 });
 

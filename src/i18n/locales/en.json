@@ -821,7 +821,7 @@
         "6": "Cataclysmic"
       },
       "strengthNote": "T{{tier}} rolls −{{low}}% or −{{high}}%",
-      "strengthOff": "T{{tier}} never rolls this strength; pick another above.",
+      "strengthOff": "T{{tier}} rolls −{{low}}% or −{{high}}%, never −{{picked}}% (T{{from}}–T{{to}} do). The numbers below are for −{{picked}}%.",
       "security": "Activate in",
       "securityOption": "{{value}} security",
       "securityBelow": "Low or null security",
