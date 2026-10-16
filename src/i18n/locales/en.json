@@ -808,7 +808,6 @@
       "more_other": "and {{count}} more"
     },
     "abyssalRun": {
-      "title": "Plan an Abyssal run",
       "tier": "Filament tier",
       "tierOption": "T{{tier}} {{name}}",
       "tierName": {
@@ -946,6 +945,7 @@
         "fleetBoosts": "Fleet boosts",
         "mining": "Mining",
         "projected": "Projected effects",
+        "abyssal": "Abyssal",
         "fighters": "Fighters"
       },
       "capacitorStable": "Stable at {{pct}}%",

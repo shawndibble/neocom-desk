@@ -64,6 +64,11 @@ import type { OverlayFitting } from './useOverlayFitting';
 import { FittingItemMenu, WeaponMenuItems } from './FittingItemMenu';
 import { kmValue, rangeLines } from './rangeText';
 import { useFittingItemActions } from './fittingItemActions';
+import {
+  AbyssalRunPlanner,
+  AbyssalWeatherMeta,
+  type Compare as AbyssalCompare,
+} from './AbyssalRunPlanner';
 
 const DMG_FILL_CLASS = {
   em: 'bg-dmg-em',
@@ -289,6 +294,7 @@ type Section =
   | 'mining'
   | 'fleetBoosts'
   | 'projected'
+  | 'abyssal'
   | 'targeting'
   | 'navigation'
   | 'drones'
@@ -420,8 +426,14 @@ interface FittingStatsSectionsProps {
   overlay?: OverlayFitting;
   /** A line above the sections — whose skills the numbers are worked out under. */
   heading?: ReactNode;
-  /** Controls for the conditions every section is worked out in — implants, Tactical mode, Abyssal weather, missing skills — under the heading. */
+  /** Controls for the conditions every section is worked out in — Tactical mode, missing skills — under the heading. */
   conditions?: ReactNode;
+  /**
+   * The Abyssal section — the session weather and a run planned in it
+   * (`AbyssalRunPlanner`); absent where the page has no fit to compare in it.
+   * The weather's delta on the fit is only worked out while the section is open.
+   */
+  abyssal?: { hullGroupId: number | undefined; compare: AbyssalCompare | null };
   /** The implant controls, grouped with the skills override under "Implants & skills" — absent where a Fitting has no implants to choose. */
   implants?: ReactNode;
   /** "What to train" (`FittingWhatToTrainPanel`) — absent where there's no Character to train. Collapsed by default: it only works anything out once opened. */
@@ -584,6 +596,7 @@ export function FittingStatsSections({
   overlay,
   heading,
   conditions,
+  abyssal,
   implants,
   whatToTrain,
   yourCharacters,
@@ -976,6 +989,17 @@ export function FittingStatsSections({
         projectedShips > 0 ? t('fittings.projected.meta', { count: projectedShips }) : undefined,
         <ProjectedEffectsPanel />
       )}
+
+      {abyssal &&
+        section(
+          'abyssal',
+          <AbyssalWeatherMeta />,
+          <AbyssalRunPlanner
+            hullGroupId={abyssal.hullGroupId}
+            compare={abyssal.compare}
+            typeName={typeName}
+          />
+        )}
 
       {section(
         'targeting',

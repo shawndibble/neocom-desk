@@ -23,8 +23,6 @@ import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
-import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
-import { StatFields } from '@/features/fittings/StatFacts';
 import { useFittingEvaluation } from '@/features/fittings/useFittingEvaluation';
 import { fittingToEft } from '@/engine/fittings/eftExport';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
@@ -81,6 +79,8 @@ export function FittingShareView({
   const [attempt, setAttempt] = useState(0);
   const online = useOnline();
   const [typeName, setTypeName] = useState<TypeName | null>(null);
+  // The hull's inventory group, for the Abyssal section's hull rule; undefined until the types load.
+  const [shipGroupId, setShipGroupId] = useState<number | undefined>(undefined);
   // Names a mutated item's rolls in the EFT copy.
   const mutaplasmids = useMutaplasmidLookup();
   const [copied, setCopied] = useState(false);
@@ -93,6 +93,7 @@ export function FittingShareView({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new code, not a render-time derivation
     setTypeName(null);
+    setShipGroupId(undefined);
   }, [code]);
 
   useEffect(() => {
@@ -136,11 +137,12 @@ export function FittingShareView({
   // On the Fitting's own set, under the viewer's own Damage Profile (a
   // local-then-synced setting, so it works with no session too) — the link
   // itself never carries one. A new code clears the stats while it resolves.
-  const { stats, statsProgress, statsError, retry, price, damageProfiles } = useFittingEvaluation({
-    fitting: readyFitting,
-    profile: readyProfile,
-    implantBasis: 'fitting',
-  });
+  const { stats, statsProgress, statsError, retry, price, damageProfiles, compareWeather } =
+    useFittingEvaluation({
+      fitting: readyFitting,
+      profile: readyProfile,
+      implantBasis: 'fitting',
+    });
   const hardpoints = useFittingHardpoints(readyFitting);
 
   useEffect(() => {
@@ -149,6 +151,7 @@ export function FittingShareView({
     void (async () => {
       const types = await loadTypes();
       if (!cancelled) {
+        setShipGroupId(types[String(readyFitting.shipTypeId)]?.groupID);
         setTypeName(
           () => (typeId: number) =>
             types[String(typeId)]?.name ?? t('common.unknownType', { id: typeId })
@@ -292,11 +295,7 @@ export function FittingShareView({
             hardpointKindOf={hardpoints.kindOf}
           />
           <FittingStatsSections
-            conditions={
-              <StatFields>
-                <AbyssalWeatherPicker field />
-              </StatFields>
-            }
+            abyssal={{ hullGroupId: shipGroupId, compare: compareWeather }}
             stats={stats}
             statsProgress={statsProgress}
             statsError={statsError}
