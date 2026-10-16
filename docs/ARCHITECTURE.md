@@ -532,7 +532,7 @@ Issue #1285. The work lands in two places, and the compiler holds you to the sec
    - `diff`: an engine diff, written test-first in `src/engine/notificationDiffs.ts`.
    - `copy`: its live wording in `domainCopy.ts` and `notifications.fired.*` strings.
    - `projection`: either a push renderer or `null`. `engine/projection.ts`'s `PROJECTABLE_EVENT_IDS` decides which, per id.
-   - `thresholds`: fields from `eventThresholds.ts`, or `null`.
+   - `thresholds`: fields from `eventThresholdFields.ts`, or `null`.
    - `rowHintKey`: a row hint, or `null`.
 3. If the event needs data no domain fetches yet, add a domain file under `src/features/notifications/pollDomains/` (a `defineDomain` call naming a new `SNAPSHOT_SOURCES` handle) and list it in `pollDomains/index.ts`. Describe its persisted snapshot's shape with `shapeGuard` and `is` from `snapshotShape.ts`, keyed by the engine type's own fields so the compiler flags a missing one; a field added after snapshots already existed is `is.optional(...)`, so an old baseline stays readable. Add the domain's stale-shape case to `staleShapes.test.ts`.
 4. A new fire type must join `AnyNotificationFire` (`eventEntries.ts`), or the entry's `diff` fails to typecheck. Joining it then makes `engine/occurrenceKey.ts`'s exhaustive `OccurrenceFire` switch demand a case.

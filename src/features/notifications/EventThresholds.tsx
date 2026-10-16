@@ -9,7 +9,7 @@ import {
   TextInput,
 } from '@/components/ui';
 import type { EventThresholds } from './eventEntries';
-import type { ThresholdField, ThresholdKey } from './eventThresholds';
+import type { ThresholdField, ThresholdKey } from './eventThresholdFields';
 import type { CharacterEventThresholds } from './preferences';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 

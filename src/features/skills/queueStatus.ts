@@ -236,8 +236,8 @@ export type QueueState = 'training' | 'idle' | 'paused' | 'endingSoon' | 'unknow
 /**
  * How close the last queued entry's finish must be to count as "about to run
  * dry". Exported so a test can pin `skillQueueEndingLeadHours`'s default
- * (`features/notifications/eventThresholds.ts`) to this figure rather than
- * risk the two silently drifting apart — `eventThresholds.ts` deliberately
+ * (`features/notifications/eventThresholdFields.ts`) to this figure rather than
+ * risk the two silently drifting apart — `eventThresholdFields.ts` deliberately
  * imports nothing at runtime (it is reachable from the service worker), so
  * that default stays its own literal `24` and a test is what keeps it honest.
  */

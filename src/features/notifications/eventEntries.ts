@@ -9,7 +9,7 @@
  * - `projection` — its Scheduled Push renderer, or `null` when it is only
  *   observable by polling (ADR 0010),
  * - `thresholds` — the per-Character threshold fields it owns
- *   (`eventThresholds.ts`), or `null`,
+ *   (`eventThresholdFields.ts`), or `null`,
  * - `rowHintKey` — a delivery caveat Settings shows under its row, or `null`.
  *
  * Every field is required, and the catalog is keyed by `NotificationEventId`
@@ -152,7 +152,7 @@ import {
 } from './domainCopy';
 import type { EveNotificationNames } from './eveNotificationText';
 import type { NotificationEventId } from './events';
-import { THRESHOLD_FIELDS, type ThresholdField } from './eventThresholds';
+import { THRESHOLD_FIELDS, type ThresholdField } from './eventThresholdFields';
 
 /** Every fire any registered diff can produce. */
 export type AnyNotificationFire =
