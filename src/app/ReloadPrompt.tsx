@@ -1,5 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { getServiceWorkerRegistration } from '@/lib/serviceWorker';
+import { isPublicRoute } from './routerPath';
 
 // Checking is cheap, so check often: a build found here is applied by the next
 // cold start or browser reload (see bootUpdate.ts), never by this component.
@@ -37,7 +40,7 @@ async function checkForUpdate(registration: ServiceWorkerRegistration) {
  * boot screen (see bootUpdate.ts), so a running tab is never reloaded and a
  * route change never triggers an update.
  */
-export function ReloadPrompt() {
+function RegisteredReloadPrompt() {
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
   useRegisterSW({
     onRegisteredSW(_swUrl, registration) {
@@ -65,4 +68,31 @@ export function ReloadPrompt() {
   }, []);
 
   return null;
+}
+
+/**
+ * Registers the worker everywhere except a public link route (`/s/<id>`, …) the
+ * visitor has not left and where no worker exists yet: registering there starts
+ * a precache of the whole app, competing with the one small read the page is
+ * waiting on, for someone who may never come back. Going on into the app (or
+ * a worker already being there) registers it, and it stays registered after.
+ */
+export function ReloadPrompt() {
+  const onPublicRoute = isPublicRoute(useLocation().pathname);
+  const [registerNow, setRegisterNow] = useState(false);
+  // Latched in render: once the visitor has been in the app, a return to a public route keeps the worker.
+  if (!onPublicRoute && !registerNow) setRegisterNow(true);
+
+  useEffect(() => {
+    if (!onPublicRoute) return;
+    let live = true;
+    void getServiceWorkerRegistration().then((existing) => {
+      if (live && existing) setRegisterNow(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [onPublicRoute]);
+
+  return registerNow || !onPublicRoute ? <RegisteredReloadPrompt /> : null;
 }

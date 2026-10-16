@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { basenameOf, isOnRoute, routerPathOf, routerPathname } from './routerPath';
+import { basenameOf, isOnRoute, isPublicRoute, routerPathOf, routerPathname } from './routerPath';
 
 describe('basenameOf', () => {
   it('is `/` for the root base', () => {
@@ -48,5 +48,22 @@ describe('isOnRoute', () => {
   it('does not match a different route that shares a prefix', () => {
     expect(isOnRoute('/callbacks', '/callback')).toBe(false);
     expect(isOnRoute('/login', '/callback')).toBe(false);
+  });
+});
+
+describe('isPublicRoute', () => {
+  it('is true for share links, the old share spelling and community invites', () => {
+    expect(isPublicRoute('/s/5gqdkt')).toBe(true);
+    expect(isPublicRoute('/share/fitting?code=x')).toBe(true);
+    expect(isPublicRoute('/share/abc')).toBe(true);
+    expect(isPublicRoute('/communities/join/XYZ')).toBe(true);
+  });
+
+  it('is false for the app and for routes that merely share a prefix', () => {
+    expect(isPublicRoute('/')).toBe(false);
+    expect(isPublicRoute('/survey')).toBe(false);
+    expect(isPublicRoute('/sharing')).toBe(false);
+    expect(isPublicRoute('/communities')).toBe(false);
+    expect(isPublicRoute('/communities/join')).toBe(true);
   });
 });

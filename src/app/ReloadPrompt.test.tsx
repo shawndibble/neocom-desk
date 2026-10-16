@@ -5,6 +5,13 @@ import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-d
 import '@/i18n';
 import { ReloadPrompt } from './ReloadPrompt';
 
+const { existingWorker } = vi.hoisted(() => ({
+  existingWorker: { current: undefined as unknown },
+}));
+vi.mock('@/lib/serviceWorker', () => ({
+  getServiceWorkerRegistration: () => Promise.resolve(existingWorker.current),
+}));
+
 const { updateServiceWorker, state, registerSWOptions } = vi.hoisted(() => ({
   updateServiceWorker: vi.fn(),
   state: { needRefresh: true },
@@ -43,9 +50,9 @@ function CaptureNavigate() {
   return null;
 }
 
-function renderPrompt() {
+function renderPrompt(path = '/') {
   return render(
-    <MemoryRouter initialEntries={['/']}>
+    <MemoryRouter initialEntries={[path]}>
       <CaptureNavigate />
       <ReloadPrompt />
     </MemoryRouter>
@@ -61,6 +68,8 @@ const HIDDEN_FOR_MS = 10 * 60 * 1000;
 beforeEach(() => {
   updateServiceWorker.mockClear();
   navigateRef.current = null;
+  existingWorker.current = undefined;
+  registerSWOptions.current = undefined;
   state.needRefresh = true;
   setHidden(false);
   vi.useFakeTimers();
@@ -118,6 +127,34 @@ describe('ReloadPrompt', () => {
     renderPrompt();
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
     expect(updateServiceWorker).not.toHaveBeenCalled();
+  });
+
+  describe('on a public link route', () => {
+    it('does not register a worker for a visitor who has none', async () => {
+      renderPrompt('/s/5gqdkt');
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(registerSWOptions.current).toBeUndefined();
+    });
+
+    it('registers when a worker already exists', async () => {
+      existingWorker.current = {};
+      renderPrompt('/s/5gqdkt');
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(registerSWOptions.current).toBeDefined();
+    });
+
+    it('registers once the visitor goes into the app, and stays registered after', async () => {
+      renderPrompt('/s/5gqdkt');
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(registerSWOptions.current).toBeUndefined();
+
+      navigateTo('/survey');
+      expect(registerSWOptions.current).toBeDefined();
+
+      registerSWOptions.current = undefined;
+      navigateTo('/s/other');
+      expect(registerSWOptions.current).toBeDefined();
+    });
   });
 
   describe('periodic update check', () => {

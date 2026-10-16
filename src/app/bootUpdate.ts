@@ -1,5 +1,5 @@
 import { getServiceWorkerRegistration } from '@/lib/serviceWorker';
-import { currentRouterPathname, isOnRoute } from './routerPath';
+import { currentRouterPathname, isOnRoute, isPublicRoute } from './routerPath';
 import { activateWaitingWorker, waitForInstall } from './swUpdate';
 
 /**
@@ -56,10 +56,17 @@ export function defaultBootUpdateEnv(): BootUpdateEnv {
  * `/callback`, or no worker controlling the page (dev, a blocked worker, the
  * first install) — the app must render on the first frame, exactly as it did
  * before this gate existed: its Dexie open, and the schema upgrade with it,
- * must not slip behind an await.
+ * must not slip behind an await. A public link route (`isPublicRoute`) never
+ * holds either: its visitor is mostly someone with no account, who should see
+ * the page, not an update.
  */
 export function bootUpdateMayHold(env: BootUpdateEnv = defaultBootUpdateEnv()): boolean {
-  return env.online && env.hasController && !isOnRoute(env.pathname, '/callback');
+  return (
+    env.online &&
+    env.hasController &&
+    !isOnRoute(env.pathname, '/callback') &&
+    !isPublicRoute(env.pathname)
+  );
 }
 
 async function swap(
@@ -130,6 +137,10 @@ export async function runBootUpdate(
         .catch(() => undefined);
       return 'skipped';
     }
+
+    // A shared link: show the page. No check, no swap, no reload; the worker's
+    // own registration check and the next normal load keep the build current.
+    if (isPublicRoute(env.pathname)) return 'skipped';
 
     const registration = await Promise.race([
       env.getRegistration(),
