@@ -5,6 +5,7 @@
  * and one column-visibility store, so hiding a column on one hides it on the
  * other.
  */
+import { formatIsoDay } from '@/lib/formatDateTick';
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -32,6 +33,7 @@ import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { JournalCoverage, JournalRow } from '@/engine/journalNetting';
 import { ActiveFilterRow } from '@/features/character/ActiveFilterRow';
+import { IskFlowChart } from '@/features/character/IskFlowChart';
 import { IskBreakdownPanel } from '@/features/character/IskBreakdownPanel';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
 import {
@@ -146,6 +148,8 @@ interface JournalTableProps {
   filteredJournal: readonly JournalRow[];
   /** The journal under the date range and text filters only, for the panel's ref-type list. */
   breakdownJournal: readonly JournalRow[];
+  /** The journal under the ref-type and text filters only: the chart sets its own date axis. */
+  chartJournal: readonly JournalRow[];
   journalColumns: DataTableColumn<JournalRow>[];
   label: string;
   /**
@@ -170,8 +174,6 @@ interface JournalTableProps {
     /** The scope in words: "All characters", or the corp division. */
     scopeLabel: string;
     coverage?: JournalCoverage;
-    /** The daily chart (#3914) slots in here, under the In / Out / Net totals. */
-    chart?: ReactNode;
   };
 }
 
@@ -179,13 +181,24 @@ interface JournalTableProps {
 const journalRowKey = (entry: JournalRow) => entry.id;
 const characterRowKey = (entry: JournalRow) => `${entry.characterId}:${entry.id}`;
 
-/** The panel's date range in words: the journal's own window when no range is set. */
-function rangeLabel(filter: WalletJournalFilter, t: TFunction): string {
-  const { startDate: from, endDate: to } = filter;
-  if (from && to) return t('wallet.journalRangeBetween', { from, to });
+/** The panel's date range in words: with none set, the span the journal really holds. */
+function rangeLabel(
+  filter: WalletJournalFilter,
+  rows: readonly JournalRow[],
+  t: TFunction
+): string {
+  const from = filter.startDate && formatIsoDay(filter.startDate);
+  const to = filter.endDate && formatIsoDay(filter.endDate);
+  if (from && to) return from === to ? from : t('wallet.journalRangeBetween', { from, to });
   if (from) return t('wallet.journalRangeFrom', { from });
   if (to) return t('wallet.journalRangeTo', { to });
-  return t('wallet.journalRangeDefault');
+  const first = rows.reduce<string | null>(
+    (min, entry) => (min === null || entry.date < min ? entry.date : min),
+    null
+  );
+  return first === null
+    ? t('wallet.journalRangeAll')
+    : t('wallet.journalRangeSince', { since: formatIsoDay(first.slice(0, 10)) });
 }
 
 /**
@@ -207,6 +220,7 @@ export function JournalTable({
   refTypeOptions,
   filteredJournal,
   breakdownJournal,
+  chartJournal,
   journalColumns,
   label,
   highlightRowKey = null,
@@ -397,13 +411,13 @@ export function JournalTable({
         open={panel.open}
         onClose={() => panel.onOpenChange(false)}
         scopeLabel={panel.scopeLabel}
-        rangeLabel={rangeLabel(filter, t)}
+        rangeLabel={rangeLabel(filter, filteredJournal, t)}
         totals={totals}
         breakdown={breakdown}
         selectedRefType={filter.refType}
         onSelectRefType={(refType) => onFilterChange(toggleBreakdownRefType(filter, refType))}
         coverage={panel.coverage}
-        chart={panel.chart}
+        chart={<IskFlowChart rows={chartJournal} filter={filter} onFilterChange={onFilterChange} />}
       />
       {filteredJournal.length === 0 ? (
         <EmptyState

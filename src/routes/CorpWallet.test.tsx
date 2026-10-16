@@ -326,7 +326,7 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     const list = await screen.findByRole('table', { name: 'Where the ISK went' });
     expect(within(list).getByText('Corporate reward payout')).toBeInTheDocument();
     expect(
-      screen.getByText("Corp · Master Wallet · last 30 days · follows the Journal's filters")
+      screen.getByText(/^Corp · Master Wallet · since .* · follows the Journal's filters$/)
     ).toBeInTheDocument();
     expect(screen.queryByText(/between your Characters/i)).toBeNull();
     expect(screen.queryByText(/Characters loaded/)).toBeNull();
