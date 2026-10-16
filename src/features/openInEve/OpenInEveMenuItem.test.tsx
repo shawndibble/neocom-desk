@@ -118,6 +118,28 @@ describe('OpenInEveMenuItem', () => {
     expect(alert).not.toHaveTextContent('logged in to the game');
   });
 
+  it('still shows the result when the connection drops mid-send', async () => {
+    await seed([SCOPE]);
+    let fail!: (err: unknown) => void;
+    infoMock.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      })
+    );
+    openMenu('information', 1);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
+    expect(await screen.findByText('Opening in EVE…')).toBeInTheDocument();
+
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+    expect(screen.getByText('Opening in EVE…')).toBeInTheDocument();
+    await act(async () => fail(new TypeError('Failed to fetch')));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("You're offline");
+  });
+
   it('is inert while offline and sends nothing', async () => {
     await seed([SCOPE]);
     Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });

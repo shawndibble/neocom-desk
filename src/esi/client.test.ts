@@ -8,6 +8,7 @@ import {
   isAuthFailure,
   isCredentialFailure,
   isOfflineFailure,
+  isUnconfirmedWrite,
   EsiOfflineError,
   EsiTimeoutError,
   ESI_BASE_URL,
@@ -861,6 +862,20 @@ describe('isOfflineFailure', () => {
     expect(isOfflineFailure(new DOMException('Aborted', 'AbortError'))).toBe(false);
     expect(isOfflineFailure(new Error('boom'))).toBe(false);
     expect(isOfflineFailure(undefined)).toBe(false);
+  });
+});
+
+describe('isUnconfirmedWrite', () => {
+  it('is true for a timeout after the request left', () => {
+    expect(isUnconfirmedWrite(new EsiTimeoutError(30_000, true))).toBe(true);
+    expect(isUnconfirmedWrite(new DOMException('timed out', 'TimeoutError'))).toBe(true);
+  });
+
+  it('is false when the request never left or the network was simply down', () => {
+    expect(isUnconfirmedWrite(new EsiTimeoutError(30_000, false))).toBe(false);
+    expect(isUnconfirmedWrite(new EsiOfflineError())).toBe(false);
+    expect(isUnconfirmedWrite(new TypeError('Failed to fetch'))).toBe(false);
+    expect(isUnconfirmedWrite(new EsiError(500, 'boom'))).toBe(false);
   });
 });
 

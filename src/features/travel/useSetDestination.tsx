@@ -66,7 +66,12 @@ export function useSetDestination(locationId: number, placeName: string): SetDes
       if (result.ok) {
         setOutcome({ tone: 'status', text: t('market.orderDetail.destinationSet', { placeName }) });
       } else if (result.offline) {
-        setOutcome({ tone: 'alert', text: t('travel.waypoints.offline') });
+        setOutcome({
+          tone: 'alert',
+          text: result.unconfirmed
+            ? t('travel.waypoints.unconfirmed')
+            : t('travel.waypoints.offline'),
+        });
       } else {
         setOutcome({
           tone: 'alert',

@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { EsiTimeoutError } from '@/esi/errors';
+import { EsiError, EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
 import { MailComposeBox } from './MailComposeBox';
 import type { MailHeader } from '@/esi/endpoints';
 
@@ -223,6 +223,23 @@ describe('recipient search that fails while the browser says it is online', () =
   });
 });
 
+describe('recipient search that ESI refuses', () => {
+  it('says the search failed, not that it needs a connection, on an HTTP error', async () => {
+    searchMailRecipients.mockRejectedValue(new EsiError(500, 'boom'));
+    const user = userEvent.setup();
+    renderBox('forward');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Subject')).toHaveValue('FWD: Ratting fleet up')
+    );
+
+    await user.type(screen.getByLabelText('Add recipient'), 'Fen');
+
+    expect(await screen.findByText('Search failed. Try again.')).toBeInTheDocument();
+    expect(screen.queryByText('Search needs a connection.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No characters found.')).not.toBeInTheDocument();
+  });
+});
+
 describe('a saved draft', () => {
   it('is used instead of the reply-all defaults', async () => {
     drafts.loadDraft.mockResolvedValue({
@@ -306,8 +323,8 @@ describe('sending', () => {
     expect(onSent).not.toHaveBeenCalled();
   });
 
-  it('says it is offline, and that the draft is saved, when the send never reached ESI', async () => {
-    sendMail.mockRejectedValue(new TypeError('Failed to fetch'));
+  it('says it is offline, and that the draft is saved, when the send was refused before leaving', async () => {
+    sendMail.mockRejectedValue(new EsiOfflineError());
     const onSent = vi.fn();
     const user = userEvent.setup();
     renderBox('reply', onSent);
@@ -336,6 +353,24 @@ describe('sending', () => {
     expect(await screen.findByText(/couldn't confirm the mail was sent/i)).toBeInTheDocument();
     expect(screen.getByText(/check your sent folder/i)).toBeInTheDocument();
     expect(screen.queryByText(/draft is saved/i)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['a fetch TypeError', new TypeError('Failed to fetch')],
+    ['a raw TimeoutError', new DOMException('timed out', 'TimeoutError')],
+  ])('cannot confirm the send after %s while online, and keeps the draft', async (_name, err) => {
+    sendMail.mockRejectedValue(err);
+    const onSent = vi.fn();
+    const user = userEvent.setup();
+    renderBox('reply', onSent);
+    await screen.findByText('Sender Sal');
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(await screen.findByText(/couldn't confirm the mail was sent/i)).toBeInTheDocument();
+    expect(screen.queryByText(/draft is saved/i)).not.toBeInTheDocument();
+    expect(drafts.clearDraft).not.toHaveBeenCalled();
+    expect(onSent).not.toHaveBeenCalled();
   });
 
   it('does not read a failure after the send as offline, and still finishes', async () => {

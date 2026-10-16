@@ -23,7 +23,11 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { KIND_FILL, KIND_TEXT } from '@/components/ui/kindTone';
-import { loadCalendarEvent, respondToCalendarEvent } from '@/features/character/calendar';
+import {
+  loadCalendarEvent,
+  respondToCalendarEvent,
+  type RsvpResult,
+} from '@/features/character/calendar';
 import { RESPONSE_BADGE_TONE, RESPONSE_ICON, RESPONSE_KEY } from './calendarResponseTone';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
@@ -44,6 +48,12 @@ const RSVP_OPTIONS: { response: CalendarRsvpResponse; labelKey: string }[] = [
 ];
 
 /** The active button already turns this tone (DESIGN.md §7's other signal is its own icon + label, not a second, redundant telling). */
+const RSVP_FAILURE_KEY: Record<Exclude<RsvpResult, 'saved'>, string> = {
+  offline: 'calendar.rsvpOffline',
+  unconfirmed: 'calendar.rsvpUnconfirmed',
+  failed: 'calendar.rsvpFailed',
+};
+
 const RSVP_ACTIVE_VARIANT: Record<CalendarRsvpResponse, ButtonVariant> = {
   accepted: 'success',
   declined: 'danger',
@@ -99,7 +109,7 @@ export function EventDetailModal({
   // was otherwise the only way back to the network.
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [rsvpFailed, setRsvpFailed] = useState<'offline' | 'failed' | null>(null);
+  const [rsvpFailed, setRsvpFailed] = useState<Exclude<RsvpResult, 'saved'> | null>(null);
 
   async function respond(response: CalendarRsvpResponse) {
     setSaving(true);
@@ -237,7 +247,7 @@ export function EventDetailModal({
             </div>
             {rsvpFailed !== null && (
               <p role="alert" className="mt-2 text-[0.6875rem] text-danger">
-                {rsvpFailed === 'offline' ? t('calendar.rsvpOffline') : t('calendar.rsvpFailed')}
+                {t(RSVP_FAILURE_KEY[rsvpFailed])}
               </p>
             )}
           </div>

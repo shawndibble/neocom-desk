@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EsiError, EsiOfflineError } from '@/esi/errors';
+import { EsiError, EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
 
 const info = vi.hoisted(() => vi.fn());
 const newMail = vi.hoisted(() => vi.fn());
@@ -25,6 +25,16 @@ describe('openInEve', () => {
     });
   });
 
+  it('flags a timeout after the request left as unconfirmed, not as not-opened', async () => {
+    info.mockRejectedValue(new EsiTimeoutError(30_000, true));
+    expect(await openInEve(7, { kind: 'information', id: 1 })).toEqual({
+      ok: false,
+      message: null,
+      offline: true,
+      unconfirmed: true,
+    });
+  });
+
   it('keeps ESI’s own words for a refusal', async () => {
     info.mockRejectedValue(new EsiError(520, 'Character is not online'));
     expect(await openInEve(7, { kind: 'information', id: 1 })).toEqual({
@@ -40,6 +50,16 @@ describe('openNewMail', () => {
   it('reports offline when the request never left the browser', async () => {
     newMail.mockRejectedValue(new EsiOfflineError());
     expect(await openNewMail(7, draft)).toEqual({ ok: false, message: null, offline: true });
+  });
+
+  it('flags a timeout after the request left as unconfirmed', async () => {
+    newMail.mockRejectedValue(new EsiTimeoutError(30_000, true));
+    expect(await openNewMail(7, draft)).toEqual({
+      ok: false,
+      message: null,
+      offline: true,
+      unconfirmed: true,
+    });
   });
 
   it('keeps ESI’s own words for a refusal', async () => {

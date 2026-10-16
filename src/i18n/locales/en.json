@@ -6321,6 +6321,7 @@
     "sendOffline": "You're offline — your draft is saved. Send it when you're back online.",
     "loadMoreOffline": "Couldn't load more — you're offline.",
     "loadMoreFailed": "Couldn't load more mail. Try again.",
+    "recipientSearchFailed": "Search failed. Try again.",
     "recipientSearchOffline": "Search needs a connection.",
     "bodyNotDownloadedOnline": "This mail hasn't been downloaded yet.",
     "bodyNotDownloaded": "This mail hasn't been downloaded yet — reconnect to read it."
@@ -6344,6 +6345,7 @@
     "rsvpDecline": "Decline",
     "rsvpTentative": "Tentative",
     "rsvpFailed": "Couldn't save your response. Try again.",
+    "rsvpUnconfirmed": "The connection timed out, so your response may not have been saved. Check the event, then try again.",
     "rsvpOffline": "You're offline — your response wasn't saved. Reconnect and try again.",
     "yourResponse": "Your response",
     "export": "Export",
@@ -11472,7 +11474,8 @@
     "needCharacter": "Log in a character to open this in its EVE client.",
     "failed": "Couldn't open it in EVE: {{message}}",
     "unknownError": "Is your character logged in to the game?",
-    "offline": "You're offline — reconnect to open this in EVE."
+    "offline": "You're offline — reconnect to open this in EVE.",
+    "unconfirmed": "The connection timed out. Couldn't confirm it opened in EVE — check your client."
   },
   "travel": {
     "incursions": {
@@ -12290,6 +12293,8 @@
       "nothingToSet": "No waypoints to set: the trip has no jumps.",
       "failed": "Waypoints not set: {{message}}",
       "offline": "You're offline — waypoints weren't set. Reconnect and try again.",
+      "unconfirmed": "The connection timed out, so the waypoints may not have been set. Check your EVE client.",
+      "unconfirmedPartway": "The connection timed out. At least {{set}} of {{total}} waypoints were set; check your EVE client.",
       "offlinePartway": "You're offline — {{set}} of {{total}} waypoints were set before the connection dropped. Reconnect and set them again.",
       "failedPartway": "{{set}} of {{total}} waypoints set, then ESI refused the rest: {{message}}",
       "unknownError": "ESI gave no reason. Is the character logged in to the game?"

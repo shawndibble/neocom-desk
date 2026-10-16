@@ -8,7 +8,7 @@ import {
   type CalendarRsvpResponse,
 } from '@/esi/endpoints';
 import { loadWithCacheStatus, readCached, writeCached, type StatusResult } from '@/esi/cache';
-import { isOfflineFailure } from '@/esi/client';
+import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { parseInstant } from '@/engine/esiInstant';
 import { stillRunning, type CalendarRetentionEntry } from '@/engine/character/calendarRetention';
@@ -160,7 +160,7 @@ export function loadCalendarEvent(
 }
 
 /** What an RSVP write came to: accepted, never sent (offline), or refused. */
-export type RsvpResult = 'saved' | 'offline' | 'failed';
+export type RsvpResult = 'saved' | 'offline' | 'unconfirmed' | 'failed';
 
 /**
  * Pushes an RSVP write to ESI. Errors are otherwise swallowed — same
@@ -197,7 +197,7 @@ export async function respondToCalendarEvent(
   try {
     await putCharacterCalendarResponse(characterId, eventId, response);
   } catch (err) {
-    if (isOfflineFailure(err)) return 'offline';
+    if (isOfflineFailure(err)) return isUnconfirmedWrite(err) ? 'unconfirmed' : 'offline';
     await reportWriteAuthFailure(characterId, err, 'putCharacterCalendarResponse');
     return 'failed';
   }

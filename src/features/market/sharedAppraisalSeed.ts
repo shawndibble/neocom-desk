@@ -65,6 +65,8 @@ export function useSharedAppraisalSeed(onSeed: (text: string) => void): SharedAp
   // Not a cancellation flag: stripping the param re-runs this effect, and its
   // cleanup must not drop the load it just started.
   const handled = useRef<string | null>(null);
+  /** The load the pilot dismissed while it was in flight: its result is ignored. */
+  const dismissed = useRef<string | null>(null);
 
   const strip = useCallback(() => {
     setSearchParams(
@@ -84,6 +86,7 @@ export function useSharedAppraisalSeed(onSeed: (text: string) => void): SharedAp
     handled.current = key;
     void loadShare(shareId).then((result) => {
       setRetrying(false);
+      if (dismissed.current === key) return;
       if (!result.ok && result.reason === 'failed') {
         setLoadFailed(true);
         return;
@@ -103,6 +106,7 @@ export function useSharedAppraisalSeed(onSeed: (text: string) => void): SharedAp
     setAttempt((n) => n + 1);
   }, []);
   const dismiss = useCallback(() => {
+    dismissed.current = handled.current;
     setLoadFailed(false);
     strip();
   }, [strip]);

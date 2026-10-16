@@ -27,8 +27,8 @@ import {
 } from '@/engine/mail';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { isOfflineFailure } from '@/esi/client';
-import { EsiTimeoutError } from '@/esi/errors';
-import { useOnline } from '@/stores/network';
+import { EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
+import { isOnline, useOnline } from '@/stores/network';
 import { sendMail } from './mail';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
 import { loadContacts } from './contacts';
@@ -94,7 +94,7 @@ export function MailComposeBox({
   const [recipientQuery, setRecipientQuery] = useState('');
   const [searchResults, setSearchResults] = useState<RecipientCandidate[]>([]);
   /** The last live search failed (offline, or a connection that says it is up and is not). */
-  const [searchFailed, setSearchFailed] = useState(false);
+  const [searchFailure, setSearchFailure] = useState<'offline' | 'error' | null>(null);
   const [contacts, setContacts] = useState<RecipientCandidate[]>([]);
   const [highlight, setHighlight] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -251,12 +251,12 @@ export function MailComposeBox({
       void searchMailRecipients(characterId, trimmed, controller.signal)
         .then((hits) => {
           if (ticket !== latestSearch.current) return;
-          setSearchFailed(false);
+          setSearchFailure(null);
           setSearchResults(hits.map((h) => ({ characterId: h.characterId, name: h.name })));
         })
-        .catch(() => {
+        .catch((err: unknown) => {
           if (ticket !== latestSearch.current || controller.signal.aborted) return;
-          setSearchFailed(true);
+          setSearchFailure(isOfflineFailure(err) ? 'offline' : 'error');
           setSearchResults([]);
         });
     }, RECIPIENT_SEARCH_DEBOUNCE_MS);
@@ -348,6 +348,8 @@ export function MailComposeBox({
       setError(t('mail.sendNoRecipients'));
       return;
     }
+    // Read before the request: a drop mid-send must not retroactively make it "never sent".
+    const wasOffline = !isOnline();
     setSending(true);
     setError(null);
     try {
@@ -360,12 +362,18 @@ export function MailComposeBox({
         );
       } catch (err) {
         // Only the send itself is classified: a failure below is not "offline".
+        // Known not to have left: offline when pressed, no token, or still queued for a permit.
+        const neverSent =
+          isOfflineFailure(err) &&
+          (wasOffline ||
+            err instanceof EsiOfflineError ||
+            (err instanceof EsiTimeoutError && !err.sent));
         setError(
-          err instanceof EsiTimeoutError && err.sent
-            ? // The request left, so the mail may have been delivered: do not invite a duplicate.
-              t('mail.sendUnconfirmed')
+          neverSent
+            ? t('mail.sendOffline')
             : isOfflineFailure(err)
-              ? t('mail.sendOffline')
+              ? // It may have left and been delivered: do not invite a duplicate.
+                t('mail.sendUnconfirmed')
               : t('mail.sendErrorPrefix', {
                   message: err instanceof Error ? err.message : String(err),
                 })
@@ -447,7 +455,7 @@ export function MailComposeBox({
             value={recipientQuery}
             onChange={(e) => {
               setRecipientQuery(e.target.value);
-              setSearchFailed(false);
+              setSearchFailure(null);
               setPickerOpen(true);
               setHighlight(null);
             }}
@@ -476,9 +484,11 @@ export function MailComposeBox({
                 <li className="px-3 py-2 text-xs text-text-dim">
                   {recipientQuery.trim().length < MIN_RECIPIENT_SEARCH_LENGTH
                     ? t('mail.recipientSearchHint')
-                    : !online || searchFailed
+                    : !online || searchFailure === 'offline'
                       ? t('mail.recipientSearchOffline')
-                      : t('mail.noRecipientResults')}
+                      : searchFailure === 'error'
+                        ? t('mail.recipientSearchFailed')
+                        : t('mail.noRecipientResults')}
                 </li>
               ) : (
                 candidates.map((c, i) => (

@@ -93,8 +93,14 @@ export function SetWaypoints({
       if (!result.ok && result.offline) {
         setOutcome({
           tone: 'alert',
-          text:
-            result.set === 0
+          text: result.unconfirmed
+            ? result.set === 0
+              ? t('travel.waypoints.unconfirmed')
+              : t('travel.waypoints.unconfirmedPartway', {
+                  set: result.set,
+                  total: waypoints.length,
+                })
+            : result.set === 0
               ? t('travel.waypoints.offline')
               : t('travel.waypoints.offlinePartway', { set: result.set, total: waypoints.length }),
         });

@@ -233,6 +233,23 @@ describe('SetWaypoints', () => {
     );
   });
 
+  it('does not claim the rest were not set when the request timed out after leaving', async () => {
+    await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
+    const { EsiTimeoutError } = await import('@/esi/errors');
+    postAutopilotWaypointMock
+      .mockResolvedValueOnce({ data: null })
+      .mockRejectedValueOnce(new EsiTimeoutError(30_000, true));
+    show([leg([JITA, PERIMETER]), leg([PERIMETER, UEDAMA])]);
+
+    const button = await screen.findByRole('button', { name: 'Set waypoints in game' });
+    await waitFor(() => expect(button).toBeEnabled());
+    await userEvent.click(button);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'At least 1 of 2 waypoints were set'
+    );
+  });
+
   it('is disabled with a "Needs a connection" reason while offline, and sends nothing', async () => {
     await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
     setOffline();

@@ -82,7 +82,10 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
       if (result.ok) {
         setOutcome({ tone: 'status', text: t('openInEve.opened') });
       } else if (result.offline) {
-        setOutcome({ tone: 'alert', text: t('openInEve.offline') });
+        setOutcome({
+          tone: 'alert',
+          text: result.unconfirmed ? t('openInEve.unconfirmed') : t('openInEve.offline'),
+        });
       } else {
         setOutcome({
           tone: 'alert',

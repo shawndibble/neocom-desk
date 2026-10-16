@@ -35,6 +35,16 @@ export function SetWaypointMenuItem({
     placeName
   );
   const label = t('travel.waypoints.menuItem');
+  // Kept when the connection drops mid-send, so the result is still shown in the blocked branch.
+  const content = sending ? (
+    t('travel.waypoints.menuSending')
+  ) : outcome ? (
+    <span role={outcome.tone} className={outcome.tone === 'alert' ? 'text-danger' : 'text-success'}>
+      {outcome.text}
+    </span>
+  ) : (
+    label
+  );
 
   if (blockedReason !== null) {
     return (
@@ -48,7 +58,7 @@ export function SetWaypointMenuItem({
                 : t('travel.waypoints.needCharacter')
           }
         >
-          {label}
+          {offline ? content : label}
         </DisabledMenuItem>
         <ViewRouteMenuItem locationId={locationId} />
         {missingGroups.length > 0 && <GrantMissingMenuItem groups={missingGroups} />}
@@ -64,18 +74,7 @@ export function SetWaypointMenuItem({
           send();
         }}
       >
-        {sending ? (
-          t('travel.waypoints.menuSending')
-        ) : outcome ? (
-          <span
-            role={outcome.tone}
-            className={outcome.tone === 'alert' ? 'text-danger' : 'text-success'}
-          >
-            {outcome.text}
-          </span>
-        ) : (
-          label
-        )}
+        {content}
       </MenuItem>
       <ViewRouteMenuItem locationId={locationId} />
     </>

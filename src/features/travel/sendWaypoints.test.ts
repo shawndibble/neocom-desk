@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
-import { EsiError, EsiOfflineError } from '@/esi/errors';
+import { EsiError, EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
 
 const postAutopilotWaypointMock = vi.hoisted(() => vi.fn());
 vi.mock('@/esi/endpoints', () => ({ postAutopilotWaypoint: postAutopilotWaypointMock }));
@@ -61,6 +61,29 @@ describe('setWaypointsInGame', () => {
 
   it('says offline, not ESI-gave-no-reason, when the request never left the browser', async () => {
     postAutopilotWaypointMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    expect(await setWaypointsInGame(7, [30000002])).toEqual({
+      ok: false,
+      set: 0,
+      message: null,
+      offline: true,
+    });
+  });
+
+  it('flags a timeout after the request left as unconfirmed', async () => {
+    postAutopilotWaypointMock
+      .mockResolvedValueOnce({ data: null })
+      .mockRejectedValueOnce(new EsiTimeoutError(30_000, true));
+    expect(await setWaypointsInGame(7, [30000002, 30000003])).toEqual({
+      ok: false,
+      set: 1,
+      message: null,
+      offline: true,
+      unconfirmed: true,
+    });
+  });
+
+  it('does not call a timeout that never left the gate unconfirmed', async () => {
+    postAutopilotWaypointMock.mockRejectedValue(new EsiTimeoutError(30_000, false));
     expect(await setWaypointsInGame(7, [30000002])).toEqual({
       ok: false,
       set: 0,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -95,6 +95,29 @@ describe('SetWaypointMenuItem', () => {
     postAutopilotWaypointMock.mockRejectedValue(new TypeError('Failed to fetch'));
     openMenu();
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Set waypoint in game' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("You're offline");
+  });
+
+  it('still shows the result when the connection drops mid-send', async () => {
+    await seed([WAYPOINT_SCOPE]);
+    let fail!: (err: unknown) => void;
+    postAutopilotWaypointMock.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      })
+    );
+    openMenu();
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Set waypoint in game' }));
+    expect(await screen.findByText('Setting waypoint…')).toBeInTheDocument();
+
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+    // The menu is now in its blocked branch; the in-flight send is still reported.
+    expect(screen.getByText('Setting waypoint…')).toBeInTheDocument();
+    await act(async () => fail(new TypeError('Failed to fetch')));
 
     expect(await screen.findByRole('alert')).toHaveTextContent("You're offline");
   });
