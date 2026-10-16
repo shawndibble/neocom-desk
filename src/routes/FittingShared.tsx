@@ -137,12 +137,20 @@ export function FittingShareView({
   // On the Fitting's own set, under the viewer's own Damage Profile (a
   // local-then-synced setting, so it works with no session too) — the link
   // itself never carries one. A new code clears the stats while it resolves.
-  const { stats, statsProgress, statsError, retry, price, damageProfiles, compareWeather } =
-    useFittingEvaluation({
-      fitting: readyFitting,
-      profile: readyProfile,
-      implantBasis: 'fitting',
-    });
+  const {
+    stats,
+    statsProgress,
+    statsError,
+    retry,
+    price,
+    damageProfiles,
+    compareWeather,
+    statsWeatherTypeId,
+  } = useFittingEvaluation({
+    fitting: readyFitting,
+    profile: readyProfile,
+    implantBasis: 'fitting',
+  });
   const hardpoints = useFittingHardpoints(readyFitting);
 
   useEffect(() => {
@@ -296,6 +304,7 @@ export function FittingShareView({
           />
           <FittingStatsSections
             abyssal={{ hullGroupId: shipGroupId, compare: compareWeather }}
+            statsWeatherTypeId={statsWeatherTypeId}
             stats={stats}
             statsProgress={statsProgress}
             statsError={statsError}

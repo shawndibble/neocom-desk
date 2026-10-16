@@ -6,13 +6,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { FittingLoadState } from '@/lib/shortcuts';
 import {
   Button,
   Disclosure,
-  IskAmount,
   LiveStatus,
   Modal,
   Panel,
@@ -27,8 +26,6 @@ import {
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
 import { SkillsUnknownNote } from '@/features/fittings/FittingPreviewPanels';
-import { StatFields } from '@/features/fittings/StatFacts';
-import { useWeatherName } from '@/features/fittings/abyssalWeatherSelection';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -80,7 +77,6 @@ import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPan
 import { FittingMutationPanel } from '@/features/fittings/FittingMutationPanel';
 import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPanel';
 import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
-import { StatsHeadingLabel } from '@/features/fittings/StatsHeadingLabel';
 import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
 import { tacticalModeKind, tacticalModesFor } from '@/engine/fittings/tacticalModes';
 import { ImplantSetControl } from '@/features/fittings/ImplantSetControl';
@@ -209,8 +205,6 @@ function FittingsPage() {
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const alpha = useFittingAlpha(workspace.fitting);
   const hardpoints = useFittingHardpoints(workspace.fitting);
-  // The weather the numbers on screen are in — which lags a new pick until they land.
-  const weatherName = useWeatherName(workspace.statsWeatherTypeId);
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
   const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
   const [saveAsNewName, setSaveAsNewName] = useState('');
@@ -599,7 +593,7 @@ function FittingsPage() {
     </div>
   );
 
-  // The conditions strip under the stats heading; Abyssal weather is its own section.
+  // What the stats column's Pilot and Situation panels hold beyond its own sections.
   const hasModes = tacticalModesFor(fitting.shipTypeId).length > 0;
   const showMissingSkills = gaps !== null && gaps.missing.length > 0 && activeCharacterId !== null;
   const showSkillsUnknown = gaps?.unknown === true && activeCharacterId !== null;
@@ -651,44 +645,29 @@ function FittingsPage() {
         hullGroupId: catalogue?.types[String(fitting.shipTypeId)]?.groupID,
         compare: workspace.compareWeather,
       }}
-      conditions={
-        // Nothing to say (no modes, no skill gaps): no empty strip under the heading.
-        hasModes || showMissingSkills || showSkillsUnknown ? (
-          <div className="space-y-2">
-            {hasModes && (
-              <StatFields>
-                <TacticalModePicker fitting={fitting} onChange={edit} />
-              </StatFields>
-            )}
-            {showMissingSkills && (
-              <MissingSkillsChip
-                entries={gaps.missing}
-                characterId={activeCharacterId}
-                fittingName={fitting.name}
-              />
-            )}
-            {showSkillsUnknown && <SkillsUnknownNote />}
-          </div>
-        ) : undefined
-      }
-      heading={
-        <>
-          <span>
-            <StatsHeadingLabel
-              hasCharacter={activeCharacterId !== null}
-              characterName={characterName ?? null}
-            />
-            {weatherName && ` · ${t('fittings.weather.in', { weather: weatherName })}`}
-          </span>
-          {workspace.price && (
-            <span className="text-text tabular-nums">
-              <Trans
-                i18nKey="fittings.stats.unit.iskAmount"
-                components={{ isk: <IskAmount value={workspace.price.totals.sell} /> }}
-              />
-            </span>
-          )}
-        </>
+      statsWeatherTypeId={workspace.statsWeatherTypeId}
+      tacticalMode={hasModes ? <TacticalModePicker fitting={fitting} onChange={edit} /> : undefined}
+      pilot={
+        activeCharacterId === null
+          ? undefined
+          : {
+              characterName: characterName ?? null,
+              missingSkills: gaps?.missing.length,
+              skillsUnknown: gaps?.unknown === true,
+              notes:
+                showMissingSkills || showSkillsUnknown ? (
+                  <>
+                    {showMissingSkills && (
+                      <MissingSkillsChip
+                        entries={gaps.missing}
+                        characterId={activeCharacterId}
+                        fittingName={fitting.name}
+                      />
+                    )}
+                    {showSkillsUnknown && <SkillsUnknownNote />}
+                  </>
+                ) : undefined,
+            }
       }
     />
   );

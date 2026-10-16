@@ -193,6 +193,12 @@ function sectionBody(title: string): HTMLElement {
   return screen.getByRole('heading', { name: title }).closest('section')!;
 }
 
+/** Opens the Pilot or Situation panel from its trigger, and returns it. */
+async function openPanel(name: 'Pilot' | 'Situation'): Promise<HTMLElement> {
+  await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}`) }));
+  return screen.findByRole('dialog', { name });
+}
+
 describe('FittingStatsSections implants & skills group', () => {
   it('starts collapsed, holding the implant controls and the skills override', async () => {
     render(
@@ -207,6 +213,8 @@ describe('FittingStatsSections implants & skills group', () => {
         implants={<span>Implant controls</span>}
       />
     );
+    expect(screen.queryByRole('button', { name: 'Implants & skills' })).toBeNull();
+    await openPanel('Pilot');
     const toggle = screen.getByRole('button', { name: 'Implants & skills' });
 
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -897,8 +905,15 @@ describe('FittingStatsSections — Overheat all', () => {
   it('turns Overheat all on for every calculation', async () => {
     const user = userEvent.setup();
     renderSections(heatedStats());
+    await openPanel('Situation');
     await user.click(screen.getByRole('checkbox', { name: 'Overheat all' }));
     expect(useOverheatAll.getState().overheatAll).toBe(true);
+    // Every figure moved: the Situation trigger says so with the panel shut.
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Situation/ })).toHaveTextContent(
+      'Normal space · overheated'
+    );
   });
 
   it('reads only the figures heat changed in the warning tone, with their unheated value on hover', async () => {
@@ -1007,8 +1022,9 @@ describe('FittingStatsSections — Overheat all', () => {
     expect(inWarningTone(capacitor.getByText('250 GJ'))).toBe(false);
   });
 
-  it('has nothing to overheat on a fit with no module that can', () => {
+  it('has nothing to overheat on a fit with no module that can', async () => {
     renderSections(stats());
+    await openPanel('Situation');
     expect(screen.getByRole('checkbox', { name: 'Overheat all' })).toBeDisabled();
   });
 });
@@ -1356,12 +1372,14 @@ describe('FittingStatsSections — Abyssal', () => {
     return { compare, toggle: () => screen.getByRole('button', { name: 'Abyssal' }) };
   }
 
-  it('is one closed row naming the weather, with no section without the prop', () => {
+  it('is one closed row naming the weather, with no section without the prop', async () => {
     renderSections(stats());
+    await openPanel('Situation');
     expect(screen.queryByRole('button', { name: 'Abyssal' })).toBeNull();
     cleanup();
 
     const { toggle } = renderAbyssal();
+    await openPanel('Situation');
     expect(toggle()).toHaveAttribute('aria-expanded', 'false');
     expect(within(sectionBody('Abyssal')).getByText('Normal space')).toBeInTheDocument();
     act(() => useAbyssalWeather.setState({ weatherTypeId: 47382 }));
@@ -1372,6 +1390,7 @@ describe('FittingStatsSections — Abyssal', () => {
     useAbyssalWeather.setState({ weatherTypeId: 47382 });
     const user = userEvent.setup();
     const { compare, toggle } = renderAbyssal();
+    await openPanel('Situation');
     expect(compare).not.toHaveBeenCalled();
 
     await user.click(toggle());
@@ -1383,5 +1402,114 @@ describe('FittingStatsSections — Abyssal', () => {
     await waitFor(() =>
       expect(useStatsSectionsPreference.getState().value).toEqual({ abyssal: true })
     );
+  });
+});
+
+describe('FittingStatsSections — column and side panels', () => {
+  afterEach(() => useAbyssalWeather.setState({ weatherTypeId: null }));
+
+  it('labels Damage, Tank and Ship over their sections, in that order', () => {
+    renderSections(stats());
+    const headings = screen.getAllByRole('heading').map((h) => h.textContent);
+    expect(headings).toEqual([
+      'Damage',
+      'Offense',
+      'Applied DPS',
+      'Drones',
+      'Tank',
+      'Defense',
+      'Capacitor',
+      'Ship',
+      'Navigation',
+      'Targeting',
+      'Fitting',
+      'Price',
+    ]);
+  });
+
+  it('keeps the pilot and the situation off the column, behind their triggers', async () => {
+    const user = userEvent.setup();
+    render(
+      <FittingStatsSections
+        stats={stats()}
+        statsProgress={null}
+        statsError={false}
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+        pilot={{
+          characterName: 'Test Pilot',
+          missingSkills: 3,
+          notes: <span>Missing chip</span>,
+        }}
+        tacticalMode={<span>Mode picker</span>}
+        whatToTrain={<span>Train list</span>}
+      />
+    );
+    for (const name of ['Implants & skills', 'What to train', 'Projected effects']) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
+    }
+    expect(screen.queryByRole('checkbox', { name: 'Overheat all' })).toBeNull();
+    const pilotTrigger = screen.getByRole('button', { name: /^Pilot/ });
+    expect(pilotTrigger).toHaveTextContent('Test Pilot · 3 missing');
+    expect(pilotTrigger).toHaveAttribute('aria-haspopup', 'dialog');
+
+    const pilot = within(await openPanel('Pilot'));
+    expect(pilotTrigger).toHaveAttribute('aria-expanded', 'true');
+    expect(pilot.getByText('Test Pilot, own skills')).toBeInTheDocument();
+    expect(pilot.getByText('Missing chip')).toBeInTheDocument();
+    expect(pilot.getByRole('button', { name: 'Implants & skills' })).toBeInTheDocument();
+    expect(pilot.getByRole('button', { name: 'What to train' })).toBeInTheDocument();
+    await user.click(pilot.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    const situation = within(await openPanel('Situation'));
+    expect(situation.getByText('Mode picker')).toBeInTheDocument();
+    expect(situation.getByRole('button', { name: 'Projected effects' })).toBeInTheDocument();
+    expect(situation.getByRole('checkbox', { name: 'Overheat all' })).toBeInTheDocument();
+    // The page behind stays live: a column section still toggles with the panel open.
+    await user.click(screen.getByRole('button', { name: 'Defense' }));
+    expect(screen.getByRole('button', { name: 'Defense' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(screen.getByRole('dialog', { name: 'Situation' })).toBeInTheDocument();
+  });
+
+  it('reads the skills basis with no Character, and the weather on the Situation trigger', () => {
+    useAbyssalWeather.setState({ weatherTypeId: 47382 });
+    renderSections(stats());
+    expect(screen.getByRole('button', { name: /^Pilot/ })).toHaveTextContent('All skills V');
+    expect(screen.getByRole('button', { name: /^Situation/ })).toHaveTextContent('Electrical 2');
+  });
+
+  it('never works the weather delta out while the Situation panel is shut, even with Abyssal left open', async () => {
+    useStatsSectionsPreference.setState({ value: { abyssal: true }, hydrated: true });
+    const compare = vi.fn().mockResolvedValue({ before: stats(), after: stats() });
+    useAbyssalWeather.setState({ weatherTypeId: 47382 });
+    render(
+      <MemoryRouter>
+        <FittingStatsSections
+          stats={stats()}
+          statsProgress={null}
+          statsError={false}
+          price={null}
+          damageProfiles={damageProfiles()}
+          targetProfiles={targetProfiles()}
+          typeName={typeName}
+          abyssal={{ hullGroupId: 26, compare }}
+        />
+      </MemoryRouter>
+    );
+    // Let the hydrate settle; nothing may start while the panel is shut.
+    await act(async () => {});
+    expect(compare).not.toHaveBeenCalled();
+    await openPanel('Situation');
+    expect(screen.getByRole('button', { name: 'Abyssal' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    await waitFor(() => expect(compare).toHaveBeenCalledWith(47382));
   });
 });
