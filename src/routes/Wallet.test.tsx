@@ -109,6 +109,9 @@ async function seed() {
   await db.tokens.clear();
   await db.settings.clear();
   await db.esiCache.clear();
+  await db.walletJournalArchive.clear();
+  await db.walletTransactionArchive.clear();
+  await db.walletArchiveCoverage.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });

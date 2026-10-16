@@ -29,8 +29,8 @@ import { miningTaxPaymentHref } from '@/features/miningTax/paymentDeepLink';
 import { linkedRefIds } from '@/features/miningTax/paymentLinks';
 import {
   loadWalletBalanceWithStatus,
-  loadWalletJournalWithStatus,
-  loadWalletTransactions,
+  loadWalletJournalHistory,
+  loadWalletTransactionsHistory,
   loadAllCharactersWalletBalances,
   oldestCachedBalanceAt,
   type WalletBalancesSnapshot,
@@ -78,6 +78,8 @@ import {
   useJournalFilterResult,
 } from '@/features/character/walletJournal';
 import { JournalTable } from '@/features/character/WalletJournalTable';
+import { WalletHistoryNote } from '@/features/character/WalletHistoryNote';
+import { loadWalletArchiveInfo, type WalletArchiveInfo } from '@/features/character/walletArchive';
 import type {
   CharacterLoyaltyPoints,
   WalletJournalEntry,
@@ -110,6 +112,8 @@ interface Snapshot {
   journalNeedsReauth: boolean;
   /** Fewer pages came back than ESI advertised — the list below is partial. */
   journalTruncated: boolean;
+  /** What the device-kept history reaches back to. */
+  archive: WalletArchiveInfo;
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   loyaltyNeedsReauth: boolean;
@@ -122,9 +126,11 @@ async function loadWalletSnapshot(
 ): Promise<Snapshot> {
   const [balanceStatus, journalStatus, loyaltyStatus] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
-    loadWalletJournalWithStatus(characterId),
+    loadWalletJournalHistory(characterId),
     loadCharacterLoyaltyPoints(characterId),
   ]);
+  // After the journal load: that fetch is what extends the coverage read here.
+  const archive = await loadWalletArchiveInfo(characterId);
   const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
   const { cached: loyaltyResult, needsReauth: loyaltyNeedsReauth } = loyaltyStatus;
   const { cached: journalResult, needsReauth: journalNeedsReauth } = journalStatus;
@@ -140,6 +146,7 @@ async function loadWalletSnapshot(
     journalResult,
     journalNeedsReauth,
     journalTruncated,
+    archive,
     loyaltyResult,
     loyaltyNeedsReauth,
     corporationNames,
@@ -160,7 +167,7 @@ interface PersonalFillsSnapshot {
 }
 
 async function loadPersonalFills(characterId: number): Promise<PersonalFillsSnapshot> {
-  const result = await loadWalletTransactions(characterId);
+  const result = await loadWalletTransactionsHistory(characterId);
   const transactions = result?.data ?? [];
   const typeNames = await loadTypeNames([...new Set(transactions.map((txn) => txn.type_id))]);
   return { transactions, typeNames, truncated: result?.truncated ?? false };
@@ -824,6 +831,11 @@ export function Wallet() {
                     {t('wallet.journalItemNamesCappedHint')}
                   </p>
                 )}
+                <WalletHistoryNote
+                  info={data?.archive}
+                  filter={journalFilter}
+                  onFilterChange={setJournalFilter}
+                />
                 <JournalTable
                   filter={journalFilter}
                   onFilterChange={setJournalFilter}

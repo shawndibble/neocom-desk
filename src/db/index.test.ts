@@ -226,7 +226,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(23);
+    expect(db.verno).toBe(24);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -289,6 +289,9 @@ describe('schema upgrade v8 -> v9 (Production Log, issue #525)', () => {
         'skillPlans',
         'stationPins',
         'tokens',
+        'walletArchiveCoverage',
+        'walletJournalArchive',
+        'walletTransactionArchive',
       ].sort()
     );
   });
@@ -375,5 +378,23 @@ describe('schema upgrade v16 -> v17 (My Fittings, issue #1538)', () => {
   it('adds fittings keyed by id, indexed on characterId', () => {
     expect(db.fittings.schema.primKey.name).toBe('id');
     expect(db.fittings.schema.indexes.map((i) => i.name)).toEqual(['characterId']);
+  });
+});
+
+describe('schema upgrade v23 -> v24 (wallet journal and transaction archive)', () => {
+  it('adds the archives keyed by character and id, indexed by character and date', () => {
+    for (const table of [db.walletJournalArchive, db.walletTransactionArchive]) {
+      expect(table.schema.primKey.name).toMatch(/^\[characterId\+/);
+      expect(table.schema.indexes.map((i) => i.name)).toEqual([
+        'characterId',
+        '[characterId+date]',
+      ]);
+    }
+    expect(db.walletJournalArchive.schema.primKey.name).toBe('[characterId+id]');
+    expect(db.walletTransactionArchive.schema.primKey.name).toBe('[characterId+transaction_id]');
+  });
+  it('adds wallet archive coverage keyed by character and kind', () => {
+    expect(db.walletArchiveCoverage.schema.primKey.name).toBe('[characterId+kind]');
+    expect(db.walletArchiveCoverage.schema.indexes.map((i) => i.name)).toEqual(['characterId']);
   });
 });
