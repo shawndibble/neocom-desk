@@ -58,7 +58,7 @@ import {
 import { resolveAffiliations } from '@/features/character/affiliations';
 import { characterStanding } from '@/features/character/entityStanding';
 import type { CachedResult } from '@/esi/cache';
-import { resolveNames } from '@/features/character/names';
+import { resolveCategories, resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useFocusHeading } from '@/lib/useFocusHeading';
@@ -183,6 +183,19 @@ function senderIds(headers: readonly MailHeader[]): number[] {
   return headers.flatMap((header) => (header.from !== undefined ? [header.from] : []));
 }
 
+/**
+ * Affiliations for the senders that are characters. A sender can also be a
+ * corporation, alliance or NPC, and one such id makes `/characters/affiliation`
+ * reject the whole batch with 400 "Invalid character ID".
+ */
+async function resolveSenderAffiliations(
+  headers: readonly MailHeader[]
+): Promise<Map<number, CharacterAffiliation>> {
+  const senders = senderIds(headers);
+  const categories = await resolveCategories(senders);
+  return resolveAffiliations(senders.filter((id) => categories.get(id) === 'character'));
+}
+
 interface LoadedOwner {
   characterId: number;
   name: string;
@@ -198,13 +211,12 @@ async function buildSnapshot(
   const allHeaders = loaded.flatMap((o) => o.load.headers?.data ?? []);
   // Already superseded: skip the name/standing lookups, their results would be discarded.
   const ids = signal.cancelled ? [] : namePartyIds(allHeaders);
-  const senders = signal.cancelled ? [] : senderIds(allHeaders);
   const [names, contacts, senderAffiliations] = await Promise.all([
     resolveNames(ids),
     Promise.all(
       loaded.map((o) => (signal.cancelled ? Promise.resolve(null) : loadContacts(o.characterId)))
     ),
-    resolveAffiliations(senders),
+    resolveSenderAffiliations(signal.cancelled ? [] : allHeaders),
   ]);
   const owners = loaded.map((o, i): OwnerSnapshot => {
     const labels = o.load.labels?.data.labels ?? [];
@@ -593,7 +605,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     const all = [...fresh.values()].flatMap((entry) => entry.headers);
     const [freshNames, freshAffiliations] = await Promise.all([
       resolveNames(namePartyIds(all)),
-      resolveAffiliations(senderIds(all)),
+      resolveSenderAffiliations(all),
     ]);
     if (dataRef.current !== requestSnapshot) return;
     setLoadedHeaders(new Map([...fresh].map(([id, entry]) => [id, entry.headers])));
@@ -1237,6 +1249,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                         kind={composeKind}
                         header={selectedRow.header}
                         bodyText={bodyText}
+                        bodyMarkup={body?.data.body ?? undefined}
                         senderName={selectedSender}
                         formattedTimestamp={
                           selectedRow.header.timestamp

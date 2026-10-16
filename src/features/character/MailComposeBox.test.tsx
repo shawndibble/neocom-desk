@@ -6,10 +6,11 @@
  * what a Send click actually calls.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EsiError, EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
+import { PlainBodyEditor } from './MailBodyEditor';
 import { MailComposeBox } from './MailComposeBox';
 import type { MailHeader } from '@/esi/endpoints';
 
@@ -81,6 +82,7 @@ function renderBox(kind: 'reply' | 'forward', onSent = vi.fn(), onClose = vi.fn(
       kind={kind}
       header={HEADER}
       bodyText="Original body text"
+      bodyEditor={PlainBodyEditor}
       senderName="Sender Sal"
       formattedTimestamp="Sep 21, 2026 03:14"
       resolveRecipientName={resolveRecipientName}
@@ -165,6 +167,37 @@ describe('Reply defaults', () => {
 
     expect(screen.queryByText('CC Cara')).not.toBeInTheDocument();
     expect(screen.getByText('Sender Sal')).toBeInTheDocument();
+  });
+});
+
+describe('send path', () => {
+  it('sanitizes the body before sending, whatever the editor emitted', async () => {
+    function Rogue({ onChange, id }: { onChange: (v: string) => void; id: string }) {
+      return (
+        <button id={id} aria-label="emit" onClick={() => onChange('<script>x</script><b>ok</b>')}>
+          emit
+        </button>
+      );
+    }
+    const user = userEvent.setup();
+    render(
+      <MailComposeBox
+        characterId={CHAR_ID}
+        kind="reply"
+        header={HEADER}
+        bodyText="Original body text"
+        bodyEditor={Rogue as never}
+        senderName="Sender Sal"
+        formattedTimestamp="Sep 21, 2026 03:14"
+        resolveRecipientName={resolveRecipientName}
+        onClose={vi.fn()}
+        onSent={vi.fn()}
+      />
+    );
+    await user.click(await screen.findByRole('button', { name: 'emit' }));
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(sendMail).toHaveBeenCalled());
+    expect(sendMail.mock.calls[0][3]).toBe('x<b>ok</b>');
   });
 });
 
@@ -302,7 +335,7 @@ describe('sending', () => {
         { recipient_id: 300, recipient_type: 'character' },
       ],
       'RE: Ratting fleet up',
-      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n> Original body text'
+      '\n\nOn Sep 21, 2026 03:14, Sender Sal wrote:\n&gt; Original body text'
     );
     expect(drafts.clearDraft).toHaveBeenCalledWith(CHAR_ID, 7);
     expect(onSent).toHaveBeenCalled();
@@ -406,6 +439,15 @@ describe('sending', () => {
     // Local actions are untouched: the draft fields still take input.
     expect(screen.getByLabelText('Subject')).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+  });
+
+  it('lays out Cancel left and Send right in one footer row', async () => {
+    renderBox('reply');
+    await screen.findByText('Sender Sal');
+    const footer = screen.getByRole('button', { name: 'Send' }).closest('footer')!;
+    const cancel = within(footer).getByRole('button', { name: 'Cancel' });
+    const send = within(footer).getByRole('button', { name: 'Send' });
+    expect(cancel.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('refuses to send with no recipients', async () => {

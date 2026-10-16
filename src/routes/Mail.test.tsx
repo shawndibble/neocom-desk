@@ -42,6 +42,11 @@ function useDesktopViewport(): void {
   };
 }
 
+// These tests are about the page, not the rich editor: its lazy chunk (Tiptap) is slow to load cold.
+vi.mock('@/features/character/mailEditor/RichMailBodyEditor', async () => ({
+  default: (await import('@/features/character/MailBodyEditor')).PlainBodyEditor,
+}));
+
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
     needRefresh: [false, vi.fn()],
@@ -595,6 +600,45 @@ describe('Mail', () => {
         })
       ).toBeInTheDocument();
     });
+  });
+
+  it('sends only character senders to the affiliation lookup', async () => {
+    let sent: number[] = [];
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          {
+            mail_id: 1,
+            from: 90000001,
+            subject: 'Fleet up!',
+            timestamp: '2026-08-01T00:00:00Z',
+            is_read: true,
+            labels: [],
+          },
+          {
+            mail_id: 2,
+            from: 1000125,
+            subject: 'From a corp',
+            timestamp: '2026-08-02T00:00:00Z',
+            is_read: true,
+            labels: [],
+          },
+        ])
+      ),
+      http.post('https://esi.evetech.net/universe/names', () =>
+        HttpResponse.json([
+          { id: 90000001, name: 'Fleet Commander', category: 'character' },
+          { id: 1000125, name: 'Some Corp', category: 'corporation' },
+        ])
+      ),
+      http.post('https://esi.evetech.net/characters/affiliation', async ({ request }) => {
+        sent = (await request.json()) as number[];
+        return HttpResponse.json([]);
+      })
+    );
+    render(<App />);
+    await screen.findByText('From a corp');
+    await vi.waitFor(() => expect(sent).toEqual([90000001]));
   });
 
   it('does not render an Export CSV button', async () => {

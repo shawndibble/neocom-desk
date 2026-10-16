@@ -12,15 +12,7 @@
 import { useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  FieldError,
-  IconButton,
-  Modal,
-  NeedsConnection,
-  Spinner,
-  TextInput,
-} from '@/components/ui';
+import { Button, FieldError, IconButton, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useVisualViewportBox } from '@/lib/useVisualViewportBox';
@@ -39,9 +31,12 @@ import {
   validateNewMail,
   type ComposeRecipient,
 } from '@/engine/mailCompose';
+import { draftMarkupBody, sanitizeMarkup } from '@/engine/mailEditorDoc';
 import { sendMail } from './mail';
 import { clearNewMailDraft, loadNewMailDraft, saveNewMailDraft } from './mailDrafts';
-import { PlainBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
+import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
+import { MailComposeFooter } from './MailComposeFooter';
+import { MailCounter } from './MailCounter';
 import { NewMailRecipientPicker } from './NewMailRecipientPicker';
 
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
@@ -63,7 +58,7 @@ interface NewMailComposerProps {
   characterId: number;
   /** Phone placement: covers the whole viewport instead of sitting in the reading pane. */
   fullPane: boolean;
-  /** Swap point for the rich editor; defaults to a plain text area. */
+  /** Swap point for the body editor; defaults to the rich (WYSIWYG + Source) one. */
   bodyEditor?: ComponentType<MailBodyEditorProps>;
   onClose: (reason: NewMailCloseReason) => void;
   onSent: () => void;
@@ -72,7 +67,7 @@ interface NewMailComposerProps {
 export function NewMailComposer({
   characterId,
   fullPane,
-  bodyEditor: BodyEditor = PlainBodyEditor,
+  bodyEditor: BodyEditor = MailBodyEditor,
   onClose,
   onSent,
 }: NewMailComposerProps) {
@@ -132,7 +127,7 @@ export function NewMailComposer({
           }))
         );
         setSubject(draft.subject);
-        setBody(draft.body);
+        setBody(draftMarkupBody(draft));
       }
       setReady(true);
     });
@@ -218,7 +213,8 @@ export function NewMailComposer({
           characterId,
           recipients.map(({ recipient_id, recipient_type }) => ({ recipient_id, recipient_type })),
           subject,
-          body
+          // Whatever the editor produced, only the safe subset is ever sent.
+          sanitizeMarkup(body)
         );
       } catch (err) {
         const neverSent =
@@ -249,6 +245,8 @@ export function NewMailComposer({
 
   function onSectionKeyDown(e: KeyboardEvent<HTMLElement>) {
     if (e.key !== 'Escape' || !fullPane || confirmingDiscard || sendingRef.current) return;
+    // Escape inside a sheet or dialog (format bar, discard) closes that, not the composer.
+    if (e.defaultPrevented || (e.target instanceof Element && e.target.closest('dialog'))) return;
     e.preventDefault();
     void handleClose();
   }
@@ -261,8 +259,6 @@ export function NewMailComposer({
   }
 
   const labelClass = 'block text-[0.6875rem] text-text-dim';
-  const counterClass = (over: boolean) =>
-    cx('text-[0.6875rem] tabular-nums', over ? 'text-danger' : 'text-text-dim');
   const subjectOver = subject.length > MAX_SUBJECT_LENGTH;
   const bodyOver = bodyLength > MAX_BODY_LENGTH;
 
@@ -278,7 +274,7 @@ export function NewMailComposer({
         fullPane && viewport ? { top: viewport.offsetTop, height: viewport.height } : undefined
       }
       className={cx(
-        'flex flex-col',
+        'mail-pane flex flex-col',
         fullPane
           ? cx(
               'fixed inset-x-0 z-50 bg-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
@@ -293,32 +289,15 @@ export function NewMailComposer({
           fullPane && 'border-b border-line px-2 py-2'
         )}
       >
+        <h2 className="min-w-0 flex-1 truncate text-xs font-semibold tracking-widest text-text-dim uppercase">
+          {t('mail.newMailHeading')}
+        </h2>
         <IconButton
           icon={<Icon.Close />}
           label={t('mail.newMailClose')}
           onClick={() => void handleClose()}
           disabled={sending}
         />
-        <h2 className="min-w-0 flex-1 truncate text-xs font-semibold tracking-widest text-text-dim uppercase">
-          {t('mail.newMailHeading')}
-        </h2>
-        {!online && saved && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
-        <NeedsConnection>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => void handleSend()}
-            disabled={sending || blocked}
-          >
-            {sending ? (
-              <span className="flex items-center gap-1.5">
-                <Spinner size="sm" /> {t('mail.sending')}
-              </span>
-            ) : (
-              t('mail.send')
-            )}
-          </Button>
-        </NeedsConnection>
       </header>
 
       <div className={cx('flex min-h-0 flex-1 flex-col gap-3', fullPane && 'overflow-y-auto p-3')}>
@@ -347,9 +326,7 @@ export function NewMailComposer({
             <label htmlFor={subjectId} className={labelClass}>
               {t('mail.subjectLabel')}
             </label>
-            <span className={counterClass(subjectOver)}>
-              {t('mail.counter', { count: subject.length, max: MAX_SUBJECT_LENGTH })}
-            </span>
+            <MailCounter count={subject.length} max={MAX_SUBJECT_LENGTH} />
           </div>
           <TextInput
             id={subjectId}
@@ -368,9 +345,7 @@ export function NewMailComposer({
             <label htmlFor={bodyId} className={labelClass}>
               {t('mail.bodyLabel')}
             </label>
-            <span id={bodyCountId} className={counterClass(bodyOver)}>
-              {t('mail.counter', { count: bodyLength, max: MAX_BODY_LENGTH })}
-            </span>
+            <MailCounter id={bodyCountId} count={bodyLength} max={MAX_BODY_LENGTH} />
           </div>
           <BodyEditor
             id={bodyId}
@@ -397,20 +372,29 @@ export function NewMailComposer({
             {error}
           </p>
         )}
-
-        {!isNewMailEmpty(fields) && (
-          <div>
-            <Button
-              variant="danger"
-              size="md"
-              onClick={() => setConfirmingDiscard(true)}
-              disabled={sending}
-            >
-              {t('mail.discardDraft')}
-            </Button>
-          </div>
-        )}
       </div>
+
+      <MailComposeFooter
+        size="md"
+        sending={sending}
+        blocked={blocked}
+        onSend={() => void handleSend()}
+        pinned={fullPane}
+      >
+        {!isNewMailEmpty(fields) && (
+          <Button
+            variant="danger"
+            size="md"
+            onClick={() => setConfirmingDiscard(true)}
+            disabled={sending}
+          >
+            {t('mail.discardDraft')}
+          </Button>
+        )}
+        {!online && saved && (
+          <span className="truncate text-xs text-text-dim">{t('mail.draftSaved')}</span>
+        )}
+      </MailComposeFooter>
 
       <Modal
         open={confirmingDiscard}

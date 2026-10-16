@@ -24,6 +24,10 @@ import { useCompareSet } from './compareSet';
 import { useItemActions } from './itemActions';
 import { StockTargetDialog } from '@/features/stockTargets/StockTargetDialog';
 import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
+import { MarketOnly } from '@/features/abyssal/MarketOnly';
+import { ViewInMarketMenuItem } from './ViewInMarketMenuItem';
+// Re-exported: menus built on this module's entries import it from here.
+export { ViewInMarketMenuItem };
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
@@ -98,23 +102,10 @@ export function ShowInfoMenuItem({
  * corporations and alliances, and silently ignores an inventory type.
  */
 export function OpenInEveItemMenuItems({ typeId }: { typeId: number }) {
-  return <OpenInEveMenuItem kind="marketDetails" id={typeId} />;
-}
-
-/** The item menu's "View in Market", keeping the page's region or hub; reused as `ShowInfoMenuItem` is. */
-export function ViewInMarketMenuItem({ typeId }: { typeId: number }) {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
   return (
-    <MenuItem
-      onSelect={() => {
-        const params = marketLinkParams(typeId, location.search);
-        navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-      }}
-    >
-      {t('market.contextMenu.viewInMarket')}
-    </MenuItem>
+    <MarketOnly typeId={typeId}>
+      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
+    </MarketOnly>
   );
 }
 
@@ -170,7 +161,8 @@ export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
  * `PriceAlertDialog`.
  *
  * Add to Quickbar, set a price alert or a stock target, show info, add to Compare, view in
- * Market, copy name, jump to a Build Plan, jump to a PI Plan.
+ * Market, copy name, jump to a Build Plan, jump to a PI Plan. Abyssal types drop
+ * Quickbar, price alert, View in Market and Open in EVE (`MarketOnly`).
  *
  * The PI action asks for itself rather than going through the page's Item
  * Actions the way `blueprintTypeID` does: `pi.json` is 15KB against
@@ -216,16 +208,22 @@ function useItemMenuItems(
 
   return (
     <>
-      {canAddToQuickbar ? (
-        <MenuItem onSelect={() => addToQuickbar(typeId, itemName)}>
-          {t('market.contextMenu.addToQuickbar')}
-        </MenuItem>
-      ) : (
-        <DisabledMenuItem reason={t('market.contextMenu.quickbarNoCharacter')}>
-          {t('market.contextMenu.addToQuickbar')}
-        </DisabledMenuItem>
-      )}
-      <PriceAlertMenuItem typeId={typeId} available={canAddToQuickbar} onSelect={onAlertRequest} />
+      <MarketOnly typeId={typeId}>
+        {canAddToQuickbar ? (
+          <MenuItem onSelect={() => addToQuickbar(typeId, itemName)}>
+            {t('market.contextMenu.addToQuickbar')}
+          </MenuItem>
+        ) : (
+          <DisabledMenuItem reason={t('market.contextMenu.quickbarNoCharacter')}>
+            {t('market.contextMenu.addToQuickbar')}
+          </DisabledMenuItem>
+        )}
+        <PriceAlertMenuItem
+          typeId={typeId}
+          available={canAddToQuickbar}
+          onSelect={onAlertRequest}
+        />
+      </MarketOnly>
       {!props.hideStockTarget && (
         <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
       )}

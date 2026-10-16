@@ -1005,7 +1005,10 @@ export interface MailDraftRecord {
   kind: 'reply' | 'forward' | 'new';
   recipients: MailDraftRecipient[];
   subject: string;
+  /** EVE markup. Absent on a draft saved before the rich editor: plain text, which must be escaped on load. */
   body: string;
+  /** `markup` once `body` is EVE markup; a draft without it holds plain text. */
+  format?: 'markup';
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

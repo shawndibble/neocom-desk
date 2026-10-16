@@ -98,6 +98,8 @@ import { hasItemRows } from '@/features/character/assetBrowserFormat';
 import { loadTypeVolumes } from '@/features/character/typeNames';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { addQuickbarItem } from '@/features/market/quickbar';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
@@ -474,6 +476,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   );
 
   const itemActions = usePageItemActions({ activeCharacterId: snapshot.activeCharacterId });
+  const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
 
   function collectRowItemIds(): number[] {
     return rows.flatMap((row) => {
@@ -494,11 +497,18 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
     setSelectedIds(new Set());
   }
   function handleBulkAddToQuickbar() {
+    // One write: `quickbar.add` closes over the rendered list, so looping it keeps only the last.
+    let items = itemActions.quickbar.items;
     for (const id of selectedIds) {
       const asset = assetsByItemId.get(id);
-      if (!asset) continue;
-      itemActions.quickbar.add(asset.type_id, typeDisplayName(asset.type_id, typeNames));
+      // Abyssal: no market; the row menu skips Quickbar too.
+      if (!asset || isAbyssalType?.(asset.type_id)) continue;
+      items = addQuickbarItem(items, {
+        typeId: asset.type_id,
+        name: typeDisplayName(asset.type_id, typeNames),
+      });
     }
+    void itemActions.quickbar.write(items);
   }
   function handleBulkAddToCompare() {
     const addToCompare = useCompareSet.getState().add;

@@ -361,15 +361,17 @@ function AbyssalTypeSection({
             <p className="mt-2 text-xs text-text-dim">
               {t('market.itemDetail.abyssal.rangesHint', { base: baseName })}
             </p>
-            <DataTable
-              className="mt-1"
-              label={t('market.itemDetail.abyssal.rangesTableLabel', { base: baseName })}
-              columns={columns}
-              rows={rows}
-              rowKey={(row) => row.attributeId}
-              density="compact"
-              responsive="table"
-            />
+            {/* Own sideways scroller (DESIGN.md §4a), or the whole dialog body scrolls on a phone. */}
+            <div className="mt-1 overflow-x-auto">
+              <DataTable
+                label={t('market.itemDetail.abyssal.rangesTableLabel', { base: baseName })}
+                columns={columns}
+                rows={rows}
+                rowKey={(row) => row.attributeId}
+                density="compact"
+                responsive="table"
+              />
+            </div>
           </>
         )}
       </Section>
@@ -463,15 +465,17 @@ function OwnedRollsSection({
       ) : rows.length === 0 ? (
         <p className="mt-2 text-xs text-text-dim">{t('market.itemDetail.abyssal.noRolls')}</p>
       ) : (
-        <DataTable
-          className="mt-2"
-          label={t('market.itemDetail.abyssal.rollsTitle')}
-          columns={columns}
-          rows={rows}
-          rowKey={(row) => row.attributeId}
-          density="compact"
-          responsive="table"
-        />
+        // Own scroller, as the ranges table: Roll quality sits past a phone's edge.
+        <div className="mt-2 overflow-x-auto">
+          <DataTable
+            label={t('market.itemDetail.abyssal.rollsTitle')}
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.attributeId}
+            density="compact"
+            responsive="table"
+          />
+        </div>
       )}
     </Section>
   );

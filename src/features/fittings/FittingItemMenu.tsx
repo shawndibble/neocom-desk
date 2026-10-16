@@ -31,8 +31,8 @@ import {
   BuildPlanMenuItems,
   OpenInEveItemMenuItems,
   ShowInfoMenuItem,
-  ViewInMarketMenuItem,
 } from '@/features/market/ItemContextMenu';
+import { ViewInMarketMenuItem } from '@/features/market/ViewInMarketMenuItem';
 import { ChargePickerMenuItems } from './ChargePickerMenu';
 import { useFittingItemActions, type FittingItemActions } from './fittingItemActions';
 

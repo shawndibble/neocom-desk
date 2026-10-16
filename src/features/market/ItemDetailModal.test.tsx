@@ -88,6 +88,7 @@ describe('ItemDetailModal', () => {
     // Waits for the mutaplasmid data: an abyssal type offers no View in Market.
     const link = await screen.findByRole('link', { name: 'View in Market' });
     expect(link).toHaveAttribute('href', `/market/browser?type=${TYPE_ID}`);
+    expect(screen.getByRole('button', { name: 'Open market in EVE: Rifter' })).toBeInTheDocument();
     await userEvent.setup().click(link);
     expect(onClose).toHaveBeenCalledTimes(1);
 
@@ -1075,8 +1076,10 @@ describe('ItemDetailModal — an owned abyssal module', () => {
     // The grouped attributes are the module's own (1,150 HP), not its type's empty shard.
     expect(await screen.findByText('1,150 HP')).toBeInTheDocument();
     expect(screen.queryByText('Best sell:')).not.toBeInTheDocument();
-    // No market order exists for an abyssal type: no book is read, no Market link offered.
+    // No market order exists for an abyssal type: no book is read, no Market link offered,
+    // and no in-game market window to open (the type has no market group).
     expect(orderReads).toBe(0);
     expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Open market in EVE/ })).not.toBeInTheDocument();
   });
 });
