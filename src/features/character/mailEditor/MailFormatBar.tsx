@@ -21,6 +21,9 @@ import { ColorDialog, LinkDialog, SizeDialog, TableDialog } from './FormatDialog
 /** Height reserved under the writing surface so the docked bar never covers the last line. */
 export const DOCKED_BAR_SPACE_CLASS = 'pb-16';
 
+/** The game's default mail text colour, `#bfffffff`. */
+const GAME_DEFAULT_TEXT_COLOR = '#bfffffff';
+
 const keepFocus = (e: PointerEvent) => e.preventDefault();
 
 interface MailFormatBarProps {
@@ -75,12 +78,12 @@ export function MailFormatBar({
   const colorDot = (
     <span
       aria-hidden
-      className="size-5 rounded-full border border-line"
+      className="size-5 rounded-full border border-text-dim ring-1 ring-black/40"
       style={{
-        backgroundColor:
-          state.color === null || state.color === 'mixed'
-            ? '#0a0e14'
-            : markupColorToCss(state.color),
+        // No colour set = the game's own default text colour, white at 75%.
+        backgroundColor: markupColorToCss(
+          state.color === null || state.color === 'mixed' ? GAME_DEFAULT_TEXT_COLOR : state.color
+        ),
         backgroundImage:
           state.color === 'mixed'
             ? 'linear-gradient(135deg, transparent 45%, #bfbfbf 45%, #bfbfbf 55%, transparent 55%)'
@@ -98,9 +101,11 @@ export function MailFormatBar({
         className={cx(
           shown ? 'flex' : 'hidden',
           'gap-1 bg-panel',
+          // Phone: one row that scrolls sideways (the cut-off button is the cue, as in Tabs).
+          phone ? 'tab-scroller flex-nowrap overflow-x-auto' : 'flex-wrap',
           dock === 'keyboard'
-            ? 'fixed inset-x-0 z-40 overflow-x-auto border-t border-line px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]'
-            : 'flex-wrap border border-line px-1 py-1',
+            ? 'fixed inset-x-0 z-40 border-t border-line px-2 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]'
+            : 'border border-line px-1 py-1',
           className
         )}
       >

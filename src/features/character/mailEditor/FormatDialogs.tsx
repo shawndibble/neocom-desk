@@ -333,7 +333,13 @@ export function TableDialog({ open, onClose, phone, onInsert }: TableDialogProps
           style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
         >
           {Array.from({ length: rows * cols }, (_, i) => (
-            <span key={i} className={cx('h-4 bg-panel-2', i < cols && 'bg-accent/40')} />
+            <span
+              key={i}
+              className={cx(
+                'h-5 border border-line-bright',
+                i < cols ? 'bg-accent/50' : 'bg-text-dim/25'
+              )}
+            />
           ))}
         </div>
         <p className="text-xs text-text-dim">{t('mail.format.tableHint')}</p>
