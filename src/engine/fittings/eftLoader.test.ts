@@ -167,8 +167,7 @@ describe('loadEftFitting', () => {
 });
 
 describe('loadEftFitting — Pyfa mutated items', () => {
-  // Layout reconstructed from Pyfa's service/port/eft.py and muta.py, not a
-  // real export sample (see eftFit.test.ts).
+  // Pyfa layout: see the eftFit.ts header.
   const MUTA_TYPES: Record<string, number> = {
     ...TYPES,
     'heavy gremlin compact energy neutralizer': 16475,

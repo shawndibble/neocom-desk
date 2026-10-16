@@ -49,25 +49,13 @@ export async function eftAttributeNamesFor(
 }
 
 /**
- * A Fitting decoded from a share code — checked for shape only — with its
- * mutations checked against the data (`normaliseFittingMutations`), so a
- * forged one can't restate a module. Every mutation is dropped when the data
- * won't load. Run on each decode of a code that may be a stranger's.
+ * `normaliseFittingMutations` for a decoded share code (the codec checks shape
+ * only); every mutation dropped when the data won't load. Run on each decode
+ * of a code that may be a stranger's.
  */
 export async function withCheckedMutations(fitting: Fitting): Promise<Fitting> {
   if (!hasMutations(fitting)) return fitting;
-  let lookup: MutaplasmidLookup;
-  try {
-    lookup = await loadMutaplasmidLookup();
-  } catch {
-    const bare = <T extends { mutation?: unknown }>(item: T): T => {
-      const next = { ...item };
-      delete next.mutation;
-      return next;
-    };
-    return { ...fitting, modules: fitting.modules.map(bare), drones: fitting.drones.map(bare) };
-  }
-  return normaliseFittingMutations(fitting, lookup);
+  return normaliseFittingMutations(fitting, await loadMutaplasmidLookup().catch(() => null));
 }
 
 /** The lookup once loaded; null while it loads or if it failed (a later render retries). */

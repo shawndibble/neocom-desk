@@ -1,24 +1,16 @@
 /**
- * Mutated (abyssal) items' rolls from ESI's
- * `GET /dogma/dynamic/items/{type_id}/{item_id}` — the one place the app asks,
- * shared by Fittings (an asset ship opened in the editor), Assets and
- * pricing.
- *
- * An item's rolls never change, so every answer is kept in Dexie
- * (`dynamicItems`) for good and ESI is asked once per item id, ever. The
- * route has no rate-limit group, only ESI's error limit, and an id that isn't
- * a mutated item answers 400 — so an id ESI rejected (any 4xx) is remembered
- * for the session and not asked again. A failure that isn't the id's fault
- * (5xx, offline, the app's own ESI budget) is not remembered.
- *
- * Throttling across the app is the ESI gate's job (`esi/budget.ts`);
- * `fetchDynamicItems` only caps how many it has in flight at once.
+ * Mutated items' rolls from ESI's dynamic-item route — the one place the app
+ * asks. Rolls never change, so answers are kept in Dexie for good. The route
+ * has only ESI's error limit, so an id rejected with a 4xx (not 420/429) is
+ * skipped for the session; other failures are retried. App-wide throttling is
+ * `esi/budget.ts`'s; this only caps what it has in flight.
  */
 import { db, type DynamicItemRecord } from '@/db';
 import { getDogmaDynamicItem, type DynamicItem } from '@/esi/endpoints';
 import { EsiError } from '@/esi/errors';
 import { mutationFromDynamicItem, type MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
 import type { ItemMutation } from '@/engine/fittings/types';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 
 /** A mutated item to look up: its abyssal type and its own unique item id. */
 export interface DynamicItemRef {
@@ -26,7 +18,10 @@ export interface DynamicItemRef {
   itemId: number;
 }
 
-/** In flight at once, per batch: a ship's worth of mutated modules lands in two rounds. */
+/**
+ * In flight at once, per batch — below `ESI_FANOUT_CONCURRENCY`: this route has
+ * only ESI's error limit, and a ship's mutated modules land in two rounds.
+ */
 const DEFAULT_CONCURRENCY = 4;
 
 const rejectedThisSession = new Set<number>();
@@ -110,24 +105,18 @@ export async function fetchDynamicItems(
   ids.forEach((id, index) => {
     const row = cached[index];
     if (row) found.set(id, row);
-    else if (!rejectedThisSession.has(id)) missing.push(unique.get(id)!);
+    else missing.push(unique.get(id)!);
   });
 
-  let next = 0;
-  const worker = async () => {
-    while (next < missing.length && !signal?.aborted) {
-      const ref = missing[next++]!;
-      try {
-        const record = await fetchOne(ref, signal);
-        if (record) found.set(ref.itemId, record);
-      } catch (err) {
-        if (!signal?.aborted) throw err;
-      }
+  await mapWithConcurrencyLimit(missing, concurrency, async (ref) => {
+    if (signal?.aborted) return;
+    try {
+      const record = await fetchOne(ref, signal);
+      if (record) found.set(ref.itemId, record);
+    } catch (err) {
+      if (!signal?.aborted) throw err;
     }
-  };
-  await Promise.all(
-    Array.from({ length: Math.max(1, Math.min(concurrency, missing.length)) }, worker)
-  );
+  });
   return found;
 }
 

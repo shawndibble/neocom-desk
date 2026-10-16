@@ -23,7 +23,6 @@ export function loadFittingFromText(text: string): Promise<LoadOutcome | ShareLo
       const [typeByName, slotByTypeId, mutaplasmids] = await Promise.all([
         loadItemNameMap(),
         loadFittingSlots(),
-        // Only Pyfa's mutated items need it; without it they load as their base modules.
         loadMutaplasmidLookup().catch(() => undefined),
       ]);
       return { typeByName, slotByTypeId, mutaplasmids };

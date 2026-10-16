@@ -36,11 +36,7 @@ function shipItems(ship: AssetTreeContainerNode): ShipAssetItem[] {
 /** How long Open in Fittings waits on ESI for a ship's rolls. */
 const ROLLS_TIMEOUT_MS = 8000;
 
-/**
- * The rolls of the ship's mutated items, by item id. Never fails the open:
- * data or ESI that won't answer leaves those items without rolls, which the
- * editor badges (`mutationStatus`).
- */
+/** The ship's rolls by item id. Never fails the open: what won't answer loads base unknown. */
 async function shipMutations(items: readonly ShipAssetItem[]): Promise<Map<number, ItemMutation>> {
   try {
     const lookup = await loadMutaplasmidLookup();
@@ -49,8 +45,7 @@ async function shipMutations(items: readonly ShipAssetItem[]): Promise<Map<numbe
         ? [{ typeId: item.typeId, itemId: item.itemId }]
         : []
     );
-    // A click waits on this: past the timeout the ship opens with the rolls
-    // that arrived; the rest load base unknown, and are cached for the next open.
+    // A click waits on this: past the timeout, open with what arrived; the rest load base unknown.
     return refs.length === 0
       ? new Map()
       : await mutationsForItems(refs, lookup, { signal: AbortSignal.timeout(ROLLS_TIMEOUT_MS) });

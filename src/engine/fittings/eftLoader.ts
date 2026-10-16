@@ -22,7 +22,12 @@
  * right now. The workspace then launches what the pilot can field once the
  * stats are in (scope decision `20260925-113331`).
  */
-import { parseEftFit, type EftItem, type EftMutationBlock } from '@/engine/import/eftFit';
+import {
+  MUTATION_REF_SUFFIX,
+  parseEftFit,
+  type EftItem,
+  type EftMutationBlock,
+} from '@/engine/import/eftFit';
 import { MAX_DRONE_STACKS, MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
 import type { FittingSlotAssignment } from '@/sde/types';
 import type { LoadParts, LoadWarning } from './load';
@@ -54,23 +59,16 @@ export type EftSlotLookup = Readonly<Record<string, FittingSlotAssignment>>;
  * in cargo (EVE's own export always writes one, even for `x1`).
  */
 const HAS_QUANTITY_SUFFIX = /^.*\S\s+x\d+$/i;
-/** Pyfa's mutated-item reference (`eftFit.ts`), stripped before the quantity check. */
-const MUTATION_REF_SUFFIX = /\s*\[\d+\]$/;
 
 export function resolveTypeId(name: string, typeByName: EftTypeLookup): number | null {
   return typeByName.get(name.toLowerCase())?.typeID ?? null;
 }
 
 /**
- * `mutaplasmids` resolves Pyfa's mutated items (`eftFit.ts`): a line
- * referencing a mutation block loads as the abyssal type its base and
- * mutaplasmid make, carrying the block's rolls (only those the mutaplasmid
- * rolls). A block naming a mutaplasmid this build doesn't know, or one that
- * doesn't apply to the base, loads the plain base module with an
- * `'unknown-mutation'` warning; a reference with no block, or no
- * `mutaplasmids` at all, loads the plain base module, as Pyfa does. A bare
- * abyssal type line (`Heavy Abyssal Energy Neutralizer`) loads as that type
- * with no mutation — its base is unknown (`mutationStatus`).
+ * `mutaplasmids` resolves Pyfa's `[N]` refs (`eftFit.ts`) to the abyssal type,
+ * rolls cut to the mutaplasmid's. Unknown or inapplicable mutaplasmid: plain
+ * base plus an `'unknown-mutation'` warning. No block or no `mutaplasmids`:
+ * plain base, as Pyfa does. A bare abyssal line: that type, base unknown.
  */
 export function loadEftFitting(
   text: string,
@@ -194,8 +192,7 @@ export function loadEftFitting(
     const rack = slotByTypeId[typeId] ?? (mutated ? slotByTypeId[namedTypeId] : undefined);
 
     if (rack === 'drone' && mutated) {
-      // Each mutated drone is its own item: never one stack sharing rolls.
-      // Capped at what a share code holds; a pasted count is unbounded.
+      // One drone per mutated item, capped at what a share code holds (a pasted count is unbounded).
       for (let n = 0; n < Math.min(item.quantity, MAX_DRONE_STACKS); n++) {
         drones.push({ typeId, quantity: 1, state: 'online', ...mutation });
       }

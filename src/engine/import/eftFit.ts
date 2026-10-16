@@ -113,7 +113,7 @@ const EMPTY_SLOT = /^\[Empty\s+.+\s+slot\]$/i;
 const OFFLINE_SUFFIX = /\s*\/offline\s*$/i;
 const QUANTITY_SUFFIX = /^(.*\S)\s+x(\d+)$/i;
 /** Pyfa's mutated-item reference, the last thing on its line. */
-const MUTATION_REF_SUFFIX = /\s*\[(\d+)\]$/;
+export const MUTATION_REF_SUFFIX = /\s*\[(\d+)\]$/;
 /** A Pyfa mutation block's header: `[N] <base name>`. Never `[Empty … slot]`, which has no digits. */
 const MUTATION_BLOCK_HEADER = /^\[(\d+)\]\s*(.*)$/;
 

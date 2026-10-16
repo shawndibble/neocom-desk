@@ -200,13 +200,7 @@ describe('parseEftFit', () => {
   });
 });
 
-// Pyfa's mutated-module layout, reconstructed from Pyfa's own source
-// (service/port/eft.py exportEft/importEft and service/port/muta.py
-// renderMutant/parseMutant, master as of 2026-10) — not from a real export
-// sample, which this ticket had no way to obtain. The fitted line names the
-// BASE module with a ` [N]` reference after any charge and `/offline`; one
-// block per reference trails the fit: `[N] <base name>`, the mutaplasmid's
-// name, then `attrName value, ...` (dogma internal names, sorted).
+// Pyfa's mutated-item layout: see the eftFit.ts header.
 const PYFA_MUTATED = [
   '[Vexor Navy Issue, Abyssal]',
   'Damage Control II [1]',

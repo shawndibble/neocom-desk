@@ -263,8 +263,7 @@ describe('fittingToEveXml', () => {
 });
 
 describe('fittingToEft — mutated items (Pyfa layout)', () => {
-  // Layout reconstructed from Pyfa's service/port/eft.py exportEft and
-  // service/port/muta.py renderMutant, not from a real export sample.
+  // Pyfa layout: see the eftFit.ts header.
   const MUTA_NAMES: Record<number, string> = {
     587: 'Rifter',
     16475: 'Heavy Gremlin Compact Energy Neutralizer',

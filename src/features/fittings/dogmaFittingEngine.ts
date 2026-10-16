@@ -173,7 +173,7 @@ async function fillEngineAssetCache(): Promise<void> {
 }
 
 let enginePromise: Promise<DogmaEngine> | null = null;
-/** Loaded with the engine; null when the data wouldn't load. */
+/** Loaded with the engine, for `fittingToDogmaFit`'s mutation check; null when the data wouldn't load. */
 let readyMutaplasmids: MutaplasmidLookup | null = null;
 
 function toDogmaFit(fitting: Fitting, profile: PilotProfile, damageProfile?: DamageProfile) {
@@ -234,7 +234,6 @@ export function loadDogmaEngine(
         for (const listener of [...progressListeners]) listener(lastProgress);
       };
 
-      // Mutated items' check (`fittingToDogmaFit`); without the data they go in bare.
       const [wasmBytes, sdeBytes, mutaplasmids] = await Promise.all([
         fetchWithProgress(WASM_URL, (loaded, total) => {
           wasmLoaded = loaded;

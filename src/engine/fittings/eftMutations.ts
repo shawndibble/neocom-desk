@@ -1,13 +1,7 @@
 /**
- * Writing mutated items in Pyfa's EFT layout — shared by both EFT exporters
- * (`fittingExport.ts`, `eftExport.ts`); the read half is `eftFit.ts` and
- * `eftLoader.ts`. Reconstructed from Pyfa's service/port/eft.py
- * (`exportEft`) and service/port/muta.py (`renderMutant`), not from a real
- * export sample: the fitted line names the base item and ends in ` [N]`
- * (after any charge and ` /OFFLINE`), and one block per reference closes the
- * fit — `[N] <base name>`, the mutaplasmid's name, and the rolls as
- * `attrName value, ...` by dogma internal name, alphabetically. A block
- * with no known rolls stops after the mutaplasmid, which Pyfa reads as such.
+ * Writes mutated items in Pyfa's EFT layout (spec: `eftFit.ts` header) for
+ * both EFT exporters. Rolls sorted by internal name; a block with no known
+ * rolls stops after the mutaplasmid line.
  */
 import { quantiseRoll } from '@/engine/fitting/fittingShare';
 import type { ItemMutation } from './types';
@@ -16,8 +10,8 @@ import type { ItemMutation } from './types';
 export type AttributeNameFor = (attributeId: number) => string | undefined;
 
 export interface EftMutationWriter {
-  /** The name and ` [N]` suffix to write a mutated item's line with; registers its block. */
-  line(mutation: ItemMutation): { name: string; suffix: string };
+  /** The name and ` [N]` suffix to write an item's line with; a mutated item's registers its block. */
+  line(item: { typeId: number; mutation?: ItemMutation }): { name: string; suffix: string };
   /** Every block registered so far, as the fit's last section; null when none. */
   section(): string | null;
 }
@@ -28,7 +22,8 @@ export function eftMutationWriter(
 ): EftMutationWriter {
   const blocks: string[] = [];
   return {
-    line(mutation) {
+    line({ typeId, mutation }) {
+      if (!mutation) return { name: nameFor(typeId), suffix: '' };
       const ref = blocks.length + 1;
       const rolls = Object.entries(mutation.attributes)
         .flatMap(([id, value]) => {

@@ -9,19 +9,16 @@ import type { DamageProfile, Fitting, FittingModule, ItemMutation, PilotProfile 
 const SLOT_INDEX_START = 1;
 
 /**
- * The engine's `Mutation` for a mutated item: its base, and the rolls when
- * known (none: the engine states the base module). The engine applies any
- * attribute id it is handed as the item's own, so every mutation is checked
- * against the data here, whatever its source: rolls cut to the mutaplasmid's,
- * and one that doesn't make this item — or any, with no data loaded — goes
- * in bare (the engine then knows nothing of the item but its slot).
+ * The engine's `Mutation`, checked here whatever the source (`normaliseMutation`).
+ * No rolls: the engine states the base module. Fails the check, or no data
+ * loaded: the item goes in bare, the engine knowing only its slot.
  */
 function toEngineMutation(
   typeId: number,
   mutation: ItemMutation | undefined,
   mutaplasmids: MutaplasmidLookup | null
 ): Pick<FitItem, 'mutation'> {
-  const checked = mutation && mutaplasmids && normaliseMutation(typeId, mutation, mutaplasmids);
+  const checked = mutation && normaliseMutation(typeId, mutation, mutaplasmids);
   if (!checked) return {};
   const rolled = Object.keys(checked.attributes).length > 0;
   return {
@@ -91,8 +88,7 @@ function slottedItem(
  * the engine rejects an explicit `environment: undefined` (live run,
  * 2026-09-24).
  *
- * `mutaplasmids` checks mutated items (`toEngineMutation`); without it they
- * go in bare.
+ * `mutaplasmids`: see `toEngineMutation`.
  */
 export function fittingToDogmaFit(
   fitting: Fitting,

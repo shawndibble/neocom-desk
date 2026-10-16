@@ -153,8 +153,7 @@ export type KillmailHashLookup =
 export interface TextLoadSources {
   /**
    * Name → typeId and typeId → rack; read only for text that needs them.
-   * `mutaplasmids`, when present, resolves Pyfa's mutated items in EFT text
-   * (`eftLoader.ts`); without it they load as their plain base modules.
+   * `mutaplasmids` (optional): see `loadEftFitting`.
    */
   catalog: () => Promise<{
     typeByName: EftTypeLookup;

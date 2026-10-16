@@ -29,11 +29,7 @@ export interface ShipAssetItem {
   itemId?: number;
 }
 
-/**
- * `mutations` holds the rolls of the ship's mutated (abyssal) items by item
- * id (`features/abyssal/dynamicItems.ts`'s `mutationsForItems`); an abyssal
- * item missing from it loads with no mutation, its base unknown.
- */
+/** `mutations`: rolls by item id (`mutationsForItems`); an abyssal item absent from it loads base unknown. */
 export function assetShipToFitting(
   ship: { typeId: number; name: string },
   items: readonly ShipAssetItem[],

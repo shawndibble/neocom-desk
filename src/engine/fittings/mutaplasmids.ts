@@ -1,16 +1,8 @@
 /**
- * Mutaplasmids and mutated (abyssal) items, pure (GLOSSARY.md **Mutated
- * module**, **Mutaplasmid**, **Roll**, **Abyssal type**). Reads the baked
- * `public/data/mutaplasmids.json` shape (`MutaplasmidData`) handed in by the
- * feature layer (`features/abyssal/mutaplasmidData.ts` loads it); nothing here
- * fetches.
- *
- * A mutaplasmid applied to a base module makes one abyssal type; the base
- * decides the starting attributes and the mutaplasmid which of them roll and
- * how far. Many bases share one abyssal type (every heavy neutralizer becomes
- * the Heavy Abyssal Energy Neutralizer), so the abyssal type alone never
- * names its base — that is why an abyssal item with no `ItemMutation` is
- * `'baseUnknown'`.
+ * Mutaplasmids and mutated items, pure (GLOSSARY **Mutated module**,
+ * **Mutaplasmid**, **Roll**, **Abyssal type**); the data is handed in by
+ * `features/abyssal/mutaplasmidData.ts`. Many bases share one abyssal type
+ * (every heavy neutralizer makes the same one), so the type never names its base.
  */
 import type { MutaplasmidAttributeRange, MutaplasmidData } from '@/sde/types';
 import type { Fitting, ItemMutation } from './types';
@@ -117,18 +109,18 @@ export function rollQuality(value: number, range: RollRange): number {
 }
 
 /**
- * `mutation` made legal for an item of `typeId`: the mutaplasmid exists,
- * applies to the base and makes `typeId`, and only attributes that
- * mutaplasmid rolls survive (finite values only). Null when the three do not
- * belong together. Every place a mutation enters the app runs it through
- * this, since the engine takes any attribute it is handed as the item's own.
+ * `mutation` made legal for an item of `typeId`: only the attributes its
+ * mutaplasmid rolls (finite values) survive. Null when base, mutaplasmid and
+ * type don't belong together, or with no data. Needed because the engine takes
+ * any attribute it is handed as the item's own.
  */
 export function normaliseMutation(
   typeId: number,
   mutation: ItemMutation,
-  lookup: MutaplasmidLookup
+  lookup: MutaplasmidLookup | null
 ): ItemMutation | null {
-  if (lookup.resultingType(mutation.baseTypeId, mutation.mutaplasmidTypeId) !== typeId) return null;
+  if (!lookup || lookup.resultingType(mutation.baseTypeId, mutation.mutaplasmidTypeId) !== typeId)
+    return null;
   const rolled = new Set(
     lookup.mutaplasmid(mutation.mutaplasmidTypeId)!.attributes.map((a) => a.id)
   );
@@ -149,14 +141,11 @@ export function hasMutations(fitting: Fitting): boolean {
   return fitting.modules.some((m) => m.mutation) || fitting.drones.some((d) => d.mutation);
 }
 
-/**
- * `fitting` with every mutation run through `normaliseMutation`: rolls cut to
- * the mutaplasmid's own, and a mutation that doesn't belong to its item (a
- * forged share code's, say) dropped. The same Fitting, by reference, when
- * nothing changes. For a Fitting from a source that wasn't checked against
- * the data — a share code is checked for shape only.
- */
-export function normaliseFittingMutations(fitting: Fitting, lookup: MutaplasmidLookup): Fitting {
+/** Every mutation through `normaliseMutation`, one that fails it dropped; the same Fitting when nothing changes. */
+export function normaliseFittingMutations(
+  fitting: Fitting,
+  lookup: MutaplasmidLookup | null
+): Fitting {
   let changed = false;
   const clean = <T extends { typeId: number; mutation?: ItemMutation }>(item: T): T => {
     if (!item.mutation) return item;
@@ -206,17 +195,9 @@ export function mutationFromDynamicItem(
 }
 
 /**
- * Where a fitted item stands on rolls — what the UI badges:
- * - `'none'`: not an abyssal type.
- * - `'rolled'`: base, mutaplasmid and rolls known; the engine states it exactly.
- * - `'rollsUnknown'`: base and mutaplasmid known, rolls not (an EFT block with
- *   no attribute line). The engine states the base module's own values.
- * - `'baseUnknown'`: an abyssal type with no mutation at all — from a
- *   killmail, an In-game Fitting or a bare `Abyssal X` EFT line, none of
- *   which carry one, or an asset ESI gave no rolls for in time. The engine
- *   knows nothing of it but its slot, so it adds no CPU, powergrid or effect
- *   to the stats (decision
- *   `docs/context/decisions/*-mutated-module-rolls-in-fitting-share-code-v3.md`).
+ * What the UI badges (decision `20261016-093132`): `'none'` not abyssal; `'rolled'` exact;
+ * `'rollsUnknown'` base and mutaplasmid known, the base's values stated; `'baseUnknown'` no
+ * mutation (killmail, In-game Fitting, bare EFT line, ESI miss) — the engine adds only the slot.
  */
 export type MutationStatus = 'none' | 'rolled' | 'rollsUnknown' | 'baseUnknown';
 
@@ -229,11 +210,7 @@ export function mutationStatus(
   return Object.keys(item.mutation.attributes).length === 0 ? 'rollsUnknown' : 'rolled';
 }
 
-/**
- * `item` re-typed as `typeId`, its mutation dropped unless the type stays the
- * same: a swapped-in variant is a different item, and a stale mutation would
- * have the engine apply one module's rolls to another.
- */
+/** `item` re-typed as `typeId`, its mutation dropped unless the type stays: a variant is another item. */
 export function withoutMutation<T extends { typeId: number; mutation?: ItemMutation }>(
   item: T,
   typeId: number

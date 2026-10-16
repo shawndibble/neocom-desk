@@ -54,11 +54,9 @@ function headerSafe(name: string): string {
 }
 
 /**
- * EFT text. A mutated module or drone is written in Pyfa's layout
- * (`eftMutations.ts`): its base's name and a ` [N]` reference, with a block
- * of mutaplasmid and rolls after the fit; `attributeName` names the rolls
- * (`MutaplasmidLookup.attributeName`) — without it a block carries none. An
- * abyssal item with no known base is written as its own type.
+ * EFT text; mutated items in Pyfa's layout (`eftMutations.ts`). Without
+ * `attributeName` the blocks carry no rolls. An abyssal item with no known
+ * base is written as its own type.
  */
 export function fittingToEft(
   fitting: Fitting,
@@ -74,9 +72,7 @@ export function fittingToEft(
       .map((m) => {
         const charge = m.chargeTypeId === undefined ? '' : `, ${nameFor(m.chargeTypeId)}`;
         const offline = m.state === 'offline' ? ' /OFFLINE' : '';
-        const { name, suffix } = m.mutation
-          ? mutations.line(m.mutation)
-          : { name: nameFor(m.typeId), suffix: '' };
+        const { name, suffix } = mutations.line(m);
         return `${name}${charge}${offline}${suffix}`;
       });
     if (lines.length > 0) sections.push(lines.join('\n'));
@@ -85,9 +81,7 @@ export function fittingToEft(
     sections.push(
       fitting.drones
         .map((d) => {
-          const { name, suffix } = d.mutation
-            ? mutations.line(d.mutation)
-            : { name: nameFor(d.typeId), suffix: '' };
+          const { name, suffix } = mutations.line(d);
           return `${name} x${d.quantity}${suffix}`;
         })
         .join('\n')

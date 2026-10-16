@@ -20,9 +20,7 @@ function moduleLine(
 ): string {
   const charge = module.chargeTypeId === undefined ? '' : `, ${typeName(module.chargeTypeId)}`;
   const offline = module.state === 'offline' ? ' /OFFLINE' : '';
-  const { name, suffix } = module.mutation
-    ? mutations.line(module.mutation)
-    : { name: typeName(module.typeId), suffix: '' };
+  const { name, suffix } = mutations.line(module);
   return `${name}${charge}${offline}${suffix}`;
 }
 
@@ -45,9 +43,7 @@ export function fittingToEft(
   if (fitting.drones.length > 0) {
     sections.push(
       fitting.drones.map((drone) => {
-        const { name, suffix } = drone.mutation
-          ? mutations.line(drone.mutation)
-          : { name: typeName(drone.typeId), suffix: '' };
+        const { name, suffix } = mutations.line(drone);
         return `${name} x${drone.quantity}${suffix}`;
       })
     );

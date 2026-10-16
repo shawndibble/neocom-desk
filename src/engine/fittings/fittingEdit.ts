@@ -450,13 +450,9 @@ export function setDroneCounts(
 }
 
 /**
- * `setDroneCounts` for a type with mutated drones among it: each mutated
- * drone is its own item with its own rolls, so none is merged or rebuilt.
- * The drones in space stay first in line, then the bay, in listed order; the
- * first `inSpace` are launched, the next `inBay` wait in the bay, and any past
- * that are dropped from the end. Past what the Fitting holds come plain
- * drones of the type. A plain stack of the type is worked in counts and
- * regrouped into one stack per state.
+ * `setDroneCounts` when the type has mutated drones, which are never merged.
+ * Space first, then bay, in listed order; excess dropped from the end, any
+ * shortfall plain drones; plain stacks worked in counts, one per state.
  */
 function setMutatedDroneCounts(
   fitting: Fitting,

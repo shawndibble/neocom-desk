@@ -1110,13 +1110,9 @@ export interface AnsiblexGateRecord {
 }
 
 /**
- * One mutated (abyssal) item's dogma as ESI's
- * `/dogma/dynamic/items/{type_id}/{item_id}` answered it — its base, its
- * mutaplasmid and its full attribute set (`esi/endpoints.ts` `DynamicItem`).
- * Immutable per item id, so a row is kept for good: never refetched, never
- * pruned. Public data, character-independent and device-local; it survives
- * logout like any other public cache. Read through
- * `features/abyssal/dynamicItems.ts`.
+ * One mutated item's dogma as ESI's dynamic-item route answered it (`DynamicItem`).
+ * Immutable per id: never refetched or pruned; public, survives logout. Read
+ * through `features/abyssal/dynamicItems.ts`.
  */
 export interface DynamicItemRecord {
   itemId: number;

@@ -1,14 +1,8 @@
-// mutaplasmids.json: what each mutaplasmid does — the abyssal type it makes,
-// the base modules (or drones) it applies to, and the range each attribute
-// rolls in — from CCP's `dynamicItemAttributes.jsonl` (no Fuzzwork table
-// carries it). `min`/`max` are multipliers on the base item's own value: a
-// rolled module's attribute is base × a uniform pick in [min, max].
-//
-// `highIsGood` is resolved here, so the app never needs the dogma attribute
-// table: the row's own override where CCP gives one (12 rows in build
-// 3607705), else the attribute's. `attributeNames` maps each mutated
-// attribute id to its internal dogma name (`capacitorNeed`), which is how
-// Pyfa's EFT mutation blocks name them.
+// mutaplasmids.json from CCP's `dynamicItemAttributes.jsonl` (no Fuzzwork table
+// has it): result type, bases, and per-attribute `min`/`max` multipliers on the
+// base's value. `highIsGood` is resolved here (row override, else the
+// attribute's) so the app never needs the dogma table; `attributeNames` gives
+// the internal names Pyfa's EFT blocks use.
 
 /**
  * @param {Array<{_key: number, attributeIDs: Array<{_key: number, min: number, max: number, highIsGood?: boolean}>, inputOutputMapping: Array<{applicableTypes: number[], resultingType: number}>}>} rows

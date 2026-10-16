@@ -58,10 +58,7 @@ export const FITTING_SHARE_VERSION = '2';
 /** The pre-name wire format; decode-only, never produced by `encodeFittingShare`. */
 export const LEGACY_FITTING_SHARE_VERSION = '1';
 
-/**
- * Written only for a Fitting carrying a mutated module or drone; everything
- * else stays `FITTING_SHARE_VERSION` (see the header).
- */
+/** Only for a Fitting with a mutated item; else `FITTING_SHARE_VERSION` (see the header). */
 export const MUTATED_FITTING_SHARE_VERSION = '3';
 
 /** A fit name past this is truncated on encode and rejected on decode. */
@@ -84,12 +81,7 @@ const TOKEN_STATES: Record<string, ModuleState> = {
   '3': 'overload',
 };
 
-/**
- * A mutated item's make and rolls on the wire — the same fields as the
- * domain's `ItemMutation` (`engine/fittings/types.ts`), restated here so the
- * codec imports nothing from the Fittings domain. Rolls are absolute dogma
- * values by attribute id; empty when unknown.
- */
+/** Wire twin of `ItemMutation`, restated so the codec imports nothing from the Fittings domain. */
 export interface ShareMutation {
   baseTypeId: number;
   mutaplasmidTypeId: number;
@@ -180,11 +172,9 @@ export const MAX_BOOSTER_SIDE_EFFECTS = 40;
 export const MAX_MUTATED_ATTRIBUTES = 32;
 
 /**
- * A roll as the wire carries it: 6 significant digits. The game shows no
- * attribute to more than 4 or 5 (a resonance's 62.35%, a 15,680 m range), so
- * the relative error this leaves (under 5e-7) never changes a shown figure or
- * a roll's quality, and a roll costs a handful of characters rather than a
- * float's 17.
+ * A roll on the wire: 6 significant digits. The game shows at most 4–5, so the
+ * error (< 5e-7) never changes a shown figure or roll quality, and a roll
+ * costs a few characters rather than a float's 17.
  */
 export function quantiseRoll(value: number): number {
   return Number(value.toPrecision(6));
@@ -357,7 +347,6 @@ export async function encodeFittingShare(
   }
   for (const [index, drone] of input.drones.entries()) {
     if (!drone.mutation) continue;
-    // One drone is one mutated item; a stack can't share one set of rolls.
     if (drone.count !== 1) return { ok: false, reason: 'too-large' };
     mutations.push(encodeMutation(`${DRONE_TARGET}${index.toString(36)}`, drone.mutation));
   }
@@ -406,7 +395,7 @@ export async function encodeFittingShare(
   ];
   const sideEffects = input.boosterSideEffects ?? [];
   const mutated = mutations.length > 0;
-  // Trailing sections only when there's something in them — see the header.
+  // Trailing sections only when non-empty, or when v3's mutations follow them — see the header.
   if (input.mode !== undefined || sideEffects.length > 0 || mutated) {
     sections.push(input.mode === undefined ? '' : input.mode.toString(36));
   }
@@ -592,7 +581,6 @@ function parseBody(body: string, version: string): DecodeFittingShareResult {
   // and booster side effects; version 3 the mutations after those.
   const named = version !== LEGACY_FITTING_SHARE_VERSION;
   const base = named ? 7 : 6;
-  // Version 1 is exactly six sections.
   const trailing = version === MUTATED_FITTING_SHARE_VERSION ? 3 : named ? 2 : 0;
   const max = base + trailing;
   if (parts.length < base || parts.length > max) return { ok: false, reason: 'invalid' };
