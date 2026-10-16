@@ -13,7 +13,7 @@
  * `'baseUnknown'`.
  */
 import type { MutaplasmidAttributeRange, MutaplasmidData } from '@/sde/types';
-import type { ItemMutation } from './types';
+import type { Fitting, ItemMutation } from './types';
 
 /** One mutaplasmid, as the lookup hands it out. */
 export interface Mutaplasmid {
@@ -142,6 +142,33 @@ export function normaliseMutation(
     mutaplasmidTypeId: mutation.mutaplasmidTypeId,
     attributes,
   };
+}
+
+/**
+ * `fitting` with every mutation run through `normaliseMutation`: rolls cut to
+ * the mutaplasmid's own, and a mutation that doesn't belong to its item (a
+ * forged share code's, say) dropped. The same Fitting, by reference, when
+ * nothing changes. For a Fitting from a source that wasn't checked against
+ * the data — a share code is checked for shape only.
+ */
+export function normaliseFittingMutations(fitting: Fitting, lookup: MutaplasmidLookup): Fitting {
+  let changed = false;
+  const clean = <T extends { typeId: number; mutation?: ItemMutation }>(item: T): T => {
+    if (!item.mutation) return item;
+    const mutation = normaliseMutation(item.typeId, item.mutation, lookup);
+    const same =
+      mutation !== null &&
+      Object.keys(mutation.attributes).length === Object.keys(item.mutation.attributes).length;
+    if (same) return item;
+    changed = true;
+    const next = { ...item };
+    if (mutation) next.mutation = mutation;
+    else delete next.mutation;
+    return next;
+  };
+  const modules = fitting.modules.map(clean);
+  const drones = fitting.drones.map(clean);
+  return changed ? { ...fitting, modules, drones } : fitting;
 }
 
 /** The fields of ESI's `GET /dogma/dynamic/items/{type_id}/{item_id}/` this reads. */

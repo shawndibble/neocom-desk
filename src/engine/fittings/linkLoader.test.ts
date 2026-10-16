@@ -24,6 +24,13 @@ describe('classifyLoadInput', () => {
     expect(classifyLoadInput('https://x.example/market?f=1.abc').kind).toBe('unknown');
   });
 
+  it('reads a version-3 code (a Fitting with mutated items) back the same way', () => {
+    expect(classifyLoadInput('https://x.example/ships/fittings/edit?f=3.abc_-')).toEqual({
+      kind: 'share',
+      code: '3.abc_-',
+    });
+  });
+
   it('reads the editor address back too, as copied from the address bar', () => {
     expect(classifyLoadInput('https://x.example/neocom-desk/fittings/edit?f=1.abc_-')).toEqual({
       kind: 'share',

@@ -733,6 +733,63 @@ describe('cargoGroups', () => {
   });
 });
 
+describe('drone counts on mutated drones', () => {
+  const LIGHT_MUTATED_DRONE = 60478;
+  const rolls = (n: number) => ({
+    baseTypeId: 2454,
+    mutaplasmidTypeId: 60461,
+    attributes: { 64: 1 + n / 10 },
+  });
+  const fit: Fitting = {
+    ...base,
+    drones: [
+      { typeId: 2185, quantity: 2, state: 'online' },
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'online', mutation: rolls(1) },
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'online', mutation: rolls(2) },
+    ],
+  };
+
+  it('launches mutated drones one item at a time, each keeping its own rolls', () => {
+    const next = launchDrones(fit, {
+      bandwidthTotal: 5,
+      maxActive: 5,
+      bandwidthOf: (typeId) => (typeId === LIGHT_MUTATED_DRONE ? 5 : 100),
+    });
+    expect(next.drones).toEqual([
+      { typeId: 2185, quantity: 2, state: 'online' },
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'active', mutation: rolls(1) },
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'online', mutation: rolls(2) },
+    ]);
+  });
+
+  it('keeps listed order when a later drone is the one in space', () => {
+    const secondOut: Fitting = {
+      ...fit,
+      drones: [
+        { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'online', mutation: rolls(1) },
+        { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'active', mutation: rolls(2) },
+      ],
+    };
+    // The one already out stays out; order on the rack does not change.
+    expect(setDroneCounts(secondOut, LIGHT_MUTATED_DRONE, { inSpace: 1, inBay: 1 }).drones).toEqual(
+      secondOut.drones
+    );
+  });
+
+  it('recalls them without merging, and drops from the end when the count shrinks', () => {
+    const launched = setDroneCounts(fit, LIGHT_MUTATED_DRONE, { inSpace: 2, inBay: 0 });
+    expect(launched.drones.filter((d) => d.mutation).map((d) => d.state)).toEqual([
+      'active',
+      'active',
+    ]);
+    const fewer = setDroneCounts(launched, LIGHT_MUTATED_DRONE, { inSpace: 0, inBay: 1 });
+    expect(fewer.drones).toEqual([
+      { typeId: 2185, quantity: 2, state: 'online' },
+      { typeId: LIGHT_MUTATED_DRONE, quantity: 1, state: 'online', mutation: rolls(1) },
+    ]);
+  });
+});
+
 describe('launchDrones', () => {
   const bandwidth: Record<number, number> = { 2185: 10, 2454: 5 };
   const bandwidthOf = (typeId: number) => bandwidth[typeId] ?? 0;

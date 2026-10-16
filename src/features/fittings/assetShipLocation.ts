@@ -33,6 +33,9 @@ function shipItems(ship: AssetTreeContainerNode): ShipAssetItem[] {
   return items;
 }
 
+/** How long Open in Fittings waits on ESI for a ship's rolls. */
+const ROLLS_TIMEOUT_MS = 8000;
+
 /**
  * The rolls of the ship's mutated items, by item id. Never fails the open:
  * data or ESI that won't answer leaves those items without rolls, which the
@@ -46,7 +49,11 @@ async function shipMutations(items: readonly ShipAssetItem[]): Promise<Map<numbe
         ? [{ typeId: item.typeId, itemId: item.itemId }]
         : []
     );
-    return refs.length === 0 ? new Map() : await mutationsForItems(refs, lookup);
+    // A click waits on this: past the timeout the ship opens without the rolls
+    // not yet fetched (those that were are kept, so the next open has them).
+    return refs.length === 0
+      ? new Map()
+      : await mutationsForItems(refs, lookup, { signal: AbortSignal.timeout(ROLLS_TIMEOUT_MS) });
   } catch {
     return new Map();
   }

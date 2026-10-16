@@ -57,10 +57,13 @@ async function readCached(itemIds: readonly number[]): Promise<(DynamicItemRecor
   }
 }
 
-async function fetchOne(ref: DynamicItemRef): Promise<DynamicItemRecord | null> {
+async function fetchOne(
+  ref: DynamicItemRef,
+  signal?: AbortSignal
+): Promise<DynamicItemRecord | null> {
   if (rejectedThisSession.has(ref.itemId)) return null;
   try {
-    const result = await getDogmaDynamicItem(ref.typeId, ref.itemId);
+    const result = await getDogmaDynamicItem(ref.typeId, ref.itemId, signal ? { signal } : {});
     if (!result.data) return null;
     const record = toRecord(ref, result.data);
     await db.dynamicItems.put(record).catch(() => {
@@ -116,7 +119,7 @@ export async function fetchDynamicItems(
     while (next < missing.length) {
       signal?.throwIfAborted();
       const ref = missing[next++]!;
-      const record = await fetchOne(ref);
+      const record = await fetchOne(ref, signal);
       if (record) found.set(ref.itemId, record);
     }
   };

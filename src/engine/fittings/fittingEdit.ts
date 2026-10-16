@@ -428,6 +428,9 @@ export function setDroneCounts(
 ): Fitting {
   const inSpace = wholeCount(counts.inSpace);
   const inBay = wholeCount(counts.inBay);
+  if (fitting.drones.some((drone) => drone.typeId === typeId && drone.mutation)) {
+    return setMutatedDroneCounts(fitting, typeId, inSpace, inBay);
+  }
   const replacement: FittingDrone[] = [];
   if (inSpace > 0) replacement.push({ typeId, quantity: inSpace, state: 'active' });
   if (inBay > 0) replacement.push({ typeId, quantity: inBay, state: 'online' });
@@ -443,6 +446,66 @@ export function setDroneCounts(
     }
   }
   if (!placed) drones.push(...replacement);
+  return { ...fitting, drones };
+}
+
+/**
+ * `setDroneCounts` for a type with mutated drones among it: each mutated
+ * drone is its own item with its own rolls, so none is merged or rebuilt.
+ * The drones in space stay first in line, then the bay, in listed order; the
+ * first `inSpace` units are launched, the next `inBay` wait in the bay, and any
+ * past that are dropped from the end. Units beyond what the Fitting holds are
+ * plain drones of the type. A plain stack of the same type splits into
+ * units the same way and is regrouped by state.
+ */
+function setMutatedDroneCounts(
+  fitting: Fitting,
+  typeId: number,
+  inSpace: number,
+  inBay: number
+): Fitting {
+  const units: FittingDrone[] = [];
+  for (const drone of fitting.drones) {
+    if (drone.typeId !== typeId) continue;
+    if (drone.mutation) units.push(drone);
+    else for (let n = 0; n < drone.quantity; n++) units.push({ ...drone, quantity: 1 });
+  }
+  const ordered = [
+    ...units.filter((unit) => unit.state === 'active'),
+    ...units.filter((unit) => unit.state !== 'active'),
+  ];
+  const wanted = inSpace + inBay;
+  while (ordered.length < wanted) ordered.push({ typeId, quantity: 1, state: 'online' });
+  // Back in listed order (new units last), plain units regrouped into one stack per state.
+  const position = new Map(units.map((unit, index) => [unit, index]));
+  const kept = ordered
+    .slice(0, wanted)
+    .map((unit, index) => ({
+      unit: { ...unit, state: index < inSpace ? 'active' : 'online' } as FittingDrone,
+      at: position.get(unit) ?? Infinity,
+    }))
+    .sort((a, b) => a.at - b.at)
+    .map(({ unit }) => unit);
+  const replacement: FittingDrone[] = [];
+  for (const unit of kept) {
+    if (unit.mutation) {
+      replacement.push(unit);
+      continue;
+    }
+    const stack = replacement.find((d) => !d.mutation && d.state === unit.state);
+    if (stack) stack.quantity += 1;
+    else replacement.push({ typeId, quantity: 1, state: unit.state });
+  }
+
+  const drones: FittingDrone[] = [];
+  let placed = false;
+  for (const drone of fitting.drones) {
+    if (drone.typeId !== typeId) drones.push(drone);
+    else if (!placed) {
+      drones.push(...replacement);
+      placed = true;
+    }
+  }
   return { ...fitting, drones };
 }
 

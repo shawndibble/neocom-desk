@@ -43,7 +43,7 @@ describe('getDynamicItem', () => {
     const second = await getDynamicItem({ typeId: NEUT, itemId: 1001 });
 
     expect(getDogmaDynamicItem).toHaveBeenCalledTimes(1);
-    expect(getDogmaDynamicItem).toHaveBeenCalledWith(NEUT, 1001);
+    expect(getDogmaDynamicItem).toHaveBeenCalledWith(NEUT, 1001, {});
     expect(second).toEqual(first);
     expect(first).toMatchObject({
       itemId: 1001,

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { MutaplasmidData } from '@/sde/types';
+import type { Fitting } from './types';
 import {
   mutaplasmidLookup,
   mutationFromDynamicItem,
   mutationStatus,
+  normaliseFittingMutations,
   normaliseMutation,
   rollQuality,
   withoutMutation,
@@ -250,5 +252,66 @@ describe('withoutMutation', () => {
       state: 'active',
     });
     expect(withoutMutation(module, HEAVY_ABYSSAL_NEUT)).toBe(module);
+  });
+});
+
+describe('normaliseFittingMutations', () => {
+  it('keeps legal mutations, filters their rolls, and drops one that does not belong', () => {
+    const fitting: Fitting = {
+      name: 'Forged',
+      shipTypeId: 17843,
+      modules: [
+        {
+          slot: 'high' as const,
+          slotIndex: 0,
+          typeId: HEAVY_ABYSSAL_NEUT,
+          state: 'active' as const,
+          mutation: {
+            baseTypeId: HEAVY_GREMLIN_NEUT,
+            mutaplasmidTypeId: GRAVID_HEAVY_NEUT,
+            attributes: { 6: 419.25, 50: 0 },
+          },
+        },
+        // A mutation forged onto a plain module.
+        {
+          slot: 'low' as const,
+          slotIndex: 0,
+          typeId: DAMAGE_CONTROL_II,
+          state: 'online' as const,
+          mutation: {
+            baseTypeId: HEAVY_GREMLIN_NEUT,
+            mutaplasmidTypeId: GRAVID_HEAVY_NEUT,
+            attributes: { 6: 1 },
+          },
+        },
+      ],
+      drones: [
+        {
+          typeId: LIGHT_MUTATED_DRONE,
+          quantity: 1,
+          state: 'online' as const,
+          mutation: {
+            baseTypeId: HOBGOBLIN_I,
+            mutaplasmidTypeId: EXIGENT_LIGHT_FIREPOWER,
+            attributes: {},
+          },
+        },
+      ],
+      cargo: [],
+    };
+    const clean = normaliseFittingMutations(fitting, lookup);
+    expect(clean.modules[0]?.mutation?.attributes).toEqual({ 6: 419.25 });
+    expect(clean.modules[1]).toEqual({
+      slot: 'low',
+      slotIndex: 0,
+      typeId: DAMAGE_CONTROL_II,
+      state: 'online',
+    });
+    expect(clean.drones[0]).toBe(fitting.drones[0]);
+  });
+
+  it('hands back the same Fitting when nothing is mutated', () => {
+    const plain: Fitting = { name: 'x', shipTypeId: 1, modules: [], drones: [], cargo: [] };
+    expect(normaliseFittingMutations(plain, lookup)).toBe(plain);
   });
 });

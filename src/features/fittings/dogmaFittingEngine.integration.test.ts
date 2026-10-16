@@ -1610,6 +1610,31 @@ describe('mutated (abyssal) modules (real WASM + real pinned SDE)', () => {
     expect(attr(baseOnly, 6)).toBeCloseTo(attr(base, 6)!, 6);
   });
 
+  it('states a mutated drone from its base, with its roll as the base value', () => {
+    // Light Mutated Drone (60478) from a Hobgoblin I (2454), Exigent Light
+    // Drone Firepower: damageMultiplier (64) rolled to 2.1.
+    const droneFit = (drone: Fitting['drones'][number]): Fitting => ({
+      name: 'Drone',
+      shipTypeId: VEXOR_NAVY_ISSUE,
+      modules: [],
+      drones: [drone],
+      cargo: [],
+    });
+    const damage = (fitting: Fitting) =>
+      calculate(fittingToDogmaFit(fitting, NO_SKILLS)).items[0]?.attributes.get(64)?.value;
+    const plain = damage(droneFit({ typeId: 2454, quantity: 1, state: 'active' }))!;
+    const rolled = damage(
+      droneFit({
+        typeId: 60478,
+        quantity: 1,
+        state: 'active',
+        mutation: { baseTypeId: 2454, mutaplasmidTypeId: 60461, attributes: { 64: 2.1 } },
+      })
+    )!;
+    // The hull's own bonus applies on top of either: base 1.6 -> plain, 2.1 -> rolled.
+    expect(rolled / plain).toBeCloseTo(2.1 / 1.6, 6);
+  });
+
   it('knows nothing of an abyssal module with no base: no CPU, no neut amount (badged baseUnknown)', () => {
     const bare = neutFit({
       slot: 'high',
