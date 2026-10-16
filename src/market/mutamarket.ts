@@ -3,9 +3,8 @@
  * (mutated) module has, since no market orders exist for one. Scope decision:
  * docs/context/decisions/20261016-085744-mutamarket-is-the-abyssal-price-source.md.
  *
- * Reaches MutaMarket only through the `mutamarketEstimate` Cloud Function
- * (`functions/src/mutamarket.ts`): MutaMarket sends no CORS headers and wants
- * a contact User-Agent, which page JS can't set. Firebase is loaded with
+ * Reaches MutaMarket only via the `mutamarketEstimate` function
+ * (`functions/src/mutamarket.ts` says why). Firebase loads with
  * `await import(...)`, so this module is safe on the startup graph.
  *
  * Consumers: call `getAbyssalEstimate` only for an abyssal (mutated) module
@@ -16,14 +15,15 @@
  * `importIfMissing` publishes the module on MutaMarket: pass it only on the
  * pilot's explicit ask, never while merely listing assets.
  *
- * Lookups run one at a time (MutaMarket's import is seconds per module and
- * must not be looped), concurrent asks for one item share a lookup, and every
- * answer is cached per item id: in memory and in the `esiCache` table under
+ * Imports run one at a time, lookups a few at once; concurrent asks for one
+ * item (same `importIfMissing`) share one. Every answer is cached per item id:
+ * in memory and in the `esiCache` table under
  * `GLOBAL_CACHE_CHARACTER_ID`, so a reload inside the TTL does not ask again.
  * `unavailable` (no Firebase config, function not deployed, MutaMarket down)
  * is held in memory only, briefly, so a list of modules doesn't retry each.
  */
 import { isSyncConfigured } from '@/app/syncStatus';
+import { createSemaphore } from '@/lib/concurrency';
 import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@/esi/cache';
 
 export const MUTAMARKET_SITE_URL = 'https://mutamarket.com';
@@ -39,7 +39,7 @@ export const ABYSSAL_UNAVAILABLE_RETRY_MS = 5 * 60 * 1000;
 
 /**
  * - `priced`: `value` is MutaMarket's model estimate, ISK, > 0.
- * - `no-estimate`: MutaMarket knows the module but its model gives no value.
+ * - `no-estimate`: MutaMarket knows the module (or its type) but has no value.
  * - `not-imported`: MutaMarket hasn't seen the module; `importIfMissing` imports it.
  * - `unknown`: MutaMarket doesn't price this type, or couldn't import the item.
  * - `unavailable`: the lookup failed; try again later.
@@ -95,7 +95,6 @@ async function callableTransport({
     import('@/sync/firebaseApp'),
     import('@/sync/syncAuth'),
   ]);
-  // The function wants a Character session: imports publish data on MutaMarket.
   await ensureAnySession(characterId);
   const call = httpsCallable<typeof input, MutamarketEstimateResponse>(
     getSyncFunctions(),
@@ -118,8 +117,9 @@ export function configureMutamarket(
 
 const memory = new Map<number, { estimate: AbyssalEstimate; expiresAt: number }>();
 const inFlight = new Map<string, Promise<AbyssalEstimate>>();
-/** Serializes calls to the function: one lookup at a time. */
-let queueTail: Promise<unknown> = Promise.resolve();
+const LOOKUP_CONCURRENCY = 4;
+let lookupSlots = createSemaphore(LOOKUP_CONCURRENCY);
+let importSlots = createSemaphore(1);
 
 export function abyssalEstimateCacheKey(itemId: number): string {
   return `mutamarket:${itemId}`;
@@ -138,15 +138,18 @@ export function toStoredEstimate(response: unknown): StoredEstimate {
     unknown
   >;
   const url = safeUrl(r.url);
-  if (r.status === 'priced' && typeof r.value === 'number' && Number.isFinite(r.value)) {
-    if (r.value > 0) {
-      return {
-        status: 'priced',
-        value: r.value,
-        valueUpdatedAt: typeof r.valueUpdatedAt === 'string' ? r.valueUpdatedAt : null,
-        url,
-      };
-    }
+  if (
+    r.status === 'priced' &&
+    typeof r.value === 'number' &&
+    Number.isFinite(r.value) &&
+    r.value > 0
+  ) {
+    return {
+      status: 'priced',
+      value: r.value,
+      valueUpdatedAt: typeof r.valueUpdatedAt === 'string' ? r.valueUpdatedAt : null,
+      url,
+    };
   }
   if (r.status === 'priced' || r.status === 'no-estimate') {
     return { status: 'no-estimate', value: null, valueUpdatedAt: null, url };
@@ -185,11 +188,11 @@ function remember(itemId: number, estimate: AbyssalEstimate): AbyssalEstimate {
 
 async function readPersisted(itemId: number): Promise<AbyssalEstimate | null> {
   try {
-    const rows = await readCachedEntries<StoredEstimate>(GLOBAL_CACHE_CHARACTER_ID, [
-      abyssalEstimateCacheKey(itemId),
-    ]);
-    const row = rows.get(abyssalEstimateCacheKey(itemId));
-    if (!row || row.value.status === 'unavailable') return null;
+    const key = abyssalEstimateCacheKey(itemId);
+    const row = (await readCachedEntries<StoredEstimate>(GLOBAL_CACHE_CHARACTER_ID, [key])).get(
+      key
+    );
+    if (!row) return null;
     const stored = toStoredEstimate(row.value);
     if (row.fetchedAt + ttlFor(stored.status) <= now()) return null;
     return { ...stored, source: 'mutamarket', fetchedAt: row.fetchedAt };
@@ -198,10 +201,13 @@ async function readPersisted(itemId: number): Promise<AbyssalEstimate | null> {
   }
 }
 
-function enqueue<T>(run: () => Promise<T>): Promise<T> {
-  const turn = queueTail.then(run);
-  queueTail = turn.catch(() => undefined);
-  return turn;
+async function throttled<T>(importIfMissing: boolean, run: () => Promise<T>): Promise<T> {
+  const release = await (importIfMissing ? importSlots : lookupSlots).acquire();
+  try {
+    return await run();
+  } finally {
+    release();
+  }
 }
 
 async function lookup(request: MutamarketRequest): Promise<AbyssalEstimate> {
@@ -211,7 +217,7 @@ async function lookup(request: MutamarketRequest): Promise<AbyssalEstimate> {
 
   let stored: StoredEstimate;
   try {
-    stored = toStoredEstimate(await enqueue(() => transport(request)));
+    stored = toStoredEstimate(await throttled(importIfMissing, () => transport(request)));
   } catch {
     return remember(itemId, unpriced('unavailable'));
   }
@@ -238,7 +244,8 @@ export function getAbyssalEstimate(
   if (!valid) return Promise.resolve(unpriced('unknown'));
   const importIfMissing = options.importIfMissing === true;
   const cached = memory.get(itemId);
-  if (cached && cached.expiresAt > now() && answers(cached.estimate, importIfMissing)) {
+  if (cached && cached.expiresAt <= now()) memory.delete(itemId);
+  else if (cached && answers(cached.estimate, importIfMissing)) {
     return Promise.resolve(cached.estimate);
   }
   const flightKey = `${itemId}:${importIfMissing}`;
@@ -255,5 +262,6 @@ export function getAbyssalEstimate(
 export function clearAbyssalEstimateMemory(): void {
   memory.clear();
   inFlight.clear();
-  queueTail = Promise.resolve();
+  lookupSlots = createSemaphore(LOOKUP_CONCURRENCY);
+  importSlots = createSemaphore(1);
 }

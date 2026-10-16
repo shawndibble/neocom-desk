@@ -1476,29 +1476,21 @@ export const syncLpStoreOffers = onSchedule(
   }
 );
 
-// mutamarketEstimate: one abyssal module's estimated value from MutaMarket
-// (mutamarket.ts). Needs a Character session (`ensureAnySession` client side):
-// an import publishes a module on MutaMarket under our User-Agent, so no
-// anonymous caller may drive it. `maxInstances: 1` makes the proxy's memory
-// cache and import queue global, which keeps MutaMarket's "never loop POST
-// /api/modules" true across every client.
+// mutamarketEstimate (mutamarket.ts). Session required: an import publishes
+// the module on MutaMarket. `maxInstances: 1` keeps the proxy's cache and
+// import queue global.
 const mutamarket = new MutamarketProxy();
 
 export const mutamarketEstimate = onCall<unknown>(
   { maxInstances: 1, timeoutSeconds: 120 },
   async (request) => {
     callerOf(request);
-    let input;
     try {
-      input = parseEstimateInput(request.data);
+      return await mutamarket.estimate(parseEstimateInput(request.data));
     } catch (err) {
-      if (err instanceof MutamarketInputError)
+      if (err instanceof MutamarketInputError) {
         throw new HttpsError('invalid-argument', err.message);
-      throw err;
-    }
-    try {
-      return await mutamarket.estimate(input);
-    } catch (err) {
+      }
       if (err instanceof MutamarketBusyError) {
         throw new HttpsError('resource-exhausted', 'MutaMarket import queue is full');
       }

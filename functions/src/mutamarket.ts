@@ -10,8 +10,8 @@
  * model, seconds per call) is never looped, and an import publishes the
  * module's rolls and creator on mutamarket.com, so:
  * - GET `/api/modules/{itemId}` first. A 404 is `not-imported`; POST only when
- *   the caller sent `importIfMissing` (a pilot's explicit click).
- *   A POST for a known module re-imports it, which is the loop they forbid.
+ *   the caller sent `importIfMissing` (a pilot's explicit click). A POST for
+ *   a known module re-imports it, which is the loop they forbid.
  * - No POST for a type `/api/estimator-statistics` doesn't list (not an
  *   abyssal type MutaMarket prices) or whose model is untrained (`r2` null:
  *   the import would carry no estimate anyway).
@@ -27,27 +27,27 @@
  * import queue are global rather than per instance.
  */
 
-export const MUTAMARKET_API = 'https://mutamarket.com/api';
-export const MUTAMARKET_SITE = 'https://mutamarket.com';
+import { ESI_USER_AGENT } from './esiNotifications.js';
 
-/** MutaMarket's API overview asks for a User-Agent with a contact address. */
-export const MUTAMARKET_USER_AGENT =
-  'NeocomDesk/0.1.0 (+https://github.com/shawndibble/neocom-desk; contact: https://github.com/shawndibble/neocom-desk/issues)';
+const MUTAMARKET_API = 'https://mutamarket.com/api';
+const MUTAMARKET_SITE = 'https://mutamarket.com';
+
+export const MUTAMARKET_USER_AGENT = `${ESI_USER_AGENT}; contact: https://github.com/shawndibble/neocom-desk/issues`;
 
 /** A module's estimate: MutaMarket retrains per type every few days. */
 export const ESTIMATE_TTL_MS = 6 * 60 * 60 * 1000;
 /** "No estimate" / "unknown": re-asking sooner won't change the answer. */
 export const NO_ESTIMATE_TTL_MS = 24 * 60 * 60 * 1000;
 /** The per-type model list changes when MutaMarket retrains. */
-export const ESTIMATOR_STATS_TTL_MS = 24 * 60 * 60 * 1000;
+const ESTIMATOR_STATS_TTL_MS = 24 * 60 * 60 * 1000;
 /** `not-imported`: someone else may import it meanwhile. */
 export const NOT_IMPORTED_TTL_MS = 60 * 60 * 1000;
 export const IMPORT_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
 export const IMPORT_MIN_GAP_MS = 3_000;
 export const MAX_PENDING_IMPORTS = 5;
-export const REQUEST_TIMEOUT_MS = 20_000;
-/** Bound on the memory cache; the oldest entry goes first. */
-export const MAX_CACHED_ESTIMATES = 5_000;
+const REQUEST_TIMEOUT_MS = 20_000;
+/** Size cap for each memory map (estimates, import backoff). */
+const MAX_CACHE_ENTRIES = 5_000;
 
 export interface EstimateInput {
   typeId: number;
@@ -77,7 +77,6 @@ export class MutamarketUnavailableError extends Error {
   }
 }
 
-/** The import queue is full; try again later. */
 export class MutamarketBusyError extends Error {
   constructor() {
     super('MutaMarket import queue is full');
@@ -85,7 +84,7 @@ export class MutamarketBusyError extends Error {
   }
 }
 
-/** Thrown for bad input; the callable maps it to `invalid-argument`. */
+/** Callable maps it to `invalid-argument`. */
 export class MutamarketInputError extends Error {
   constructor(message: string) {
     super(message);
@@ -100,11 +99,12 @@ function positiveId(value: unknown, field: string): number {
   return value;
 }
 
-export function parseEstimateInput(data: unknown): EstimateInput {
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-    throw new MutamarketInputError('expected { typeId, itemId, importIfMissing? }');
-  }
-  const d = data as Record<string, unknown>;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function parseEstimateInput(d: unknown): EstimateInput {
+  if (!isRecord(d)) throw new MutamarketInputError('expected { typeId, itemId, importIfMissing? }');
   if (d.importIfMissing !== undefined && typeof d.importIfMissing !== 'boolean') {
     throw new MutamarketInputError('importIfMissing must be a boolean');
   }
@@ -113,10 +113,6 @@ export function parseEstimateInput(data: unknown): EstimateInput {
     itemId: positiveId(d.itemId, 'itemId'),
     importIfMissing: d.importIfMissing === true,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -145,7 +141,7 @@ export function parseModuleEnvelope(body: unknown, typeId: number): MutamarketEs
 }
 
 /** `/api/estimator-statistics` to type id → whether its model is trained. */
-export function parseEstimatorStatistics(body: unknown): Map<number, boolean> {
+function parseEstimatorStatistics(body: unknown): Map<number, boolean> {
   const out = new Map<number, boolean>();
   if (!Array.isArray(body)) return out;
   for (const row of body) {
@@ -172,7 +168,7 @@ interface Cached<V> {
   expiresAt: number;
 }
 
-/** Insertion-ordered TTL map; past `MAX_CACHED_ESTIMATES` the oldest entry goes. */
+/** Insertion-ordered TTL map; past `MAX_CACHE_ENTRIES` the oldest entry goes. */
 class BoundedTtlMap<V> {
   private readonly entries = new Map<string, Cached<V>>();
 
@@ -187,7 +183,7 @@ class BoundedTtlMap<V> {
   set(key: string, value: V, expiresAt: number): void {
     this.entries.delete(key);
     this.entries.set(key, { value, expiresAt });
-    if (this.entries.size > MAX_CACHED_ESTIMATES) {
+    if (this.entries.size > MAX_CACHE_ENTRIES) {
       const oldest = this.entries.keys().next().value;
       if (oldest !== undefined) this.entries.delete(oldest);
     }
@@ -252,23 +248,20 @@ export class MutamarketProxy {
       throw new MutamarketUnavailableError('import backing off after a failure');
     }
 
-    let posted: { status: number; body: unknown };
-    try {
-      posted = await this.enqueueImport(() =>
-        this.request(`${MUTAMARKET_API}/modules`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type_id: typeId, item_id: itemId }),
-        })
-      );
-    } catch (err) {
+    const posted = await this.enqueueImport(() =>
+      this.request(`${MUTAMARKET_API}/modules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type_id: typeId, item_id: itemId }),
+      })
+    ).catch((err: unknown) => {
       if (err instanceof MutamarketUnavailableError) this.backOffImport(key);
       throw err;
-    }
+    });
     if (posted.status === 200) {
       return this.remember(key, parseModuleEnvelope(posted.body, typeId));
     }
-    // 400: MutaMarket couldn't import it (not abyssal, not in EVE any more).
+    // 400/404/422: MutaMarket can't import it (not abyssal, item gone).
     if (posted.status === 400 || posted.status === 404 || posted.status === 422) {
       return this.remember(key, { status: 'unknown' });
     }
@@ -345,14 +338,15 @@ export class MutamarketProxy {
     } catch (err) {
       throw new MutamarketUnavailableError(err instanceof Error ? err.message : 'fetch failed');
     }
-    let body: unknown = null;
-    if (response.status === 200) {
-      try {
-        body = await response.json();
-      } catch {
-        throw new MutamarketUnavailableError('unreadable JSON');
-      }
+    if (response.status !== 200) {
+      // Frees the socket for keep-alive; the body of a non-200 is never read.
+      await response.body?.cancel().catch(() => {});
+      return { status: response.status, body: null };
     }
-    return { status: response.status, body };
+    try {
+      return { status: 200, body: await response.json() };
+    } catch {
+      throw new MutamarketUnavailableError('unreadable JSON');
+    }
   }
 }

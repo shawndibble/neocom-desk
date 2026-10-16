@@ -135,7 +135,7 @@ describe('getAbyssalEstimate', () => {
     expect(transport).toHaveBeenCalledTimes(2);
   });
 
-  it('runs lookups one at a time and shares one per item', async () => {
+  it('runs imports one at a time and shares one ask per item', async () => {
     let active = 0;
     let peak = 0;
     const transport = setup(async () => {
@@ -146,13 +146,28 @@ describe('getAbyssalEstimate', () => {
       return PRICED;
     });
     await Promise.all([
-      getAbyssalEstimate(BCS, 1, OPTS),
-      getAbyssalEstimate(BCS, 2, OPTS),
-      getAbyssalEstimate(BCS, 2, OPTS),
-      getAbyssalEstimate(BCS, 3, OPTS),
+      getAbyssalEstimate(BCS, 1, IMPORT),
+      getAbyssalEstimate(BCS, 2, IMPORT),
+      getAbyssalEstimate(BCS, 2, IMPORT),
+      getAbyssalEstimate(BCS, 3, IMPORT),
     ]);
     expect(peak).toBe(1);
     expect(transport).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not make lookups wait behind an import', async () => {
+    let releaseImport: () => void = () => {};
+    const importGate = new Promise<void>((resolve) => {
+      releaseImport = resolve;
+    });
+    setup(async ({ importIfMissing }) => {
+      if (importIfMissing) await importGate;
+      return PRICED;
+    });
+    const importing = getAbyssalEstimate(BCS, 1, IMPORT);
+    expect((await getAbyssalEstimate(BCS, 2, OPTS)).status).toBe('priced');
+    releaseImport();
+    expect((await importing).status).toBe('priced');
   });
 
   it('imports only on an explicit ask, past a cached not-imported', async () => {
