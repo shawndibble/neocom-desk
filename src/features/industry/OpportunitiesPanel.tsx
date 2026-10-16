@@ -21,6 +21,7 @@ import {
   Button,
   DataTable,
   EmptyState,
+  LiveStatus,
   InfoTooltip,
   IskAmount,
   Modal,
@@ -38,8 +39,10 @@ import {
   SelectValue,
   STAT_CHIP_TONE_TEXT_CLASS,
   MenuItem,
+  CachedNotice,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { DataGate } from '@/components/DataGate';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
@@ -228,7 +231,18 @@ export function OpportunitiesPanel({
     loading: boolean;
     /** Oldest fetch across every fetched Character — reported up through `onDataAgeChange`. */
     oldestFetchedAt: Date | null;
-  }>({ ownedByCharacter: new Map(), loading: true, oldestFetchedAt: null });
+    /** Selected Characters whose blueprint read came back with nothing (offline, ESI down, nothing cached). */
+    failedCount: number;
+    /** When the oldest cached-copy blueprint list was read (ms); null when every list is a fresh read. */
+    cachedAt: number | null;
+  }>({
+    ownedByCharacter: new Map(),
+    loading: true,
+    oldestFetchedAt: null,
+    failedCount: 0,
+    cachedAt: null,
+  });
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     if (characterIds.length === 0) {
@@ -236,7 +250,13 @@ export function OpportunitiesPanel({
       // Character is selected, so there is nothing to fetch and the panel's
       // empty state should say so immediately.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBlueprintsState({ ownedByCharacter: new Map(), loading: false, oldestFetchedAt: null });
+      setBlueprintsState({
+        ownedByCharacter: new Map(),
+        loading: false,
+        oldestFetchedAt: null,
+        failedCount: 0,
+        cachedAt: null,
+      });
       return;
     }
     let cancelled = false;
@@ -245,19 +265,43 @@ export function OpportunitiesPanel({
       if (cancelled) return;
       const map = new Map<number, CharacterBlueprint[]>();
       let oldestFetchedAt: Date | null = null;
+      let failedCount = 0;
+      let cachedAt: number | null = null;
       results.forEach((result, index) => {
         map.set(characterIds[index]!, result.cached?.data ?? []);
+        // `null` is "nothing came back", which is not the same as a Character
+        // who owns no blueprints (`[]`).
+        if (result.cached === null) failedCount += 1;
+        else if (result.cached.fromCache) {
+          const at = result.cached.fetchedAt.getTime();
+          if (cachedAt === null || at < cachedAt) cachedAt = at;
+        }
         const fetchedAt = result.cached?.fetchedAt;
         if (fetchedAt && (!oldestFetchedAt || fetchedAt < oldestFetchedAt))
           oldestFetchedAt = fetchedAt;
       });
-      setBlueprintsState({ ownedByCharacter: map, loading: false, oldestFetchedAt });
+      setBlueprintsState({
+        ownedByCharacter: map,
+        loading: false,
+        oldestFetchedAt,
+        failedCount,
+        cachedAt,
+      });
     });
     return () => {
       cancelled = true;
     };
-  }, [characterIds]);
-  const { ownedByCharacter, loading: blueprintsLoading, oldestFetchedAt } = blueprintsState;
+  }, [characterIds, retryTick]);
+  const {
+    ownedByCharacter,
+    loading: blueprintsLoading,
+    oldestFetchedAt,
+    failedCount,
+    cachedAt,
+  } = blueprintsState;
+  /** Every selected Character came back with nothing: "no blueprints" would be a guess. */
+  const allBlueprintsFailed = characterIds.length > 0 && failedCount === characterIds.length;
+
   const oldestFetchedMs = oldestFetchedAt?.getTime() ?? null;
   useEffect(() => {
     onDataAgeChange?.(oldestFetchedMs === null ? null : new Date(oldestFetchedMs));
@@ -775,65 +819,93 @@ export function OpportunitiesPanel({
         </span>
       }
     >
-      {blueprintsLoading ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : candidates.length === 0 ? (
-        <EmptyState
-          title={t('industry.opportunitiesEmptyTitle')}
-          hint={t('industry.opportunitiesEmptyHint')}
-          className="py-8"
-        />
-      ) : needsRefresh ? (
-        <EmptyState
-          title={t('industry.opportunitiesNeedsRefreshTitle')}
-          hint={t('industry.opportunitiesNeedsRefreshHint')}
-          className="py-8"
-        />
-      ) : stockFilter !== 'any' && rows.length === 0 && allRows.length > 0 ? (
-        <EmptyState
-          title={t('industry.opportunitiesStockEmptyTitle')}
-          hint={t('industry.opportunitiesStockEmptyHint')}
-          action={
-            <Button size="sm" onClick={() => setStockFilter('any')}>
-              {t('common.resetFilters')}
-            </Button>
-          }
-          className="py-8"
-        />
-      ) : isDesktop ? (
-        <div className="overflow-x-auto">
-          <DataTable
-            {...opportunitiesExport.tableProps}
-            columns={shownColumns}
-            rows={rows}
-            rowKey={opportunityRowKey}
-            virtualize="auto"
-            label={t('industry.opportunitiesTitle')}
-            onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
-            rowContextMenu={rowContextMenu}
-            rowMoreActions
-            {...sortProps}
+      <DataGate
+        status={
+          blueprintsLoading
+            ? 'busy'
+            : candidates.length === 0 && allBlueprintsFailed
+              ? 'failed'
+              : 'ok'
+        }
+        title={t('common.couldntLoad')}
+        hint={t('industry.opportunitiesLoadFailedHint')}
+        onRetry={() => setRetryTick((n) => n + 1)}
+        resetKey={characterIdsKey}
+        busy={
+          <div className="flex justify-center py-8">
+            <Spinner label={t('common.loading')} />
+          </div>
+        }
+      >
+        <LiveStatus>
+          {failedCount > 0 && !allBlueprintsFailed
+            ? t('industry.opportunitiesSomeFailed', { count: failedCount })
+            : ''}
+        </LiveStatus>
+        {!allBlueprintsFailed &&
+          (failedCount > 0 ? (
+            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+              {t('industry.opportunitiesSomeFailed', { count: failedCount })}
+            </p>
+          ) : (
+            cachedAt !== null && <CachedNotice className="px-3 pt-2" fetchedAt={cachedAt} />
+          ))}
+        {candidates.length === 0 ? (
+          <EmptyState
+            title={t('industry.opportunitiesEmptyTitle')}
+            hint={t('industry.opportunitiesEmptyHint')}
+            className="py-8"
           />
-        </div>
-      ) : (
-        <MobileOpportunityList
-          rows={rows}
-          showCharacterColumn={showCharacterColumn}
-          selectedIds={selectedIds}
-          onToggleSelected={toggleSelected}
-          onClearSelected={() => setSelectedIds(new Set())}
-          onCompare={onAddToCompare}
-          onStartPlan={onStartPlan}
-          onViewHistory={(typeId, itemName, regionId) =>
-            setHistoryItem({ typeId, itemName, regionId })
-          }
-          skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
-          nameForSkill={(typeID) => nameForType(catalog, typeID)}
-          nameForCharacter={(id) => characterNames.get(id) ?? unknown}
-        />
-      )}
+        ) : needsRefresh ? (
+          <EmptyState
+            title={t('industry.opportunitiesNeedsRefreshTitle')}
+            hint={t('industry.opportunitiesNeedsRefreshHint')}
+            className="py-8"
+          />
+        ) : stockFilter !== 'any' && rows.length === 0 && allRows.length > 0 ? (
+          <EmptyState
+            title={t('industry.opportunitiesStockEmptyTitle')}
+            hint={t('industry.opportunitiesStockEmptyHint')}
+            action={
+              <Button size="sm" onClick={() => setStockFilter('any')}>
+                {t('common.resetFilters')}
+              </Button>
+            }
+            className="py-8"
+          />
+        ) : isDesktop ? (
+          <div className="overflow-x-auto">
+            <DataTable
+              {...opportunitiesExport.tableProps}
+              columns={shownColumns}
+              rows={rows}
+              rowKey={opportunityRowKey}
+              virtualize="auto"
+              label={t('industry.opportunitiesTitle')}
+              onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
+              rowContextMenu={rowContextMenu}
+              rowMoreActions
+              {...sortProps}
+            />
+          </div>
+        ) : (
+          <MobileOpportunityList
+            rows={rows}
+            showCharacterColumn={showCharacterColumn}
+            selectedIds={selectedIds}
+            onToggleSelected={toggleSelected}
+            onClearSelected={() => setSelectedIds(new Set())}
+            onCompare={onAddToCompare}
+            onStartPlan={onStartPlan}
+            onViewHistory={(typeId, itemName, regionId) =>
+              setHistoryItem({ typeId, itemName, regionId })
+            }
+            skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
+            nameForSkill={(typeID) => nameForType(catalog, typeID)}
+            nameForCharacter={(id) => characterNames.get(id) ?? unknown}
+          />
+        )}
+      </DataGate>
       {historyItem && (
         <Modal
           open

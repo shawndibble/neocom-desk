@@ -7,14 +7,22 @@
  */
 import { useId, useMemo, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Popover, PopoverContent, PopoverTrigger, SearchInput } from '@/components/ui';
+import {
+  Button,
+  LiveStatus,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  SearchInput,
+} from '@/components/ui';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
 import { rankedSearch } from '@/lib/rankedSearch';
 import type { SolarSystemEntry } from '@/sde/marketTypes';
-import { useSolarSystems, useSystemName } from './useSolarSystems';
+import { useSolarSystemList, useSystemName } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
 
@@ -60,7 +68,12 @@ export function SolarSystemPicker({
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
   const listId = useId();
-  const systems = useSolarSystems(open);
+  const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(open);
+  // Retry's notice unmounts when the read restarts: focus waits on the popover body.
+  const [bodyRef, , holdRetryFocus] = useRetryFocus(
+    systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
+    open
+  );
   const valueName = useSystemName(triggerLabel === undefined ? value : null);
 
   const matches = useMemo(
@@ -112,7 +125,8 @@ export function SolarSystemPicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2">
-        <div className="flex flex-col gap-2">
+        <div ref={bodyRef} tabIndex={-1} className="flex flex-col gap-2 focus:outline-none">
+          <LiveStatus>{systemsFailed ? t('jumpRange.systemsFailed') : ''}</LiveStatus>
           {hint !== undefined && <p className="text-text-dim">{hint}</p>}
           <SearchInput
             autoFocus
@@ -130,6 +144,21 @@ export function SolarSystemPicker({
             aria-expanded={matches.length > 0}
             aria-autocomplete="list"
           />
+          {systemsFailed && (
+            // The list never loaded, so no result is a statement about any system.
+            <div className="flex flex-col items-start gap-1.5">
+              <p className="text-warning">{t('jumpRange.systemsFailed')}</p>
+              <Button
+                size="sm"
+                onClick={() => {
+                  holdRetryFocus();
+                  retrySystems();
+                }}
+              >
+                {t('common.retry')}
+              </Button>
+            </div>
+          )}
           {matches.length > 0 && (
             <ul id={listId} role="listbox" className="flex flex-col">
               {matches.map((system, index) => (

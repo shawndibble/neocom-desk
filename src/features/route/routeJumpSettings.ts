@@ -14,6 +14,7 @@ import {
 } from '@/engine/route/jumpDrive';
 import { hullJumpDrive, type JumpDriveOptions } from '@/engine/route/jumpLegs';
 import { createLocalSetting } from '@/lib/useLocalSetting';
+import { onReconnect } from '@/stores/network';
 import { loadSystemPositions } from '@/sde/loadMarketSde';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { useRouteShipMass } from './routeShip';
@@ -52,6 +53,13 @@ export interface RouteJump {
   setup: RouteJumpSetup | null;
   /** False until the settings are read and, when jump legs are wanted, the positions are in. */
   ready: boolean;
+  /**
+   * Jump legs are on and the hull has a drive, but the system map could not be
+   * read (offline with nothing cached). The route is then planned without jump
+   * legs, which a view must say rather than leave looking like "no jump helps".
+   * Retried when the connection returns.
+   */
+  unavailable: boolean;
 }
 
 interface JumpMap {
@@ -65,7 +73,12 @@ let jumpMap: Promise<JumpMap | null> | null = null;
 function loadJumpMap(): Promise<JumpMap | null> {
   jumpMap ??= Promise.all([loadSystemPositions(), loadSolarSystemsById()])
     .then(([flat, entries]) => {
-      if (!entries) return null;
+      if (!entries) {
+        // `loadSolarSystemsById` resolves null on a failed read; drop the cached
+        // promise so a retry (on reconnect) reads again instead of replaying null.
+        jumpMap = null;
+        return null;
+      }
       const positions = indexSystemPositions(flat);
       const systems: JumpSystem[] = [];
       for (const [id, position] of positions) {
@@ -91,6 +104,8 @@ export function useRouteJump(): RouteJump {
   const { ship } = useRouteShipMass();
   const [map, setMap] = useState<JumpMap | null>(null);
   const [mapSettled, setMapSettled] = useState(false);
+  /** Bumped on reconnect after a failed map read, to try it again. */
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     void useRouteJumpsEnabled.getState().hydrate();
     void useRouteJumpRange.getState().hydrate();
@@ -99,6 +114,9 @@ export function useRouteJump(): RouteJump {
   useEffect(() => {
     if (!wanted) return;
     let live = true;
+    // A fresh attempt is not yet settled, so it cannot flash "unavailable" first.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restarting the map read
+    setMapSettled(false);
     void loadJumpMap().then((loaded) => {
       if (!live) return;
       setMap(loaded);
@@ -107,13 +125,21 @@ export function useRouteJump(): RouteJump {
     return () => {
       live = false;
     };
-  }, [wanted]);
+  }, [wanted, attempt]);
+  // The map read failed: try again when the connection returns.
+  useEffect(() => {
+    if (!wanted || !mapSettled || map) return;
+    return onReconnect(() => {
+      setMapSettled(false);
+      setAttempt((n) => n + 1);
+    });
+  }, [wanted, mapSettled, map]);
   return useMemo((): RouteJump => {
     const hydrated = enabledHydrated && rangeHydrated;
-    if (!hydrated) return { setup: null, ready: false };
-    if (!wanted || !ship?.drive) return { setup: null, ready: true };
-    if (!mapSettled) return { setup: null, ready: false };
-    if (!map) return { setup: null, ready: true };
+    if (!hydrated) return { setup: null, ready: false, unavailable: false };
+    if (!wanted || !ship?.drive) return { setup: null, ready: true, unavailable: false };
+    if (!mapSettled) return { setup: null, ready: false, unavailable: false };
+    if (!map) return { setup: null, ready: true, unavailable: true };
     const hull = hullJumpDrive(ship.groupId, ship.drive);
     const drive: JumpDriveOptions = {
       rangeLy: range === 'short' ? hull.rangeLy * SHORT_JUMP_SHARE : hull.rangeLy,
@@ -121,6 +147,6 @@ export function useRouteJump(): RouteJump {
       distanceFactor: hull.distanceFactor,
     };
     const key = `${drive.rangeLy}:${drive.fuelPerLy}:${drive.distanceFactor}`;
-    return { setup: { key, ...map, drive }, ready: true };
+    return { setup: { key, ...map, drive }, ready: true, unavailable: false };
   }, [enabledHydrated, rangeHydrated, wanted, ship, mapSettled, map, range]);
 }

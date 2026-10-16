@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Build-time SDE pipeline: downloads Fuzzwork SDE CSVs, emits slim JSON for the app.
 // Usage: node scripts/build-sde.mjs
-// Node 24 built-ins, plus fflate (already an app dependency) to read the one
-// table only CCP's own JSONL export carries — see lib/ccpStaticData.mjs.
+// Node 24 built-ins, plus fflate (already an app dependency) to read the
+// tables only CCP's own JSONL export carries, or carries at full precision —
+// see lib/ccpStaticData.mjs.
 
-import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flattenMarketWideTree, MARKET_WIDE_MAX_DEPTH } from './lib/flattenMarketWideTree.mjs';
@@ -21,6 +22,7 @@ import { bakeTypeNames, namesMissingFrom } from './lib/typeNames.mjs';
 import { WORMHOLE_GROUP_ID, bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
 import { bakeOreAndIceTypeIds } from './lib/oreTypeIds.mjs';
 import { bakeSystemPositions } from './lib/systemPositions.mjs';
+import { bakeTypeInfoShards, typeInfoBucketOf } from './lib/typeInfo.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -2110,7 +2112,14 @@ async function main() {
   // and faction/group names come from the same build so everything agrees. ---
   const ccpStaticData = await readCcpStaticDataFiles(
     CACHE_DIR,
-    ['skillPlans.jsonl', 'factions.jsonl', 'certificates.jsonl', 'groups.jsonl'],
+    [
+      'skillPlans.jsonl',
+      'factions.jsonl',
+      'certificates.jsonl',
+      'groups.jsonl',
+      'types.jsonl',
+      'typeDogma.jsonl',
+    ],
     ESI_USER_AGENT
   );
   const bakedSkillIds = new Set(skills.map((s) => s.typeID));
@@ -2125,6 +2134,12 @@ async function main() {
     certificateRecords,
     parseJsonl(ccpStaticData['groups.jsonl']),
     bakedSkillIds
+  );
+
+  // --- typeInfo shards (issue #3882); see lib/typeInfo.mjs ---
+  const typeInfoShards = bakeTypeInfoShards(
+    parseJsonl(ccpStaticData['types.jsonl']),
+    parseJsonl(ccpStaticData['typeDogma.jsonl'])
   );
 
   // --- typeNames.json: every type name, published or not; see lib/typeNames.mjs ---
@@ -2226,6 +2241,19 @@ async function main() {
     await writeFile(path, json);
     console.log(`  market/${name}: ${Buffer.byteLength(json).toLocaleString()} bytes`);
   }
+  {
+    // Cleared first, so a shard dropped by a count change can't linger.
+    const dir = join(OUT_DIR, 'typeInfo');
+    await rm(dir, { recursive: true, force: true });
+    await mkdir(dir, { recursive: true });
+    const jsons = typeInfoShards.map((shard) => JSON.stringify(shard));
+    await Promise.all(jsons.map((json, n) => writeFile(join(dir, `${n}.json`), json)));
+    const bytes = jsons.reduce((sum, json) => sum + Buffer.byteLength(json), 0);
+    const count = typeInfoShards.reduce((sum, shard) => sum + Object.keys(shard).length, 0);
+    console.log(
+      `  typeInfo/0..${typeInfoShards.length - 1}.json: ${count} types, ${bytes.toLocaleString()} bytes`
+    );
+  }
 
   // --- sanity checks ---
   console.log('Sanity checks...');
@@ -2247,6 +2275,13 @@ async function main() {
     );
   }
   console.log(`  types map entries: ${Object.keys(typeMap).length}`);
+  {
+    const rifter = typeInfoShards[typeInfoBucketOf(587)]['587'];
+    if (!rifter?.description || !rifter.attributes.some(([id]) => id === 4)) {
+      console.error('  FAIL: typeInfo shards look wrong: Rifter (587) lacks a description or mass');
+      process.exitCode = 1;
+    }
+  }
   console.log(
     `  packaged volume: baked for ${packagedVolumeApplied} of ${manufacturingMaterialTypeIds.size} manufacturing material types`
   );

@@ -73,6 +73,15 @@ function cached<T>(data: T): StatusResult<T> {
   return { cached: result, needsReauth: false };
 }
 
+/** A read that fell back to its saved copy, an hour older than a fresh one. */
+function savedCopy<T>(data: T): StatusResult<T> {
+  const result = cached(data).cached!;
+  return {
+    cached: { ...result, fromCache: true, fetchedAt: new Date(NOW - HOUR) },
+    needsReauth: false,
+  };
+}
+
 function tracking(
   overrides: Partial<CorporationMemberTracking> & { character_id: number }
 ): CorporationMemberTracking {
@@ -210,6 +219,29 @@ describe('access (AC1)', () => {
   });
 });
 
+describe('the cached data notice', () => {
+  it('says nothing while every read is fresh', async () => {
+    await rosterTable();
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['the roster read', 'loadCorporationMemberIds', [1001, 1002]],
+    ['the tracking read', 'loadCorporationMemberTracking', [tracking({ character_id: 1001 })]],
+  ] as const)('shows it, aged, when %s is the saved copy', async (_name, loader, data) => {
+    (mocked[loader] as ReturnType<typeof vi.fn>).mockResolvedValue(savedCopy(data));
+    renderMembers();
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('1h ago', { selector: 'p time' })).toBeInTheDocument();
+  });
+
+  it('ignores a saved-copy roles read, which only feeds an optional column', async () => {
+    mocked.loadCorporationMemberRoles.mockResolvedValue(savedCopy([]));
+    await rosterTable();
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+});
+
 describe('the roster table', () => {
   it('joins each member to its resolved name, ship and location', async () => {
     const table = await rosterTable();
@@ -326,6 +358,23 @@ describe('the roster table', () => {
     renderMembers();
     expect(await screen.findByText('No member activity')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('says it could not load, not "no member activity", when the tracking read failed (offline)', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue({ cached: null, needsReauth: false });
+    renderMembers();
+    expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
+    expect(screen.queryByText('No member activity')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    // The join/leave baseline is not consumed while the page cannot show the change.
+    expect(mocked.recordRoster).not.toHaveBeenCalled();
+
+    // Retry reads again, and a read that now succeeds fills the table.
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 })])
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
   });
 });
 

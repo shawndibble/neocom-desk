@@ -13,10 +13,22 @@
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Modal, Spinner, type ButtonVariant } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  Modal,
+  NeedsConnection,
+  CachedNotice,
+  Spinner,
+  type ButtonVariant,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { KIND_FILL, KIND_TEXT } from '@/components/ui/kindTone';
-import { loadCalendarEvent, respondToCalendarEvent } from '@/features/character/calendar';
+import {
+  loadCalendarEvent,
+  respondToCalendarEvent,
+  type RsvpResult,
+} from '@/features/character/calendar';
 import { RESPONSE_BADGE_TONE, RESPONSE_ICON, RESPONSE_KEY } from './calendarResponseTone';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
@@ -37,6 +49,12 @@ const RSVP_OPTIONS: { response: CalendarRsvpResponse; labelKey: string }[] = [
 ];
 
 /** The active button already turns this tone (DESIGN.md §7's other signal is its own icon + label, not a second, redundant telling). */
+const RSVP_FAILURE_KEY: Record<Exclude<RsvpResult, 'saved'>, string> = {
+  offline: 'calendar.rsvpOffline',
+  unconfirmed: 'calendar.rsvpUnconfirmed',
+  failed: 'calendar.rsvpFailed',
+};
+
 const RSVP_ACTIVE_VARIANT: Record<CalendarRsvpResponse, ButtonVariant> = {
   accepted: 'success',
   declined: 'danger',
@@ -92,15 +110,15 @@ export function EventDetailModal({
   // was otherwise the only way back to the network.
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [rsvpFailed, setRsvpFailed] = useState(false);
+  const [rsvpFailed, setRsvpFailed] = useState<Exclude<RsvpResult, 'saved'> | null>(null);
 
   async function respond(response: CalendarRsvpResponse) {
     setSaving(true);
-    setRsvpFailed(false);
+    setRsvpFailed(null);
     try {
-      const ok = await respondToCalendarEvent(characterId, event.event_id, response);
-      if (!ok) {
-        setRsvpFailed(true);
+      const outcome = await respondToCalendarEvent(characterId, event.event_id, response);
+      if (outcome !== 'saved') {
+        setRsvpFailed(outcome);
         return;
       }
       setState((prev) =>
@@ -165,6 +183,7 @@ export function EventDetailModal({
         <div className="space-y-3 text-xs">
           {/* Kind-colour bar, bled to the modal's edges: the same hue the Coming Up Rail and Calendar Map use for `calendarEvent`, so the popup carries the identity a plain dialog otherwise loses. */}
           <div className={`-mx-3 -mt-3 h-1 ${KIND_FILL.calendarEvent}`} />
+          {state.detail.fromCache && <CachedNotice fetchedAt={state.detail.fetchedAt} />}
           <p className="flex items-center gap-1.5 text-text-dim">
             <Icon.CalendarEvent
               className={`size-4 shrink-0 ${KIND_TEXT.calendarEvent}`}
@@ -213,23 +232,24 @@ export function EventDetailModal({
                 const OptionIcon = RESPONSE_ICON[response];
                 const active = state.detail.data.response === response;
                 return (
-                  <Button
-                    key={response}
-                    size="md"
-                    variant={active ? RSVP_ACTIVE_VARIANT[response] : 'ghost'}
-                    aria-pressed={active}
-                    disabled={saving}
-                    onClick={() => void respond(response)}
-                  >
-                    <OptionIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                    {t(labelKey)}
-                  </Button>
+                  <NeedsConnection key={response}>
+                    <Button
+                      size="md"
+                      variant={active ? RSVP_ACTIVE_VARIANT[response] : 'ghost'}
+                      aria-pressed={active}
+                      disabled={saving}
+                      onClick={() => void respond(response)}
+                    >
+                      <OptionIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                      {t(labelKey)}
+                    </Button>
+                  </NeedsConnection>
                 );
               })}
             </div>
-            {rsvpFailed && (
+            {rsvpFailed !== null && (
               <p role="alert" className="mt-2 text-[0.6875rem] text-danger">
-                {t('calendar.rsvpFailed')}
+                {t(RSVP_FAILURE_KEY[rsvpFailed])}
               </p>
             )}
           </div>

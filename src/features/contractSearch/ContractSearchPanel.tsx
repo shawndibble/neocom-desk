@@ -29,6 +29,7 @@ import {
   ColumnPickerMenu,
   DataTable,
   EmptyState,
+  LoadFailedState,
   FilterBar,
   FilterChip,
   FilterField,
@@ -44,6 +45,7 @@ import {
   IskAmount,
   LiveStatus,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import {
   CONTRACT_SEARCH_ITEMS_COLUMN_IDS,
@@ -92,6 +94,7 @@ import {
   type PublicContractDetailModalStatChip,
 } from '@/features/contracts/PublicContractDetailModal';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { cx } from '@/lib/cx';
@@ -630,6 +633,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     offersRefresh();
     courierRefresh();
   }, [offersRefresh, courierRefresh]);
+  // Retry can unmount into the spinner: focus waits on the always-mounted wrapper.
+  const [resultRef, , holdRetryFocus] = useRetryFocus(
+    active.loading
+      ? 'busy'
+      : syncConfigured && (active.error || activeResult === null)
+        ? 'failed'
+        : 'ok',
+    mode
+  );
 
   const lastSyncedAt = activeResult?.data?.lastSyncedAt ?? null;
   const headerLoading = offers.loading || courier.loading;
@@ -1051,6 +1063,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
 
   return (
     <>
+      <h2 ref={resultRef} tabIndex={-1} className="sr-only focus:outline-none">
+        {t('contractSearch.title')}
+      </h2>
+      <LiveStatus>
+        {/* Only what the visible branch below says, and never for a build with no sync backend. */}
+        {syncConfigured && !active.loading && (active.error || activeResult === null)
+          ? t('common.contractIndexUnreachableTitle')
+          : ''}
+      </LiveStatus>
       <Panel
         padded={false}
         // Frameless on a phone, bleeding through `<main>`'s `px-2`: the dense
@@ -1070,20 +1091,18 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
         ) : (
           <>
             {activeResult?.fromCache && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {/*
-                  A Refresh that still falls back to cache is a more alarming
-                  case than the first load finding cache — same banner, different
-                  copy. It is also how a background revalidation that failed
-                  reaches the screen: `esi/cache.ts` re-serves the stored row
-                  with `fromCache` set once the late call reports a failure, so
-                  a refresh that never lands is stated rather than left standing
-                  as a loading state.
-                */}
-                {active.refreshCount > 0
-                  ? t('common.refreshFailedTitle')
-                  : t('common.offlineTitle')}
-              </p>
+              // A Refresh that still falls back to cache is a more alarming
+              // case than the first load finding cache — same banner, different
+              // copy. It is also how a background revalidation that failed
+              // reaches the screen: `esi/cache.ts` re-serves the stored row
+              // with `fromCache` set once the late call reports a failure, so
+              // a refresh that never lands is stated rather than left standing
+              // as a loading state.
+              <CachedNotice
+                className="px-3 pt-2"
+                fetchedAt={activeResult.fetchedAt}
+                refreshFailed={active.refreshCount > 0}
+              />
             )}
             {revalidating && (
               // The visible half of stale-serve: these rows are last publish
@@ -1104,8 +1123,18 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   {modeLoadingLabel}
                 </p>
               </div>
-            ) : modeError ? (
-              <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+            ) : modeError || (activeResult === null && !modeLoading) ? (
+              // The read failed, or came back with nothing: the live index was
+              // unreachable and nothing is cached. That is not "no contracts
+              // synced yet".
+              <LoadFailedState
+                title={t('common.contractIndexUnreachableTitle')}
+                hint={t('common.contractIndexUnreachableHint')}
+                onRetry={() => {
+                  holdRetryFocus();
+                  refresh();
+                }}
+              />
             ) : modeRowCount === 0 && !(mode === 'items' && modeLoading) ? (
               // Nothing synced for the corpus on screen — distinct from
               // `noFilterMatches` below, which is "rows exist, the filter just

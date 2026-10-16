@@ -41,7 +41,12 @@ beforeEach(() => {
 
 describe('ContactsStandings header', () => {
   it('shows the data-age chip and a Refresh button once standings load', async () => {
-    loadMock.mockResolvedValue({ entries: [ENTRY], fetchedAt: new Date() });
+    loadMock.mockResolvedValue({
+      entries: [ENTRY],
+      fetchedAt: new Date(),
+      fromCache: false,
+      available: true,
+    });
     renderTab();
 
     expect(await screen.findByText('Caldari Navy')).toBeInTheDocument();
@@ -51,13 +56,20 @@ describe('ContactsStandings header', () => {
   });
 
   it('Refresh forces a live fetch and re-renders the rows', async () => {
-    loadMock.mockResolvedValueOnce({ entries: [ENTRY], fetchedAt: new Date() });
+    loadMock.mockResolvedValueOnce({
+      entries: [ENTRY],
+      fetchedAt: new Date(),
+      fromCache: false,
+      available: true,
+    });
     renderTab();
     await screen.findByText('Caldari Navy');
 
     loadMock.mockResolvedValueOnce({
       entries: [{ ...ENTRY, standing: -2 }],
       fetchedAt: new Date(),
+      fromCache: false,
+      available: true,
     });
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
@@ -66,10 +78,65 @@ describe('ContactsStandings header', () => {
   });
 
   it('has no chip when there is no data', async () => {
-    loadMock.mockResolvedValue({ entries: [], fetchedAt: null });
+    loadMock.mockResolvedValue({ entries: [], fetchedAt: null, fromCache: false, available: true });
     renderTab();
 
     expect(await screen.findByText('No NPC standings yet')).toBeInTheDocument();
     expect(screen.queryByText(/just now|ago/i)).toBeNull();
+  });
+
+  it('says it could not load, not "No NPC standings yet", when nothing was loaded', async () => {
+    loadMock.mockResolvedValueOnce({
+      entries: [],
+      fetchedAt: null,
+      fromCache: false,
+      available: false,
+    });
+    renderTab();
+
+    expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
+    expect(screen.queryByText('No NPC standings yet')).toBeNull();
+
+    loadMock.mockResolvedValueOnce({
+      entries: [ENTRY],
+      fetchedAt: new Date(),
+      fromCache: false,
+      available: true,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Caldari Navy')).toBeInTheDocument();
+  });
+
+  it('labels rows served from cache', async () => {
+    loadMock.mockResolvedValue({
+      entries: [ENTRY],
+      fetchedAt: new Date(),
+      fromCache: true,
+      available: true,
+    });
+    renderTab();
+
+    expect(await screen.findByText('Caldari Navy')).toBeInTheDocument();
+    expect(screen.getByText('Showing cached data')).toBeInTheDocument();
+  });
+
+  it('keeps the rows on screen while Refresh is in flight', async () => {
+    loadMock.mockResolvedValueOnce({
+      entries: [ENTRY],
+      fetchedAt: new Date(),
+      fromCache: false,
+      available: true,
+    });
+    renderTab();
+    await screen.findByText('Caldari Navy');
+
+    let finish: (value: unknown) => void = () => {};
+    loadMock.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled());
+    expect(screen.getByText('Caldari Navy')).toBeInTheDocument();
+    finish({ entries: [ENTRY], fetchedAt: new Date(), fromCache: true, available: true });
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
   });
 });

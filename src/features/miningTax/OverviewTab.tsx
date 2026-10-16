@@ -30,6 +30,7 @@ import {
   Spinner,
   type DataTableColumn,
   TabPanel,
+  CachedNotice,
 } from '@/components/ui';
 import { onReconnect } from '@/stores/network';
 import { HintText } from '@/components/ui/HintText';
@@ -608,9 +609,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : (
           <>
-            {data && data.fromCache && (
-              <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-            )}
+            {data && data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
 
             {refiningUnavailable && (
               <p className="text-xs text-warning">{t('miningTax.overview.refiningUnavailable')}</p>

@@ -6,14 +6,15 @@
  */
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SearchInput } from '@/components/ui';
+import { Button, LiveStatus, SearchInput } from '@/components/ui';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
 import { rankedSearch } from '@/lib/rankedSearch';
 import type { SolarSystemEntry } from '@/sde/marketTypes';
-import { useSolarSystems } from './useSolarSystems';
+import { useSolarSystemList } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
 const NAV_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
@@ -36,7 +37,12 @@ export function SolarSystemSearchField({
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<number | null>(null);
   const listId = useId();
-  const systems = useSolarSystems(true);
+  const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(true);
+  // Retry's notice unmounts when the read restarts: focus waits on the field wrapper.
+  const [wrapRef, , holdRetryFocus] = useRetryFocus(
+    systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
+    'systems'
+  );
   const matches = useMemo(
     () =>
       systems && query.trim() !== ''
@@ -69,7 +75,8 @@ export function SolarSystemSearchField({
   }
 
   return (
-    <div className={cx('relative', className)}>
+    <div ref={wrapRef} tabIndex={-1} className={cx('relative focus:outline-none', className)}>
+      <LiveStatus>{systemsFailed ? t('jumpRange.systemsFailed') : ''}</LiveStatus>
       <SearchInput
         autoFocus={autoFocus}
         value={query}
@@ -86,6 +93,20 @@ export function SolarSystemSearchField({
         aria-expanded={matches.length > 0}
         aria-autocomplete="list"
       />
+      {systemsFailed && (
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-warning">
+          <span>{t('jumpRange.systemsFailed')}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              holdRetryFocus();
+              retrySystems();
+            }}
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
+      )}
       {matches.length > 0 && (
         <ul
           id={listId}

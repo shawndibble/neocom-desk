@@ -81,6 +81,9 @@ vi.mock('@/sde/loadSde', () => ({
   // ItemDetailModal (opened via "Show info" below) loads this unconditionally.
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
 }));
+// ItemDetailModal reads the baked type-info shard first. Mocked rather than
+// fetched (`onUnhandledRequest: 'error'`); null sends it to the ESI handlers below.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 
 // ItemDetailModal (opened from the plan's item menus) resolves
 // attribute ids through this dictionary. Mocked rather than fetched: the real

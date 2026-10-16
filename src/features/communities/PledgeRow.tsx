@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FieldError, TextInput } from '@/components/ui';
+import { FieldError, TextInput, NeedsConnection, Button } from '@/components/ui';
 import type { DeliveryFlag } from '@/engine/communities/delivery';
 import {
   STALE_PLEDGE_DAYS,
@@ -14,7 +14,6 @@ import {
 import { cx } from '@/lib/cx';
 import { PledgeBar } from './PledgeBar';
 import { formatQuantity } from './requestFormat';
-import { NeedsConnectionButton } from './NeedsConnectionButton';
 
 /** A delivered amount typed in: a whole number from 0 (clears it) up to the Pledge. */
 function parseDelivered(text: string, max: number): number | null {
@@ -139,18 +138,22 @@ export function PledgeRow({
               if (e.key === 'Enter' && parsed !== null && !busy) onPledge(parsed);
             }}
           />
-          <NeedsConnectionButton
-            size="sm"
-            disabled={parsed === null}
-            loading={busy}
-            onClick={() => parsed !== null && onPledge(parsed)}
-          >
-            {own ? t('communities.board.updatePledge') : t('communities.board.pledge')}
-          </NeedsConnectionButton>
+          <NeedsConnection>
+            <Button
+              size="sm"
+              disabled={parsed === null}
+              loading={busy}
+              onClick={() => parsed !== null && onPledge(parsed)}
+            >
+              {own ? t('communities.board.updatePledge') : t('communities.board.pledge')}
+            </Button>
+          </NeedsConnection>
           {own && own.delivered === 0 && (
-            <NeedsConnectionButton size="sm" variant="ghost" disabled={busy} onClick={onWithdraw}>
-              {t('communities.board.withdraw')}
-            </NeedsConnectionButton>
+            <NeedsConnection>
+              <Button size="sm" variant="ghost" disabled={busy} onClick={onWithdraw}>
+                {t('communities.board.withdraw')}
+              </Button>
+            </NeedsConnection>
           )}
         </div>
       )}
@@ -174,15 +177,17 @@ export function PledgeRow({
                 onSaveDelivered(deliveredAmount);
             }}
           />
-          <NeedsConnectionButton
-            size="sm"
-            variant="ghost"
-            disabled={deliveredAmount === null || deliveredText.trim() === ''}
-            loading={busy}
-            onClick={() => deliveredAmount !== null && onSaveDelivered(deliveredAmount)}
-          >
-            {t('communities.board.saveDelivered')}
-          </NeedsConnectionButton>
+          <NeedsConnection>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={deliveredAmount === null || deliveredText.trim() === ''}
+              loading={busy}
+              onClick={() => deliveredAmount !== null && onSaveDelivered(deliveredAmount)}
+            >
+              {t('communities.board.saveDelivered')}
+            </Button>
+          </NeedsConnection>
         </div>
       )}
       {deliveredInvalid && (

@@ -1,11 +1,11 @@
 /**
  * Item Detail (GLOSSARY.md round 6): fitting cost, volume, bonuses and
  * description for one item — the things a shopper checks before deciding
- * whether a price is worth paying. Read live from ESI on open, the one
- * Market Browser panel that needs the network for its own content — baking
- * every item's attributes into the snapshot would ship a slice of a 16 MB
- * table for a panel that is rarely opened. The snapshot instead carries the
- * small attribute dictionary that turns attribute ids into names/units/categories.
+ * whether a price is worth paying. The item's own description, volume and
+ * attribute values come from the baked typeInfo shards, falling back to
+ * cached ESI (`itemDetailType.ts`); only order-book prices need the network.
+ * The market snapshot carries the small attribute dictionary that turns
+ * attribute ids into names/units/categories.
  * Rows whose value is an id rather than a measurement — a required skill, a
  * Group a module can be fitted to — resolve to names through
  * `attributeReferenceNames.ts`, which starts from `skills.json` (public/data,
@@ -51,8 +51,6 @@ import {
   type ModifyingSkillEffect,
 } from '@/engine/market/skillAttributeEffects';
 import type { TrainedSkill } from '@/engine/types';
-import type { UniverseType } from '@/esi/endpoints';
-import { loadUniverseTypeOnce } from '@/features/skills/data';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
 import type { PiData, SkillAttributeModifierMap } from '@/sde/types';
@@ -64,6 +62,7 @@ import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan'
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
+import { loadItemDetailType, type ItemDetailType } from './itemDetailType';
 import {
   loadOrderBookView,
   useSavedOrderBookLocation,
@@ -101,7 +100,7 @@ export interface ItemDetailModalProps {
 }
 
 interface DetailData {
-  type: UniverseType;
+  type: ItemDetailType;
   /** Skill-requirement rows already excluded — the Required Skills section below owns those instead. */
   groups: AttributeGroup[];
   requiredSkills: RequiredSkill[];
@@ -110,8 +109,6 @@ interface DetailData {
   /** Every skill's name — the popover surfaces skills the item doesn't require, so `skillNames` above isn't enough. */
   allSkillNames: Readonly<Record<number, string>>;
   skillAttributeModifiers: SkillAttributeModifierMap;
-  /** Null when pi.json couldn't be read — the rest of the modal is unaffected. */
-  pi: PiData | null;
 }
 
 /**
@@ -137,6 +134,11 @@ export function ItemDetailModal({
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  /**
+   * Its own state, not part of `data`. Null when pi.json couldn't be read —
+   * the rest of the modal is unaffected.
+   */
+  const [pi, setPi] = useState<PiData | null>(null);
   const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
 
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -190,22 +192,26 @@ export function ItemDetailModal({
       setLoading(true);
       setData(null);
       setError(false);
+      setPi(null);
+      // Off the shared handler and `loading`: only planetary commodities lose
+      // anything if it's missing, and it shouldn't hold up the rest.
+      void loadPi()
+        .catch(() => null)
+        .then((loaded) => {
+          if (!cancelled) setPi(loaded);
+        });
       try {
-        const [typeResult, dictionary, pi, skillAttributeModifiers, skills] = await Promise.all([
-          loadUniverseTypeOnce(typeId),
+        const [type, dictionary, skillAttributeModifiers, skills] = await Promise.all([
+          loadItemDetailType(typeId),
           loadAttributeDictionary(),
-          // Caught here, not by the shared handler below: only planetary
-          // commodities have anything to lose if this payload is missing, and
-          // a rejection inside the Promise.all would blank the whole modal.
-          loadPi().catch(() => null),
-          // Same reasoning: the attribute-modifier popover is a bonus, not
-          // core item detail, so its data failing to load degrades to no
-          // popovers rather than blanking the modal.
+          // Caught here, not by the shared handler below: the
+          // attribute-modifier popover is a bonus, not core item detail, so
+          // its data failing to load degrades to no popovers rather than
+          // blanking the modal.
           loadSkillAttributeModifiers().catch(() => ({})),
           loadSkills().catch(() => []),
         ]);
         if (cancelled) return;
-        const type = typeResult?.data;
         if (!type) throw new Error(`No type data for ${typeId}`);
         // Needs the dictionary to know which values are ids, so it can't join
         // the fetch above; it never rejects, so it can't blank the modal.
@@ -222,7 +228,6 @@ export function ItemDetailModal({
           allSkillNames,
           skillAttributeModifiers,
           skillNames: names.types ?? {},
-          pi,
         });
       } catch {
         if (!cancelled) setError(true);
@@ -266,7 +271,8 @@ export function ItemDetailModal({
             hint={t('market.itemDetail.errorHint')}
             className="py-8"
           />
-          {/* Local SDE data, so it outlives an ESI failure. */}
+          {/* Local SDE data, so they outlive a type-info failure. */}
+          <PlanetaryProduction pi={pi} typeId={typeId} />
           <UsedInSection typeId={typeId} onNavigate={leave} />
         </div>
       ) : (
@@ -320,7 +326,7 @@ export function ItemDetailModal({
             itemName={itemName}
           />
 
-          <PlanetaryProduction pi={data.pi} typeId={typeId} />
+          <PlanetaryProduction pi={pi} typeId={typeId} />
 
           <UsedInSection typeId={typeId} onNavigate={leave} />
 

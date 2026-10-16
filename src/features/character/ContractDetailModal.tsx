@@ -24,7 +24,8 @@ import {
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { loadContractItems } from './contractItems';
+import { DataGate } from '@/components/DataGate';
+import { loadContractItemsDetailed } from './contractItems';
 import { contractItemsCsvColumns } from './contractItemsCsv';
 import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
@@ -134,6 +135,13 @@ export function ContractDetailModal({
   const [systems, setSystems] = useState<SystemsState | undefined>(undefined);
   /** Stays `undefined` forever for a courier/loan contract — `HAS_ITEMS` gates both the fetch and the render, so it's never inspected there. */
   const [items, setItems] = useState<ItemsState | undefined>(undefined);
+  /**
+   * The item read came back with nothing (no cache and no answer from ESI). That
+   * is "couldn't load", not the "no item data" of a contract that has none, so it
+   * is kept apart from `items` and offers Retry.
+   */
+  const [itemsFailed, setItemsFailed] = useState(false);
+  const [itemsAttempt, setItemsAttempt] = useState(0);
   /** Only computed for an outstanding contract — see the `Market value` render gate below. */
   const [marketValue, setMarketValue] = useState<MarketValueState | undefined>(undefined);
 
@@ -172,15 +180,25 @@ export function ContractDetailModal({
     let cancelled = false;
     void (async () => {
       setItems(undefined);
-      const result = await loadContractItems(characterId, contract.contract_id);
-      const list = result?.data ?? [];
+      setItemsFailed(false);
+      const outcome = await loadContractItemsDetailed(characterId, contract.contract_id);
+      if (outcome.result === null) {
+        if (cancelled) return;
+        // ESI answered 404: this contract has no item lines (it is gone, or never had
+        // any), a definite answer that Retry cannot change. Anything else — no
+        // answer, a 5xx, a 403 — is "couldn't load" and keeps Retry.
+        if (outcome.failureStatus === 404) setItems({ list: [], typeNames: new Map() });
+        else setItemsFailed(true);
+        return;
+      }
+      const list = outcome.result.data;
       const typeNames = await loadTypeNames(list.map((item) => item.type_id));
       if (!cancelled) setItems({ list, typeNames });
     })();
     return () => {
       cancelled = true;
     };
-  }, [characterId, contract.type, contract.contract_id]);
+  }, [characterId, contract.type, contract.contract_id, itemsAttempt]);
 
   /**
    * Only for an outstanding contract (issue #717) — a finished/cancelled one
@@ -384,43 +402,54 @@ export function ContractDetailModal({
           </dl>
         )}
 
-        {HAS_ITEMS.has(contract.type) &&
-          (items === undefined ? (
-            <div className="flex justify-center py-4">
-              <Spinner size="sm" label={t('common.loading')} />
-            </div>
-          ) : items.list.length === 0 ? (
-            <EmptyState title={t('contracts.detailNoItems')} className="py-4" />
-          ) : (
-            <>
-              {itemColumns && (
-                <ItemSection
-                  contractId={contract.contract_id}
-                  title={t('contracts.detailItemsIncluded')}
-                  columns={itemColumns}
-                  items={included}
-                  typeNames={items.typeNames}
-                  marketValue={
-                    contract.status === 'outstanding' ? marketValue?.included : undefined
-                  }
-                  hubName={hub.systemName}
-                />
-              )}
-              {itemColumns && (
-                <ItemSection
-                  contractId={contract.contract_id}
-                  title={t('contracts.detailItemsRequested')}
-                  columns={itemColumns}
-                  items={requested}
-                  typeNames={items.typeNames}
-                  marketValue={
-                    contract.status === 'outstanding' ? marketValue?.requested : undefined
-                  }
-                  hubName={hub.systemName}
-                />
-              )}
-            </>
-          ))}
+        {HAS_ITEMS.has(contract.type) && (
+          <DataGate
+            status={itemsFailed ? 'failed' : items === undefined ? 'busy' : 'ok'}
+            title={t('common.couldntLoad')}
+            hint={t('contracts.detailItemsFailedHint')}
+            onRetry={() => setItemsAttempt((n) => n + 1)}
+            resetKey={contract.contract_id}
+            busy={
+              <div className="flex justify-center py-4">
+                <Spinner size="sm" label={t('common.loading')} />
+              </div>
+            }
+          >
+            {items !== undefined &&
+              (items.list.length === 0 ? (
+                <EmptyState title={t('contracts.detailNoItems')} className="py-4" />
+              ) : (
+                <>
+                  {itemColumns && (
+                    <ItemSection
+                      contractId={contract.contract_id}
+                      title={t('contracts.detailItemsIncluded')}
+                      columns={itemColumns}
+                      items={included}
+                      typeNames={items.typeNames}
+                      marketValue={
+                        contract.status === 'outstanding' ? marketValue?.included : undefined
+                      }
+                      hubName={hub.systemName}
+                    />
+                  )}
+                  {itemColumns && (
+                    <ItemSection
+                      contractId={contract.contract_id}
+                      title={t('contracts.detailItemsRequested')}
+                      columns={itemColumns}
+                      items={requested}
+                      typeNames={items.typeNames}
+                      marketValue={
+                        contract.status === 'outstanding' ? marketValue?.requested : undefined
+                      }
+                      hubName={hub.systemName}
+                    />
+                  )}
+                </>
+              ))}
+          </DataGate>
+        )}
       </div>
     </Modal>
   );

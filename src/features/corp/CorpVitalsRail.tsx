@@ -37,8 +37,8 @@ const RUNWAY_WARNING_DAYS = 30;
 interface CorpVitalsRailProps {
   /** Balances joined to the corporation's own names — `divisions.ts` (#298). */
   divisions: readonly WalletDivision[];
-  /** The journal, already reduced. Empty when it could not be read. */
-  journal: readonly VitalsJournalEntry[];
+  /** The journal, already reduced. `null` when it could not be read: net and runway then read as unknown. */
+  journal: readonly VitalsJournalEntry[] | null;
   /**
    * Which division `journal` came from. The runway divides that division's own
    * balance by its own spending — see the chip below for why the two halves
@@ -139,8 +139,8 @@ export function CorpVitalsRail({
           <StatChip label={t('corp.vitals.total')} value={<IskAmount value={total} />} />
           <StatChip
             label={t('corp.vitals.net', { days: VITALS_WINDOW_DAYS })}
-            value={<IskAmount value={net} />}
-            tone={net < 0 ? 'danger' : 'success'}
+            value={net === null ? t('common.unknown') : <IskAmount value={net} />}
+            tone={net === null ? 'default' : net < 0 ? 'danger' : 'success'}
           />
           <StatChip
             label={t('corp.vitals.runway')}

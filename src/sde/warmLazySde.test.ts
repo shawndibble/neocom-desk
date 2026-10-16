@@ -31,7 +31,8 @@ describe('warmLazySde', () => {
     expect(fetchMock).toHaveBeenCalledTimes(LAZY_SDE_FILES.length);
     const fetched = fetchMock.mock.calls.map(([url]) => String(url));
     LAZY_SDE_FILES.forEach((file, i) => expect(fetched[i]).toContain(`data/${file}`));
-    expect(LAZY_SDE_FILES.length).toBeLessThanOrEqual(64);
+    // ~2x headroom under `sw.ts`'s sde-data maxEntries (150) for stale `?v=` entries.
+    expect(LAZY_SDE_FILES.length * 2).toBeLessThanOrEqual(150);
     expect(warmDogma).toHaveBeenCalledOnce();
   });
 

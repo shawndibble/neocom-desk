@@ -29,7 +29,8 @@ export interface CorpStandingClocks {
 /** What the wallet contributes. `null` without `canReadWallet`. */
 export interface CorpStandingMoney {
   total: number;
-  net: number;
+  /** `null` when the wallet journal could not be read. */
+  net: number | null;
   /** `null` is not zero days — see `CorpVitalsRail`. */
   runwayDays: number | null;
   divisionCount: number;
@@ -122,14 +123,14 @@ export function CorpStanding({ clocks, money }: CorpStandingProps) {
               <span aria-hidden="true" className="hidden w-px shrink-0 bg-line sm:block" />
               <Figure
                 label={t('corp.vitals.net', { days: VITALS_WINDOW_DAYS })}
-                value={<IskAmount value={money.net} />}
+                value={money.net === null ? t('common.unknown') : <IskAmount value={money.net} />}
                 note={
                   <>
                     <IskAmount value={money.total} />{' '}
                     {t('corp.standing.heldNote', { count: money.divisionCount })}
                   </>
                 }
-                tone={money.net < 0 ? 'text-isk-neg' : 'text-isk-pos'}
+                tone={money.net === null ? '' : money.net < 0 ? 'text-isk-neg' : 'text-isk-pos'}
               />
             </>
           )}

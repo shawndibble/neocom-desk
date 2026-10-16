@@ -5,6 +5,7 @@
  * or a contract. One ESI call, nothing in
  * the game changes. Which button or menu item sends it is `useOpenInEve`'s job.
  */
+import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { EsiError } from '@/esi/errors';
 import {
   postOpenWindowContract,
@@ -30,6 +31,10 @@ export type OpenInEveResult =
       message: string | null;
       /** ESI refused and the grant lacks the scope: a Grant fixes it. */
       needsPermission?: true;
+      /** The request never reached ESI (offline, a timeout): nothing was refused. */
+      offline?: true;
+      /** The failure was a timeout after the request left: the window may have opened. */
+      unconfirmed?: true;
     };
 
 const ENDPOINT_IDS = {
@@ -60,6 +65,11 @@ export async function openInEve(
     await call(characterId, target);
     return { ok: true };
   } catch (err) {
+    if (isOfflineFailure(err)) {
+      return isUnconfirmedWrite(err)
+        ? { ok: false, message: null, offline: true, unconfirmed: true }
+        : { ok: false, message: null, offline: true };
+    }
     const outcome = await reportWriteAuthFailure(characterId, err, ENDPOINT_IDS[target.kind]);
     const message = err instanceof EsiError && err.message !== '' ? err.message : null;
     return outcome === 'grant-needed'

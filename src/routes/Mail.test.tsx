@@ -631,6 +631,58 @@ describe('Mail', () => {
     expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
   });
 
+  it('says it is offline when "load more" cannot reach ESI, and keeps the button to try again', async () => {
+    const fullPage = Array.from({ length: 50 }, (_, i) => ({
+      mail_id: 1000 - i,
+      subject: `Mail ${1000 - i}`,
+      timestamp: '2026-08-05T00:00:00Z',
+      labels: [],
+    }));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, ({ request }) =>
+        new URL(request.url).searchParams.get('last_mail_id') === null
+          ? HttpResponse.json(fullPage)
+          : HttpResponse.error()
+      )
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Mail 1000');
+    await user.click(screen.getByRole('button', { name: /load more/i }));
+
+    expect(
+      await screen.findByText("Couldn't load more — you're offline.", {}, { timeout: 5000 })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /load more/i })).toBeEnabled();
+  });
+
+  it('says an unopened mail has not been downloaded when it cannot be fetched, and retries', async () => {
+    let fail = true;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1`, () =>
+        fail
+          ? HttpResponse.error()
+          : HttpResponse.json({
+              from: 90000001,
+              subject: 'Fleet up!',
+              body: 'Undock <b>now</b>.',
+              read: false,
+              recipients: [],
+              labels: [],
+            })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet up!'));
+
+    expect(await screen.findByText("This mail hasn't been downloaded yet.")).toBeInTheDocument();
+    fail = false;
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Undock now.')).toBeInTheDocument();
+  });
+
   it('resolves sender names for mail fetched by "load more", not just the first page', async () => {
     const fullPage = Array.from({ length: 50 }, (_, i) => ({
       mail_id: 1000 - i,

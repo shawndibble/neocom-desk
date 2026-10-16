@@ -56,21 +56,3 @@ export async function loadContractItemsDetailed(
     ...(result === null && networkRead ? { failureStatus: failureStatus ?? 0 } : {}),
   };
 }
-
-/** One contract's item lines, or null if unresolvable (offline + uncached). */
-export function loadContractItems(
-  characterId: number,
-  contractId: number
-): Promise<CachedResult<ContractItem[]> | null> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getCharacterContractItems(characterId, contractId, options)
-  );
-  return loadWithCache(
-    characterId,
-    cacheKey(contractId),
-    fetchLive,
-    // A contract's item lines are fixed when it is issued; only its *status*
-    // moves, and that lives on the contract row, not here.
-    { staleAfterMs: STALE_AFTER.static, conditional }
-  );
-}

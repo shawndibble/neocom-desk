@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -75,6 +76,7 @@ import {
 } from '@/engine/corp/members';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { DataGate } from '@/components/DataGate';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
@@ -126,7 +128,12 @@ function rosterOptions(
 
 interface MembersSnapshot {
   corporationId: number | null;
-  members: MemberActivity[];
+  /**
+   * `null` when the tracking read produced nothing (offline, ESI down): that is
+   * "couldn't load", not the empty roster `[]` of a corporation EVE reported no
+   * rows for.
+   */
+  members: MemberActivity[] | null;
   /** Corporation-wide roles by member, for the optional roles column (issue #1766). */
   roles: ReadonlyMap<number, readonly string[]>;
   labels: MemberLabels;
@@ -137,17 +144,20 @@ interface MembersSnapshot {
    * fallback must not age the badge for everyone.
    */
   fetchedAt: Date | null;
+  /** Either of those two reads fell back to its saved copy. */
+  fromCache: boolean;
   /** Captured in the loader: `Date.now()` in render is impure. */
   loadedAt: number;
 }
 
 const EMPTY_SNAPSHOT: MembersSnapshot = {
   corporationId: null,
-  members: [],
+  members: null,
   roles: new Map(),
   labels: EMPTY_MEMBER_LABELS,
   diff: EMPTY_ROSTER_DIFF,
   fetchedAt: null,
+  fromCache: false,
   loadedAt: 0,
 };
 
@@ -185,14 +195,17 @@ async function loadMembersSnapshot(
   let diff = EMPTY_ROSTER_DIFF;
   if (memberIds !== null) {
     diff = diffRoster(await readPreviousRoster(characterId, corporationId), memberIds);
-    if (!signal.cancelled) await recordRoster(characterId, corporationId, memberIds, loadedAt);
+    // Nor while the page is saying "couldn't load" (no tracking rows): the change would be
+    // consumed unseen.
+    if (!signal.cancelled && tracking.cached)
+      await recordRoster(characterId, corporationId, memberIds, loadedAt);
   }
 
-  const members = toMemberActivity(tracking.cached?.data ?? []);
+  const members = tracking.cached ? toMemberActivity(tracking.cached.data) : null;
   const roles = toMemberRoles(memberRoles.cached?.data ?? []);
   // Members who left are in neither read any more, so their names are asked for
   // explicitly — the summary is the only place they appear.
-  const labels = await loadMemberLabels(characterId, members, diff.left);
+  const labels = await loadMemberLabels(characterId, members ?? [], diff.left);
 
   const fetchedAts = [roster, tracking]
     .map((result) => result.cached?.fetchedAt)
@@ -202,7 +215,9 @@ async function loadMembersSnapshot(
       ? null
       : fetchedAts.reduce((oldest, date) => (date < oldest ? date : oldest));
 
-  return { corporationId, members, roles, labels, diff, fetchedAt, loadedAt };
+  const fromCache = [roster, tracking].some((result) => result.cached?.fromCache);
+
+  return { corporationId, members, roles, labels, diff, fetchedAt, fromCache, loadedAt };
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
@@ -225,7 +240,7 @@ function CorpMembersView() {
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
 
   const rows = useMemo<RosterRow[]>(() => {
-    if (data === null) return [];
+    if (data === null || data.members === null) return [];
     return data.members.map((member) => ({
       characterId: member.characterId,
       name: data.labels.characters.get(member.characterId) ?? null,
@@ -288,6 +303,11 @@ function CorpMembersView() {
     columns: csvColumns,
   });
 
+  // The tracking read did not come back (or the whole load failed). Not the same
+  // answer as a roster EVE reported empty, so it never reaches the table's
+  // "no member activity" line.
+  const loadFailed = data === null || data.members === null;
+
   if (!snapshot.hydrated) return <Spinner />;
 
   return (
@@ -317,10 +337,18 @@ function CorpMembersView() {
         }
       />
 
-      {snapshot.loading && data === null ? (
-        <Spinner />
-      ) : (
+      <DataGate
+        status={snapshot.loading && data === null ? 'busy' : loadFailed ? 'failed' : 'ok'}
+        title={t('common.couldntLoad')}
+        hint={t('corp.members.loadFailedHint')}
+        onRetry={snapshot.refresh}
+        resetKey={snapshot.activeCharacterId}
+        busy={<Spinner />}
+      >
         <div className="space-y-2">
+          {data?.fromCache && (
+            <CachedNotice fetchedAt={data.fetchedAt} refreshFailed={snapshot.refreshCount > 0} />
+          )}
           <FilterBar
             value={rosterFilter}
             onChange={(next) => setFilterParams(next)}
@@ -419,7 +447,7 @@ function CorpMembersView() {
             )}
           </Panel>
         </div>
-      )}
+      </DataGate>
     </div>
   );
 }

@@ -24,6 +24,7 @@ import {
   useTabsId,
   Tooltip,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useColumnVisibility } from '@/lib/columnVisibility';
@@ -778,9 +779,7 @@ export function Contracts() {
         ) : (
           <Panel padded={false}>
             {contractsResult.fromCache && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('common.offlineTitle')}
-              </p>
+              <CachedNotice className="px-3 pt-2" fetchedAt={contractsResult.fetchedAt} />
             )}
             {contractsTruncated && (
               <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">

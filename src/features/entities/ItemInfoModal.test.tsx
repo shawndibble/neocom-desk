@@ -18,6 +18,9 @@ vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
 }));
+// ItemDetailModal reads the baked type-info shard first. Mocked rather than
+// fetched (`onUnhandledRequest: 'error'`); null sends it to the ESI handlers below.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 vi.mock('@/features/industry/blueprintCatalog', async (importOriginal) => {
   const entries: BlueprintCatalogEntry[] = [
     {

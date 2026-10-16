@@ -14,6 +14,7 @@ import {
   TextInput,
   Tooltip,
   type StatChipTone,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
@@ -941,9 +942,7 @@ export function Clones() {
               </div>
             )}
             {clonesResult.fromCache && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('common.offlineTitle')}
-              </p>
+              <CachedNotice className="px-3 pt-2" fetchedAt={clonesResult.fetchedAt} />
             )}
             {clones.length > 1 && (
               <div className="overflow-x-auto border-b border-line px-3 py-2">

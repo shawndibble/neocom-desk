@@ -1869,7 +1869,6 @@
     "attributeBreakdownBoth": "{{base}} base + {{implant}} implant + {{booster}} booster = {{effective}}",
     "emptyTitle": "No skill data cached",
     "emptyHint": "Couldn't load this character's trained skills yet. Try again shortly.",
-    "offlineTitle": "Showing cached data",
     "sp": "{{value}} SP",
     "trainingChip": "Training → {{level}} · {{time}}",
     "board": {
@@ -3189,6 +3188,9 @@
       "unknown": "Unknown"
     },
     "opportunitiesUnlimitedRuns": "Unlimited",
+    "opportunitiesLoadFailedHint": "Your blueprints aren't saved on this device yet, so there is nothing to rank. They load once ESI answers.",
+    "opportunitiesSomeFailed_one": "Couldn't load blueprints for {{count}} character — their blueprints are missing here",
+    "opportunitiesSomeFailed_other": "Couldn't load blueprints for {{count}} characters — their blueprints are missing here",
     "opportunitiesEmptyTitle": "No manufacturing blueprints found",
     "opportunitiesEmptyHint": "Own a blueprint original or copy, then refresh — reaction blueprints are not ranked here.",
     "opportunitiesProgress": "{{done}} of {{total}} calculated",
@@ -3686,6 +3688,7 @@
     "errorSpent": "This login link has already been used, or it was opened in a different tab or window. Log in again.",
     "errorMismatch": "This login could not be verified. Another login may have started before this one finished. Log in again.",
     "errorDenied": "Login was cancelled on the EVE Online page. Nothing was added.",
+    "errorOffline": "You're offline — the connection dropped while logging you in. Nothing was added. Reconnect, then try again.",
     "retry": "Try again"
   },
   "character": {
@@ -5008,9 +5011,12 @@
     },
     "loadFailedTitle": "Could not load",
     "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
+    "couldntLoad": "Couldn't load",
+    "contractIndexUnreachableTitle": "Couldn't reach the contract index — nothing cached yet",
+    "contractIndexUnreachableHint": "Public contracts show here once the index answers.",
     "retry": "Try again",
     "loadFailedRetryHint": "Something went wrong loading this. Try again.",
-    "connectOnceHint": "This is downloaded the first time it's needed. Connect once and it will be kept on this device. We'll try again when you're back online.",
+    "connectOnceHint": "You're offline. Connect once and this will load — we'll try again when you're back online.",
     "spaceOption": {
       "highsec": "Highsec",
       "lowsec": "Lowsec",
@@ -5958,6 +5964,8 @@
       "ships": "Ships",
       "move": "Move"
     },
+    "skippedCharacters": "Couldn't load assets for {{names}} — they are missing here.",
+    "skippedAllHint": "Their assets aren't saved on this device yet. They load once ESI answers.",
     "movePlan": {
       "title": "Plan a move",
       "loading": "Reading the assets…",
@@ -6314,7 +6322,16 @@
     "sending": "Sending…",
     "cancel": "Cancel",
     "sendErrorPrefix": "Couldn't send: {{message}} Try sending from the EVE client instead.",
-    "sendNoRecipients": "Add at least one recipient before sending."
+    "sendNoRecipients": "Add at least one recipient before sending.",
+    "sendUnconfirmed": "Couldn't confirm the mail was sent. Check your Sent folder before sending it again.",
+    "draftSaved": "Your draft is saved.",
+    "sendOffline": "You're offline — your draft is saved. Send it when you're back online.",
+    "loadMoreOffline": "Couldn't load more — you're offline.",
+    "loadMoreFailed": "Couldn't load more mail. Try again.",
+    "recipientSearchFailed": "Search failed. Try again.",
+    "recipientSearchOffline": "Search needs a connection.",
+    "bodyNotDownloadedOnline": "This mail hasn't been downloaded yet.",
+    "bodyNotDownloaded": "This mail hasn't been downloaded yet — reconnect to read it."
   },
   "calendar": {
     "title": "Calendar",
@@ -6335,6 +6352,8 @@
     "rsvpDecline": "Decline",
     "rsvpTentative": "Tentative",
     "rsvpFailed": "Couldn't save your response. Try again.",
+    "rsvpUnconfirmed": "The connection timed out, so your response may not have been saved. Check the event, then try again.",
+    "rsvpOffline": "You're offline — your response wasn't saved. Reconnect and try again.",
     "yourResponse": "Your response",
     "export": "Export",
     "contextMenu": {
@@ -7960,6 +7979,7 @@
     "detailItemName": "Name",
     "detailQuantity": "Qty",
     "detailNoItems": "No item data for this contract",
+    "detailItemsFailedHint": "This contract's items aren't saved on this device yet.",
     "detailMarketValue": "Market value at {{hub}} (sell orders)",
     "detailMarketValueUnpriced_one": "({{count}} item unpriced)",
     "detailMarketValueUnpriced_other": "({{count}} items unpriced)",
@@ -8742,6 +8762,7 @@
     "standingsUsedForFees": "Broker fees",
     "standingsUsedForFeesYes": "Used for fees",
     "standingsFeesNote": "Broker fees use your standing with each Trade Hub's owning corporation and faction. Other NPC stations use their own owner, and agents never count.",
+    "standingsUnavailableHint": "Your NPC standings aren't saved on this device yet. They load once ESI answers.",
     "standingsEmptyTitle": "No NPC standings yet",
     "standingsEmptyHint": "EVE lists a standing once you have earned or lost one with a faction, corporation or agent.",
     "standingsNoResultsHint": "Clear the search to see every standing.",
@@ -9215,6 +9236,7 @@
   },
   "market": {
     "title": "Market",
+    "sharedAppraisalLoadFailed": "Couldn't load the shared appraisal. You may be offline.",
     "compareUndo": {
       "added_one": "Added {{count}} variant of {{name}}",
       "added_other": "Added {{count}} variants of {{name}}",
@@ -9263,6 +9285,7 @@
     "emptyFiltersHint": "No orders match the filters. Loosen them to see more.",
     "orderBookFailedTitle": "Couldn't load the order book",
     "orderBookFailedHint": "ESI didn't answer — it may be limiting requests right now. This doesn't mean nobody is trading the item.",
+    "orderBookFailedOfflineHint": "You're offline, and this order book isn't saved on this device. This doesn't mean nobody is trading the item.",
     "orderBookFailedRetry": "Try again",
     "price": "Price",
     "quantity": "Quantity",
@@ -11107,6 +11130,7 @@
       "left_other": "{{count}} left:",
       "empty": "No member activity",
       "emptyHint": "EVE reported no tracking rows for this corporation.",
+      "loadFailedHint": "The member list isn't saved on this device yet, so there is nothing to show. It loads once EVE answers.",
       "noFilterMatches": "No members match your search or filters.",
       "noFilterMatchesHint": "Clear the search or reset the dark-only, ship and location filters to see every member.",
       "noAccessTitle": "Member tracking needs Director",
@@ -11187,6 +11211,8 @@
     },
     "cards": {
       "fuel": "Fuel",
+      "loadFailedAnnounce_one": "{{count}} corp card couldn't load",
+      "loadFailedAnnounce_other": "{{count}} corp cards couldn't load",
       "fuelEmpty": "Every structure is fuelled.",
       "timers": "Structure timers",
       "timersEmpty": "No structure is on a timer.",
@@ -11208,6 +11234,7 @@
     }
   },
   "publicInfo": {
+    "loadFailedHint": "Couldn't look this up. Check your connection, then try again.",
     "title": "Public info",
     "tabsLabel": "Character, corporation, alliance, and employment",
     "characterTab": "Character",
@@ -11456,6 +11483,7 @@
     "routeExposureChokepoints": "Route runs through {{systems}}, where haulers are most often killed."
   },
   "jumpRange": {
+    "systemsFailed": "System list couldn't load",
     "label": "Distance",
     "option": {
       "3": "Within 3 jumps",
@@ -11487,7 +11515,9 @@
     "opened": "Opened in your EVE client.",
     "needCharacter": "Log in a character to open this in its EVE client.",
     "failed": "Couldn't open it in EVE: {{message}}",
-    "unknownError": "Is your character logged in to the game?"
+    "unknownError": "Is your character logged in to the game?",
+    "offline": "You're offline — reconnect to open this in EVE.",
+    "unconfirmed": "The connection timed out. Couldn't confirm it opened in EVE — check your client."
   },
   "travel": {
     "incursions": {
@@ -12209,6 +12239,7 @@
       "chokepointsNone": "None"
     },
     "jumpDrive": {
+      "unavailable": "Jump-drive range data isn't available offline yet, so this route has no jump legs.",
       "enabled": "Allow jump drive legs",
       "hint": "Uses the hull's range and fuel with Jump Drive Calibration and Jump Fuel Conservation at V.",
       "range": "Longest single jump",
@@ -12304,6 +12335,10 @@
       },
       "nothingToSet": "No waypoints to set: the trip has no jumps.",
       "failed": "Waypoints not set: {{message}}",
+      "offline": "You're offline — waypoints weren't set. Reconnect and try again.",
+      "unconfirmed": "The connection timed out, so the waypoints may not have been set. Check your EVE client.",
+      "unconfirmedPartway": "The connection timed out. At least {{set}} of {{total}} waypoints were set; check your EVE client.",
+      "offlinePartway": "You're offline — {{set}} of {{total}} waypoints were set before the connection dropped. Reconnect and set them again.",
       "failedPartway": "{{set}} of {{total}} waypoints set, then ESI refused the rest: {{message}}",
       "unknownError": "ESI gave no reason. Is the character logged in to the game?"
     },

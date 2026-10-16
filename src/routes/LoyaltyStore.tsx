@@ -56,6 +56,7 @@ import {
   TabPanel,
   useTabsId,
   type DataTableColumn,
+  CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -1064,9 +1065,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             )}
           </FilterBar>
 
-          {offersFromCache && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-          )}
+          {offersFromCache && <CachedNotice fetchedAt={offersFetchedAt} />}
 
           {isDesktop ? (
             <div className="flex items-start gap-3">

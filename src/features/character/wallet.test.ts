@@ -11,6 +11,7 @@ import {
   loadWalletTransactions,
   loadWalletTransactionsWithStatus,
   loadAllCharactersWalletBalances,
+  oldestCachedBalanceAt,
   totalWalletBalance,
   type CharacterWalletBalance,
 } from './wallet';
@@ -415,6 +416,40 @@ describe('loadAllCharactersWalletBalances', () => {
     const { entries } = await loadAllCharactersWalletBalances();
 
     expect(entries.map((e) => e.characterId)).toEqual([CHAR_A, CHAR_B, CHAR_C]);
+  });
+});
+
+describe('oldestCachedBalanceAt', () => {
+  const entry = (
+    characterId: number,
+    fromCache: boolean,
+    at: number | null
+  ): CharacterWalletBalance => ({
+    characterId,
+    characterName: `Pilot ${characterId}`,
+    balanceResult:
+      at === null ? null : { data: 100, fetchedAt: new Date(at), fromCache, truncated: false },
+    needsReauth: false,
+  });
+
+  it('is the oldest read among the cached balances of the shown Characters', () => {
+    const entries = [entry(1, true, 5_000), entry(2, true, 2_000), entry(3, false, 1_000)];
+    expect(oldestCachedBalanceAt(entries, new Set([1, 2, 3]))).toBe(2_000);
+  });
+
+  it('ignores a cached Character the view has filtered out', () => {
+    const entries = [entry(1, true, 5_000), entry(2, true, 2_000)];
+    expect(oldestCachedBalanceAt(entries, new Set([1]))).toBe(5_000);
+  });
+
+  it('is null when every shown balance is fresh, missing, or nothing is shown', () => {
+    const entries = [entry(1, false, 5_000), entry(2, true, null)];
+    expect(oldestCachedBalanceAt(entries, new Set([1, 2]))).toBeNull();
+    expect(oldestCachedBalanceAt([entry(1, true, 5_000)], new Set())).toBeNull();
+  });
+
+  it('keeps a real epoch-zero read as a time, not as missing', () => {
+    expect(oldestCachedBalanceAt([entry(1, true, 0)], new Set([1]))).toBe(0);
   });
 });
 

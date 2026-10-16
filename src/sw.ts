@@ -81,9 +81,9 @@ const cacheOnly200 = new CacheableResponsePlugin({ statuses: [200] });
 // SDE files not in the precache (vite.config.ts globIgnores, built from
 // src/sde/lazySdeFiles.ts): cache-first under their content-versioned URL. A
 // changed file is a new `?v=`, i.e. a cache miss, so this never serves stale
-// SDE; unchanged files survive any number of deploys. maxEntries 64: the lazy
-// set is ~9 files, and each deploy that changes one leaves its old `?v=` entry
-// behind; the 90-day age cap evicts those rather than letting them accumulate.
+// SDE; unchanged files survive any number of deploys. maxEntries 150 ≈ 2x the
+// lazy set (9 files + 64 typeInfo shards): a deploy leaves old `?v=` entries
+// behind; the 90-day cap evicts them.
 // The base path comes from the registration scope (= Vite's `base`), not
 // `import.meta`, which would break sw.js as a classic script (check-sw.mjs).
 const scopePath = new URL(self.registration.scope).pathname;
@@ -94,7 +94,7 @@ registerRoute(
     plugins: [
       cacheOnly200,
       new ExpirationPlugin({
-        maxEntries: 64,
+        maxEntries: 150,
         maxAgeSeconds: 90 * DAY_SECONDS,
         purgeOnQuotaError: true,
       }),

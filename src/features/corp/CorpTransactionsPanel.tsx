@@ -37,6 +37,7 @@ import {
   Spinner,
   type DataTableColumn,
   type DataTableSort,
+  CachedNotice,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -80,7 +81,7 @@ interface CorpTransactionsPanelProps {
   nameFor: (typeId: number) => string;
   /** Names the CSV file's division, when the division list has loaded. */
   divisionQualifier: string | undefined;
-  offlineTitleKey: string;
+  refreshFailed: boolean;
 }
 
 /** Radix needs a value here, and `''` reads to it as "nothing selected". */
@@ -166,7 +167,7 @@ export function CorpTransactionsPanel({
   onSortChange,
   nameFor,
   divisionQualifier,
-  offlineTitleKey,
+  refreshFailed,
 }: CorpTransactionsPanelProps) {
   const { t } = useTranslation();
 
@@ -297,9 +298,11 @@ export function CorpTransactionsPanel({
       ) : (
         <>
           {transactionsResult.fromCache && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t(offlineTitleKey)}
-            </p>
+            <CachedNotice
+              className="px-3 pt-2"
+              fetchedAt={transactionsResult.fetchedAt}
+              refreshFailed={refreshFailed}
+            />
           )}
           {transactionsResult.truncated && (
             <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">

@@ -24,7 +24,7 @@ import {
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
-import { isAuthFailure } from '@/esi/client';
+import { isAuthFailure, isOfflineFailure } from '@/esi/client';
 import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { mergeMailHeaderPage, MAIL_HEADERS_PAGE_SIZE } from '@/engine/mail';
@@ -58,6 +58,8 @@ export async function loadMailHeaders(characterId: number): Promise<MailHeadersR
 export interface LoadMoreMailHeadersResult {
   headers: MailHeader[];
   hasMore: boolean;
+  /** Set when the page could not be loaded: `offline` for a network failure, `error` for the rest. */
+  failure?: 'offline' | 'error';
 }
 
 /**
@@ -86,7 +88,11 @@ export async function loadMoreMailHeaders(
     return { headers, hasMore };
   } catch (err) {
     if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'getCharacterMailHeaders');
-    return { headers: [...currentHeaders], hasMore: true };
+    return {
+      headers: [...currentHeaders],
+      hasMore: true,
+      failure: isOfflineFailure(err) ? 'offline' : 'error',
+    };
   }
 }
 

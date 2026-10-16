@@ -10,28 +10,24 @@
  * footer and the command palette switch the active Character, and each
  * widget's own menu chooses its Character scope.
  */
-import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, SEVERITY_TEXT, SeverityIcon, Tooltip, buttonClassName } from '@/components/ui';
+import {
+  Button,
+  SEVERITY_TEXT,
+  SeverityIcon,
+  Tooltip,
+  buttonClassName,
+  CachedNotice,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
-import { useTicker } from '@/lib/ticker';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { DataAgePopover } from './DataAgePopover';
-import { useKindViews, viewKey } from './widgets/data/useWidgetView';
 import { useOverviewRefresh } from './widgets/data/refreshContext';
 import { useOverviewEdit } from './widgets/editContext';
-import { collectDeadlines, fetchBreakdown, stalestFetch } from './widgets/headerSummary';
-import type { Widget } from './widgets/layout';
-import { chipTone, nextDeadline, type ChipTone } from './widgets/nextDeadline';
-import { distinctKinds, visibleWidgets } from './widgets/visibility';
-
-const CLOCK_TICK_MS = 30_000;
-
-/** A kind whose view has not been built yet: no read to date. */
-const EMPTY_READ = { fetchedAt: null, fromCache: false };
+import type { ChipTone } from './widgets/nextDeadline';
+import type { OverviewSummary } from './useOverviewSummary';
 
 /** The button's own ladder: amber under 3 h, red under 30 min (not the per-card severities). */
 const CHIP_TEXT: Record<ChipTone, string> = {
@@ -40,42 +36,13 @@ const CHIP_TEXT: Record<ChipTone, string> = {
   danger: SEVERITY_TEXT.critical,
 };
 
-/** What the header shows of the drawn widgets: the soonest clock and the stalest read. */
-function useOverviewSummary(widgets: readonly Widget[]) {
-  const isPhone = useIsPhone();
-  const now = useTicker(CLOCK_TICK_MS);
-  const shown = useMemo(() => visibleWidgets(widgets, isPhone), [widgets, isPhone]);
-  const requests = useMemo(
-    () => distinctKinds(shown).map((kind) => ({ kind, scopeAll: false })),
-    [shown]
-  );
-  const views = useKindViews(requests);
-  const all = [...views.values()];
-  const next = nextDeadline(collectDeadlines(all), now);
-  const breakdown = fetchBreakdown(
-    shown.map((widget) => ({
-      kind: widget.kind,
-      view: views.get(viewKey({ kind: widget.kind, scopeAll: false })) ?? EMPTY_READ,
-    }))
-  );
-  const remaining = next ? next.at - now : 0;
-  return {
-    next,
-    remaining,
-    tone: chipTone(remaining),
-    fetchedAt: stalestFetch(all).date,
-    breakdown,
-    now,
-  };
-}
-
 /**
  * "Data updated N ago" on the tab row: the stalest read of any drawn
  * widget. Its tooltip names that widget; a click opens the per-widget table, so
  * "14h ago" is never a mystery (no Refresh: widgets retry themselves).
  */
-export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
-  const { fetchedAt, breakdown, now } = useOverviewSummary(widgets);
+export function OverviewDataAge({ summary }: { summary: OverviewSummary }) {
+  const { fetchedAt, breakdown, now } = summary;
   const { refresh } = useOverviewRefresh();
   if (!fetchedAt) return null;
   return (
@@ -84,14 +51,25 @@ export function OverviewDataAge({ widgets }: { widgets: readonly Widget[] }) {
 }
 
 /**
+ * "Showing cached data · N ago" under the sub-nav when any drawn widget read
+ * from the saved copy, at every width: `OverviewDataAge` above sits on a tab
+ * row a phone has no room for, and says how old, not that it is a saved copy.
+ */
+export function OverviewCachedNotice({ summary }: { summary: OverviewSummary }) {
+  const { fetchedAt, fromCache } = summary;
+  if (!fromCache) return null;
+  return <CachedNotice fetchedAt={fetchedAt} />;
+}
+
+/**
  * The Next deadline: a link to the page that owns the clock, drawn as a plain
  * button (absent with no deadline). It is a child of `CharacterHeader`'s flex
  * row: left of Customize and the bell from `md`, on its own full-width line
  * under them on a phone.
  */
-export function OverviewNext({ widgets }: { widgets: readonly Widget[] }) {
+export function OverviewNext({ summary }: { summary: OverviewSummary }) {
   const { t } = useTranslation();
-  const { next, remaining, tone } = useOverviewSummary(widgets);
+  const { next, remaining, tone } = summary;
   if (!next) return null;
   return (
     <div className="order-last min-w-0 basis-full md:order-none md:basis-auto">

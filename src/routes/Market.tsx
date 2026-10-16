@@ -30,6 +30,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
+import { orderBookFailedOffline } from '@/features/market/orderBookView';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
@@ -515,7 +516,7 @@ export function Market() {
   }, [location.key, location.state, appraisal]);
   // "Open Neocom Desk" on a stored Appraisal Share Link lands here with
   // `?share=<id>`, its hub and percent riding `?hub=` and `?percent=`.
-  useSharedAppraisalSeed((text) => appraisal.appraiseText(text));
+  const sharedSeed = useSharedAppraisalSeed((text) => appraisal.appraiseText(text));
   // Feeds the net-of-fees chips' broker fee — resolved once per character,
   // same as every other configurable-Trade-Hub broker-fee surface.
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
@@ -1155,7 +1156,11 @@ export function Market() {
                         // blueprint BPC hint, just the failure and a way to retry.
                         <EmptyState
                           title={t('market.orderBookFailedTitle')}
-                          hint={t('market.orderBookFailedHint')}
+                          hint={t(
+                            orderBookFailedOffline(orderBookView, online)
+                              ? 'market.orderBookFailedOfflineHint'
+                              : 'market.orderBookFailedHint'
+                          )}
                           className="py-8"
                           action={
                             <Button size="sm" onClick={handleRefresh}>
@@ -1380,6 +1385,18 @@ export function Market() {
                 : (marketRegions?.find((region) => region.id === orderBookLocation.regionId)
                     ?.name ?? hubRegionName)
             }
+          />
+        )}
+
+        {sharedSeed.loadFailed && (
+          <Toast
+            message={t('market.sharedAppraisalLoadFailed')}
+            // Stays mounted, busy, until the retry settles: it unmounts only on success.
+            action={{
+              label: sharedSeed.retrying ? t('common.loading') : t('common.retry'),
+              onAction: sharedSeed.retrying ? () => {} : sharedSeed.retry,
+            }}
+            onClose={sharedSeed.dismiss}
           />
         )}
 

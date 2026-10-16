@@ -40,6 +40,7 @@ import {
   type DataTableColumn,
   Checkbox,
   TabPanel,
+  CachedNotice,
 } from '@/components/ui';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
@@ -1778,9 +1779,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : (
           <>
-            {data && data.fromCache && (
-              <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-            )}
+            {data && data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
 
             <AttentionStrip items={attentionItems} />
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
-import { DataAgeBadge, Spinner } from '@/components/ui';
+import { DataAgeBadge, Spinner, CachedNotice } from '@/components/ui';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
@@ -43,6 +43,8 @@ export function SkillPlans() {
     trainedSkillsKnown,
     attributes,
     queueEntries,
+    fetchedAt,
+    fromCache,
   } = usePlanEditorData(activeCharacterId);
   // Memoised: the list pane's per-plan costing re-runs when this changes.
   const scheduleInputs = useMemo(
@@ -75,6 +77,16 @@ export function SkillPlans() {
     () => buildQueueView(classifySkillQueue(queueResult?.data ?? [], nowMs)),
     [queueResult, nowMs]
   );
+
+  // The oldest of the sources that are actually the saved copy: a fresh queue
+  // must not date cached skills as "just now".
+  const cachedAt = useMemo(() => {
+    const times = [
+      queueResult?.fromCache ? queueResult.fetchedAt.getTime() : null,
+      fromCache && fetchedAt ? fetchedAt.getTime() : null,
+    ].filter((time): time is number => time !== null);
+    return times.length > 0 ? Math.min(...times) : null;
+  }, [queueResult, fromCache, fetchedAt]);
 
   // A skill plan pasted anywhere (`app/GlobalPasteRouter.tsx`) lands here: it
   // gets a plan of its own and that plan's editor opens the Import dialog on
@@ -120,6 +132,8 @@ export function SkillPlans() {
         meta={queueResult?.fetchedAt && <DataAgeBadge date={queueResult.fetchedAt} />}
       />
       <SkillsSubNav />
+
+      {cachedAt !== null && <CachedNotice fetchedAt={cachedAt} />}
 
       <QueueStrip view={queueView} nowMs={nowMs} />
 

@@ -15,8 +15,21 @@ import { useOpenInEve } from './useOpenInEve';
 
 export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
   const { t } = useTranslation();
-  const { blockedReason, missingGroups, sending, outcome, send } = useOpenInEve({ kind, id });
+  const { blockedReason, offline, missingGroups, sending, outcome, send } = useOpenInEve({
+    kind,
+    id,
+  });
   const label = t(`openInEve.${kind}`);
+  // Kept when the connection drops mid-send, so the result is still shown in the blocked branch.
+  const content = sending ? (
+    t('openInEve.sending')
+  ) : outcome ? (
+    <span role={outcome.tone} className={outcome.tone === 'alert' ? 'text-danger' : 'text-success'}>
+      {outcome.text}
+    </span>
+  ) : (
+    label
+  );
 
   if (blockedReason !== null) {
     return missingGroups.length > 0 ? (
@@ -25,7 +38,11 @@ export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
         <GrantMissingMenuItem groups={missingGroups} />
       </>
     ) : (
-      <DisabledMenuItem reason={t('openInEve.needCharacter')}>{label}</DisabledMenuItem>
+      <DisabledMenuItem
+        reason={offline ? t('common.needsConnection') : t('openInEve.needCharacter')}
+      >
+        {offline ? content : label}
+      </DisabledMenuItem>
     );
   }
   return (
@@ -36,18 +53,7 @@ export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
         send();
       }}
     >
-      {sending ? (
-        t('openInEve.sending')
-      ) : outcome ? (
-        <span
-          role={outcome.tone}
-          className={outcome.tone === 'alert' ? 'text-danger' : 'text-success'}
-        >
-          {outcome.text}
-        </span>
-      ) : (
-        label
-      )}
+      {content}
     </MenuItem>
   );
 }
