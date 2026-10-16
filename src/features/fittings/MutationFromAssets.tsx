@@ -117,7 +117,7 @@ export function MutationFromAssets({
     );
   }
   return (
-    <div className="space-y-1">
+    <div className="w-full space-y-1">
       <p className="text-text-dim">
         {found.items.length === 0
           ? t('fittings.mutation.fromAssetsNone')

@@ -1891,6 +1891,7 @@
       "loading": "Loading mutaplasmids…",
       "mutaplasmid": "Mutaplasmid",
       "pickMutaplasmid": "Apply a mutaplasmid",
+      "pickMadeBy": "Which mutaplasmid made it?",
       "noMutaplasmids": "No mutaplasmid takes this module.",
       "base": "Base module",
       "pickBase": "Pick its base module",

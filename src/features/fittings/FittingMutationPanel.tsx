@@ -231,12 +231,14 @@ function MutationEditor({
             ))}
           </ul>
         ))}
-      {fromAssets}
-      {mutation && (
-        <Button size="sm" onClick={() => apply(null)}>
-          {t('fittings.mutation.remove')}
-        </Button>
-      )}
+      <div className="flex flex-wrap items-start gap-2">
+        {fromAssets}
+        {mutation && (
+          <Button size="sm" onClick={() => apply(null)}>
+            {t('fittings.mutation.remove')}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -247,12 +249,15 @@ function MutaplasmidSelect({
   value,
   nameOf,
   disabled,
+  placeholder,
   onChange,
 }: {
   options: readonly Mutaplasmid[];
   value: number | null;
   nameOf: (typeId: number) => string;
   disabled?: boolean;
+  /** What the empty picker asks; "Apply a mutaplasmid" by default. */
+  placeholder?: string;
   onChange: (mutaplasmidTypeId: number) => void;
 }) {
   const { t } = useTranslation();
@@ -274,7 +279,7 @@ function MutaplasmidSelect({
         className="w-full max-w-md"
         aria-label={t('fittings.mutation.mutaplasmid')}
       >
-        <SelectValue placeholder={t('fittings.mutation.pickMutaplasmid')} />
+        <SelectValue placeholder={placeholder ?? t('fittings.mutation.pickMutaplasmid')} />
       </SelectTrigger>
       <SelectContent>
         {groups.map((group) => (
@@ -319,6 +324,7 @@ function BasePicker({
         options={lookup.mutaplasmidsForResult(resultTypeId)}
         value={mutaplasmidTypeId}
         nameOf={nameOf}
+        placeholder={t('fittings.mutation.pickMadeBy')}
         onChange={setMutaplasmidTypeId}
       />
       {mutaplasmidTypeId !== null && (
