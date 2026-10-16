@@ -253,6 +253,40 @@ export async function installEsiMock(page: Page): Promise<void> {
       });
     }
 
+    // Detail rows the background prefetch fetches after a list sync
+    // (`features/character/detailPrefetch.ts`: mail bodies, calendar event
+    // details). A spec that seeds mail or calendar rows (via its own list
+    // route) triggers them on a desktop "online" browser, where the gate is
+    // open, so every such id answers a plausible record rather than escaping.
+    const calendarEventMatch = /^\/characters\/\d+\/calendar\/(\d+)$/.exec(path);
+    if (calendarEventMatch) {
+      const eventId = Number(calendarEventMatch[1]);
+      return json({
+        event_id: eventId,
+        title: `Event ${eventId}`,
+        date: '2099-01-01T18:00:00Z',
+        duration: 60,
+        importance: 0,
+        owner_id: CORPORATION_ID,
+        owner_name: CORPORATION_NAME,
+        owner_type: 'corporation',
+        response: 'not_responded',
+        text: 'Fixture event.',
+      });
+    }
+    const mailBodyMatch = /^\/characters\/\d+\/mail\/(\d+)$/.exec(path);
+    if (mailBodyMatch) {
+      return json({
+        from: CHARACTER_ID,
+        subject: `Mail ${mailBodyMatch[1]}`,
+        timestamp: '2026-01-01T12:00:00Z',
+        body: 'Fixture mail body.',
+        read: false,
+        labels: [1],
+        recipients: [{ recipient_id: CHARACTER_ID, recipient_type: 'character' }],
+      });
+    }
+
     // Unknown ESI path: fall through to the network guard so it shows up as
     // an explicit "unmocked request" failure rather than a silent 404.
     await route.fallback();

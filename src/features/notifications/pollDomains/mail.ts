@@ -35,8 +35,9 @@ export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificatio
   load: async (characterId) => {
     const result = await loadMailHeaders(characterId);
     if (result.needsReauth || result.cached === null) return null;
-    // The sync landed: keep the newest mail bodies ready to read offline.
-    void prefetchMailBodies(characterId, result.cached.data);
+    // Only after a read that reached ESI (a cache hit or an offline fallback
+    // proves nothing landed); see `detailPrefetch.ts` for the triggers.
+    if (!result.cached.fromCache) void prefetchMailBodies(characterId, result.cached.data);
     return result.cached.data;
   },
   toSnapshot: (headers, nowMs) => ({ entries: headers.map(toMailHeaderSnapshot), nowMs }),

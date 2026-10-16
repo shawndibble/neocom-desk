@@ -325,9 +325,10 @@ export function selectMailBodiesToPrefetch(
   const ordered = headers
     .filter((header) => header.from !== options.ownerId)
     .sort((a, b) => {
-      const unreadA = a.is_read === true ? 1 : 0;
-      const unreadB = b.is_read === true ? 1 : 0;
-      return unreadA - unreadB || b.mail_id - a.mail_id;
+      const readRankA = a.is_read === true ? 1 : 0;
+      const readRankB = b.is_read === true ? 1 : 0;
+      // Unread (rank 0) sorts ahead of read (rank 1); newest first within each.
+      return readRankA - readRankB || b.mail_id - a.mail_id;
     });
   return ordered
     .slice(0, Math.max(0, options.limit))

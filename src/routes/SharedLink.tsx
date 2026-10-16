@@ -113,7 +113,10 @@ export function SharedLink() {
     return (
       <div ref={retryRef} tabIndex={-1} className="focus:outline-none">
         {result.cachedAt !== undefined && (
-          <CachedNotice fetchedAt={result.cachedAt} className="mx-auto max-w-5xl px-4 pt-3" />
+          <CachedNotice
+            fetchedAt={result.cachedAt}
+            className="mx-auto max-w-3xl px-2 pt-2 sm:px-6 sm:pt-4"
+          />
         )}
         <SharedScreen share={result.share} shareId={shareId} />
       </div>

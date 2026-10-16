@@ -29,8 +29,10 @@ describe('selectCalendarEventsToPrefetch', () => {
     expect(pick([event(1, NOW + 14 * DAY), event(2, NOW + 14 * DAY + 1)])).toEqual([1]);
   });
 
-  it('keeps one that started a moment ago, since it is still on the board, but not an old one', () => {
-    expect(pick([event(1, NOW - 60 * 60_000), event(2, NOW - 2 * DAY)])).toEqual([1]);
+  it('keeps one that started hours ago while the calendar still shows it, but not an old one', () => {
+    const HOUR = 60 * 60_000;
+    // The window is `calendarRetention`'s own (end of its day, or 6 h from the start).
+    expect(pick([event(1, NOW - 5 * HOUR), event(2, NOW - 2 * DAY)])).toEqual([1]);
   });
 
   it('never asks again for details already cached', () => {

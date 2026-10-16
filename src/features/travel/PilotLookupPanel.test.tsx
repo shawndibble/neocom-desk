@@ -470,14 +470,20 @@ describe('PilotLookupPanel', () => {
   });
 
   it('shows how old the profile really is, not when it was looked at', async () => {
-    mocks.loadPilotProfile.mockResolvedValue({
-      ...PROFILE,
-      fetchedAt: new Date(Date.now() - 3 * 60 * 60_000),
-    });
-    renderTab('/travel/pilot?pilot=42');
-    expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
-    // Hours, whatever the shared clock reads: never the "just now" of a fresh stamp.
-    expect(screen.getByText(/^\dh ago$/)).toBeTruthy();
+    // Only Date is faked, so the shared age clock and the awaits keep running.
+    const now = Date.UTC(2026, 9, 16, 12);
+    vi.useFakeTimers({ now, toFake: ['Date'] });
+    try {
+      mocks.loadPilotProfile.mockResolvedValue({
+        ...PROFILE,
+        fetchedAt: new Date(now - 3 * 60 * 60_000),
+      });
+      renderTab('/travel/pilot?pilot=42');
+      expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+      expect(screen.getByText('3h ago')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows the unknown-pilot state when ESI has no such character', async () => {

@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
+import { resetDetailPrefetchForTests } from './detailPrefetch';
 import {
   loadCalendarEvents,
   loadCalendarEvent,
@@ -79,6 +80,20 @@ describe('prefetchCalendarEventDetails', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    resetDetailPrefetchForTests();
+  });
+
+  it('does not ask again, this session, for an event whose details failed', async () => {
+    let hits = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => {
+        hits += 1;
+        return HttpResponse.json({ error: 'forbidden' }, { status: 403 });
+      })
+    );
+    await prefetchCalendarEventDetails(CHAR_ID, [summary(1, NOW + DAY)], NOW);
+    await prefetchCalendarEventDetails(CHAR_ID, [summary(1, NOW + DAY)], NOW);
+    expect(hits).toBe(1);
   });
 });
 

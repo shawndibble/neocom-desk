@@ -15,6 +15,7 @@ import {
   PRUNE_LEGACY_CLEARED_KEY,
   PRUNE_LAST_RUN_KEY,
   PRUNE_MIN_INTERVAL_MS,
+  SHARE_COPY_RETENTION_MS,
   STATIC_RETENTION_MS,
   pruneEsiCache,
   pruneRuleFor,
@@ -142,6 +143,22 @@ describe('pruneRuleFor', () => {
     'nametag:1',
   ])('%s is never pruned', (key) => {
     expect(pruneRuleFor(key)).toBeUndefined();
+  });
+});
+
+describe('share copies', () => {
+  it('are pruned a day past the 7-day life of the share itself', () => {
+    expect(SHARE_COPY_RETENTION_MS).toBe(8 * DAY);
+    expect(pruneRuleFor('share:abc123')?.maxAgeMs).toBe(SHARE_COPY_RETENTION_MS);
+  });
+
+  it('are found under the sentinel Character, old ones dropped and recent ones kept', async () => {
+    await seed(G, 'share:old123', NOW - SHARE_COPY_RETENTION_MS - 1);
+    await seed(G, 'share:new123', NOW - 2 * DAY);
+
+    await pruneEsiCache({ now: NOW });
+
+    expect(await keys()).toEqual([`${G}|share:new123`]);
   });
 });
 

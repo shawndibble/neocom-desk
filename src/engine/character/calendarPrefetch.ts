@@ -1,12 +1,12 @@
 import { parseInstant } from '../esiInstant';
-
-/** An event that began this recently is still on the board (see `calendarRetention`), so its details are still worth having. */
-const RUNNING_GRACE_MS = 3 * 60 * 60_000;
+import { retentionEndsAt } from './calendarRetention';
 
 /**
  * Which calendar events to fetch full details for ahead of being opened, so
- * the detail modal works offline: events starting from just now out to the
- * horizon, soonest first, cut to `limit` and then minus those already cached.
+ * the detail modal works offline: events starting out to the horizon, plus
+ * those that began recently enough to still be on the board (the same
+ * `retentionEndsAt` rule the calendar uses), soonest first, cut to `limit` and
+ * then minus those already cached.
  * The cut comes first so each sync adds only what newly entered the window.
  * An event whose date will not parse is left out rather than guessed at.
  */
@@ -18,7 +18,8 @@ export function selectCalendarEventsToPrefetch(
   for (const event of events) {
     const startMs = parseInstant(event.event_date);
     if (startMs === null) continue;
-    if (startMs < options.nowMs - RUNNING_GRACE_MS) continue;
+    // Started already: still on the board only while the calendar retains it.
+    if (startMs < options.nowMs && retentionEndsAt(startMs) <= options.nowMs) continue;
     if (startMs > options.nowMs + options.horizonMs) continue;
     upcoming.push({ id: event.event_id, startMs });
   }

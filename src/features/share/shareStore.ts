@@ -18,6 +18,7 @@
 import { doc, getDoc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore/lite';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { isOfflineFailure } from '@/esi/client';
 import { generateShareId, isShareId } from '@/engine/share/shareId';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureAnySession } from '@/sync/syncAuth';
@@ -131,12 +132,20 @@ function isShareType(value: unknown): value is ShareType {
 /**
  * A loaded share is kept in `esiCache` under the sentinel Character (a share
  * is public, owned by nobody) until its own `expiresAt`, so a link opened once
- * still opens with no connection. A share never changes under its id, so the
- * copy is only a fallback: a live read always wins, and replaces it. The
- * daily `esiCache` prune does not know this key, so expiry is enforced here.
+ * still opens with no connection. Most types are written once under a fresh
+ * id, so the copy is only a fallback: a live read always wins and replaces it.
+ * A Survey is the exception: it is rewritten under its id and its scans live in
+ * subcollections this payload does not carry, so it is never kept. The daily
+ * `esiCache` prune drops what is left past `PRUNE_RULES`' `share:` window;
+ * expiry itself is enforced here, on read.
  */
 function shareCacheKey(id: string): string {
   return `share:${id}`;
+}
+
+/** Firestore's own offline codes, or a raw network failure. */
+function isUnreachable(error: unknown, code: unknown): boolean {
+  return code === 'unavailable' || code === 'deadline-exceeded' || isOfflineFailure(error);
 }
 
 async function forgetShare(id: string): Promise<void> {
@@ -148,6 +157,7 @@ async function forgetShare(id: string): Promise<void> {
 }
 
 async function rememberShare(id: string, share: StoredShare): Promise<void> {
+  if (share.type === 'survey') return;
   try {
     await db.esiCache.put({
       characterId: GLOBAL_CACHE_CHARACTER_ID,
@@ -189,7 +199,11 @@ export async function loadShare(id: string): Promise<LoadShareResult> {
       await forgetShare(id);
       return { ok: false, reason: 'not-found' };
     }
-    return (await recallShare(id)) ?? { ok: false, reason: 'failed' };
+    // Only a link that could not be reached falls back to the saved copy; any
+    // other failure is not evidence the share is still there.
+    if (isUnreachable(error, code))
+      return (await recallShare(id)) ?? { ok: false, reason: 'failed' };
+    return { ok: false, reason: 'failed' };
   }
   if (!snapshot.exists()) {
     await forgetShare(id);
@@ -204,6 +218,7 @@ export async function loadShare(id: string): Promise<LoadShareResult> {
   }
   if (!isShareType(data.type)) return { ok: false, reason: 'unsupported' };
   const share: StoredShare = { type: data.type, payload: data.payload, expiresAt };
-  await rememberShare(id, share);
+  // Not awaited: it cannot throw, and the visitor should not wait on a disk write.
+  void rememberShare(id, share);
   return { ok: true, share };
 }

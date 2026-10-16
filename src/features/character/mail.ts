@@ -18,7 +18,6 @@ import {
   loadWithCache,
   loadWithCacheStatus,
   readCachedEntries,
-  cachedKeySet,
   readCachedRows,
   writeCached,
   STALE_AFTER,
@@ -33,7 +32,7 @@ import {
   selectMailBodiesToPrefetch,
   MAIL_HEADERS_PAGE_SIZE,
 } from '@/engine/mail';
-import { detailPrefetchAllowed, MAIL_BODY_PREFETCH_LIMIT, prefetchDetails } from './detailPrefetch';
+import { MAIL_BODY_PREFETCH_LIMIT, prefetchMissing } from './detailPrefetch';
 
 const KEYS = {
   headers: 'mail:headers',
@@ -191,34 +190,28 @@ export function loadMailBody(
 }
 
 /**
- * After a successful header sync: fetches and caches the bodies of the newest
- * mail (unread first) that are not cached yet, so the reader shows them
- * offline. A delivered body never changes, so a cached one is never fetched
- * again. Bounded, low-concurrency and skipped on a metered or save-data
- * connection (`detailPrefetch.ts`); never throws.
+ * After a header load that reached ESI: fetches and caches the bodies of the
+ * newest mail (unread first) that are not cached yet, so the reader shows
+ * them offline. A delivered body does not change, so a cached one is never
+ * fetched again. Bounds, gate and failure memory: `detailPrefetch.ts`.
  */
-export async function prefetchMailBodies(
+export function prefetchMailBodies(
   characterId: number,
   headers: readonly MailHeader[]
 ): Promise<void> {
-  if (!detailPrefetchAllowed()) return;
-  try {
-    const cachedKeys = await cachedKeySet(
-      characterId,
-      headers.map((header) => KEYS.body(header.mail_id))
-    );
-    if (cachedKeys === null) return;
-    const ids = selectMailBodiesToPrefetch(headers, {
-      ownerId: characterId,
-      cachedIds: new Set(
-        headers.map((h) => h.mail_id).filter((id) => cachedKeys.has(KEYS.body(id)))
-      ),
-      limit: MAIL_BODY_PREFETCH_LIMIT,
-    });
-    await prefetchDetails(ids, (mailId) => loadMailBody(characterId, mailId));
-  } catch {
-    // Warm-up only; see `prefetchDetails`.
-  }
+  return prefetchMissing({
+    kind: 'mail-body',
+    characterId,
+    allIds: headers.map((header) => header.mail_id),
+    keyOf: KEYS.body,
+    select: (skip) =>
+      selectMailBodiesToPrefetch(headers, {
+        ownerId: characterId,
+        cachedIds: skip,
+        limit: MAIL_BODY_PREFETCH_LIMIT,
+      }),
+    load: (mailId) => loadMailBody(characterId, mailId),
+  });
 }
 
 /**

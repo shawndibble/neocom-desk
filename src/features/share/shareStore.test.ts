@@ -136,6 +136,7 @@ describe('loadShare offline copy', () => {
   it('keeps a loaded share and serves it, labelled with when it was saved, when Firestore is unreachable', async () => {
     getDoc.mockResolvedValueOnce(live());
     await loadShare('abc123XYZ');
+    await vi.waitFor(async () => expect(await db.esiCache.count()).toBe(1));
 
     vi.setSystemTime(NOW + 30_000);
     getDoc.mockRejectedValueOnce(offline());
@@ -149,6 +150,7 @@ describe('loadShare offline copy', () => {
   it('does not serve the saved copy once the share has expired, and drops it', async () => {
     getDoc.mockResolvedValueOnce(live());
     await loadShare('abc123XYZ');
+    await vi.waitFor(async () => expect(await db.esiCache.count()).toBe(1));
 
     vi.setSystemTime(NOW + 60_000);
     getDoc.mockRejectedValueOnce(offline());
@@ -159,7 +161,55 @@ describe('loadShare offline copy', () => {
   it('drops the saved copy when the server says the share is gone', async () => {
     getDoc.mockResolvedValueOnce(live());
     await loadShare('abc123XYZ');
+    await vi.waitFor(async () => expect(await db.esiCache.count()).toBe(1));
     getDoc.mockResolvedValueOnce(stored(null));
+    expect(await loadShare('abc123XYZ')).toEqual({ ok: false, reason: 'not-found' });
+    expect(await db.esiCache.count()).toBe(0);
+  });
+
+  it('does not keep a Survey: its scans are not in the payload, so a copy would only mislead', async () => {
+    getDoc.mockResolvedValueOnce(
+      stored({ type: 'survey', payload: {}, expiresAt: FakeTimestamp.fromMillis(NOW + 60_000) })
+    );
+    expect(await loadShare('abc123XYZ')).toMatchObject({ ok: true });
+    await vi.waitFor(async () => expect(await db.esiCache.count()).toBe(0));
+    getDoc.mockRejectedValueOnce(offline());
+    expect(await loadShare('abc123XYZ')).toEqual({ ok: false, reason: 'failed' });
+  });
+
+  it('serves the copy only for a failure that means unreachable, not any error', async () => {
+    getDoc.mockResolvedValueOnce(live());
+    await loadShare('abc123XYZ');
+    await vi.waitFor(async () => expect(await db.esiCache.count()).toBe(1));
+
+    getDoc.mockRejectedValueOnce(Object.assign(new Error('boom'), { code: 'internal' }));
+    expect(await loadShare('abc123XYZ')).toEqual({ ok: false, reason: 'failed' });
+
+    getDoc.mockRejectedValueOnce(Object.assign(new Error('slow'), { code: 'deadline-exceeded' }));
+    expect(await loadShare('abc123XYZ')).toMatchObject({ ok: true, cachedAt: NOW });
+
+    getDoc.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    expect(await loadShare('abc123XYZ')).toMatchObject({ ok: true, cachedAt: NOW });
+  });
+
+  it('drops the saved copy when the rules refuse the read (permission-denied)', async () => {
+    getDoc.mockResolvedValueOnce(live());
+    await loadShare('abc123XYZ');
+    await vi.waitFor(async () => expect(await db.esiCache.count()).toBe(1));
+
+    getDoc.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    expect(await loadShare('abc123XYZ')).toEqual({ ok: false, reason: 'not-found' });
+    expect(await db.esiCache.count()).toBe(0);
+  });
+
+  it('drops the saved copy when the live doc has expired', async () => {
+    getDoc.mockResolvedValueOnce(live());
+    await loadShare('abc123XYZ');
+    await vi.waitFor(async () => expect(await db.esiCache.count()).toBe(1));
+
+    getDoc.mockResolvedValueOnce(
+      stored({ type: 'dscan', payload: {}, expiresAt: FakeTimestamp.fromMillis(NOW - 1) })
+    );
     expect(await loadShare('abc123XYZ')).toEqual({ ok: false, reason: 'not-found' });
     expect(await db.esiCache.count()).toBe(0);
   });

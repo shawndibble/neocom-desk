@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { db } from '@/db';
+import { resetDetailPrefetchForTests } from './detailPrefetch';
 import {
   loadMailHeaders,
   loadMailBody,
@@ -218,6 +219,7 @@ describe('prefetchMailBodies', () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    resetDetailPrefetchForTests();
   });
 
   it('caches the bodies of the newest mail so the reader has them offline, skipping cached ones', async () => {
@@ -247,6 +249,23 @@ describe('prefetchMailBodies', () => {
     vi.stubGlobal('navigator', { onLine: true, connection: { saveData: true } });
     await prefetchMailBodies(CHAR_ID, headers);
     expect(requested).toEqual([]);
+  });
+
+  it('does not ask again, this session, for a body that failed (deleted mail, a 403 or 404)', async () => {
+    let hits = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/30`, () => {
+        hits += 1;
+        return HttpResponse.json({ error: 'gone' }, { status: 404 });
+      })
+    );
+
+    await prefetchMailBodies(CHAR_ID, headers);
+    await prefetchMailBodies(CHAR_ID, headers);
+
+    expect(hits).toBe(1);
+    // The others were cached by the first run and are not asked for again either.
+    expect(requested.sort()).toEqual([10, 20]);
   });
 
   it('never rejects when a body cannot be fetched, and carries on with the rest', async () => {

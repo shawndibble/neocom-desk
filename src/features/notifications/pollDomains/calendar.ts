@@ -64,8 +64,10 @@ export const calendarDomain = defineDomain<
   load: async (characterId) => {
     const result = await loadCharacterCalendarEvents(characterId);
     if (result.needsReauth || result.cached === null) return null;
-    // The sync landed: keep the next fortnight's event details ready offline.
-    void prefetchCalendarEventDetails(characterId, result.cached.data);
+    // Only after a read that reached ESI (a cache hit or an offline fallback
+    // proves nothing landed); see `detailPrefetch.ts` for the triggers.
+    if (!result.cached.fromCache)
+      void prefetchCalendarEventDetails(characterId, result.cached.data);
     return result.cached.data;
   },
   toSnapshot: (events, nowMs) => ({
