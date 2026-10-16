@@ -179,8 +179,9 @@ export function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<Unive
  * One retry on a failed live call, paced by a short delay: unlike
  * typeNames.ts's POST /universe/names (a batch with a per-id fallback), every
  * caller here — notification item/skill names, and `typeDetail.ts`'s `retry`
- * fallback (required skills, hardpoints, implants, clipboard import) — resolves one type at a time, so a single transient failure would
- * silently drop just that lookup (an implant read "#12345", and its attribute
+ * fallback (required skills, hardpoints, implants, clipboard import) —
+ * resolves one type at a time, so a single transient failure would silently
+ * drop just that lookup (an implant read "#12345", and its attribute
  * bonus never reached the sum, reading the character's sheet as an
  * unexplainable "impossible" baseline). Retries indiscriminately rather than
  * narrowing by failure kind, since `loadWithCache` doesn't surface why a

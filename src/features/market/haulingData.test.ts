@@ -146,7 +146,7 @@ describe('runHaulingScan, selling into buy orders', () => {
       to: TO,
       typeIds: [34],
       scope: 4,
-      types: { '34': { name: 'Merlin' } } as never,
+      types: { '34': { name: 'Unlisted hull' } } as never,
       mode: 'instant',
     });
     expect(loadUniverseTypeOnce).not.toHaveBeenCalled();

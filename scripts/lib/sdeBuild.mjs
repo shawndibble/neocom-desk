@@ -44,16 +44,34 @@ export function ccpBuildFromSdeJsonl(text) {
   return build;
 }
 
-/** Rebuild only when both sources agree on a build newer than the baked one. */
-export function sdeUpdateDecision({ ccp, fuzzwork, baked }) {
+// Fuzzwork usually trails CCP by hours; past this, someone should look.
+const MAX_FUZZWORK_LAG_DAYS = 3;
+
+/**
+ * Rebuild only when both sources agree on a build newer than the baked one.
+ * `stale` when Fuzzwork has lagged a build the bake still lacks for longer than
+ * MAX_FUZZWORK_LAG_DAYS (`ccpAgeDays`: days since CCP shipped it).
+ */
+export function sdeUpdateDecision({ ccp, fuzzwork, baked, ccpAgeDays = 0 }) {
+  const behind = baked === null || baked < ccp;
   if (ccp !== fuzzwork) {
+    if (behind && ccpAgeDays > MAX_FUZZWORK_LAG_DAYS) {
+      return {
+        update: false,
+        stale: true,
+        reason: `Fuzzwork is still on ${fuzzwork}, ${ccpAgeDays} days after CCP shipped ${ccp}`,
+      };
+    }
     return {
       update: false,
+      stale: false,
       reason: `Fuzzwork is on ${fuzzwork}, CCP on ${ccp}: waiting for them to agree`,
     };
   }
-  if (baked !== null && baked >= ccp) {
-    return { update: false, reason: `build ${ccp} is already baked` };
-  }
-  return { update: true, reason: `build ${ccp} replaces ${baked ?? 'an unstamped bake'}` };
+  if (!behind) return { update: false, stale: false, reason: `build ${ccp} is already baked` };
+  return {
+    update: true,
+    stale: false,
+    reason: `build ${ccp} replaces ${baked ?? 'an unstamped bake'}`,
+  };
 }

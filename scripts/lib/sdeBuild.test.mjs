@@ -57,6 +57,7 @@ describe('sdeUpdateDecision', () => {
   it('rebuilds when CCP and Fuzzwork agree on a build newer than the baked one', () => {
     expect(sdeUpdateDecision({ ccp: 3607705, fuzzwork: 3607705, baked: 3586130 })).toEqual({
       update: true,
+      stale: false,
       reason: 'build 3607705 replaces 3586130',
     });
   });
@@ -66,15 +67,40 @@ describe('sdeUpdateDecision', () => {
   });
 
   it('waits while Fuzzwork lags CCP', () => {
-    expect(sdeUpdateDecision({ ccp: 3607705, fuzzwork: 3586130, baked: 3586130 })).toEqual({
+    expect(
+      sdeUpdateDecision({
+        ccp: 3607705,
+        fuzzwork: 3586130,
+        baked: 3586130,
+        ccpAgeDays: 1,
+      })
+    ).toEqual({
       update: false,
+      stale: false,
       reason: 'Fuzzwork is on 3586130, CCP on 3607705: waiting for them to agree',
     });
+  });
+
+  it('calls it stale once Fuzzwork has lagged a newer CCP build for over 3 days', () => {
+    expect(
+      sdeUpdateDecision({ ccp: 3607705, fuzzwork: 3586130, baked: 3586130, ccpAgeDays: 4 })
+    ).toEqual({
+      update: false,
+      stale: true,
+      reason: 'Fuzzwork is still on 3586130, 4 days after CCP shipped 3607705',
+    });
+  });
+
+  it('never calls a lag stale when the baked build is already current', () => {
+    expect(
+      sdeUpdateDecision({ ccp: 3607705, fuzzwork: 3586130, baked: 3607705, ccpAgeDays: 9 }).stale
+    ).toBe(false);
   });
 
   it('does nothing when the baked build is current', () => {
     expect(sdeUpdateDecision({ ccp: 3607705, fuzzwork: 3607705, baked: 3607705 })).toEqual({
       update: false,
+      stale: false,
       reason: 'build 3607705 is already baked',
     });
   });
