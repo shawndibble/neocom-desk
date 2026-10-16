@@ -97,7 +97,12 @@ const DELVE_REGION_ID = 10000060;
 // Jita: the game's busiest system, used as the jump graph's canary — if the
 // stargate join ever produces nothing, it shows up here first.
 const JITA_SYSTEM_ID = 30000142;
-const MARKET_REGIONS_MIN = 78;
+// Regions with live orders, as counted against ESI on 2026-10-15: 77 = 68
+// known-space + 9 wormhole (C-R00012 had emptied since the last bake's 10).
+// Wormhole markets sit in player structures and come and go, so the floor
+// tracks the stable known-space count, not the last total; a broken probe
+// lands near 0, not slightly off (issue #3891).
+const MARKET_REGIONS_MIN = 65;
 const MARKET_REGIONS_MAX = 116;
 // Ore, ice and moon-ore types carrying attribute 790 (Reprocessing Skill), as
 // counted against the bake on 2026-09-14: 338. A join that silently breaks
