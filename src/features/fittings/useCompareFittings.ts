@@ -12,6 +12,7 @@ import { decodeFittingShare, type DecodeFittingShareResult } from '@/engine/fitt
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { typeName } from '@/sde/loadSde';
+import { withCheckedMutations } from '@/features/abyssal/mutaplasmidData';
 
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
 
@@ -25,7 +26,8 @@ async function decodeSlot(code: string): Promise<CompareSlot> {
   const decoded: DecodeFittingShareResult = await decodeFittingShare(code);
   if (!decoded.ok) return { code, fitting: null, shareError: decoded.reason };
   const name = await typeName(decoded.value.hullTypeId);
-  return { code, fitting: shareToFitting(decoded.value, name), shareError: null };
+  const fitting = await withCheckedMutations(shareToFitting(decoded.value, name));
+  return { code, fitting, shareError: null };
 }
 
 /** One decoded slot per code, in the same order; `null` while a code's decode is in flight. */

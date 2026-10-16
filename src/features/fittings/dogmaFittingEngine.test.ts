@@ -23,6 +23,10 @@ vi.mock('@eveshipfit/dogma-engine', () => ({
   calculate: (fit: MockFit, options?: { validate?: boolean }) => calculateMock(fit, options),
   load_sde: (bytes: Uint8Array) => loadSdeMock(bytes),
 }));
+// Loaded alongside the engine; kept off the stubbed network these tests count.
+vi.mock('@/features/abyssal/mutaplasmidData', () => ({
+  loadMutaplasmidLookup: () => Promise.reject(new Error('not in these tests')),
+}));
 
 function fakeResponse(bytes: Uint8Array, contentLength?: number): Response {
   return new Response(new Blob([bytes.buffer as ArrayBuffer]), {

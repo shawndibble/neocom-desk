@@ -10,6 +10,7 @@ const groups = new Map([
   [18, { name: 'Mineral', categoryID: 4 }],
   [280, { name: 'General Freight', categoryID: 17 }],
   [1950, { name: 'Permanent SKIN', categoryID: 91 }],
+  [1964, { name: 'Mutaplasmids', categoryID: 17 }],
 ]);
 
 const type = (groupID, published = true) => ({ groupID, published });
@@ -31,6 +32,14 @@ describe('fitTypeIds', () => {
       [3, type(280)],
     ]);
     expect([...fitTypeIds(types, groups)].sort((a, b) => a - b)).toEqual([47762, 47889]);
+  });
+
+  it('takes mutaplasmids, named in an EFT mutation block (Pyfa)', () => {
+    const types = new Map([
+      [47299, type(1964)],
+      [3, type(280)],
+    ]);
+    expect([...fitTypeIds(types, groups)]).toEqual([47299]);
   });
 
   it('skips unpublished types, other categories, and types with no known group', () => {

@@ -13,8 +13,9 @@
  *   And Use jump bridges (issue #2478), with the Ansiblex list behind it:
  *   a device-local default, since the list itself never leaves the device.
  *
- * Those two groups sit behind one "More route options" disclosure (issue #3084),
- * closed by default, with an "N on" readout in its header while either is on.
+ * The Thera / Turnur switch sits in the panel itself; the rest of that group
+ * sits behind one "More route options" disclosure (issue #3084), closed by
+ * default, with an "N on" readout in its header while a rule in it is on.
  *
  * On a phone the panel folds above the route, with chips naming the rules on.
  */
@@ -181,6 +182,26 @@ function RouteJumpFields({
 
 const NO_SHIP = 'none';
 
+/** Route through Thera / Turnur: a plain switch; Browse open wormholes opens the modal. */
+function RouteHoleSwitch({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (change: RouteHoleChange) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
+      <Checkbox
+        checked={enabled}
+        onChange={() => onChange({ field: 'enabled', value: !enabled })}
+      />
+      {t('travel.holes.enabled')}
+    </label>
+  );
+}
+
 /** Settings → Travel (`bare`): fill the column on a phone, natural width from `md` up (issue #3252). */
 const bareFillClassName = 'md:inline-flex md:w-auto md:*:flex-none';
 
@@ -206,7 +227,10 @@ export function RouteHoleFields({
   nested?: boolean;
   /** Route Safety only: Settings → Travel has no jump drive legs to switch. */
   jump?: RouteJumpFieldsProps;
-  /** Route Safety only: opens the Thera / Turnur modal (Settings → Travel has none). */
+  /**
+   * Route Safety only: opens the Thera / Turnur modal (Settings → Travel has none).
+   * Route Safety draws the switch above its disclosure, so this shows the button in its place.
+   */
   onBrowseWormholes?: () => void;
 }) {
   const { t } = useTranslation();
@@ -224,32 +248,11 @@ export function RouteHoleFields({
     >
       {!bare && <GroupLabel>{t('travel.holes.group')}</GroupLabel>}
       {onBrowseWormholes ? (
-        <>
-          {/* The switch toggles; the label beside it is a button that opens the modal (a window that only shows a list: no "…"). */}
-          <div className="flex items-center gap-2 font-semibold">
-            <label className={tappableRowClassName}>
-              <Checkbox
-                checked={enabled}
-                aria-label={t('travel.holes.enabled')}
-                onChange={() => onChange({ field: 'enabled', value: !enabled })}
-              />
-            </label>
-            <Button size="sm" variant="ghost" aria-haspopup="dialog" onClick={onBrowseWormholes}>
-              {t('travel.holes.enabled')}
-            </Button>
-          </div>
-          <Button size="sm" onClick={onBrowseWormholes}>
-            {t('travel.holes.browse')}
-          </Button>
-        </>
+        <Button size="sm" onClick={onBrowseWormholes}>
+          {t('travel.holes.browse')}
+        </Button>
       ) : (
-        <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
-          <Checkbox
-            checked={enabled}
-            onChange={() => onChange({ field: 'enabled', value: !enabled })}
-          />
-          {t('travel.holes.enabled')}
-        </label>
+        <RouteHoleSwitch enabled={enabled} onChange={onChange} />
       )}
       <div className="space-y-1.5">
         <p className="font-semibold">
@@ -443,10 +446,7 @@ export function RouteRulesPanel({
   const { settingsHydrated, podKillsUnavailable } = useRouteRules();
   const avoidedCount = useAvoidedSystems((state) => state.value.length);
   const { ship } = useRouteShipMass();
-  const moreOn =
-    Number(holeQuery.enabled) +
-    Number(bridges.bridgeQuery.enabled) +
-    Number(jump.enabled && ship?.drive != null);
+  const moreOn = Number(bridges.bridgeQuery.enabled) + Number(jump.enabled && ship?.drive != null);
 
   return (
     <CollapsiblePanel
@@ -497,6 +497,8 @@ export function RouteRulesPanel({
               switchLabel={t('travel.rules.avoidedSystems', { count: avoidedCount })}
             />
           </section>
+
+          <RouteHoleSwitch enabled={holeQuery.enabled} onChange={onHoleChange} />
 
           <Disclosure
             label={t('travel.rules.more')}

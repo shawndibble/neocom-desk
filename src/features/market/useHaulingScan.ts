@@ -32,7 +32,9 @@ export function useHaulingScan(
   to: HaulingEnd,
   categoryId: number,
   mode: HaulMode,
-  enabled = true
+  enabled = true,
+  /** Max price per item; null for none. */
+  maxUnitPrice: number | null = null
 ): { state: HaulingScanState; refresh: () => void } {
   const [state, setState] = useState<HaulingScanState>({ status: 'loading', progress: null });
   const [attempt, setAttempt] = useState(0);
@@ -50,6 +52,7 @@ export function useHaulingScan(
             to,
             mode,
             scope: categoryId,
+            maxUnitPrice,
             typeIds: (groups, marketTypes) =>
               typeIdsInHaulingCategory(categoryId, groups, marketTypes),
           },
@@ -66,7 +69,7 @@ export function useHaulingScan(
       }
     })();
     return () => controller.abort();
-  }, [from, to, categoryId, mode, enabled, attempt]);
+  }, [from, to, categoryId, mode, enabled, maxUnitPrice, attempt]);
 
   const refresh = useCallback(() => {
     clearHaulingScanCache();

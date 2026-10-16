@@ -79,6 +79,7 @@ export function Tabs({
   className = '',
   activation = 'automatic',
 }: TabsProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   // Only consulted in 'manual' mode, where the roving tab stop tracks
   // keyboard focus rather than `value` — arrowing around must not select
@@ -94,14 +95,24 @@ export function Tabs({
    * see, and `.focus()` scrolls to what it focuses), so this is only for the
    * case nothing else covers.
    *
-   * `block: 'nearest'` is load-bearing: the default `'start'` would scroll the
-   * page vertically to put the tab bar at the top, which is not what changing
-   * a tab asked for.
+   * Slides only the bar's own `scrollLeft`, never `scrollIntoView`: that
+   * scrolls every ancestor too, even with `block: 'nearest'`, so a bar below
+   * the fold dragged the whole page down to it on load (the landing page's
+   * feature tabs). Honours the bar's `scroll-padding-inline` as
+   * `scrollIntoView` did, so the tab stops clear of the edge fade.
    */
   useEffect(() => {
-    listRef.current
-      ?.querySelector<HTMLButtonElement>(`[data-tab-id="${focusedId}"]`)
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const scroller = scrollerRef.current;
+    const tab = listRef.current?.querySelector(`[data-tab-id="${focusedId}"]`);
+    if (!scroller || !tab) return;
+    const bar = scroller.getBoundingClientRect();
+    const style = getComputedStyle(scroller);
+    // `auto` (no padding set) parses to NaN.
+    const start = bar.left + (parseFloat(style.scrollPaddingLeft) || 0);
+    const end = bar.right - (parseFloat(style.scrollPaddingRight) || 0);
+    const item = tab.getBoundingClientRect();
+    if (item.left < start) scroller.scrollLeft -= start - item.left;
+    else if (item.right > end) scroller.scrollLeft += item.right - end;
   }, [focusedId]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -122,7 +133,7 @@ export function Tabs({
     // `className` lands on the scroller, not the tablist: callers pass spacing
     // (`mt-3`), and margin on the inner bar would be measured inside the
     // scrollport.
-    <div className={cx(tabScrollerClassName, className)}>
+    <div ref={scrollerRef} className={cx(tabScrollerClassName, className)}>
       <div
         ref={listRef}
         role="tablist"

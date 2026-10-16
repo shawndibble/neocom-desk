@@ -13,7 +13,7 @@
 import { sdeDataUrl } from './sdeDataUrl';
 import { currentWarmLevel } from '@/lib/lazyAssetWarmGate';
 import { fetchWithIdleTimeout } from '@/lib/idleTimeout';
-import { LAZY_SDE_FILES } from './lazySdeFiles';
+import { LAZY_SDE_FILES, LAZY_SDE_PRIORITY_COUNT } from './lazySdeFiles';
 
 export { LAZY_SDE_FILES };
 
@@ -76,6 +76,28 @@ function warmFile(file: string): Promise<boolean> {
   return started;
 }
 
+async function warmEngine(): Promise<void> {
+  const { warmDogmaEngineAssets } = await import('@/features/fittings/dogmaFittingEngine');
+  await warmDogmaEngineAssets();
+}
+
+/**
+ * The Fittings page was opened: fetch the dogma engine now rather than wait
+ * for the idle warm. Only where the gate says `all` (online, not Save-Data,
+ * not cellular, not slow): on cellular the Fittings notice keeps its explicit
+ * download button. Shares `warmDogmaEngineAssets`' in-flight fetch and skips a
+ * cached engine, so a second visit or a running idle warm costs nothing.
+ * (The catalogue files are precached, so only the engine is on demand.)
+ */
+export async function warmFittingAssets(): Promise<void> {
+  if (currentWarmLevel() !== 'all') return;
+  try {
+    await warmEngine();
+  } catch {
+    // Reported through the engine status when the real load runs.
+  }
+}
+
 export interface WarmOptions {
   /**
    * A pilot asked for everything ("Download everything for offline"): skip the
@@ -112,9 +134,9 @@ export async function warmLazySde(
   try {
     const controlled = hasControllingServiceWorker();
     if (!controlled && !force) return failed;
-    if (controlled) {
-      for (const file of LAZY_SDE_FILES) {
-        if (signal.cancelled || level() === 'none') return failed;
+    const warmFiles = async (files: readonly string[]): Promise<boolean> => {
+      for (const file of files) {
+        if (signal.cancelled || level() === 'none') return false;
         try {
           if (!(await warmFile(file))) failed.push(file);
         } catch {
@@ -122,16 +144,22 @@ export async function warmLazySde(
         }
         onProgress?.(++done, LAZY_ASSET_TOTAL);
       }
+      return true;
+    };
+    // The engine sits after the priority files, ahead of the low-value rest.
+    if (controlled && !(await warmFiles(LAZY_SDE_FILES.slice(0, LAZY_SDE_PRIORITY_COUNT)))) {
+      return failed;
     }
-    if (signal.cancelled || level() !== 'all') return failed;
-    try {
-      const { warmDogmaEngineAssets } = await import('@/features/fittings/dogmaFittingEngine');
-      await warmDogmaEngineAssets();
-    } catch {
-      // A chunk that would not load (offline mid-deploy): the engine is reported, never retry-looped.
-      failed.push(ENGINE_ITEM);
+    if (!signal.cancelled && level() === 'all') {
+      try {
+        await warmEngine();
+      } catch {
+        // A chunk that would not load (offline mid-deploy): the engine is reported, never retry-looped.
+        failed.push(ENGINE_ITEM);
+      }
     }
-    onProgress?.(LAZY_ASSET_TOTAL, LAZY_ASSET_TOTAL);
+    onProgress?.(controlled ? ++done : LAZY_ASSET_TOTAL, LAZY_ASSET_TOTAL);
+    if (controlled) await warmFiles(LAZY_SDE_FILES.slice(LAZY_SDE_PRIORITY_COUNT));
   } catch {
     // The engine import or warm failed: lose it, never retry-loop.
   }

@@ -1,0 +1,7 @@
+# Scope decisions — Market catalogue files are precached; lazy warm fetches the dogma engine early
+
+_Recorded 2026-10-15._
+
+- **`market/types.json` (1.8 MB raw, 226 KB gzip), `market/stations.json` (0.8 MB, 84 KB) and `market/variations.json` (0.5 MB, 48 KB) join the install precache; about 3.1 MB raw, 358 KB over the wire.** Amends `20261015-225232-core-feature-sde-files-are-precached-for-offline.md`, which kept them lazy for the Market Browser. The Fittings add panel and catalogue, Show Info and station names read them, and a device that never opened those views had none of them offline. They come out of `LAZY_SDE_FILES` (one list, so the warm and the precache ignores stay in step).
+- **Warm order: the 64 `typeInfo` shards, then the dogma engine, then `masteries`, `typeNames`, `pi-*`, `reprocessing`, `marketWideTrees`.** A short session now reaches the engine (it unlocks Fittings stats) before the low-value files. The Save-Data / cellular / slow-network gate is unchanged: the engine is still only fetched at level `all`.
+- **Opening Fittings online fetches the dogma engine at once (`warmFittingAssets`)** instead of waiting for the ~90 s idle warm, under the same gate: on cellular, Save-Data or a slow link it does nothing and the Fittings notice keeps its explicit download button. It shares `warmDogmaEngineAssets`' in-flight fetch and skips a cached engine, so it never double-fetches. A reconnect already re-queues the warm (`reconnectRecovery.ts`), and one failed file never stops the rest.

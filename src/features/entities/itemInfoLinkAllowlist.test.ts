@@ -16,6 +16,7 @@ const REVIEWED = new Set<string>([
   'src/features/corp/CorpBoardRow.tsx',
   'src/features/corp/CorpRoster.tsx',
   'src/features/corp/CorpTransactionsPanel.tsx',
+  'src/features/fittings/AbyssalRunPlanner.tsx',
   'src/features/fittings/FittingFightersPanel.tsx',
   'src/features/fittings/FittingModuleList.tsx',
   'src/features/fittings/FittingPreviewPanels.tsx',

@@ -13,7 +13,7 @@ import {
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
-import { loadUniverseType } from '../data';
+import { loadTypeDetail } from '../typeDetail';
 import { loadItemNameMap, loadSkillNameMap } from '../typeCatalog';
 import { previewClipboardImport, type ClipboardImportPreview } from './clipboardImport';
 import { previewPlanXmlImport } from './planXmlImport';
@@ -106,7 +106,7 @@ export function ImportClipboardDialog({
       const result = await previewClipboardImport(source, {
         skillByName,
         typeByName,
-        loadType: loadUniverseType,
+        loadType: (typeId) => loadTypeDetail(typeId, { retry: true }),
       });
       setPreview(result);
     } finally {

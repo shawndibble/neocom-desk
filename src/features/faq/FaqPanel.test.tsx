@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { ARCHIVE_DAYS } from '@/engine/wallet/archiveCoverage';
 import { AUTHORIZED_APPS_URL } from '@/lib/links';
 import { REMOTE_COLLECTIONS } from '@/sync/syncedCollections';
 import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
@@ -301,6 +302,12 @@ describe('FaqPanel: Communities', () => {
       screen.getByText(/Delete all data also offers to leave your Communities/)
     ).toBeInTheDocument();
     expect(screen.getByText(/A Community's admin can't leave/)).toBeInTheDocument();
+  });
+
+  it('keeps the wallet archive retention equal to the days the archive prunes at', () => {
+    expect(ARCHIVE_DAYS).toBe(365);
+    renderFaq();
+    expect(document.body.textContent).toMatch(/Wallet journal and transactions:\s*one year\./);
   });
 
   it('keeps the Community retention numbers equal to the code that enforces them', () => {

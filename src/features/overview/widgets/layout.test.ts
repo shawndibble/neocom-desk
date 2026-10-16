@@ -16,7 +16,9 @@ import {
   resizeWidgetUndoable,
   restoreLayout,
   setRange,
+  setPlexPer30Days,
   setRowsPerPage,
+  newWidget,
   setScope,
   setShowOnPhone,
   setView,
@@ -186,6 +188,29 @@ describe('setRange', () => {
     const l = layoutOf(w('a', 'wallet', { range: 30 }), w('b', 'orders'));
     expect(setRange(l, 'a', 7).widgets[0].range).toBe(7);
     expect(setRange(l, 'b', 7)).toBe(l);
+  });
+});
+
+describe('setPlexPer30Days', () => {
+  it('a new Omega coverage widget reads every Character; other kinds the header', () => {
+    expect(newWidget('omega', 'a')!.scope).toBe('all');
+    expect(newWidget('orders', 'a')!.scope).toBe('header');
+  });
+
+  it('stores a non-default plan and drops the field when it goes back to 500', () => {
+    const l = layoutOf(w('a', 'omega'));
+    const plan = setPlexPer30Days(l, 'a', 1200);
+    expect(plan.widgets[0].plexPer30Days).toBe(1200);
+    expect('plexPer30Days' in setPlexPer30Days(plan, 'a', 500).widgets[0]).toBe(false);
+  });
+
+  it('changes nothing for the default, a bad plan or a kind with no plan', () => {
+    const l = layoutOf(w('a', 'omega'), w('b', 'orders'));
+    expect(setPlexPer30Days(l, 'a', 500)).toBe(l);
+    expect(setPlexPer30Days(l, 'a', 0)).toBe(l);
+    expect(setPlexPer30Days(l, 'a', 1.5)).toBe(l);
+    expect(setPlexPer30Days(l, 'a', 99999)).toBe(l);
+    expect(setPlexPer30Days(l, 'b', 700)).toBe(l);
   });
 });
 

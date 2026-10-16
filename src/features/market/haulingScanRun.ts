@@ -21,6 +21,8 @@ export interface HaulingScanTarget {
   mode: HaulMode;
   /** See `HaulingScanRequest.scope`. */
   scope: number | string;
+  /** See `HaulingScanRequest.maxUnitPrice`. */
+  maxUnitPrice?: number | null;
   typeIds: (
     groups: readonly MarketGroupNode[],
     marketTypes: readonly MarketTypeEntry[]
@@ -45,6 +47,7 @@ export async function scanHaulingLane(
     typeIds: target.typeIds(groups, marketTypes),
     scope: target.scope,
     mode: target.mode,
+    maxUnitPrice: target.maxUnitPrice,
     types,
     groupCategories,
     signal,

@@ -1,5 +1,6 @@
 // typeInfo/<n>.json: every published type's description, dogma attributes and
-// volume, shaped as ESI's /universe/types/{id} (issue #3882). Source is CCP
+// effects, volume and packaged volume, shaped as ESI's /universe/types/{id}
+// (issues #3882, #3884). Source is CCP
 // JSONL, not Fuzzwork CSV: its valueFloat rounds (Rifter attr 124: 16777200,
 // not 16777215).
 
@@ -25,12 +26,14 @@ const TYPE_ROW_ATTRIBUTES = [
 
 /**
  * TYPE_INFO_SHARD_COUNT shards, each type id -> `{ description, attributes:
- * [[id, value]...], volume? }`, published only; an empty bucket is `{}` so
+ * [[id, value]...], effects: [id...], defaultEffect?, volume?, packagedVolume? }`,
+ * published only; packagedVolume only where it differs from volume (the app
+ * reads `packaged ?? volume`, as ESI's own). An empty bucket is `{}` so
  * every listed file exists. `types`/`typeDogma` are parsed
  * `types.jsonl`/`typeDogma.jsonl` records.
  */
 export function bakeTypeInfoShards(types, typeDogma) {
-  const dogmaByType = new Map(typeDogma.map((r) => [r._key, r.dogmaAttributes ?? []]));
+  const dogmaByType = new Map(typeDogma.map((r) => [r._key, r]));
   const shards = Array.from({ length: TYPE_INFO_SHARD_COUNT }, () => ({}));
   const published = types.filter((t) => t.published).sort((a, b) => a._key - b._key);
   for (const t of published) {
@@ -45,16 +48,23 @@ export function bakeTypeInfoShards(types, typeDogma) {
     // (Tritanium), type-row ones included.
     const attributes = [];
     if (dogma) {
-      const byId = new Map(dogma.map((a) => [a.attributeID, a.value]));
+      const byId = new Map((dogma.dogmaAttributes ?? []).map((a) => [a.attributeID, a.value]));
       for (const [id, field, fallback] of TYPE_ROW_ATTRIBUTES) byId.set(id, t[field] ?? fallback);
       attributes.push(...[...byId].sort((a, b) => a[0] - b[0]));
     }
     // CCP's export uses `\n`; ESI, which EveMarkupText was built against, `\r\n`.
+    const effects = dogma?.dogmaEffects ?? [];
     const record = {
       description: (t.description?.en ?? '').replace(/\r?\n/g, '\r\n'),
       attributes,
+      effects: effects.map((e) => e.effectID).sort((a, b) => a - b),
     };
+    const defaultEffect = effects.find((e) => e.isDefault)?.effectID;
+    if (defaultEffect !== undefined) record.defaultEffect = defaultEffect;
     if (t.volume !== undefined) record.volume = t.volume;
+    if (t.packagedVolume !== undefined && t.packagedVolume !== t.volume) {
+      record.packagedVolume = t.packagedVolume;
+    }
     shards[shard][t._key] = record;
   }
   return shards;

@@ -353,6 +353,36 @@ export function getUniverseType(
   });
 }
 
+// --- GET /dogma/dynamic/items/{type_id}/{item_id} (public) ---
+
+/**
+ * One mutated item's base, mutaplasmid and full dogma set, absolute values
+ * (live 2026-10-16: 23 attributes on a Heavy Abyssal Neut, not only the rolls).
+ * A non-mutated id answers 400 against ESI's error limit: fetch through
+ * `features/abyssal/dynamicItems.ts`.
+ */
+export interface DynamicItem {
+  /** Character id of the pilot who applied the mutaplasmid. */
+  created_by: number;
+  /** The base module or drone type. */
+  source_type_id: number;
+  /** The mutaplasmid type. */
+  mutator_type_id: number;
+  dogma_attributes: DogmaAttribute[];
+  dogma_effects: { effect_id: number; is_default: boolean }[];
+}
+
+export function getDogmaDynamicItem(
+  typeId: number,
+  itemId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<DynamicItem>> {
+  return esiFetch<DynamicItem>(`/dogma/dynamic/items/${typeId}/${itemId}`, {
+    ...options,
+    endpointId: 'getDogmaDynamicItem',
+  });
+}
+
 // --- GET /universe/groups/{group_id} (public) ---
 
 /**

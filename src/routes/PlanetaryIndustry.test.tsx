@@ -615,17 +615,15 @@ describe('PlanetaryIndustry', () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
         HttpResponse.json(roleCardsDetailPayload)
-      ),
-      http.get(`${ESI}/universe/schematics/${SCHEMATIC_ID}`, () =>
-        HttpResponse.json({ schematic_name: 'Plasmoids', cycle_time: 1800 })
       )
+      // No ESI schematic handler: the name comes from the bundled pi.json.
     );
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
     const region = within(panel).getByRole('region');
     // Two Basic Industry Facility pins running the same schematic collapse
     // into one row, not two identical ones.
-    expect(within(region).getByText('Plasmoids')).toBeInTheDocument();
+    expect(within(region).getByText('Bacteria')).toBeInTheDocument();
     expect(within(region).getByText(/^2×/)).toBeInTheDocument();
   });
 

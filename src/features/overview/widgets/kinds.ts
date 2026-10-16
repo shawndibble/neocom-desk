@@ -34,6 +34,8 @@ export interface WidgetKindDef {
   defaultView: WidgetView;
   /** Whether the kind reads a time window (7 / 30 / 90 days). */
   hasRange: boolean;
+  /** Whether the kind reads the pilot's Omega plan (PLEX per 30 days), a per-widget setting. */
+  hasPlexPlan: boolean;
   /** ESI endpoints the kind needs, for the "needs permission" state. */
   endpoints: readonly EsiEndpointId[];
   emptyMessageKey: string;
@@ -50,6 +52,7 @@ interface Spec {
   view: WidgetView;
   size: WidgetSize;
   range?: true;
+  plexPlan?: true;
   soon?: true;
   endpoints: readonly EsiEndpointId[];
 }
@@ -139,6 +142,14 @@ const SPECS: Record<string, Spec> = {
     view: 'table',
     size: 'M',
     endpoints: ['getCharacterOrders'],
+  },
+  omega: {
+    category: 'money',
+    views: NCT,
+    view: 'chart',
+    size: 'M',
+    plexPlan: true,
+    endpoints: ['getCharacterWalletJournal', 'getCharacterWalletTransactions'],
   },
   lp: {
     category: 'money',
@@ -266,6 +277,7 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(SPECS).map(
   defaultSize: s.size,
   defaultView: s.view,
   hasRange: s.range === true,
+  hasPlexPlan: s.plexPlan === true,
   endpoints: s.endpoints,
   emptyMessageKey: `overview.widgets.${id}.empty`,
   availability: s.soon ? 'comingSoon' : 'available',

@@ -6,12 +6,20 @@
  *
  * Ships are left out for now: a hull's hauled (packaged) volume differs from
  * the assembled one the catalogue carries, and getting it wrong would mislead
- * the one number the Trip Plan rests on.
+ * the one number the Trip Plan rests on. So are the groups with no useful
+ * volume to haul: Blueprints & Reactions, Skills, Ship SKINs, Apparel,
+ * Personalization, Special Edition Assets and Pilot's Services.
  */
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
-/** Market Group ids, by name in the SDE: Ammunition & Charges, Ship Equipment, Drones, Implants & Boosters, Trade Goods, Ship and Module Modifications, Planetary Infrastructure. */
-export const HAULING_CATEGORY_IDS = [11, 9, 157, 24, 19, 955, 1320] as const;
+/**
+ * Market Group ids, by name in the SDE: Ammunition & Charges, Ship Equipment,
+ * Drones, Implants & Boosters, Trade Goods, Ship and Module Modifications,
+ * Planetary Infrastructure, Manufacture & Research (minerals, planetary
+ * commodities, fuel blocks, ice products), Structures (deployables),
+ * Structure Modifications (rigs) and Structure Equipment.
+ */
+export const HAULING_CATEGORY_IDS = [11, 9, 157, 24, 19, 955, 1320, 475, 477, 2203, 2202] as const;
 
 /** Not a Market Group: _Everything_ scans every offered category at once — still no ships. */
 export const EVERYTHING_CATEGORY_ID = 0;
@@ -35,23 +43,6 @@ export function typeIdsInHaulingCategory(
     categoryId === EVERYTHING_CATEGORY_ID ? HAULING_CATEGORY_IDS : [categoryId],
     groups,
     types
-  );
-}
-
-/**
- * The type ids of every offered category but `categoryId`, ascending: what a
- * fill from other categories scans. Empty for Everything, which has none
- * left. A set difference, so a category nested under another never leaks in.
- */
-export function typeIdsOutsideHaulingCategory(
-  categoryId: number,
-  groups: readonly MarketGroupNode[],
-  types: readonly MarketTypeEntry[]
-): number[] {
-  if (categoryId === EVERYTHING_CATEGORY_ID) return [];
-  const inside = new Set(typeIdsInHaulingCategory(categoryId, groups, types));
-  return typeIdsInHaulingCategory(EVERYTHING_CATEGORY_ID, groups, types).filter(
-    (id) => !inside.has(id)
   );
 }
 

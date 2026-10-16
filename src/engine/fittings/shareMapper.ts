@@ -28,6 +28,9 @@
  * `{implants: [], boosters: []}` staying distinct the way
  * `fittingShare.ts`'s own codec keeps them.
  *
+ * A mutated module's or drone's `ItemMutation` rides version 3's mutations
+ * section as it is; the codec's `ShareMutation` is the same shape.
+ *
  * A `Fitting`'s name rides the version-2 payload (#1718). Version-1 links
  * carry none, so `shareToFitting` still takes a fallback name — callers pass
  * the hull name — used whenever the decoded share has no name of its own.
@@ -66,6 +69,7 @@ export function fittingToShareInput(fitting: Fitting): FittingShareInput {
       typeId: module.typeId,
       state: module.state,
       ...(module.chargeTypeId === undefined ? {} : { chargeTypeId: module.chargeTypeId }),
+      ...(module.mutation === undefined ? {} : { mutation: module.mutation }),
     });
   }
 
@@ -76,6 +80,7 @@ export function fittingToShareInput(fitting: Fitting): FittingShareInput {
       typeId: drone.typeId,
       count: drone.quantity,
       active: drone.state === 'active' ? drone.quantity : 0,
+      ...(drone.mutation === undefined ? {} : { mutation: drone.mutation }),
     })),
     fighters: (fitting.fighters ?? []).map((fighter) => ({
       typeId: fighter.typeId,
@@ -107,6 +112,7 @@ export function shareToFitting(decoded: FittingShareInput, fallbackName: string)
       typeId: entry.typeId,
       state: entry.state,
       ...(entry.chargeTypeId === undefined ? {} : { chargeTypeId: entry.chargeTypeId }),
+      ...(entry.mutation === undefined ? {} : { mutation: entry.mutation }),
     }))
   );
 
@@ -118,6 +124,7 @@ export function shareToFitting(decoded: FittingShareInput, fallbackName: string)
       typeId: drone.typeId,
       quantity: drone.count,
       state: drone.active > 0 ? 'active' : 'online',
+      ...(drone.mutation === undefined ? {} : { mutation: drone.mutation }),
     })),
     cargo: decoded.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
     ...(decoded.fighters.length === 0

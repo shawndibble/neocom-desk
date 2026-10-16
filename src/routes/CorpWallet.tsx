@@ -55,6 +55,7 @@ import type {
   WalletJournalEntry,
 } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
+import type { JournalRow } from '@/engine/journalNetting';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
@@ -284,7 +285,7 @@ interface CorpJournalPanelProps {
   journalResult: CachedResult<WalletJournalEntry[]> | null;
   journal: readonly WalletJournalEntry[];
   loading: boolean;
-  journalColumns: DataTableColumn<WalletJournalEntry>[];
+  journalColumns: DataTableColumn<JournalRow>[];
   filter: WalletJournalFilter;
   rowsFilter: WalletJournalFilter;
   onFilterChange: (filter: WalletJournalFilter) => void;
@@ -292,6 +293,9 @@ interface CorpJournalPanelProps {
   onSortChange: (sort: DataTableSort) => void;
   divisionQualifier: string | undefined;
   refreshFailed: boolean;
+  /** "Where the ISK went" side panel; its state lives on the page, which shifts aside for it. */
+  iskPanelOpen: boolean;
+  onIskPanelOpenChange: (open: boolean) => void;
 }
 
 function CorpJournalPanel({
@@ -306,12 +310,12 @@ function CorpJournalPanel({
   onSortChange,
   divisionQualifier,
   refreshFailed,
+  iskPanelOpen,
+  onIskPanelOpenChange,
 }: CorpJournalPanelProps) {
   const { t } = useTranslation();
-  const { filteredJournal, breakdownJournal, refTypeOptions } = useJournalFilterResult(
-    journal,
-    rowsFilter
-  );
+  const { filteredJournal, breakdownJournal, chartJournal, refTypeOptions } =
+    useJournalFilterResult(journal, rowsFilter);
   const journalCsvColumns = useMemo(() => walletJournalCsvColumns(t), [t]);
   // Named after the division, so exporting two divisions never overwrites the
   // same file (issue #413).
@@ -374,11 +378,17 @@ function CorpJournalPanel({
             refTypeOptions={refTypeOptions}
             filteredJournal={filteredJournal}
             breakdownJournal={breakdownJournal}
+            chartJournal={chartJournal}
             journalColumns={journalColumns}
             label={t('wallet.journalTab')}
             sort={sort}
             onSortChange={onSortChange}
             tableExport={journalExport}
+            panel={{
+              open: iskPanelOpen,
+              onOpenChange: onIskPanelOpenChange,
+              scopeLabel: t('character.scope.corp', { division: divisionQualifier ?? '' }),
+            }}
           />
         </>
       )}
@@ -396,6 +406,7 @@ function CorpWalletView() {
   const corporationId = corporationIdState ?? null;
   const corpPending = corporationIdState === undefined;
   const [view, setView] = useUrlParam('view', VIEW_PARAM);
+  const [iskPanelOpen, setIskPanelOpen] = useState(false);
 
   // Corp Transactions' item context menu (issue #817) — same Quickbar/Item
   // Detail plumbing as every other item table.
@@ -528,7 +539,13 @@ function CorpWalletView() {
 
   return (
     <ItemActionsProvider page={itemActions}>
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div
+        className={cx(
+          'mx-auto max-w-6xl space-y-4',
+          // Same shift as `/wallet`: 26rem = SlideOver's 25rem max width plus a 1rem gutter.
+          view === 'journal' && iskPanelOpen && 'md:mr-[26rem] md:ml-0'
+        )}
+      >
         <PageHeader
           title={t('corp.wallet.title')}
           subNav={<CorpSubNav flush />}
@@ -577,6 +594,8 @@ function CorpWalletView() {
             onSortChange={journalSortProps.onSortChange}
             divisionQualifier={divisionQualifier}
             refreshFailed={corpJournal.refreshCount > 0}
+            iskPanelOpen={iskPanelOpen}
+            onIskPanelOpenChange={setIskPanelOpen}
           />
         ) : (
           <CorpTransactionsPanel

@@ -33,6 +33,9 @@ describe('LAZY_SDE_FILES', () => {
     expect(precached).toContain('blueprints.json');
     expect(precached).toContain('shipTree.json');
     expect(precached).toContain('market/systemPositions.json');
+    // The Fittings / Show Info catalogue: ~360 KB gzip together, precached so it needs no warm.
+    for (const f of ['market/types.json', 'market/stations.json', 'market/variations.json'])
+      expect(precached).toContain(f);
     for (const file of precached) {
       expect(statSync(join(dataDir, file)).size, file).toBeLessThan(PRECACHE_MAX_BYTES);
     }

@@ -27,6 +27,18 @@ export type FittingItemState = 'offline' | 'online' | 'active' | 'overload';
 /** A fitted module as a fit row's rack icon strip draws it: just its rack and type. */
 export type RackModule = Pick<FittingModule, 'slot' | 'typeId'>;
 
+/**
+ * How a mutated item was made and what it rolled (GLOSSARY **Mutated module**).
+ * The item's `typeId` is the abyssal type; `baseTypeId` what the engine starts
+ * from. `attributes`: absolute rolled values by attribute id, only those the
+ * mutaplasmid rolls (`normaliseMutation`); empty means rolls unknown.
+ */
+export interface ItemMutation {
+  baseTypeId: number;
+  mutaplasmidTypeId: number;
+  attributes: Readonly<Record<number, number>>;
+}
+
 export interface FittingModule {
   slot: FittingSlotKind;
   /** Position within the slot's own rack, starting at 0. */
@@ -43,6 +55,8 @@ export interface FittingModule {
    * reopened Fitting has none.
    */
   chargeQuantity?: number;
+  /** Set on a mutated (abyssal) module whose base is known; see `ItemMutation`. */
+  mutation?: ItemMutation;
 }
 
 /**
@@ -64,6 +78,8 @@ export interface FittingDrone {
   quantity: number;
   /** Launched and engaging, vs. sitting in the bay. */
   state: 'online' | 'active';
+  /** A mutated drone's make and rolls: each is its own item, so `quantity` 1, never merged. */
+  mutation?: ItemMutation;
 }
 
 /** One fighter squadron: its size, and whether it is launched from a tube or waits in the bay. */

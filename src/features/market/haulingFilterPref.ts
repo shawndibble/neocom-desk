@@ -1,6 +1,7 @@
 /**
- * The Hauling tab's "Sells within" / "Margin over" / "Demand" filter,
- * remembered across sessions (issue: hauling toolbar redesign).
+ * The Hauling tab's "Sells within" / "Margin over" / "Demand" / "Max price
+ * per item" filter, remembered across sessions. Max spend lives in the
+ * `haulingBudget` store (`haulingCargo.ts`).
  *
  * URL wins whenever present (scope decision `20260922-221531` / ADR 0015):
  * this setting is consulted only for the fields a link leaves unset.
@@ -21,6 +22,8 @@ export interface StoredHaulingFilter {
   days: number;
   margin: number;
   demand: HaulingDemandFilter;
+  /** Max price per item, whole ISK; null is no limit. Named as its URL param, which `useRememberedUrlParams` keys on. */
+  maxprice: number | null;
 }
 
 /** The filter a hauler who has never touched it sees — matches the URL codecs' own defaults. */
@@ -28,6 +31,7 @@ export const DEFAULT_HAULING_FILTER: StoredHaulingFilter = {
   days: 14,
   margin: 3,
   demand: 'steady',
+  maxprice: null,
 };
 
 export function parseStoredHaulingFilter(raw: unknown): StoredHaulingFilter | null {
@@ -38,7 +42,12 @@ export function parseStoredHaulingFilter(raw: unknown): StoredHaulingFilter | nu
   const demand = record.demand;
   if (typeof days !== 'number' || typeof margin !== 'number') return null;
   if (demand !== 'steady' && demand !== 'any') return null;
-  return { days, margin, demand };
+  // Absent in a filter stored before Max price existed: that reads as no limit.
+  const maxprice =
+    Number.isSafeInteger(record.maxprice) && (record.maxprice as number) > 0
+      ? (record.maxprice as number)
+      : null;
+  return { days, margin, demand, maxprice };
 }
 
 export const useHaulingFilterPref = createLocalSetting<StoredHaulingFilter>({
