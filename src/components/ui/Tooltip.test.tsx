@@ -54,6 +54,29 @@ describe('Tooltip', () => {
     expect(trigger).toHaveAttribute('aria-describedby', tooltip.id);
   });
 
+  it('renders just the trigger, with no bubble, while its content is empty, and keeps the same node when content arrives', async () => {
+    const { rerender } = render(
+      <Tooltip content={null}>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+    trigger.focus();
+    fireEvent.pointerMove(trigger);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    rerender(
+      <Tooltip content="Now there is something to say.">
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    // The control was not remounted: same node, still focused.
+    expect(screen.getByRole('button', { name: 'Trigger' })).toBe(trigger);
+    expect(document.activeElement).toBe(trigger);
+    fireEvent.pointerMove(trigger);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Now there is something to say.');
+  });
+
   // PI settings gear: its modal returned and retook focus in one tick (dev remount).
   it('ends closed when focus arrives and leaves in the same tick', () => {
     render(

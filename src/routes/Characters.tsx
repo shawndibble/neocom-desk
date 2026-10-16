@@ -40,7 +40,7 @@ import {
   STAT_CHIP_TONE_TEXT_CLASS,
   TextInput,
   Toast,
-  Tooltip,
+  NeedsConnection,
   type DataTableColumn,
   type StatChipTone,
 } from '@/components/ui';
@@ -1613,7 +1613,7 @@ export function Characters() {
               adding several alts with one hand-picked grant stays one click each.
             */}
             <div className="flex">
-              <Tooltip content={t('characters.add')}>
+              <NeedsConnection tooltip={t('characters.add')}>
                 <Button
                   variant="primary"
                   size="md"
@@ -1625,7 +1625,7 @@ export function Characters() {
                   {/* Icon-only below `sm`: no room beside the split trigger. */}
                   <span className="hidden sm:inline">{t('characters.addLabel')}</span>
                 </Button>
-              </Tooltip>
+              </NeedsConnection>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button

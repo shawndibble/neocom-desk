@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, Checkbox, Panel } from '@/components/ui';
+import { Button, Checkbox, NeedsConnection, Panel } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
@@ -148,9 +148,11 @@ export function PermissionsPanel() {
                   {t('settings.permissions.selectNone')}
                 </Button>
                 {chosen.length > 0 && (
-                  <Button size="sm" onClick={() => grant(chosen)}>
-                    {t('settings.permissions.grantSelected', { count: chosen.length })}
-                  </Button>
+                  <NeedsConnection>
+                    <Button size="sm" onClick={() => grant(chosen)}>
+                      {t('settings.permissions.grantSelected', { count: chosen.length })}
+                    </Button>
+                  </NeedsConnection>
                 )}
               </div>
             )}
@@ -197,15 +199,19 @@ export function PermissionsPanel() {
                             one primary on the notifications panel's Enable
                             (docs/DESIGN.md §6, "One `primary` button per view").
                           */}
-                          <Button
-                            size="sm"
-                            ref={group === firstFlagged ? scrollIntoViewOnce : undefined}
-                            className={flagged.has(group) ? 'grant-flash' : undefined}
-                            aria-label={t('settings.permissions.grantAria', { permission: label })}
-                            onClick={() => grant([group])}
-                          >
-                            {t('settings.permissions.grant')}
-                          </Button>
+                          <NeedsConnection>
+                            <Button
+                              size="sm"
+                              ref={group === firstFlagged ? scrollIntoViewOnce : undefined}
+                              className={flagged.has(group) ? 'grant-flash' : undefined}
+                              aria-label={t('settings.permissions.grantAria', {
+                                permission: label,
+                              })}
+                              onClick={() => grant([group])}
+                            >
+                              {t('settings.permissions.grant')}
+                            </Button>
+                          </NeedsConnection>
                         </>
                       )}
                     </div>

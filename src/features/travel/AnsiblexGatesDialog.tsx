@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { beginGrant } from '@/app/grantAction';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { Button, Modal, TextArea, textActionClassName } from '@/components/ui';
+import { Button, Modal, NeedsConnection, TextArea, textActionClassName } from '@/components/ui';
 import { db, type CharacterRecord } from '@/db';
 import { parseGateList, type GateListError, type SystemLookup } from '@/engine/route/ansiblex';
 import type { SolarSystemEntry } from '@/sde/marketTypes';
@@ -77,13 +77,15 @@ function CharacterSearchRow({
       {lacksScope ? (
         <>
           <span className="text-text-dim">{t('travel.bridges.needsGrant')}</span>
-          <button
-            type="button"
-            className={textActionClassName()}
-            onClick={() => void beginGrant(character.characterId, ANSIBLEX_SEARCH_ENDPOINTS)}
-          >
-            {t('travel.bridges.grant')}
-          </button>
+          <NeedsConnection>
+            <button
+              type="button"
+              className={textActionClassName()}
+              onClick={() => void beginGrant(character.characterId, ANSIBLEX_SEARCH_ENDPOINTS)}
+            >
+              {t('travel.bridges.grant')}
+            </button>
+          </NeedsConnection>
         </>
       ) : (
         <Button

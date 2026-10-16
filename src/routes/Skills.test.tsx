@@ -483,11 +483,7 @@ describe('Skills', () => {
     expect(beginEveLogin).toHaveBeenCalled();
   });
 
-  it('exports no rows in the re-login state, so a stale cache cannot be exported behind the banner', async () => {
-    // The invariant: whatever the route refuses to render, export refuses to
-    // hand over. loadWithCacheStatus deliberately still reads the cache on an
-    // auth failure ("needsReauth never short-circuits the cache read"), so
-    // nothing upstream guarantees `groups` is empty here.
+  it('keeps the saved skills on screen, with a small log-in note, when the grant lapsed over them', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,
       key: 'skills',
@@ -502,9 +498,34 @@ describe('Skills', () => {
 
     render(<App />);
 
-    // The route's own banner, not Layout's global auth notice — the latter
+    expect(await screen.findByText(/log in again to refresh/i)).toBeInTheDocument();
+    expect(screen.queryByText(/log in again to see skills/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Gunnery/ })).toBeInTheDocument();
+  });
+
+  it('exports what the list shows in the re-login state, the saved skills', async () => {
+    // The invariant: export hands over exactly what the route renders.
+    // loadWithCacheStatus still reads the cache on an auth failure ("needsReauth
+    // never short-circuits the cache read"), and the route now shows that saved
+    // copy under a small note, so the export carries it too. The full banner (and
+    // an empty export) is only for a lapsed grant with nothing saved.
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'skills',
+      value: skillsPayload,
+      fetchedAt: STALE_FETCHED_AT,
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+
+    render(<App />);
+
+    // The route's own note, not Layout's global auth notice — the latter
     // fires on emitEsiAuthFailure, before the snapshot settles.
-    expect(await screen.findByText(/log in again to see skills/i)).toBeInTheDocument();
+    expect(await screen.findByText(/log in again to refresh/i)).toBeInTheDocument();
 
     const copied: string[] = [];
     configureClipboard(async (text) => {
@@ -519,8 +540,8 @@ describe('Skills', () => {
       (await screen.findByRole('menuitem', { name: 'Copy for Google Sheets / Excel' })).focus();
       await user.keyboard('{Enter}');
       await waitFor(() => expect(copied).toHaveLength(1));
-      // The header row only — no skill from the stale cache.
-      expect(copied[0].trim().split('\n')).toHaveLength(1);
+      // The header row and the saved skills.
+      expect(copied[0].trim().split('\n').length).toBeGreaterThan(1);
     } finally {
       configureClipboard(null);
     }
