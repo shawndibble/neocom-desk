@@ -252,6 +252,26 @@ describe('runBootUpdate', () => {
   });
 });
 
+describe('public link routes', () => {
+  it.each(['/s/5gqdkt', '/share/fitting', '/communities/join/ABC'])(
+    'on %s never checks, waits or swaps, even with a build waiting',
+    async (pathname) => {
+      const postMessage = vi.fn();
+      const registration = reg({ waiting: { postMessage } });
+      const env = makeEnv(registration, { pathname });
+      await expect(runBootUpdate(env)).resolves.toBe('skipped');
+      expect(env.getRegistration).not.toHaveBeenCalled();
+      expect(registration.update).not.toHaveBeenCalled();
+      expect(postMessage).not.toHaveBeenCalled();
+      expect(env.reload).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not hold the first frame', () => {
+    expect(bootUpdateMayHold(makeEnv(undefined, { pathname: '/s/5gqdkt' }))).toBe(false);
+  });
+});
+
 describe('bootUpdateMayHold', () => {
   it('holds only when online, controlled by a worker, and not on /callback', () => {
     expect(bootUpdateMayHold(makeEnv(undefined))).toBe(true);

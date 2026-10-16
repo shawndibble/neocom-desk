@@ -41,6 +41,19 @@ export function currentRouterPath(): string {
   return routerPathOf(window.location, import.meta.env.BASE_URL);
 }
 
+/**
+ * Routes whoever was sent a link opens, usually with no account and often for
+ * the only time. They boot lean: no wait on an app update, no service worker
+ * (and so no background precache of the whole app) until the visitor goes into
+ * the app. Keep in step with the exemptions in `App.tsx` / `routeScopes.test.ts`.
+ */
+const PUBLIC_ROUTES = ['/s', '/share', '/communities/join'] as const;
+
+/** Whether `path` (a router path) is on a public link route. */
+export function isPublicRoute(path: string): boolean {
+  return PUBLIC_ROUTES.some((route) => isOnRoute(path, route));
+}
+
 /** Whether `path` (a router path) is on `route`, e.g. `/callback?code=…` on `/callback`. */
 export function isOnRoute(path: string, route: string): boolean {
   if (!path.startsWith(route)) return false;
