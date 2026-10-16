@@ -809,7 +809,7 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     renderPanel();
     expect(row(/Expensive Widget/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Filters' }));
-    await user.type(screen.getByRole('textbox', { name: 'Max price per item' }), '1000');
+    await user.type(screen.getByRole('textbox', { name: 'Max price per item' }), '1000{Enter}');
     expect(screen.queryByRole('row', { name: /Expensive Widget/ })).toBeNull();
     expect(row()).toBeInTheDocument();
     expect(screen.getByText(/1 cost more than your max price per item/)).toBeInTheDocument();
@@ -818,9 +818,34 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
     // Cleared: no limit, gone from the link and from storage.
     await user.clear(screen.getByRole('textbox', { name: 'Max price per item' }));
+    await user.keyboard('{Enter}');
     expect(row(/Expensive Widget/)).toBeInTheDocument();
     expect(linkParam('maxprice')).toBeNull();
     expect(useHaulingFilterPref.getState().value.maxprice).toBeNull();
+  });
+
+  it('on a wide screen commits on Enter or blur, not per keystroke: the rows and the selection stay', async () => {
+    mainState = WITH_DEAR;
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(row());
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    const field = screen.getByRole('textbox', { name: 'Max price per item' });
+    // `250m` passes through 2 ISK, which would hide every row.
+    await user.type(field, '250m');
+    expect(linkParam('maxprice')).toBeNull();
+    expect(row()).toHaveAttribute('aria-current', 'true');
+    expect(row(/Expensive Widget/)).toBeInTheDocument();
+    await user.tab();
+    expect(linkParam('maxprice')).toBe('250000000');
+    expect(row()).toHaveAttribute('aria-current', 'true');
+    // Enter commits too.
+    await user.clear(field);
+    await user.type(field, '1000');
+    expect(row(/Expensive Widget/)).toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('row', { name: /Expensive Widget/ })).toBeNull();
+    expect(row()).toHaveAttribute('aria-current', 'true');
   });
 
   it('keeps shorthand typed on its way to a figure: 1.5b commits 1,500,000,000', async () => {
@@ -828,11 +853,12 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     renderPanel();
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     const field = screen.getByRole('textbox', { name: 'Max price per item' });
-    await user.type(field, '1.5b');
+    await user.type(field, '1.5b{Enter}');
     expect(field).toHaveValue('1.5b');
     expect(linkParam('maxprice')).toBe('1500000000'); // 2.01 × 1e6 is 2009999.99… in floating point: it still commits the whole figure, and the text stays.
     await user.clear(field);
     await user.type(field, '2.01m');
+    await user.tab();
     expect(field).toHaveValue('2.01m');
     expect(linkParam('maxprice')).toBe('2010000');
   });
@@ -876,6 +902,7 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     const field = screen.getByRole('textbox', { name: 'Max spend' });
     expect(field).toHaveAccessibleDescription(/For the whole trip/);
     await user.type(field, '1000');
+    await user.tab();
     // 100 ISK a unit: 1,000 ISK buys 10.
     expect(bringBox()).toHaveValue('10');
     expect(useHaulingBudget.getState().value).toBe(1_000);
