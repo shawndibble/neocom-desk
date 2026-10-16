@@ -808,7 +808,6 @@
       "more_other": "and {{count}} more"
     },
     "abyssalRun": {
-      "title": "Plan an Abyssal run",
       "tier": "Filament tier",
       "tierOption": "T{{tier}} {{name}}",
       "tierName": {
@@ -946,6 +945,7 @@
         "fleetBoosts": "Fleet boosts",
         "mining": "Mining",
         "projected": "Projected effects",
+        "abyssal": "Abyssal",
         "fighters": "Fighters"
       },
       "capacitorStable": "Stable at {{pct}}%",
@@ -6485,7 +6485,6 @@
     "title": "Mail",
     "markup": {
       "openInEve": "Open this in EVE. Neocom Desk can't show it.",
-      "placeSoon": "A place view isn't available yet. Open it in EVE.",
       "realHost": "Opens {{host}}"
     },
     "refresh": "Refresh",
@@ -6579,9 +6578,8 @@
       "table": "Insert table",
       "clear": "Clear formatting",
       "clearUnavailable": "Not available in Source view",
-      "viewLabel": "Editor view",
-      "preview": "Preview",
-      "source": "Source",
+      "linkInTable": "Table cells hold plain text, so they can't carry a link.",
+      "source": "Edit source",
       "sourceLabel": "Message source (EVE markup)",
       "sourceDropped": "Some markup was removed because EVE can't show it.",
       "sourceWillDrop": "Some markup here can't be sent and will be removed.",
@@ -11931,6 +11929,22 @@
     "noOrigin": "Set your current system to filter by distance.",
     "graphUnavailable": "Distances are unavailable offline. Showing every distance.",
     "distanceUnavailable": "Distance unavailable — the local stargate snapshot couldn't be read."
+  },
+  "placeInfo": {
+    "title": "Place info",
+    "loading": "Loading place",
+    "type": "Type",
+    "system": "System",
+    "region": "Region",
+    "kind": {
+      "region": "Region",
+      "station": "Station",
+      "structure": "Structure"
+    },
+    "structureUnreadable": "Can't read this structure",
+    "structureUnreadableHint": "Only a character with docking access can see a structure's name and system.",
+    "unknown": "Can't find this place",
+    "unknownHint": "Neocom Desk has no record of this location."
   },
   "openInEve": {
     "information": "Open in EVE",

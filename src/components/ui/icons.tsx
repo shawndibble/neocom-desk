@@ -387,6 +387,10 @@ export const MailReply = withWeight(ArrowBendUpLeft);
 export const MailForward = withWeight(ArrowBendUpRight);
 /** Start a new mail — the Compose entry on the Mail page. */
 export const MailCompose = withWeight(PencilSimple);
+/** A mail recipient chip's slot for a mailing list, which has no image. */
+export const MailingList = withWeight(ListBullets);
+/** A character recipient chip's slot when the portrait fails to load. */
+export const MailCharacter = withWeight(User);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
 /** A calendar event — the Coming Up rail's own kind. */

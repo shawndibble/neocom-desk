@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { classifyPlaceId } from '@/features/places/classify';
+import { classifyPlaceInfoId } from '@/features/places';
 import { SHIP_CATEGORY_ID, SKILL_CATEGORY_ID } from '@/sde/categories';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 
 /**
  * What a mail's `showinfo:<typeID>[//<id>]` link opens in Neocom Desk. Typed
  * entities carry their own id (`//id`); anything else is an item type, which
- * covers skills and ships (Item Detail). A region, constellation, faction,
- * station or structure has no view yet and is `place`.
+ * covers skills and ships (Item Detail). A region, station or structure is
+ * `place` (Place Info); a constellation or faction has no view (`noView`).
  */
 export type ShowInfoTarget =
   | { kind: 'character' | 'corporation' | 'alliance' | 'system' | 'place'; id: number }
-  | { kind: 'item'; typeId: number };
+  | { kind: 'item'; typeId: number }
+  | { kind: 'noView' };
 
 const CHARACTER_TYPE_FIRST = 1373;
 const CHARACTER_TYPE_LAST = 1386;
@@ -24,11 +25,11 @@ const ALLIANCE_TYPE = 16159;
 
 export function resolveShowInfo(typeId: number, id: number | null): ShowInfoTarget {
   if (id !== null && id > 0) {
-    const placeKind = classifyPlaceId(id);
+    const placeKind = classifyPlaceInfoId(id);
     if (typeId === SOLAR_SYSTEM_TYPE || placeKind === 'solar_system') return { kind: 'system', id };
     if (placeKind !== null) return { kind: 'place', id };
     if (typeId === REGION_TYPE || typeId === CONSTELLATION_TYPE || typeId === FACTION_TYPE) {
-      return { kind: 'place', id };
+      return { kind: 'noView' };
     }
     if (typeId >= CHARACTER_TYPE_FIRST && typeId <= CHARACTER_TYPE_LAST) {
       return { kind: 'character', id };

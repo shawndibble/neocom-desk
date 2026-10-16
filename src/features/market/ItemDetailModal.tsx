@@ -32,16 +32,20 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useInRouterContext, useLocation } from 'react-router-dom';
+import { Link, useInRouterContext, useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
   buttonClassName,
   EmptyState,
   IskAmount,
+  MenuItem,
   Modal,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  RowActionsContext,
+  RowMenuExtrasContext,
+  RowMoreActions,
   Spinner,
   Tooltip,
   TypeIcon,
@@ -69,6 +73,8 @@ import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
 import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
+import { OpenInEveMenuItem } from '@/features/openInEve/OpenInEveMenuItem';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
 import { loadTypeDetail, type TypeDetail } from '@/features/skills/typeDetail';
@@ -150,6 +156,7 @@ export function ItemDetailModal({
 }: ItemDetailModalProps) {
   const { t } = useTranslation();
   const leave = onLeave ?? onClose;
+  const narrow = useIsNarrow();
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -296,6 +303,8 @@ export function ItemDetailModal({
   // Gates which attribute-modifier popovers can apply (empty while `data`
   // hasn't loaded yet).
   const requiredSkillTypeIds = new Set((data?.requiredSkills ?? []).map((r) => r.skillTypeID));
+  // Implies Open in EVE too: an abyssal type gets neither.
+  const showMarketLink = showOpenInMarket && abyssal === false;
 
   return (
     <Modal
@@ -307,13 +316,29 @@ export function ItemDetailModal({
       placement={abyssal ? 'wide' : 'center'}
       title={itemName}
       titleActions={
-        <>
-          {/* An abyssal type has no market group, so no in-game market window either. */}
-          {abyssal !== true && <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />}
-          {showOpenInMarket && abyssal === false && (
-            <OpenInMarketLink typeId={typeId} onNavigate={leave} replace={onLeave !== undefined} />
-          )}
-        </>
+        // Two text buttons squeeze the name to a letter on a phone; there they share one ⋮.
+        narrow && showMarketLink ? (
+          <ItemDetailMoreActions
+            typeId={typeId}
+            itemName={itemName}
+            onNavigate={leave}
+            replace={onLeave !== undefined}
+          />
+        ) : (
+          <>
+            {/* An abyssal type has no market group, so no in-game market window either. */}
+            {abyssal !== true && (
+              <OpenInEveButton kind="marketDetails" id={typeId} name={itemName} />
+            )}
+            {showMarketLink && (
+              <OpenInMarketLink
+                typeId={typeId}
+                onNavigate={leave}
+                replace={onLeave !== undefined}
+              />
+            )}
+          </>
+        )
       }
     >
       {loading ? (
@@ -480,6 +505,48 @@ function OpenInMarketLink({
     >
       {t('market.itemDetail.openInMarket')}
     </Link>
+  );
+}
+
+/**
+ * Below `md`, the header's two actions as one ⋮ (DESIGN.md §6c Header
+ * controls): Open market in EVE, and View in Market doing what
+ * `OpenInMarketLink` does.
+ */
+function ItemDetailMoreActions({
+  typeId,
+  itemName,
+  onNavigate,
+  replace,
+}: {
+  typeId: number;
+  itemName: string;
+  onNavigate: () => void;
+  replace: boolean;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { search } = useLocation();
+  const items = (
+    <>
+      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
+      <MenuItem
+        onSelect={() => {
+          onNavigate();
+          void navigate(marketItemUrl(typeId, search), { replace });
+        }}
+      >
+        {t('market.itemDetail.openInMarket')}
+      </MenuItem>
+    </>
+  );
+  // Null extras: a host table's "Export table" submenu would otherwise reach this ⋮ through the portal.
+  return (
+    <RowMenuExtrasContext.Provider value={null}>
+      <RowActionsContext.Provider value={{ name: itemName, items }}>
+        <RowMoreActions />
+      </RowActionsContext.Provider>
+    </RowMenuExtrasContext.Provider>
   );
 }
 
