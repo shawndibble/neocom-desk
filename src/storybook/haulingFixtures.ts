@@ -1,17 +1,15 @@
 /**
  * Travel › Hauling fixtures: the Amarr → Jita "Ammunition & Charges" scan the
- * Hauling mockups were drawn from (`docs/design/mockups/README.md`), served as
- * the Fuzzwork, ESI market and pilot answers the real page asks for, so the
- * page story renders the live panel against known books.
+ * trip-rail mockups were drawn from, served as the Fuzzwork, ESI market and
+ * pilot answers the real page asks for, so the page story renders the live
+ * panel against known books.
  *
  * Each sample item is stated as the mockup states it — buy at Amarr, Expected
- * Sell at Jita, a week of sales, Days to Sell — and its order books and
+ * Sell Price at Jita, a week of sales, Days to Sell — and its order books and
  * history are worked back from the engine's own rules (`haulingMarket.ts`),
  * so the scan arrives at about those figures rather than having them typed
  * in. Any other item gets no hub price, so it drops out at the first pass.
- *
- * The fill items (other categories) are answered by type id like the ammo,
- * so a scan over any category finds whichever of them that category holds.
+ * Every item is answered by type id, whatever category a scan covers.
  */
 import { HAULING_THRESHOLDS, type DemandKind } from '@/engine/market/haulingMarket';
 import { outbidPrice, roundPriceDown, roundPriceUp } from '@/engine/market/priceTick';
@@ -21,6 +19,7 @@ import { TRADE_HUBS } from '@/market/hubs';
 import type { HaulingCargo } from '@/features/market/haulingCargo';
 import { walletFixtureRoutes } from './esiFixtureRoutes';
 import type { FixtureRoute } from './fixtureFetch';
+import { sampleDate } from './sampleData';
 
 const hub = (id: string) => TRADE_HUBS.find((h) => h.id === id)!;
 const AMARR = hub('amarr');
@@ -47,7 +46,10 @@ interface SampleItem {
   typeId: number;
   /** Lowest sell at Amarr: what a unit costs. */
   buy: number;
-  /** The Expected Sell Price at Jita: one tick under the cheapest listing. */
+  /**
+   * The Expected Sell Price at Jita. The cheapest listing sits one tick
+   * above it and the recent sales a little above that, so the undercut sets it.
+   */
   sell: number;
   /** About a week of sales: the most worth bringing. */
   weekSales: number;
@@ -55,12 +57,14 @@ interface SampleItem {
   demand: Exclude<DemandKind, 'rarely'>;
   /** Ten or more listings sit at the cheapest ask. */
   crowded?: boolean;
-  /** The Jita sell ladder as [price, units], where the mockup gives one. */
-  ladder?: Array<[number, number]>;
-  /** Units sold per day, where the mockup gives one. */
-  daily?: number;
-  /** What it recently sold for, where the mockup gives one. */
-  recentSale?: number;
+  /** The Jita book exactly as a mockup draws it, in place of one worked back from the figures above. */
+  book?: {
+    /** The sell ladder as [price, units]. */
+    ladder: Array<[number, number]>;
+    /** Units sold per day. */
+    daily: number;
+    recentSale: number;
+  };
 }
 
 type Row = [
@@ -83,8 +87,9 @@ const item = ([typeId, buy, sell, weekSales, daysToSell, demand = 'most-days', c
 });
 
 /**
- * The mockup's ammo rows. Its three "thin" rows are not thin here: the engine
- * reads "thin" as rarely sells, which the page's default filter hides.
+ * The mockup's ammo rows. Flags are the engine's, not the mockup's: its three
+ * "thin" rows sell steadily here (thin is "rarely sells", which the default
+ * filter hides), and margins over 100% read as too good to be true.
  */
 const AMMO: SampleItem[] = [
   item([21194, 302.4, 2492, 1, 1]), // Blood Radio S
@@ -94,13 +99,15 @@ const AMMO: SampleItem[] = [
   {
     // True Sanshas Gamma S: the item detail mockup's row, ladder and all.
     ...item([20861, 10_460_000, 23_160_000, 1, 9, 'bursts']),
-    ladder: [
-      [23_180_000, 1],
-      [23_280_000, 3],
-      [23_290_000, 1],
-    ],
-    daily: 20 / 30,
-    recentSale: 23_167_500,
+    book: {
+      ladder: [
+        [23_180_000, 1],
+        [23_280_000, 3],
+        [23_290_000, 1],
+      ],
+      daily: 20 / 30,
+      recentSale: 23_167_500,
+    },
   },
   item([20853, 200_000, 372_400, 6, 1]), // True Sanshas Infrared S
   item([185, 13.82, 24.98, 100, 1]), // EMP S
@@ -119,7 +126,12 @@ const AMMO: SampleItem[] = [
   item([209, 118, 152, 44_000, 2]), // Scourge Heavy Missile
 ];
 
-/** Bulky items from other categories: what filling the free space could load. */
+/**
+ * Bulky items from other categories: what filling the free space could load.
+ * The mockup's own (first eight) are mostly outside every Hauling category
+ * (fuel, PI, ice, structures), so a scan never asks for them; the last four
+ * are in Drones, Ship Equipment, Rigs and Trade Goods, and it does.
+ */
 const FILL: SampleItem[] = [
   item([4051, 18_450, 21_900, 1800, 1]), // Nitrogen Fuel Block
   item([4247, 18_900, 21_600, 1500, 1]), // Helium Fuel Block
@@ -129,6 +141,10 @@ const FILL: SampleItem[] = [
   item([16275, 2950, 3610, 1600, 3, 'bursts']), // Strontium Clathrates
   item([3841, 1_210_000, 1_445_000, 120, 3]), // Large Shield Extender II
   item([9832, 9800, 11_650, 2600, 1]), // Coolant
+  item([2185, 1_050_000, 1_240_000, 500, 2]), // Hammerhead II
+  item([440, 1_640_000, 1_990_000, 160, 2]), // 5MN Microwarpdrive II
+  item([25894, 2_100_000, 2_690_000, 90, 3]), // Large Trimark Armor Pump I
+  item([16686, 9500, 11_800, 1200, 2]), // Manufacturing Tools
 ];
 
 /** A price level of one side of a book: `orders` orders sharing `units`. */
@@ -148,8 +164,10 @@ interface ItemMarket {
   history: (today: number) => MarketHistoryEntry[];
 }
 
-const DAY_MS = 86_400_000;
-const T = HAULING_THRESHOLDS;
+const HOUR_MS = 3_600_000;
+const DAY_MS = 24 * HOUR_MS;
+const { horizonDays, ownShareOfDemand, historyDays, mostDaysMin, burstsMin, crowdedOrderCount } =
+  HAULING_THRESHOLDS;
 
 /**
  * Units sold per day and units listed ahead of the hauler that make the
@@ -162,20 +180,20 @@ function sizeDemand(
   minMonthly: number
 ): { daily: number; ahead: number } {
   const guess =
-    daysToSell < T.horizonDays
-      ? (weekSales / T.ownShareOfDemand / (T.horizonDays + 1 - daysToSell)) * T.historyDays
+    daysToSell < horizonDays
+      ? (weekSales / ownShareOfDemand / (horizonDays + 1 - daysToSell)) * historyDays
       : minMonthly;
   const low = Math.max(minMonthly, Math.floor(guess * 0.7));
   const high = Math.max(Math.ceil(guess * 1.5), minMonthly * 2);
   const step = Math.max(1, Math.floor((high - low) / 400));
-  let best = { daily: low / T.historyDays, ahead: 1, error: Infinity };
+  let best = { daily: low / historyDays, ahead: 1, error: Infinity };
   for (let monthly = low; monthly <= high; monthly += step) {
-    const daily = monthly / T.historyDays;
+    const daily = monthly / historyDays;
     const lot = Math.max(1, Math.ceil(daily));
     const ahead = Math.max(1, Math.round(daysToSell * daily - lot));
     const week = Math.max(
       1,
-      Math.floor(Math.max(0, daily * T.horizonDays - ahead) * T.ownShareOfDemand)
+      Math.floor(Math.max(0, daily * horizonDays - ahead) * ownShareOfDemand)
     );
     const days = (ahead + lot) / daily;
     const error = Math.abs(week - weekSales) / weekSales + Math.abs(days - daysToSell) / daysToSell;
@@ -184,7 +202,7 @@ function sizeDemand(
   return best;
 }
 
-const tick = (price: number, factor: number) => roundPriceUp(price * factor) ?? price;
+const markUp = (price: number, factor: number) => roundPriceUp(price * factor) ?? price;
 const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** Spreads `monthly` units over `days` trading days, ending yesterday; every second day for bursts. */
@@ -200,7 +218,7 @@ function history(
       return {
         date: isoDay(today - (1 + i * every) * DAY_MS),
         average,
-        highest: tick(average, 1.01),
+        highest: markUp(average, 1.01),
         lowest: roundPriceDown(average * 0.99) ?? average,
         order_count: Math.max(3, Math.min(400, Math.ceil(volume / 25))),
         volume,
@@ -211,33 +229,33 @@ function history(
 function marketOf(sample: SampleItem): ItemMarket {
   const mostDays = sample.demand === 'most-days';
   // Enough trading days to read as the mockup's demand, and units to fill them.
-  const minMonthly = mostDays ? T.mostDaysMin : T.burstsMin;
-  const sized =
-    sample.daily !== undefined
-      ? { daily: sample.daily, ahead: sample.ladder!.reduce((sum, [, units]) => sum + units, 0) }
-      : sizeDemand(sample.weekSales, sample.daysToSell, minMonthly);
-  const monthly = Math.round(sized.daily * T.historyDays);
+  const minMonthly = mostDays ? mostDaysMin : burstsMin;
+  const { book } = sample;
+  const sized = book
+    ? { daily: book.daily, ahead: book.ladder.reduce((sum, [, units]) => sum + units, 0) }
+    : sizeDemand(sample.weekSales, sample.daysToSell, minMonthly);
+  const monthly = Math.round(sized.daily * historyDays);
   const tradingDays = Math.min(monthly, mostDays ? 26 : 12);
 
   const lowestAsk = outbidPrice(sample.sell) ?? sample.sell;
-  const ahead = sample.crowded ? Math.max(sized.ahead, T.crowdedOrderCount + 2) : sized.ahead;
-  const destSell: Level[] = sample.ladder
-    ? sample.ladder.map(([price, units]) => ({ price, units, orders: 1 }))
+  const ahead = sample.crowded ? Math.max(sized.ahead, crowdedOrderCount + 2) : sized.ahead;
+  const destSell: Level[] = book
+    ? book.ladder.map(([price, units]) => ({ price, units, orders: 1 }))
     : [
         {
           price: lowestAsk,
           units: ahead,
-          orders: sample.crowded ? T.crowdedOrderCount + 2 : Math.min(ahead, 3),
+          orders: sample.crowded ? crowdedOrderCount + 2 : Math.min(ahead, 3),
         },
         // Deeper levels sit outside the crowded band: competition, not ahead of you.
-        { price: tick(lowestAsk, 1.03), units: sample.weekSales + 5, orders: 2 },
-        { price: tick(lowestAsk, 1.08), units: sample.weekSales * 2 + 5, orders: 4 },
+        { price: markUp(lowestAsk, 1.03), units: sample.weekSales + 5, orders: 2 },
+        { price: markUp(lowestAsk, 1.08), units: sample.weekSales * 2 + 5, orders: 4 },
       ];
   const depth = sample.weekSales * 4 + 10;
   return {
     originSell: [
       { price: sample.buy, units: depth, orders: 6 },
-      { price: tick(sample.buy, 1.04), units: Math.ceil(depth / 2), orders: 3 },
+      { price: markUp(sample.buy, 1.04), units: Math.ceil(depth / 2), orders: 3 },
     ],
     destSell,
     destBuy: {
@@ -252,7 +270,7 @@ function marketOf(sample: SampleItem): ItemMarket {
       monthly,
       tradingDays,
       mostDays ? 1 : 2,
-      sample.recentSale ?? tick(sample.sell, 1.003)
+      book?.recentSale ?? markUp(sample.sell, 1.003)
     ),
   };
 }
@@ -297,10 +315,10 @@ function aggregatesAt(stationId: number, typeIds: readonly number[]) {
 function ordersIn(regionId: number, typeId: number, now: number): RegionOrder[] {
   const market = MARKETS.get(typeId);
   if (!market) return [];
-  const at = regionId === AMARR.regionId ? AMARR : regionId === JITA.regionId ? JITA : null;
-  if (!at) return [];
+  const atHub = regionId === AMARR.regionId ? AMARR : regionId === JITA.regionId ? JITA : null;
+  if (!atHub) return [];
   const book: Array<[Level, boolean]> =
-    at === AMARR
+    atHub === AMARR
       ? market.originSell.map((level) => [level, false])
       : [
           ...market.destSell.map((level): [Level, boolean] => [level, false]),
@@ -320,11 +338,11 @@ function ordersIn(regionId: number, typeId: number, now: number): RegionOrder[] 
           volume_remain: units,
           volume_total: units,
           min_volume: 1,
-          location_id: at.stationId,
-          system_id: at.systemId,
+          location_id: atHub.stationId,
+          system_id: atHub.systemId,
           range: isBuy ? 'station' : 'region',
           duration: 90,
-          issued: new Date(now - (i + 1) * 3_600_000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+          issued: sampleDate((i + 1) * HOUR_MS, now),
         };
       })
     )
@@ -360,7 +378,12 @@ export function haulingFixtureRoutes(): FixtureRoute[] {
     { path: at('/standings/'), respond: () => ({ body: STANDINGS }) },
     {
       path: at('/skills'),
-      respond: () => ({ body: { skills: SKILLS, total_sp: 135_765 } }),
+      respond: () => ({
+        body: {
+          skills: SKILLS,
+          total_sp: SKILLS.reduce((sum, s) => sum + s.skillpoints_in_skill, 0),
+        },
+      }),
     },
     // Read alongside the skills (queue-corrected levels, clone implants): nothing training, no implants.
     { path: at('/skillqueue'), respond: () => ({ body: [] }) },

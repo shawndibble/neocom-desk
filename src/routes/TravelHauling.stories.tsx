@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Route, Routes } from 'react-router-dom';
 import { db } from '@/db';
-import { useHaulingCargo } from '@/features/market/haulingCargo';
+import { useHaulingBudget, useHaulingCargo } from '@/features/market/haulingCargo';
+import { clearHaulingScanCache } from '@/features/market/haulingData';
+import { useHaulingFilterPref } from '@/features/market/haulingFilterPref';
+import { clearOrderBookCache } from '@/features/market/orderBook';
+import { clearMarketPriceCache } from '@/market/prices';
 import {
   haulingFixtureRoutes,
   HAULING_PATH,
@@ -10,13 +14,24 @@ import {
 } from '@/storybook/haulingFixtures';
 import { Travel } from './Travel';
 
-/** A Mastodon as the Cargo Space, the intro read; the store is module state, so it re-reads them. */
+/**
+ * A Mastodon as the Cargo Space and the intro read. Prices, books and scans
+ * are cached in module memory, where another story's fixtures (Market Stock
+ * prices some of the same items) would outlive its shell; so are the page's
+ * setting stores, which re-read the rows. The intro's store is the panel's
+ * own and stays as the first story left it.
+ */
 async function seedHauling() {
+  clearMarketPriceCache();
+  clearOrderBookCache();
+  clearHaulingScanCache();
   await db.settings.bulkPut([
     { key: 'haulingCargo', value: MASTODON_CARGO },
     { key: 'haulingIntroDismissed', value: true },
   ]);
   useHaulingCargo.setState({ hydrated: false });
+  useHaulingBudget.setState({ hydrated: false });
+  useHaulingFilterPref.setState({ hydrated: false });
 }
 
 const meta = {
