@@ -553,6 +553,10 @@ export const ESI_REGISTRY = {
     route: '/universe/types/{type_id}',
     scope: PUBLIC,
   },
+  getDogmaDynamicItem: {
+    route: '/dogma/dynamic/items/{type_id}/{item_id}',
+    scope: PUBLIC,
+  },
   getUniverseGroup: {
     route: '/universe/groups/{group_id}',
     scope: PUBLIC,

@@ -1109,6 +1109,28 @@ export interface AnsiblexGateRecord {
   savedAt: number;
 }
 
+/**
+ * One mutated (abyssal) item's dogma as ESI's
+ * `/dogma/dynamic/items/{type_id}/{item_id}` answered it — its base, its
+ * mutaplasmid and its full attribute set (`esi/endpoints.ts` `DynamicItem`).
+ * Immutable per item id, so a row is kept for good: never refetched, never
+ * pruned. Public data, character-independent and device-local; it survives
+ * logout like any other public cache. Read through
+ * `features/abyssal/dynamicItems.ts`.
+ */
+export interface DynamicItemRecord {
+  itemId: number;
+  /** The abyssal type it was fetched as. */
+  typeId: number;
+  createdBy: number;
+  sourceTypeId: number;
+  mutatorTypeId: number;
+  /** `[attributeId, value]`, absolute values, as ESI sent them. */
+  attributes: [number, number][];
+  /** Epoch ms of the fetch. */
+  savedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -1140,6 +1162,7 @@ export const db = new Dexie('neocom') as Dexie & {
   jitaPriceSnapshots: EntityTable<JitaPriceSnapshotRecord, 'date'>;
   hullFitCache: EntityTable<HullFitCacheRecord, 'key'>;
   ansiblexGates: EntityTable<AnsiblexGateRecord, 'id'>;
+  dynamicItems: EntityTable<DynamicItemRecord, 'itemId'>;
 };
 
 /**
@@ -1693,4 +1716,39 @@ db.version(24).stores({
   walletJournalArchive: '[characterId+id], characterId, [characterId+date]',
   walletTransactionArchive: '[characterId+transaction_id], characterId, [characterId+date]',
   walletArchiveCoverage: '[characterId+kind], characterId',
+});
+
+// Adds `dynamicItems`, mutated items' rolled attributes from ESI, kept for good.
+db.version(25).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  esiCacheMeta: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
+  hullFitCache: 'key, savedAt',
+  ansiblexGates: 'id',
+  industryJobHistory: 'characterId',
+  netWorthSnapshots: 'id, characterId',
+  productionLosses: 'id, characterId, runId',
+  walletJournalArchive: '[characterId+id], characterId, [characterId+date]',
+  walletTransactionArchive: '[characterId+transaction_id], characterId, [characterId+date]',
+  walletArchiveCoverage: '[characterId+kind], characterId',
+  dynamicItems: 'itemId',
 });

@@ -5,6 +5,7 @@ import type {
   FittingSlotMap,
   MarketWideTreeMap,
   MasteryMap,
+  MutaplasmidData,
   PiData,
   PiSystemPlanets,
   ReprocessingMap,
@@ -119,6 +120,12 @@ export const loadCompressedOreTypeIds = cached<Record<string, number>>('compress
 export const loadMarketWideTrees = cached<MarketWideTreeMap>('marketWideTrees.json');
 /** See `FittingSlotMap` — which rack an EFT-loaded item goes in. */
 export const loadFittingSlots = cached<FittingSlotMap>('fittingSlots.json');
+/**
+ * What each mutaplasmid rolls, and every abyssal type (`MutaplasmidData`).
+ * Read through `features/abyssal/mutaplasmidData.ts`'s lookup, not directly.
+ * Precached: ~13 KB gzipped, and an EFT paste or share link may need it offline.
+ */
+export const loadMutaplasmids = cached<MutaplasmidData>('mutaplasmids.json');
 
 /** The Ship Tree's classes, factions and hulls — see `ShipTreeData`. */
 export const loadShipTree = cached<ShipTreeData>('shipTree.json');

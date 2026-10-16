@@ -353,6 +353,41 @@ export function getUniverseType(
   });
 }
 
+// --- GET /dogma/dynamic/items/{type_id}/{item_id} (public) ---
+
+/**
+ * One mutated (abyssal) item as it was rolled: its base, its mutaplasmid, and
+ * its full dogma attribute set as absolute values — not only the rolled
+ * ones (verified live 2026-10-16: 23 attributes on a Heavy Abyssal Energy
+ * Neutralizer). Immutable per item id. `type_id` is the abyssal type,
+ * `item_id` the item's own unique id from assets or a contract. An id that
+ * isn't a mutated item answers 400 "Invalid item ID", which counts against
+ * ESI's error limit — so callers fetch through
+ * `features/abyssal/dynamicItems.ts`, which caches every answer and never
+ * asks twice for an id that failed.
+ */
+export interface DynamicItem {
+  /** Character id of the pilot who applied the mutaplasmid. */
+  created_by: number;
+  /** The base module or drone type. */
+  source_type_id: number;
+  /** The mutaplasmid type. */
+  mutator_type_id: number;
+  dogma_attributes: DogmaAttribute[];
+  dogma_effects: { effect_id: number; is_default: boolean }[];
+}
+
+export function getDogmaDynamicItem(
+  typeId: number,
+  itemId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<DynamicItem>> {
+  return esiFetch<DynamicItem>(`/dogma/dynamic/items/${typeId}/${itemId}`, {
+    ...options,
+    endpointId: 'getDogmaDynamicItem',
+  });
+}
+
 // --- GET /universe/groups/{group_id} (public) ---
 
 /**
