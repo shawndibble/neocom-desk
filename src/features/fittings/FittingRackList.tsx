@@ -260,7 +260,7 @@ export function ModuleRow({
           catalogue={catalogue}
           context={context}
           edit={edit}
-          className="flex-1 @min-[34rem]:w-56 @min-[34rem]:flex-none"
+          className="flex-1 @min-[44rem]:w-56 @min-[44rem]:min-w-32 @min-[44rem]:flex-initial"
         />
       )}
     </SlotCard>
@@ -274,15 +274,17 @@ export function ModuleRow({
 const TOUCH_SELECT_CLASS = '[&>select]:min-h-11 md:[&>select]:min-h-7';
 
 const SLOT_NAME_CLASS =
-  'line-clamp-2 min-w-0 flex-1 text-left text-sm break-words @min-[34rem]:truncate @min-[34rem]:text-xs';
+  'line-clamp-2 min-w-0 flex-1 text-left text-sm break-words @min-[44rem]:min-w-40 @min-[44rem]:truncate @min-[44rem]:text-xs';
 
 /**
  * A fitted module's, drone's or cargo item's card. In a narrow column (a
  * phone) the name gets the first line to itself — two lines if it needs
  * them — with its menu and remove in the top-right corner as on the app's
  * other cards, and the controls below; with room, it is one line, remove
- * last. With `menu`, right-click (or touch-and-hold) anywhere on it opens the
- * item's menu, and a ⋮ button opens the same.
+ * last. On one line the name keeps 10rem and the controls give up space
+ * first; 44rem is where the widest row (a drone with its mutation badge)
+ * still fits that way. With `menu`, right-click (or touch-and-hold) anywhere
+ * on it opens the item's menu, and a ⋮ button opens the same.
  */
 function SlotCard({
   identity,
@@ -313,9 +315,9 @@ function SlotCard({
       className={`@container rounded-xs bg-panel-2 ${highlight} ${drop?.lights === 'dim' ? 'opacity-40' : ''}`}
       {...drop?.props}
     >
-      <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1.5 p-1.5 @min-[34rem]:flex-nowrap">
+      <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1.5 p-1.5 @min-[44rem]:flex-nowrap">
         <div
-          className={`flex min-h-9 min-w-0 basis-full items-center gap-2 @min-[34rem]:min-h-0 @min-[34rem]:flex-1 @min-[34rem]:basis-0 @min-[34rem]:pr-0 ${menu ? 'pr-22' : 'pr-11'}`}
+          className={`flex min-h-9 min-w-0 basis-full items-center gap-2 @min-[44rem]:min-h-0 @min-[44rem]:min-w-auto @min-[44rem]:flex-1 @min-[44rem]:basis-0 @min-[44rem]:pr-0 ${menu ? 'pr-22' : 'pr-11'}`}
         >
           {grip && (
             <span
@@ -334,13 +336,13 @@ function SlotCard({
         {/* The controls keep their own right-click and press-and-hold (a count
             box's paste or text selection) rather than opening the item's menu. */}
         <div
-          className="flex min-w-0 basis-full items-center gap-2 @min-[34rem]:basis-auto"
+          className="flex min-w-0 basis-full items-center gap-2 @min-[44rem]:min-w-auto @min-[44rem]:basis-auto"
           onContextMenu={menu ? (event) => event.stopPropagation() : undefined}
           onPointerDown={menu ? (event) => event.stopPropagation() : undefined}
         >
           {children}
         </div>
-        <div className="absolute top-0 right-0 flex @min-[34rem]:static">
+        <div className="absolute top-0 right-0 flex @min-[44rem]:static">
           {menu && <RowMoreActions />}
           <IconButton
             icon={<Close />}
