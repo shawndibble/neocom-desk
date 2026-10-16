@@ -47,5 +47,22 @@ test('/travel/hauling: the open filter row shares one height', async ({ page }) 
   await signInAndGoto(page, '/travel/hauling');
   await page.getByRole('button', { name: /^Filters/ }).click();
   await expect(page.getByRole('textbox', { name: 'Max spend' })).toBeVisible();
+  // A typed figure shows its full-ISK echo: it must not lift its box out of the row.
+  await page.getByRole('textbox', { name: 'Max price per item' }).fill('1000');
+  await expect(page.getByText('= 1,000 ISK')).toBeVisible();
   await expectInlineControlsAligned(page, '/travel/hauling filters open');
+  const field = await page.getByRole('textbox', { name: 'Max price per item' }).boundingBox();
+  const sells = await page.getByRole('combobox', { name: 'Sells within' }).boundingBox();
+  expect(Math.abs(field!.y - sells!.y)).toBeLessThanOrEqual(1);
 });
+
+// Category and Sell by give way before the route row wraps the funnel.
+for (const width of [960, 1024]) {
+  test(`/travel/hauling @${width}: the filter funnel stays on the route row`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await signInAndGoto(page, '/travel/hauling');
+    const from = await page.getByRole('combobox', { name: 'From' }).boundingBox();
+    const funnel = await page.getByRole('button', { name: /^Filters/ }).boundingBox();
+    expect(Math.abs(funnel!.y + funnel!.height / 2 - (from!.y + from!.height / 2))).toBeLessThan(4);
+  });
+}
