@@ -134,6 +134,27 @@ describe('loadMoreMailHeaders', () => {
     const result = await loadMoreMailHeaders(CHAR_ID, current);
     expect(result.headers).toEqual(current);
     expect(result.hasMore).toBe(true);
+    expect(result.failure).toBe('offline');
+  });
+
+  it('names a non-network failure as an error, not as offline', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json({ error: 'boom' }, { status: 500 })
+      )
+    );
+    const result = await loadMoreMailHeaders(CHAR_ID, [{ mail_id: 5 }]);
+    expect(result.hasMore).toBe(true);
+    expect(result.failure).toBe('error');
+  });
+
+  it('reports no failure on success', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([{ mail_id: 1 }])
+      )
+    );
+    expect((await loadMoreMailHeaders(CHAR_ID, [{ mail_id: 5 }])).failure).toBeUndefined();
   });
 });
 

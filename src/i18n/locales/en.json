@@ -3653,6 +3653,7 @@
     "errorSpent": "This login link has already been used, or it was opened in a different tab or window. Log in again.",
     "errorMismatch": "This login could not be verified. Another login may have started before this one finished. Log in again.",
     "errorDenied": "Login was cancelled on the EVE Online page. Nothing was added.",
+    "errorOffline": "Connection lost while signing in. Nothing was added. Reconnect, then try again.",
     "retry": "Try again"
   },
   "character": {
@@ -4921,6 +4922,7 @@
   },
   "common": {
     "opensInNewTab": "(opens in a new tab)",
+    "needsConnection": "Needs a connection",
     "iskAmountHint": "= {{amount}} ISK",
     "iskInvalid": "Not an ISK amount. Try 1.5b, 500m or 1,000,000.",
     "unknownType": "Type {{id}}",
@@ -6260,7 +6262,12 @@
     "sending": "Sending…",
     "cancel": "Cancel",
     "sendErrorPrefix": "Couldn't send: {{message}} Try sending from the EVE client instead.",
-    "sendNoRecipients": "Add at least one recipient before sending."
+    "sendNoRecipients": "Add at least one recipient before sending.",
+    "sendOffline": "You're offline — your draft is saved. Send it when you're back online.",
+    "loadMoreOffline": "Couldn't load more — you're offline.",
+    "loadMoreFailed": "Couldn't load more mail. Try again.",
+    "recipientSearchOffline": "Search needs a connection.",
+    "bodyNotDownloaded": "This mail hasn't been downloaded yet — reconnect to read it."
   },
   "calendar": {
     "title": "Calendar",
@@ -6281,6 +6288,7 @@
     "rsvpDecline": "Decline",
     "rsvpTentative": "Tentative",
     "rsvpFailed": "Couldn't save your response. Try again.",
+    "rsvpOffline": "You're offline — your response wasn't saved. Reconnect and try again.",
     "yourResponse": "Your response",
     "export": "Export",
     "contextMenu": {
@@ -9159,6 +9167,7 @@
   },
   "market": {
     "title": "Market",
+    "sharedAppraisalLoadFailed": "Couldn't load the shared appraisal. You may be offline.",
     "compareUndo": {
       "added_one": "Added {{count}} variant of {{name}}",
       "added_other": "Added {{count}} variants of {{name}}",
@@ -11387,7 +11396,8 @@
     "opened": "Opened in your EVE client.",
     "needCharacter": "Log in a character to open this in its EVE client.",
     "failed": "Couldn't open it in EVE: {{message}}",
-    "unknownError": "Is your character logged in to the game?"
+    "unknownError": "Is your character logged in to the game?",
+    "offline": "You're offline — reconnect to open this in EVE."
   },
   "travel": {
     "incursions": {
@@ -12204,6 +12214,8 @@
       },
       "nothingToSet": "No waypoints to set: the trip has no jumps.",
       "failed": "Waypoints not set: {{message}}",
+      "offline": "You're offline — waypoints weren't set. Reconnect and try again.",
+      "offlinePartway": "You're offline — {{set}} of {{total}} waypoints were set before the connection dropped. Reconnect and set them again.",
       "failedPartway": "{{set}} of {{total}} waypoints set, then ESI refused the rest: {{message}}",
       "unknownError": "ESI gave no reason. Is the character logged in to the game?"
     },
@@ -12358,6 +12370,7 @@
         "stateFocus": "Focus-visible",
         "stateHighlighted": "Highlighted option",
         "stateDisabled": "Disabled",
+        "stateNeedsConnection": "aria-disabled with a \"Needs a connection\" tooltip: offline, this action cannot run",
         "stateLoading": "Loading (Button loading)",
         "stateSelected": "Selected / on (aria-pressed)",
         "stateSelectedSegment": "Selected segment",
@@ -12377,6 +12390,7 @@
         "highlighted": "Open any menu or picker with the keyboard and press ArrowDown: 2px accent outline inside the option, shown here whenever the last input was the keyboard. A pointer keeps only the fill.",
         "focus": "Press Tab: 2px accent outline, outset on boxed controls and inline links.",
         "disabled": "opacity-40. aria-disabled keeps the tooltip reachable.",
+        "needsConnection": "Hover or focus the button. Turn off your network to see it live; this sample is always in that state.",
         "selectedToggle": "On takes the accent tint.",
         "selectedSegment": "Selected takes the accent tint and a 2px accent underline.",
         "fieldCaret": "The box is a control (§6); the caret says it opens a list."
@@ -12431,6 +12445,7 @@
         "boxed": "Boxed control",
         "disabled": "Disabled",
         "ariaDisabled": "aria-disabled",
+        "needsConnection": "Send",
         "saving": "Saving",
         "toggleOn": "Toggle on",
         "toggleOff": "Toggle off",

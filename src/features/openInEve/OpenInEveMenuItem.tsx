@@ -15,7 +15,10 @@ import { useOpenInEve } from './useOpenInEve';
 
 export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
   const { t } = useTranslation();
-  const { blockedReason, missingGroups, sending, outcome, send } = useOpenInEve({ kind, id });
+  const { blockedReason, offline, missingGroups, sending, outcome, send } = useOpenInEve({
+    kind,
+    id,
+  });
   const label = t(`openInEve.${kind}`);
 
   if (blockedReason !== null) {
@@ -25,7 +28,11 @@ export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
         <GrantMissingMenuItem groups={missingGroups} />
       </>
     ) : (
-      <DisabledMenuItem reason={t('openInEve.needCharacter')}>{label}</DisabledMenuItem>
+      <DisabledMenuItem
+        reason={offline ? t('common.needsConnection') : t('openInEve.needCharacter')}
+      >
+        {label}
+      </DisabledMenuItem>
     );
   }
   return (

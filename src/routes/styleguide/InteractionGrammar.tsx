@@ -404,6 +404,11 @@ export function InteractionGrammar() {
               <Button disabled>{k('samples.disabled')}</Button>
               <Button aria-disabled="true">{k('samples.ariaDisabled')}</Button>
             </Cue>
+            <Cue rule={k('rules.stateNeedsConnection')} note={k('notes.needsConnection')}>
+              <Tooltip content={t('common.needsConnection')}>
+                <Button aria-disabled="true">{k('samples.needsConnection')}</Button>
+              </Tooltip>
+            </Cue>
             <Cue rule={k('rules.stateLoading')}>
               <Button loading>{k('samples.saving')}</Button>
               <Button variant="primary" loading>

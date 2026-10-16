@@ -18,7 +18,9 @@ import {
   type AlertsGrantOutcome,
 } from '@/features/notifications/alertsGrant';
 import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
+import { NeedsConnection } from '@/components/NeedsConnection';
 import { Button, Panel, Spinner } from '@/components/ui';
+import { isOfflineFailure } from '@/esi/client';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 /**
@@ -34,12 +36,13 @@ class SsoRejection extends Error {
 }
 
 /** Which wording the panel shows; `null` while the callback is still working. */
-type ErrorKind = LoginFailureReason | 'denied' | 'generic' | null;
+type ErrorKind = LoginFailureReason | 'denied' | 'offline' | 'generic' | null;
 
 const MESSAGE_KEY: Record<Exclude<ErrorKind, null>, string> = {
   'no-login-in-progress': 'callback.errorSpent',
   'state-mismatch': 'callback.errorMismatch',
   denied: 'callback.errorDenied',
+  offline: 'callback.errorOffline',
   generic: 'callback.errorMessage',
 };
 
@@ -136,6 +139,12 @@ export function Callback() {
           setErrorKind(err.code === 'access_denied' ? 'denied' : 'generic');
           return;
         }
+        // The exchange never reached SSO: nothing is wrong with the login, and
+        // restarting it would only navigate to the browser's offline page.
+        if (isOfflineFailure(err)) {
+          setErrorKind('offline');
+          return;
+        }
         if (await retryLastLoginOnce().catch(() => false)) return;
         setErrorKind(err instanceof LoginError ? err.reason : 'generic');
       });
@@ -152,21 +161,26 @@ export function Callback() {
         <Panel title={t('callback.errorTitle')} className="w-full max-w-sm">
           <div role="alert" className="space-y-3">
             <p className="text-sm text-danger">{t(MESSAGE_KEY[errorKind])}</p>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                // A user-initiated retry is not one of the automatic ones.
-                clearRetryBudget();
-                // Add Character only when this tab has no record of what the
-                // failed login was for.
-                void retryLastLogin()
-                  .then((restarted) => (restarted ? undefined : beginAddCharacterLogin()))
-                  .catch(() => setErrorKind('generic'));
-              }}
-            >
-              {t('callback.retry')}
-            </Button>
+            <NeedsConnection>
+              {(offline) => (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  aria-disabled={offline || undefined}
+                  onClick={() => {
+                    // A user-initiated retry is not one of the automatic ones.
+                    clearRetryBudget();
+                    // Add Character only when this tab has no record of what the
+                    // failed login was for.
+                    void retryLastLogin()
+                      .then((restarted) => (restarted ? undefined : beginAddCharacterLogin()))
+                      .catch(() => setErrorKind('generic'));
+                  }}
+                >
+                  {t('callback.retry')}
+                </Button>
+              )}
+            </NeedsConnection>
           </div>
         </Panel>
       )}

@@ -5,8 +5,8 @@
  * component wires it up: which defaults populate, which chip is pinned,
  * what a Send click actually calls.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { MailComposeBox } from './MailComposeBox';
@@ -57,6 +57,17 @@ beforeEach(() => {
   loadContacts.mockResolvedValue({ cached: { data: [] } });
   resolveNames.mockResolvedValue(new Map());
   searchMailRecipients.mockResolvedValue([]);
+});
+
+function goOffline() {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+  act(() => {
+    window.dispatchEvent(new Event('offline'));
+  });
+}
+
+afterEach(() => {
+  Reflect.deleteProperty(navigator, 'onLine');
 });
 
 function renderBox(kind: 'reply' | 'forward', onSent = vi.fn(), onClose = vi.fn()) {
@@ -179,6 +190,22 @@ describe('Forward defaults', () => {
   });
 });
 
+describe('recipient search offline', () => {
+  it('says the search needs a connection instead of "no results"', async () => {
+    const user = userEvent.setup();
+    renderBox('forward');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Subject')).toHaveValue('FWD: Ratting fleet up')
+    );
+    goOffline();
+
+    await user.type(screen.getByLabelText('Add recipient'), 'Fen');
+
+    expect(await screen.findByText('Search needs a connection.')).toBeInTheDocument();
+    expect(screen.queryByText('No characters found.')).not.toBeInTheDocument();
+  });
+});
+
 describe('a saved draft', () => {
   it('is used instead of the reply-all defaults', async () => {
     drafts.loadDraft.mockResolvedValue({
@@ -260,6 +287,42 @@ describe('sending', () => {
     ).toBeInTheDocument();
     expect(drafts.clearDraft).not.toHaveBeenCalled();
     expect(onSent).not.toHaveBeenCalled();
+  });
+
+  it('says it is offline, and that the draft is saved, when the send never reached ESI', async () => {
+    sendMail.mockRejectedValue(new TypeError('Failed to fetch'));
+    const onSent = vi.fn();
+    const user = userEvent.setup();
+    renderBox('reply', onSent);
+    await screen.findByText('Sender Sal');
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(
+      await screen.findByText(
+        "You're offline — your draft is saved. Send it when you're back online."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
+    expect(drafts.clearDraft).not.toHaveBeenCalled();
+    expect(onSent).not.toHaveBeenCalled();
+  });
+
+  it('disables Send while offline, with the reason in a tooltip, and sends nothing', async () => {
+    const user = userEvent.setup();
+    renderBox('reply');
+    await screen.findByText('Sender Sal');
+    goOffline();
+
+    const send = screen.getByRole('button', { name: 'Send' });
+    expect(send).toHaveAttribute('aria-disabled', 'true');
+    await user.hover(send);
+    expect((await screen.findAllByText('Needs a connection')).length).toBeGreaterThan(0);
+    await user.click(send);
+    expect(sendMail).not.toHaveBeenCalled();
+    // Local actions are untouched: the draft fields still take input.
+    expect(screen.getByLabelText('Subject')).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
   });
 
   it('refuses to send with no recipients', async () => {

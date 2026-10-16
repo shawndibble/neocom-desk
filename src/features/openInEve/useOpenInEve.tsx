@@ -10,6 +10,7 @@ import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { permissionsForEndpoints, type ScopeGroup } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useOnline } from '@/stores/network';
 import { openInEve, OPEN_IN_EVE_ENDPOINTS, type OpenInEveTarget } from './sendOpenInEve';
 
 /** How long a result stays on screen before it clears itself. */
@@ -22,6 +23,8 @@ const MISSING_GROUPS: readonly ScopeGroup[] = permissionsForEndpoints(OPEN_IN_EV
 export interface OpenInEve {
   /** Why sending can't work yet — no Character, or no Open in EVE permission — or null when it can. */
   blockedReason: ReactNode;
+  /** Sending is blocked only because the browser is offline: the item reads "Needs a connection". */
+  offline: boolean;
   /** The Permissions blocking it, for a menu that can't carry a link in its reason; empty otherwise. */
   missingGroups: readonly ScopeGroup[];
   sending: boolean;
@@ -44,6 +47,7 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
   const { t } = useTranslation();
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const lacksScope = useCharacterLacksEndpoints(characterId, OPEN_IN_EVE_ENDPOINTS);
+  const online = useOnline();
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
   /** `sending` lags a render behind; two quick selects must not both send. */
@@ -60,6 +64,8 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
       t('openInEve.needCharacter')
     ) : lacksScope ? (
       <GrantMissingLink groups={MISSING_GROUPS} />
+    ) : !online ? (
+      t('common.needsConnection')
     ) : null;
 
   async function sendFor(forCharacter: number) {
@@ -75,6 +81,8 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
       const result = await openInEve(forCharacter, { kind, id: targetId });
       if (result.ok) {
         setOutcome({ tone: 'status', text: t('openInEve.opened') });
+      } else if (result.offline) {
+        setOutcome({ tone: 'alert', text: t('openInEve.offline') });
       } else {
         setOutcome({
           tone: 'alert',
@@ -99,6 +107,7 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
 
   return {
     blockedReason,
+    offline: characterId !== null && !lacksScope && !online,
     missingGroups: lacksScope && characterId !== null ? MISSING_GROUPS : [],
     sending,
     outcome,

@@ -8,7 +8,7 @@
  * ride `?hub=` and `?percent=`, per-visit overrides that never rewrite the
  * visitor's own synced settings.
  */
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { MARKET_TABS } from '@/app/pageTabs';
 import {
@@ -32,26 +32,38 @@ export function sharedAppraisalOpenInApp(view: AppraisalShareView, shareId: stri
   return { path: `${tabPath(MARKET_TABS, 'appraisal')}?${query}` };
 }
 
+export interface SharedAppraisalSeed {
+  /** The share could not be fetched (offline, a timeout): `?share=` is still in the URL. */
+  loadFailed: boolean;
+  /** Fetches the share again. */
+  retry: () => void;
+  /** Gives up on the failed load: drops `?share=` so a reload does not try again. */
+  dismiss: () => void;
+}
+
 /**
- * Reads `?share=` once, strips it from the URL (a reload or a copied address
- * must not re-paste over whatever the pilot has since typed), and hands the
- * share's paste text to `onSeed`. A dead or unreadable share seeds nothing —
+ * Reads `?share=` once and hands the share's paste text to `onSeed`, then
+ * strips it from the URL (a reload or a copied address must not re-paste over
+ * whatever the pilot has since typed). It is stripped only once the share has
+ * answered: a fetch that failed (offline) keeps `?share=` so a reload or
+ * `retry` can still load it, and says so through `loadFailed`. A dead or
+ * unsupported share seeds nothing and is stripped — retrying cannot help, and
  * the share page itself is where that gets explained.
  */
-export function useSharedAppraisalSeed(onSeed: (text: string) => void): void {
+export function useSharedAppraisalSeed(onSeed: (text: string) => void): SharedAppraisalSeed {
   const [searchParams, setSearchParams] = useSearchParams();
   const shareId = searchParams.get(SHARE_PARAM);
   const latestOnSeed = useRef(onSeed);
   useEffect(() => {
     latestOnSeed.current = onSeed;
   });
+  const [attempt, setAttempt] = useState(0);
+  const [loadFailed, setLoadFailed] = useState(false);
   // Not a cancellation flag: stripping the param re-runs this effect, and its
   // cleanup must not drop the load it just started.
   const handled = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (shareId === null || handled.current === shareId) return;
-    handled.current = shareId;
+  const strip = useCallback(() => {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -60,10 +72,34 @@ export function useSharedAppraisalSeed(onSeed: (text: string) => void): void {
       },
       { replace: true }
     );
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    if (shareId === null) return;
+    const key = `${shareId}#${attempt}`;
+    if (handled.current === key) return;
+    handled.current = key;
     void loadShare(shareId).then((result) => {
-      if (!result.ok || result.share.type !== 'appraisal') return;
-      const snapshot = parseAppraisalSnapshot(result.share.payload);
-      if (snapshot !== null) latestOnSeed.current(appraisalSnapshotPasteText(snapshot));
+      if (!result.ok && result.reason === 'failed') {
+        setLoadFailed(true);
+        return;
+      }
+      if (result.ok && result.share.type === 'appraisal') {
+        const snapshot = parseAppraisalSnapshot(result.share.payload);
+        if (snapshot !== null) latestOnSeed.current(appraisalSnapshotPasteText(snapshot));
+      }
+      strip();
     });
-  }, [shareId, setSearchParams]);
+  }, [shareId, attempt, strip]);
+
+  const retry = useCallback(() => {
+    setLoadFailed(false);
+    setAttempt((n) => n + 1);
+  }, []);
+  const dismiss = useCallback(() => {
+    setLoadFailed(false);
+    strip();
+  }, [strip]);
+
+  return { loadFailed, retry, dismiss };
 }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useMarkPublicRouteRendered } from '@/app/routeFocus';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Spinner } from '@/components/ui';
+import { Button, EmptyState, Spinner } from '@/components/ui';
 import { parseAppraisalSnapshot } from '@/engine/market/appraisalSnapshot';
 import {
   AppraisalShareScreen,
@@ -46,6 +47,8 @@ export function SharedLink() {
   useMarkPublicRouteRendered();
   const { shareId = '' } = useParams();
   const [loaded, setLoaded] = useState<LoadState>(null);
+  // Bumped by Try again after a failed read, to fetch the share once more.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,10 +58,15 @@ export function SharedLink() {
     return () => {
       cancelled = true;
     };
-  }, [shareId]);
+  }, [shareId, attempt]);
 
   // A result for a different id (the visitor followed another link) is stale.
   const result = loaded?.shareId === shareId ? loaded.result : null;
+  // Try again unmounts while the share loads, so the always-mounted wrapper below holds focus.
+  const [retryRef, , holdRetryFocus] = useRetryFocus<HTMLDivElement>(
+    result === null ? 'busy' : result.ok || result.reason !== 'failed' ? 'ok' : 'failed',
+    shareId
+  );
 
   if (result?.ok) {
     switch (result.share.type) {
@@ -100,24 +108,42 @@ export function SharedLink() {
 
   return (
     <ShareShell title={t('share.title')}>
-      {result === null && (
-        <div className="flex justify-center py-10">
-          <Spinner label={t('common.loading')} />
-        </div>
-      )}
-      {result?.ok === false && result.reason === 'not-found' && (
-        <EmptyState title={t('share.goneTitle')} hint={t('share.goneHint')} className="py-10" />
-      )}
-      {result?.ok === false && result.reason === 'unsupported' && (
-        <EmptyState
-          title={t('share.unsupportedTitle')}
-          hint={t('share.unsupportedHint')}
-          className="py-10"
-        />
-      )}
-      {result?.ok === false && result.reason === 'failed' && (
-        <EmptyState title={t('share.failedTitle')} hint={t('share.failedHint')} className="py-10" />
-      )}
+      <div ref={retryRef} tabIndex={-1} className="focus:outline-none">
+        {result === null && (
+          <div className="flex justify-center py-10">
+            <Spinner label={t('common.loading')} />
+          </div>
+        )}
+        {result?.ok === false && result.reason === 'not-found' && (
+          <EmptyState title={t('share.goneTitle')} hint={t('share.goneHint')} className="py-10" />
+        )}
+        {result?.ok === false && result.reason === 'unsupported' && (
+          <EmptyState
+            title={t('share.unsupportedTitle')}
+            hint={t('share.unsupportedHint')}
+            className="py-10"
+          />
+        )}
+        {result?.ok === false && result.reason === 'failed' && (
+          <EmptyState
+            title={t('share.failedTitle')}
+            hint={t('share.failedHint')}
+            className="py-10"
+            action={
+              <Button
+                size="sm"
+                onClick={() => {
+                  holdRetryFocus();
+                  setLoaded(null);
+                  setAttempt((n) => n + 1);
+                }}
+              >
+                {t('common.retry')}
+              </Button>
+            }
+          />
+        )}
+      </div>
     </ShareShell>
   );
 }

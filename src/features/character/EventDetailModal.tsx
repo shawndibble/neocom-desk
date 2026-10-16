@@ -12,6 +12,7 @@
  */
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
+import { NeedsConnection } from '@/components/NeedsConnection';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, Spinner, type ButtonVariant } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -92,15 +93,15 @@ export function EventDetailModal({
   // was otherwise the only way back to the network.
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [rsvpFailed, setRsvpFailed] = useState(false);
+  const [rsvpFailed, setRsvpFailed] = useState<'offline' | 'failed' | null>(null);
 
   async function respond(response: CalendarRsvpResponse) {
     setSaving(true);
-    setRsvpFailed(false);
+    setRsvpFailed(null);
     try {
-      const ok = await respondToCalendarEvent(characterId, event.event_id, response);
-      if (!ok) {
-        setRsvpFailed(true);
+      const outcome = await respondToCalendarEvent(characterId, event.event_id, response);
+      if (outcome !== 'saved') {
+        setRsvpFailed(outcome);
         return;
       }
       setState((prev) =>
@@ -213,23 +214,27 @@ export function EventDetailModal({
                 const OptionIcon = RESPONSE_ICON[response];
                 const active = state.detail.data.response === response;
                 return (
-                  <Button
-                    key={response}
-                    size="md"
-                    variant={active ? RSVP_ACTIVE_VARIANT[response] : 'ghost'}
-                    aria-pressed={active}
-                    disabled={saving}
-                    onClick={() => void respond(response)}
-                  >
-                    <OptionIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                    {t(labelKey)}
-                  </Button>
+                  <NeedsConnection key={response}>
+                    {(offline) => (
+                      <Button
+                        size="md"
+                        variant={active ? RSVP_ACTIVE_VARIANT[response] : 'ghost'}
+                        aria-pressed={active}
+                        disabled={saving}
+                        aria-disabled={offline || undefined}
+                        onClick={() => void respond(response)}
+                      >
+                        <OptionIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                        {t(labelKey)}
+                      </Button>
+                    )}
+                  </NeedsConnection>
                 );
               })}
             </div>
-            {rsvpFailed && (
+            {rsvpFailed !== null && (
               <p role="alert" className="mt-2 text-[0.6875rem] text-danger">
-                {t('calendar.rsvpFailed')}
+                {rsvpFailed === 'offline' ? t('calendar.rsvpOffline') : t('calendar.rsvpFailed')}
               </p>
             )}
           </div>

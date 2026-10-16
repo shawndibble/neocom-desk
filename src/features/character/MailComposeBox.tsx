@@ -26,6 +26,9 @@ import {
   type ComposeKind,
 } from '@/engine/mail';
 import { moveHighlight } from '@/lib/comboboxNav';
+import { isOfflineFailure } from '@/esi/client';
+import { NeedsConnection } from '@/components/NeedsConnection';
+import { useOnline } from '@/stores/network';
 import { sendMail } from './mail';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
 import { loadContacts } from './contacts';
@@ -80,6 +83,7 @@ export function MailComposeBox({
   onSent,
 }: MailComposeBoxProps) {
   const { t } = useTranslation();
+  const online = useOnline();
   const [ready, setReady] = useState(false);
   const [recipients, setRecipients] = useState<RecipientChip[]>([]);
   const [subject, setSubject] = useState('');
@@ -353,7 +357,9 @@ export function MailComposeBox({
       onSent();
     } catch (err) {
       setError(
-        t('mail.sendErrorPrefix', { message: err instanceof Error ? err.message : String(err) })
+        isOfflineFailure(err)
+          ? t('mail.sendOffline')
+          : t('mail.sendErrorPrefix', { message: err instanceof Error ? err.message : String(err) })
       );
     } finally {
       setSending(false);
@@ -455,7 +461,9 @@ export function MailComposeBox({
                 <li className="px-3 py-2 text-xs text-text-dim">
                   {recipientQuery.trim().length < MIN_RECIPIENT_SEARCH_LENGTH
                     ? t('mail.recipientSearchHint')
-                    : t('mail.noRecipientResults')}
+                    : !online
+                      ? t('mail.recipientSearchOffline')
+                      : t('mail.noRecipientResults')}
                 </li>
               ) : (
                 candidates.map((c, i) => (
@@ -521,15 +529,25 @@ export function MailComposeBox({
       )}
 
       <div className="flex items-center gap-2">
-        <Button variant="primary" size="sm" onClick={() => void handleSend()} disabled={sending}>
-          {sending ? (
-            <span className="flex items-center gap-1.5">
-              <Spinner size="sm" /> {t('mail.sending')}
-            </span>
-          ) : (
-            t('mail.send')
+        <NeedsConnection>
+          {(offline) => (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => void handleSend()}
+              disabled={sending}
+              aria-disabled={offline || undefined}
+            >
+              {sending ? (
+                <span className="flex items-center gap-1.5">
+                  <Spinner size="sm" /> {t('mail.sending')}
+                </span>
+              ) : (
+                t('mail.send')
+              )}
+            </Button>
           )}
-        </Button>
+        </NeedsConnection>
         <Button size="sm" onClick={onClose} disabled={sending}>
           {t('mail.cancel')}
         </Button>

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -48,6 +48,10 @@ function openMenu(locationId = JITA_4_4) {
   fireEvent.contextMenu(screen.getByText('row'));
 }
 
+afterEach(() => {
+  Reflect.deleteProperty(navigator, 'onLine');
+});
+
 beforeEach(async () => {
   vi.clearAllMocks();
   postAutopilotWaypointMock.mockResolvedValue({ data: null });
@@ -84,6 +88,26 @@ describe('SetWaypointMenuItem', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Waypoints not set: Character is not online'
     );
+  });
+
+  it('says it is offline in the menu when the request never left the browser', async () => {
+    await seed([WAYPOINT_SCOPE]);
+    postAutopilotWaypointMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    openMenu();
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Set waypoint in game' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("You're offline");
+  });
+
+  it('stays inert while offline, without blaming the Character', async () => {
+    await seed([WAYPOINT_SCOPE]);
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    openMenu();
+
+    const item = await screen.findByRole('menuitem', { name: 'Set waypoint in game' });
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(item);
+    expect(postAutopilotWaypointMock).not.toHaveBeenCalled();
   });
 
   it('stays inert for a Character without the waypoint scope', async () => {

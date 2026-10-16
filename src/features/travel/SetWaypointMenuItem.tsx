@@ -30,7 +30,7 @@ export function SetWaypointMenuItem({
   placeName: string;
 }) {
   const { t } = useTranslation();
-  const { blockedReason, missingGroups, sending, outcome, send } = useSetDestination(
+  const { blockedReason, offline, missingGroups, sending, outcome, send } = useSetDestination(
     locationId,
     placeName
   );
@@ -43,7 +43,9 @@ export function SetWaypointMenuItem({
           reason={
             missingGroups.length > 0
               ? t('permissions.grantMissing')
-              : t('travel.waypoints.needCharacter')
+              : offline
+                ? t('common.needsConnection')
+                : t('travel.waypoints.needCharacter')
           }
         >
           {label}

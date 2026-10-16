@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -251,6 +251,48 @@ describe('EventDetailModal', () => {
 
       await vi.waitFor(() => expect(declineButton).not.toBeDisabled());
       expect(await screen.findByText(/couldn't save your response/i)).toBeInTheDocument();
+    });
+
+    it('says offline, not a generic failure, when the write never reached ESI', async () => {
+      serveDetail('not_responded');
+      server.use(
+        http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () => HttpResponse.error())
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Decline' }));
+
+      expect(await screen.findByText(/you're offline — your response wasn't saved/i)).toBeVisible();
+      expect(screen.queryByText(/couldn't save your response/i)).not.toBeInTheDocument();
+    });
+
+    it('disables the RSVP buttons while offline, with the reason in a tooltip', async () => {
+      serveDetail('not_responded');
+      let puts = 0;
+      server.use(
+        http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () => {
+          puts += 1;
+          return new HttpResponse(null, { status: 204 });
+        })
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+      await screen.findByRole('button', { name: 'Accept' });
+
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+      act(() => {
+        window.dispatchEvent(new Event('offline'));
+      });
+      try {
+        const user = userEvent.setup();
+        const accept = screen.getByRole('button', { name: 'Accept' });
+        expect(accept).toHaveAttribute('aria-disabled', 'true');
+        await user.hover(accept);
+        expect((await screen.findAllByText('Needs a connection')).length).toBeGreaterThan(0);
+        await user.click(accept);
+        expect(puts).toBe(0);
+      } finally {
+        Reflect.deleteProperty(navigator, 'onLine');
+      }
     });
 
     it('marks the current response with aria-pressed, not color alone', async () => {
