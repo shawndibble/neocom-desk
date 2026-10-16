@@ -1130,6 +1130,13 @@ Rows:
   product), a click on the selected row clears it, the same as a toggle;
   closing its detail pane does not. When such a row is a link, Space clicks
   it as Enter does.
+- **A detail pane beside a table** (Hauling's trip rail): where the panel
+  is wide enough by its own width (ADR 0017) it is a sticky column beside
+  the table, and a "‹ Back" crumb in it leaves the detail without clearing the
+  selection; narrower, a row click opens the same detail as a sheet
+  (`sheet-full` for a long one). Where the row's ⋮ would hold only the
+  item's own actions, the row drops it and its right-click menu, and they
+  move to an `ItemMoreActions` ⋮ in the detail's header.
 - **A row with a menu** shows the ⋮ (`rowMoreActions`) only if the menu
   passes the restraint rules below. Right-click and touch-and-hold open the
   same menu, never the only way in. A row without a ⋮ has no custom menu.

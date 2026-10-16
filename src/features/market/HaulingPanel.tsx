@@ -132,17 +132,18 @@ import {
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
 /**
- * The table widths (rem) the layout changes at, estimated from the columns'
- * widest figures beside a 20rem rail: below `compact` the figures go compact
- * (`12.08M`; the full ones, a two-line Item and the Bring box need about
- * 42rem), and below `cards` the rows become the phone's cards (the compact
- * columns need about 32rem). A rem and more of headroom on each, so a longer
- * figure never brings the scroll back. Any hub's Hub column needs about
- * 5.3rem more of each.
+ * The table widths (rem) the layout changes at, measured in Chrome beside a
+ * 20rem rail (#3878): below `compact` the figures go compact (`12.08M`; the
+ * full columns need about 35.8rem, and a long Item name needs about 9rem to
+ * wrap to two lines at most), and below `cards` the rows become the phone's
+ * cards (the compact columns need about 34.3rem, plus the Item column's
+ * 7rem floor and a rem of headroom). The headers' sort and help marks set
+ * most columns' widths, not the figures, which is why the two sit close.
+ * Any hub's Hub column needs about 5.3rem more of each.
  */
 const TABLE_WIDTHS = {
-  oneHub: { compact: 44, cards: 34 },
-  anyHub: { compact: 49.5, cards: 39.5 },
+  oneHub: { compact: 45, cards: 42.5 },
+  anyHub: { compact: 50.5, cards: 48 },
 } as const;
 /** The rail's 20rem and the 1rem gap beside it: the rail shows only where the table still fits beside it as a table. */
 const RAIL_REM = 21;
@@ -914,7 +915,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       id: 'm3',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.m3'),
-      headerTooltip: t('market.hauling.columns.m3Tip'),
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { after: ` ${t('market.hauling.columns.m3')}` },

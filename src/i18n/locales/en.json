@@ -9377,8 +9377,7 @@
         "marginInstantTip": "Profit as a percentage of what the load costs, after the sales tax on the sale. Nothing is listed, so there is no broker fee. Select a row for the full working.",
         "iskPerM3": "ISK/m³",
         "iskPerM3Tip": "Profit per unit divided by its hauled volume: what each cubic metre of hold earns carrying this item.",
-        "m3": "m³",
-        "m3Tip": "The hold space the quantity in Bring takes up."
+        "m3": "m³"
       },
       "demand": {
         "most-days": "Sells most days",
