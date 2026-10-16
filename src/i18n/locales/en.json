@@ -6514,6 +6514,14 @@
     "noMatchesTitle": "No mail matches these filters",
     "noMatchesHint": "Try another folder, clear the search, or show read mail again.",
     "loadMore": "Load more",
+    "age": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week",
+      "earlierThisMonth": "Earlier this month",
+      "lastMonth": "Last month",
+      "undated": "No date"
+    },
     "backToList": "Back",
     "searchLabel": "Search subject or sender",
     "searchPlaceholder": "Search subject or sender…",

@@ -153,6 +153,7 @@ afterEach(() => {
   server.resetHandlers();
   restoreMatchMedia?.();
   restoreMatchMedia = undefined;
+  vi.useRealTimers();
 });
 async function seed() {
   await db.characters.clear();
@@ -663,8 +664,41 @@ describe('Mail', () => {
     );
     render(<App />);
     await screen.findByText('Mail 0');
-    const list = screen.getByText('Mail 0').closest('ul');
-    expect(list).toHaveClass('max-h-[36rem]', 'overflow-y-auto');
+    // The scroller wraps the date sections, each its own <ul>.
+    const list = screen.getByText('Mail 0').closest('.overflow-y-auto');
+    expect(list).toHaveClass('max-h-[36rem]');
+  });
+
+  it('groups the list under date headings without breaking row selection (issue #3971)', async () => {
+    // Only Date is faked: real timers keep findBy/waitFor polling. Local noon,
+    // so the 09:00 mail is Today in any runner zone.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 2, 12));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          { ...headers[0], timestamp: new Date(2026, 7, 2, 9).toISOString() },
+          { ...headers[1], timestamp: '2020-03-15T12:00:00Z' },
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const subject = await screen.findByText('Fleet up!');
+    const today = screen.getByRole('heading', { name: 'Today' });
+    // Device locale, like every other date in the app.
+    const marchLabel = new Date(Date.UTC(2020, 2, 15)).toLocaleDateString(undefined, {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+    const march = screen.getByRole('heading', { name: marchLabel });
+    expect(today.compareDocumentPosition(march) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByRole('heading', { name: 'Today' })).toHaveLength(1);
+
+    await user.click(subject);
+    expect(await screen.findByRole('button', { name: 'Reply' })).toBeInTheDocument();
+    expect(subject.closest('[aria-current]')).toHaveAttribute('aria-current', 'true');
   });
 
   it('does not show a "load more" affordance when fewer than 50 mails are cached', async () => {
