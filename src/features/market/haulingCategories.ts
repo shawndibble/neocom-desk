@@ -38,6 +38,23 @@ export function typeIdsInHaulingCategory(
   );
 }
 
+/**
+ * The type ids of every offered category but `categoryId`, ascending: what a
+ * fill from other categories scans. Empty for Everything, which has none
+ * left. A set difference, so a category nested under another never leaks in.
+ */
+export function typeIdsOutsideHaulingCategory(
+  categoryId: number,
+  groups: readonly MarketGroupNode[],
+  types: readonly MarketTypeEntry[]
+): number[] {
+  if (categoryId === EVERYTHING_CATEGORY_ID) return [];
+  const inside = new Set(typeIdsInHaulingCategory(categoryId, groups, types));
+  return typeIdsInHaulingCategory(EVERYTHING_CATEGORY_ID, groups, types).filter(
+    (id) => !inside.has(id)
+  );
+}
+
 /** Every type id under `rootId`, at any depth of the market-group tree, ascending. */
 export function typeIdsInCategory(
   rootId: number,
