@@ -97,6 +97,18 @@ import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExpo
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
 import { getAveragePriceByType } from '@/market/prices';
+import {
+  abyssalItemRefs,
+  summarizeAbyssal,
+  withoutAbyssalTypePrices,
+  type AbyssalSummary,
+} from '@/engine/market/abyssalValuation';
+import {
+  useAbyssalAssetEstimates,
+  type AbyssalAssetEstimates,
+} from '@/features/abyssal/useAbyssalAssetEstimates';
+import { AbyssalValueNote } from '@/features/abyssal/AbyssalValueNote';
+import { abyssalValueHint } from '@/features/abyssal/abyssalValueHint';
 import { formatIsk, parseIskAmount } from '@/lib/isk';
 import {
   assetStackValue,
@@ -613,7 +625,9 @@ function characterBadgeFor(itemId: number, ctx: CharacterBadgeContext): string |
  */
 interface AssetItemActions {
   priceByTypeId: ReadonlyMap<number, number>;
-  copyValueByItemId: ReadonlyMap<number, number>;
+  itemValueByItemId: ReadonlyMap<number, number>;
+  /** Abyssal modules' MutaMarket estimates; a row on screen asks for its own. */
+  abyssal: AbyssalAssetEstimates;
   volumeByTypeId: ReadonlyMap<number, number>;
   /** Material typeID -> the character's own Build Plan consuming it; null until the blueprint catalog has loaded. */
   materialPlanMap: ReadonlyMap<number, BuildPlanRecord> | null;
@@ -913,7 +927,7 @@ export function Assets() {
   const assetsNeedsReauth = data?.assetsNeedsReauth ?? false;
   const typeNames = data?.typeNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
-  const priceByTypeId = data?.priceByTypeId ?? NO_PRICES;
+  const typePrices = data?.priceByTypeId ?? NO_PRICES;
   const ownCopyValues = data?.copyValueByItemId ?? NO_COPY_VALUES;
   const volumeByTypeId = data?.volumeByTypeId ?? NO_VOLUMES;
 
@@ -934,7 +948,7 @@ export function Assets() {
     const matches =
       flatModeActive && minValueThreshold > 0
         ? searched.filter(
-            (m) => assetStackValue(m.asset, priceByTypeId, ownCopyValues) >= minValueThreshold
+            (m) => assetStackValue(m.asset, priceByTypeId, itemValueByItemId) >= minValueThreshold
           )
         : searched;
 
@@ -970,10 +984,27 @@ export function Assets() {
     if (!activeCrossCharacterData) return own;
     return [...own, ...activeCrossCharacterData.entries.flatMap((entry) => entry.assets)];
   }, [assetsResult, activeCrossCharacterData]);
-  const copyValueByItemId = useMemo(() => {
-    if (!activeCrossCharacterData) return ownCopyValues;
-    return new Map([...ownCopyValues, ...activeCrossCharacterData.copyValueByItemId]);
-  }, [ownCopyValues, activeCrossCharacterData]);
+  // Abyssal types leave the price map; their estimates join the per-item values.
+  const abyssal = useAbyssalAssetEstimates(
+    mergedAssets,
+    (itemId) => activeCrossCharacterData?.characterIdByItemId.get(itemId) ?? activeCharacterId,
+    `${activeCharacterId}:${activeCrossCharacterData ? 'all' : 'one'}`
+  );
+  const priceByTypeId = useMemo(
+    () =>
+      abyssal.isAbyssalType
+        ? withoutAbyssalTypePrices(typePrices, abyssal.isAbyssalType)
+        : typePrices,
+    [typePrices, abyssal.isAbyssalType]
+  );
+  const itemValueByItemId = useMemo(() => {
+    if (!activeCrossCharacterData && abyssal.values.size === 0) return ownCopyValues;
+    return new Map([
+      ...ownCopyValues,
+      ...(activeCrossCharacterData?.copyValueByItemId ?? []),
+      ...abyssal.values,
+    ]);
+  }, [ownCopyValues, activeCrossCharacterData, abyssal.values]);
   const mergedTypeNames = useMemo(() => {
     if (!activeCrossCharacterData) return typeNames;
     const merged = new Map(typeNames);
@@ -1065,8 +1096,8 @@ export function Assets() {
   // (results are a separate flat list), so browsing always sees the whole
   // structure and clearing a search never has to rebuild it.
   const tree = useMemo(
-    () => buildAssetTree(mergedAssets, priceByTypeId, copyValueByItemId),
-    [mergedAssets, priceByTypeId, copyValueByItemId]
+    () => buildAssetTree(mergedAssets, priceByTypeId, itemValueByItemId),
+    [mergedAssets, priceByTypeId, itemValueByItemId]
   );
   const stationLabelFor = useMemo(
     () => (station: AssetTreeStation) =>
@@ -1200,7 +1231,7 @@ export function Assets() {
     if (!flatModeActive) return [];
     const valued: ValuedAssetMatch[] = searchMatches.map((match) => ({
       match,
-      value: assetStackValue(match.asset, priceByTypeId, copyValueByItemId),
+      value: assetStackValue(match.asset, priceByTypeId, itemValueByItemId),
     }));
     const filtered =
       minValueThreshold > 0 ? valued.filter((v) => v.value >= minValueThreshold) : valued;
@@ -1210,7 +1241,7 @@ export function Assets() {
     searchMatches,
     minValueThreshold,
     priceByTypeId,
-    copyValueByItemId,
+    itemValueByItemId,
     sortField,
   ]);
 
@@ -1478,7 +1509,8 @@ export function Assets() {
   const assetItemActions = useMemo<AssetItemActions>(
     () => ({
       priceByTypeId,
-      copyValueByItemId,
+      itemValueByItemId,
+      abyssal,
       volumeByTypeId,
       materialPlanMap,
       onViewInIndustryAsMaterial: handleViewInIndustryAsMaterial,
@@ -1486,7 +1518,8 @@ export function Assets() {
     }),
     [
       priceByTypeId,
-      copyValueByItemId,
+      itemValueByItemId,
+      abyssal,
       volumeByTypeId,
       materialPlanMap,
       handleViewInIndustryAsMaterial,
@@ -1526,6 +1559,26 @@ export function Assets() {
   const deepest = resolved.trail[resolved.trail.length - 1] ?? resolved.station;
   const currentTotals =
     deepest && (!('kind' in deepest) || deepest.kind !== 'item') ? deepest : null;
+
+  // How the abyssal modules in view are valued: every asset at the root, the
+  // level's contents when drilled in, the matches in a flat list.
+  const abyssalSummary: AbyssalSummary | null = (() => {
+    const isAbyssalType = abyssal.isAbyssalType;
+    if (!isAbyssalType) return null;
+    let scope: readonly Pick<CharacterAsset, 'item_id' | 'type_id'>[];
+    if (flatModeActive) scope = flatMatches.map((match) => match.asset);
+    else if (pathStationId === null) scope = mergedAssets;
+    else if (!deepest) scope = [];
+    else {
+      const ids = 'kind' in deepest ? collectItemIds(deepest) : collectStationItemIds(deepest);
+      scope = ids.flatMap((id) => assetsByItemId.get(id) ?? []);
+    }
+    return summarizeAbyssal(
+      abyssalItemRefs(scope, isAbyssalType).map((item) => item.itemId),
+      abyssal.values,
+      abyssal.estimates
+    );
+  })();
 
   // Phone station header (#2989): security · ISK · jumps on a second line, so the
   // top line is the back button and the full-width station name. An absent item
@@ -2013,6 +2066,13 @@ export function Assets() {
                     </>
                   )}
 
+                  {abyssalSummary && (
+                    <AbyssalValueNote
+                      summary={abyssalSummary}
+                      className="shrink-0 border-b border-line px-3 py-1.5"
+                    />
+                  )}
+
                   {/* --- the list --- */}
                   {resolved.unresolved.length > 0 ? (
                     <EmptyState
@@ -2157,6 +2217,29 @@ function BrowseRowView(props: BrowseRowViewProps) {
   return <SearchMatchRow {...props} match={row.match} />;
 }
 
+/**
+ * An abyssal module's row asks for its MutaMarket estimate while it is on
+ * screen, and names what its value is (or why it has none). Undefined for
+ * any other stack.
+ */
+function useAbyssalValueHint(
+  asset: Pick<CharacterAsset, 'item_id' | 'type_id'> | null,
+  abyssal: AbyssalAssetEstimates,
+  t: Translate
+): string | undefined {
+  const isAbyssal = asset !== null && (abyssal.isAbyssalType?.(asset.type_id) ?? false);
+  const itemId = asset?.item_id;
+  const typeId = asset?.type_id;
+  const { request } = abyssal;
+  useEffect(() => {
+    if (!isAbyssal || itemId === undefined || typeId === undefined) return undefined;
+    // Leaving the screen before its turn drops the ask.
+    return request({ itemId, typeId });
+  }, [isAbyssal, itemId, typeId, request]);
+  if (!isAbyssal || itemId === undefined) return undefined;
+  return abyssalValueHint(abyssal.estimates.get(itemId), t);
+}
+
 /** Split out so it can call `useAssetItemActions` — a heading/location row does not. */
 function SearchMatchRow({
   match,
@@ -2169,17 +2252,19 @@ function SearchMatchRow({
 }: BrowseRowViewProps & { match: AssetMatch }) {
   const actions = useAssetItemActions();
   const { asset, name } = match;
+  const valueHint = useAbyssalValueHint(asset, actions.abyssal, t);
   const rootStationId = rootStationIdFor(asset);
   return (
     <SearchResultRow
       name={name}
       quantity={asset.quantity}
-      estimatedValue={assetStackValue(asset, actions.priceByTypeId, actions.copyValueByItemId)}
+      estimatedValue={assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId)}
       trail={trailFor(asset)}
       security={rootStationId === null ? undefined : securityForStation(rootStationId)}
       href={assetHref(rootStationId, [], query)}
       characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
+      valueHint={valueHint}
       t={t}
     />
   );
@@ -2203,6 +2288,11 @@ function NodeRowView({
   const label = nodeLabel(node);
   const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
 
+  const valueHint = useAbyssalValueHint(
+    node.kind === 'item' ? node.asset : null,
+    actions.abyssal,
+    t
+  );
   if (node.kind !== 'item') {
     return (
       <ContainerRow
@@ -2221,7 +2311,9 @@ function NodeRowView({
   }
 
   const { asset } = node;
-  const estimatedValue = assetStackValue(asset, actions.priceByTypeId, actions.copyValueByItemId);
+  // A Mutated module's Show info opens on its own Rolls; any other stack's on its type.
+  const itemId = actions.abyssal.isAbyssalType?.(asset.type_id) ? asset.item_id : undefined;
+  const estimatedValue = assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId);
   const planTarget =
     pageActions.blueprints === null
       ? undefined
@@ -2238,9 +2330,11 @@ function NodeRowView({
       quantity={asset.quantity}
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
+      valueHint={valueHint}
       characterBadge={badge}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
       typeId={asset.type_id}
+      itemId={itemId}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
       onToggleSelection={() => onToggleSelection([asset.item_id])}
@@ -2249,6 +2343,7 @@ function NodeRowView({
         <OreItemMenu
           quantity={asset.quantity}
           typeId={asset.type_id}
+          itemId={itemId}
           itemName={label}
           blueprintTypeID={blueprintTypeID}
           planProductTypeID={planTarget?.productTypeID}

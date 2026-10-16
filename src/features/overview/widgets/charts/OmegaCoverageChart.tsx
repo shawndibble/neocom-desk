@@ -1,5 +1,5 @@
 /**
- * The Omega coverage widget's chart: one bar per 30-day period of net income,
+ * The Omega coverage widget's chart: one bar per period (the widget range) of net income,
  * and a labelled horizontal line at each whole account's cost (1x, 2x...), so
  * a bar above a line reads as covering that many accounts. One series, so one
  * colour; the lines are neutral and carry text labels, never colour alone.

@@ -79,6 +79,7 @@ export function EntityInfoRoute() {
   const info = parseEntityInfo(location.search);
   const kind = info?.kind ?? null;
   const id = info?.id ?? null;
+  const itemId = info?.itemId;
   useEffect(() => {
     const publicInfo = usePublicInfoModalStore.getState();
     const skill = useSkillDetailModalStore.getState();
@@ -91,7 +92,11 @@ export function EntityInfoRoute() {
       publicInfo.clear();
       skill.clear();
       const staged = item.staged;
-      item.show({ typeId: id, itemName: staged?.typeId === id ? staged.itemName : undefined });
+      item.show({
+        typeId: id,
+        itemName: staged?.typeId === id ? staged.itemName : undefined,
+        itemId,
+      });
       item.stage(id, undefined);
     } else if (kind === 'skill') {
       publicInfo.clear();
@@ -105,7 +110,7 @@ export function EntityInfoRoute() {
       item.clear();
       publicInfo.show({ kind, id });
     }
-  }, [kind, id]);
+  }, [kind, id, itemId]);
 
   return null;
 }

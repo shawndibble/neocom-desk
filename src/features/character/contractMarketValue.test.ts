@@ -5,6 +5,8 @@ import { loadContractMarketValue } from './contractMarketValue';
 
 const pricesMock = vi.hoisted(() => ({ getHubPricesWithStatus: vi.fn() }));
 vi.mock('@/market/prices', () => pricesMock);
+const mutamarket = vi.hoisted(() => ({ getAbyssalEstimate: vi.fn() }));
+vi.mock('@/market/mutamarket', () => mutamarket);
 
 const TRITANIUM = 34;
 const PYERITE = 35;
@@ -89,5 +91,86 @@ describe('loadContractMarketValue', () => {
       TRITANIUM,
       PYERITE,
     ]);
+  });
+});
+
+describe('loadContractMarketValue with abyssal modules', () => {
+  const NEUT = 47832;
+  const abyssal = { isAbyssalType: (typeId: number) => typeId === NEUT, characterId: 7 };
+  const estimate = (value: number | null) => ({
+    status: value === null ? 'no-estimate' : 'priced',
+    value,
+    source: 'mutamarket',
+    fetchedAt: 0,
+    valueUpdatedAt: null,
+    url: 'https://mutamarket.com',
+  });
+
+  beforeEach(() => {
+    pricesMock.getHubPricesWithStatus.mockResolvedValue({
+      unreachable: false,
+      prices: new Map([[TRITANIUM, { sellMin: 5, buyMax: 4, sellVolume: 0, buyVolume: 0 }]]),
+    });
+  });
+
+  it('prices each abyssal module by its own estimate, apart from the market total', async () => {
+    mutamarket.getAbyssalEstimate.mockImplementation(async (_type: number, itemId: number) =>
+      estimate(itemId === 11 ? 90_000_000 : null)
+    );
+    const result = await loadContractMarketValue(
+      DEFAULT_TRADE_HUB,
+      [
+        { type_id: TRITANIUM, quantity: 10 },
+        { type_id: NEUT, quantity: 1, item_id: 11 },
+        { type_id: NEUT, quantity: 1, item_id: 12 },
+        { type_id: NEUT, quantity: 1 },
+      ],
+      new Map(),
+      { abyssal }
+    );
+    expect(result).toEqual({
+      total: 50,
+      unpriced: 0,
+      unreachable: false,
+      abyssal: { estimated: 90_000_000, priced: 1, unpriced: 2, onlyAbyssal: false },
+    });
+    expect(pricesMock.getHubPricesWithStatus.mock.calls[0][1]).toEqual([TRITANIUM]);
+    expect(mutamarket.getAbyssalEstimate).toHaveBeenCalledTimes(2);
+    expect(mutamarket.getAbyssalEstimate).toHaveBeenCalledWith(NEUT, 11, { characterId: 7 });
+  });
+
+  it('leaves abyssal lines unpriced without an item id or a Character, and reads no prices for them', async () => {
+    const result = await loadContractMarketValue(
+      DEFAULT_TRADE_HUB,
+      [{ type_id: NEUT, quantity: 1, item_id: 11 }],
+      new Map(),
+      { abyssal: { ...abyssal, characterId: null } }
+    );
+    expect(result.abyssal).toEqual({ estimated: 0, priced: 0, unpriced: 1, onlyAbyssal: true });
+    expect(pricesMock.getHubPricesWithStatus).not.toHaveBeenCalled();
+    expect(mutamarket.getAbyssalEstimate).not.toHaveBeenCalled();
+  });
+
+  it('stops looking up once MutaMarket is unavailable', async () => {
+    mutamarket.getAbyssalEstimate.mockResolvedValue({ ...estimate(null), status: 'unavailable' });
+    const lines = Array.from({ length: 12 }, (_, i) => ({
+      type_id: NEUT,
+      quantity: 1,
+      item_id: 100 + i,
+    }));
+    const result = await loadContractMarketValue(DEFAULT_TRADE_HUB, lines, new Map(), { abyssal });
+    expect(mutamarket.getAbyssalEstimate.mock.calls.length).toBeLessThanOrEqual(4);
+    expect(result.abyssal).toEqual({ estimated: 0, priced: 0, unpriced: 12, onlyAbyssal: true });
+  });
+
+  it('starts no lookup once the view is closed', async () => {
+    const result = await loadContractMarketValue(
+      DEFAULT_TRADE_HUB,
+      [{ type_id: NEUT, quantity: 1, item_id: 11 }],
+      new Map(),
+      { abyssal: { ...abyssal, isCancelled: () => true } }
+    );
+    expect(mutamarket.getAbyssalEstimate).not.toHaveBeenCalled();
+    expect(result.abyssal?.unpriced).toBe(1);
   });
 });

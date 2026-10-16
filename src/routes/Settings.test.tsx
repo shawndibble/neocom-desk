@@ -1,3 +1,4 @@
+import { SINGLE_KEY_SHORTCUTS_SETTING_KEY, useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, onTestFinished, vi } from 'vitest';
 import { enableWebPush } from '@/features/notifications/webPush';
 import { clearPushFailure, usePushFailure } from '@/features/notifications/pushFailure';
@@ -159,6 +160,7 @@ beforeEach(async () => {
   await db.tokens.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useFontScale.setState({ value: DEFAULT_FONT_SCALE, hydrated: false });
+  useSingleKeyShortcuts.setState({ value: true, hydrated: false });
   // Module-scope singletons: a value left over from a previous test would
   // make the assertions below pass or fail for the wrong reason.
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
@@ -228,7 +230,7 @@ describe('Settings', () => {
     expect(window.location.pathname).toBe('/help/shortcuts');
     const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
     expect(tabs).toEqual(['Shortcuts', 'FAQ', 'Support']);
-    // Always on now: no switch.
+    // The off switch lives in Settings › Display, not on Help.
     expect(
       screen.queryByRole('checkbox', { name: /single-key shortcuts/i })
     ).not.toBeInTheDocument();
@@ -238,7 +240,22 @@ describe('Settings', () => {
     expect(screen.queryByText('Jump to search')).not.toBeInTheDocument();
     expect(screen.getByText('Switch character')).toBeInTheDocument();
     expect(screen.getByText('Open Settings')).toBeInTheDocument();
+    expect(screen.getAllByText('then').length).toBeGreaterThan(0);
     expect(screen.getByText('Close the open dialog')).toBeInTheDocument();
+  });
+
+  it('turns the single-key shortcuts off from Display, on this device', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/display');
+    render(<App />);
+    const toggle = await screen.findByRole('checkbox', { name: /single-key shortcuts/i });
+    expect(toggle).toBeChecked();
+
+    await user.click(toggle);
+
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText(/single-key shortcuts are off/i)).toBeInTheDocument();
+    expect((await db.settings.get(SINGLE_KEY_SHORTCUTS_SETTING_KEY))?.value).toBe(false);
   });
 
   it('shows an empty state when nothing has been fetched yet (issue #32)', async () => {

@@ -4,6 +4,7 @@
  * `features/netWorth`.
  */
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
+import { assetStackValue } from '@/engine/assetTree';
 
 export interface NetWorthSnapshotRow {
   /** `${characterId}:${day}` */
@@ -67,6 +68,11 @@ export interface SnapshotInputs {
   assets: readonly SnapshotAsset[] | null;
   orders: readonly SnapshotOrder[] | null;
   priceByTypeId: ReadonlyMap<number, number>;
+  /**
+   * Items valued on their own rather than by type: an abyssal module at its
+   * last known MutaMarket estimate. Such an item never takes a type price.
+   */
+  itemValueByItemId?: ReadonlyMap<number, number>;
 }
 
 /** The day's row, or `null` when any of wallet, assets or orders is unavailable — a partial total would read as a crash in net worth. */
@@ -77,9 +83,7 @@ export function buildSnapshotRow(input: SnapshotInputs): NetWorthSnapshotRow | n
   for (const asset of assets) {
     // PLEX is not counted: the PLEX Vault is not in ESI's assets, so only hangar PLEX would show.
     if (asset.type_id === PLEX_TYPE_ID) continue;
-    // A blueprint copy has no market price; the Assets page values it separately.
-    if (asset.is_blueprint_copy) continue;
-    assetValue += asset.quantity * (input.priceByTypeId.get(asset.type_id) ?? 0);
+    assetValue += assetStackValue(asset, input.priceByTypeId, input.itemValueByItemId);
   }
   let escrow = 0;
   let sellStock = 0;

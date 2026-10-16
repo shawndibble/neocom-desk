@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import type { ComposeRecipientType } from '@/engine/mailCompose';
 import { emitUpgradeBlocked } from './blockedSignal';
 import { esiCacheMetaMiddleware, type CachedPage, type EsiCacheMetaRecord } from './esiCacheMeta';
 import type { Attributes, Implants, PlanEntry, PlanMilestone } from '@/engine/types';
@@ -980,7 +981,9 @@ export interface OrderProblemSampleRecord {
 /** Local widening of `MailRecipient` (`esi/endpoints.ts`) — `src/db` carries no dependency on the esi layer, same rule `NotificationFeedRecord.eventId` follows for `src/features`. */
 export interface MailDraftRecipient {
   recipient_id: number;
-  recipient_type: 'alliance' | 'character' | 'corporation' | 'mailing_list';
+  recipient_type: ComposeRecipientType;
+  /** New Mail drafts keep the chip's name so a reopened draft needs no lookup; Reply/Forward drafts leave it out. */
+  name?: string;
 }
 
 /**
@@ -993,12 +996,13 @@ export interface MailDraftRecipient {
  * separate expiry is added here.
  */
 export interface MailDraftRecord {
-  /** `${characterId}:${mailId}` — one draft per source mail per Character. */
+  /** `${characterId}:${mailId}` — one draft per source mail per Character; `${characterId}:new` for New Mail. */
   id: string;
   characterId: number;
-  /** The mail this is a reply/forward of. */
+  /** The mail this is a reply/forward of; `0` for the New Mail slot (no real mail id is 0). */
   mailId: number;
-  kind: 'reply' | 'forward';
+  /** `new` is the single New Mail slot per Character (`id` = `${characterId}:new`). */
+  kind: 'reply' | 'forward' | 'new';
   recipients: MailDraftRecipient[];
   subject: string;
   body: string;

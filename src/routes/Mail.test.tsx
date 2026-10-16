@@ -209,6 +209,27 @@ describe('Mail', () => {
     expect(document.querySelectorAll('header')).toHaveLength(2);
   });
 
+  it('Compose opens the New Mail composer on a phone and closing it returns to the list', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    await user.click(screen.getByRole('button', { name: 'Compose' }));
+    expect(await screen.findByRole('dialog', { name: 'New mail' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Close and keep draft' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New mail' })).toBeNull());
+    expect(screen.getByRole('button', { name: 'Compose' })).toBeInTheDocument();
+  });
+
+  it('Compose opens the New Mail composer in the reading pane on a wide screen', async () => {
+    useDesktopViewport();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    await user.click(screen.getByRole('button', { name: 'Compose' }));
+    expect(await screen.findByRole('region', { name: 'New mail' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Compose' })).not.toBeInTheDocument();
+  });
+
   it('shows the body, markup rendered, on click', async () => {
     const user = userEvent.setup();
     render(<App />);

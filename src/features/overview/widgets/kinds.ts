@@ -149,6 +149,7 @@ const SPECS: Record<string, Spec> = {
     view: 'chart',
     size: 'M',
     plexPlan: true,
+    range: true,
     endpoints: ['getCharacterWalletJournal', 'getCharacterWalletTransactions'],
   },
   lp: {

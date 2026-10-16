@@ -54,6 +54,27 @@ describe('computeNetLoss', () => {
   });
 });
 
+describe('computeNetLoss with abyssal modules', () => {
+  it('counts an abyssal module apart, never at a price, since the killmail carries no roll', () => {
+    const loss = computeNetLoss({
+      victim,
+      prices: new Map([...prices, [1, 999_999]]),
+      insurance: null,
+      zkbValue: null,
+      isAbyssalType: (typeId) => typeId === 1,
+    });
+    expect(loss.fitted).toBe(20);
+    expect(loss.abyssalItems).toBe(1);
+    expect(loss.unpricedTypes).toEqual([]);
+  });
+
+  it('has no abyssal types without the test', () => {
+    expect(computeNetLoss({ victim, prices, insurance: null, zkbValue: null }).abyssalItems).toBe(
+      0
+    );
+  });
+});
+
 describe('matchInsurance', () => {
   const killTime = Date.parse('2026-10-01T12:00:00Z');
   const row = (

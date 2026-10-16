@@ -197,6 +197,18 @@ describe('estimated value cell', () => {
     expect(screen.queryByText('assets.noEstimate')).toBeNull();
     expect(container.querySelector('.text-isk-pos')).not.toBeNull();
   });
+
+  it('puts a value note in the figure tooltip: one tab stop, not two', () => {
+    const { container } = renderItemRow({ estimatedValue: 90_000_000, valueHint: 'An estimate.' });
+    expect(container.querySelectorAll('[tabindex="0"]')).toHaveLength(1);
+    expect(container.querySelector('[tabindex="0"]')).toHaveTextContent('An estimate.');
+  });
+
+  it('gives an unpriced dash the note in place of "No estimate"', () => {
+    renderItemRow({ estimatedValue: 0, valueHint: 'MutaMarket has no estimate.' });
+    expect(screen.getByText('MutaMarket has no estimate.')).toHaveClass('sr-only');
+    expect(screen.queryByText('assets.noEstimate')).toBeNull();
+  });
 });
 
 describe('JumpsAwayText unknown', () => {

@@ -10,7 +10,7 @@
     "tips": {
       "commandPalette": "Press Ctrl+K (Cmd+K on a Mac) to open Go to… and jump to any page from anywhere.",
       "shortcutsList": "Press ? outside a text box to see every keyboard shortcut.",
-      "pageKeys": "Single keys jump between pages: O for Overview, M for Market, I for Industry, W for Wallet.",
+      "pageKeys": "Jump between pages with G then a letter: G O for Overview, G M for Market, G I for Industry, G W for Wallet.",
       "pasteFit": "Paste a fit or an item list outside a text box and Neocom Desk opens it in Fittings or Appraisal.",
       "pasteLocal": "Paste a Local list or a D-Scan outside a text box to check the pilots in Pilot Lookup.",
       "pasteBack": "After a paste takes you to a page, the browser's Back button returns you to where you were.",
@@ -4225,9 +4225,9 @@
           "total": "Total"
         },
         "omega": {
-          "note": "Net income per 30 days. Lines mark what 1, 2... accounts cost.",
+          "note": "Net income per {{days}} days. Lines mark what 1, 2... accounts cost for {{days}} days.",
           "partial": "Lighter bars are partial: your journal history starts inside them or has a gap there.",
-          "partialLatest": "Partial: your journal history has a gap in the last 30 days, so this may be short.",
+          "partialLatest": "Your journal history covers only part of the last {{days}} days, so this undercounts.",
           "summaryPeriod": "to {{date}} {{net}}",
           "truncated": "Some journal pages were missing.",
           "skipped_one": "{{count}} Character's journal could not be read.",
@@ -4236,9 +4236,9 @@
           "tickPartial": "to {{date}} (partial)",
           "line_one": "{{count}} account",
           "line_other": "{{count}} accounts",
-          "summary_one": "Net income {{net}} ISK over the last 30 days covers {{count}} account at {{cost}} ISK each. Per 30 days, oldest first: {{periods}}.",
-          "summary_other": "Net income {{net}} ISK over the last 30 days covers {{count}} accounts at {{cost}} ISK each. Per 30 days, oldest first: {{periods}}.",
-          "summaryNoPrice": "Net income {{net}} ISK over the last 30 days. PLEX has no price, so accounts cannot be counted.",
+          "summary_one": "Net income {{net}} ISK over the last {{days}} days covers {{count}} account at {{cost}} ISK each per {{days}} days. Per {{days}} days, oldest first: {{periods}}.",
+          "summary_other": "Net income {{net}} ISK over the last {{days}} days covers {{count}} accounts at {{cost}} ISK each per {{days}} days. Per {{days}} days, oldest first: {{periods}}.",
+          "summaryNoPrice": "Net income {{net}} ISK over the last {{days}} days. PLEX has no price, so accounts cannot be counted.",
           "tip": {
             "net": "Net income",
             "covers": "Covers",
@@ -4326,13 +4326,13 @@
           "covers_one": "Covers {{count}} account",
           "covers_other": "Covers {{count}} accounts",
           "coversNone": "Doesn't cover one account",
-          "shortBy": "short by {{amount}} ISK / 30 days",
-          "figures": "net {{net}} ISK / 30 days · one account {{cost}} ISK",
-          "next": "Next account needs +{{amount}} ISK / 30 days",
+          "shortBy": "short by {{amount}} ISK / {{days}} days",
+          "figures": "net {{net}} ISK / {{days}} days · one account {{cost}} ISK / {{days}} days",
+          "next": "Next account needs +{{amount}} ISK / {{days}} days",
           "noPrice": "No PLEX price",
-          "netOnly": "net {{net}} ISK / 30 days",
+          "netOnly": "net {{net}} ISK / {{days}} days",
           "noPriceHint": "Can't count accounts without PLEX's price. Try Refresh.",
-          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account."
+          "plexPrice": "PLEX {{price}} ISK each, {{plex}} PLEX per account per 30 days."
         }
       },
       "training": {
@@ -4774,7 +4774,7 @@
         "period": "{{from}} – {{to}}",
         "periodPartial": "{{title}} (partial)",
         "col": {
-          "period": "30 days",
+          "period": "{{days}} days",
           "net": "Net income",
           "accounts": "Accounts"
         }
@@ -5222,7 +5222,7 @@
       "emptyHint": "A snapshot is recorded each day the app is open. Wallet history comes from your journal.",
       "firstDays": "Layers start on {{date}}. The chart fills in as days are recorded.",
       "gapNote": "Hatched days: the app was not open, so only the wallet is known. Nothing is estimated.",
-      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later.",
+      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later. An abyssal module counts at the last MutaMarket estimate this device held that day, so the line steps up on the day one is first estimated.",
       "walletCrumb": "Wallet",
       "layers": {
         "isk": "ISK",
@@ -6290,6 +6290,16 @@
     "fetchTruncatedRetry": "Try again",
     "unknownValue": "-",
     "noEstimate": "No estimate",
+    "abyssal": {
+      "estimated_one": "{{count}} abyssal module at MutaMarket's estimate",
+      "estimated_other": "{{count}} abyssal modules at MutaMarket's estimate",
+      "unpriced_one": "{{count}} abyssal module not priced, left out of the total",
+      "unpriced_other": "{{count}} abyssal modules not priced, left out of the total",
+      "pending_one": "{{count}} abyssal module not looked up yet, left out of the total",
+      "pending_other": "{{count}} abyssal modules not looked up yet, left out of the total",
+      "rowEstimatedAge": "Estimated {{age}}.",
+      "rowNotImported": "MutaMarket hasn't priced this module yet. Show info can ask it to."
+    },
     "security": {
       "ariaLabel": "Security status: {{value}}"
     },
@@ -6524,9 +6534,7 @@
     "removeRecipient": "Remove {{name}}",
     "senderNotRemovable": "The sender can't be removed — remove every other recipient and this still sends as a reply.",
     "addRecipient": "Add recipient",
-    "recipientSearchPlaceholder": "Search by character name…",
-    "recipientSearchHint": "Type at least 3 characters to search.",
-    "noRecipientResults": "No characters found.",
+    "recipientSearchHint": "Type at least {{min}} characters to search.",
     "contactsHeading": "Contacts",
     "searchResultsHeading": "Search results",
     "recipientResultsCount_one": "{{count}} result",
@@ -6542,6 +6550,36 @@
     "sendNoRecipients": "Add at least one recipient before sending.",
     "sendUnconfirmed": "Couldn't confirm the mail was sent. Check your Sent folder before sending it again.",
     "draftSaved": "Your draft is saved.",
+    "compose": "Compose",
+    "newMailHeading": "New mail",
+    "newMailClose": "Close and keep draft",
+    "newMailRecipientPlaceholder": "Add a character, corporation, alliance or list",
+    "newMailNoResults": "No matches.",
+    "newMailNoLists": "You have no mailing lists. Type {{min}} or more characters to search.",
+    "mailingListsFailed": "Couldn't load your mailing lists. Type {{min}} or more characters to search.",
+    "newMailSearchNeedsGrant": "Searching needs a Permission. Your mailing lists are still listed.",
+    "searchReauthTitle": "Grant search to find recipients",
+    "searchReauthHint": "Searching for characters, corporations and alliances needs the search Permission.",
+    "searchReauthAction": "Grant search",
+    "recipientsFull": "Recipient limit reached ({{max}})",
+    "counter": "{{count}} / {{max}}",
+    "recipientType": {
+      "character": "Character",
+      "corporation": "Corporation",
+      "alliance": "Alliance",
+      "mailing_list": "Mailing list"
+    },
+    "problem": {
+      "tooManyRecipients": "A mail can have at most {{max}} recipients.",
+      "subjectTooLong": "The subject is too long.",
+      "bodyTooLong": "The message is too long."
+    },
+    "discardDraft": "Discard draft…",
+    "discardTitle": "Discard this draft?",
+    "discardBody": "The recipients, subject and message will be deleted from this device.",
+    "discardKeep": "Keep editing",
+    "discardConfirm": "Discard",
+    "sentToast": "Mail sent",
     "sendOffline": "You're offline — your draft is saved. Send it when you're back online.",
     "loadMoreOffline": "Couldn't load more — you're offline.",
     "loadMoreFailed": "Couldn't load more mail. Try again.",
@@ -8200,6 +8238,12 @@
     "detailMarketValue": "Market value at {{hub}} (sell orders)",
     "detailMarketValueUnpriced_one": "({{count}} item unpriced)",
     "detailMarketValueUnpriced_other": "({{count}} items unpriced)",
+    "detailAbyssalValue": "Abyssal modules (MutaMarket estimate)",
+    "detailAbyssalNotPriced": "Not priced",
+    "detailAbyssalUnpriced_one": "({{count}} not priced)",
+    "detailAbyssalUnpriced_other": "({{count}} not priced)",
+    "detailAbyssalEstimateNote": "MutaMarket's model estimate for each module's exact rolls, not a sale price.",
+    "detailAbyssalWhy": "An abyssal module is worth its own rolls, so it has no market price; MutaMarket can only estimate one it can identify.",
     "statusFilterLabel": "Status",
     "typeFilterLabel": "Contract type"
   },
@@ -9958,6 +10002,10 @@
       "unmatched_one": "{{count}} line not matched",
       "unmatched_other": "{{count}} lines not matched",
       "unmatchedLine": "line {{lines}} · {{name}}",
+      "abyssal_one": "{{count}} abyssal module not priced",
+      "abyssal_other": "{{count}} abyssal modules not priced",
+      "abyssalHint": "An abyssal module is worth its own rolls, which a pasted name doesn't carry. MutaMarket can estimate one from its in-game link.",
+      "abyssalLink": "Appraise on MutaMarket",
       "unpriced_one": "{{count}} item has no orders on one side at this hub, so it is left out of that total.",
       "unpriced_other": "{{count}} items have no orders on one side at this hub, so they are left out of that total.",
       "compareHubsTitle": "Compare hubs",
@@ -10093,6 +10141,46 @@
       "groupNoneSold_other": "{{count}} items · none sold at {{scope}}"
     },
     "itemDetail": {
+      "abyssal": {
+        "mutatedFrom": "Mutated from",
+        "mutaplasmids": "Mutaplasmids",
+        "rangesTitle": "Roll ranges",
+        "baseModule": "Base module",
+        "rangesHint": "What each mutaplasmid can roll on a {{base}}, in absolute values.",
+        "rangesTableLabel": "Roll ranges on a {{base}}, by mutaplasmid",
+        "noRanges": "No roll ranges to show for this base module.",
+        "noRolls": "No rolls to show for this module.",
+        "attributeColumn": "Attribute",
+        "baseColumn": "Base",
+        "rolledColumn": "Rolled",
+        "possibleColumn": "Possible",
+        "qualityColumn": "Roll quality",
+        "qualityHint": "Where the roll sits in what the mutaplasmid could roll: 100% is the best roll, 0% the worst.",
+        "quality": "{{pct}}%",
+        "higherIsBetter": "Higher is better",
+        "lowerIsBetter": "Lower is better",
+        "notRolled": "Not rolled by this mutaplasmid",
+        "range": "{{low}} – {{high}}",
+        "rollsTitle": "This module's rolls",
+        "mutaplasmid": "Mutaplasmid",
+        "rollsUnreadable": "Couldn't read this module's own rolls from EVE, so here is what its mutaplasmids can roll.",
+        "makes": "Makes",
+        "appliesTo": "Applies to",
+        "multipliersTitle": "Rolls",
+        "multipliersHint": "Each roll multiplies the base module's own value. The direction says which end is the better roll.",
+        "multiplierRange": "{{low}} to {{high}}",
+        "shownBackwards": "Multiplies the value behind this figure, so a lower roll shows as a higher figure.",
+        "estimate": {
+          "label": "MutaMarket estimate:",
+          "notImported": "MutaMarket hasn't priced this module yet.",
+          "ask": "Ask MutaMarket to price this",
+          "publicWarning": "This publishes the module on MutaMarket: a public page showing its rolls and the pilot who made it.",
+          "noEstimate": "MutaMarket has no estimate for this module.",
+          "open": "View on MutaMarket",
+          "unknown": "MutaMarket doesn't price this kind of module.",
+          "unavailable": "Couldn't reach MutaMarket for an estimate. Try again later."
+        }
+      },
       "modifiersFor": "skills that change {{attribute}}",
       "openInMarket": "View in Market",
       "volume": "Volume: {{volume}} m3",
@@ -10914,6 +11002,9 @@
     },
     "displayTitle": "Display",
     "fontScaleLabel": "Text size",
+    "singleKeyShortcutsLabel": "Single-key shortcuts",
+    "singleKeyShortcutsHint": "G then a letter jumps between pages, and ? lists them, anywhere outside a text field. Turn them off if you set them off by accident, for example with speech input. Stays on this device.",
+    "singleKeyShortcutsOffNote": "Single-key shortcuts are off. Esc still closes an open dialog, and the command palette still opens from its key. Stays on this device.",
     "fontScaleHint": "Scales text and controls together. Applies immediately and stays on this device.",
     "fontScaleSmall": "Small",
     "fontScaleDefault": "Default",
@@ -11252,6 +11343,8 @@
     "goToMiningTax": "Go to Mining tax",
     "openSettings": "Open Settings",
     "showShortcuts": "Show this shortcut list",
+    "then": "then",
+    "offNote": "Single-key shortcuts are off, so only Esc and the command palette key respond. Turn them on in Settings › Display.",
     "close": "Close the open dialog",
     "onPageTitle": "On a page",
     "onPageHint": "These work inside text boxes too. Every fitting edit is in the address bar, so your browser's Back button is undo.",
@@ -11271,10 +11364,6 @@
       "fitting": {
         "label": "EFT fitting",
         "opens": "Opens in Fittings"
-      },
-      "chatLink": {
-        "label": "Chat link",
-        "opens": "Opens the item or system page"
       },
       "dscan": {
         "label": "D-Scan",
@@ -12301,6 +12390,8 @@
           "dropped": "Of which {{value}} dropped as loot.",
           "unpriced_one": "{{count}} item has no sell price here and counts as zero.",
           "unpriced_other": "{{count}} items have no sell price here and count as zero.",
+          "abyssal_one": "{{count}} abyssal module isn't priced: its worth depends on its rolls, which a killmail doesn't record. It's left out of the loss.",
+          "abyssal_other": "{{count}} abyssal modules aren't priced: their worth depends on their rolls, which a killmail doesn't record. They're left out of the loss.",
           "zkb": "zKillboard valued it at {{value}} when it died."
         }
       }

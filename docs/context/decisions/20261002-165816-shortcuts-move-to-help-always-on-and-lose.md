@@ -17,3 +17,5 @@ _Recorded 2026-10-02._
 - **`/` is removed.** It said "Jump to search" but only focused the Market
   browser's search box; the command palette (Ctrl+K / Cmd+K, the rail's Go to
   button) is the global search now. Market's focus-on-arrival hook went with it.
+
+> **Partly superseded** by `20261016-121137-shortcuts-become-g-sequences-with-an-off-switch`: page keys are `G` sequences and the Settings off switch is back. The move to Help and the removal of `/` stand.

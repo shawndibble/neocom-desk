@@ -29,6 +29,8 @@ import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 export interface ItemContextMenuProps {
   typeId: number;
   itemName: string;
+  /** A Mutated module's item id: Show info opens on its own Rolls. */
+  itemId?: number;
   /**
    * The blueprint behind Build Plan, when the row already knows it (an
    * industry job, a Loyalty Store offer); null when nothing produces the item.
@@ -68,11 +70,23 @@ export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElemen
 type ItemMenuProps = Omit<ItemContextMenuProps, 'children'>;
 
 /** The item menu's "Show info" — also reused as-is by menus that aren't item menus (the Fittings editor's). */
-export function ShowInfoMenuItem({ typeId, itemName }: { typeId: number; itemName: string }) {
+export function ShowInfoMenuItem({
+  typeId,
+  itemName,
+  itemId,
+}: {
+  typeId: number;
+  itemName: string;
+  itemId?: number;
+}) {
   const { t } = useTranslation();
   const { showInfo } = useItemActions();
   return (
-    <MenuItem onSelect={() => showInfo(typeId, itemName)}>
+    <MenuItem
+      onSelect={() =>
+        itemId === undefined ? showInfo(typeId, itemName) : showInfo(typeId, itemName, itemId)
+      }
+    >
       {t('market.contextMenu.showInfo')}
     </MenuItem>
   );
@@ -175,6 +189,7 @@ function useItemMenuItems(
   const {
     typeId,
     itemName,
+    itemId,
     planProductTypeID,
     onCompareVariations,
     onViewInIndustryAsMaterial,
@@ -214,7 +229,7 @@ function useItemMenuItems(
       {!props.hideStockTarget && (
         <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
       )}
-      <ShowInfoMenuItem typeId={typeId} itemName={itemName} />
+      <ShowInfoMenuItem typeId={typeId} itemName={itemName} itemId={itemId} />
       <OpenInEveItemMenuItems typeId={typeId} />
       {!props.hideCompare && (
         <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>

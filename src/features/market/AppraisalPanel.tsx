@@ -47,6 +47,10 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { Caret } from '@/components/ui/Disclosure';
 import { HintText } from '@/components/ui/HintText';
+import { ExternalLink } from '@/components/ui/ExternalLink';
+import { cx } from '@/lib/cx';
+import type { AppraisalUnmatched } from '@/engine/market/appraisalMatch';
+import { MUTAMARKET_SITE_URL } from '@/market/mutamarket';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { GrantNote } from '@/app/GrantNote';
@@ -455,6 +459,7 @@ export function AppraisalPanel({
   const tableExport = useTableExport({ surface: 'market-appraisal', rows, columns: csvColumns });
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
+  const abyssalLines = result?.abyssal ?? [];
   const implantBonusPct = result?.implantBonusPct ?? 0;
   const refinesOreOrIce = result?.refinesOreOrIce ?? false;
   const accountingLevel = result?.accountingLevel ?? null;
@@ -615,23 +620,36 @@ export function AppraisalPanel({
   }
 
   const pasteFolded = !isDesktop && rows.length > 0 && !editingList;
-  // About the pasted list, so it shows folded or open.
-  const unmatchedNote = unmatched.length > 0 && (
-    <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
-      <p className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
-        <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-        {t('market.appraisal.unmatched', { count: unmatched.length })}
+  // Abyssal modules are real items with no market price: said apart from the
+  // unmatched lines, with where to price one instead.
+  const abyssalNote = abyssalLines.length > 0 && (
+    <PastedLinesNote
+      heading={t('market.appraisal.abyssal', { count: abyssalLines.length })}
+      entries={abyssalLines}
+    >
+      <p className="pt-1 text-[0.6875rem] text-text-dim">
+        {t('market.appraisal.abyssalHint')}{' '}
+        <ExternalLink href={MUTAMARKET_SITE_URL}>{t('market.appraisal.abyssalLink')}</ExternalLink>
       </p>
-      <ul className="pt-1">
-        {unmatched.map((entry) => (
-          <li key={entry.name} className="font-mono text-[0.6875rem] text-text-dim">
-            {t('market.appraisal.unmatchedLine', {
-              lines: entry.lines.join(', '),
-              name: entry.name,
-            })}
-          </li>
-        ))}
-      </ul>
+    </PastedLinesNote>
+  );
+  const unmatchedLinesNote = unmatched.length > 0 && (
+    <PastedLinesNote
+      heading={
+        <>
+          <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+          {t('market.appraisal.unmatched', { count: unmatched.length })}
+        </>
+      }
+      headingClassName="flex items-center gap-1.5 text-warning"
+      entries={unmatched}
+    />
+  );
+  // About the pasted list, so it shows folded or open.
+  const unmatchedNote = (unmatchedLinesNote || abyssalNote) && (
+    <div className="flex flex-col gap-2">
+      {unmatchedLinesNote}
+      {abyssalNote}
     </div>
   );
 
@@ -1066,6 +1084,41 @@ export function AppraisalPanel({
           </section>
         )}
       </div>
+    </div>
+  );
+}
+
+/** A boxed list of pasted lines under a heading: the unmatched ones, or the abyssal ones. */
+function PastedLinesNote({
+  heading,
+  headingClassName = 'text-text-dim',
+  entries,
+  children,
+}: {
+  heading: ReactNode;
+  headingClassName?: string;
+  entries: readonly AppraisalUnmatched[];
+  children?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
+      <p
+        className={cx('text-[0.6875rem] font-semibold tracking-widest uppercase', headingClassName)}
+      >
+        {heading}
+      </p>
+      <ul className="pt-1">
+        {entries.map((entry) => (
+          <li key={entry.name} className="font-mono text-[0.6875rem] text-text-dim">
+            {t('market.appraisal.unmatchedLine', {
+              lines: entry.lines.join(', '),
+              name: entry.name,
+            })}
+          </li>
+        ))}
+      </ul>
+      {children}
     </div>
   );
 }

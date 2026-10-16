@@ -119,7 +119,7 @@ const BAY_ORDER: AssetTreeBayKind[] = ['cargoHold', 'droneBay', 'fitting'];
 interface BuildContext {
   childrenByLocationId: Map<number, EngineAsset[]>;
   priceByTypeId: ReadonlyMap<number, number>;
-  copyValueByItemId: ReadonlyMap<number, number>;
+  itemValueByItemId: ReadonlyMap<number, number>;
   visited: Set<number>;
 }
 
@@ -134,20 +134,22 @@ function childrenByLocationId(assets: readonly EngineAsset[]): Map<number, Engin
   return map;
 }
 
-const NO_COPY_VALUES: ReadonlyMap<number, number> = new Map();
+const NO_ITEM_VALUES: ReadonlyMap<number, number> = new Map();
 
 /**
- * One asset stack's estimated value: quantity at the type's average price,
- * except a blueprint copy, which is worth only what `copyValueByItemId`
- * says (`blueprintCopyValue.ts`) and 0 when it says nothing — never its
- * original's price, which the typeID alone would give it.
+ * Quantity × type price, unless `itemValueByItemId` holds the item (a blueprint
+ * copy's value, an abyssal module's estimate): then exactly that. A copy missing
+ * from it is 0, never its original's price; callers strip abyssal types from
+ * `priceByTypeId` for the same reason.
  */
 export function assetStackValue(
   asset: Pick<EngineAsset, 'item_id' | 'type_id' | 'quantity' | 'is_blueprint_copy'>,
   priceByTypeId: ReadonlyMap<number, number>,
-  copyValueByItemId: ReadonlyMap<number, number> = NO_COPY_VALUES
+  itemValueByItemId: ReadonlyMap<number, number> = NO_ITEM_VALUES
 ): number {
-  if (asset.is_blueprint_copy) return copyValueByItemId.get(asset.item_id) ?? 0;
+  const own = itemValueByItemId.get(asset.item_id);
+  if (own !== undefined) return own;
+  if (asset.is_blueprint_copy) return 0;
   return asset.quantity * (priceByTypeId.get(asset.type_id) ?? 0);
 }
 
@@ -162,11 +164,11 @@ export function assetStackValue(
 export function nodeContribution(
   node: AssetTreeNode,
   priceByTypeId: ReadonlyMap<number, number>,
-  copyValueByItemId: ReadonlyMap<number, number> = NO_COPY_VALUES
+  itemValueByItemId: ReadonlyMap<number, number> = NO_ITEM_VALUES
 ): { itemCount: number; estimatedValue: number } {
   if (node.kind === 'bay')
     return { itemCount: node.itemCount, estimatedValue: node.estimatedValue };
-  const ownValue = assetStackValue(node.asset, priceByTypeId, copyValueByItemId);
+  const ownValue = assetStackValue(node.asset, priceByTypeId, itemValueByItemId);
   if (node.kind === 'item') return { itemCount: node.asset.quantity, estimatedValue: ownValue };
   return {
     itemCount: node.asset.quantity + node.itemCount,
@@ -235,7 +237,7 @@ function sumNodes(
   let itemCount = 0;
   let estimatedValue = 0;
   for (const node of nodes) {
-    const contribution = nodeContribution(node, ctx.priceByTypeId, ctx.copyValueByItemId);
+    const contribution = nodeContribution(node, ctx.priceByTypeId, ctx.itemValueByItemId);
     itemCount += contribution.itemCount;
     estimatedValue += contribution.estimatedValue;
   }
@@ -322,12 +324,12 @@ export function buildAssetGroups<Id>(
   alwaysInclude: ReadonlySet<Id>,
   groupIdFor: (asset: EngineAsset) => Id,
   priceByTypeId: ReadonlyMap<number, number> = new Map(),
-  copyValueByItemId: ReadonlyMap<number, number> = NO_COPY_VALUES
+  itemValueByItemId: ReadonlyMap<number, number> = NO_ITEM_VALUES
 ): AssetTreeGroup<Id>[] {
   const ctx: BuildContext = {
     childrenByLocationId: childrenByLocationId(assets),
     priceByTypeId,
-    copyValueByItemId,
+    itemValueByItemId,
     visited: new Set(),
   };
 
@@ -385,12 +387,12 @@ export function collectGroupItemIds<Id>(group: AssetTreeGroup<Id>): number[] {
 export function buildAssetTree(
   assets: readonly EngineAsset[],
   priceByTypeId: ReadonlyMap<number, number> = new Map(),
-  copyValueByItemId: ReadonlyMap<number, number> = NO_COPY_VALUES
+  itemValueByItemId: ReadonlyMap<number, number> = NO_ITEM_VALUES
 ): AssetTreeStation[] {
   const ctx: BuildContext = {
     childrenByLocationId: childrenByLocationId(assets),
     priceByTypeId,
-    copyValueByItemId,
+    itemValueByItemId,
     visited: new Set(),
   };
   const buildStation = (locationId: number, group: RootGroup): AssetTreeStation => {

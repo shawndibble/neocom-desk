@@ -50,6 +50,7 @@ import { ItemInfoLink } from '@/features/entities';
 import { loadPlexPrice } from '@/features/market/plexPrice';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import { useMarketHub } from '@/features/market/hub';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { ContractMarketValueRow } from './ContractMarketValueRow';
@@ -113,6 +114,7 @@ export function PublicContractDetailModal({
   const timeZone = useTimeZone();
   const hubId = useMarketHub((s) => s.value);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
   const [location, setLocation] = useState<string | null | undefined>(undefined);
   const [items, setItems] = useState<ItemsState | null | undefined>(undefined);
   const [marketValue, setMarketValue] = useState<MarketValueState | undefined>(undefined);
@@ -156,7 +158,9 @@ export function PublicContractDetailModal({
   // Merged before anything reads the lines, so the ISK total and the rendered
   // list are counting the same things.
   const lines =
-    items && items.outcome.kind === 'items' ? mergeContractItemLines(items.outcome.items) : [];
+    items && items.outcome.kind === 'items'
+      ? mergeContractItemLines(items.outcome.items, isAbyssalType)
+      : [];
   const included = lines.filter((line) => line.isIncluded);
   const requested = lines.filter((line) => !line.isIncluded);
 
@@ -172,9 +176,16 @@ export function PublicContractDetailModal({
         setMarketValue(undefined);
         return;
       }
-      const merged = mergeContractItemLines(items.outcome.items);
+      const merged = mergeContractItemLines(items.outcome.items, isAbyssalType);
       const priced = (group: ContractItemLine[]) =>
-        group.map((line) => ({ type_id: line.typeId, quantity: line.quantity }));
+        group.map((line) => ({
+          type_id: line.typeId,
+          quantity: line.quantity,
+          item_id: line.itemId,
+        }));
+      const abyssal = isAbyssalType
+        ? { isAbyssalType, characterId, isCancelled: () => cancelled }
+        : undefined;
       const includedLines = merged.filter((line) => line.isIncluded);
       const requestedLines = merged.filter((line) => !line.isIncluded);
       const plexPrice = merged.some((line) => line.typeId === PLEX_TYPE_ID)
@@ -183,10 +194,16 @@ export function PublicContractDetailModal({
       const overrides = new Map(plexPrice === null ? [] : [[PLEX_TYPE_ID, plexPrice]]);
       const [includedValue, requestedValue] = await Promise.all([
         includedLines.length > 0
-          ? loadContractMarketValue(hub, priced(includedLines), items.typeNames, overrides)
+          ? loadContractMarketValue(hub, priced(includedLines), items.typeNames, {
+              sellOverrides: overrides,
+              abyssal,
+            })
           : Promise.resolve(null),
         requestedLines.length > 0
-          ? loadContractMarketValue(hub, priced(requestedLines), items.typeNames, overrides)
+          ? loadContractMarketValue(hub, priced(requestedLines), items.typeNames, {
+              sellOverrides: overrides,
+              abyssal,
+            })
           : Promise.resolve(null),
       ]);
       if (!cancelled) setMarketValue({ included: includedValue, requested: requestedValue });
@@ -194,7 +211,7 @@ export function PublicContractDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [items, hub]);
+  }, [items, hub, isAbyssalType, characterId]);
 
   /**
    * Only an item_exchange contract asking for something in return has two

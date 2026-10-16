@@ -18,6 +18,7 @@ import {
   Panel,
   SearchInput,
   Spinner,
+  Toast,
   Tooltip,
   CachedNotice,
 } from '@/components/ui';
@@ -48,6 +49,7 @@ import type { CharacterFilterValue } from '@/features/character/characterFilterV
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { loadContacts } from '@/features/character/contacts';
 import { MailComposeBox } from '@/features/character/MailComposeBox';
+import { NewMailComposer, type NewMailCloseReason } from '@/features/character/NewMailComposer';
 import { MailBodyView } from '@/features/character/MailBodyView';
 import {
   buildContactStandingIndex,
@@ -307,6 +309,22 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   // reset below whenever the selected mail changes, so switching mails never
   // leaves a stale Reply/Forward box open against the wrong header.
   const [composeKind, setComposeKind] = useState<ComposeKind | null>(null);
+  // New Mail compose (full-pane on a phone, inline in the reading pane on a
+  // wide screen) and the one-line notice it leaves behind.
+  const [newMailOpen, setNewMailOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Whichever Compose button is on screen (header on a wide screen, floating
+  // on a phone); focus returns to it when the composer closes.
+  const composeButtonRef = useRef<HTMLButtonElement>(null);
+  const composerWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (newMailOpen) {
+      composerWasOpenRef.current = true;
+    } else if (composerWasOpenRef.current) {
+      composerWasOpenRef.current = false;
+      composeButtonRef.current?.focus();
+    }
+  }, [newMailOpen]);
   function selectMail(target: { ownerId: number; mailId: number } | null) {
     setSelected(target && { ...target, key: mailKey(target.ownerId, target.mailId) });
     setComposeKind(null);
@@ -681,6 +699,20 @@ function MailView({ scope, scopeControl }: MailViewProps) {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  const composeCharacterId = activeCharacterId;
+  function closeNewMail(reason: NewMailCloseReason) {
+    setNewMailOpen(false);
+    if (reason === 'kept') setNotice(t('mail.draftSaved'));
+  }
+  function handleNewMailSent() {
+    setNewMailOpen(false);
+    setNotice(t('mail.sentToast'));
+    void handleSent(composeCharacterId);
+  }
+
+  // The composer takes the reader's place on a wide screen.
+  const newMailInline = newMailOpen && isDesktop;
+  const readerVisible = !newMailInline && (isDesktop || selectedKey !== null);
   const showBackControl = !isDesktop && selectedKey !== null;
   const recipients = selectedHeader?.recipients ?? [];
   const selectedTab = selectedRow?.tab ?? 'inbox';
@@ -707,6 +739,11 @@ function MailView({ scope, scopeControl }: MailViewProps) {
         }
         actions={
           <>
+            {isDesktop && !newMailOpen && (
+              <Button ref={composeButtonRef} size="md" onClick={() => setNewMailOpen(true)}>
+                <Icon.MailCompose size={Icon.ICON_SIZE.sm} /> {t('mail.compose')}
+              </Button>
+            )}
             <IconButton
               icon={<Icon.Refresh />}
               label={t('mail.refresh')}
@@ -1025,8 +1062,20 @@ function MailView({ scope, scopeControl }: MailViewProps) {
               )}
             </Panel>
 
+            {newMailInline && (
+              <Panel className="min-w-0">
+                <NewMailComposer
+                  key={composeCharacterId}
+                  characterId={composeCharacterId}
+                  fullPane={false}
+                  onClose={closeNewMail}
+                  onSent={handleNewMailSent}
+                />
+              </Panel>
+            )}
+
             <Panel
-              className={isDesktop || selectedKey !== null ? 'min-w-0' : 'hidden'}
+              className={readerVisible ? 'min-w-0' : 'hidden'}
               // The folder the open mail sits in, not a repeat of the select
               // hint the empty body already renders — that string used to
               // appear twice on the same panel at once.
@@ -1206,6 +1255,30 @@ function MailView({ scope, scopeControl }: MailViewProps) {
           </div>
         </>
       )}
+
+      {newMailOpen && !isDesktop && (
+        <NewMailComposer
+          key={composeCharacterId}
+          characterId={composeCharacterId}
+          fullPane
+          onClose={closeNewMail}
+          onSent={handleNewMailSent}
+        />
+      )}
+      {!isDesktop && !newMailOpen && selectedKey === null && (
+        // 5rem clears the bottom nav (Layout's `<nav>`, which has no shared height token).
+        <div className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30">
+          <Button
+            ref={composeButtonRef}
+            variant="primary"
+            className="shadow-lg"
+            onClick={() => setNewMailOpen(true)}
+          >
+            <Icon.MailCompose size={Icon.ICON_SIZE.sm} /> {t('mail.compose')}
+          </Button>
+        </div>
+      )}
+      {notice !== null && <Toast message={notice} onClose={() => setNotice(null)} />}
     </div>
   );
 }

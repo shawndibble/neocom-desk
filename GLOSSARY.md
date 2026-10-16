@@ -34,7 +34,7 @@ here — they go one per file in `docs/context/decisions/`.
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer.
-- **Omega coverage**: Overview widget: how many Omega subscriptions ("accounts") a pilot's net ISK income per rolling 30 days could pay for, at PLEX's price. Its "accounts" are EVE subscriptions counted from ISK, not the **Account** UI grouping of Characters.
+- **Omega coverage**: Overview widget: how many Omega subscriptions ("accounts") a pilot's net ISK income per rolling 7, 30 or 90 days (the widget range; 30 by default) could pay for, at PLEX's price, against one account's cost for that window. Its "accounts" are EVE subscriptions counted from ISK, not the **Account** UI grouping of Characters.
 - **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation or alliance; an item's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction

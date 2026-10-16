@@ -1159,7 +1159,7 @@ describe('omega coverage', () => {
   it('covers whole accounts: net 1.2B against 1.0B per account', () => {
     const view = build(data());
     expect(view.number.value).toContain('data.omega.covers{"count":1}');
-    expect(view.number.secondary?.text).toContain('data.omega.next{"amount":"800M"}');
+    expect(view.number.secondary?.text).toContain('data.omega.next{"days":30,"amount":"800M"}');
   });
 
   it('counts net across every Character when scoped to all, leaving out transfers and PLEX', () => {
@@ -1182,6 +1182,21 @@ describe('omega coverage', () => {
     expect(view.chart.bars[1]!.tip.rows.map((r) => r.label)).toContain(
       'overview.widgets.chart.omega.tip.covers'
     );
+  });
+
+  it('scales the account cost and the bars to the widget range', () => {
+    const week = build(data(), { range: 7 });
+    expect(week.number.secondary?.text).toContain('"days":7');
+    if (week.chart?.kind !== 'omega') throw new Error('omega');
+    // one account is 7/30 of 1B = 233.3M: 1.2B covers 5, lines step above it.
+    expect(week.number.value).toContain('"count":5');
+    expect(week.chart.lines[0]!.value).toBeCloseTo((1 * B * 7) / 30);
+    expect(week.chart.bars.length).toBeGreaterThan(2);
+    const quarter = build(data(), { range: 90 });
+    expect(quarter.number.value).toContain('coversNone');
+    expect(quarter.number.secondary?.text).toContain('"days":90');
+    if (quarter.chart?.kind !== 'omega') throw new Error('omega');
+    expect(quarter.chart.lines[0]!.value).toBe(3 * B);
   });
 
   it('says why when PLEX has no price, with no count and no chart', () => {
@@ -1220,7 +1235,7 @@ describe('omega coverage', () => {
   it('states the shortfall when net is zero or negative', () => {
     const view = build(data({ rows: [{ characterId: 91, date: iso(NOW - DAY), amount: -1 * B }] }));
     expect(view.number.value).toContain('coversNone');
-    expect(view.number.unit).toContain('data.omega.shortBy{"amount":"2B"}');
+    expect(view.number.unit).toContain('data.omega.shortBy{"days":30,"amount":"2B"}');
   });
 
   it('steps the reference lines when there are many accounts', () => {

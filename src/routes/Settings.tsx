@@ -64,6 +64,7 @@ import {
   useMobileTabs,
   type MobileTabPath,
 } from '@/lib/mobileTabs';
+import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { useTimeFormat, useTimeZone, TIME_FORMATS } from '@/lib/timeFormat';
 import {
   useCalendarWeekStart,
@@ -1038,6 +1039,9 @@ export function Settings() {
   // needs its own hydrate here too, or the chip would paint the default until
   // Calendar happened to be visited (see `useHydratedStore`'s doc comment).
   const weekStartHydrated = useHydratedStore(useCalendarWeekStart);
+  const singleKeyShortcuts = useSingleKeyShortcuts((state) => state.value);
+  const setSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.setValue);
+  const singleKeyShortcutsHydrated = useHydratedStore(useSingleKeyShortcuts);
   const { hash } = useLocation();
   const navigate = useNavigate();
   const [section] = usePageTab(SETTINGS_TABS);
@@ -1115,6 +1119,26 @@ export function Settings() {
                       onSelect={(day) => void setWeekStart(day)}
                       labelFor={(day) => t(`settings.weekStart.${day}`)}
                     />
+                  )}
+                  {singleKeyShortcutsHydrated && (
+                    <Field
+                      label={t('settings.singleKeyShortcutsLabel')}
+                      htmlFor="settings-single-key-shortcuts"
+                      inline
+                      note={t(
+                        singleKeyShortcuts
+                          ? 'settings.singleKeyShortcutsHint'
+                          : 'settings.singleKeyShortcutsOffNote'
+                      )}
+                    >
+                      <label className={touchCheckboxLabelClassName}>
+                        <Checkbox
+                          id="settings-single-key-shortcuts"
+                          checked={singleKeyShortcuts}
+                          onChange={() => void setSingleKeyShortcuts(!singleKeyShortcuts)}
+                        />
+                      </label>
+                    </Field>
                   )}
                 </Fields>
               </Panel>

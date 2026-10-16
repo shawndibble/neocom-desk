@@ -15,6 +15,7 @@
 import { type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { IconButton, IskAmount, RowMoreActions, Tooltip } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, tappableRowClassName } from '@/components/ui/controlStyles';
@@ -383,11 +384,15 @@ interface ItemRowProps {
   quantity: number;
   unitVolume: number | undefined;
   estimatedValue: number;
+  /** Tooltip note on the value. */
+  valueHint?: string;
   characterBadge: string | null;
   /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
   blueprintKind?: BlueprintKind | null;
   /** Makes the name a Market link (§6c); Show info stays in the row menu. */
   typeId?: number;
+  /** Set for a Mutated module only: Show info opens on its own Rolls. */
+  itemId?: number;
   /** Wraps the row in the shared item context menu — supplied by the route. */
   wrap: (children: ReactElement) => ReactNode;
   selectMode: boolean;
@@ -399,15 +404,35 @@ interface ItemRowProps {
 /**
  * An item's estimated value. Exactly 0 means "no estimate" (an unpriced type or
  * a blueprint copy without a valuation), so it reads as a dim dash with a
- * screen-reader "No estimate" rather than a green "0".
+ * screen-reader "No estimate" rather than a green "0". `hint` (an abyssal
+ * module's estimate note, or why it has none) joins the figure's own tooltip,
+ * or gives the dash one; `inLink` keeps that dash tooltip reachable inside a
+ * whole-row link (see JumpsAwayText).
  */
-function ValueFigure({ value, t }: { value: number; t: Translate }) {
-  if (value !== 0) return <IskAmount value={value} decimals={0} />;
-  return (
+function ValueFigure({
+  value,
+  hint,
+  inLink = false,
+  t,
+}: {
+  value: number;
+  hint?: string;
+  inLink?: boolean;
+  t: Translate;
+}) {
+  if (value !== 0) return <IskAmount value={value} decimals={0} note={hint} />;
+  const dash = (
     <>
       <span aria-hidden="true">{t('assets.unknownValue')}</span>
-      <span className="sr-only">{t('assets.noEstimate')}</span>
+      <span className="sr-only">{hint ?? t('assets.noEstimate')}</span>
     </>
+  );
+  if (hint === undefined) return dash;
+  if (!inLink) return <HintText content={hint}>{dash}</HintText>;
+  return (
+    <Tooltip content={hint}>
+      <span className="relative z-10">{dash}</span>
+    </Tooltip>
   );
 }
 
@@ -428,9 +453,11 @@ export function ItemRow({
   quantity,
   unitVolume,
   estimatedValue,
+  valueHint,
   characterBadge,
   blueprintKind = null,
   typeId,
+  itemId,
   wrap,
   selectMode,
   selectionState,
@@ -466,6 +493,7 @@ export function ItemRow({
               ) : (
                 <ItemInfoLink
                   typeId={typeId}
+                  itemId={itemId}
                   className={cx('flex min-w-0 items-center text-sm', tappableRowClassName)}
                   {...guard.handlers}
                   onClick={(e) => {
@@ -495,7 +523,7 @@ export function ItemRow({
                   ITEM_VALUE_CELL
                 )}
               >
-                <ValueFigure value={estimatedValue} t={t} />
+                <ValueFigure value={estimatedValue} hint={valueHint} t={t} />
               </span>
             </span>
           </span>
@@ -521,6 +549,8 @@ interface SearchResultRowProps {
   characterBadge: string | null;
   /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
   blueprintKind?: BlueprintKind | null;
+  /** Tooltip note on the value. */
+  valueHint?: string;
   t: Translate;
 }
 
@@ -541,6 +571,7 @@ export function SearchResultRow({
   href,
   characterBadge,
   blueprintKind = null,
+  valueHint,
   t,
 }: SearchResultRowProps) {
   return (
@@ -572,7 +603,7 @@ export function SearchResultRow({
                 estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
               )}
             >
-              <ValueFigure value={estimatedValue} t={t} />
+              <ValueFigure value={estimatedValue} hint={valueHint} inLink t={t} />
             </span>
           </span>
         </span>

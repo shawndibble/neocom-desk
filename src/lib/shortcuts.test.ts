@@ -93,9 +93,18 @@ describe('commandPaletteDisplayKey', () => {
 describe('SHORTCUTS', () => {
   it('has unique ids and keys, so the dispatch table never double-matches', () => {
     const ids = SHORTCUTS.map((s) => s.id);
-    const keys = SHORTCUTS.map((s) => s.key);
+    const keys = SHORTCUTS.map((s) => `${s.sequence ? 'g ' : ''}${s.key}`);
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('keeps only ? and Escape as single keys, every page key a g sequence', () => {
+    const singles = SHORTCUTS.filter((s) => !s.sequence).map((s) => s.key);
+    expect(singles.sort()).toEqual(['?', 'Escape']);
+  });
+
+  it('never uses the g prefix itself as a second key', () => {
+    expect(SHORTCUTS.some((s) => s.sequence && s.key === 'g')).toBe(false);
   });
 
   it('lets only a shift-typed key opt into firing with Shift held', () => {
@@ -124,6 +133,8 @@ describe('SHORTCUTS', () => {
   });
 
   it.each([
+    ['switch-character', 'c', '/characters'],
+    ['open-settings', 's', '/settings'],
     ['go-to-overview', 'o', '/overview'],
     ['go-to-market', 'm', '/market'],
     ['go-to-industry', 'i', '/industry'],
@@ -131,7 +142,7 @@ describe('SHORTCUTS', () => {
     ['go-to-planetary-industry', 'p', '/planetary-industry'],
     ['go-to-alerts', 'a', '/alerts'],
     ['go-to-mining-tax', 't', '/mining/tax'],
-  ])('%s fires on "%s" and navigates to %s', (id, key, path) => {
+  ])('%s fires on "g then %s" and navigates to %s', (id, key, path) => {
     const shortcut = SHORTCUTS.find((s) => s.id === id);
     expect(shortcut?.key).toBe(key);
     const navigate = vi.fn();
