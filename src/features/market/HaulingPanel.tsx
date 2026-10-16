@@ -438,6 +438,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     setDetailOpen(false);
   }
 
+  const scannedTypeIds = useMemo(
+    () => (state.status === 'ready' ? state.scan.rows.map((r) => r.typeId) : []),
+    [state]
+  );
   const fill = useHaulingFill({
     from,
     to,
@@ -447,6 +451,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     feesAt: fees.at,
     filters: rowFilters,
     groups,
+    scannedTypeIds,
   });
   // A reload re-prices the lane: the fill and the rows added from it were
   // priced from the old books, so they go, and with them Add's pins.
@@ -497,11 +502,11 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   /** The room left in every hold: one figure for the summary, the fill offer and the trip bar. */
   const freeM3 = plan.holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
 
-  // Fill the free space: on demand only (the scan costs ESI budget), never for
-  // Everything (no other category left), only once a Cargo Space binds the plan,
-  // and on a fixed lane only: with Any hub at an end it would scan every hub's books.
-  const fillOffered =
-    categoryId !== EVERYTHING_CATEGORY_ID && cargoSet && anyEnd === null && !sameHub;
+  // Fill the free space: on demand only (each batch costs a scan's ESI budget),
+  // from every category less the table's rows (Everything too), only once a
+  // Cargo Space binds the plan, and on a fixed lane only: with Any hub at an
+  // end it would scan every hub's books.
+  const fillOffered = cargoSet && anyEnd === null && !sameHub;
   const fillOffer = useHaulingFillOffer(fill, {
     offered: fillOffered,
     current: tableCandidates,
@@ -973,7 +978,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         <HaulingFillList
           {...fillOffer.list}
           freeM3={freeM3}
-          progressText={fill.status === 'loading' ? progressText(fill.progress) : undefined}
+          progressText={
+            fill.state.status === 'loading' ? progressText(fill.state.progress) : undefined
+          }
         />
       )}
     </div>

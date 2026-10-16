@@ -9,7 +9,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useHaulingCargo } from './haulingCargo';
 import type { ListHaulingScanRow } from './haulingData';
 import type { HaulingScanState } from './useHaulingScan';
-import type { HaulingFillScanState } from './useHaulingFillScan';
+import type { HaulingFillScanInput, HaulingFillScanState } from './useHaulingFillScan';
 import type { HubJumps } from './useHubJumps';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 
@@ -112,20 +112,40 @@ vi.mock('./useHaulingScan', () => ({
 }));
 
 let fillState: HaulingFillScanState = { status: 'idle' };
-const fillCalls: { enabled: boolean }[] = [];
-const fillRefresh = vi.fn();
-vi.mock('./useHaulingFillScan', () => ({
-  useHaulingFillScan: (
-    _from: unknown,
-    _to: unknown,
-    _cat: unknown,
-    _mode: unknown,
-    enabled: boolean
-  ) => {
-    fillCalls.push({ enabled });
-    return { state: enabled ? fillState : { status: 'idle' }, refresh: fillRefresh };
-  },
-}));
+/** The input the panel last gave the fill: its exclusions and its sizing. */
+let fillInput: HaulingFillScanInput | null = null;
+const fillFind = vi.fn();
+const fillMore = vi.fn();
+const fillStop = vi.fn();
+const fillReset = vi.fn();
+vi.mock('./useHaulingFillScan', async () => {
+  const { useState } = await import('react');
+  return {
+    useHaulingFillScan: (input: HaulingFillScanInput) => {
+      fillInput = input;
+      const end = (e: HaulingFillScanInput['from']) => (typeof e === 'string' ? e : e.id);
+      const lane = `${end(input.from)}>${end(input.to)}:${input.categoryId}:${input.mode}`;
+      const [asked, setAsked] = useState<string | null>(null);
+      return {
+        // A new lane is idle until asked again, like the real hook.
+        state: asked === lane ? fillState : { status: 'idle' },
+        find: () => {
+          fillFind();
+          setAsked(lane);
+        },
+        more: () => {
+          fillMore();
+          setAsked(lane);
+        },
+        stop: fillStop,
+        reset: () => {
+          fillReset();
+          setAsked(null);
+        },
+      };
+    },
+  };
+});
 
 const jumpCalls: [number | null, number | null][] = [];
 vi.mock('./useHubJumps', () => ({
@@ -187,8 +207,11 @@ beforeEach(() => {
   useActiveCharacter.setState({ activeCharacterId: null });
   mainState = null;
   fillState = { status: 'idle' };
-  fillCalls.length = 0;
-  fillRefresh.mockClear();
+  fillInput = null;
+  fillFind.mockClear();
+  fillMore.mockClear();
+  fillStop.mockClear();
+  fillReset.mockClear();
   jumpCalls.length = 0;
   phone = false;
   panelRem = Infinity;
@@ -376,27 +399,62 @@ describe('HaulingPanel trip rail', () => {
   });
 });
 
-describe('HaulingPanel fill the free space', () => {
-  it('scans only when asked: idle, then loading', async () => {
-    const user = userEvent.setup();
-    setCargo(1000);
-    fillState = { status: 'loading', progress: { stage: 'prices', done: 1, total: 3 } };
-    renderPanel();
-    expect(fillCalls.every((c) => !c.enabled)).toBe(true);
-    // 1,000 m³ less Damage Control II's 350.
-    expect(screen.getByText(/fit the free 650 m³/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
-    expect(fillCalls.at(-1)).toEqual({ enabled: true });
-    expect(screen.queryByRole('button', { name: /Find items/ })).toBeNull();
-  });
+/** The fill once its batches stopped, with `rows` found. */
+const fillDone = (
+  rows: ListHaulingScanRow[],
+  reason: Extract<HaulingFillScanState, { status: 'ready' }>['reason'] = 'nothing-left'
+): HaulingFillScanState => ({ status: 'ready', rows, reason, batches: 1 });
 
-  it('offers other categories’ items, and Add puts the ticked ones in the trip as offered', async () => {
+describe('HaulingPanel fill the free space', () => {
+  it('scans only when asked: idle, then the running batch with Stop', async () => {
     const user = userEvent.setup();
     setCargo(1000);
     fillState = {
-      status: 'ready',
-      scan: { rows: [FILL_ROW], scanned: 1, fetchedAt: 0 },
+      status: 'loading',
+      batch: 2,
+      progress: { stage: 'prices', done: 1, total: 3 },
+      rows: [],
+      freeM3: 300,
     };
+    renderPanel();
+    expect(fillFind).not.toHaveBeenCalled();
+    // 1,000 m³ less Damage Control II's 350.
+    expect(screen.getByText(/fit the free 650 m³/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+    expect(fillFind).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: /Find items/ })).toBeNull();
+    expect(screen.getByRole('status', { name: 'Batch 2 · 300 m³ still free' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(fillStop).toHaveBeenCalledOnce();
+  });
+
+  it('never scans the table’s own rows again, and sizes each batch as the list would', async () => {
+    setCargo(1000);
+    renderPanel();
+    expect([...fillInput!.excludeIds()]).toEqual([2048]);
+    // 200 m³ of the 650 free: one line, from this batch.
+    expect(fillInput!.measure([FILL_ROW], new Set([4051]))).toEqual({
+      freeM3: 450,
+      capacityM3: 1000,
+      newLines: 1,
+      binding: 'sales',
+    });
+    expect(fillInput!.measure([FILL_ROW], new Set())).toMatchObject({ newLines: 0 });
+  });
+
+  it('sizes only rows the user’s filters let through', async () => {
+    setCargo(1000);
+    renderPanel('from=jita&to=amarr&margin=90');
+    expect(fillInput!.measure([FILL_ROW], new Set([4051]))).toMatchObject({
+      freeM3: 1000,
+      newLines: 0,
+    });
+  });
+
+  it('offers what the batches found; Add puts the ticked ones in the trip and says what it loaded', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = fillDone([FILL_ROW]);
     renderPanel();
     await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
 
@@ -405,6 +463,9 @@ describe('HaulingPanel fill the free space', () => {
     expect(within(list).getByText('200 m³')).toBeInTheDocument();
     expect(await within(list).findByText('· Planetary Infrastructure')).toBeInTheDocument();
     expect(screen.getByText(/with the fill/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Nothing else on this lane is profitable.', { selector: 'p' })
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add 1 · +200 m³' }));
 
@@ -413,11 +474,44 @@ describe('HaulingPanel fill the free space', () => {
     // The plan already shipped stays as it was.
     expect(bringBox()).toHaveValue('70');
     expect(screen.getByText('2 of 2 in the trip')).toBeInTheDocument();
-    expect(screen.getByText('Nothing else on this lane fits.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Added 1 item · +200 m³ · 450 m³ still free', { selector: 'p' })
+    ).toBeInTheDocument();
+    // Nothing is left on the lane: no Find more.
+    expect(screen.queryByRole('button', { name: 'Find more' })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Hauling actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Show multibuy list' }));
     expect(screen.getByLabelText('Multibuy list')).toHaveTextContent('Nitrogen Fuel Block 40');
+  });
+
+  it('keeps the added rows in the table while Find more runs, and excludes them', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = fillDone([FILL_ROW], 'batch-cap');
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+    await user.click(screen.getByRole('button', { name: /^Add 1/ }));
+    expect([...fillInput!.excludeIds()]).toEqual([2048, 4051]);
+
+    fillState = { status: 'loading', batch: 2, progress: null, rows: [FILL_ROW], freeM3: null };
+    await user.click(screen.getByRole('button', { name: 'Find more' }));
+    expect(fillMore).toHaveBeenCalledOnce();
+    expect(row(/Nitrogen Fuel Block/)).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Batch 2 · 450 m³ still free' })).toBeInTheDocument();
+  });
+
+  it('says why it stopped, and offers Find more while the hold has room', async () => {
+    const user = userEvent.setup();
+    setCargo(1000);
+    fillState = fillDone([], 'batch-cap');
+    renderPanel();
+    await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
+    expect(
+      screen.getByText('Stopped after 8 batches; press Find more to keep going.', { selector: 'p' })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Find more' }));
+    expect(fillMore).toHaveBeenCalledOnce();
   });
 
   it('sizes the ticked items again: unticking one frees its room for the rest', async () => {
@@ -430,14 +524,10 @@ describe('HaulingPanel fill the free space', () => {
       name,
       sale: { ...FILL_ROW.sale, price, demandCapUnits: 100 },
     });
-    fillState = {
-      status: 'ready',
-      scan: {
-        rows: [big(4051, 'Nitrogen Fuel Block', 160), big(4246, 'Hydrogen Fuel Block', 150)],
-        scanned: 2,
-        fetchedAt: 0,
-      },
-    };
+    fillState = fillDone([
+      big(4051, 'Nitrogen Fuel Block', 160),
+      big(4246, 'Hydrogen Fuel Block', 150),
+    ]);
     renderPanel();
     await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     const list = screen.getByRole('list', { name: 'Items that fit the free space' });
@@ -453,7 +543,7 @@ describe('HaulingPanel fill the free space', () => {
   it('drops the fill and the added items with a new lane, and with a reload', async () => {
     const user = userEvent.setup();
     setCargo(1000);
-    fillState = { status: 'ready', scan: { rows: [FILL_ROW], scanned: 1, fetchedAt: 0 } };
+    fillState = fillDone([FILL_ROW]);
     let info: { refresh: () => void } | null = null;
     render(
       <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=amarr']}>
@@ -470,6 +560,7 @@ describe('HaulingPanel fill the free space', () => {
 
     await addOne();
     act(() => info!.refresh());
+    expect(fillReset).toHaveBeenCalledOnce();
     expect(screen.queryByRole('row', { name: /Nitrogen Fuel Block/ })).toBeNull();
     // Add's pins go with the rows: nothing is left edited for Fill my hold to undo.
     await user.click(screen.getByRole('button', { name: 'Hauling actions' }));
@@ -489,21 +580,21 @@ describe('HaulingPanel fill the free space', () => {
   it('an unticked item is not added', async () => {
     const user = userEvent.setup();
     setCargo(1000);
-    fillState = { status: 'ready', scan: { rows: [FILL_ROW], scanned: 1, fetchedAt: 0 } };
+    fillState = fillDone([FILL_ROW]);
     renderPanel();
     await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     await user.click(screen.getByRole('checkbox', { name: 'Nitrogen Fuel Block' }));
     expect(screen.getByRole('button', { name: /^Add 0/ })).toBeDisabled();
   });
 
-  it('retries a failed scan with a refresh', async () => {
+  it('retries a failed batch by carrying on', async () => {
     const user = userEvent.setup();
     setCargo(1000);
-    fillState = { status: 'error' };
+    fillState = { status: 'error', rows: [], batches: 0 };
     renderPanel();
     await user.click(screen.getByRole('button', { name: 'Find items to fill it' }));
     await user.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Try again' }));
-    expect(fillRefresh).toHaveBeenCalled();
+    expect(fillMore).toHaveBeenCalledOnce();
   });
 
   it('is not offered with Any hub at an end: it would scan every hub', () => {
@@ -512,10 +603,10 @@ describe('HaulingPanel fill the free space', () => {
     expect(screen.queryByText('Fill the free space')).toBeNull();
   });
 
-  it('is not offered for Everything, which leaves no other category', () => {
+  it('is offered for Everything too', () => {
     setCargo(1000);
     renderPanel('from=jita&to=amarr&cat=0');
-    expect(screen.queryByText('Fill the free space')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Find items to fill it' })).toBeInTheDocument();
   });
 });
 

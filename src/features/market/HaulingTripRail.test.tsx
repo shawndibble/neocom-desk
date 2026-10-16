@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { HoldUse, TripPlan } from '@/engine/market/haulingPlan';
@@ -247,11 +247,23 @@ const ITEMS: HaulingFillItem[] = [
 ];
 
 function renderFill(props: Partial<HaulingFillListProps> = {}) {
-  const handlers = { onToggle: vi.fn(), onFind: vi.fn(), onAdd: vi.fn() };
+  const handlers = {
+    onToggle: vi.fn(),
+    onFind: vi.fn(),
+    onMore: vi.fn(),
+    onStop: vi.fn(),
+    onAdd: vi.fn(),
+  };
   render(
     <HaulingFillList
       freeM3={44_462}
       status="ready"
+      batch={0}
+      runningFreeM3={null}
+      reason="full"
+      leftM3={120}
+      canFindMore={false}
+      added={null}
       items={ITEMS}
       ticked={new Set([1])}
       tickedTotals={{ count: 1, volumeM3: 9_000, cost: 30_000_000, profit: 3_903_930 }}
@@ -263,6 +275,9 @@ function renderFill(props: Partial<HaulingFillListProps> = {}) {
   return handlers;
 }
 
+/** The visible line, not its screen-reader copy in the live region. */
+const line = (text: string | RegExp) => screen.getByText(text, { selector: 'p' });
+
 describe('HaulingFillList', () => {
   it('idle: offers the scan for the free m³, and never runs it by itself', async () => {
     const user = userEvent.setup();
@@ -273,23 +288,82 @@ describe('HaulingFillList', () => {
     expect(onFind).toHaveBeenCalledOnce();
   });
 
-  it('loading: a spinner and the progress line', () => {
-    renderFill({ status: 'loading', items: [], progressText: 'Reading 3 of 12 categories' });
-    expect(screen.getByRole('status', { name: 'Reading 3 of 12 categories' })).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
-  });
-
-  it('error: a message with a retry that runs the scan again', async () => {
+  it('loading: a spinner with the batch and the room still free, the stage line, and Stop', async () => {
     const user = userEvent.setup();
-    const { onFind } = renderFill({ status: 'error', items: [] });
-    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't scan the other categories.");
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(onFind).toHaveBeenCalledOnce();
+    const { onStop } = renderFill({
+      status: 'loading',
+      batch: 3,
+      runningFreeM3: 21_000,
+      items: [],
+      progressText: 'Reading 3 of 12 categories',
+    });
+    expect(
+      screen.getByRole('status', { name: 'Batch 3 · 21,000 m³ still free' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Reading 3 of 12 categories')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(onStop).toHaveBeenCalledOnce();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
-  it('ready and empty: says nothing else fits', () => {
-    renderFill({ items: [] });
-    expect(screen.getByText('Nothing else on this lane fits.')).toBeInTheDocument();
+  it('loading before the first batch lands: the plan’s own free m³', () => {
+    renderFill({ status: 'loading', batch: 1, runningFreeM3: null, items: [] });
+    expect(
+      screen.getByRole('status', { name: 'Batch 1 · 44,462 m³ still free' })
+    ).toBeInTheDocument();
+  });
+
+  it('error: a message with a retry that carries on', async () => {
+    const user = userEvent.setup();
+    const { onMore, onFind } = renderFill({ status: 'error', items: [] });
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't scan for more items.");
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onMore).toHaveBeenCalledOnce();
+    expect(onFind).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['full', 'Filled: 120 m³ left.'],
+    ['nothing-left', 'Nothing else on this lane is profitable.'],
+    ['no-gain', 'Nothing else on this lane is profitable.'],
+    ['budget', 'Your Max spend is the limit.'],
+    ['batch-cap', 'Stopped after 8 batches; press Find more to keep going.'],
+    ['stopped', 'Stopped.'],
+  ] as const)('ready: says why it stopped (%s)', async (reason, text) => {
+    renderFill({ reason });
+    expect(line(text)).toBeInTheDocument();
+    // Announced too, from a region mounted before the text.
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(text));
+  });
+
+  it('offers Find more when it may find more, and it carries on', async () => {
+    const user = userEvent.setup();
+    const { onMore } = renderFill({ reason: 'batch-cap', canFindMore: true });
+    await user.click(screen.getByRole('button', { name: 'Find more' }));
+    expect(onMore).toHaveBeenCalledOnce();
+  });
+
+  it('offers no Find more when full', () => {
+    renderFill({ reason: 'full', canFindMore: false });
+    expect(screen.queryByRole('button', { name: 'Find more' })).toBeNull();
+  });
+
+  it('after Add: what it loaded and the room left, in place of the stop reason', () => {
+    renderFill({
+      items: [],
+      reason: 'full',
+      added: { count: 8, volumeM3: 35_850 },
+      freeM3: 21_000,
+      canFindMore: true,
+    });
+    expect(line('Added 8 items · +35,850 m³ · 21,000 m³ still free')).toBeInTheDocument();
+    expect(screen.queryByText('Filled: 120 m³ left.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Find more' })).toBeInTheDocument();
+  });
+
+  it('ready with nothing found: only the reason', () => {
+    renderFill({ items: [], reason: 'nothing-left' });
+    expect(line('Nothing else on this lane is profitable.')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 

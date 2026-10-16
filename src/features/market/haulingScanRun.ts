@@ -19,8 +19,11 @@ export interface HaulingScanTarget {
   from: HaulingEnd;
   to: HaulingEnd;
   mode: HaulMode;
-  /** See `HaulingScanRequest.scope`. */
-  scope: number | string;
+  /**
+   * See `HaulingScanRequest.scope`. A function names the scope from the ids
+   * `typeIds` picked, for a scan whose id set is only known once the SDE is read.
+   */
+  scope: number | string | ((typeIds: readonly number[]) => string);
   typeIds: (
     groups: readonly MarketGroupNode[],
     marketTypes: readonly MarketTypeEntry[]
@@ -39,11 +42,12 @@ export async function scanHaulingLane(
     // Without it every category reads as unknown: items still plan, in the general hold only.
     loadGroupCategories().catch(() => ({})),
   ]);
+  const typeIds = target.typeIds(groups, marketTypes);
   return runHaulingScan({
     from: target.from,
     to: target.to,
-    typeIds: target.typeIds(groups, marketTypes),
-    scope: target.scope,
+    typeIds,
+    scope: typeof target.scope === 'function' ? target.scope(typeIds) : target.scope,
     mode: target.mode,
     types,
     groupCategories,

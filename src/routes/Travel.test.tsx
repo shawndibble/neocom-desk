@@ -88,7 +88,7 @@ vi.mock('@/features/market/useHaulingScan', () => {
 // The fill scan loads market types, and the jump count pulls the route
 // settings stores: neither has anything to show while the main scan failed.
 vi.mock('@/features/market/useHaulingFillScan', () => {
-  const fill = { state: { status: 'idle' }, refresh: () => {} };
+  const fill = { state: { status: 'idle' }, find() {}, more() {}, stop() {}, reset() {} };
   return { useHaulingFillScan: () => fill };
 });
 vi.mock('@/features/market/useHubJumps', () => ({ useHubJumps: () => ({ status: 'none' }) }));

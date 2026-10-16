@@ -1,15 +1,18 @@
 /**
- * Hauling's "Fill the free space": the on-demand scan, the rows added from it,
- * and the offer sized into the room the plan leaves. Two hooks: the offer
- * needs the plan, and the plan needs the added rows.
+ * Hauling's "Fill the free space": the on-demand batches, the rows added from
+ * them, and the offer sized into the room the plan leaves. Two hooks: the
+ * offer needs the plan, and the plan needs the added rows. The offer lends the
+ * batches its sizing (`bindSize`), so each batch's stop is judged on exactly
+ * what the list will show.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { planFill } from '@/engine/market/haulingFill';
-import type { TripCandidate, TripOverride, TripPlan } from '@/engine/market/haulingPlan';
+import { fillFullAtM3 } from '@/engine/market/haulingFillStop';
+import type { HoldUse, TripCandidate, TripOverride, TripPlan } from '@/engine/market/haulingPlan';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { haulingCategoryOf } from './haulingCategories';
-import type { HaulMode } from './haulingData';
+import type { HaulMode, HaulingScanRow } from './haulingData';
 import type { HaulingEnd } from './haulingHubs';
 import type { HaulingFillItem, HaulingFillListProps } from './HaulingTripRail';
 import {
@@ -19,9 +22,16 @@ import {
   type HaulingFilters,
   type HaulingViewRow,
 } from './haulingView';
-import { useHaulingFillScan } from './useHaulingFillScan';
+import { useHaulingFillScan, type HaulingFillMeasure } from './useHaulingFillScan';
 
 const NO_IDS: ReadonlySet<number> = new Set();
+const NO_ROWS: readonly HaulingScanRow[] = [];
+
+/** Sizes fill rows (already filtered, added ones out) against the plan; `batchIds` are the last batch's. */
+type SizeFill = (
+  extras: readonly HaulingViewRow[],
+  batchIds: ReadonlySet<number>
+) => HaulingFillMeasure;
 
 export interface HaulingFillInput {
   from: HaulingEnd;
@@ -31,8 +41,11 @@ export interface HaulingFillInput {
   /** The route, category and mode as one key: a new one drops the fill and its added rows. */
   laneKey: string;
   feesAt: HaulingFeesAt;
+  /** The panel's own row filters: the fill shows and sizes only what the table would. */
   filters: HaulingFilters;
   groups: readonly MarketGroupNode[] | null;
+  /** Every type id the category scan returned: the fill never scans them again. */
+  scannedTypeIds: readonly number[];
 }
 
 export function useHaulingFill({
@@ -44,16 +57,18 @@ export function useHaulingFill({
   feesAt,
   filters,
   groups,
+  scannedTypeIds,
 }: HaulingFillInput) {
-  const [requested, setRequested] = useState(false);
   const [addedIds, setAddedIds] = useState<ReadonlySet<number>>(NO_IDS);
   const [unticked, setUnticked] = useState<ReadonlySet<number>>(NO_IDS);
+  /** What the last Add loaded, for "Added 8 items · …"; cleared by the next Find. */
+  const [lastAdded, setLastAdded] = useState<{ count: number; volumeM3: number } | null>(null);
   const [resetFor, setResetFor] = useState(laneKey);
   if (resetFor !== laneKey) {
     setResetFor(laneKey);
-    setRequested(false);
     setAddedIds(NO_IDS);
     setUnticked(NO_IDS);
+    setLastAdded(null);
   }
   // `reset` reads the added ids through a ref, so it keeps one identity for the page's reload button.
   const addedRef = useRef(addedIds);
@@ -61,24 +76,46 @@ export function useHaulingFill({
     addedRef.current = addedIds;
   }, [addedIds]);
 
-  const scan = useHaulingFillScan(from, to, categoryId, mode, requested);
-  const rows = useMemo(
-    () =>
-      scan.state.status === 'ready'
-        ? filterHaulingRows(toViewRows(scan.state.scan.rows, feesAt), filters).shown
-        : [],
-    [scan.state, feesAt, filters]
+  /** Scan rows as the table shows them: the one filter the panel applies to its own rows. */
+  const viewOf = useCallback(
+    (scanRows: readonly HaulingScanRow[]) =>
+      filterHaulingRows(toViewRows([...scanRows], feesAt), filters).shown,
+    [feesAt, filters]
   );
+  const sizeRef = useRef<SizeFill | null>(null);
+  const bindSize = useCallback((size: SizeFill | null) => {
+    sizeRef.current = size;
+  }, []);
+
+  const scan = useHaulingFillScan({
+    from,
+    to,
+    categoryId,
+    mode,
+    excludeIds: () => [...scannedTypeIds, ...addedIds],
+    measure: (scanRows, batchIds) => {
+      const size = sizeRef.current;
+      return size === null
+        ? null
+        : size(
+            viewOf(scanRows).filter((r) => !addedIds.has(r.typeId)),
+            batchIds
+          );
+    },
+  });
+  const { state } = scan;
+  const scanned = state.status === 'idle' ? null : state.rows;
+  // Every row found so far, while a later batch runs too: the added ones stay in the table.
+  const rows = useMemo(() => viewOf(scanned ?? NO_ROWS), [viewOf, scanned]);
   const addedRows = useMemo(
     () => (addedIds.size === 0 ? [] : rows.filter((r) => addedIds.has(r.typeId))),
     [rows, addedIds]
   );
 
-  // Category per scanned row, for "Fuel Blocks · 9,000 m³": the scan has just read the types file, so it is cached.
+  // Category per found row, for "Fuel Blocks · 9,000 m³": the scan has just read the types file, so it is cached.
   const [categoryOf, setCategoryOf] = useState<ReadonlyMap<number, number> | null>(null);
-  const scanned = scan.state.status === 'ready' ? scan.state.scan.rows : null;
   useEffect(() => {
-    if (scanned === null || groups === null) return;
+    if (scanned === null || scanned.length === 0 || groups === null) return;
     let cancelled = false;
     void loadMarketTypes()
       .then((types) => {
@@ -93,10 +130,16 @@ export function useHaulingFill({
     };
   }, [scanned, groups]);
 
+  const { find: findFresh, more: findMore, reset: resetScan } = scan;
   const find = () => {
-    // The scan starts when first asked; a retry re-scans through `refresh`.
-    if (requested) scan.refresh();
-    else setRequested(true);
+    setUnticked(NO_IDS);
+    setLastAdded(null);
+    findFresh();
+  };
+  /** Find more, and Try again: carries on from the batches already run. */
+  const more = () => {
+    setLastAdded(null);
+    findMore();
   };
   const toggle = (typeId: number, on: boolean) =>
     setUnticked((current) => {
@@ -105,27 +148,34 @@ export function useHaulingFill({
       else next.add(typeId);
       return next;
     });
-  const markAdded = (typeIds: readonly number[]) =>
-    setAddedIds((current) => new Set([...current, ...typeIds]));
+  const markAdded = (lines: readonly { typeId: number; volumeM3: number }[]) => {
+    setAddedIds((current) => new Set([...current, ...lines.map((l) => l.typeId)]));
+    setLastAdded({ count: lines.length, volumeM3: lines.reduce((sum, l) => sum + l.volumeM3, 0) });
+  };
   /** Drops the fill and its added rows; returns the ids that were added, for the caller's pins. */
   const reset = useCallback((): ReadonlySet<number> => {
     const dropped = addedRef.current;
-    setRequested(false);
+    resetScan();
     setAddedIds(NO_IDS);
     setUnticked(NO_IDS);
+    setLastAdded(null);
     return dropped;
-  }, []);
+  }, [resetScan]);
 
   return {
-    status: scan.state.status,
-    progress: scan.state.status === 'loading' ? scan.state.progress : null,
-    requested,
+    status: state.status,
+    state,
+    requested: state.status !== 'idle' || addedIds.size > 0,
     rows,
     addedIds,
     addedRows,
     unticked,
+    lastAdded,
     categoryOf,
+    bindSize,
     find,
+    more,
+    stop: scan.stop,
     toggle,
     markAdded,
     reset,
@@ -135,7 +185,7 @@ export function useHaulingFill({
 export type HaulingFill = ReturnType<typeof useHaulingFill>;
 
 export interface HaulingFillOfferInput {
-  /** False hides the offer (Everything, no Cargo Space, Any hub). */
+  /** False hides the offer (no Cargo Space, Any hub). */
   offered: boolean;
   current: readonly TripCandidate[];
   overrides: ReadonlyMap<number, TripOverride>;
@@ -147,14 +197,19 @@ export interface HaulingFillOfferInput {
   pin: (lines: readonly { typeId: number; quantity: number }[]) => void;
 }
 
+const freeOf = (holds: readonly HoldUse[]) =>
+  holds.reduce((sum, h) => sum + Math.max(0, h.capacityM3 - h.usedM3), 0);
+const capacityOf = (holds: readonly HoldUse[]) => holds.reduce((sum, h) => sum + h.capacityM3, 0);
+
 /** The fill sized against the current plan: what `HaulingFillList` shows and what Add loads. */
 export function useHaulingFillOffer(
   fill: HaulingFill,
   { offered, current, overrides, before, base, categoryName, pin }: HaulingFillOfferInput
 ) {
+  const ready = fill.status === 'ready';
   const extras = useMemo(
-    () => (offered ? fill.rows.filter((r) => !fill.addedIds.has(r.typeId)) : []),
-    [offered, fill.rows, fill.addedIds]
+    () => (offered && ready ? fill.rows.filter((r) => !fill.addedIds.has(r.typeId)) : []),
+    [offered, ready, fill.rows, fill.addedIds]
   );
   const planOf = useCallback(
     (rows: readonly HaulingViewRow[]) =>
@@ -163,6 +218,26 @@ export function useHaulingFillOffer(
         : planFill({ ...base, current, overrides, before, extras: rows.map((r) => r.candidate) }),
     [base, current, overrides, before]
   );
+
+  // Each batch is judged on the plan of everything found so far, as the list would size it.
+  const size = useCallback<SizeFill>(
+    (rows, batchIds) => {
+      const plan = planOf(rows);
+      const after = plan?.after ?? before;
+      return {
+        freeM3: freeOf(after.holds),
+        capacityM3: capacityOf(after.holds),
+        newLines: (plan?.lines ?? []).filter((l) => batchIds.has(l.typeId) && l.profit > 0).length,
+        binding: after.binding,
+      };
+    },
+    [planOf, before]
+  );
+  const { bindSize } = fill;
+  useEffect(() => {
+    bindSize(offered ? size : null);
+  }, [bindSize, offered, size]);
+
   const offer = useMemo(() => planOf(extras), [planOf, extras]);
   const offerLines = useMemo(() => offer?.lines ?? [], [offer]);
   // Every offered item starts ticked. The ticked ones are sized again on their
@@ -191,16 +266,31 @@ export function useHaulingFillOffer(
   const add = () => {
     const lines = ticked?.lines ?? [];
     if (lines.length === 0) return;
-    fill.markAdded(lines.map((l) => l.typeId));
+    fill.markAdded(lines);
     pin(lines);
   };
 
+  const { state } = fill;
+  /** Free m³ once every offered item is in: what "Filled" reports and Find more is judged on. */
+  const freeAfterOffer = freeOf((offer?.after ?? before).holds);
+  const reason = state.status === 'ready' ? state.reason : null;
   const list: Omit<HaulingFillListProps, 'freeM3' | 'progressText'> = {
     status: fill.status,
+    batch: state.status === 'loading' ? state.batch : 0,
+    runningFreeM3: state.status === 'loading' ? state.freeM3 : null,
+    reason,
+    leftM3: freeAfterOffer,
+    canFindMore:
+      reason !== null &&
+      reason !== 'nothing-left' &&
+      freeAfterOffer > fillFullAtM3(capacityOf(before.holds)),
+    added: fill.lastAdded,
     items,
     ticked: new Set(offerLines.filter((l) => !fill.unticked.has(l.typeId)).map((l) => l.typeId)),
     onToggle: fill.toggle,
     onFind: fill.find,
+    onMore: fill.more,
+    onStop: fill.stop,
     onAdd: add,
     tickedTotals: {
       count: ticked?.lines.length ?? 0,
@@ -209,13 +299,10 @@ export function useHaulingFillOffer(
       profit: ticked?.added.profit ?? 0,
     },
     holdAfter: ticked
-      ? ticked.after.holds.reduce(
-          (sum, h) => ({
-            usedM3: sum.usedM3 + h.usedM3,
-            capacityM3: sum.capacityM3 + h.capacityM3,
-          }),
-          { usedM3: 0, capacityM3: 0 }
-        )
+      ? {
+          usedM3: ticked.after.holds.reduce((sum, h) => sum + h.usedM3, 0),
+          capacityM3: capacityOf(ticked.after.holds),
+        }
       : null,
   };
   return { list, cargoValueAfterFill: ticked ? ticked.after.totals.cost : null };

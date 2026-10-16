@@ -7,13 +7,14 @@
  */
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Panel, ProgressBar, Spinner } from '@/components/ui';
+import { Button, Checkbox, LiveStatus, Panel, ProgressBar, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   focusRingClassName,
   inlineLinkClassName,
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
+import { FILL_BATCH_CAP, type HaulingFillStopReason } from '@/engine/market/haulingFillStop';
 import type { TripPlan } from '@/engine/market/haulingPlan';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
 import { formatIsk, formatIskCompactSigned } from '@/lib/isk';
@@ -239,18 +240,44 @@ export interface HaulingFillItem {
 
 export type HaulingFillStatus = 'idle' | 'loading' | 'ready' | 'error';
 
+/** Literal keys, so the locale split finds them. */
+const STOP_KEYS = {
+  full: 'market.hauling.fill.stopped.full',
+  'nothing-left': 'market.hauling.fill.stopped.nothingLeft',
+  'no-gain': 'market.hauling.fill.stopped.noGain',
+  budget: 'market.hauling.fill.stopped.budget',
+  'batch-cap': 'market.hauling.fill.stopped.batchCap',
+  stopped: 'market.hauling.fill.stopped.byYou',
+} as const satisfies Record<Exclude<HaulingFillStopReason, 'error'>, string>;
+
 export interface HaulingFillListProps {
-  /** Free m³ the fill is sized against. */
+  /** Free m³ in the plan as it stands. */
   freeM3: number;
   status: HaulingFillStatus;
-  /** The scan's progress line while `loading`. */
+  /** The batch running while `loading`, counted from Find. */
+  batch: number;
+  /** Free m³ once everything found so far is planned, while `loading`; null before the first batch lands. */
+  runningFreeM3: number | null;
+  /** The stage line of the batch running. */
   progressText?: string;
-  /** Best profit per m³ first. Empty when ready means nothing else fits. */
+  /** Why the batches stopped, once `ready`. */
+  reason: Exclude<HaulingFillStopReason, 'error'> | null;
+  /** Free m³ once every offered item is in: "Filled: 120 m³ left." */
+  leftM3: number;
+  /** Offers Find more: the hold is not full and something may be left. */
+  canFindMore: boolean;
+  /** What the last Add loaded; it replaces the stop reason until the next Find. */
+  added: { count: number; volumeM3: number } | null;
+  /** Best profit per m³ first. */
   items: readonly HaulingFillItem[];
   ticked: ReadonlySet<number>;
   onToggle: (typeId: number, ticked: boolean) => void;
-  /** Starts the on-demand scan (idle) or retries it (error). */
+  /** Starts the batches afresh. */
   onFind: () => void;
+  /** Carries on from where they stopped: Find more, and Try again after a failed batch. */
+  onMore: () => void;
+  /** Ends the batches, keeping what was found. */
+  onStop: () => void;
   /** Adds the ticked items to the Trip Plan. */
   onAdd: () => void;
   /** Totals of the ticked items. */
@@ -303,17 +330,36 @@ function FillRow({
 export function HaulingFillList({
   freeM3,
   status,
+  batch,
+  runningFreeM3,
   progressText,
+  reason,
+  leftM3,
+  canFindMore,
+  added,
   items,
   ticked,
   onToggle,
   onFind,
+  onMore,
+  onStop,
   onAdd,
   tickedTotals,
   holdAfter,
 }: HaulingFillListProps) {
   const { t } = useTranslation();
   const addDetailId = useId();
+
+  let outcome: string | null = null;
+  if (status === 'ready' && added !== null) {
+    outcome = t('market.hauling.fill.added', {
+      count: added.count,
+      m3: formatTripM3(added.volumeM3),
+      free: formatTripM3(freeM3),
+    });
+  } else if (status === 'ready' && reason !== null) {
+    outcome = t(STOP_KEYS[reason], { m3: formatTripM3(leftM3), count: FILL_BATCH_CAP });
+  }
 
   let body: ReactNode;
   if (status === 'idle') {
@@ -328,10 +374,18 @@ export function HaulingFillList({
       </>
     );
   } else if (status === 'loading') {
+    const running = t('market.hauling.fill.running', {
+      batch,
+      m3: formatTripM3(runningFreeM3 ?? freeM3),
+    });
     body = (
       <div className="flex items-center gap-2 text-xs text-text-dim">
-        <Spinner size="sm" label={progressText ?? t('common.loading')} />
-        {progressText && <span aria-hidden="true">{progressText}</span>}
+        <Spinner size="sm" label={running} />
+        <span aria-hidden="true" className="flex min-w-0 flex-1 flex-col leading-tight">
+          <span className="tabular-nums">{running}</span>
+          {progressText && <span>{progressText}</span>}
+        </span>
+        <Button onClick={onStop}>{t('market.hauling.fill.stop')}</Button>
       </div>
     );
   } else if (status === 'error') {
@@ -341,53 +395,61 @@ export function HaulingFillList({
         className="flex flex-col gap-2 rounded-xs border border-warning/45 bg-warning/10 p-2 text-xs"
       >
         <p className="text-warning">{t('market.hauling.fill.error')}</p>
-        <Button size="sm" className="self-start" onClick={onFind}>
+        <Button size="sm" className="self-start" onClick={onMore}>
           {t('market.hauling.retry')}
         </Button>
       </div>
     );
-  } else if (items.length === 0) {
-    body = <p className="text-xs text-text-dim">{t('market.hauling.fill.empty')}</p>;
   } else {
     body = (
       <>
-        <ul aria-label={t('market.hauling.fill.listLabel')} className="flex flex-col">
-          {items.map((item) => (
-            <FillRow
-              key={item.typeId}
-              item={item}
-              ticked={ticked.has(item.typeId)}
-              onToggle={onToggle}
-            />
-          ))}
-        </ul>
-        <div className="flex flex-col gap-1">
-          <Button
-            className="w-full"
-            disabled={tickedTotals.count === 0}
-            onClick={onAdd}
-            aria-describedby={addDetailId}
-          >
-            {t('market.hauling.fill.add', {
-              count: tickedTotals.count,
-              m3: formatTripM3(tickedTotals.volumeM3),
-            })}
+        {items.length > 0 && (
+          <>
+            <ul aria-label={t('market.hauling.fill.listLabel')} className="flex flex-col">
+              {items.map((item) => (
+                <FillRow
+                  key={item.typeId}
+                  item={item}
+                  ticked={ticked.has(item.typeId)}
+                  onToggle={onToggle}
+                />
+              ))}
+            </ul>
+            <div className="flex flex-col gap-1">
+              <Button
+                className="w-full"
+                disabled={tickedTotals.count === 0}
+                onClick={onAdd}
+                aria-describedby={addDetailId}
+              >
+                {t('market.hauling.fill.add', {
+                  count: tickedTotals.count,
+                  m3: formatTripM3(tickedTotals.volumeM3),
+                })}
+              </Button>
+              <p id={addDetailId} className="text-center text-xs text-text-dim tabular-nums">
+                {t('market.hauling.fill.addDetail', {
+                  spend: isk(tickedTotals.cost),
+                  profit: signed(tickedTotals.profit),
+                })}
+              </p>
+            </div>
+            {holdAfter && (
+              <p className="text-xs text-text-dim tabular-nums">
+                {t('market.hauling.fill.holdAfter', {
+                  used: formatTripM3(holdAfter.usedM3),
+                  total: formatTripM3(holdAfter.capacityM3),
+                  free: formatTripM3(Math.max(0, holdAfter.capacityM3 - holdAfter.usedM3)),
+                })}
+              </p>
+            )}
+          </>
+        )}
+        {outcome && <p className="text-xs text-text-dim tabular-nums">{outcome}</p>}
+        {canFindMore && (
+          <Button className="w-full" onClick={onMore}>
+            {t('market.hauling.fill.more')}
           </Button>
-          <p id={addDetailId} className="text-center text-xs text-text-dim tabular-nums">
-            {t('market.hauling.fill.addDetail', {
-              spend: isk(tickedTotals.cost),
-              profit: signed(tickedTotals.profit),
-            })}
-          </p>
-        </div>
-        {holdAfter && (
-          <p className="text-xs text-text-dim tabular-nums">
-            {t('market.hauling.fill.holdAfter', {
-              used: formatTripM3(holdAfter.usedM3),
-              total: formatTripM3(holdAfter.capacityM3),
-              free: formatTripM3(Math.max(0, holdAfter.capacityM3 - holdAfter.usedM3)),
-            })}
-          </p>
         )}
       </>
     );
@@ -396,6 +458,8 @@ export function HaulingFillList({
   return (
     <section className="flex flex-col gap-2 border border-line bg-panel-2 p-3">
       <h3 className="text-sm font-semibold">{t('market.hauling.fill.title')}</h3>
+      {/* Always mounted, so the stop reason and Add's result are read out when they land. */}
+      <LiveStatus>{outcome}</LiveStatus>
       {body}
     </section>
   );
