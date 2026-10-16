@@ -48,7 +48,9 @@ describe('OreDecisionDialog', () => {
     });
     renderDialog();
 
-    expect(await screen.findByText("Reprocessing data isn't downloaded yet")).toBeInTheDocument();
+    expect(
+      (await screen.findAllByText("Reprocessing data isn't downloaded yet")).length
+    ).toBeGreaterThan(0);
     expect(screen.queryByText('Pricing this ore…')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));

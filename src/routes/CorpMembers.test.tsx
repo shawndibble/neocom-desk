@@ -166,7 +166,7 @@ describe('access (AC1)', () => {
   it('waits rather than deciding while corp access is still resolving', () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     renderMembers();
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
   });
 
@@ -174,8 +174,10 @@ describe('access (AC1)', () => {
     const retry = vi.fn();
     mockedAccess.mockReturnValue({ ...accessOf('unknown', {}), readFailed: true, retry });
     renderMembers();
-    expect(screen.getByText("Can't check your corporation roles right now")).toBeInTheDocument();
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(
+      screen.getAllByText("Can't check your corporation roles right now").length
+    ).toBeGreaterThan(0);
+    expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(retry).toHaveBeenCalledTimes(1);
   });

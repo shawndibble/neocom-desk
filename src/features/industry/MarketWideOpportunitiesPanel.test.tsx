@@ -650,8 +650,8 @@ describe('MarketWideOpportunitiesPanel offline', () => {
       onRetryTrees,
     });
     expect(
-      screen.getByText("Market-wide build data hasn't been downloaded yet")
-    ).toBeInTheDocument();
+      screen.getAllByText("Market-wide build data hasn't been downloaded yet").length
+    ).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetryTrees).toHaveBeenCalledTimes(1);
   });

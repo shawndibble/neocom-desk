@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
@@ -30,7 +30,11 @@ describe('DataGate', () => {
   it('names what is missing and retries on request, announcing the failure', async () => {
     const onRetry = vi.fn();
     render(<DataGate status="failed" title="Blueprint data couldn't load" onRetry={onRetry} />);
-    expect(screen.getAllByText("Blueprint data couldn't load")).toHaveLength(2);
+    expect(screen.getByText("Blueprint data couldn't load")).toBeInTheDocument();
+    // Announced too, through the always-mounted live region.
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent("Blueprint data couldn't load")
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });

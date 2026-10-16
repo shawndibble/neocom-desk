@@ -43,7 +43,7 @@ describe('StockBuilderView', () => {
   it('says the blueprint data could not load, then loads it on Try again', async () => {
     loadBlueprintCatalog.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(CATALOG);
     renderView();
-    expect(await screen.findByText("Blueprint data couldn't load")).toBeInTheDocument();
+    expect((await screen.findAllByText("Blueprint data couldn't load")).length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     await vi.waitFor(() => expect(screen.queryByText("Blueprint data couldn't load")).toBeNull());
     expect(loadBlueprintCatalog).toHaveBeenCalledTimes(2);

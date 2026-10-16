@@ -203,7 +203,7 @@ describe('IndustryGroupPage', () => {
     await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', buildGroupId: 'g1' }));
     render(<App />);
 
-    expect(await screen.findByText("Blueprint data couldn't load")).toBeInTheDocument();
+    expect((await screen.findAllByText("Blueprint data couldn't load")).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('link', { name: /Rifter run/ })).toBeInTheDocument();
   });

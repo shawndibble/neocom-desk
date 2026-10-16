@@ -233,7 +233,8 @@ describe('Industry: data that fails to load', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(await screen.findByText("Blueprint data couldn't load")).toBeInTheDocument();
+    // Once visible, once announced by the always-mounted live region.
+    expect((await screen.findAllByText("Blueprint data couldn't load")).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('searchbox', { name: 'Add Build Plan' })).toBeInTheDocument();
   });
@@ -261,8 +262,8 @@ describe('Industry: data that fails to load', () => {
     render(<App />);
 
     expect(
-      await screen.findByText("Market-wide build data hasn't been downloaded yet")
-    ).toBeInTheDocument();
+      (await screen.findAllByText("Market-wide build data hasn't been downloaded yet")).length
+    ).toBeGreaterThan(0);
   });
 });
 
