@@ -163,6 +163,13 @@ import {
 } from './publicContracts.js';
 import { runWorkbenchSync } from './workbenchFits.js';
 import { firestoreWorkbenchFitsStore } from './workbenchFitsStore.js';
+import {
+  MutamarketBusyError,
+  MutamarketInputError,
+  MutamarketProxy,
+  MutamarketUnavailableError,
+  parseEstimateInput,
+} from './mutamarket.js';
 
 initializeApp();
 
@@ -1466,5 +1473,38 @@ export const syncLpStoreOffers = onSchedule(
       return;
     }
     await writeChunkedSnapshot(getFirestore(), LP_STORE_OFFERS_SNAPSHOT, rows);
+  }
+);
+
+// mutamarketEstimate: one abyssal module's estimated value from MutaMarket
+// (mutamarket.ts). No session: asset values show with nobody signed in to
+// sync, and the answer is public data. `maxInstances: 1` makes the proxy's
+// memory cache and import queue global, which is what keeps MutaMarket's
+// "never loop POST /api/modules" true across every client.
+const mutamarket = new MutamarketProxy();
+
+export const mutamarketEstimate = onCall<unknown>(
+  { maxInstances: 1, timeoutSeconds: 120 },
+  async (request) => {
+    let input;
+    try {
+      input = parseEstimateInput(request.data);
+    } catch (err) {
+      if (err instanceof MutamarketInputError)
+        throw new HttpsError('invalid-argument', err.message);
+      throw err;
+    }
+    try {
+      return await mutamarket.estimate(input);
+    } catch (err) {
+      if (err instanceof MutamarketBusyError) {
+        throw new HttpsError('resource-exhausted', 'MutaMarket import queue is full');
+      }
+      if (err instanceof MutamarketUnavailableError) {
+        logWarn('MutaMarket unavailable', { error: err.message });
+        throw new HttpsError('unavailable', 'MutaMarket is unavailable');
+      }
+      throw err;
+    }
   }
 );
