@@ -124,13 +124,13 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
 });
 
 describe('ResultsSummary: Costs stack (#116)', () => {
-  it('renders Material Cost, Job Fee, Total Cost, Time, and Cost Index as a stacked list', () => {
+  it('renders Material Cost, Job Fee, Total Cost, Main job time, and Cost Index as a stacked list', () => {
     renderSummary();
 
     expect(screen.getByText('Material cost')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^total job cost/i })).toBeInTheDocument();
     expect(screen.getByText('Total cost')).toBeInTheDocument();
-    expect(screen.getByText('Time')).toBeInTheDocument();
+    expect(screen.getByText('Main job time')).toBeInTheDocument();
     expect(screen.getByText('Cost index (Jita)')).toBeInTheDocument();
 
     // No more flat StatChip wrap for costs: values render as text within stacked row containers.
@@ -138,13 +138,13 @@ describe('ResultsSummary: Costs stack (#116)', () => {
     expect(totalCostRow).toHaveTextContent('565');
   });
 
-  it('renders costs in stack order: Material Cost, Job Fee, Total Cost, Time, Cost Index', () => {
+  it('renders costs in stack order: Material Cost, Job Fee, Total Cost, Main job time, Cost Index', () => {
     const { container } = renderSummary();
     const text = container.textContent ?? '';
     const materialIdx = text.indexOf('Material cost');
     const jobFeeIdx = text.indexOf('Total job cost');
     const totalIdx = text.indexOf('Total cost');
-    const timeIdx = text.indexOf('Time');
+    const timeIdx = text.indexOf('Main job time');
     const costIndexIdx = text.indexOf('Cost index');
 
     expect(materialIdx).toBeGreaterThanOrEqual(0);

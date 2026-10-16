@@ -2781,7 +2781,7 @@
     "subBuildRuns": "{{runs}} runs",
     "subBuildSummary": "Building {{count}} of this plan's own material(s) here: {{total}}, already reflected in the totals above — anything those jobs build in turn is inside that figure.",
     "subBuildSummaryComparison": "Buying them ready-made instead would cost {{planned}}.",
-    "subBuildTimeNote": "The sub-jobs add {{time}} of job time before the main run can start.",
+    "subBuildTimeNote": "The sub-jobs take {{time}} of job time in total.",
     "assumesNoImplantsHint": "Job time is calculated without this character's fitted implants, so a manufacturing time implant isn't counted. Grant Character details for an accurate estimate.",
     "buildRecipe": {
       "action": "Build it",
@@ -2821,6 +2821,7 @@
     "materialCost": "Material cost",
     "totalCost": "Total cost",
     "time": "Time",
+    "jobTime": "Main job time",
     "costIndexWithSystem": "Cost index ({{system}})",
     "costIndexTooltip": "<b>Can be slightly off:</b> ESI rounds it to 4 decimals. The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named above — the trade hub sets material and product prices, never this.",
     "revenue": "Revenue",
@@ -3170,7 +3171,8 @@
       "profitTitle": "Profit",
       "profitNet": "Net = revenue − sales tax − broker fee − total cost. The default.",
       "profitGross": "Gross = revenue − total cost. Ignores both market fees — only realistic if you never list it.",
-      "profitIskPerHour": "ISK/hour = profit ÷ build time ({{time}}). Slot time, not time to sell.",
+      "profitIskPerHour": "ISK/hour = profit ÷ the plan's own job time ({{time}}): what one slot earns. Slot time, not time to sell.",
+      "profitPlanTime": "Plan time ({{time}}) is different on purpose: the wall-clock until the whole tree is done if started now, sub-jobs running side by side on the free slots.",
       "breakEvenTitle": "Break-even price",
       "breakEven": "What one unit must list at to cover the whole job. Fees come out of the listed price, so it sits above cost per unit.",
       "breakEvenFormula": "Total cost {{total}} ÷ ({{quantity}} units × (100% − {{feePct}} fees)) = {{breakEven}}",
@@ -3234,10 +3236,21 @@
     "setupChipRig": "Rig",
     "setupChipTax": "Tax",
     "profitAfterFees": "Profit after fees",
-    "planSlotLine": "{{character}}: uses 1 {{category}} slot · {{open}} free · done by {{time}} EVE if started now",
-    "planSlotLineFull": "{{character}}: uses 1 {{category}} slot · none free · done by {{time}} EVE once one frees",
-    "groupSlotLine_one": "{{character}}: needs {{count}} job · {{needs}} slots · {{free}} free",
-    "groupSlotLine_other": "{{character}}: needs {{count}} jobs · {{needs}} slots · {{free}} free",
+    "planSchedule": {
+      "line_one": "Uses {{count}} slot · done by {{time}}",
+      "line_other": "Uses {{count}} slots · done by {{time}}",
+      "show": "Show plan",
+      "hide": "Hide plan",
+      "now": "Now",
+      "stage": "{{time}}: {{jobs}}",
+      "reaction_one": "{{count}} reaction",
+      "reaction_other": "{{count}} reactions",
+      "part_one": "{{count}} part",
+      "part_other": "{{count}} parts",
+      "final_one": "final item",
+      "final_other": "{{count}} final items",
+      "teNote": "Sub-jobs are timed at TE 0"
+    },
     "heroMargin": "{{value}} margin",
     "heroIskPerHour": "{{value}} ISK/hour",
     "heroBreakEven": "break-even {{value}}/unit",
@@ -4148,7 +4161,8 @@
           "ganttSummary": "{{note}}. {{jobs}}.",
           "ganttAgo": "{{duration}} ago",
           "ganttNow": "Now",
-          "ganttIn": "in {{duration}}"
+          "ganttIn": "in {{duration}}",
+          "slotsNote": "Free slots per Character, all activities"
         },
         "training": {
           "note": "Queue ends in {{duration}}"
@@ -4543,17 +4557,25 @@
       },
       "industry": {
         "title": "Industry",
-        "description": "Jobs ready to deliver and the next to finish",
+        "description": "Jobs ready to deliver, the next to finish, and free job slots",
         "empty": "No industry jobs running.",
         "ready": "ready",
         "running": "running",
         "next": "Next: {{name}}, {{duration}}",
+        "slotsFree_one": "{{count}} slot free",
+        "slotsFree_other": "{{count}} slots free",
+        "slotsOf": "{{free}} of {{max}} free",
+        "slotsFooter": "Free / max slots per activity",
         "col": {
           "job": "Job",
           "ends": "Ends in",
           "progress": "Done",
           "activity": "Activity",
-          "location": "Location"
+          "location": "Location",
+          "character": "Character",
+          "manufacturing": "Manufacturing",
+          "science": "Science",
+          "reactions": "Reactions"
         }
       },
       "profit": {

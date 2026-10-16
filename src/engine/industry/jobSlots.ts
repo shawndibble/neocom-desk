@@ -141,6 +141,27 @@ export interface JobFinishProjection {
 }
 
 /**
+ * When each of the character's `category` slots is next free, earliest first:
+ * `nowMs` for an open slot, else the end of the running job holding it. Over
+ * capacity, the jobs ending last hold the slots (the earlier ones free a slot
+ * only for another queued-over job), so the first free moment is the
+ * `running - max`-th earliest end.
+ */
+export function slotFreeTimes(
+  character: { skills: JobSlotSkills; jobs: readonly JobSlotJob[] },
+  category: JobSlotCategory,
+  nowMs: number
+): number[] {
+  const max = Math.max(1, maxJobSlots(character.skills)[category]);
+  const runningEnds = character.jobs
+    .filter((job) => job.endMs > nowMs && jobSlotCategory(job.activityId) === category)
+    .map((job) => job.endMs)
+    .sort((a, b) => a - b);
+  const open = Math.max(0, max - runningEnds.length);
+  return [...new Array<number>(open).fill(nowMs), ...runningEnds].slice(-max);
+}
+
+/**
  * When a job of `seconds` in `category` would finish if the character
  * installed it as soon as a slot allows. With a slot open that is now; with
  * every slot full it waits for the running job that ends soonest (the
@@ -152,12 +173,8 @@ export function projectJobFinish(
   seconds: number,
   nowMs: number
 ): JobFinishProjection {
-  const max = maxJobSlots(character.skills)[category];
-  const runningEnds = character.jobs
-    .filter((job) => job.endMs > nowMs && jobSlotCategory(job.activityId) === category)
-    .map((job) => job.endMs)
-    .sort((a, b) => a - b);
-  const open = Math.max(0, max - runningEnds.length);
-  const startMs = open > 0 ? nowMs : (runningEnds[runningEnds.length - max] ?? nowMs);
+  const freeTimes = slotFreeTimes(character, category, nowMs);
+  const open = freeTimes.filter((ms) => ms === nowMs).length;
+  const startMs = freeTimes[0] ?? nowMs;
   return { open, startMs, finishMs: startMs + seconds * 1000 };
 }

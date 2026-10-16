@@ -1,17 +1,6 @@
 import type { PiData } from '@/sde/types';
 
-const EVE_CLOCK = new Intl.DateTimeFormat('en-GB', {
-  weekday: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-  timeZone: 'UTC',
-});
-
-/** "Wed 02:00": EVE time is UTC, and a pilot plans a login against it, not their own zone. */
-export function eveClock(ms: number): string {
-  return EVE_CLOCK.format(new Date(ms)).replace(',', '');
-}
+export { eveClock } from '@/lib/eveTime';
 
 /** 16 h, 2 d 4 h: hours under two days, then days and hours. */
 export function hoursLabel(hours: number): string {

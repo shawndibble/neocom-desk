@@ -51,13 +51,14 @@ describe('kindSumsAcrossCharacters', () => {
       'netWorth',
       'miningYield',
       'routeSafety',
+      'industry',
     ]) {
       expect(kindSumsAcrossCharacters(kind), kind).toBe(true);
     }
   });
 
   it('is false for per-Character kinds', () => {
-    for (const kind of ['wallet', 'training', 'mail', 'industry']) {
+    for (const kind of ['wallet', 'training', 'mail']) {
       expect(kindSumsAcrossCharacters(kind), kind).toBe(false);
     }
   });
