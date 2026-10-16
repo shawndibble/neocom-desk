@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -334,6 +334,26 @@ describe('RichMailBodyEditor', () => {
       'false'
     );
     await waitFor(() => expect(document.querySelector('.ProseMirror')).toHaveFocus());
+  });
+
+  it('mounts under StrictMode and survives a value change from outside', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { rerender } = render(
+      <StrictMode>
+        <RichMailBodyEditor id="body" value="<b>one</b>" onChange={() => undefined} />
+      </StrictMode>
+    );
+    const pm = await editor();
+    expect(pm.querySelector('strong')?.textContent).toBe('one');
+    expect(pm).not.toHaveFocus();
+    rerender(
+      <StrictMode>
+        <RichMailBodyEditor id="body" value="two" onChange={() => undefined} />
+      </StrictMode>
+    );
+    await waitFor(() => expect(pm.textContent).toBe('two'));
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
   });
 
   it('puts the counter inside the card', async () => {

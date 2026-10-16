@@ -131,7 +131,7 @@ export default function RichMailBodyEditor({
     };
   }, [editor, id, mode]);
   useEffect(() => {
-    editor?.setEditable(!disabled);
+    if (editor && !editor.isDestroyed) editor.setEditable(!disabled);
   }, [editor, disabled]);
 
   // A value the editor did not produce replaces what it shows.
@@ -139,7 +139,9 @@ export default function RichMailBodyEditor({
     if (value === lastEmitted.current) return;
     lastEmitted.current = value;
     setSource(value);
-    editor?.commands.setContent(markupToDoc(value), { emitUpdate: false });
+    if (editor && !editor.isDestroyed) {
+      editor.commands.setContent(markupToDoc(value), { emitUpdate: false });
+    }
   }, [value, editor]);
 
   useLayoutEffect(() => {
@@ -161,14 +163,14 @@ export default function RichMailBodyEditor({
   });
 
   // Switching moves focus into the new surface, so the focus-gated bar (and the toggle) stays.
-  const switched = useRef(false);
+  // Compared against the mode last seen, not a "first run" flag: StrictMode runs effects twice on
+  // mount, and mount must not steal focus (the editor may even be mid-recreate then).
+  const seenMode = useRef(mode);
   useEffect(() => {
-    if (!switched.current) {
-      switched.current = true;
-      return;
-    }
+    if (seenMode.current === mode) return;
+    seenMode.current = mode;
     if (mode === 'source') sourceRef.current?.focus();
-    else editor?.commands.focus();
+    else if (editor && !editor.isDestroyed) editor.commands.focus();
   }, [mode, editor]);
 
   function switchMode(next: Mode) {
@@ -178,7 +180,9 @@ export default function RichMailBodyEditor({
       setDropped(droppedMarkup(source));
       lastEmitted.current = clean;
       onChangeRef.current(clean);
-      editor?.commands.setContent(markupToDoc(clean), { emitUpdate: false });
+      if (editor && !editor.isDestroyed) {
+        editor.commands.setContent(markupToDoc(clean), { emitUpdate: false });
+      }
     } else {
       setSource(value);
       setDropped(false);
@@ -221,7 +225,7 @@ export default function RichMailBodyEditor({
     linkTarget: () =>
       editor ? linkTargetOfEditor(editor) : { from: 0, to: 0, text: '', href: null },
     setLink: (target, edit) => {
-      if (!editor) return;
+      if (!editor || editor.isDestroyed) return;
       if (target.markOnly) {
         // Spans blocks or cells: add the mark, leave the text and structure alone.
         const link = editor.schema.marks.link.create({ href: edit.href });
@@ -248,7 +252,7 @@ export default function RichMailBodyEditor({
         .run();
     },
     removeLink: (target) => {
-      if (!editor) return;
+      if (!editor || editor.isDestroyed) return;
       const link = editor.schema.marks.link;
       const { tr } = editor.state;
       for (const [from, to] of target.ranges ?? [[target.from, target.to]]) {
@@ -340,7 +344,9 @@ export default function RichMailBodyEditor({
             inSource && 'hidden'
           )}
           onClick={(e) => {
-            if (e.target === e.currentTarget) editor?.commands.focus('end');
+            if (e.target === e.currentTarget && editor && !editor.isDestroyed) {
+              editor.commands.focus('end');
+            }
           }}
         >
           <EditorContent editor={editor} className="min-h-full" />
