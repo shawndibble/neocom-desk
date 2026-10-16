@@ -22,6 +22,19 @@ describe('committed typeInfo shards', () => {
     }
   });
 
+  it('give every record an effects list, so a missing one never reads as "no hardpoint"', () => {
+    for (let n = 0; n < TYPE_INFO_SHARD_COUNT; n++) {
+      const bad = Object.entries(read(n))
+        .filter(([, record]) => !Array.isArray(record.effects))
+        .map(([id]) => id);
+      expect(bad, `typeInfo/${n}.json`).toEqual([]);
+    }
+  });
+
+  it('carry the Merlin (603) at its packaged volume', () => {
+    expect(read(typeInfoBucket(603) ?? -1)['603'].packagedVolume).toBe(2500);
+  });
+
   it('carry the Rifter (587) with its description and mass', () => {
     const rifter = read(typeInfoBucket(587) ?? -1)['587'];
     expect(rifter.description).not.toBe('');

@@ -88,7 +88,7 @@ vi.mock('@/features/market/useHaulingScan', () => {
 // The fill scan loads market types, and the jump count pulls the route
 // settings stores: neither has anything to show while the main scan failed.
 vi.mock('@/features/market/useHaulingFillScan', () => {
-  const fill = { state: { status: 'idle' }, refresh: () => {} };
+  const fill = { state: { status: 'idle' }, find() {}, more() {}, stop() {}, reset() {} };
   return { useHaulingFillScan: () => fill };
 });
 vi.mock('@/features/market/useHubJumps', () => ({ useHubJumps: () => ({ status: 'none' }) }));
@@ -1308,17 +1308,13 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
     expect(await within(dialog).findByRole('table', { name: MAIN_TABLE })).toBeInTheDocument();
   });
 
-  it('opens from the Route through Thera / Turnur label, which is a button beside the switch', async () => {
+  it('keeps the Route through Thera / Turnur switch a plain switch, outside More route options', async () => {
     visit(`?from=${JITA}`);
-    await userEvent.click(await screen.findByRole('button', { name: /More route options/ }));
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Route through Thera / Turnur' })
-    );
-    expect(await screen.findByRole('dialog', { name: 'Thera / Turnur' })).toBeInTheDocument();
-    // The switch itself still only toggles.
+    await userEvent.click(await screen.findByText('Route through Thera / Turnur'));
     expect(
-      screen.getByRole('checkbox', { name: 'Route through Thera / Turnur' })
-    ).not.toBeChecked();
+      await screen.findByRole('checkbox', { name: 'Route through Thera / Turnur' })
+    ).toBeChecked();
+    expect(screen.queryByRole('dialog', { name: 'Thera / Turnur' })).toBeNull();
   });
 
   it('lists live K-space holes nearest first, folding J-space exits into a group under them', async () => {

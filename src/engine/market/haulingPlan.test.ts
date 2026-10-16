@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CargoHold } from './cargoHolds';
 import { lotEconomics } from './haulingMarket';
-import { maxBuyPrice, multibuyText, planTrip, type TripCandidate } from './haulingPlan';
+import {
+  holdsCapacityM3,
+  holdsUsedM3,
+  maxBuyPrice,
+  multibuyText,
+  planTrip,
+  type TripCandidate,
+} from './haulingPlan';
 
 const FEES = {
   accountingLevel: 5,
@@ -67,6 +74,29 @@ describe('planTrip', () => {
     });
     expect(plan.lines[0]).toMatchObject({ quantity: 25, limitedBy: 'space', volumeM3: 250 });
     expect(plan.binding).toBe('space');
+  });
+
+  it('ships nothing of a lot that would lose money, such as one the broker’s minimum fee eats', () => {
+    // 2 ISK left for item 2, a thin margin: two units, and a listing's broker fee is at least 100 ISK.
+    const plan = planTrip({
+      candidates: [
+        candidate({ typeId: 1, demandCapUnits: 10 }),
+        candidate({
+          typeId: 2,
+          buyLadder: [{ price: 1, units: 1000, orders: 1 }],
+          expectedPrice: 1.2,
+          demandCapUnits: 1000,
+        }),
+      ],
+      holds: null,
+      budgetIsk: 1_002,
+      fees: FEES,
+      overrides: NO_OVERRIDES,
+    });
+    const small = plan.lines.find((l) => l.typeId === 2)!;
+    expect(small).toMatchObject({ quantity: 0, profit: 0, cost: 0 });
+    expect(plan.totals.items).toBe(1);
+    expect(plan.lines.every((l) => l.quantity === 0 || l.profit > 0)).toBe(true);
   });
 
   it('stops at the budget and says budget was the limit', () => {
@@ -481,5 +511,17 @@ describe('planTrip with specialised holds', () => {
       { kind: 'fuel', quantity: 60, volumeM3: 60 },
       { kind: 'infrastructure', quantity: 40, volumeM3: 40 },
     ]);
+  });
+});
+
+describe('holdsUsedM3 / holdsCapacityM3', () => {
+  const holds = [
+    { kind: 'general' as const, capacityM3: 1000, usedM3: 400 },
+    { kind: 'ammo' as const, capacityM3: 500, usedM3: 600 },
+  ];
+  it('sums every hold’s use and capacity', () => {
+    expect(holdsUsedM3(holds)).toBe(1000);
+    expect(holdsCapacityM3(holds)).toBe(1500);
+    expect(holdsUsedM3([])).toBe(0);
   });
 });

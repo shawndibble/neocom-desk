@@ -1,19 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { db } from '@/db';
-import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { useTableExport } from '@/components/ui/useTableExport';
-import type { WalletJournalEntry } from '@/esi/endpoints';
+import type { JournalRow } from '@/engine/journalNetting';
 import { JournalTable } from './WalletJournalTable';
 import { useJournalColumnsBuilder } from './walletJournal';
-import { EMPTY_WALLET_JOURNAL_FILTER } from './walletJournalFilter';
+import { EMPTY_WALLET_JOURNAL_FILTER, type WalletJournalFilter } from './walletJournalFilter';
 import { walletJournalCsvColumns } from './walletJournalCsv';
-import { useJournalBreakdownPref, JOURNAL_BREAKDOWN_SETTING_KEY } from './journalBreakdownPref';
 
-const journal: WalletJournalEntry[] = [
+const phone = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => phone.value }));
+
+const journal: JournalRow[] = [
   { id: 1, date: '2026-10-07T23:47:00Z', ref_type: 'bounty_prize', amount: 5000, description: 'x' },
   {
     id: 2,
@@ -22,18 +22,39 @@ const journal: WalletJournalEntry[] = [
     amount: -2000,
     description: 'y',
   },
+  {
+    id: 3,
+    date: '2026-10-07T23:49:00Z',
+    ref_type: 'player_donation',
+    amount: 900,
+    description: 'from alt',
+    internal: true,
+  },
 ];
 
 function Harness({
   filter = EMPTY_WALLET_JOURNAL_FILTER,
   rows = journal,
+  netted = true,
+  keyByCharacter = false,
+  highlightRowKey = null,
+  onFilterChange = () => {},
+  sort = { columnId: 'date', direction: 'desc' },
 }: {
-  filter?: typeof EMPTY_WALLET_JOURNAL_FILTER;
-  rows?: WalletJournalEntry[];
+  sort?: { columnId: string; direction: 'asc' | 'desc' };
+  filter?: WalletJournalFilter;
+  rows?: JournalRow[];
+  /** The personal journal: own-Character netting on. The corp journal passes false. */
+  netted?: boolean;
+  keyByCharacter?: boolean;
+  highlightRowKey?: string | number | null;
+  onFilterChange?: (filter: WalletJournalFilter) => void;
 }) {
   const journalColumns = useJournalColumnsBuilder()(
     () => undefined,
-    () => ''
+    () => '',
+    undefined,
+    keyByCharacter ? (id) => `Pilot ${id}` : undefined
   );
   const tableExport = useTableExport({
     surface: 'wallet-journal',
@@ -44,131 +65,104 @@ function Harness({
     <MemoryRouter>
       <JournalTable
         filter={filter}
-        onFilterChange={() => {}}
+        onFilterChange={onFilterChange}
         refTypeOptions={['bounty_prize', 'market_escrow']}
         filteredJournal={rows}
         breakdownJournal={rows}
+        chartJournal={rows}
         journalColumns={journalColumns}
         label="Journal"
-        sort={{ columnId: 'date', direction: 'desc' }}
+        sort={sort}
         onSortChange={() => {}}
         tableExport={tableExport}
+        keyByCharacter={keyByCharacter}
+        highlightRowKey={highlightRowKey}
+        panel={{
+          open: true,
+          onOpenChange: () => {},
+          scopeLabel: 'All characters',
+          coverage: netted ? { loaded: 2, total: 2, missing: [] } : undefined,
+        }}
       />
     </MemoryRouter>
   );
 }
 
-const manyTypes = (n: number): WalletJournalEntry[] =>
-  Array.from({ length: n }, (_, i) => ({
-    id: 100 + i,
-    date: '2026-10-07T23:47:00Z',
-    ref_type: `type_${i}`,
-    amount: 1000,
-    description: 'z',
-  }));
-
-const realMatchMedia = window.matchMedia;
-
-/** The jsdom stub never matches, which `useIsNarrow` reads as "not narrow". */
-function setNarrow(narrow: boolean) {
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: narrow && media === NARROW_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-}
-
-beforeEach(async () => {
-  await db.settings.clear();
-  useJournalBreakdownPref.setState({ value: null, hydrated: false });
-});
-
-afterEach(() => {
-  window.matchMedia = realMatchMedia;
-});
-
-const breakdownTable = () => screen.queryByRole('table', { name: 'Where the ISK went' });
-const toggle = () => screen.findByRole('button', { name: /(Show|Hide) breakdown/ });
-
-describe('JournalTable breakdown panel', () => {
-  it('is open on a wide screen until the pilot toggles it', async () => {
-    setNarrow(false);
+describe('JournalTable', () => {
+  it('leaves own-Character transfers out of the In / Out / Net line and says so', () => {
     render(<Harness />);
-    expect(await toggle()).toHaveAttribute('aria-expanded', 'true');
-    expect(breakdownTable()).toBeInTheDocument();
+    expect(screen.getByText('3 entries')).toBeInTheDocument();
+    expect(screen.getByText('1 entry between your Characters left out')).toBeInTheDocument();
+    // The list still shows the transfer, marked.
+    expect(screen.getAllByText('Between your Characters').length).toBeGreaterThan(0);
   });
 
-  it('starts folded on a wide screen when there are more than 6 ref types', async () => {
-    setNarrow(false);
-    render(<Harness rows={manyTypes(7)} />);
-    expect(await toggle()).toHaveAttribute('aria-expanded', 'false');
-    expect(breakdownTable()).not.toBeInTheDocument();
+  it('keeps the breakdown panel on a corp journal, with no netting, coverage or Character filter', async () => {
+    render(<Harness netted={false} rows={journal.slice(0, 2)} />);
+    expect(screen.queryByText(/between your Characters/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Characters loaded/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Where the ISK went' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    const list = await screen.findByRole('table', { name: 'Where the ISK went' });
+    expect(within(list).getByText('Bounty prize')).toBeInTheDocument();
   });
 
-  it('starts open on a wide screen with exactly 6 ref types', async () => {
-    setNarrow(false);
-    render(<Harness rows={manyTypes(6)} />);
-    expect(await toggle()).toHaveAttribute('aria-expanded', 'true');
+  it('says the scope and the date range in the panel subtitle', () => {
+    const { rerender } = render(<Harness />);
+    expect(
+      screen.getByText("All characters · since 10/7/2026 · follows the Journal's filters")
+    ).toBeInTheDocument();
+    rerender(
+      <Harness
+        filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, startDate: '2026-10-01', endDate: '2026-10-07' }}
+      />
+    );
+    expect(
+      screen.getByText("All characters · 10/1/2026 – 10/7/2026 · follows the Journal's filters")
+    ).toBeInTheDocument();
   });
 
-  it('keeps a stored open choice with many ref types', async () => {
-    setNarrow(false);
-    await db.settings.put({ key: JOURNAL_BREAKDOWN_SETTING_KEY, value: true });
-    render(<Harness rows={manyTypes(14)} />);
-    expect(await toggle()).toHaveAttribute('aria-expanded', 'true');
+  it('keys rows per Character when two Characters carry the same entry id', () => {
+    const rows: JournalRow[] = [
+      { ...journal[0], characterId: 1 },
+      { ...journal[0], characterId: 2 },
+    ];
+    render(<Harness rows={rows} keyByCharacter highlightRowKey="2:1" />);
+    expect(document.querySelector('[data-row-key="1:1"]')).toBeInTheDocument();
+    const second = document.querySelector('[data-row-key="2:1"]');
+    expect(second).toBeInTheDocument();
+    expect(second?.className).toContain('row-pulse');
+    expect(document.querySelector('[data-row-key="1:1"]')?.className).not.toContain('row-pulse');
   });
 
-  it('is folded on a phone until the pilot toggles it', async () => {
-    setNarrow(true);
-    render(<Harness />);
-    expect(await toggle()).toHaveAttribute('aria-expanded', 'false');
-    expect(breakdownTable()).not.toBeInTheDocument();
-  });
-
-  it('keeps a closed choice on a wide screen, and stores it', async () => {
-    setNarrow(false);
+  it('filters the Journal when a ref type is clicked in the panel', async () => {
+    const onFilterChange = vi.fn();
     const user = userEvent.setup();
-    const { unmount } = render(<Harness />);
-    await user.click(await toggle());
-    expect(breakdownTable()).not.toBeInTheDocument();
-    unmount();
-
-    // A fresh mount (a reload) reads the stored choice back.
-    useJournalBreakdownPref.setState({ value: null, hydrated: false });
-    render(<Harness />);
-    expect(await toggle()).toHaveAttribute('aria-expanded', 'false');
-    expect(breakdownTable()).not.toBeInTheDocument();
-    expect((await db.settings.get(JOURNAL_BREAKDOWN_SETTING_KEY))?.value).toBe(false);
+    render(<Harness onFilterChange={onFilterChange} />);
+    const list = await screen.findByRole('table', { name: 'Where the ISK went' });
+    await user.click(within(list).getByText('Bounty prize'));
+    expect(onFilterChange).toHaveBeenCalledWith({
+      ...EMPTY_WALLET_JOURNAL_FILTER,
+      refType: 'bounty_prize',
+    });
   });
 
-  it('keeps an open choice on a phone', async () => {
-    setNarrow(true);
+  it('shows the active ref type as a selected chip that a click clears', async () => {
+    const onFilterChange = vi.fn();
     const user = userEvent.setup();
-    const { unmount } = render(<Harness />);
-    await user.click(await toggle());
-    expect(breakdownTable()).toBeInTheDocument();
-    unmount();
-
-    useJournalBreakdownPref.setState({ value: null, hydrated: false });
-    render(<Harness />);
-    expect(await toggle()).toHaveAttribute('aria-expanded', 'true');
-    expect(breakdownTable()).toBeInTheDocument();
-  });
-
-  it('hydrates from a stored value without first showing the default', async () => {
-    setNarrow(false);
-    await db.settings.put({ key: JOURNAL_BREAKDOWN_SETTING_KEY, value: false });
-    render(<Harness />);
-    // Held back until the stored choice loads: never rendered open first.
-    expect(breakdownTable()).not.toBeInTheDocument();
-    expect(await toggle()).toHaveAttribute('aria-expanded', 'false');
-    expect(breakdownTable()).not.toBeInTheDocument();
+    render(
+      <Harness
+        filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, refType: 'bounty_prize' }}
+        onFilterChange={onFilterChange}
+        netted={false}
+      />
+    );
+    const chip = screen.getByRole('button', { name: 'Type: Bounty prize' });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await user.click(chip);
+    expect(onFilterChange).toHaveBeenCalledWith(EMPTY_WALLET_JOURNAL_FILTER);
   });
 });
 
@@ -185,6 +179,97 @@ describe('JournalTable filtered summary status', () => {
     const { container } = render(
       <Harness filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, text: 'x' }} />
     );
-    await waitFor(() => expect(statusRegion(container)).toHaveTextContent(/2 entries · net /));
+    await waitFor(() => expect(statusRegion(container)).toHaveTextContent(/3 entries · net /));
+  });
+
+  describe('on a phone', () => {
+    afterEach(() => {
+      phone.value = false;
+    });
+
+    const days: JournalRow[] = [
+      ...journal,
+      {
+        id: 4,
+        date: '2026-10-06T10:00:00Z',
+        ref_type: 'bounty_prize',
+        amount: 700,
+        description: 'z',
+      },
+    ];
+
+    it('groups lines under UTC day headers, each with a net that leaves out own-Character transfers', () => {
+      phone.value = true;
+      render(<Harness rows={days} />);
+      const headers = document.querySelectorAll('.dt-group-header');
+      expect(headers).toHaveLength(2);
+      // 5,000 - 2,000; the 900 own-Character transfer is left out.
+      expect(headers[0]).toHaveTextContent('Wed 7 Oct · EVE time');
+      expect(headers[0]).toHaveTextContent('+3,000');
+      expect(headers[1]).toHaveTextContent('+700');
+    });
+
+    it('opens only the newest three days', () => {
+      phone.value = true;
+      const many = [1, 2, 3, 4, 5].map((n) => ({
+        id: 100 + n,
+        date: `2026-09-0${n}T10:00:00Z`,
+        ref_type: 'bounty_prize',
+        amount: 10,
+        description: 'd',
+      }));
+      render(<Harness rows={many} />);
+      expect(document.querySelectorAll('.dt-group-header')).toHaveLength(5);
+      expect(document.querySelector('[data-row-key="103"]')).toBeInTheDocument();
+      expect(document.querySelector('[data-row-key="102"]')).not.toBeInTheDocument();
+      expect(document.querySelector('[data-row-key="105"]')).toBeInTheDocument();
+      expect(document.querySelector('[data-row-key="101"]')).not.toBeInTheDocument();
+    });
+
+    it('opens the day a highlighted line is on', () => {
+      phone.value = true;
+      const many = [1, 2, 3, 4, 5].map((n) => ({
+        id: 100 + n,
+        date: `2026-09-0${n}T10:00:00Z`,
+        ref_type: 'bounty_prize',
+        amount: 10,
+        description: 'd',
+      }));
+      render(<Harness rows={many} highlightRowKey={101} />);
+      expect(document.querySelector('[data-row-key="101"]')).toBeInTheDocument();
+    });
+
+    it('falls back to Date for a sort the cards lack', () => {
+      phone.value = true;
+      render(<Harness rows={days} sort={{ columnId: 'description', direction: 'asc' }} />);
+      expect(document.querySelectorAll('.dt-group-header')).toHaveLength(2);
+    });
+
+    it('folds a day away', async () => {
+      phone.value = true;
+      const user = userEvent.setup();
+      render(<Harness rows={days} />);
+      expect(document.querySelector('[data-row-key="4"]')).toBeInTheDocument();
+      await user.click(document.querySelectorAll('.dt-group-header button')[1] as HTMLElement);
+      expect(document.querySelector('[data-row-key="4"]')).not.toBeInTheDocument();
+    });
+
+    it('is a flat list under the Amount sort, and offers only Date, Amount and Type', () => {
+      phone.value = true;
+      render(<Harness rows={days} sort={{ columnId: 'amount', direction: 'desc' }} />);
+      expect(document.querySelectorAll('.dt-group-header')).toHaveLength(0);
+      const picker = screen.getByRole('combobox', { name: 'Sort by' });
+      const options = within(picker)
+        .getAllByRole('option')
+        .map((option) => option.textContent);
+      expect(options.join(' ')).toMatch(/Date.*Type.*Amount/);
+      expect(options.join(' ')).not.toMatch(/Description|Character|Balance/);
+    });
+
+    it('keeps the unchanged table at desktop width', () => {
+      render(<Harness rows={days} />);
+      expect(document.querySelectorAll('.dt-group-header')).toHaveLength(0);
+      expect(screen.queryByRole('combobox', { name: 'Sort by' })).not.toBeInTheDocument();
+    });
   });
 });

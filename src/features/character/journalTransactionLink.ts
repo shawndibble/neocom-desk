@@ -12,20 +12,27 @@
  * Transactions are capped at a few pages while the journal is not, so an
  * older journal line simply finds nothing.
  */
-import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
+import type { WalletTransactionCommon } from '@/esi/endpoints';
+import type { JournalLine } from '@/engine/journalNetting';
 
-export function journalTransactionLinks<T extends WalletTransactionCommon>(
-  transactions: readonly T[]
-): (entry: WalletJournalEntry) => T | undefined {
-  const byJournalRef = new Map<number, T>();
-  const byTransactionId = new Map<number, T>();
+/**
+ * Tagged with `characterId`, lines and fills match within their own Character:
+ * two Characters' journals can carry the same ref id (a transfer between them
+ * is on both).
+ */
+export function journalTransactionLinks<
+  T extends WalletTransactionCommon & { characterId?: number },
+>(transactions: readonly T[]): (entry: JournalLine) => T | undefined {
+  const scoped = (characterId: number | undefined, id: number) => `${characterId ?? ''}:${id}`;
+  const byJournalRef = new Map<string, T>();
+  const byTransactionId = new Map<string, T>();
   for (const txn of transactions) {
-    byJournalRef.set(txn.journal_ref_id, txn);
-    byTransactionId.set(txn.transaction_id, txn);
+    byJournalRef.set(scoped(txn.characterId, txn.journal_ref_id), txn);
+    byTransactionId.set(scoped(txn.characterId, txn.transaction_id), txn);
   }
   return (entry) =>
-    byJournalRef.get(entry.id) ??
+    byJournalRef.get(scoped(entry.characterId, entry.id)) ??
     (entry.context_id_type === 'market_transaction_id' && entry.context_id !== undefined
-      ? byTransactionId.get(entry.context_id)
+      ? byTransactionId.get(scoped(entry.characterId, entry.context_id))
       : undefined);
 }

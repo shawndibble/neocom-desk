@@ -63,6 +63,7 @@ export default function DemoBoard() {
       setRange: none,
       setRowsPerPage: (id, rowsPerPage) =>
         setWidgets((all) => all.map((w) => (w.id === id ? { ...w, rowsPerPage } : w))),
+      setPlexPer30Days: none,
       rename: none,
       setShowOnPhone: none,
     }),

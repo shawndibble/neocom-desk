@@ -6,6 +6,7 @@ import {
   useNotificationPreferences,
 } from '@/features/notifications/preferences';
 import { useTicker } from '@/lib/ticker';
+import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import { DEFAULT_RANGE, type WidgetRange } from '../layout';
 import { useFeedStore } from './feedStoreContext';
 import { buildView } from './models';
@@ -20,10 +21,12 @@ export interface ViewRequest {
   scopeAll: boolean;
   /** The widget's time window; left out, the default. Two widgets of one kind with different ranges get their own view. */
   range?: WidgetRange;
+  /** The widget's Omega plan (PLEX per 30 days); left out, the default. */
+  plexPer30Days?: number;
 }
 
 export const viewKey = (request: ViewRequest): string =>
-  `${request.kind}:${request.scopeAll ? 1 : 0}:${request.range ?? DEFAULT_RANGE}`;
+  `${request.kind}:${request.scopeAll ? 1 : 0}:${request.range ?? DEFAULT_RANGE}:${request.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS}`;
 
 /** Views for several kinds at once, rebuilt as their feeds change and as the clock ticks. */
 export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<string, KindView> {
@@ -40,7 +43,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   return useMemo(() => {
     const views = new Map<string, KindView>();
     for (const id of key === '' ? [] : key.split('|')) {
-      const [kind, scope, range] = id.split(':');
+      const [kind, scope, range, plex] = id.split(':');
       views.set(
         id,
         buildView(kind, feeds, {
@@ -49,6 +52,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
           activeCharacterId,
           scopeAll: scope === '1',
           range: Number(range) as WidgetRange,
+          plexPer30Days: Number(plex),
           notTrainingAlert,
         })
       );
@@ -58,8 +62,16 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
 }
 
 /** The view for one widget. */
-export function useWidgetView(kind: string, scopeAll: boolean, range?: WidgetRange): KindView {
-  const requests = useMemo(() => [{ kind, scopeAll, range }], [kind, scopeAll, range]);
+export function useWidgetView(
+  kind: string,
+  scopeAll: boolean,
+  range?: WidgetRange,
+  plexPer30Days?: number
+): KindView {
+  const requests = useMemo(
+    () => [{ kind, scopeAll, range, plexPer30Days }],
+    [kind, scopeAll, range, plexPer30Days]
+  );
   const views = useKindViews(requests);
-  return views.get(viewKey({ kind, scopeAll, range })) as KindView;
+  return views.get(viewKey({ kind, scopeAll, range, plexPer30Days })) as KindView;
 }

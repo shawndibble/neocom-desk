@@ -9,7 +9,8 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { loadEftFitting } from '@/engine/fittings/eftLoader';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
-import type { FittingSlotAssignment } from '@/sde/types';
+import type { FittingSlotAssignment, MutaplasmidData } from '@/sde/types';
+import { mutaplasmidLookup, mutationStatus } from '@/engine/fittings/mutaplasmids';
 
 async function readData<T>(name: string): Promise<T> {
   return JSON.parse(
@@ -59,5 +60,43 @@ describe('EFT load against the bundled catalogue', () => {
 
     expect(parts.hullTypeId).toBe(601);
     expect(parts.unresolved).toEqual([]);
+  });
+
+  it('resolves a Pyfa mutated module and a bare abyssal line against the bundled data', async () => {
+    const [typeByName, slotByTypeId, data] = await Promise.all([
+      loadItemNameMap(),
+      readData<Record<string, FittingSlotAssignment>>('fittingSlots.json'),
+      readData<MutaplasmidData>('mutaplasmids.json'),
+    ]);
+    const lookup = mutaplasmidLookup(data);
+    // Pyfa layout, reconstructed from Pyfa's source (eft.py, muta.py).
+    const text = [
+      '[Vexor Navy Issue, Abyssal]',
+      'Heavy Gremlin Compact Energy Neutralizer [1]',
+      'Large Abyssal Remote Armor Repairer',
+      '',
+      '[1] Heavy Gremlin Compact Energy Neutralizer',
+      '  Gravid Heavy Energy Neutralizer Mutaplasmid',
+      '  capacitorNeed 419.25, energyNeutralizerAmount 591.36, maxRange 15680, power 1720',
+    ].join('\n');
+
+    const parts = loadEftFitting(text, typeByName, slotByTypeId, lookup);
+    if (parts.hullTypeId === null) throw new Error('hull did not resolve');
+
+    expect(parts.unresolved).toEqual([]);
+    const [neut, rar] = parts.modules;
+    expect(neut).toMatchObject({
+      slot: 'high',
+      typeId: 47832, // Heavy Abyssal Energy Neutralizer
+      mutation: {
+        baseTypeId: 16475,
+        mutaplasmidTypeId: 47831,
+        attributes: { 6: 419.25, 30: 1720, 54: 15680, 97: 591.36 },
+      },
+    });
+    expect(mutationStatus(neut!, lookup)).toBe('rolled');
+    // A bare abyssal line: the type is known, its base and rolls are not.
+    expect(rar).toMatchObject({ slot: 'high', typeId: 97657 });
+    expect(mutationStatus(rar!, lookup)).toBe('baseUnknown');
   });
 });

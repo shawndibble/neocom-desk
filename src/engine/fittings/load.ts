@@ -12,6 +12,7 @@
  * stays fetch-free.
  */
 import { loadEftFitting, type EftSlotLookup, type EftTypeLookup } from './eftLoader';
+import type { MutaplasmidLookup } from './mutaplasmids';
 import {
   classifyLoadInput,
   killmailVictimToLoadResult,
@@ -45,7 +46,12 @@ export type LoadWarningKind =
   /** A fittings-file entry whose slot string isn't a rack, bay or cargo. */
   | { kind: 'unknown-slot' }
   /** A line the EFT parser couldn't read at all: the author's typo, not the game's. */
-  | { kind: 'parse-error' };
+  | { kind: 'parse-error' }
+  /**
+   * A Pyfa mutation block naming a mutaplasmid this build doesn't know, or one
+   * that doesn't apply to its module: the plain base module was loaded instead.
+   */
+  | { kind: 'unknown-mutation' };
 
 /** One thing a Load couldn't place. `line` is the pasted text's line, for a text Load. */
 export type LoadWarning = {
@@ -145,8 +151,15 @@ export type KillmailHashLookup =
   { status: 'ok'; hash: string } | { status: 'not-found' } | { status: 'unreachable' };
 
 export interface TextLoadSources {
-  /** Name → typeId and typeId → rack; read only for text that needs them. */
-  catalog: () => Promise<{ typeByName: EftTypeLookup; slotByTypeId: EftSlotLookup }>;
+  /**
+   * Name → typeId and typeId → rack; read only for text that needs them.
+   * `mutaplasmids` (optional): see `loadEftFitting`.
+   */
+  catalog: () => Promise<{
+    typeByName: EftTypeLookup;
+    slotByTypeId: EftSlotLookup;
+    mutaplasmids?: MutaplasmidLookup;
+  }>;
   hullName: (typeId: number) => Promise<string>;
   /** zKillboard's hash for a killmail. */
   killmailHash: (killmailId: number) => Promise<KillmailHashLookup>;
@@ -227,12 +240,14 @@ export async function loadText(
     workbenchEft = read.eft;
   }
 
-  const { typeByName, slotByTypeId } = await sources.catalog();
+  const { typeByName, slotByTypeId, mutaplasmids } = await sources.catalog();
   let parts: LoadParts;
   if (input.kind === 'eft') {
-    parts = loadEftFitting(input.text, typeByName, slotByTypeId);
+    parts = loadEftFitting(input.text, typeByName, slotByTypeId, mutaplasmids);
   } else if (input.kind === 'eveWorkbench') {
-    parts = withoutLineNumbers(loadEftFitting(workbenchEft, typeByName, slotByTypeId));
+    parts = withoutLineNumbers(
+      loadEftFitting(workbenchEft, typeByName, slotByTypeId, mutaplasmids)
+    );
   } else if (input.kind === 'dna') {
     parts = loadDnaFitting(input.dna, slotByTypeId);
   } else {

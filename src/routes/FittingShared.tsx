@@ -27,6 +27,7 @@ import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { StatFields } from '@/features/fittings/StatFacts';
 import { useFittingEvaluation } from '@/features/fittings/useFittingEvaluation';
 import { fittingToEft } from '@/engine/fittings/eftExport';
+import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { loadTypes } from '@/sde/loadSde';
 
@@ -80,6 +81,8 @@ export function FittingShareView({
   const [attempt, setAttempt] = useState(0);
   const online = useOnline();
   const [typeName, setTypeName] = useState<TypeName | null>(null);
+  // Names a mutated item's rolls in the EFT copy.
+  const mutaplasmids = useMutaplasmidLookup();
   const [copied, setCopied] = useState(false);
   // Bumped per attempt so a repeat copy is announced again.
   const [copyCount, setCopyCount] = useState(0);
@@ -180,7 +183,9 @@ export function FittingShareView({
     if (state.status !== 'ready' || typeName === null) return;
     setCopyCount((count) => count + 1);
     try {
-      await writeToClipboard(fittingToEft(state.fitting, typeName));
+      await writeToClipboard(
+        fittingToEft(state.fitting, typeName, { attributeName: mutaplasmids?.attributeName })
+      );
       setCopied(true);
       window.setTimeout(() => setCopied(false), COPIED_MS);
     } catch {

@@ -108,6 +108,12 @@ export interface HoldUse {
   usedM3: number;
 }
 
+export const holdsUsedM3 = (holds: readonly HoldUse[]): number =>
+  holds.reduce((sum, h) => sum + h.usedM3, 0);
+
+export const holdsCapacityM3 = (holds: readonly HoldUse[]): number =>
+  holds.reduce((sum, h) => sum + h.capacityM3, 0);
+
 export interface TripPlan {
   /** One line per candidate, in the order given (an unselected or zero line stays, with quantity 0). */
   lines: TripLine[];
@@ -383,7 +389,12 @@ export function planTrip(input: PlanTripInput): TripPlan {
       }
     }
 
-    const line = place(candidate, lineFor(candidate, quantity, true, limitedBy, fees));
+    let sizedLine = lineFor(candidate, quantity, true, limitedBy, fees);
+    // A lot the limit cut too small to pay (a listing's broker fee has a floor) ships nothing.
+    if (sizedLine.quantity > 0 && sizedLine.profit <= 0) {
+      sizedLine = lineFor(candidate, 0, true, limitedBy, fees);
+    }
+    const line = place(candidate, sizedLine);
     lines.set(candidate.typeId, line);
     if (remainingBudget !== null) remainingBudget -= line.cost;
   }

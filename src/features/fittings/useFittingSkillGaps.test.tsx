@@ -19,6 +19,8 @@ let maxInFlight = 0;
 let reconnectTypeReadable = false;
 // 99999 stands for a type neither the cache nor ESI could supply.
 const UNREADABLE_TYPE_ID = 99999;
+// The baked typeInfo shard lacks every type here, so reads take the ESI fallback.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 // typeId 587 (the hull) requires skillTypeID 3300 at level 5; everything else needs nothing.
 vi.mock('@/features/skills/data', () => ({
   loadUniverseType: async (typeId: number) => {

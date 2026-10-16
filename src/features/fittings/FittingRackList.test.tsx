@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
@@ -423,7 +423,29 @@ describe('FittingRackList with the editor’s item actions', () => {
       pointerType: 'mouse',
     });
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Variations' }));
-    expect(actions.openVariations).toHaveBeenCalledWith('high', 0);
+    // Once the menu has closed and handed focus back (§6c, `useOpenAfterMenu`).
+    await waitFor(() => expect(actions.openVariations).toHaveBeenCalledWith('high', 0));
+  });
+
+  it('opens the module dialog’s Mutation from a "Mutate…" menu entry, only for a module that can be mutated', async () => {
+    const without = fakeItemActions({ names });
+    const { unmount } = renderList(without);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    await screen.findByRole('menuitem', { name: 'Move up' });
+    expect(screen.queryByRole('menuitem', { name: 'Mutate…' })).toBeNull();
+    unmount();
+
+    const actions = fakeItemActions({ names }, { canMutate: (typeId) => typeId === 10 });
+    renderList(actions);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Mutate…' }));
+    await waitFor(() => expect(actions.openMutation).toHaveBeenCalledWith('high', 0));
   });
 
   it('gives an empty slot the Ring’s empty-slot menu — Paste and Fill rack from its More actions', async () => {

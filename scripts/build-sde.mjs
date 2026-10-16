@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Build-time SDE pipeline: downloads Fuzzwork SDE CSVs, emits slim JSON for the app.
 // Usage: node scripts/build-sde.mjs
+// Fails when Fuzzwork's dump and CCP's export are on different game builds;
+// SDE_ALLOW_BUILD_MISMATCH=1 bakes anyway (local experiments only).
 // Node 24 built-ins, plus fflate (already an app dependency) to read the
 // tables only CCP's own JSONL export carries, or carries at full precision —
 // see lib/ccpStaticData.mjs.
@@ -23,8 +25,12 @@ import { WORMHOLE_GROUP_ID, bakeShipMass, bakeWormholeMass } from './lib/jumpMas
 import { bakeOreAndIceTypeIds } from './lib/oreTypeIds.mjs';
 import { bakeSystemPositions } from './lib/systemPositions.mjs';
 import { bakeTypeInfoShards, typeInfoBucketOf } from './lib/typeInfo.mjs';
+import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
+import { ccpBuildFromSdeJsonl, fetchFuzzworkDump, FUZZWORK_DUMP_URL } from './lib/sdeBuild.mjs';
 
-const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
+// The build this bake used, for the nightly refresh's "is there a newer one"
+// check (.github/workflows/sde-refresh.yml).
+const BUILD_STAMP_FILE = join(dirname(fileURLToPath(import.meta.url)), 'sde-build.json');
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'public', 'data');
 // Default cache lives inside the repo (gitignored), not the world-shared
@@ -97,7 +103,12 @@ const DELVE_REGION_ID = 10000060;
 // Jita: the game's busiest system, used as the jump graph's canary — if the
 // stargate join ever produces nothing, it shows up here first.
 const JITA_SYSTEM_ID = 30000142;
-const MARKET_REGIONS_MIN = 78;
+// Regions with live orders, as counted against ESI on 2026-10-15: 77 = 68
+// known-space + 9 wormhole (C-R00012 had emptied since the last bake's 10).
+// Wormhole player markets come and go, so the floor sits under the stable
+// known-space count, not the last total. A failing probe throws; this band
+// catches ESI silently answering empty for many regions (issue #3891).
+const MARKET_REGIONS_MIN = 65;
 const MARKET_REGIONS_MAX = 116;
 // Ore, ice and moon-ore types carrying attribute 790 (Reprocessing Skill), as
 // counted against the bake on 2026-09-14: 338. A join that silently breaks
@@ -334,8 +345,9 @@ function isMarketType(t) {
   return t.published && t.marketGroupID != null;
 }
 
-async function download(name) {
-  const cached = join(CACHE_DIR, name);
+async function download(dump, name) {
+  const cacheDir = join(CACHE_DIR, 'fuzzwork', dump.dir);
+  const cached = join(cacheDir, name);
   try {
     const s = await stat(cached);
     if (s.size > 0) {
@@ -345,14 +357,14 @@ async function download(name) {
   } catch {
     /* not cached */
   }
-  const url = BASE_URL + name;
+  const url = `${FUZZWORK_DUMP_URL}${dump.dir}/csv/${name}`;
   let lastErr;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
       const text = await res.text();
-      await mkdir(CACHE_DIR, { recursive: true });
+      await mkdir(cacheDir, { recursive: true });
       await writeFile(cached, text);
       console.log(`  ${name}: downloaded (${(text.length / 1048576).toFixed(1)} MB)`);
       return text;
@@ -520,8 +532,8 @@ async function fetchAllMarketTypeIds(regionId) {
  * Probes every candidate region for a non-empty market-types listing rather
  * than trusting NPC-station presence or a hand-written exclusion list — 31
  * nullsec regions have no NPC station and still carry busy player-structure
- * markets, while wormhole/Abyssal/dev regions never carry orders at all
- * (GLOSSARY.md). Results are cached to disk (like the CSV downloads), so
+ * markets, wormhole regions carry orders only while a public player-structure
+ * market is up, and Abyssal/dev regions never do (GLOSSARY.md). Results are cached to disk (like the CSV downloads), so
  * repeated local builds do not re-probe ~150 regions against ESI every time.
  */
 async function probeMarketRegions(candidates) {
@@ -552,110 +564,32 @@ async function probeMarketRegions(candidates) {
   return result;
 }
 
-const PACKAGED_VOLUME_CACHE_FILE = join(CACHE_DIR, 'packaged-volume-probe.json');
-// Merlin: a manufacturing material of the Hawk Blueprint (the ticket's own
-// example), with a packaged volume CCP has held stable for years. Used to
-// catch a probe that silently stops returning sane values — a schema change
-// dropping `packaged_volume`, or ESI quietly reverting to the assembled
-// figure — rather than baking wrong numbers with no build error (issue #1085).
+// Merlin: a manufacturing material of the Hawk Blueprint, with a packaged
+// volume CCP has held stable for years. Catches an export that silently stops
+// carrying `packagedVolume`, rather than baking assembled hull sizes with no
+// build error (issue #1085).
 const PACKAGED_VOLUME_CONTROL_TYPE_ID = 603; // Merlin
 const PACKAGED_VOLUME_CONTROL_EXPECTED = 2500;
 // Tritanium: the mineral control for market/types.json's plain `volume`.
 const MARKET_VOLUME_CONTROL_TYPE_ID = 34;
 const MARKET_VOLUME_CONTROL_EXPECTED = 0.01;
-// The probe covers every market type (~19.5k), so it runs a few requests at
-// once and saves its disk cache as it goes: an interrupted first build
-// resumes from the last checkpoint instead of starting over.
-const PACKAGED_VOLUME_PROBE_CONCURRENCY = 8;
-const PACKAGED_VOLUME_CHECKPOINT_EVERY = 500;
-
-/** Fetches one type's ESI record, or null for a type ESI doesn't know (404). */
-async function fetchTypeInfo(typeID) {
-  const url = `${ESI_BASE}/universe/types/${typeID}/?datasource=tranquility`;
-  const res = await fetchEsiProbe(url);
-  // A 404 is a definite answer, not a transient failure: cached as "no
-  // figure" by the probe so one retired type can't fail every rebuild.
-  if (res.status === 404) return null;
-  return res.json();
-}
 
 /**
- * Packaged volume (m3) for every manufacturing material and market typeID, from ESI's
- * type endpoint — the SDE's own packaged-volume table ships empty (issue
- * #1085), so this is the only source. `invTypes.csv`'s `volume` column is
- * always the assembled figure; ESI's `packaged_volume` matches it for an
- * ordinary mineral/component and differs for anything assembled in space
- * (a hull, a capital module).
- *
- * Cached to disk like `probeMarketRegions`, keyed by typeID, so repeated
- * local builds don't re-probe ~20,000 types against ESI every time. A type
- * the probe can't resolve after retries is left out of the result rather
- * than guessed, matching `volumeForType`'s existing "no data, don't fake it"
- * contract — the caller falls back to the assembled `volume` for it, same as
- * today.
+ * Packaged volume (m3) by typeID from CCP's `types.jsonl`. `invTypes.csv`'s
+ * `volume` is always the assembled figure; this differs for anything assembled
+ * in space (a hull, a capital module). It matches ESI's `packaged_volume`
+ * (checked on every probed market type, issue #3884), which the build used to
+ * probe once per type.
  */
-async function probePackagedVolumes(typeIds) {
-  let diskCache = {};
-  try {
-    diskCache = JSON.parse(await readFile(PACKAGED_VOLUME_CACHE_FILE, 'utf8'));
-  } catch {
-    /* no cache yet */
-  }
-  const saveCache = async () => {
-    await mkdir(CACHE_DIR, { recursive: true });
-    await writeFile(PACKAGED_VOLUME_CACHE_FILE, JSON.stringify(diskCache));
-  };
-
-  const toProbe = typeIds.filter((typeID) => !diskCache[typeID]);
-  let failed = 0;
-  let probed = 0;
-  let next = 0;
-  const worker = async () => {
-    while (next < toProbe.length) {
-      const typeID = toProbe[next++];
-      try {
-        const info = await fetchTypeInfo(typeID);
-        const packagedVolume = info?.packaged_volume;
-        // Cached even when ESI returned nothing usable, same as
-        // `probeMarketRegions` caching a `false` result — otherwise every
-        // ordinary mineral/component (the common case, where there's simply
-        // no distinct figure to bake) gets re-probed against ESI on every
-        // future build instead of just once. A failure is not cached, so a
-        // rerun retries it.
-        diskCache[typeID] = {
-          packagedVolume: typeof packagedVolume === 'number' ? packagedVolume : null,
-        };
-      } catch (err) {
-        console.warn(`  packaged volume: typeID ${typeID} failed: ${err.message}`);
-        failed++;
-        continue;
-      }
-      probed++;
-      if (probed % PACKAGED_VOLUME_CHECKPOINT_EVERY === 0) {
-        await saveCache();
-        console.log(`  packaged volume: probed ${probed} of ${toProbe.length}...`);
-      }
-    }
-  };
-  await Promise.all(
-    Array.from({ length: Math.min(PACKAGED_VOLUME_PROBE_CONCURRENCY, toProbe.length) }, worker)
-  );
-  await saveCache();
-
+function packagedVolumesFrom(ccpTypes) {
   const volumes = new Map();
-  for (const typeID of typeIds) {
-    const cached = diskCache[typeID];
-    // >0, not >=0: a real item never has zero volume, so a 0 here is ESI
-    // returning something unusable, not a genuine figure to bake.
-    if (typeof cached?.packagedVolume === 'number' && cached.packagedVolume > 0) {
-      volumes.set(typeID, cached.packagedVolume);
+  for (const t of ccpTypes) {
+    // >0: a real item never has zero volume.
+    if (typeof t.packagedVolume === 'number' && t.packagedVolume > 0) {
+      volumes.set(t._key, t.packagedVolume);
     }
   }
-
-  console.log(
-    `  packaged volume: ${volumes.size} of ${typeIds.length} resolved (${typeIds.length - toProbe.length} from cache, ${probed} probed${failed > 0 ? `, ${failed} probe failures` : ''})`
-  );
-  return { volumes, failed };
+  return volumes;
 }
 
 const LP_STORE_CACHE_FILE = join(CACHE_DIR, 'lp-store-probe.json');
@@ -681,7 +615,7 @@ async function fetchLpStoreHasOffers(corporationId) {
 
 /**
  * The NPC corps with an LP Store, cached to disk per corporation id like
- * `probePackagedVolumes`, so a rebuild doesn't re-probe ~280 corps against ESI.
+ * `probeMarketRegions`, so a rebuild doesn't re-probe ~280 corps against ESI.
  */
 async function probeLpStoreCorporations(corps) {
   let diskCache = {};
@@ -712,9 +646,35 @@ async function probeLpStoreCorporations(corps) {
 }
 
 async function main() {
-  console.log('Downloading SDE CSVs...');
+  const fuzzwork = await fetchFuzzworkDump(ESI_USER_AGENT);
+  console.log(`Downloading SDE CSVs (Fuzzwork dump ${fuzzwork.dir})...`);
   const raw = {};
-  for (const f of FILES) raw[f] = parseCsv(await download(f));
+  for (const f of FILES) raw[f] = parseCsv(await download(fuzzwork, f));
+
+  // CCP's own JSONL export: the tables Fuzzwork's CSVs lack or round (see the
+  // bakes below), and the same build's packaged volumes.
+  const ccpStaticData = await readCcpStaticDataFiles(
+    CACHE_DIR,
+    [
+      '_sde.jsonl',
+      'skillPlans.jsonl',
+      'factions.jsonl',
+      'certificates.jsonl',
+      'groups.jsonl',
+      'types.jsonl',
+      'typeDogma.jsonl',
+      'dynamicItemAttributes.jsonl',
+      'dogmaAttributes.jsonl',
+    ],
+    ESI_USER_AGENT
+  );
+  const ccpBuild = ccpBuildFromSdeJsonl(ccpStaticData['_sde.jsonl']);
+  if (ccpBuild !== fuzzwork.build) {
+    const message = `Fuzzwork dump ${fuzzwork.dir} and CCP export ${ccpBuild} are different game builds`;
+    if (process.env.SDE_ALLOW_BUILD_MISMATCH !== '1') throw new Error(message);
+    console.warn(`  WARN: ${message}; baking anyway (SDE_ALLOW_BUILD_MISMATCH=1)`);
+  }
+  const ccpTypes = parseJsonl(ccpStaticData['types.jsonl']);
 
   // --- invGroups: groupID -> {name, categoryID} ---
   const groups = new Map();
@@ -1226,22 +1186,10 @@ async function main() {
     if (bp.activity !== 'manufacturing') continue;
     for (const m of bp.materials) manufacturingMaterialTypeIds.add(m.typeID);
   }
-  // Every market type too, for market/types.json's packagedVolume (issue
-  // #2336): one probe over the union, so a type in both lists costs one call.
-  const marketTypeIds = [];
-  for (const [typeID, t] of types) {
-    if (isMarketType(t)) marketTypeIds.push(typeID);
-  }
-  const packagedVolumeTypeIds = [...new Set([...manufacturingMaterialTypeIds, ...marketTypeIds])];
-  console.log(
-    `Probing packaged volume for ${manufacturingMaterialTypeIds.size} manufacturing material and ${marketTypeIds.length} market types...`
-  );
-  const { volumes: packagedVolumeByType, failed: packagedVolumeProbeFailures } =
-    await probePackagedVolumes(packagedVolumeTypeIds);
+  const packagedVolumeByType = packagedVolumesFrom(ccpTypes);
   let packagedVolumeApplied = 0;
-  // Only the material types: the probe now also covers every market type,
-  // and types.json keeps #1085's scope rather than growing a packaged figure
-  // for every hull it names as a blueprint product.
+  // Only the material types: types.json keeps #1085's scope rather than
+  // growing a packaged figure for every hull it names as a blueprint product.
   for (const typeID of manufacturingMaterialTypeIds) {
     const packagedVolume = packagedVolumeByType.get(typeID);
     if (packagedVolume === undefined) continue;
@@ -2106,22 +2054,10 @@ async function main() {
     dgmAttributeTypes: raw['dgmAttributeTypes.csv'],
   });
 
-  // --- certifiedPlans.json and certificates.json: read from CCP's own JSONL
+  // --- certifiedPlans.json and certificates.json: from CCP's own JSONL
   // export. Only it carries skillPlans (issue #2392); certificates come from
   // it too (issue #2390) so their names and group names travel with them,
   // and faction/group names come from the same build so everything agrees. ---
-  const ccpStaticData = await readCcpStaticDataFiles(
-    CACHE_DIR,
-    [
-      'skillPlans.jsonl',
-      'factions.jsonl',
-      'certificates.jsonl',
-      'groups.jsonl',
-      'types.jsonl',
-      'typeDogma.jsonl',
-    ],
-    ESI_USER_AGENT
-  );
   const bakedSkillIds = new Set(skills.map((s) => s.typeID));
   const skillPlanRecords = parseJsonl(ccpStaticData['skillPlans.jsonl']);
   const certifiedPlans = bakeCertifiedPlans(
@@ -2137,10 +2073,21 @@ async function main() {
   );
 
   // --- typeInfo shards (issue #3882); see lib/typeInfo.mjs ---
-  const typeInfoShards = bakeTypeInfoShards(
-    parseJsonl(ccpStaticData['types.jsonl']),
-    parseJsonl(ccpStaticData['typeDogma.jsonl'])
+  const typeInfoShards = bakeTypeInfoShards(ccpTypes, parseJsonl(ccpStaticData['typeDogma.jsonl']));
+
+  // --- mutaplasmids.json: what each mutaplasmid rolls; see lib/mutaplasmids.mjs ---
+  const mutaplasmids = bakeMutaplasmids(
+    parseJsonl(ccpStaticData['dynamicItemAttributes.jsonl']),
+    dogmaAttributeInfo(parseJsonl(ccpStaticData['dogmaAttributes.jsonl']))
   );
+  if (
+    Object.keys(mutaplasmids.mutaplasmids).length < 400 ||
+    mutaplasmids.abyssalTypeIds.length < 90
+  ) {
+    throw new Error(
+      'mutaplasmids.json looks wrong: expected 400+ mutaplasmids and 90+ abyssal types'
+    );
+  }
 
   // --- typeNames.json: every type name, published or not; see lib/typeNames.mjs ---
   const typeNames = bakeTypeNames([...types.values()].map((t) => t.name));
@@ -2212,6 +2159,7 @@ async function main() {
     ['shipTree.json', shipTree],
     // Only the Workbench's out-of-date check reads it (~1.7 MB), so it loads on demand.
     ['typeNames.json', typeNames],
+    ['mutaplasmids.json', mutaplasmids],
     ['wormholeMass.json', wormholeMass],
     ['shipMass.json', shipMass],
   ];
@@ -2254,6 +2202,10 @@ async function main() {
       `  typeInfo/0..${typeInfoShards.length - 1}.json: ${count} types, ${bytes.toLocaleString()} bytes`
     );
   }
+  await writeFile(
+    BUILD_STAMP_FILE,
+    `${JSON.stringify({ ccpBuild, fuzzworkDump: fuzzwork.dir }, null, 2)}\n`
+  );
 
   // --- sanity checks ---
   console.log('Sanity checks...');
@@ -2287,7 +2239,7 @@ async function main() {
   );
   if (manufacturingMaterialTypeIds.size > 0 && packagedVolumeByType.size === 0) {
     console.error(
-      '  FAIL: packaged volume probe resolved 0 types — ESI type endpoint may be unreachable or its schema changed'
+      "  FAIL: CCP's types.jsonl carried no packagedVolume — the export's schema may have changed"
     );
     process.exitCode = 1;
   }
@@ -2296,7 +2248,7 @@ async function main() {
     const resolved = control?.packagedVolume;
     if (typeof resolved !== 'number' || Math.abs(resolved - PACKAGED_VOLUME_CONTROL_EXPECTED) > 1) {
       console.error(
-        `  FAIL: packaged volume control type ${PACKAGED_VOLUME_CONTROL_TYPE_ID} (Merlin) resolved to ${resolved ?? 'missing'}, expected ~${PACKAGED_VOLUME_CONTROL_EXPECTED} — the ESI type endpoint's packaged_volume field may have changed`
+        `  FAIL: packaged volume control type ${PACKAGED_VOLUME_CONTROL_TYPE_ID} (Merlin) resolved to ${resolved ?? 'missing'}, expected ~${PACKAGED_VOLUME_CONTROL_EXPECTED} — CCP's packagedVolume field may have changed`
       );
       process.exitCode = 1;
     }
@@ -2637,14 +2589,6 @@ async function main() {
     const packaged = marketTypes.filter((t) => t.packagedVolume !== undefined).length;
     const volumeless = marketTypes.filter((t) => !(t.volume > 0));
     console.log(`  market types with a distinct packaged volume: ${packaged}`);
-    // A failed probe isn't cached, so a rerun heals it; shipping without it
-    // would quietly show a hull at its assembled size.
-    if (packagedVolumeProbeFailures > 0) {
-      console.error(
-        `  FAIL: ${packagedVolumeProbeFailures} packaged volume probes failed; rerun to retry them`
-      );
-      process.exitCode = 1;
-    }
     if (volumeless.length > 0) {
       console.warn(
         `  WARN: ${volumeless.length} market types have no volume (e.g. ${volumeless

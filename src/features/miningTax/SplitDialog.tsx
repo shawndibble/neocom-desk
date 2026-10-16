@@ -13,6 +13,7 @@ import {
   SelectValue,
   TextInput,
   Radio,
+  Slider,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
@@ -293,8 +294,7 @@ export function SplitDialog({
                       className={cx('w-28 text-right', moved > 0 && 'border-accent')}
                     />
                   </div>
-                  <input
-                    type="range"
+                  <Slider
                     aria-label={t('miningTax.splitSliderLabel', {
                       ore: typeNames.get(line.typeId) ?? `#${line.typeId}`,
                     })}
@@ -302,7 +302,6 @@ export function SplitDialog({
                     max={line.quantity}
                     value={moved}
                     onChange={(e) => setMove(line.typeId, Number(e.target.value), line.quantity)}
-                    className="h-2 w-full cursor-pointer accent-accent"
                   />
                 </li>
               );

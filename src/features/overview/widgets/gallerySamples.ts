@@ -429,6 +429,34 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         xEnd: t('overview.widgets.chart.kills.xEnd'),
       },
     },
+    omega: {
+      value: t('overview.widgets.data.omega.covers', { count: 2 }),
+      unit: t('overview.widgets.data.omega.figures', { net: '2.2B', cost: '1B' }),
+      note: t('overview.widgets.data.omega.next', { amount: '800M' }),
+      rows: [],
+      chart: {
+        kind: 'omega',
+        summary: '',
+        bars: [0.4, 0.9, 1.3, 1.1, 1.6, 2.2].map((net, i) => ({
+          key: `p${i}`,
+          label: t(
+            i === 0
+              ? 'overview.widgets.chart.omega.tickPartial'
+              : 'overview.widgets.chart.omega.tick',
+            {
+              date: `${i + 1}`,
+            }
+          ),
+          net: net * 1e9,
+          partial: i === 0,
+          tip: { title: '', rows: [] },
+        })),
+        lines: [1, 2, 3].map((count) => ({
+          value: count * 1e9,
+          label: t('overview.widgets.chart.omega.line', { count }),
+        })),
+      },
+    },
     planetary: {
       value: '4',
       unit: t('overview.gallery.samples.planetary.unit'),

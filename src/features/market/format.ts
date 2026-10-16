@@ -66,3 +66,29 @@ export function formatOrderLocationText(
 ): string {
   return `${location.stationName ?? unknownStructureLabel} · ${location.systemName} (${location.security.toFixed(1)})`;
 }
+
+interface HoldFigures {
+  capacityM3: number;
+  usedM3: number;
+}
+
+/** Whole m³ used, each hold rounded as shown: shown used and free always add up to the capacity. */
+export const shownUsedM3 = (holds: readonly HoldFigures[]): number =>
+  holds.reduce((sum, h) => sum + Math.round(h.usedM3), 0);
+
+/** Whole m³ free, from the same rounded figures as `shownUsedM3`. */
+export const shownFreeM3 = (holds: readonly HoldFigures[]): number =>
+  holds.reduce((sum, h) => sum + Math.max(0, Math.round(h.capacityM3) - Math.round(h.usedM3)), 0);
+
+/**
+ * The m³ a change loads, as the shown figures move, so "free before − added"
+ * reads as "free after". A change too small to move them keeps `rawM3` ("<1").
+ */
+export function shownAddedM3(
+  before: readonly HoldFigures[],
+  after: readonly HoldFigures[],
+  rawM3: number
+): number {
+  const moved = shownUsedM3(after) - shownUsedM3(before);
+  return moved === 0 ? rawM3 : moved;
+}

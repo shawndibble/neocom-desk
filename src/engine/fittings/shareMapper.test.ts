@@ -182,3 +182,49 @@ describe('fittingToShareInput / shareToFitting — fighters', () => {
     expect(shareToFitting(fittingToShareInput(fitting()), 'Rifter')).not.toHaveProperty('fighters');
   });
 });
+
+describe('fittingToShareInput / shareToFitting — mutated modules and drones', () => {
+  it('round-trips a mutated module and drone through the real codec', async () => {
+    const original = fitting({
+      shipTypeId: 17843,
+      modules: [
+        {
+          slot: 'high',
+          slotIndex: 0,
+          typeId: 47832,
+          state: 'active',
+          mutation: {
+            baseTypeId: 16475,
+            mutaplasmidTypeId: 47831,
+            attributes: { 6: 419.25, 54: 15680, 97: 591.36 },
+          },
+        },
+        { slot: 'low', slotIndex: 0, typeId: 2048, state: 'online' },
+      ],
+      drones: [
+        { typeId: 2454, quantity: 3, state: 'active' },
+        {
+          typeId: 60478,
+          quantity: 1,
+          state: 'online',
+          mutation: { baseTypeId: 2454, mutaplasmidTypeId: 60461, attributes: {} },
+        },
+      ],
+    });
+    const encoded = await encodeFittingShare(fittingToShareInput(original));
+    if (!encoded.ok) throw new Error('encode failed');
+    const decoded = await decodeFittingShare(encoded.payload);
+    if (!decoded.ok) throw new Error('decode failed');
+    expect(shareToFitting(decoded.value, 'fallback')).toEqual(original);
+  });
+
+  it('carries no mutation key on a plain module', () => {
+    const restored = shareToFitting(
+      fittingToShareInput(
+        fitting({ modules: [{ slot: 'low', slotIndex: 0, typeId: 2048, state: 'online' }] })
+      ),
+      'x'
+    );
+    expect(Object.keys(restored.modules[0]!)).not.toContain('mutation');
+  });
+});

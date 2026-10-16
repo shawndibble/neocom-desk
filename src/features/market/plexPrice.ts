@@ -18,14 +18,26 @@ import {
 } from '@/features/market/orderBookView';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 
-export async function loadPlexPrice(): Promise<number | null> {
+export interface PlexQuote {
+  price: number;
+  /** When the order book was read, ms since the epoch. */
+  fetchedAt: number;
+}
+
+/** `loadPlexPrice` with the age of the book behind it, for a view that shows its Data Age. */
+export async function loadPlexQuote(): Promise<PlexQuote | null> {
   const globalMarkets = await loadGlobalMarketOverrides();
   // Region mode: Hub mode would narrow PLEX's global book to the hub station
   // and find nothing. The chosen region is ignored — the override wins.
   const location = orderBookLocationFor('region', null, DEFAULT_TRADE_HUB, globalMarkets);
   const view = await loadOrderBookView(PLEX_TYPE_ID, location);
   if (view.status !== 'ready') return null;
-  return view.sell[0]?.price ?? null;
+  const price = view.sell[0]?.price;
+  return price === undefined ? null : { price, fetchedAt: view.fetchedAt };
+}
+
+export async function loadPlexPrice(): Promise<number | null> {
+  return (await loadPlexQuote())?.price ?? null;
 }
 
 /** `loadPlexPrice` as state: `null` until (and unless) a price arrives. */

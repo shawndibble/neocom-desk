@@ -18,7 +18,7 @@ export interface PlanFillInput {
   current: readonly TripCandidate[];
   /** The user's edits to `current`, as `planTrip` takes them. */
   overrides: ReadonlyMap<number, TripOverride>;
-  /** Candidates from other categories; any whose `typeId` is already in `current` is ignored. */
+  /** Candidates the table doesn't hold; any whose `typeId` is in `current` is ignored. */
   extras: readonly TripCandidate[];
   holds: readonly CargoHold[] | null;
   budgetIsk: number | null;

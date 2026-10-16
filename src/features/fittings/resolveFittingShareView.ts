@@ -11,6 +11,7 @@ import { shareToFitting } from '@/engine/fittings/shareMapper';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { loadTypes, loadSkills } from '@/sde/loadSde';
+import { withCheckedMutations } from '@/features/abyssal/mutaplasmidData';
 
 /** Matches `decodeFittingShare`'s own `DecodeFittingShareResult['reason']`, which isn't exported on its own. */
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
@@ -26,7 +27,7 @@ export async function resolveFittingShareView(
 
   const [types, skills] = await Promise.all([loadTypes(), loadSkills()]);
   const name = types[String(decoded.value.hullTypeId)]?.name ?? `Type ${decoded.value.hullTypeId}`;
-  const fitting = shareToFitting(decoded.value, name);
+  const fitting = await withCheckedMutations(shareToFitting(decoded.value, name));
 
   const profile = buildAllVProfile(skills.map((skill) => skill.typeID));
 

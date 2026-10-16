@@ -182,6 +182,14 @@ export interface SurveyChartModel extends ChartBase {
   data: SurveySummary;
 }
 
+export interface OmegaChartModel extends ChartBase {
+  kind: 'omega';
+  /** One per 30-day period, oldest first. */
+  bars: { key: string; label: string; net: number; partial: boolean; tip: ChartTip }[];
+  /** Horizontal reference lines at 1x, 2x... one account's cost; `value` is ISK, `label` is "2 accounts". */
+  lines: { value: number; label: string }[];
+}
+
 export type ChartModel =
   | AreaChartModel
   | BarsChartModel
@@ -192,6 +200,7 @@ export type ChartModel =
   | StackedAreaChartModel
   | StackRowsChartModel
   | SparkChartModel
-  | SurveyChartModel;
+  | SurveyChartModel
+  | OmegaChartModel;
 
 export type ChartKind = ChartModel['kind'];

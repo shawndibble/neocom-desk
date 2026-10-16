@@ -4,7 +4,7 @@ import { TabPanel, Tabs, useTabsId } from '@/components/ui';
 import { ICON_SIZE } from '@/components/ui/icons';
 import { focusRingInsetClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { screenshotSrc, type Screenshot } from './screenshots';
+import { screenshotSrc, screenshotSrcSet, type Screenshot } from './screenshots';
 import { ScreenshotZoom, ZoomBadge } from './ScreenshotZoom';
 import { SHOWCASE_TABS, type ShowcaseTab } from './showcaseTabs';
 
@@ -125,6 +125,8 @@ function ShotButton({
     >
       <img
         src={screenshotSrc(shot)}
+        srcSet={screenshotSrcSet(shot)}
+        sizes="(min-width: 1024px) min(calc(100vw - 24rem), 56rem), calc(100vw - 2rem)"
         alt={t(`login.screenshots.${shot.key}.alt`)}
         width={shot.size.width}
         height={shot.size.height}

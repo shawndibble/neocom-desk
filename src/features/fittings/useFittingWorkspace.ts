@@ -31,6 +31,7 @@ import { useUrlParam } from '@/lib/useUrlState';
 import { FITTING_EDIT_PATH, FITTINGS_PATH, fittingEditLocation } from './fittingRoutes';
 import { nullableTextParam } from '@/lib/urlState';
 import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { withCheckedMutations } from '@/features/abyssal/mutaplasmidData';
 import { loadEveFitXmlEntry, type FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { toLoadOutcome, type LoadedFitting, type LoadOutcome } from '@/engine/fittings/load';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
@@ -313,10 +314,13 @@ export function useFittingWorkspace(): FittingWorkspace {
       const pendingName = pending?.code === shareCode ? pending.name : undefined;
       const fallbackName = pendingName ?? (await typeName(decoded.value.hullTypeId));
       if (cancelled) return;
-      const opened = shareToFitting(
-        pendingName === undefined ? decoded.value : { ...decoded.value, name: pendingName },
-        fallbackName
+      const opened = await withCheckedMutations(
+        shareToFitting(
+          pendingName === undefined ? decoded.value : { ...decoded.value, name: pendingName },
+          fallbackName
+        )
       );
+      if (cancelled) return;
       // The Load's own write has decoded: from here the launch waits for this object's stats.
       const launch = launchPendingRef.current;
       if (launch !== null && 'code' in launch && launch.code === shareCode) {

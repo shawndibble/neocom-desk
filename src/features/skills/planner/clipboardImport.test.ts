@@ -67,7 +67,7 @@ describe('previewClipboardImport: EFT fit', () => {
     return async (typeId: number) => {
       const dogma_attributes = dogmaByTypeId[typeId];
       if (!dogma_attributes) return null;
-      return { data: { dogma_attributes } as UniverseType };
+      return { dogma_attributes };
     };
   }
 

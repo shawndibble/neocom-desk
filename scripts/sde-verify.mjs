@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { compareType, driftIssueAction, renderDiff } from './lib/sdeVerify.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ESI = 'https://esi.evetech.tech';
+const ESI = 'https://esi.evetech.net';
 const COMPATIBILITY_DATE = '2026-08-01';
 const USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
 const SKILL_SAMPLE = 12;

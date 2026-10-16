@@ -108,4 +108,23 @@ describe('walletJournalCsvColumns', () => {
     expect(fields[3]).toBe('0');
     expect(fields[4]).toBe('0');
   });
+
+  it('exports PLEX rows under the same names the table shows', () => {
+    const csv = toCsv(
+      [{ ...entry({ ref_type: 'market_transaction' }), refKey: 'plex_bought' }],
+      walletJournalCsvColumns(t)
+    );
+    expect(csv.split('\r\n')[1].split(',')[1]).toBe('"wallet.refTypePlexBought"');
+  });
+
+  it('adds a Character column after the date in the multi-Character view', () => {
+    const columns = walletJournalCsvColumns(t, (id) => `Pilot ${id}`);
+    expect(columns.slice(0, 3).map((c) => c.header)).toEqual([
+      'wallet.date',
+      'wallet.balanceCharacterColumn',
+      'wallet.refType',
+    ]);
+    const csv = toCsv([{ ...entry(), characterId: 7 }], columns);
+    expect(csv.split('\r\n')[1].split(',')[1]).toBe('"Pilot 7"');
+  });
 });
