@@ -33,3 +33,15 @@ export function useVisualViewportBox(active: boolean): VisualViewportBox | null 
   }, [active]);
   return active ? box : null;
 }
+
+/** How far the on-screen keyboard covers the bottom of the layout viewport, in px. */
+export function keyboardInset(layoutHeight: number, viewport: VisualViewportBox | null): number {
+  if (viewport === null) return 0;
+  return Math.max(0, Math.round(layoutHeight - viewport.height - viewport.offsetTop));
+}
+
+/** The on-screen keyboard's height over the layout viewport while `active`; `0` when it is down or unknown. */
+export function useKeyboardInset(active: boolean): number {
+  const box = useVisualViewportBox(active);
+  return active ? keyboardInset(window.innerHeight, box) : 0;
+}

@@ -13,6 +13,7 @@ import {
   parseMailFolders,
   prefixSubject,
   quoteMailBody,
+  forwardMailBody,
   resolveMailTab,
   selectMailBodiesToPrefetch,
   unreadCountsByTab,
@@ -442,5 +443,13 @@ describe('selectMailBodiesToPrefetch', () => {
   it('is empty for a limit of zero or an empty mailbox', () => {
     expect(pick([header(1)], { limit: 0 })).toEqual([]);
     expect(pick([])).toEqual([]);
+  });
+});
+
+describe('forwardMailBody', () => {
+  it('puts an escaped plain header over the original markup, formatting kept', () => {
+    expect(forwardMailBody('A & B', 'Sep 21, 2026 03:14', 'Re: <fleet>', '<b>original</b>')).toBe(
+      '\n\n---------- Forwarded message ----------\nFrom: A &amp; B\nDate: Sep 21, 2026 03:14\nSubject: Re: &lt;fleet&gt;\n\n<b>original</b>'
+    );
   });
 });

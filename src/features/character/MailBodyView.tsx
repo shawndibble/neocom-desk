@@ -25,7 +25,7 @@ import { cx } from '@/lib/cx';
 import { resolveShowInfo, useItemKind } from './mailShowInfo';
 
 /** The game's default mail text size; `size` nodes scale relative to it. */
-const BASE_SIZE_PX = 12;
+export const BASE_SIZE_PX = 12;
 
 /**
  * The reader's fixed surface for a mail body, theme-independent on purpose: a
@@ -33,7 +33,8 @@ const BASE_SIZE_PX = 12;
  * default text is `#bfffffff` (white at 75%). Not a theme token — it must stay
  * dark in light theme too (docs/DESIGN.md §1, "EVE mail surface").
  */
-const EVE_MAIL_SURFACE_CLASS = 'rounded-xs border border-line bg-[#0a0e14] p-3 text-white/75';
+export const EVE_MAIL_SURFACE_CLASS =
+  'rounded-xs border border-line bg-[#0a0e14] p-3 text-white/75';
 
 /** `https://x.example/a` or `www.x.example`, host only, for comparing link text with its href. */
 function hostOfText(text: string): string | null {

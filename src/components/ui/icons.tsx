@@ -120,6 +120,11 @@ import { SquaresFour } from '@phosphor-icons/react/dist/csr/SquaresFour';
 import { Stack } from '@phosphor-icons/react/dist/csr/Stack';
 import { Star } from '@phosphor-icons/react/dist/csr/Star';
 import { Table as TableGlyph } from '@phosphor-icons/react/dist/csr/Table';
+import { TextB } from '@phosphor-icons/react/dist/csr/TextB';
+import { TextItalic } from '@phosphor-icons/react/dist/csr/TextItalic';
+import { TextUnderline } from '@phosphor-icons/react/dist/csr/TextUnderline';
+import { LinkSimple } from '@phosphor-icons/react/dist/csr/LinkSimple';
+import { Eraser } from '@phosphor-icons/react/dist/csr/Eraser';
 import { Target } from '@phosphor-icons/react/dist/csr/Target';
 import { TextAa } from '@phosphor-icons/react/dist/csr/TextAa';
 import { Tray } from '@phosphor-icons/react/dist/csr/Tray';
@@ -479,3 +484,11 @@ export const Recent = withWeight(ClockCounterClockwise);
 export const NavShown = withWeight(Eye);
 /** Hidden from the rail and the More sheet (the rail editor's toggle, off). */
 export const NavHidden = withWeight(EyeSlash);
+
+/** Mail format bar: bold, italic, underline, text size, link, and clear formatting. */
+export const FormatBold = withWeight(TextB);
+export const FormatItalic = withWeight(TextItalic);
+export const FormatUnderline = withWeight(TextUnderline);
+export const FormatSize = withWeight(TextAa);
+export const FormatLink = withWeight(LinkSimple);
+export const FormatClear = withWeight(Eraser);

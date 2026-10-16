@@ -8,6 +8,8 @@
  * default without a special case.
  */
 
+import { plainTextToMarkup } from './mailEditorDoc';
+
 export type MailTab = 'inbox' | 'sent' | 'corp' | 'alliance';
 
 interface SystemLabel {
@@ -334,4 +336,19 @@ export function selectMailBodiesToPrefetch(
     .slice(0, Math.max(0, options.limit))
     .map((header) => header.mail_id)
     .filter((id) => !options.cachedIds.has(id));
+}
+
+/**
+ * A Forward's starting body, as EVE markup: a plain header (escaped so `< > &`
+ * in a name stay literal) over the original body with its formatting kept.
+ * `originalMarkup` must already be safe markup (`sanitizeMarkup`).
+ */
+export function forwardMailBody(
+  senderName: string,
+  formattedTimestamp: string,
+  subject: string,
+  originalMarkup: string
+): string {
+  const header = `\n\n---------- Forwarded message ----------\nFrom: ${senderName}\nDate: ${formattedTimestamp}\nSubject: ${subject}\n\n`;
+  return plainTextToMarkup(header) + originalMarkup;
 }

@@ -37,6 +37,7 @@ export function saveDraft(
     recipients: [...recipients],
     subject,
     body,
+    format: 'markup',
     updatedAt: Date.now(),
   });
 }
@@ -76,6 +77,7 @@ export function saveNewMailDraft(
     })),
     subject,
     body,
+    format: 'markup',
     updatedAt: Date.now(),
   });
 }

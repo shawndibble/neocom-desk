@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EsiOfflineError } from '@/esi/errors';
 import { NewMailComposer } from './NewMailComposer';
+import { PlainBodyEditor } from './MailBodyEditor';
 
 const sendMail = vi.hoisted(() => vi.fn());
 const loadMailingLists = vi.hoisted(() => vi.fn());
@@ -49,7 +50,14 @@ function setup(props: Partial<React.ComponentProps<typeof NewMailComposer>> = {}
   const onClose = vi.fn();
   const onSent = vi.fn();
   render(
-    <NewMailComposer characterId={CHAR_ID} fullPane onClose={onClose} onSent={onSent} {...props} />
+    <NewMailComposer
+      characterId={CHAR_ID}
+      fullPane
+      bodyEditor={PlainBodyEditor}
+      onClose={onClose}
+      onSent={onSent}
+      {...props}
+    />
   );
   return { onClose, onSent, user: userEvent.setup() };
 }
@@ -109,6 +117,79 @@ describe('draft', () => {
     expect(await screen.findByDisplayValue('Hello')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Saved body')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'To' })).toHaveTextContent('Industry Chat');
+  });
+
+  it('escapes a plain draft saved before the rich editor, so its < > & stay literal and are sent as entities', async () => {
+    drafts.loadNewMailDraft.mockResolvedValue({
+      recipients: [],
+      subject: '',
+      body: 'if a < b && <b>x</b>',
+    });
+    setup();
+    expect(await screen.findByDisplayValue('if a < b && <b>x</b>')).toBeInTheDocument();
+  });
+
+  it('keeps a markup draft as saved', async () => {
+    drafts.loadNewMailDraft.mockResolvedValue({
+      recipients: [],
+      subject: '',
+      body: '<b>bold</b>',
+      format: 'markup',
+    });
+    setup();
+    expect(await screen.findByDisplayValue('bold')).toBeInTheDocument();
+  });
+
+  it('sends a legacy plain draft with < > & as entities, never as tags', async () => {
+    drafts.loadNewMailDraft.mockResolvedValue({
+      recipients: [{ recipient_id: 5, recipient_type: 'mailing_list', name: 'Industry Chat' }],
+      subject: 's',
+      body: 'a <b>x</b> & y',
+    });
+    const { user } = setup();
+    await screen.findByDisplayValue('a <b>x</b> & y');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(sendMail).toHaveBeenCalled());
+    expect(sendMail.mock.calls[0][3]).toBe('a &lt;b&gt;x&lt;/b&gt; &amp; y');
+  });
+
+  it('sanitizes whatever an editor emitted before sending', async () => {
+    function Rogue({ onChange, id }: { onChange: (v: string) => void; id: string }) {
+      return (
+        <button
+          id={id}
+          aria-label="emit"
+          onClick={() => onChange('<script>x</script><b>ok</b><img src=x>')}
+        >
+          emit
+        </button>
+      );
+    }
+    const { user } = setup({ bodyEditor: Rogue as never });
+    await addList(user);
+    await user.click(await screen.findByRole('button', { name: 'emit' }));
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(sendMail).toHaveBeenCalled());
+    expect(sendMail.mock.calls[0][3]).toBe('x<b>ok</b>');
+  });
+
+  it('Escape inside a dialog (a format sheet) does not close the composer', async () => {
+    function WithSheet({ id }: { id: string }) {
+      return (
+        <dialog open>
+          <button id={id} aria-label="in sheet">
+            in sheet
+          </button>
+        </dialog>
+      );
+    }
+    const { user, onClose } = setup({ bodyEditor: WithSheet as never });
+    (await screen.findByRole('button', { name: 'in sheet' })).focus();
+    await user.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+    screen.getByLabelText('Subject').focus();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
   it('closing keeps the draft and reports it', async () => {
