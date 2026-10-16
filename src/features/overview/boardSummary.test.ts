@@ -175,6 +175,19 @@ describe('ordersSummary', () => {
     expect(ordersSummary(t, [makeRow()], false)).toBe('overview.board.ordersClear');
   });
 
+  it('does not call it clear when some orders were never checked for competition', () => {
+    const rows = [makeRow({ orderId: 1 }), makeRow({ orderId: 2, competitionUnchecked: true })];
+    expect(ordersSummary(t, rows, false)).toBe('overview.board.ordersNotChecked(count=1)');
+  });
+
+  it('still leads with real work over the not-checked note', () => {
+    const rows = [
+      makeRow({ orderId: 1, problem: 'outbid', problems: ['outbid'] }),
+      makeRow({ orderId: 2, competitionUnchecked: true }),
+    ];
+    expect(ordersSummary(t, rows, false)).toBe('overview.board.ordersMeta(count=1)');
+  });
+
   it('reads no orders at all as nothing to do, not as an error', () => {
     expect(ordersSummary(t, [], false)).toBe('overview.board.ordersClear');
   });

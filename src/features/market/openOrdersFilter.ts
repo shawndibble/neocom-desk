@@ -115,7 +115,8 @@ function matchesMinIskTiedUp(row: OpenOrderRow, min: number | null): boolean {
 
 function matchesHideHealthy(row: OpenOrderRow, hideHealthy: boolean): boolean {
   if (!hideHealthy) return true;
-  return row.problem !== 'healthy';
+  // An unchecked row is not known to be healthy, so the healthy fold keeps it.
+  return row.problem !== 'healthy' || row.competitionUnchecked === true;
 }
 
 /**

@@ -981,7 +981,7 @@ describe('PlanetaryIndustry', () => {
   });
 
   describe('with hub prices unavailable', () => {
-    const NOTICE = 'Hub prices could not be fetched';
+    const NOTICE = 'Prices unavailable right now';
     beforeEach(() => {
       vi.mocked(loadPlanPrices).mockResolvedValueOnce({
         prices: {},

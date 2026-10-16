@@ -130,6 +130,14 @@ export interface OpenOrderRow {
    * nothing — and false whenever the sample history is too thin to judge.
    */
   frequentlyUndercut: boolean;
+  /**
+   * Nothing could tell whether anyone beats this order: the station's prices
+   * never loaded (Fuzzwork unreachable, e.g. offline) and no deeper book was
+   * read either. Such a row's `problem` says nothing about competition, so it
+   * must not read as "Healthy" / "nobody beats you", and must not be recorded
+   * as an undercut sample. Absent means checked.
+   */
+  competitionUnchecked?: boolean;
 }
 
 export interface CharacterSkills {
@@ -377,6 +385,9 @@ function buildRow(
     frequentlyUndercut:
       problem === 'healthy' &&
       wasFrequentlyUndercut(input.problemSamples?.get(order.order_id) ?? [], input.now),
+    // `loadStationBestPrices` returns an entry for every type of a station it
+    // reached (null prices for "no orders"), so a missing one is a failed read.
+    competitionUnchecked: aggregate === undefined && deepUndercut === null,
   };
 }
 
@@ -408,16 +419,36 @@ export function buildOpenOrderRows(input: BuildRowsInput): OpenOrderRow[] {
   return rows.sort(compareOpenOrderRowsWorstFirst);
 }
 
+/**
+ * A group's heading: every `OrderProblem`, plus `notChecked` for orders that
+ * read healthy only because nothing could check their competition — kept out
+ * of the Healthy group so that heading holds only orders actually checked.
+ */
+export type OrderGroupKey = OrderProblem | 'notChecked';
+
 export interface OrderGroup {
-  problem: OrderProblem;
+  /** The group's key; named `problem` for every group but `notChecked`, which is not a problem. */
+  problem: OrderGroupKey;
   rows: OpenOrderRow[];
 }
 
-/** Groups by `problem` in ORDER_PROBLEMS order. Empty groups are dropped. */
+/** The group a row is filed under. */
+export function orderGroupKey(row: OpenOrderRow): OrderGroupKey {
+  return row.problem === 'healthy' && row.competitionUnchecked === true
+    ? 'notChecked'
+    : row.problem;
+}
+
+/** Worst first, `notChecked` just above `healthy`. */
+const GROUP_ORDER: readonly OrderGroupKey[] = ORDER_PROBLEMS.flatMap((problem) =>
+  problem === 'healthy' ? (['notChecked', 'healthy'] as const) : [problem]
+);
+
+/** Groups by `orderGroupKey` in worst-first order. Empty groups are dropped. */
 export function groupOpenOrders(rows: readonly OpenOrderRow[]): OrderGroup[] {
   const groups: OrderGroup[] = [];
-  for (const problem of ORDER_PROBLEMS) {
-    const groupRows = rows.filter((row) => row.problem === problem);
+  for (const problem of GROUP_ORDER) {
+    const groupRows = rows.filter((row) => orderGroupKey(row) === problem);
     if (groupRows.length > 0) groups.push({ problem, rows: groupRows });
   }
   return groups;
@@ -435,6 +466,16 @@ export function openOrderProblemCounts(
     for (const problem of row.problems) counts[problem]++;
   }
   return counts;
+}
+
+/**
+ * Orders that read healthy only because nothing could check their competition
+ * (`competitionUnchecked`). Surfaces that summarise order health count these
+ * apart from the checked healthy ones instead of calling them healthy.
+ */
+export function notCheckedCount(rows: readonly OpenOrderRow[]): number {
+  return rows.filter((row) => row.competitionUnchecked === true && row.problem === 'healthy')
+    .length;
 }
 
 /** Orders that are not `healthy`. */

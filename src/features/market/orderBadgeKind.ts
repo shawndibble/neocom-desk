@@ -39,6 +39,7 @@ export const ORDER_BADGE_KINDS: readonly OrderBadgeKind[] = [
   'best',
   'topBid',
   'noCostBasis',
+  'notChecked',
 ];
 
 /** The one badge a row wears, and the short detail beside it. Null renders no badge — never a false "best"/"noCostBasis" claim the data can't back up. */
@@ -74,6 +75,9 @@ export function orderBadgeFor(row: OrderAdviceInput): OrderBadgeChoice | null {
       // wear a green "best price" badge. Only reachable for healthy rows —
       // `openOrdersModel.ts` already gates `frequentlyUndercut` on that.
       if (row.frequentlyUndercut) return { kind: 'frequentlyUndercut' };
+      // Prices never loaded: say so rather than let a green badge or silence
+      // imply nobody is cheaper.
+      if (row.competitionUnchecked) return { kind: 'notChecked' };
       if (!row.isBuyOrder && row.costBasis === null) return { kind: 'noCostBasis' };
       if (row.station.bestPrice !== null) return { kind: row.isBuyOrder ? 'topBid' : 'best' };
       return null;

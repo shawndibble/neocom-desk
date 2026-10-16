@@ -189,6 +189,18 @@ describe('filterOpenOrders', () => {
     ).toEqual([2]);
   });
 
+  it('hideHealthy keeps an unchecked row, which is not known to be healthy', () => {
+    const rows = [
+      makeRow({ orderId: 1, problem: 'healthy' }),
+      makeRow({ orderId: 2, problem: 'healthy', competitionUnchecked: true }),
+    ];
+    expect(
+      filterOpenOrders(rows, { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true }).map(
+        (r) => r.orderId
+      )
+    ).toEqual([2]);
+  });
+
   it('combines constraints with AND', () => {
     const rows = [
       makeRow({ orderId: 1, isBuyOrder: false, typeName: 'Tritanium' }),

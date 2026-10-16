@@ -55,6 +55,8 @@ export interface LoyaltyStoreResult {
   hubHydrated: boolean;
   /** True once offers, the catalog and (when there are offers to price) a market snapshot have all loaded at least once. */
   ready: boolean;
+  /** The price source could not be reached, so ISK/LP and profit are unknown, not zero. */
+  pricesUnreachable: boolean;
   useOwnMaterialsFor: ReadonlySet<number>;
   toggleUseOwnMaterials: (offerId: number) => void;
 }
@@ -268,6 +270,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     // A store with no offers has no prices to wait for, so `snapshot` stays
     // null for good: that is "no offers", not still loading.
     ready: offers !== null && catalog !== null && (typeIds.length === 0 || snapshot !== null),
+    pricesUnreachable: snapshot?.hubPricesUnreachable === true,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
   };
