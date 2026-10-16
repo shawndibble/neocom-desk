@@ -210,9 +210,9 @@ describe('Mail', () => {
     render(<App />);
     await screen.findByText('Fleet up!');
     await user.click(screen.getByRole('button', { name: 'Compose' }));
-    expect(await screen.findByRole('region', { name: 'New mail' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'New mail' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Close and keep draft' }));
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'New mail' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New mail' })).toBeNull());
     expect(screen.getByRole('button', { name: 'Compose' })).toBeInTheDocument();
   });
 

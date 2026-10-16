@@ -5,27 +5,16 @@
  * while a pilot has Reply or Forward open; `Mail.tsx` unmounts it on Cancel,
  * on send, or when the selected mail changes.
  */
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
-} from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, NeedsConnection, Spinner, TextArea, TextInput } from '@/components/ui';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { cx } from '@/lib/cx';
 import {
   buildReplyAllRecipients,
   prefixSubject,
   quoteMailBody,
   type ComposeKind,
 } from '@/engine/mail';
-import { moveHighlight } from '@/lib/comboboxNav';
 import { isOfflineFailure } from '@/esi/client';
 import { EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
 import { isOnline, useOnline } from '@/stores/network';
@@ -33,7 +22,8 @@ import { sendMail } from './mail';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
 import { loadContacts } from './contacts';
 import { resolveNames } from './names';
-import { searchMailRecipients, MIN_RECIPIENT_SEARCH_LENGTH } from './mailRecipientSearch';
+import { NewMailRecipientPicker } from './NewMailRecipientPicker';
+import { addRecipient, type ComposeRecipient } from '@/engine/mailCompose';
 import type { MailHeader } from '@/esi/endpoints';
 
 /** One chip in the recipient row — a name is always resolved before it is added, so the row never shows a bare id. */
@@ -42,16 +32,8 @@ interface RecipientChip extends MailDraftRecipient {
   removable: boolean;
 }
 
-interface RecipientCandidate {
-  characterId: number;
-  name: string;
-}
-
 /** Saves the draft in progress without hammering Dexie on every keystroke. */
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
-/** Matches `BuildLocationPicker`'s own recipient-search debounce (the same ESI search endpoint). */
-const RECIPIENT_SEARCH_DEBOUNCE_MS = 300;
-const MAX_QUICK_PICKS = 8;
 
 function chipKey(r: { recipient_id: number; recipient_type: string }): string {
   return `${r.recipient_type}:${r.recipient_id}`;
@@ -91,14 +73,8 @@ export function MailComposeBox({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [recipientQuery, setRecipientQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<RecipientCandidate[]>([]);
-  /** The last live search failed (offline, or a connection that says it is up and is not). */
-  const [searchFailure, setSearchFailure] = useState<'offline' | 'error' | null>(null);
-  const [contacts, setContacts] = useState<RecipientCandidate[]>([]);
-  const [highlight, setHighlight] = useState<number | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const listboxId = `mail-compose-recipient-listbox-${header.mail_id}`;
+  /** Forward's contacts, offered before anything is typed. */
+  const [contacts, setContacts] = useState<ComposeRecipient[]>([]);
   const errorId = `mail-compose-error-${header.mail_id}`;
   const fieldId = useId();
   const toLabelId = `${fieldId}-to`;
@@ -106,30 +82,15 @@ export function MailComposeBox({
   const subjectId = `${fieldId}-subject`;
   const bodyId = `${fieldId}-body`;
 
-  // First-field focus (issue #1485): Forward's recipient search is the real
-  // first field (it sits above Subject); `skipNextPickerOpenRef` stops that
-  // field's own `onFocus` from popping its picker open on this programmatic
-  // focus. Runs once per mount, which a kind/mail switch already is —
-  // Mail.tsx keys this component by `${mail_id}:${kind}`.
-  const recipientSearchRef = useRef<HTMLInputElement>(null);
+  // First-field focus (issue #1485): Forward's recipient picker is the real
+  // first field (it sits above Subject) and focuses itself (`autoFocus`);
+  // Reply lands on Subject. Runs once per mount, which a kind/mail switch
+  // already is — Mail.tsx keys this component by `${mail_id}:${kind}`.
   const subjectRef = useRef<HTMLInputElement>(null);
-  const skipNextPickerOpenRef = useRef(false);
   useEffect(() => {
-    if (kind === 'forward') {
-      skipNextPickerOpenRef.current = true;
-      recipientSearchRef.current?.focus();
-    } else {
-      subjectRef.current?.focus();
-    }
+    if (kind !== 'forward') subjectRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, see comment above
   }, []);
-  function handleRecipientSearchFocus() {
-    if (skipNextPickerOpenRef.current) {
-      skipNextPickerOpenRef.current = false;
-      return;
-    }
-    setPickerOpen(true);
-  }
 
   // Flips true the moment a pilot makes their own edit (subject, body, a
   // chip). Guards the hydration effect below: `loadDraft` is async, and
@@ -219,8 +180,13 @@ export function MailComposeBox({
       setContacts(
         characterIds
           .map((id) => ({ characterId: id, name: names.get(id) }))
-          .filter((c): c is RecipientCandidate => c.name !== undefined)
+          .filter((c): c is { characterId: number; name: string } => c.name !== undefined)
           .sort((a, b) => a.name.localeCompare(b.name))
+          .map((c): ComposeRecipient => ({
+            recipient_id: c.characterId,
+            recipient_type: 'character',
+            name: c.name,
+          }))
       );
     })();
     return () => {
@@ -228,92 +194,11 @@ export function MailComposeBox({
     };
   }, [kind, characterId]);
 
-  // Only the newest query may write results (ESI can answer out of order) —
-  // same `latest`-ticket guard `BuildLocationPicker` uses against its own
-  // search. The `.catch()` also matters on its own: `esi/client.ts` throws
-  // on an aborted request, and every keystroke that supersedes an in-flight
-  // search aborts the previous one — with no catch here, that was an
-  // unhandled rejection on nearly every character typed.
-  const latestSearch = useRef(0);
-
-  // Debounced live search (decision: same ESI search pattern as
-  // BuildLocationPicker). Below the floor there is nothing to fetch — no
-  // setState here either; `candidates` below gates on the same floor, so a
-  // shortened query simply stops showing the stale `searchResults` rather
-  // than needing them cleared.
-  useEffect(() => {
-    if (kind !== 'forward') return;
-    const trimmed = recipientQuery.trim();
-    if (trimmed.length < MIN_RECIPIENT_SEARCH_LENGTH) return;
-    const ticket = ++latestSearch.current;
-    const controller = new AbortController();
-    const id = setTimeout(() => {
-      void searchMailRecipients(characterId, trimmed, controller.signal)
-        .then((hits) => {
-          if (ticket !== latestSearch.current) return;
-          setSearchFailure(null);
-          setSearchResults(hits.map((h) => ({ characterId: h.characterId, name: h.name })));
-        })
-        .catch((err: unknown) => {
-          if (ticket !== latestSearch.current || controller.signal.aborted) return;
-          setSearchFailure(isOfflineFailure(err) ? 'offline' : 'error');
-          setSearchResults([]);
-        });
-    }, RECIPIENT_SEARCH_DEBOUNCE_MS);
-    return () => {
-      clearTimeout(id);
-      controller.abort();
-    };
-  }, [kind, characterId, recipientQuery]);
-
-  const addedIds = useMemo(
-    () =>
-      new Set(
-        recipients.filter((r) => r.recipient_type === 'character').map((r) => r.recipient_id)
-      ),
-    [recipients]
-  );
-
-  const candidates = useMemo((): RecipientCandidate[] => {
-    const trimmed = recipientQuery.trim();
-    const query = trimmed.toLowerCase();
-    const quickPicks =
-      query === ''
-        ? contacts.slice(0, MAX_QUICK_PICKS)
-        : contacts.filter((c) => c.name.toLowerCase().includes(query));
-    // Stale `searchResults` below the floor (see the search effect above) is dropped here.
-    const liveResults = trimmed.length < MIN_RECIPIENT_SEARCH_LENGTH ? [] : searchResults;
-    const merged = [...quickPicks, ...liveResults].filter((c) => !addedIds.has(c.characterId));
-    return Array.from(new Map(merged.map((c) => [c.characterId, c])).values());
-  }, [contacts, searchResults, recipientQuery, addedIds]);
-
-  function addRecipient(candidate: RecipientCandidate) {
+  function addPicked(candidate: ComposeRecipient) {
     touchedRef.current = true;
     setError(null);
-    setRecipients((prev) => [
-      ...prev,
-      {
-        recipient_id: candidate.characterId,
-        recipient_type: 'character',
-        name: candidate.name,
-        removable: true,
-      },
-    ]);
-    setRecipientQuery('');
-    setSearchResults([]);
-    setHighlight(null);
-    setPickerOpen(false);
-  }
-
-  // Named rather than inlined at its `onMouseDown` call site: a block-body
-  // arrow directly in JSX (needed for `preventDefault()` before the call)
-  // is what the `react-hooks/refs` lint rule flags as an unproven-safe call
-  // to a ref-touching function — a single-expression arrow calling a named
-  // function, the same shape every other handler below already uses, reads
-  // as a plain event handler to it.
-  function pickCandidateOnMouseDown(e: ReactMouseEvent, candidate: RecipientCandidate) {
-    e.preventDefault();
-    addRecipient(candidate);
+    const result = addRecipient(recipients, candidate);
+    if (result.ok) setRecipients((prev) => [...prev, { ...candidate, removable: true }]);
   }
 
   function removeRecipient(target: RecipientChip) {
@@ -323,24 +208,6 @@ export function MailComposeBox({
     // `noRecipientsError`, which reads `recipients.length` alone.
     setError(null);
     setRecipients((prev) => prev.filter((r) => chipKey(r) !== chipKey(target)));
-  }
-
-  function handlePickerKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Escape') {
-      setPickerOpen(false);
-      return;
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (highlight !== null && candidates[highlight]) addRecipient(candidates[highlight]);
-      return;
-    }
-    const key = e.key;
-    if (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End') {
-      e.preventDefault();
-      setPickerOpen(true);
-      setHighlight((current) => moveHighlight(key, current, candidates.length));
-    }
   }
 
   async function handleSend() {
@@ -401,116 +268,54 @@ export function MailComposeBox({
         {t(headingKey)}
       </p>
 
-      <div className="space-y-1">
-        <p id={toLabelId} className={labelClass}>
-          {t('mail.toLabel')}
-        </p>
-        <div
-          role="group"
-          aria-labelledby={toLabelId}
-          aria-describedby={noRecipientsError ? errorId : undefined}
-          className="flex flex-wrap gap-1.5"
-        >
-          {recipients.map((r) => (
-            <span
-              key={chipKey(r)}
-              className="flex items-center gap-1 rounded-xs border border-line bg-panel-2 py-1 pr-1 pl-2 text-xs text-text"
-            >
-              {r.name}
-              {r.removable ? (
-                <IconButton
-                  icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
-                  label={t('mail.removeRecipient', { name: r.name })}
-                  size="sm"
-                  variant="plain"
-                  onClick={() => removeRecipient(r)}
-                />
-              ) : (
-                <span className="sr-only">{t('mail.senderNotRemovable')}</span>
-              )}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {kind === 'forward' && (
-        <div className="relative space-y-1">
+      {kind === 'forward' ? (
+        <div className="space-y-1">
           <label htmlFor={recipientSearchId} className={labelClass}>
             {t('mail.addRecipient')}
           </label>
-          <TextInput
-            id={recipientSearchId}
-            ref={recipientSearchRef}
-            size="sm"
-            role="combobox"
-            aria-autocomplete="list"
-            aria-expanded={pickerOpen}
-            aria-controls={listboxId}
-            aria-activedescendant={
-              highlight !== null ? `${listboxId}-option-${highlight}` : undefined
-            }
-            placeholder={t('mail.recipientSearchPlaceholder')}
-            aria-invalid={noRecipientsError}
-            aria-describedby={noRecipientsError ? errorId : undefined}
-            value={recipientQuery}
-            onChange={(e) => {
-              setRecipientQuery(e.target.value);
-              setSearchFailure(null);
-              setPickerOpen(true);
-              setHighlight(null);
-            }}
-            onFocus={handleRecipientSearchFocus}
-            onKeyDown={handlePickerKeyDown}
-            className="w-full"
+          <NewMailRecipientPicker
+            characterId={characterId}
+            recipients={recipients}
+            onAdd={addPicked}
+            onRemove={(r) => removeRecipient({ ...r, removable: true })}
+            inputId={recipientSearchId}
+            quickPicks={contacts}
+            autoFocus
+            invalid={noRecipientsError}
+            describedBy={noRecipientsError ? errorId : undefined}
           />
-          <span role="status" aria-live="polite" className="sr-only">
-            {pickerOpen &&
-              recipientQuery.trim().length >= MIN_RECIPIENT_SEARCH_LENGTH &&
-              (highlight !== null && candidates[highlight]
-                ? t('mail.recipientHighlighted', {
-                    count: candidates.length,
-                    name: candidates[highlight].name,
-                  })
-                : t('mail.recipientResultsCount', { count: candidates.length }))}
-          </span>
-          {pickerOpen && (
-            <ul
-              id={listboxId}
-              role="listbox"
-              aria-label={t('mail.addRecipient')}
-              className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-xs border border-line bg-panel shadow-lg"
-            >
-              {candidates.length === 0 ? (
-                <li className="px-3 py-2 text-xs text-text-dim">
-                  {recipientQuery.trim().length < MIN_RECIPIENT_SEARCH_LENGTH
-                    ? t('mail.recipientSearchHint')
-                    : !online || searchFailure === 'offline'
-                      ? t('mail.recipientSearchOffline')
-                      : searchFailure === 'error'
-                        ? t('mail.recipientSearchFailed')
-                        : t('mail.noRecipientResults')}
-                </li>
-              ) : (
-                candidates.map((c, i) => (
-                  <li
-                    key={c.characterId}
-                    id={`${listboxId}-option-${i}`}
-                    role="option"
-                    aria-selected={highlight === i}
-                    className={cx(
-                      'cursor-pointer px-3 py-1.5 text-xs text-text',
-                      highlight === i ? `bg-panel-2 ${activeOptionClassName}` : 'hover:bg-panel-2'
-                    )}
-                    onMouseEnter={() => setHighlight(i)}
-                    // Keeps the input focused — a plain click would blur it first and close the list.
-                    onMouseDown={(e) => pickCandidateOnMouseDown(e, c)}
-                  >
-                    {c.name}
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <p id={toLabelId} className={labelClass}>
+            {t('mail.toLabel')}
+          </p>
+          <div
+            role="group"
+            aria-labelledby={toLabelId}
+            aria-describedby={noRecipientsError ? errorId : undefined}
+            className="flex flex-wrap gap-1.5"
+          >
+            {recipients.map((r) => (
+              <span
+                key={chipKey(r)}
+                className="flex items-center gap-1 rounded-xs border border-line bg-panel-2 py-1 pr-1 pl-2 text-xs text-text"
+              >
+                {r.name}
+                {r.removable ? (
+                  <IconButton
+                    icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
+                    label={t('mail.removeRecipient', { name: r.name })}
+                    size="sm"
+                    variant="plain"
+                    onClick={() => removeRecipient(r)}
+                  />
+                ) : (
+                  <span className="sr-only">{t('mail.senderNotRemovable')}</span>
+                )}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 

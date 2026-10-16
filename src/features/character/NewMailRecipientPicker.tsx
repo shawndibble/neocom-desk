@@ -1,7 +1,8 @@
 /**
- * The New Mail recipient row: typed chips plus one combobox that lists the
- * Character's joined mailing lists (local) and ESI search hits for
- * characters, corporations and alliances.
+ * The recipient row of New Mail and Forward: typed chips plus one combobox
+ * that lists the Character's joined mailing lists (local), optional quick
+ * picks (Forward's contacts) and ESI search hits for characters,
+ * corporations and alliances.
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,16 +25,25 @@ import { loadMailingLists } from './mail';
 import { MIN_RECIPIENT_SEARCH_LENGTH, searchTypedMailRecipients } from './mailRecipientSearch';
 
 const SEARCH_DEBOUNCE_MS = 300;
+const MAX_QUICK_PICKS = 8;
 const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
+
+type ListsState =
+  | { status: 'loading'; lists: [] }
+  | { status: 'failed'; lists: [] }
+  | { status: 'ready'; lists: { mailing_list_id: number; name: string }[] };
 
 interface NewMailRecipientPickerProps {
   characterId: number;
   recipients: readonly ComposeRecipient[];
   onAdd: (recipient: ComposeRecipient) => void;
   onRemove: (recipient: ComposeRecipient) => void;
-  /** Id of the combobox input, for the composer's label. */
+  /** Id of the combobox input, for the caller's visible label. */
   inputId: string;
-  inputRef?: React.Ref<HTMLInputElement>;
+  /** People shown before anything is typed, and filtered by it after (Forward's contacts). */
+  quickPicks?: readonly ComposeRecipient[];
+  /** Focus the field on mount without popping its list open. */
+  autoFocus?: boolean;
   invalid?: boolean;
   describedBy?: string;
 }
@@ -44,7 +54,8 @@ export function NewMailRecipientPicker({
   onAdd,
   onRemove,
   inputId,
-  inputRef,
+  quickPicks = [],
+  autoFocus = false,
   invalid,
   describedBy,
 }: NewMailRecipientPickerProps) {
@@ -54,18 +65,35 @@ export function NewMailRecipientPicker({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState<number | null>(null);
-  const [lists, setLists] = useState<{ mailing_list_id: number; name: string }[]>([]);
+  const [listsState, setListsState] = useState<ListsState>({ status: 'loading', lists: [] });
   const [hits, setHits] = useState<ComposeRecipient[]>([]);
   const [failure, setFailure] = useState<'offline' | 'error' | null>(null);
   const listboxId = `${useId()}-recipients`;
   const latest = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const skipNextOpenRef = useRef(false);
   const full = recipients.length >= MAX_RECIPIENTS;
 
   useEffect(() => {
+    if (!autoFocus) return;
+    skipNextOpenRef.current = true;
+    inputRef.current?.focus();
+  }, [autoFocus]);
+
+  useEffect(() => {
     let cancelled = false;
-    void loadMailingLists(characterId).then((result) => {
-      if (!cancelled) setLists(result.cached?.data ?? []);
-    });
+    loadMailingLists(characterId)
+      .then((result) => {
+        if (cancelled) return;
+        setListsState(
+          result.cached === null
+            ? { status: 'failed', lists: [] }
+            : { status: 'ready', lists: result.cached.data }
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setListsState({ status: 'failed', lists: [] });
+      });
     return () => {
       cancelled = true;
     };
@@ -98,20 +126,34 @@ export function NewMailRecipientPicker({
 
   const candidates = useMemo(() => {
     const taken = new Set(recipients.map(recipientKey));
-    const found = (searchable ? hits : []).filter((h) => !taken.has(recipientKey(h)));
-    return [...filterMailingLists(lists, query, recipients), ...found];
-  }, [lists, hits, query, recipients, searchable]);
+    const q = trimmed.toLowerCase();
+    const quick =
+      q === ''
+        ? quickPicks.slice(0, MAX_QUICK_PICKS)
+        : quickPicks.filter((p) => p.name.toLowerCase().includes(q));
+    const merged = [
+      ...quick,
+      ...filterMailingLists(listsState.lists, query, recipients),
+      ...(searchable ? hits : []),
+    ].filter((c) => !taken.has(recipientKey(c)));
+    return Array.from(new Map(merged.map((c) => [recipientKey(c), c])).values());
+  }, [listsState.lists, hits, query, trimmed, recipients, searchable, quickPicks]);
 
   function pick(candidate: ComposeRecipient) {
     onAdd(candidate);
     setQuery('');
     setHits([]);
     setHighlight(null);
+    setOpen(false);
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
-      setOpen(false);
+      if (open) {
+        // Closes the list only; a full-pane composer must not also close.
+        e.stopPropagation();
+        setOpen(false);
+      }
       return;
     }
     if (e.key === 'Enter') {
@@ -126,17 +168,22 @@ export function NewMailRecipientPicker({
     }
   }
 
+  const min = MIN_RECIPIENT_SEARCH_LENGTH;
   const emptyText = lacksSearch
     ? t('mail.newMailSearchNeedsGrant')
-    : trimmed.length > 0 && trimmed.length < MIN_RECIPIENT_SEARCH_LENGTH
-      ? t('mail.recipientSearchHint')
+    : trimmed.length > 0 && trimmed.length < min
+      ? t('mail.recipientSearchHint', { min })
       : searchable && (!online || failure === 'offline')
         ? t('mail.recipientSearchOffline')
         : searchable && failure === 'error'
           ? t('mail.recipientSearchFailed')
           : searchable
             ? t('mail.newMailNoResults')
-            : t('mail.newMailNoLists');
+            : listsState.status === 'failed'
+              ? t('mail.mailingListsFailed', { min })
+              : listsState.status === 'loading'
+                ? t('common.loading')
+                : t('mail.newMailNoLists', { min });
 
   return (
     <div className="space-y-1.5">
@@ -152,7 +199,6 @@ export function NewMailRecipientPicker({
               <IconButton
                 icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
                 label={t('mail.removeRecipient', { name: r.name })}
-                size="sm"
                 variant="plain"
                 onClick={() => onRemove(r)}
               />
@@ -164,7 +210,6 @@ export function NewMailRecipientPicker({
         <TextInput
           id={inputId}
           ref={inputRef}
-          size="sm"
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={open && !full}
@@ -187,13 +232,31 @@ export function NewMailRecipientPicker({
             setOpen(true);
             setHighlight(null);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            if (skipNextOpenRef.current) {
+              skipNextOpenRef.current = false;
+              return;
+            }
+            setOpen(true);
+          }}
+          onClick={() => setOpen(true)}
           onBlur={() => setOpen(false)}
           onKeyDown={onKeyDown}
           className="min-w-0 flex-1"
         />
         <span className={cx('text-xs tabular-nums', full ? 'text-warning' : 'text-text-dim')}>
-          {t('mail.recipientCount', { count: recipients.length, max: MAX_RECIPIENTS })}
+          {t('mail.counter', { count: recipients.length, max: MAX_RECIPIENTS })}
+        </span>
+        <span role="status" aria-live="polite" className="sr-only">
+          {open &&
+            !full &&
+            candidates.length > 0 &&
+            (highlight !== null && candidates[highlight]
+              ? t('mail.recipientHighlighted', {
+                  count: candidates.length,
+                  name: candidates[highlight].name,
+                })
+              : t('mail.recipientResultsCount', { count: candidates.length }))}
         </span>
         {open && !full && (
           <ul
@@ -212,7 +275,7 @@ export function NewMailRecipientPicker({
                   role="option"
                   aria-selected={highlight === i}
                   className={cx(
-                    'flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-text',
+                    'flex min-h-11 cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-text md:min-h-0',
                     highlight === i ? `bg-panel-2 ${activeOptionClassName}` : 'hover:bg-panel-2'
                   )}
                   onMouseEnter={() => setHighlight(i)}

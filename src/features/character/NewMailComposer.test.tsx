@@ -4,7 +4,7 @@
  * `engine/mailCompose.test.ts`.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EsiOfflineError } from '@/esi/errors';
@@ -196,5 +196,91 @@ describe('body editor seam', () => {
     await user.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(onSent).toHaveBeenCalled());
     expect(sendMail.mock.calls[0]?.[3]).toBe('[b]x[/b]');
+  });
+});
+
+describe('draft survives leaving without Close', () => {
+  it('flushes the latest text when the composer unmounts inside the debounce window', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <NewMailComposer characterId={CHAR_ID} fullPane={false} onClose={vi.fn()} onSent={vi.fn()} />
+    );
+    await user.type(await screen.findByLabelText('Subject'), 'Typed fast');
+    unmount();
+    await waitFor(() =>
+      expect(drafts.saveNewMailDraft).toHaveBeenLastCalledWith(CHAR_ID, [], 'Typed fast', '')
+    );
+  });
+
+  it('flushes when the page is backgrounded', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.type(await screen.findByLabelText('Subject'), 'Hidden soon');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    Reflect.deleteProperty(document, 'visibilityState');
+    await waitFor(() =>
+      expect(drafts.saveNewMailDraft).toHaveBeenLastCalledWith(CHAR_ID, [], 'Hidden soon', '')
+    );
+  });
+
+  it('does not write after a send finished', async () => {
+    const { user, onSent } = setup();
+    await addList(user);
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSent).toHaveBeenCalled());
+    drafts.saveNewMailDraft.mockClear();
+    await new Promise((r) => setTimeout(r, 600));
+    expect(drafts.saveNewMailDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('send guard', () => {
+  it('sends once on a double press', async () => {
+    let release: (v: number) => void = () => undefined;
+    sendMail.mockReturnValue(new Promise<number>((r) => (release = r)));
+    const { user } = setup();
+    await addList(user);
+    const send = screen.getByRole('button', { name: 'Send' });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    release(1);
+    await waitFor(() => expect(sendMail).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('full-pane dialog', () => {
+  it('is a modal dialog, makes the page behind inert, and Escape closes keeping the draft', async () => {
+    const behind = document.createElement('div');
+    document.body.appendChild(behind);
+    const { user, onClose } = setup();
+    const dialog = await screen.findByRole('dialog', { name: 'New mail' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(behind).toHaveAttribute('inert');
+    await user.type(screen.getByLabelText('Subject'), 'Esc me');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(onClose).toHaveBeenCalledWith('kept'));
+    expect(drafts.saveNewMailDraft).toHaveBeenLastCalledWith(CHAR_ID, [], 'Esc me', '');
+    behind.remove();
+  });
+
+  it('Escape in an open recipient list closes only the list', async () => {
+    const { user, onClose } = setup();
+    await user.click(await screen.findByRole('combobox'));
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('mailing list loading', () => {
+  it('says so when the lists could not be loaded', async () => {
+    loadMailingLists.mockResolvedValue({ cached: null, needsReauth: false });
+    const { user } = setup();
+    await user.click(await screen.findByRole('combobox'));
+    expect(await screen.findByText(/Couldn't load your mailing lists/)).toBeInTheDocument();
   });
 });

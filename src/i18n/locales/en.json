@@ -6519,9 +6519,7 @@
     "removeRecipient": "Remove {{name}}",
     "senderNotRemovable": "The sender can't be removed — remove every other recipient and this still sends as a reply.",
     "addRecipient": "Add recipient",
-    "recipientSearchPlaceholder": "Search by character name…",
-    "recipientSearchHint": "Type at least 3 characters to search.",
-    "noRecipientResults": "No characters found.",
+    "recipientSearchHint": "Type at least {{min}} characters to search.",
     "contactsHeading": "Contacts",
     "searchResultsHeading": "Search results",
     "recipientResultsCount_one": "{{count}} result",
@@ -6542,13 +6540,13 @@
     "newMailClose": "Close and keep draft",
     "newMailRecipientPlaceholder": "Add a character, corporation, alliance or list",
     "newMailNoResults": "No matches.",
-    "newMailNoLists": "Type 3 or more characters to search, or pick one of your mailing lists.",
+    "newMailNoLists": "You have no mailing lists. Type {{min}} or more characters to search.",
+    "mailingListsFailed": "Couldn't load your mailing lists. Type {{min}} or more characters to search.",
     "newMailSearchNeedsGrant": "Searching needs a Permission. Your mailing lists are still listed.",
     "searchReauthTitle": "Grant search to find recipients",
     "searchReauthHint": "Searching for characters, corporations and alliances needs the search Permission.",
     "searchReauthAction": "Grant search",
     "recipientsFull": "Recipient limit reached ({{max}})",
-    "recipientCount": "{{count}} / {{max}}",
     "counter": "{{count}} / {{max}}",
     "recipientType": {
       "character": "Character",
@@ -6557,7 +6555,7 @@
       "mailing_list": "Mailing list"
     },
     "problem": {
-      "tooManyRecipients": "A mail can have at most 50 recipients.",
+      "tooManyRecipients": "A mail can have at most {{max}} recipients.",
       "subjectTooLong": "The subject is too long.",
       "bodyTooLong": "The message is too long."
     },

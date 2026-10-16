@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import type { ComposeRecipientType } from '@/engine/mailCompose';
 import { emitUpgradeBlocked } from './blockedSignal';
 import { esiCacheMetaMiddleware, type CachedPage, type EsiCacheMetaRecord } from './esiCacheMeta';
 import type { Attributes, Implants, PlanEntry, PlanMilestone } from '@/engine/types';
@@ -980,7 +981,7 @@ export interface OrderProblemSampleRecord {
 /** Local widening of `MailRecipient` (`esi/endpoints.ts`) — `src/db` carries no dependency on the esi layer, same rule `NotificationFeedRecord.eventId` follows for `src/features`. */
 export interface MailDraftRecipient {
   recipient_id: number;
-  recipient_type: 'alliance' | 'character' | 'corporation' | 'mailing_list';
+  recipient_type: ComposeRecipientType;
   /** New Mail drafts keep the chip's name so a reopened draft needs no lookup; Reply/Forward drafts leave it out. */
   name?: string;
 }

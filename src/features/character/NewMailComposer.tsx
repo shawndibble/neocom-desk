@@ -9,7 +9,8 @@
  * (`MailBodyEditor.tsx`), so a rich editor replaces the plain text area
  * without touching send or draft code.
  */
-import { useEffect, useId, useRef, useState, type ComponentType } from 'react';
+import { useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { useVisualViewportBox } from '@/lib/useVisualViewportBox';
 import { isOfflineFailure } from '@/esi/client';
 import { EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
 import { isOnline, useOnline } from '@/stores/network';
@@ -31,6 +33,8 @@ import {
   addRecipient,
   composeBodyLength,
   isNewMailEmpty,
+  MAX_RECIPIENTS,
+  type NewMailFields,
   recipientKey,
   validateNewMail,
   type ComposeRecipient,
@@ -41,6 +45,16 @@ import { PlainBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
 import { NewMailRecipientPicker } from './NewMailRecipientPicker';
 
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
+
+/** Writes the slot, or clears it when there is nothing worth keeping. Returns whether a draft is now stored. */
+async function persistNewMail(characterId: number, fields: NewMailFields): Promise<boolean> {
+  if (isNewMailEmpty(fields)) {
+    await clearNewMailDraft(characterId);
+    return false;
+  }
+  await saveNewMailDraft(characterId, fields.recipients, fields.subject, fields.body);
+  return true;
+}
 
 /** How the composer ended: draft kept, nothing worth keeping, or an explicit Discard. */
 export type NewMailCloseReason = 'kept' | 'empty' | 'discarded';
@@ -71,19 +85,38 @@ export function NewMailComposer({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [saved, setSaved] = useState(false);
   const touchedRef = useRef(false);
   const finishedRef = useRef(false);
+  const sendingRef = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  // The latest values, for the flushes that run outside a render (unmount,
+  // backgrounding), where the closure would be stale.
+  const latestRef = useRef({ characterId, recipients, subject, body, ready: false });
+  useEffect(() => {
+    latestRef.current = { characterId, recipients, subject, body, ready };
+  });
   const fieldId = useId();
   const recipientsId = `${fieldId}-to`;
   const subjectId = `${fieldId}-subject`;
   const bodyId = `${fieldId}-body`;
   const bodyCountId = `${fieldId}-body-count`;
   const errorId = `${fieldId}-error`;
-  const recipientInputRef = useRef<HTMLInputElement>(null);
+  const viewport = useVisualViewportBox(fullPane);
 
+  // The page behind a full-pane composer is not reachable by keyboard or
+  // screen reader: every other child of <body> goes inert while it is open.
   useEffect(() => {
-    recipientInputRef.current?.focus();
-  }, []);
+    if (!fullPane) return;
+    const section = sectionRef.current;
+    const marked: Element[] = [];
+    for (const child of Array.from(document.body.children)) {
+      if (child === section || child.hasAttribute('inert') || child.tagName === 'SCRIPT') continue;
+      child.setAttribute('inert', '');
+      marked.push(child);
+    }
+    return () => marked.forEach((el) => el.removeAttribute('inert'));
+  }, [fullPane]);
 
   // Reopens the draft as left; anything typed before it resolves wins.
   useEffect(() => {
@@ -108,22 +141,44 @@ export function NewMailComposer({
     };
   }, [characterId]);
 
-  async function persist() {
-    if (isNewMailEmpty({ recipients, subject, body })) {
-      await clearNewMailDraft(characterId);
-    } else {
-      await saveNewMailDraft(characterId, recipients, subject, body);
-    }
+  // Writes what is on screen right now, from the refs; never after the
+  // composer has finished (sent, discarded or closed).
+  function flushLatest() {
+    const l = latestRef.current;
+    if (finishedRef.current || !l.ready) return Promise.resolve();
+    return persistNewMail(l.characterId, l).then(
+      () => undefined,
+      () => undefined
+    );
   }
 
   useEffect(() => {
     if (!ready) return;
     const id = setTimeout(() => {
-      if (!finishedRef.current) void persist();
+      if (finishedRef.current) return;
+      void persistNewMail(characterId, { recipients, subject, body }).then(
+        setSaved,
+        () => undefined
+      );
     }, DRAFT_SAVE_DEBOUNCE_MS);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- persist closes over exactly these values
   }, [ready, characterId, recipients, subject, body]);
+
+  // The 500 ms debounce is lost if the composer goes away without Close
+  // (bottom nav, route change, Back) or the page is backgrounded.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') void flushLatest();
+    };
+    const onPageHide = () => void flushLatest();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+      void flushLatest();
+    };
+  }, []);
 
   const fields = { recipients, subject, body };
   const problems = validateNewMail(fields);
@@ -131,10 +186,10 @@ export function NewMailComposer({
   const bodyLength = composeBodyLength(body);
 
   async function handleClose() {
-    finishedRef.current = true;
     const empty = isNewMailEmpty(fields);
     // Flush now: the debounce may not have fired, and the draft must survive the close.
-    await persist().catch(() => undefined);
+    await flushLatest();
+    finishedRef.current = true;
     onClose(empty ? 'empty' : 'kept');
   }
 
@@ -146,12 +201,15 @@ export function NewMailComposer({
   }
 
   async function handleSend() {
+    // Synchronous: a double tap lands before `sending` re-renders the button disabled.
+    if (sendingRef.current) return;
     if (recipients.length === 0) {
       setError(t('mail.sendNoRecipients'));
       return;
     }
     // Read before the request: a drop mid-send must not retroactively make it "never sent".
     const wasOffline = !isOnline();
+    sendingRef.current = true;
     setSending(true);
     setError(null);
     try {
@@ -184,8 +242,15 @@ export function NewMailComposer({
       await clearNewMailDraft(characterId).catch(() => undefined);
       onSent();
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
+  }
+
+  function onSectionKeyDown(e: KeyboardEvent<HTMLElement>) {
+    if (e.key !== 'Escape' || !fullPane || confirmingDiscard || sendingRef.current) return;
+    e.preventDefault();
+    void handleClose();
   }
 
   function add(recipient: ComposeRecipient) {
@@ -201,13 +266,24 @@ export function NewMailComposer({
   const subjectOver = subject.length > MAX_SUBJECT_LENGTH;
   const bodyOver = bodyLength > MAX_BODY_LENGTH;
 
-  return (
+  const content = (
     <section
+      ref={sectionRef}
+      role={fullPane ? 'dialog' : undefined}
+      aria-modal={fullPane ? true : undefined}
       aria-label={t('mail.newMailHeading')}
+      onKeyDown={onSectionKeyDown}
+      // `dvh` does not shrink for the iOS keyboard, so a known visual viewport sizes the pane.
+      style={
+        fullPane && viewport ? { top: viewport.offsetTop, height: viewport.height } : undefined
+      }
       className={cx(
         'flex flex-col',
         fullPane
-          ? 'fixed inset-0 z-50 h-dvh bg-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]'
+          ? cx(
+              'fixed inset-x-0 z-50 bg-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
+              viewport ? '' : 'inset-y-0 h-dvh'
+            )
           : 'min-h-96 gap-3'
       )}
     >
@@ -226,7 +302,7 @@ export function NewMailComposer({
         <h2 className="min-w-0 flex-1 truncate text-xs font-semibold tracking-widest text-text-dim uppercase">
           {t('mail.newMailHeading')}
         </h2>
-        {!online && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
+        {!online && saved && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
         <NeedsConnection>
           <Button
             variant="primary"
@@ -260,7 +336,7 @@ export function NewMailComposer({
               setRecipients((prev) => prev.filter((p) => recipientKey(p) !== recipientKey(r)));
             }}
             inputId={`${fieldId}-recipient-input`}
-            inputRef={recipientInputRef}
+            autoFocus
             invalid={error !== null && recipients.length === 0}
             describedBy={error !== null && recipients.length === 0 ? errorId : undefined}
           />
@@ -277,7 +353,6 @@ export function NewMailComposer({
           </div>
           <TextInput
             id={subjectId}
-            size="sm"
             value={subject}
             aria-invalid={subjectOver}
             onChange={(e) => {
@@ -313,7 +388,7 @@ export function NewMailComposer({
         {problems.map((p) =>
           p === 'noRecipients' ? null : (
             <FieldError key={p} id={`${fieldId}-${p}`}>
-              {t(`mail.problem.${p}`)}
+              {t(`mail.problem.${p}`, { max: MAX_RECIPIENTS })}
             </FieldError>
           )
         )}
@@ -327,7 +402,7 @@ export function NewMailComposer({
           <div>
             <Button
               variant="danger"
-              size="sm"
+              size="md"
               onClick={() => setConfirmingDiscard(true)}
               disabled={sending}
             >
@@ -345,10 +420,10 @@ export function NewMailComposer({
         <div className="space-y-4 text-sm">
           <p>{t('mail.discardBody')}</p>
           <div className="flex justify-end gap-2">
-            <Button size="sm" onClick={() => setConfirmingDiscard(false)}>
+            <Button size="md" onClick={() => setConfirmingDiscard(false)}>
               {t('mail.discardKeep')}
             </Button>
-            <Button variant="danger" size="sm" onClick={() => void handleDiscard()}>
+            <Button variant="danger" size="md" onClick={() => void handleDiscard()}>
               {t('mail.discardConfirm')}
             </Button>
           </div>
@@ -356,4 +431,5 @@ export function NewMailComposer({
       </Modal>
     </section>
   );
+  return fullPane ? createPortal(content, document.body) : content;
 }

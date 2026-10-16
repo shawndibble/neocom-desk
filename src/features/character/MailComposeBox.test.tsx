@@ -14,7 +14,9 @@ import { MailComposeBox } from './MailComposeBox';
 import type { MailHeader } from '@/esi/endpoints';
 
 const sendMail = vi.hoisted(() => vi.fn());
-vi.mock('./mail', () => ({ sendMail }));
+const loadMailingLists = vi.hoisted(() => vi.fn());
+vi.mock('./mail', () => ({ sendMail, loadMailingLists }));
+vi.mock('@/app/useGrantedScopes', () => ({ useCharacterLacksEndpoints: () => false }));
 
 const drafts = vi.hoisted(() => ({
   loadDraft: vi.fn(),
@@ -31,7 +33,7 @@ vi.mock('./names', () => ({ resolveNames }));
 
 const searchMailRecipients = vi.hoisted(() => vi.fn());
 vi.mock('./mailRecipientSearch', () => ({
-  searchMailRecipients,
+  searchTypedMailRecipients: searchMailRecipients,
   MIN_RECIPIENT_SEARCH_LENGTH: 3,
 }));
 
@@ -58,6 +60,7 @@ beforeEach(() => {
   loadContacts.mockResolvedValue({ cached: { data: [] } });
   resolveNames.mockResolvedValue(new Map());
   searchMailRecipients.mockResolvedValue([]);
+  loadMailingLists.mockResolvedValue({ cached: { data: [] } });
 });
 
 function goOffline() {
@@ -112,7 +115,7 @@ describe('visible labels', () => {
     const search = await screen.findByLabelText('Add recipient');
     expect(search).not.toHaveAttribute('aria-label');
     expect(document.querySelector(`label[for="${search.id}"]`)).toBeVisible();
-    expect(search).toHaveAttribute('placeholder', 'Search by character name…');
+    expect(search).toHaveAttribute('placeholder', 'Add a character, corporation, alliance or list');
   });
 });
 
@@ -175,7 +178,7 @@ describe('Forward defaults', () => {
   });
 
   it('adding a search result creates a removable chip', async () => {
-    searchMailRecipients.mockResolvedValue([{ characterId: 500, name: 'Found Fenn' }]);
+    searchMailRecipients.mockResolvedValue([{ id: 500, type: 'character', name: 'Found Fenn' }]);
     const user = userEvent.setup();
     renderBox('forward');
     await waitFor(() =>
@@ -183,7 +186,7 @@ describe('Forward defaults', () => {
     );
 
     await user.type(screen.getByLabelText('Add recipient'), 'Fen');
-    const option = await screen.findByRole('option', { name: 'Found Fenn' });
+    const option = await screen.findByRole('option', { name: /Found Fenn/ });
     await user.click(option);
 
     expect(screen.getByText('Found Fenn')).toBeInTheDocument();
@@ -203,7 +206,7 @@ describe('recipient search offline', () => {
     await user.type(screen.getByLabelText('Add recipient'), 'Fen');
 
     expect(await screen.findByText('Search needs a connection.')).toBeInTheDocument();
-    expect(screen.queryByText('No characters found.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No matches.')).not.toBeInTheDocument();
   });
 });
 
@@ -219,7 +222,7 @@ describe('recipient search that fails while the browser says it is online', () =
     await user.type(screen.getByLabelText('Add recipient'), 'Fen');
 
     expect(await screen.findByText('Search needs a connection.')).toBeInTheDocument();
-    expect(screen.queryByText('No characters found.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No matches.')).not.toBeInTheDocument();
   });
 });
 
@@ -236,7 +239,7 @@ describe('recipient search that ESI refuses', () => {
 
     expect(await screen.findByText('Search failed. Try again.')).toBeInTheDocument();
     expect(screen.queryByText('Search needs a connection.')).not.toBeInTheDocument();
-    expect(screen.queryByText('No characters found.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No matches.')).not.toBeInTheDocument();
   });
 });
 
