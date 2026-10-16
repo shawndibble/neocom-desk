@@ -9235,6 +9235,10 @@
     "installAndroidFirefoxCta": "Install Neocom Desk: open Firefox's menu (⋮), then choose Add app to Home screen."
   },
   "market": {
+    "mutamarket": {
+      "priceFrom": "Price from MutaMarket",
+      "estimateNote": "MutaMarket's model estimate for this exact roll, not a sale price."
+    },
     "title": "Market",
     "sharedAppraisalLoadFailed": "Couldn't load the shared appraisal. You may be offline.",
     "compareUndo": {
