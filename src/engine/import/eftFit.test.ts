@@ -200,6 +200,97 @@ describe('parseEftFit', () => {
   });
 });
 
+// Pyfa's mutated-module layout, reconstructed from Pyfa's own source
+// (service/port/eft.py exportEft/importEft and service/port/muta.py
+// renderMutant/parseMutant, master as of 2026-10) — not from a real export
+// sample, which this ticket had no way to obtain. The fitted line names the
+// BASE module with a ` [N]` reference after any charge and `/offline`; one
+// block per reference trails the fit: `[N] <base name>`, the mutaplasmid's
+// name, then `attrName value, ...` (dogma internal names, sorted).
+const PYFA_MUTATED = [
+  '[Vexor Navy Issue, Abyssal]',
+  'Damage Control II [1]',
+  'Drone Damage Amplifier II',
+  '',
+  'Heavy Gremlin Compact Energy Neutralizer /offline [2]',
+  '',
+  'Hobgoblin II x2 [3]',
+  'Hobgoblin II x3',
+  '',
+  '',
+  '[1] Damage Control II',
+  '  Unstable Damage Control Mutaplasmid',
+  '  armorEmDamageResonance 0.65, capacitorNeed 0.9, hullEmDamageResonance oops',
+  '[2] Heavy Gremlin Compact Energy Neutralizer',
+  '  Gravid Heavy Energy Neutralizer Mutaplasmid',
+  '  capacitorNeed 419.25, energyNeutralizerAmount 591.36, maxRange 15680',
+  '[3] Hobgoblin II',
+  '  Exigent Light Drone Firepower Mutaplasmid',
+].join('\n');
+
+describe('parseEftFit — Pyfa mutated items', () => {
+  it('strips the reference off the item line, base name kept', () => {
+    const fit = parseEftFit(PYFA_MUTATED);
+    expect(fit.items.map((i) => [i.name, i.quantity, i.mutationRef])).toEqual([
+      ['Damage Control II', 1, 1],
+      ['Drone Damage Amplifier II', 1, undefined],
+      ['Heavy Gremlin Compact Energy Neutralizer', 1, 2],
+      ['Hobgoblin II', 2, 3],
+      ['Hobgoblin II', 3, undefined],
+    ]);
+    expect(fit.errors).toEqual([]);
+  });
+
+  it('reads each block — base, mutaplasmid, rolls — and emits none of it as an item', () => {
+    const fit = parseEftFit(PYFA_MUTATED);
+    expect(fit.mutations).toEqual([
+      {
+        ref: 1,
+        line: 11,
+        baseName: 'Damage Control II',
+        mutaplasmidName: 'Unstable Damage Control Mutaplasmid',
+        // An unreadable value is skipped, as Pyfa does.
+        attributes: [
+          { name: 'armorEmDamageResonance', value: 0.65 },
+          { name: 'capacitorNeed', value: 0.9 },
+        ],
+      },
+      {
+        ref: 2,
+        line: 14,
+        baseName: 'Heavy Gremlin Compact Energy Neutralizer',
+        mutaplasmidName: 'Gravid Heavy Energy Neutralizer Mutaplasmid',
+        attributes: [
+          { name: 'capacitorNeed', value: 419.25 },
+          { name: 'energyNeutralizerAmount', value: 591.36 },
+          { name: 'maxRange', value: 15680 },
+        ],
+      },
+      {
+        ref: 3,
+        line: 17,
+        baseName: 'Hobgoblin II',
+        mutaplasmidName: 'Exigent Light Drone Firepower Mutaplasmid',
+        attributes: [],
+      },
+    ]);
+  });
+
+  it('keeps a charge and the reference apart', () => {
+    const fit = parseEftFit('[Rifter]\nHeavy Missile Launcher II, Scourge Heavy Missile [4]\n');
+    expect(fit.items).toEqual([
+      { name: 'Heavy Missile Launcher II', quantity: 1, line: 2, mutationRef: 4 },
+      { name: 'Scourge Heavy Missile', quantity: 1, line: 2, isCharge: true },
+    ]);
+  });
+
+  it('gives a plain paste no mutations and no mutationRef', () => {
+    const fit = parseEftFit('[Rifter]\nDamage Control II\n');
+    expect(fit.mutations).toEqual([]);
+    expect(Object.keys(fit.items[0]!)).not.toContain('mutationRef');
+  });
+});
+
 describe('looksLikeEftFit', () => {
   it('recognizes a fit by its bracketed first non-blank line', () => {
     expect(looksLikeEftFit('[Rifter, My Fit]\n\nDamage Control II')).toBe(true);

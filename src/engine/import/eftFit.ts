@@ -17,6 +17,15 @@
  * - Empty slots render as "[Empty <slot> slot]" — skipped entirely.
  * - Offline modules carry a "/offline" suffix — stripped; in-game import
  *   ignores it too, so we don't track offline state.
+ * - Pyfa's mutated items (reconstructed from Pyfa's service/port/eft.py and
+ *   muta.py, not from a real export sample): the fitted line names the base
+ *   module and ends in a ` [N]` reference, after any charge and `/offline`
+ *   (`Name, Charge /offline [N]`, `Drone xQty [N]`); one block per reference
+ *   follows the fit, `[N] <base name>`, then the mutaplasmid's name, then
+ *   `attrName value, ...` (dogma internal names), running to the next block
+ *   header or blank line. A block's lines are never items — they are
+ *   `mutations` — so a reader that only wants names (Appraisal, the Skill
+ *   Planner's import) never sees them.
  */
 
 export interface EftParseError {
@@ -56,6 +65,24 @@ export interface EftItem {
    * the pilot can actually go and fix.
    */
   line: number;
+  /**
+   * Pyfa's ` [N]` on a mutated item's line: which `EftFit.mutations` block
+   * holds its mutaplasmid and rolls. The line's `name` is then the base
+   * module's. Absent on every other line.
+   */
+  mutationRef?: number;
+}
+
+/** One Pyfa mutation block: what made reference `ref`'s item, and its rolls. */
+export interface EftMutationBlock {
+  ref: number;
+  /** 1-indexed line of the `[N] <base name>` header. */
+  line: number;
+  baseName: string;
+  /** Absent when the block stops after its header. */
+  mutaplasmidName?: string;
+  /** Dogma internal name and value per roll; unreadable pairs skipped, as Pyfa does. */
+  attributes: { name: string; value: number }[];
 }
 
 export interface EftFit {
@@ -68,6 +95,8 @@ export interface EftFit {
    */
   headerLine: number;
   items: EftItem[];
+  /** Pyfa mutation blocks, in the order written; empty for any other paste. */
+  mutations: EftMutationBlock[];
   errors: EftParseError[];
 }
 
@@ -83,6 +112,23 @@ const HEADER = /^\[\s*([^\s,\]][^,\]]*?)\s*(?:,\s*(.*?)\s*)?\]$/;
 const EMPTY_SLOT = /^\[Empty\s+.+\s+slot\]$/i;
 const OFFLINE_SUFFIX = /\s*\/offline\s*$/i;
 const QUANTITY_SUFFIX = /^(.*\S)\s+x(\d+)$/i;
+/** Pyfa's mutated-item reference, the last thing on its line. */
+const MUTATION_REF_SUFFIX = /\s*\[(\d+)\]$/;
+/** A Pyfa mutation block's header: `[N] <base name>`. Never `[Empty … slot]`, which has no digits. */
+const MUTATION_BLOCK_HEADER = /^\[(\d+)\]\s*(.*)$/;
+
+/** `attrName value, ...` → the pairs that read; Pyfa splits the same way and skips the rest. */
+function parseRolls(line: string): { name: string; value: number }[] {
+  const rolls: { name: string; value: number }[] = [];
+  for (const pair of line.split(',')) {
+    const [name, valueStr, ...rest] = pair.trim().split(/\s+/);
+    if (!name || valueStr === undefined || rest.length > 0) continue;
+    const value = Number(valueStr);
+    if (valueStr === '' || !Number.isFinite(value)) continue;
+    rolls.push({ name, value });
+  }
+  return rolls;
+}
 
 /**
  * Does this paste look like an EFT fit? True when its first non-blank line
@@ -127,12 +173,44 @@ export function parseEftFit(text: string): EftFit {
     });
   }
 
+  const mutations: EftMutationBlock[] = [];
+  // The block being read, and how many of its lines (header included) so far.
+  let block: EftMutationBlock | null = null;
+  let blockLines = 0;
+
   const bodyStart = headerIndex === -1 ? lines.length : headerIndex + 1;
   for (let i = bodyStart; i < lines.length; i++) {
     const trimmed = lines[i].trim();
-    if (trimmed === '' || EMPTY_SLOT.test(trimmed)) continue;
+    if (trimmed === '') {
+      block = null;
+      continue;
+    }
+    if (EMPTY_SLOT.test(trimmed)) continue;
 
-    const withoutOffline = trimmed.replace(OFFLINE_SUFFIX, '').trim();
+    const blockHeader = MUTATION_BLOCK_HEADER.exec(trimmed);
+    if (blockHeader) {
+      block = {
+        ref: Number(blockHeader[1]),
+        line: i + 1,
+        baseName: blockHeader[2].trim(),
+        attributes: [],
+      };
+      blockLines = 1;
+      mutations.push(block);
+      continue;
+    }
+    if (block) {
+      // Line 2 names the mutaplasmid, line 3 the rolls; Pyfa reads no further.
+      if (blockLines === 1) block.mutaplasmidName = trimmed;
+      else if (blockLines === 2) block.attributes = parseRolls(trimmed);
+      blockLines++;
+      continue;
+    }
+
+    const refMatch = MUTATION_REF_SUFFIX.exec(trimmed);
+    const mutationRef = refMatch ? Number(refMatch[1]) : undefined;
+    const withoutRef = refMatch ? trimmed.slice(0, refMatch.index) : trimmed;
+    const withoutOffline = withoutRef.replace(OFFLINE_SUFFIX, '').trim();
     const qtyMatch = QUANTITY_SUFFIX.exec(withoutOffline);
     const quantity = qtyMatch ? Number(qtyMatch[2]) : 1;
     const body = qtyMatch ? qtyMatch[1] : withoutOffline;
@@ -142,9 +220,14 @@ export function parseEftFit(text: string): EftFit {
       errors.push({ line: i + 1, text: trimmed, reason: 'unparseable item line' });
       continue;
     }
-    items.push({ name: modulePart, quantity, line: i + 1 });
+    items.push({
+      name: modulePart,
+      quantity,
+      line: i + 1,
+      ...(mutationRef === undefined ? {} : { mutationRef }),
+    });
     if (chargePart) items.push({ name: chargePart, quantity, line: i + 1, isCharge: true });
   }
 
-  return { shipName, fitName, headerLine, items, errors };
+  return { shipName, fitName, headerLine, items, mutations, errors };
 }

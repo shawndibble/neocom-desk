@@ -22,7 +22,7 @@
  * right now. The workspace then launches what the pilot can field once the
  * stats are in (scope decision `20260925-113331`).
  */
-import { parseEftFit, type EftItem } from '@/engine/import/eftFit';
+import { parseEftFit, type EftItem, type EftMutationBlock } from '@/engine/import/eftFit';
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
 import type { FittingSlotAssignment } from '@/sde/types';
 import type { LoadParts, LoadWarning } from './load';
@@ -35,6 +35,8 @@ import {
   type FittingSlotKind,
 } from './types';
 import { isFighter, squadronsOf } from './fighters';
+import { normaliseMutation, type MutaplasmidLookup } from './mutaplasmids';
+import type { ItemMutation } from './types';
 
 /** A `TypeCatalog` value, matching `features/skills/typeCatalog.ts`'s shape. */
 export interface EftTypeLookup {
@@ -52,17 +54,33 @@ export type EftSlotLookup = Readonly<Record<string, FittingSlotAssignment>>;
  * in cargo (EVE's own export always writes one, even for `x1`).
  */
 const HAS_QUANTITY_SUFFIX = /^.*\S\s+x\d+$/i;
+/** Pyfa's mutated-item reference (`eftFit.ts`), stripped before the quantity check. */
+const MUTATION_REF_SUFFIX = /\s*\[\d+\]$/;
 
 export function resolveTypeId(name: string, typeByName: EftTypeLookup): number | null {
   return typeByName.get(name.toLowerCase())?.typeID ?? null;
 }
 
+/**
+ * `mutaplasmids` resolves Pyfa's mutated items (`eftFit.ts`): a line
+ * referencing a mutation block loads as the abyssal type its base and
+ * mutaplasmid make, carrying the block's rolls (only those the mutaplasmid
+ * rolls). A block naming a mutaplasmid this build doesn't know, or one that
+ * doesn't apply to the base, loads the plain base module with an
+ * `'unknown-mutation'` warning; a reference with no block, or no
+ * `mutaplasmids` at all, loads the plain base module, as Pyfa does. A bare
+ * abyssal type line (`Heavy Abyssal Energy Neutralizer`) loads as that type
+ * with no mutation — its base is unknown (`mutationStatus`).
+ */
 export function loadEftFitting(
   text: string,
   typeByName: EftTypeLookup,
-  slotByTypeId: EftSlotLookup
+  slotByTypeId: EftSlotLookup,
+  mutaplasmids?: MutaplasmidLookup
 ): LoadParts {
   const fit = parseEftFit(text);
+  const blocks = new Map<number, EftMutationBlock>();
+  for (const block of fit.mutations) if (!blocks.has(block.ref)) blocks.set(block.ref, block);
   const lines = text.split(/\r\n|\r|\n/);
   const unresolved: LoadWarning[] = fit.errors.map((e) => ({
     line: e.line,
@@ -109,6 +127,40 @@ export function loadEftFitting(
     return chargeTypeId;
   }
 
+  /** The abyssal type and mutation a referenced line loads as; null to load the base plain. */
+  function resolveMutation(
+    item: EftItem,
+    baseTypeId: number
+  ): { typeId: number; mutation: ItemMutation } | null {
+    if (item.mutationRef === undefined || !mutaplasmids) return null;
+    const block = blocks.get(item.mutationRef);
+    if (!block) return null;
+    const mutaplasmidTypeId =
+      block.mutaplasmidName === undefined ? null : resolveTypeId(block.mutaplasmidName, typeByName);
+    const resultTypeId =
+      mutaplasmidTypeId === null ? null : mutaplasmids.resultingType(baseTypeId, mutaplasmidTypeId);
+    if (mutaplasmidTypeId === null || resultTypeId === null) {
+      unresolved.push({
+        line: block.line + (block.mutaplasmidName === undefined ? 0 : 1),
+        text: block.mutaplasmidName ?? block.baseName,
+        reason: 'unknown mutaplasmid',
+        kind: 'unknown-mutation',
+      });
+      return null;
+    }
+    const attributes: Record<number, number> = {};
+    for (const roll of block.attributes) {
+      const id = mutaplasmids.attributeId(roll.name);
+      if (id !== undefined) attributes[id] = roll.value;
+    }
+    const mutation = normaliseMutation(
+      resultTypeId,
+      { baseTypeId, mutaplasmidTypeId, attributes },
+      mutaplasmids
+    );
+    return mutation ? { typeId: resultTypeId, mutation } : null;
+  }
+
   const items = fit.items;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -118,11 +170,14 @@ export function loadEftFitting(
     const chargeTypeId = nextIsCharge ? resolveCharge(items[i + 1]) : undefined;
     if (nextIsCharge) i++; // its charge, already handled either way
 
-    const rawLine = (lines[item.line - 1] ?? '').trim().replace(/\s*\/offline\s*$/i, '');
+    const rawLine = (lines[item.line - 1] ?? '')
+      .trim()
+      .replace(MUTATION_REF_SUFFIX, '')
+      .replace(/\s*\/offline\s*$/i, '');
     const hasExplicitQuantity = HAS_QUANTITY_SUFFIX.test(rawLine);
 
-    const typeId = resolveTypeId(item.name, typeByName);
-    if (typeId === null) {
+    const namedTypeId = resolveTypeId(item.name, typeByName);
+    if (namedTypeId === null) {
       unresolved.push({
         line: item.line,
         text: item.name,
@@ -133,9 +188,17 @@ export function loadEftFitting(
       continue;
     }
 
-    const rack = slotByTypeId[typeId];
+    const mutated = resolveMutation(item, namedTypeId);
+    const typeId = mutated?.typeId ?? namedTypeId;
+    const mutation = mutated ? { mutation: mutated.mutation } : {};
+    const rack = slotByTypeId[typeId] ?? (mutated ? slotByTypeId[namedTypeId] : undefined);
 
-    if (rack === 'drone') {
+    if (rack === 'drone' && mutated) {
+      // Each mutated drone is its own item: never one stack sharing rolls.
+      for (let n = 0; n < item.quantity; n++) {
+        drones.push({ typeId, quantity: 1, state: 'online', ...mutation });
+      }
+    } else if (rack === 'drone') {
       drones.push({ typeId, quantity: item.quantity, state: 'online' });
     } else if (isFighter(typeId)) {
       // A fighter line is a squadron (or a stack of them), always to the bay.
@@ -159,6 +222,7 @@ export function loadEftFitting(
         typeId,
         state: 'active',
         ...(chargeTypeId === undefined ? {} : { chargeTypeId }),
+        ...mutation,
       });
     } else {
       cargo.push({ typeId, quantity: item.quantity });

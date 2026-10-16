@@ -11,6 +11,7 @@ import {
   fittingToMultibuy,
 } from './fittingExport';
 import type { Fitting } from './types';
+import { mutaplasmidLookup } from './mutaplasmids';
 
 const NAMES: Record<number, string> = {
   587: 'Rifter',
@@ -258,5 +259,121 @@ describe('fittingToEveXml', () => {
     expect(fittingToEveXml(odd, nameFor)).toContain(
       '<fitting name="Tom &amp; &quot;Jerry&quot; &lt;3&gt;">'
     );
+  });
+});
+
+describe('fittingToEft — mutated items (Pyfa layout)', () => {
+  // Layout reconstructed from Pyfa's service/port/eft.py exportEft and
+  // service/port/muta.py renderMutant, not from a real export sample.
+  const MUTA_NAMES: Record<number, string> = {
+    587: 'Rifter',
+    16475: 'Heavy Gremlin Compact Energy Neutralizer',
+    47831: 'Gravid Heavy Energy Neutralizer Mutaplasmid',
+    47832: 'Heavy Abyssal Energy Neutralizer',
+    2454: 'Hobgoblin I',
+    60461: 'Exigent Light Drone Firepower Mutaplasmid',
+    60478: 'Light Mutated Drone',
+    2048: 'Damage Control II',
+  };
+  const ATTRIBUTE_NAMES: Record<number, string> = {
+    6: 'capacitorNeed',
+    97: 'energyNeutralizerAmount',
+    64: 'damageMultiplier',
+  };
+  const lookup = mutaplasmidLookup({
+    attributeNames: ATTRIBUTE_NAMES,
+    mutaplasmids: {
+      47831: {
+        result: 47832,
+        bases: [16475],
+        attributes: [
+          { id: 6, min: 0.8, max: 1.3, highIsGood: false },
+          { id: 97, min: 0.9, max: 1.2, highIsGood: true },
+        ],
+      },
+      60461: {
+        result: 60478,
+        bases: [2454],
+        attributes: [{ id: 64, min: 1, max: 1.2, highIsGood: true }],
+      },
+    },
+    abyssalTypeIds: [47832, 60478],
+  });
+  const fitting: Fitting = {
+    name: 'Neut',
+    shipTypeId: 587,
+    modules: [
+      {
+        slot: 'high',
+        slotIndex: 0,
+        typeId: 47832,
+        state: 'offline',
+        mutation: {
+          baseTypeId: 16475,
+          mutaplasmidTypeId: 47831,
+          attributes: { 97: 591.3600000476837, 6: 419.25 },
+        },
+      },
+      { slot: 'low', slotIndex: 0, typeId: 2048, state: 'online' },
+    ],
+    drones: [
+      {
+        typeId: 60478,
+        quantity: 1,
+        state: 'online',
+        mutation: { baseTypeId: 2454, mutaplasmidTypeId: 60461, attributes: {} },
+      },
+    ],
+    cargo: [],
+  };
+  const nameFor = (id: number) => MUTA_NAMES[id] ?? `#${id}`;
+
+  it('names each mutated item by its base with a reference, and writes the blocks last', () => {
+    expect(fittingToEft(fitting, nameFor, { attributeName: lookup.attributeName })).toBe(
+      [
+        '[Rifter, Neut]',
+        'Damage Control II',
+        '',
+        'Heavy Gremlin Compact Energy Neutralizer /OFFLINE [1]',
+        '',
+        'Hobgoblin I x1 [2]',
+        '',
+        '[1] Heavy Gremlin Compact Energy Neutralizer',
+        '  Gravid Heavy Energy Neutralizer Mutaplasmid',
+        '  capacitorNeed 419.25, energyNeutralizerAmount 591.36',
+        '[2] Hobgoblin I',
+        '  Exigent Light Drone Firepower Mutaplasmid',
+      ].join('\n')
+    );
+  });
+
+  it('round-trips through the EFT loader with the same rolls', () => {
+    const text = fittingToEft(fitting, nameFor, { attributeName: lookup.attributeName });
+    const byName = new Map(
+      Object.entries(MUTA_NAMES).map(([id, n]) => [n.toLowerCase(), Number(id)])
+    );
+    const parts = loadEftFitting(
+      text,
+      { get: (name) => (byName.has(name) ? { typeID: byName.get(name)! } : undefined) },
+      { 16475: 'high', 47832: 'high', 2048: 'low', 2454: 'drone', 60478: 'drone' },
+      lookup
+    );
+    if (parts.hullTypeId === null) throw new Error('no hull');
+    expect(parts.unresolved).toEqual([]);
+    expect(parts.modules.find((m) => m.slot === 'high')?.mutation).toEqual({
+      baseTypeId: 16475,
+      mutaplasmidTypeId: 47831,
+      attributes: { 6: 419.25, 97: 591.36 },
+    });
+    expect(parts.drones).toEqual([fitting.drones[0]]);
+  });
+
+  it('writes an abyssal item with no known base as its own type name', () => {
+    const bare: Fitting = {
+      ...fitting,
+      modules: [{ slot: 'high', slotIndex: 0, typeId: 47832, state: 'active' }],
+      drones: [],
+    };
+    expect(fittingToEft(bare, nameFor)).toBe('[Rifter, Neut]\nHeavy Abyssal Energy Neutralizer');
   });
 });

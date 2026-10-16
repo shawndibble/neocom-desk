@@ -9,6 +9,7 @@
  * the price always cover the same items in the same quantities.
  */
 import { FITTING_SLOT_KINDS, type Fitting, type FittingSlotKind } from './types';
+import { eftMutationWriter, type AttributeNameFor } from './eftMutations';
 
 export type ItemNameFor = (typeId: number) => string;
 
@@ -52,7 +53,19 @@ function headerSafe(name: string): string {
   return name.replace(/[[\]<>\r\n]+/g, ' ').trim();
 }
 
-export function fittingToEft(fitting: Fitting, nameFor: ItemNameFor): string {
+/**
+ * EFT text. A mutated module or drone is written in Pyfa's layout
+ * (`eftMutations.ts`): its base's name and a ` [N]` reference, with a block
+ * of mutaplasmid and rolls after the fit; `attributeName` names the rolls
+ * (`MutaplasmidLookup.attributeName`) — without it a block carries none. An
+ * abyssal item with no known base is written as its own type.
+ */
+export function fittingToEft(
+  fitting: Fitting,
+  nameFor: ItemNameFor,
+  { attributeName }: { attributeName?: AttributeNameFor } = {}
+): string {
+  const mutations = eftMutationWriter(nameFor, attributeName);
   const sections: string[] = [];
   for (const rack of EFT_RACK_ORDER) {
     const lines = fitting.modules
@@ -61,12 +74,24 @@ export function fittingToEft(fitting: Fitting, nameFor: ItemNameFor): string {
       .map((m) => {
         const charge = m.chargeTypeId === undefined ? '' : `, ${nameFor(m.chargeTypeId)}`;
         const offline = m.state === 'offline' ? ' /OFFLINE' : '';
-        return `${nameFor(m.typeId)}${charge}${offline}`;
+        const { name, suffix } = m.mutation
+          ? mutations.line(m.mutation)
+          : { name: nameFor(m.typeId), suffix: '' };
+        return `${name}${charge}${offline}${suffix}`;
       });
     if (lines.length > 0) sections.push(lines.join('\n'));
   }
   if (fitting.drones.length > 0) {
-    sections.push(fitting.drones.map((d) => `${nameFor(d.typeId)} x${d.quantity}`).join('\n'));
+    sections.push(
+      fitting.drones
+        .map((d) => {
+          const { name, suffix } = d.mutation
+            ? mutations.line(d.mutation)
+            : { name: nameFor(d.typeId), suffix: '' };
+          return `${name} x${d.quantity}${suffix}`;
+        })
+        .join('\n')
+    );
   }
   // A squadron a line, after the drones, as Pyfa writes them.
   const fighters = fitting.fighters ?? [];
@@ -76,6 +101,8 @@ export function fittingToEft(fitting: Fitting, nameFor: ItemNameFor): string {
   if (fitting.cargo.length > 0) {
     sections.push(fitting.cargo.map((c) => `${nameFor(c.typeId)} x${c.quantity}`).join('\n'));
   }
+  const mutationSection = mutations.section();
+  if (mutationSection !== null) sections.push(mutationSection);
 
   const header = `[${nameFor(fitting.shipTypeId)}, ${headerSafe(fitting.name)}]`;
   // Header directly above the first rack, as in the game's own export.
