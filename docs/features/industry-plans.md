@@ -180,7 +180,7 @@ Modal "Import a fit" (`industry.fitImportTitle`) opened from toolbar icon or rou
 
 1. Title row: `<h1>` group name (focus target for route focus), "N plans" count (`groupMemberCount`). No rename/delete here (list only).
 2. Loading spinner while any member row loads. Empty group: EmptyState "This group is empty" / "Move plans in from the list, or import a fit..." (`industry.groupEmptyTitle/Hint`, `BuildGroupPanel.tsx:551`).
-3. Verdict band: group Acquisition Verdict only (`view.savings` / `view.verdict`): "BUILD saves X ISK", "BUILD is cheaper by X ISK" (verdict unknown but savings positive), "BUY is cheaper by X ISK", or Unknown. Sub-line: "N% cheaper than buying [at hub]" / "N% more than buying" (percent + hub only when buy cost known; hub only if single), "material X", "total job cost X", duration, "volume X" ("volume at least X" when any unknown). `GroupSlotLine` joins demand per slot pool to the active Character's free slots.
+3. Verdict band: group Acquisition Verdict only (`view.savings` / `view.verdict`): "BUILD saves X ISK", "BUILD is cheaper by X ISK" (verdict unknown but savings positive), "BUY is cheaper by X ISK", or Unknown. Sub-line: "N% cheaper than buying [at hub]" / "N% more than buying" (percent + hub only when buy cost known; hub only if single), "material X", "total job cost X", duration, "volume X" ("volume at least X" when any unknown). Under it the same `PlanScheduleLine` as the plan hero, run over every member's tree on the first member's Character.
 4. Auto Build row (`AutoBuildControl`): Build Strategy select + Craft Scope chips (Reactions chip lit when any member eligible) + "Apply..." (disabled while applying or when no member tree has a recipe). Trailing: Retarget group (icon), Copy shopping list for multibuy (icon, enabled only when single hub, no member unresolved, non-empty list).
 5. Copy failure alert; mixed-hub notice + one "Copy <hub> list" button per hub (`copyHubShoppingList`) (each disabled when that hub has an unresolved member or empty list) (`BuildGroupPanel.tsx:704`).
 6. Unpriceable warning (`industry.groupUnpriceable`) and a red list of members that failed to resolve.
@@ -207,8 +207,8 @@ Modal "Import a fit" (`industry.fitImportTitle`) opened from toolbar icon or rou
 
 - Corner "More actions" + right-click item menu on product name `<h2>`; `SkillGateMarker` chip if no Character on the account can install the product blueprint (account-wide, #1231); "· N runs · profit after fees" (`heroTitle`).
 - Big figure = Sale Profitability: net profit after sales tax + broker (ADR 0006), tone-coded, `IskAmount` (tap shows exact). "Unknown" when unpriced; spinner while prices load; "No price data yet" hint.
-- Qualifier line: margin %, ISK/h, duration, break-even price (net, always).
-- `PlanSlotLine`: "<Character>: uses 1 <pool> slot - N free - done by <EVE time> if started now" (hidden without slot data).
+- Qualifier line: margin %, ISK/h, duration, break-even price (net, always). Duration = wall-clock from the schedule (done-by minus now); falls back to the plan's own job time without slot data. ISK/h stays profit / the plan's own top-level job time (per-slot earning).
+- `PlanScheduleLine` (replaced `PlanSlotLine`): "Uses N slots - done by Thu 14:20 - Show plan". N = peak concurrent slots; time = weekday + EVE time under a week out, else MM-DD HH:MM. Show plan expands in place (leading rotating Caret): "Now: 4 reactions - Wed 09:00: 6 parts - Thu 02:00: final item", plus "Sub-jobs are timed at TE 0" when sub-jobs exist. Hidden without slot data (no jobs scope, no skills). Corp jobs are not counted as busy slots (follow-up).
 - Pills: Acquisition Verdict ("BUILD saves X ISK" / "BUY is cheaper by X ISK" / Unknown; no fees, ADR 0006). The use-or-sell verdict is not in the hero; it lives in the Costs panel.
 - `BpcCoverageWarning` when profit unknown because an owned BPC's runs < plan runs; one-click "Set runs to N".
 - Log Production button (primary; disabled if blueprint has no product) opens the Production Runs form.
@@ -246,7 +246,7 @@ Button "Match from in-game numbers" opens modal "Work out the rigs": steps text 
 
 ### 6.5 Materials panel (`BuildPlanDetail.tsx:1689`, `MaterialsTable.tsx`)
 
-Panel actions: `DataAgeBadge` (snapshot fetch time), Copy shopping list for multibuy, `TableActionsMenu` (CSV), Refresh, total job duration.
+Panel actions: `DataAgeBadge` (snapshot fetch time), Copy shopping list for multibuy, `TableActionsMenu` (CSV), Refresh, total job duration (`result.seconds`, the plan's own job time, not the wall-clock).
 
 - Error / no result: danger text `industry.computeError` or engine error message.
 - `ImplantsAssumedNote` (non-reaction plans): time implants not counted without Character details scope.
@@ -257,7 +257,7 @@ Panel actions: `DataAgeBadge` (snapshot fetch time), Copy shopping list for mult
 - Phone (`useIsPhone`): per-section ledger rows (NEED | HAVE | BUY header), Have and Price are tap-to-edit text with pencil, actions on the left, sort picker (Plan order / Total / To buy / Name) in the first heading.
 - Row actions (text links): Recipe (opens `BuildRecipeModal`), "Build instead" / "Buy instead" (`SwapButton`, per-material `buildHere` toggle; green + "saves X" when advice says build), "Change tier" (Blueprint row, opens acquisition modal), "Find blueprint" on an unpriced blueprint row. Allowed only when the recipe's method is in Craft Scope (`canBuildHere`).
 - Make-or-buy marker (`MakeOrBuyMarker`): glyph per method (hammer manufacturing, flask reaction, planet planetary; cart = buy) with tooltip: verdict, both unit prices (2 decimals), blueprint cost, savings. Verdict is one level deep: recipe inputs at hub price, never recursive (`makeOrBuy.ts`); Blueprint Acquisition tier and blueprint cost folded in when available.
-- Footnote (only when sub-builds exist): `subBuildSummary` (N of this plan's own materials built here: total), `subBuildSummaryComparison` (buying ready-made instead would cost Y), `subBuildTimeNote` (sub-jobs add T of job time before the main run can start).
+- Footnote (only when sub-builds exist): `subBuildSummary` (N of this plan's own materials built here: total), `subBuildSummaryComparison` (buying ready-made instead would cost Y), `subBuildTimeNote` ("The sub-jobs take T of job time in total.").
 - Item name click: Show info; right-click/⋮: item context menu (Market, Build Plan for that material, copy, compare). No row context menu of its own; "More actions" from `exportProps`.
 - Shopping list copy (`shoppingList.ts`, `shoppingListMaterials`): `name<TAB>quantity` per leaf with remaining > 0; blueprints dropped (toast says N left out, #1778); disabled with no remainder / error; icon turns check/warn for 2 s.
 - CSV (`materialsCsv.ts`): Material, Quantity, Unit price ISK, Line total ISK, Make or buy.
@@ -292,7 +292,7 @@ Open:
 
 ### 6.9 Calculation Breakdown modal (`CalculationBreakdown.tsx`)
 
-Sections: Prices (materials basis, ore/owned/built rules, product), Materials (ME formula, reaction has none, formula with live material cost), Job fee (cost index + system, formula lines, total cost formula), Revenue (qty x price, assumption, tax/broker % from Accounting, Broker Relations, standings, formula), Profit (net/gross/ISK per hour), Break-even (formula, 100 ISK floor), Use or sell, Verdicts (Acquisition vs Sale). Tax/broker % read from `engine/industry/fees` (same source as result). `Section`/`Formula` also reused by `RealizedProfitBreakdown.tsx` for Production Runs.
+Sections: Prices (materials basis, ore/owned/built rules, product), Materials (ME formula, reaction has none, formula with live material cost), Job fee (cost index + system, formula lines, total cost formula), Revenue (qty x price, assumption, tax/broker % from Accounting, Broker Relations, standings, formula), Profit (net/gross/ISK per hour, plus a line saying plan time is wall-clock, sub-jobs side by side, and differs from the job time ISK/h uses on purpose), Break-even (formula, 100 ISK floor), Use or sell, Verdicts (Acquisition vs Sale). Tax/broker % read from `engine/industry/fees` (same source as result). `Section`/`Formula` also reused by `RealizedProfitBreakdown.tsx` for Production Runs.
 
 ### 6.10 Production Runs panel (`ProductionRunsPanel.tsx`, `productionRunColumns.tsx`, `productionRunSummary.ts`, `SaleLinkingControls.tsx`)
 
@@ -312,7 +312,7 @@ Panel "Production Runs", collapsible only once a run exists (folded by default t
 
 ### 6.12 Job time, slots
 
-`PlanSlotLine` (single plan) and `GroupSlotLine` use `usePlanJobSlots`/`engine/industry/jobSlots.ts` (1 free + Mass Production / Advanced Mass Production etc., per manufacturing / science / reaction pool) and `projectJobFinish`. Count includes every nested sub-job (`countJobsByCategory`).
+`PlanScheduleLine` (single plan and Build Group) uses `planJobSlots.ts`/`usePlanJobSlots` over `engine/industry/jobSchedule.ts` `scheduleJobs` and `jobSlots.ts` (1 free + Mass Production / Advanced Mass Production etc., per manufacturing / science / reaction pool). `scheduleJobs`: greedy list schedule, one job per plan node (no run splitting); sub-jobs run in parallel on free slots per pool; a parent waits on all its sub-jobs; each pool starts from slots busy now (running jobs' end times; over capacity matches `projectJobFinish`, via `slotFreeTimes`). Ties: earliest start, then longest remaining path to root, then input order. Returns per-job start/finish, stages (grouped by dependency height), overall finish, `peakSlots`. Sub-jobs timed at TE 0. Group: every member's tree, first member's Character.
 
 ### 6.13 Skill gate marker
 
@@ -428,8 +428,8 @@ Time (`time.ts:13-47`, `characterModifiers.ts:95-136`)
 
 - `seconds = base x runs x (1-TE/100) x (1-facilityTime%) x (1-rigTE%) x characterMult`. TE 0..20.
 - Character mult, manufacturing: Industry 4%/level x Advanced Industry 3%/level x each blueprint-listed science skill (1%/level, Mutagenic Stabilization 2%, `types.ts:422`) x BX-80x implant (BX-801 1%, 802 2%, 804 4%). All multiplicative. Reactions: Reactions skill 4%/level only; no Industry, science or BX. Missing skills/implants scope: treated as 0 (note `ImplantsAssumedNote`).
-- Sub-job time: quoted at TE 0 (`subBuild.ts` passes `0`); `resolvedSubBuildSeconds` adds every nested job serially (no parallelism, no slot model in the sum). The footnote says sub-jobs add this before the main run can start.
-- ISK/h = profit / (seconds/3600); null when seconds is 0 or unpriceable.
+- Sub-job time: quoted at TE 0 (`subBuild.ts` passes `0`); `resolvedSubBuildSeconds` adds every nested job serially: total job time, not wall-clock (wall-clock comes from `scheduleJobs`, 6.12). The footnote says the sub-jobs take this much job time in total.
+- ISK/h = profit / (seconds/3600), seconds = the plan's own top-level job time (what one slot earns); null when seconds is 0 or unpriceable.
 
 Fees on revenue (`fees.ts`)
 
@@ -481,7 +481,7 @@ Verdicts (`buildVsBuy.ts:107-154`)
 ### 13.4 Known engine limits
 
 - One bonus table for manufacturing and reactor rigs; no per-rig names. Alpha tax, structure role-based tax tables, and Upwell structure reprocessing/fit are not read from ESI.
-- Time is not slot-aware: sub-jobs summed serially, group seconds are a sum, not wall clock.
+- Job time sums stay serial totals (group verdict qualifier = total job time). Wall-clock only on the plan hero and schedule line. The schedule ignores corp jobs as busy slots.
 - Make-or-buy advice is one level deep; the real plan is recursive. A Cost-effective Auto Build can therefore differ slightly from the verdict marker's advice at deeper nodes.
 - Fuzzwork price is region/hub aggregate (lowest sell / best buy), not volume-walked: large runs can be optimistic. Product revenue ignores market depth and listing time.
 - EIV needs ESI adjusted prices; without them (or the cost index) the whole cost panel is "unavailable" and profit is hidden.
@@ -548,7 +548,7 @@ Plan page
 12. How does Break-even runs work and when does it fail? Doubles from current runs to 1,000,000 then bisects (`breakEvenRuns.ts:14-47`). Can miss a pocket between doublings and returns "no break even" if none; the message renders without the `{{max}}` value (gap).
 13. What is the break-even price and why is it always net? `cost / (1 - tax% - broker%)/qty` with a 100 ISK broker floor re-solve (`fees.ts:133-150`). ADR 0006: it answers "at what price do I stop losing ISK", true only after sale fees.
 14. Why does Auto Build overwrite hand picks, and is group Auto Build undoable? It rewrites `buildHere` for the whole tree (single: immediately; group: confirm via "Apply...") and saves `autoBuildDefault` (`autoBuildGroup.ts`, decisions `20260910-225348`, `20260910-220447`). No undo and no preview (gap). Skill-gated materials always become buy.
-15. How is job time computed and what is missing? `base x runs x (1-TE) x (1-facility) x (1-rig) x Industry(4%/lvl) x AdvIndustry(3%/lvl) x science(1%/lvl) x BX-80x` (reactions: Reactions 4%/lvl only) (`time.ts:13-47`, `characterModifiers.ts:112-136`). Sub-jobs TE 0, summed serially, no slot parallelism; implants unknown without clones scope (`ImplantsAssumedNote`).
+15. How is job time computed and what is missing? `base x runs x (1-TE) x (1-facility) x (1-rig) x Industry(4%/lvl) x AdvIndustry(3%/lvl) x science(1%/lvl) x BX-80x` (reactions: Reactions 4%/lvl only) (`time.ts:13-47`, `characterModifiers.ts:112-136`). Sub-jobs TE 0, job time summed serially; the hero's wall-clock comes from `scheduleJobs` (parallel on free slots per pool); implants unknown without clones scope (`ImplantsAssumedNote`).
 16. Does a Build Plan model refining? No. Reprocessing is a separate engine (Open Orders exits, Appraisal, mining-tax valuation); formula and rules in section 13.1 (`reprocessing.ts:68-127`; decision `20260906-180034`).
 17. What persists where? Plans in Dexie `buildPlans`, synced as Editable Data; group names/order/snapshot/overlay/autoBuildDefault in synced setting `sync.industryBuildGroups`; membership on the plan; expanded groups, sort, ticks, gross/net, use-or-sell basis are local (device or component state); refresh tokens Dexie only (`db/index.ts:240`, `buildPlanStore.ts`, `buildGroups.ts`).
 18. What happens when ESI scopes are missing? Blueprints scope: reauth banner, no owned tiers (assumed ME); assets: no owned detection; standings: base-standing note, broker at 0 standing; implants: note; search/structures scope: picker hint + "Log in again", typed Override still works; corp assets need Director role (chip disabled with tooltip). All routes ungated (`routeScopes.ts:97,118,119`).
@@ -566,7 +566,7 @@ Plan page
 - Group Auto Build: dry-run preview (n flips, cost delta) and per-member opt-out; make single-plan strategy re-runnable.
 - Compare: hub/facility/ME/TE columns, gross/net toggle, URL-encoded selection.
 - Plans list: text filter over existing plans, CSV export, loading vs unpriceable distinction, Data Age + refresh.
-- Slot-aware duration (parallel jobs per pool) and real build-by-date from `PlanSlotLine`.
+- Corp jobs as busy slots in the plan schedule. (Slot-aware duration and done-by shipped in #3985.)
 - Market depth: walk the order book for large runs instead of lowest sell; optional relist/undercut model for revenue.
 - Extend assumed TE and make-or-buy to nest recursively so the glyph matches the engine; reconcile one-level advice vs recursive plan.
 - Reprocess-vs-build: expose the refine engine as an owned-stock exit in Use-or-sell (it currently lists only instant/order sell).
