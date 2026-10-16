@@ -81,6 +81,12 @@ test('shows the offline banner while the browser is offline and drops it on reco
   context,
 }) => {
   await signInAndGoto(page);
+  // Wait for the shell itself, not just the page load: `Layout` is its own lazy
+  // chunk, and cutting the network while it is still downloading is a cold chunk
+  // failing offline (the full-page Reload screen, no shell, so no strip), not
+  // the already-running app this spec is about. The rail's pinned Character link
+  // exists only once `Layout` has rendered.
+  await expect(page.getByRole('link', { name: CHARACTER_NAME })).toBeVisible();
   // The strip by test id: its sentence is also in a screen-reader-only live region, so text alone matches twice.
   const banner = page.getByTestId('offline-banner');
   await expect(banner).toHaveCount(0);
