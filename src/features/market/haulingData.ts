@@ -44,6 +44,7 @@ import { loadUniverseTypeOnce } from '@/features/skills/data';
 import { getOrderBook } from '@/features/market/orderBook';
 import { loadPriceHistory } from '@/features/market/priceHistory';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { EsiError } from '@/esi/errors';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { expandHaulingLane, haulingEndId, type HaulingEnd, type HubLane } from './haulingHubs';
@@ -140,7 +141,8 @@ export interface HaulingScan {
   /**
    * Every id looked at past pass 1 and not worth another look: dropped by the
    * history pass, or given its order books (a row or not). Ids cut by a cap
-   * before their next pass are left out: a later scan should reach them.
+   * before their next pass, or whose history read failed, are left out: a
+   * later scan should reach them.
    */
   examinedTypeIds: number[];
   fetchedAt: number;
@@ -154,6 +156,8 @@ export interface HaulingScanRequest {
   scope: number | string;
   /** How the cargo is sold; defaults to `list`. */
   mode?: HaulMode;
+  /** Max price per item: a lane whose origin price is above it is never ranked, so the caps go to affordable items. */
+  maxUnitPrice?: number | null;
   types: TypeMap;
   /** SDE groupID -> categoryID (`groupCategories.json`); without it every row's category is unknown. */
   groupCategories?: Readonly<Record<string, number>>;
@@ -169,16 +173,28 @@ export function clearHaulingScanCache(): void {
   scanCache.clear();
 }
 
+/** Test-only: how many scans the cache holds, expired ones included. */
+export function haulingScanCacheSize(): number {
+  return scanCache.size;
+}
+
+function writeScanCache(key: string, scan: HaulingScan): void {
+  const now = Date.now();
+  for (const [k, entry] of scanCache) if (entry.expiresAt <= now) scanCache.delete(k);
+  scanCache.set(key, { scan, expiresAt: now + SCAN_CACHE_TTL_MS });
+}
+
 /** Drops one scan's cache entry (by `haulingScanCacheKey`), leaving every other lane's. */
 export function evictHaulingScan(key: string): void {
   scanCache.delete(key);
 }
 
-/** A scan is cached per route (Any included), category and mode: the two modes keep different rows for the same route. */
+/** A scan is cached per route (Any included), category, mode and Max price: each keeps different rows for the same route. */
 export function haulingScanCacheKey(
-  request: Pick<HaulingScanRequest, 'from' | 'to' | 'scope' | 'mode'>
+  request: Pick<HaulingScanRequest, 'from' | 'to' | 'scope' | 'mode' | 'maxUnitPrice'>
 ): string {
-  return `${haulingEndId(request.from)}>${haulingEndId(request.to)}:${request.scope}:${request.mode ?? 'list'}`;
+  const price = request.maxUnitPrice == null ? '' : `:max${request.maxUnitPrice}`;
+  return `${haulingEndId(request.from)}>${haulingEndId(request.to)}:${request.scope}:${request.mode ?? 'list'}${price}`;
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -252,6 +268,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   const { from, to, typeIds, types, onProgress, signal } = request;
   const today = request.today ?? new Date().toISOString().slice(0, 10);
   const mode = request.mode ?? 'list';
+  const maxUnitPrice = request.maxUnitPrice ?? null;
   const key = haulingScanCacheKey(request);
 
   const cached = scanCache.get(key);
@@ -297,6 +314,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
         const buy = origin?.sellMin ?? null;
         const sell = (instant ? dest?.buyMax : dest?.sellMin) ?? null;
         if (buy === null || sell === null || buy <= 0) continue;
+        if (maxUnitPrice !== null && buy > maxUnitPrice) continue;
         const gap = sell / buy;
         if (gap < minGap) continue;
         const originListed = origin?.sellVolume ?? 0;
@@ -315,6 +333,8 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   const withHistory: ShortlistCandidate[] =
     mode === 'instant' ? priced.map((c) => ({ ...c, demand: null })) : [];
   let historyDone = 0;
+  // A read that failed for now (rate limit, network) is not a verdict: a later scan may look again.
+  const historyUnread = new Set<number>();
   const historyPass = mode === 'instant' ? [] : priced;
   if (mode === 'list') onProgress?.({ stage: 'history', done: 0, total: priced.length });
   await mapWithConcurrencyLimit(historyPass, SCAN_CONCURRENCY, async (candidate) => {
@@ -340,8 +360,9 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
           });
         }
       }
-    } catch {
-      // No market history for this type at the destination: nothing to sell it for.
+    } catch (error) {
+      // ESI's 400 is "no market for this type": nothing to sell it for, for good.
+      if (!(error instanceof EsiError && error.status === 400)) historyUnread.add(candidate.typeId);
     }
     historyDone += 1;
     onProgress?.({ stage: 'history', done: historyDone, total: priced.length });
@@ -407,7 +428,9 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     pricedAll.length > MAX_PRICED_CANDIDATES || withHistory.length > MAX_BOOK_CANDIDATES;
   const passedHistory = new Set(withHistory.map((c) => c.typeId));
   const examinedTypeIds = [
-    ...priced.filter((c) => !passedHistory.has(c.typeId)).map((c) => c.typeId),
+    ...priced
+      .filter((c) => !passedHistory.has(c.typeId) && !historyUnread.has(c.typeId))
+      .map((c) => c.typeId),
     ...shortlist.map((c) => c.typeId),
   ];
   const scan: HaulingScan = {
@@ -417,6 +440,8 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     examinedTypeIds,
     fetchedAt: Date.now(),
   };
-  scanCache.set(key, { scan, expiresAt: Date.now() + SCAN_CACHE_TTL_MS });
+  // An abandoned scan never lands: its caller moved on, and a later one must not be answered from it.
+  throwIfAborted(signal);
+  writeScanCache(key, scan);
   return scan;
 }

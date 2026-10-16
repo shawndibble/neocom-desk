@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
+import { EsiError } from '@/esi/errors';
 import { TRADE_HUBS } from '@/market/hubs';
 
 const getHubPrices = vi.fn();
@@ -27,6 +28,7 @@ const {
   clearHaulingScanCache,
   evictHaulingScan,
   haulingScanCacheKey,
+  haulingScanCacheSize,
   MAX_BOOK_CANDIDATES,
   MAX_PRICED_CANDIDATES,
   runHaulingScan,
@@ -309,9 +311,9 @@ describe('runHaulingScan, shortlist order', () => {
   });
 
   it('names what it examined: dropped by history or given books, never what a cap cut first', async () => {
-    // Every tenth thin item has no history at the destination: dropped by pass 2.
+    // Every tenth thin item has no market at the destination: dropped by pass 2.
     loadPriceHistory.mockImplementation(async (_region: number, typeId: number) => {
-      if (typeId !== BULK && typeId % 10 === 0) throw new Error('no history');
+      if (typeId !== BULK && typeId % 10 === 0) throw new EsiError(400, 'no market');
       return { points: typeId === BULK ? BULK_HISTORY : THIN_HISTORY };
     });
     const typeIds = [...THIN, BULK];
@@ -332,6 +334,154 @@ describe('runHaulingScan, shortlist order', () => {
     // Cut at the price pass, or past history but cut before the books: a later scan's.
     expect(historyIds.length).toBe(MAX_PRICED_CANDIDATES);
     expect(scan.examinedTypeIds.length).toBeLessThan(historyIds.length);
+  });
+});
+
+describe('runHaulingScan, examined ids and a failed history read', () => {
+  const TODAY = '2026-10-15';
+  const points = (average: number, volume: number) =>
+    Array.from({ length: 30 }, (_, day) =>
+      historyPoint({
+        date: new Date(Date.parse(`${TODAY}T00:00:00Z`) - day * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
+        average,
+        volume,
+        orderCount: 10,
+      })
+    );
+
+  it('leaves an item whose history read failed (rate limit, network) unexamined, for a later scan', async () => {
+    loadPriceHistory.mockRejectedValue(new Error('429'));
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      today: TODAY,
+    });
+    expect(scan.examinedTypeIds).not.toContain(34);
+  });
+
+  it('marks examined an item whose history loaded and did not sell above the origin price', async () => {
+    loadPriceHistory.mockResolvedValue({ points: points(90, 1_000) });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds: [34],
+      scope: 4,
+      types: TYPES,
+      today: TODAY,
+    });
+    expect(scan.examinedTypeIds).toContain(34);
+  });
+});
+
+describe('runHaulingScan, Max price', () => {
+  /** More dear, high-scoring items than the order-book pass takes, and one cheap one. */
+  const DEAR = Array.from({ length: MAX_BOOK_CANDIDATES + 5 }, (_, i) => 7000 + i);
+  const CHEAP = 8000;
+
+  beforeEach(() => {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => {
+          if (id === CHEAP) return [id, atOrigin ? aggregate(100, 90) : aggregate(200, 150)];
+          return [
+            id,
+            atOrigin ? aggregate(1_000_000, 1) : aggregate(3_000_000, 2_000_000, 1_000, 1_000),
+          ];
+        })
+      );
+    });
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      const origin = regionId === FROM.regionId;
+      return {
+        orders: [
+          {
+            price: origin ? 100 : 150,
+            volume_remain: 100,
+            is_buy_order: !origin,
+            location_id: (origin ? FROM : TO).stationId,
+          },
+        ],
+      };
+    });
+  });
+
+  it('gives no shortlist slot to an item dearer than Max price, so a cheaper one takes it', async () => {
+    const typeIds = [...DEAR, CHEAP];
+    const run = (maxUnitPrice?: number) =>
+      runHaulingScan({
+        from: FROM,
+        to: TO,
+        typeIds,
+        scope: 4,
+        types: typesFor(typeIds),
+        mode: 'instant',
+        maxUnitPrice,
+      });
+    expect((await run()).rows.map((r) => r.typeId)).not.toContain(CHEAP);
+    getOrderBook.mockClear();
+    const capped = await run(500);
+    expect(capped.rows.map((r) => r.typeId)).toEqual([CHEAP]);
+    expect(getOrderBook).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a Max price scan apart in the cache', () => {
+    const base = { from: FROM, to: TO, scope: 4, mode: 'instant' as const };
+    expect(haulingScanCacheKey({ ...base, maxUnitPrice: 500 })).not.toBe(haulingScanCacheKey(base));
+    expect(haulingScanCacheKey({ ...base, maxUnitPrice: null })).toBe(haulingScanCacheKey(base));
+  });
+});
+
+describe('runHaulingScan, the scan cache', () => {
+  it('writes nothing once the scan was aborted, even after the last book landed', async () => {
+    const controller = new AbortController();
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      controller.abort();
+      return regionId === FROM.regionId
+        ? {
+            orders: [
+              { price: 100, volume_remain: 10, is_buy_order: false, location_id: FROM.stationId },
+            ],
+          }
+        : {
+            orders: [
+              { price: 115, volume_remain: 5, is_buy_order: true, location_id: TO.stationId },
+            ],
+          };
+    });
+    await expect(
+      runHaulingScan({
+        from: FROM,
+        to: TO,
+        typeIds: [34],
+        scope: 4,
+        types: TYPES,
+        mode: 'instant',
+        signal: controller.signal,
+      })
+    ).rejects.toThrow(/aborted/);
+    expect(haulingScanCacheSize()).toBe(0);
+  });
+
+  it('sweeps expired entries when it writes a new one', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const scan = (scope: number) =>
+        runHaulingScan({ from: FROM, to: TO, typeIds: [34], scope, types: TYPES, mode: 'instant' });
+      await scan(4);
+      await scan(5);
+      expect(haulingScanCacheSize()).toBe(2);
+      vi.setSystemTime(Date.now() + 10 * 60_000);
+      await scan(6);
+      expect(haulingScanCacheSize()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

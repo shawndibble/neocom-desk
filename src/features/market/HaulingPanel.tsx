@@ -385,7 +385,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     mode,
     // Not before the default hub has loaded: until then the lane is the
     // fallback one, and scanning it would spend ESI budget on the wrong route.
-    defaultHubHydrated && !sameHub && !bothAny
+    defaultHubHydrated && !sameHub && !bothAny,
+    params.maxprice
   );
   const fees = useHaulingFees(activeCharacterId);
 
