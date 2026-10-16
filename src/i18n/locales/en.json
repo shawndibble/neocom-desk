@@ -5337,7 +5337,6 @@
     "journalBreakdownOut": "Out",
     "journalBreakdownNet": "Net",
     "journalBreakdownRefType": "Ref type",
-    "journalBreakdownBothSides": "in {{in}} · out {{out}}",
     "journalBreakdownShare": "{{type}} share",
     "journalPanelSubtitle": "{{scope}} · {{range}} · follows the Journal's filters",
     "journalDayHeader": "{{day}} · EVE time",

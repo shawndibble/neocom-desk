@@ -94,19 +94,7 @@ export function IskBreakdownPanel({
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (row) => netToneClass(row.net),
-        render: (row) => (
-          <>
-            {signedIsk(row.net, 0)}
-            {row.income > 0 && row.expense > 0 && (
-              <span className="block text-xs font-normal text-text-dim">
-                {t('wallet.journalBreakdownBothSides', {
-                  in: formatIsk(row.income),
-                  out: formatIsk(row.expense),
-                })}
-              </span>
-            )}
-          </>
-        ),
+        render: (row) => signedIsk(row.net, 0),
         sortValue: (row) => row.net,
       },
     ],
