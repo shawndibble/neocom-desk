@@ -4,7 +4,7 @@
  * `engine/mailCompose.test.ts`.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EsiOfflineError } from '@/esi/errors';
@@ -91,6 +91,23 @@ describe('recipients', () => {
     const { user } = setup();
     await user.type(await screen.findByRole('combobox'), 'acme');
     expect(search).not.toHaveBeenCalled();
+  });
+});
+
+describe('action layout', () => {
+  it('puts Close in the header after the title, and Send and Discard in the footer', async () => {
+    const { user } = setup();
+    await user.type(await screen.findByLabelText('Subject'), 'x');
+    const header = screen.getByRole('heading', { name: 'New mail' }).closest('header')!;
+    const footer = screen.getByRole('button', { name: 'Send' }).closest('footer')!;
+    const title = within(header).getByRole('heading', { name: 'New mail' });
+    const close = within(header).getByRole('button', { name: 'Close and keep draft' });
+    expect(title.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(header).queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
+    const discard = within(footer).getByRole('button', { name: 'Discard draft…' });
+    const send = within(footer).getByRole('button', { name: 'Send' });
+    expect(discard.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(footer).queryByRole('button', { name: /^Close/ })).not.toBeInTheDocument();
   });
 });
 

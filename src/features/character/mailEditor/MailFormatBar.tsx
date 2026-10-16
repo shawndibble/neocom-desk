@@ -19,7 +19,7 @@ import type { MailEditorCommands } from './commands';
 import { ColorDialog, LinkDialog, SizeDialog, TableDialog } from './FormatDialogs';
 
 /** Height reserved under the writing surface so the docked bar never covers the last line. */
-export const DOCKED_BAR_SPACE_CLASS = 'pb-16';
+export const DOCKED_BAR_SPACE_CLASS = 'pb-(--mail-format-bar-space)';
 
 /** The game's default mail text colour, `#bfffffff`. */
 const GAME_DEFAULT_TEXT_COLOR = '#bfffffff';
@@ -97,6 +97,7 @@ export function MailFormatBar({
       <div
         role="toolbar"
         aria-label={t('mail.format.barLabel')}
+        data-mail-format-bar={dock === 'keyboard' && shown ? 'docked' : undefined}
         style={dock === 'keyboard' ? { bottom: keyboardInset } : undefined}
         className={cx(
           shown ? 'flex' : 'hidden',

@@ -6,7 +6,7 @@
  * what a Send click actually calls.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EsiError, EsiOfflineError, EsiTimeoutError } from '@/esi/errors';
@@ -439,6 +439,15 @@ describe('sending', () => {
     // Local actions are untouched: the draft fields still take input.
     expect(screen.getByLabelText('Subject')).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+  });
+
+  it('lays out Cancel left and Send right in one footer row', async () => {
+    renderBox('reply');
+    await screen.findByText('Sender Sal');
+    const footer = screen.getByRole('button', { name: 'Send' }).closest('footer')!;
+    const cancel = within(footer).getByRole('button', { name: 'Cancel' });
+    const send = within(footer).getByRole('button', { name: 'Send' });
+    expect(cancel.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('refuses to send with no recipients', async () => {

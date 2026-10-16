@@ -12,15 +12,7 @@
 import { useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  FieldError,
-  IconButton,
-  Modal,
-  NeedsConnection,
-  Spinner,
-  TextInput,
-} from '@/components/ui';
+import { Button, FieldError, IconButton, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useVisualViewportBox } from '@/lib/useVisualViewportBox';
@@ -43,6 +35,7 @@ import { draftMarkupBody, sanitizeMarkup } from '@/engine/mailEditorDoc';
 import { sendMail } from './mail';
 import { clearNewMailDraft, loadNewMailDraft, saveNewMailDraft } from './mailDrafts';
 import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
+import { MailComposeFooter } from './MailComposeFooter';
 import { MailCounter } from './MailCounter';
 import { NewMailRecipientPicker } from './NewMailRecipientPicker';
 
@@ -281,7 +274,7 @@ export function NewMailComposer({
         fullPane && viewport ? { top: viewport.offsetTop, height: viewport.height } : undefined
       }
       className={cx(
-        'flex flex-col',
+        'mail-pane flex flex-col',
         fullPane
           ? cx(
               'fixed inset-x-0 z-50 bg-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]',
@@ -296,32 +289,15 @@ export function NewMailComposer({
           fullPane && 'border-b border-line px-2 py-2'
         )}
       >
+        <h2 className="min-w-0 flex-1 truncate text-xs font-semibold tracking-widest text-text-dim uppercase">
+          {t('mail.newMailHeading')}
+        </h2>
         <IconButton
           icon={<Icon.Close />}
           label={t('mail.newMailClose')}
           onClick={() => void handleClose()}
           disabled={sending}
         />
-        <h2 className="min-w-0 flex-1 truncate text-xs font-semibold tracking-widest text-text-dim uppercase">
-          {t('mail.newMailHeading')}
-        </h2>
-        {!online && saved && <span className="text-xs text-text-dim">{t('mail.draftSaved')}</span>}
-        <NeedsConnection>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => void handleSend()}
-            disabled={sending || blocked}
-          >
-            {sending ? (
-              <span className="flex items-center gap-1.5">
-                <Spinner size="sm" /> {t('mail.sending')}
-              </span>
-            ) : (
-              t('mail.send')
-            )}
-          </Button>
-        </NeedsConnection>
       </header>
 
       <div className={cx('flex min-h-0 flex-1 flex-col gap-3', fullPane && 'overflow-y-auto p-3')}>
@@ -396,20 +372,29 @@ export function NewMailComposer({
             {error}
           </p>
         )}
-
-        {!isNewMailEmpty(fields) && (
-          <div>
-            <Button
-              variant="danger"
-              size="md"
-              onClick={() => setConfirmingDiscard(true)}
-              disabled={sending}
-            >
-              {t('mail.discardDraft')}
-            </Button>
-          </div>
-        )}
       </div>
+
+      <MailComposeFooter
+        size="md"
+        sending={sending}
+        blocked={blocked}
+        onSend={() => void handleSend()}
+        pinned={fullPane}
+      >
+        {!isNewMailEmpty(fields) && (
+          <Button
+            variant="danger"
+            size="md"
+            onClick={() => setConfirmingDiscard(true)}
+            disabled={sending}
+          >
+            {t('mail.discardDraft')}
+          </Button>
+        )}
+        {!online && saved && (
+          <span className="truncate text-xs text-text-dim">{t('mail.draftSaved')}</span>
+        )}
+      </MailComposeFooter>
 
       <Modal
         open={confirmingDiscard}
