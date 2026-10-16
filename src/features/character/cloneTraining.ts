@@ -1,10 +1,10 @@
 import type { CloneInput, QueueEntryInput } from '@/engine/cloneTrainingTime';
 import { acceleratorBonusOf, baselineAttributes } from '@/engine/attributeBaseline';
-import type { Attributes, EngineSkill, Implants } from '@/engine/types';
+import type { Attributes, EngineSkill } from '@/engine/types';
 import type { JumpClone, SkillQueueEntry } from '@/esi/endpoints';
 import { classifySkillQueue, isQueuePaused } from '@/features/skills/queueStatus';
-import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
-import { loadCharacterAttributes, loadUniverseType } from '@/features/skills/data';
+import { loadCharacterAttributes } from '@/features/skills/data';
+import { loadImplantTypeBonuses } from '@/features/skills/typeDetail';
 import { loadSkillCatalog, toAttributeBaseline } from '@/features/skills/skillMap';
 
 /** Id of the clone the Character is wearing; jump clones keep their own ids. */
@@ -58,11 +58,6 @@ export function queueEntryInputs(
   return out;
 }
 
-async function implantBonuses(typeIds: readonly number[]): Promise<Implants> {
-  const types = await Promise.all(typeIds.map((id) => loadUniverseType(id)));
-  return sumAttributeBonuses(types.map((t) => extractAttributeBonuses(t?.data?.dogma_attributes)));
-}
-
 /**
  * Null when the verdict cannot be built honestly: no readable attribute sheet
  * (or one that no allocation explains), or a skill the SDE does not know.
@@ -80,8 +75,8 @@ export async function loadCloneTrainingData(
   const [catalog, attrs, worn, jumps] = await Promise.all([
     loadSkillCatalog(),
     loadCharacterAttributes(characterId),
-    implantBonuses(input.wornImplantIds),
-    Promise.all(input.jumpClones.map((c) => implantBonuses(c.implants))),
+    loadImplantTypeBonuses(input.wornImplantIds),
+    Promise.all(input.jumpClones.map((c) => loadImplantTypeBonuses(c.implants))),
   ]);
   if (!attrs?.data) return null;
   const baseline = toAttributeBaseline(attrs.data, worn);

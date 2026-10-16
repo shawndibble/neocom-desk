@@ -12,7 +12,7 @@ import type {
   AttributeReferenceNames,
   RawDogmaAttribute,
 } from '@/engine/market/itemAttributes';
-import { loadUniverseTypeOnce } from '@/features/skills/data';
+import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
@@ -61,9 +61,7 @@ export function useCompareAttributes(
       setData(null);
       setError(false);
       try {
-        const types = new Array<Awaited<ReturnType<typeof loadUniverseTypeOnce>>>(
-          currentItems.length
-        );
+        const types = new Array<Awaited<ReturnType<typeof loadTypeDetail>>>(currentItems.length);
         const [, dictionary] = await Promise.all([
           // A large variation group (up to `VARIATIONS_LIMIT`) fanning out
           // unbounded risks ESI's rate limit, same reasoning as
@@ -75,15 +73,15 @@ export function useCompareAttributes(
             async ({ item, index }) => {
               // A superseded run stops spending ESI budget on columns nobody will see.
               if (cancelled) return;
-              types[index] = await loadUniverseTypeOnce(item.typeId);
+              types[index] = await loadTypeDetail(item.typeId);
             }
           ),
           loadAttributeDictionary(),
         ]);
         if (cancelled) return;
-        if (types.some((result) => !result?.data)) throw new Error('Missing type data');
+        if (types.some((type) => !type)) throw new Error('Missing type data');
         const dogmaByTypeId = new Map(
-          currentItems.map((item, index) => [item.typeId, types[index]?.data.dogma_attributes])
+          currentItems.map((item, index) => [item.typeId, types[index]?.dogma_attributes])
         );
         // One resolve for the whole matrix: ids repeat hard across
         // variations, so every column shares the lookups the first paid for.

@@ -6,6 +6,7 @@ import { ESI_BASE_URL } from '@/esi/client';
 import { useCompareAttributes } from './useCompareAttributes';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadSkills } from '@/sde/loadSde';
+import { loadTypeInfo } from '@/sde/loadTypeInfo';
 import { db } from '@/db';
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 
@@ -17,6 +18,9 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
+
+// Default: the baked shard lacks the type, so ESI handlers serve it.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
 
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
 const mockedLoadSkills = vi.mocked(loadSkills);
@@ -32,6 +36,7 @@ afterAll(() => server.close());
 afterEach(async () => {
   server.resetHandlers();
   vi.clearAllMocks();
+  vi.mocked(loadTypeInfo).mockResolvedValue(null);
   await db.esiCache.clear();
 });
 
@@ -73,6 +78,22 @@ describe('useCompareAttributes', () => {
     expect(result.current.data?.dictionary).toEqual({
       9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
     });
+  });
+
+  it('reads baked attributes offline, without asking ESI', async () => {
+    vi.mocked(loadTypeInfo).mockImplementation(async (typeId) => ({
+      description: '',
+      attributes: [[9, typeId === 587 ? 1200 : 1300]],
+    }));
+    mockedLoadDictionary.mockResolvedValue({});
+    mockedLoadSkills.mockResolvedValue([]);
+
+    // No ESI handler: an ESI read would fail on the unhandled request.
+    const { result } = renderHook(() => useCompareAttributes(ITEMS, true));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe(false);
+    expect(result.current.data?.dogmaByTypeId.get(588)).toEqual([{ attribute_id: 9, value: 1300 }]);
   });
 
   it('sets an error when a fetch fails, without throwing', async () => {

@@ -23,8 +23,6 @@ import {
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
-import type { Implants } from '@/engine/types';
-import { extractAttributeBonuses, sumAttributeBonuses } from './dogma';
 
 export type { CachedResult };
 
@@ -155,10 +153,11 @@ function universeTypeCacheKey(typeId: number): string {
 
 /**
  * One cache-first, ETag-revalidated read of a type (no retry, no delay):
- * `null` only when the type is neither cached nor fetchable. The Show Info
- * modal, row skills, Compare Attributes and hauling use this so a type they
- * have seen once still renders offline; `loadUniverseType` adds a retry on
- * top for the one-at-a-time callers that want it.
+ * `null` only when the type is neither cached nor fetchable, so a type seen
+ * once still renders offline; `loadUniverseType` adds a retry on top for the
+ * one-at-a-time callers that want it. A reader of only the description, dogma
+ * attributes or volume goes through `typeDetail.ts` instead, which tries the
+ * baked typeInfo shard first and falls back to these.
  */
 export function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType> | null> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
@@ -181,7 +180,8 @@ export function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<Unive
  * One retry on a failed live call, paced by a short delay: unlike
  * typeNames.ts's POST /universe/names (a batch with a per-id fallback), every
  * caller here — implant names and bonuses, notification item/skill names,
- * the clipboard import flow — resolves one type at a time, so a single
+ * the clipboard import flow, and the ESI fallback of `typeDetail.ts`'s
+ * implant reads — resolves one type at a time, so a single
  * transient failure used to silently drop just that lookup (an implant read
  * "#12345", and the SAME failure also meant its attribute bonus never
  * reached `loadImplantBonuses`, reading the character's sheet as an
@@ -201,18 +201,4 @@ export async function loadUniverseType(typeId: number): Promise<CachedResult<Uni
   if (first) return first;
   await sleep(TYPE_LOOKUP_RETRY_DELAY_MS);
   return loadUniverseTypeOnce(typeId);
-}
-
-/**
- * Aggregate attribute bonuses across a character's fitted implants: implant
- * typeIDs (ESI or cache) -> per-type dogma attributes (ESI or cache) -> summed
- * into one Implants map (engine's computeSchedule/optimizer input). Returns
- * `{}` when there's no implant data cached or fetchable (offline first-load).
- * `loadUniverseType` above already retries a failed per-type lookup once.
- */
-export async function loadImplantBonuses(characterId: number): Promise<Implants> {
-  const implants = await loadCharacterImplants(characterId);
-  const typeIds = implants?.data ?? [];
-  const types = await Promise.all(typeIds.map((typeId) => loadUniverseType(typeId)));
-  return sumAttributeBonuses(types.map((t) => extractAttributeBonuses(t?.data?.dogma_attributes)));
 }
