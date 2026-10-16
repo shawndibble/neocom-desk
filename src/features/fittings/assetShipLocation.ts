@@ -1,7 +1,7 @@
 /**
  * Where "Open in Fittings" on an Assets ship goes: the Fittings editor, with
  * the ship as it sits in the hangar — slots, loaded charges, drones,
- * fighters, cargo —
+ * fighters, cargo, and each mutated (abyssal) item's real rolls from ESI —
  * as its Fitting Share Code. Null when it's too large for one.
  */
 import type { AssetTreeContainerNode, AssetTreeNode } from '@/engine/assetTree';
@@ -9,6 +9,9 @@ import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { assetShipToFitting, type ShipAssetItem } from '@/engine/fittings/assetShipMapper';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import { loadFittingSlots } from '@/sde/loadSde';
+import type { ItemMutation } from '@/engine/fittings/types';
+import { mutationsForItems } from '@/features/abyssal/dynamicItems';
+import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { fittingEditLocation } from './fittingRoutes';
 
 /** Every asset inside a ship, whichever bay the tree grouped it under. */
@@ -23,10 +26,30 @@ function shipItems(ship: AssetTreeContainerNode): ShipAssetItem[] {
       typeId: node.asset.type_id,
       quantity: node.asset.quantity,
       flag: node.asset.location_flag,
+      itemId: node.asset.item_id,
     });
   };
   ship.children.forEach(visit);
   return items;
+}
+
+/**
+ * The rolls of the ship's mutated items, by item id. Never fails the open:
+ * data or ESI that won't answer leaves those items without rolls, which the
+ * editor badges (`mutationStatus`).
+ */
+async function shipMutations(items: readonly ShipAssetItem[]): Promise<Map<number, ItemMutation>> {
+  try {
+    const lookup = await loadMutaplasmidLookup();
+    const refs = items.flatMap((item) =>
+      item.itemId !== undefined && lookup.isAbyssalType(item.typeId)
+        ? [{ typeId: item.typeId, itemId: item.itemId }]
+        : []
+    );
+    return refs.length === 0 ? new Map() : await mutationsForItems(refs, lookup);
+  } catch {
+    return new Map();
+  }
 }
 
 export async function assetShipEditLocation(
@@ -41,7 +64,7 @@ export async function shipItemsEditLocation(
   ship: { typeId: number; name: string },
   items: readonly ShipAssetItem[]
 ): Promise<{ pathname: string; search: string } | null> {
-  const rackOf = await loadFittingSlots();
+  const [rackOf, mutations] = await Promise.all([loadFittingSlots(), shipMutations(items)]);
   const fitting = assetShipToFitting(
     ship,
     items,
@@ -49,7 +72,8 @@ export async function shipItemsEditLocation(
     (typeId) => {
       const rack = rackOf[String(typeId)];
       return rack !== undefined && rack !== 'drone';
-    }
+    },
+    mutations
   );
   const encoded = await encodeFittingShare(fittingToShareInput(fitting));
   return encoded.ok ? fittingEditLocation(encoded.payload) : null;

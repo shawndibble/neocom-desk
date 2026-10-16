@@ -98,6 +98,7 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
       typeId: asset.type_id,
       quantity: asset.quantity,
       flag: asset.location_flag,
+      itemId: asset.item_id,
     });
     contentsByShip.set(asset.location_id, list);
   }
