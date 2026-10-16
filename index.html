@@ -24,6 +24,11 @@
       body {
         background-color: #0a0e14;
       }
+      /* While the prerendered landing hero stands in (#landing-shell-boot
+         below), React renders under it unseen. src/app/landingShell.ts. */
+      html[data-landing-shell] #root {
+        display: none;
+      }
     </style>
     <!-- Applies the stored text scale (src/lib/fontScale.ts) before the first
          paint, from the localStorage mirror that store keeps: its own Dexie
@@ -95,6 +100,33 @@
     </script>
   </head>
   <body>
+    <!-- The landing page's header and hero as static HTML, so a first-time
+         visitor sees them before any JS has loaded (#3926). vite.config.ts
+         fills the template from src/features/landing/landingShell.snapshot.html;
+         src/app/landingShell.ts explains the hand-off to React. -->
+    <template id="landing-shell-template"><!-- landing-shell --></template>
+    <!-- Only on the landing page's own paths, and never for a returning pilot
+         (the signed-in hint, src/app/signedInShellHint.ts) or inside the Play
+         Store app (src/lib/playStoreApp.ts), which get no marketing page.
+         Appended where the parser is, so it lands just before #root. Pinned by
+         src/app/landingShellBootScript.test.ts. -->
+    <script id="landing-shell-boot">
+      try {
+        var p = location.pathname;
+        var t = document.getElementById('landing-shell-template');
+        if (
+          (p === '/' || p === '/login') &&
+          t.content.firstElementChild &&
+          localStorage.getItem('neocom:has-character') !== '1' &&
+          sessionStorage.getItem('playStoreApp') !== '1' &&
+          document.referrer.indexOf('android-app://com.neocomdesk.app') !== 0
+        ) {
+          document.body.appendChild(t.content.cloneNode(true));
+          document.documentElement.setAttribute('data-landing-shell', '');
+          document.documentElement.setAttribute('data-landing-shell-shown', '');
+        }
+      } catch (e) {}
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

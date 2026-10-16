@@ -1454,6 +1454,11 @@
   .lp-hero-in-3 {
     animation-delay: 270ms;
   }
+  /* The prerendered hero (src/app/landingShell.ts) already showed this text,
+     still: fading it in again would blink it out and back. */
+  html[data-landing-shell-shown] .lp-hero-in {
+    animation: none;
+  }
 
   /* Accent glow behind the hero login button. Static: an infinite animation on a large gradient layer made scrolling choppy. */
   .lp-cta-glow {
