@@ -9,7 +9,7 @@
  * in neither. Paths are relative to `public/data/`, forward slashes.
  *
  * Pure data, importing only the import-free `typeInfoShard.ts`:
- * `vite.config.ts` loads this file at config time (no `@/` alias there).
+ * `vite.config.ts` loads this file at config time.
  * Everything in `public/data` NOT listed here is precached.
  */
 import { TYPE_INFO_SHARD_COUNT } from './typeInfoShard';
@@ -24,9 +24,8 @@ export const LAZY_SDE_FILES: readonly string[] = [
   'market/types.json',
   'market/stations.json',
   'market/variations.json',
-  // Item Detail's description + attributes per type (issue #3882), ~12 MB in
-  // all, so one range-bucket shard per `typeInfoBucket` slot. Every slot has a
-  // file (`{}` when empty), so this is a constant, not read from the build.
+  // Item Detail typeInfo shards (issue #3882); every slot has a file (`{}` if
+  // empty), so this is constant, not read from the build.
   ...Array.from({ length: TYPE_INFO_SHARD_COUNT }, (_, n) => `typeInfo/${n}.json`),
 ];
 

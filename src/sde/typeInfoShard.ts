@@ -1,15 +1,13 @@
 /**
  * Which `public/data/typeInfo/<n>.json` shard holds a type's baked Item Detail
- * data (description + dogma attributes, issue #3882). Shared contract with
- * `scripts/lib/typeInfo.mjs`, which writes the shards with the same key —
- * `typeInfoShards.test.ts` checks the two agree against the committed files.
+ * data (issue #3882). `scripts/lib/typeInfo.mjs` mirrors the key;
+ * `typeInfoShards.test.ts` checks they agree.
  *
  * Range buckets of TYPE_INFO_SHARD_WIDTH ids, not `id % n`: neighbouring ids
  * are near-identical types (a module's variants, a ship's skins) sharing most
  * of their text, so gzip compresses them together — ~1.36 MB over the set,
  * against ~2.9 MB scattered by modulo. A patch that only adds new types
  * usually rewrites just the top bucket, so the rest keep their `?v=` hash.
- * Opening one item parses one small file rather than the whole ~12 MB set.
  *
  * 64 buckets cover ids below 128,000 (the highest published id is ~98,000).
  * The build fails on a published id past that; raise the count here and in

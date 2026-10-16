@@ -99,16 +99,10 @@ test('shows the offline banner while the browser is offline and drops it on reco
 });
 
 /**
- * Item Detail offline for an item never opened before (issue #3882): its
- * description and dogma attributes come from the baked `typeInfo` shard
- * (`public/data/typeInfo/0.json` for the Rifter), served by the app's own
- * server, so cutting ESI off before the modal ever opens still renders them.
- *
- * Opened by its `?info=type-<id>` URL over Overview, not from the Market
- * Browser: that item panel reads the same type from ESI for its order-row
- * skills (`useOrderRowSkills`), which would muddy the count below. Counting
- * `/universe/types/587` requests — an aborted one still fires `request` —
- * proves the baked path, not an `esiCache` row from an earlier online read.
+ * Item Detail offline for a never-opened item (issue #3882): description and attributes come from
+ * the baked typeInfo shard. Opened via `?info=type-<id>` over Overview, not Market Browser, whose
+ * item panel also reads `/universe/types/587` (useOrderRowSkills). Counting those requests
+ * (aborted ones still fire) proves the baked path, not an esiCache row.
  */
 test('opens Item Detail with baked description and attributes for a never-seen item', async ({
   page,

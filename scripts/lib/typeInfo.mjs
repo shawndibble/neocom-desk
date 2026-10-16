@@ -1,12 +1,17 @@
-// typeInfo/<n>.json: every published type's Item Detail data — description,
-// dogma attributes and volume — so Show info opens offline (issue #3882).
-// Shaped as ESI's `/universe/types/{id}` gives it, from CCP's JSONL export:
-// Fuzzwork's CSV `valueFloat` rounds (Rifter attr 124: 16777200, not 16777215).
+// typeInfo/<n>.json: every published type's description, dogma attributes and
+// volume, shaped as ESI's /universe/types/{id} (issue #3882). Source is CCP
+// JSONL, not Fuzzwork CSV: its valueFloat rounds (Rifter attr 124: 16777200,
+// not 16777215).
 
 // Same as src/sde/typeInfoShard.ts, which the app reads shards by (and says
 // why range buckets); src/sde/typeInfoShards.test.ts checks the committed files.
 export const TYPE_INFO_SHARD_WIDTH = 2000;
 export const TYPE_INFO_SHARD_COUNT = 64;
+
+/** The shard index a type id falls in; may be past the last shard. */
+export function typeInfoBucketOf(typeId) {
+  return Math.floor(typeId / TYPE_INFO_SHARD_WIDTH);
+}
 
 // The attributes ESI adds to `dogma_attributes` from the type row itself,
 // with the value it sends when the row has none (verified live: EMP S, 185,
@@ -19,17 +24,17 @@ const TYPE_ROW_ATTRIBUTES = [
 ];
 
 /**
- * TYPE_INFO_SHARD_COUNT shard objects (index = floor(typeId / width)), each
- * type id -> `{ description, attributes: [[attributeId, value], ...], volume? }`,
- * published types only; an empty bucket is `{}`, so every file the app lists
- * exists. `types`/`typeDogma` are parsed `types.jsonl`/`typeDogma.jsonl` records.
+ * TYPE_INFO_SHARD_COUNT shards, each type id -> `{ description, attributes:
+ * [[id, value]...], volume? }`, published only; an empty bucket is `{}` so
+ * every listed file exists. `types`/`typeDogma` are parsed
+ * `types.jsonl`/`typeDogma.jsonl` records.
  */
 export function bakeTypeInfoShards(types, typeDogma) {
   const dogmaByType = new Map(typeDogma.map((r) => [r._key, r.dogmaAttributes ?? []]));
   const shards = Array.from({ length: TYPE_INFO_SHARD_COUNT }, () => ({}));
   const published = types.filter((t) => t.published).sort((a, b) => a._key - b._key);
   for (const t of published) {
-    const shard = Math.floor(t._key / TYPE_INFO_SHARD_WIDTH);
+    const shard = typeInfoBucketOf(t._key);
     if (shard >= TYPE_INFO_SHARD_COUNT) {
       throw new Error(
         `Published type ${t._key} is past the last typeInfo bucket (ids < ${TYPE_INFO_SHARD_COUNT * TYPE_INFO_SHARD_WIDTH}): raise TYPE_INFO_SHARD_COUNT in both scripts/lib/typeInfo.mjs and src/sde/typeInfoShard.ts`

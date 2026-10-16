@@ -15,12 +15,9 @@ function fromTypeInfo(record: TypeInfoRecord): ItemDetailType {
 }
 
 /**
- * One item's description, volume and dogma attributes for Item Detail: the
- * baked `typeInfo` shard first (issue #3882), so any published item opens
- * offline. A type the shard doesn't carry (unpublished, or newer than the
- * build) or a shard that won't load falls back to the cached ESI read — one
- * seen online before still renders offline. Null, never a rejection, when
- * neither has it.
+ * Baked typeInfo shard first; a type it lacks (unpublished, newer than the
+ * build) or a shard that won't load falls back to cached ESI. Null, never a
+ * rejection, when neither has it.
  */
 export async function loadItemDetailType(typeId: number): Promise<ItemDetailType | null> {
   const baked = await loadTypeInfo(typeId).catch(() => null);

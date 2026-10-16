@@ -22,7 +22,7 @@ import { bakeTypeNames, namesMissingFrom } from './lib/typeNames.mjs';
 import { WORMHOLE_GROUP_ID, bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
 import { bakeOreAndIceTypeIds } from './lib/oreTypeIds.mjs';
 import { bakeSystemPositions } from './lib/systemPositions.mjs';
-import { TYPE_INFO_SHARD_WIDTH, bakeTypeInfoShards } from './lib/typeInfo.mjs';
+import { bakeTypeInfoShards, typeInfoBucketOf } from './lib/typeInfo.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -2136,18 +2136,11 @@ async function main() {
     bakedSkillIds
   );
 
-  // --- typeInfo/<n>.json: Item Detail's description + attributes, offline
-  // (issue #3882); see lib/typeInfo.mjs ---
+  // --- typeInfo shards (issue #3882); see lib/typeInfo.mjs ---
   const typeInfoShards = bakeTypeInfoShards(
     parseJsonl(ccpStaticData['types.jsonl']),
     parseJsonl(ccpStaticData['typeDogma.jsonl'])
   );
-  {
-    const rifter = typeInfoShards[Math.floor(587 / TYPE_INFO_SHARD_WIDTH)]['587'];
-    if (!rifter?.description || !rifter.attributes.some(([id]) => id === 4)) {
-      throw new Error('typeInfo shards look wrong: Rifter (587) lacks a description or mass');
-    }
-  }
 
   // --- typeNames.json: every type name, published or not; see lib/typeNames.mjs ---
   const typeNames = bakeTypeNames([...types.values()].map((t) => t.name));
@@ -2253,12 +2246,9 @@ async function main() {
     const dir = join(OUT_DIR, 'typeInfo');
     await rm(dir, { recursive: true, force: true });
     await mkdir(dir, { recursive: true });
-    let bytes = 0;
-    for (const [n, shard] of typeInfoShards.entries()) {
-      const json = JSON.stringify(shard);
-      await writeFile(join(dir, `${n}.json`), json);
-      bytes += Buffer.byteLength(json);
-    }
+    const jsons = typeInfoShards.map((shard) => JSON.stringify(shard));
+    await Promise.all(jsons.map((json, n) => writeFile(join(dir, `${n}.json`), json)));
+    const bytes = jsons.reduce((sum, json) => sum + Buffer.byteLength(json), 0);
     const count = typeInfoShards.reduce((sum, shard) => sum + Object.keys(shard).length, 0);
     console.log(
       `  typeInfo/0..${typeInfoShards.length - 1}.json: ${count} types, ${bytes.toLocaleString()} bytes`
@@ -2285,6 +2275,13 @@ async function main() {
     );
   }
   console.log(`  types map entries: ${Object.keys(typeMap).length}`);
+  {
+    const rifter = typeInfoShards[typeInfoBucketOf(587)]['587'];
+    if (!rifter?.description || !rifter.attributes.some(([id]) => id === 4)) {
+      console.error('  FAIL: typeInfo shards look wrong: Rifter (587) lacks a description or mass');
+      process.exitCode = 1;
+    }
+  }
   console.log(
     `  packaged volume: baked for ${packagedVolumeApplied} of ${manufacturingMaterialTypeIds.size} manufacturing material types`
   );

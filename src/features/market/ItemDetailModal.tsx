@@ -2,11 +2,10 @@
  * Item Detail (GLOSSARY.md round 6): fitting cost, volume, bonuses and
  * description for one item — the things a shopper checks before deciding
  * whether a price is worth paying. The item's own description, volume and
- * attribute values come from the baked `typeInfo` shards (lazy SDE, one
- * small file per 2000-id range — `itemDetailType.ts`), falling back
- * to the cached ESI read for a type the build doesn't carry; only the
- * order-book prices need the network. The market snapshot carries the
- * small attribute dictionary that turns attribute ids into names/units/categories.
+ * attribute values come from the baked typeInfo shards, falling back to
+ * cached ESI (`itemDetailType.ts`); only order-book prices need the network.
+ * The market snapshot carries the small attribute dictionary that turns
+ * attribute ids into names/units/categories.
  * Rows whose value is an id rather than a measurement — a required skill, a
  * Group a module can be fitted to — resolve to names through
  * `attributeReferenceNames.ts`, which starts from `skills.json` (public/data,
@@ -136,9 +135,8 @@ export function ItemDetailModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   /**
-   * Its own state, not part of `data`: pi.json is local, so the schematic
-   * outlives a type-info failure. Null when pi.json couldn't be read — the
-   * rest of the modal is unaffected.
+   * Its own state, not part of `data`. Null when pi.json couldn't be read —
+   * the rest of the modal is unaffected.
    */
   const [pi, setPi] = useState<PiData | null>(null);
   const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
@@ -195,13 +193,15 @@ export function ItemDetailModal({
       setData(null);
       setError(false);
       setPi(null);
-      // Caught here and kept out of the shared handler below: only planetary
-      // commodities have anything to lose if this payload is missing, and it
-      // is local, so it renders even when the type info below fails.
-      const piLoad = loadPi().catch(() => null);
+      // Off the shared handler and `loading`: only planetary commodities lose
+      // anything if it's missing, and it shouldn't hold up the rest.
+      void loadPi()
+        .catch(() => null)
+        .then((loaded) => {
+          if (!cancelled) setPi(loaded);
+        });
       try {
         const [type, dictionary, skillAttributeModifiers, skills] = await Promise.all([
-          // Never rejects: baked shard, then cached ESI, then null.
           loadItemDetailType(typeId),
           loadAttributeDictionary(),
           // Caught here, not by the shared handler below: the
@@ -232,11 +232,7 @@ export function ItemDetailModal({
       } catch {
         if (!cancelled) setError(true);
       } finally {
-        const loadedPi = await piLoad;
-        if (!cancelled) {
-          setPi(loadedPi);
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {

@@ -8,8 +8,7 @@
  *
  * The list is `lazySdeFiles.ts`, shared with `vite.config.ts`'s precache
  * ignores. Entry budget in `sde-data` (maxEntries 150 in `sw.ts`): ~2x its
- * length (73: 9 files + 64 `typeInfo/` shards), so a deploy's stale `?v=`
- * entries never evict a current one.
+ * length (73).
  */
 import { sdeDataUrl } from './sdeDataUrl';
 import { currentWarmLevel } from '@/lib/lazyAssetWarmGate';

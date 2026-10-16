@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { bakeTypeInfoShards, TYPE_INFO_SHARD_COUNT, TYPE_INFO_SHARD_WIDTH } from './typeInfo.mjs';
+import {
+  bakeTypeInfoShards,
+  typeInfoBucketOf,
+  TYPE_INFO_SHARD_COUNT,
+  TYPE_INFO_SHARD_WIDTH,
+} from './typeInfo.mjs';
 
 const bucket = (id) => Math.floor(id / 2000);
 
@@ -21,6 +26,19 @@ const rifterDogma = {
     { attributeID: 5796, value: 2147483647000 },
   ],
 };
+
+describe('typeInfoBucketOf', () => {
+  it('floors the id by the shard width, including past the last shard', () => {
+    expect(typeInfoBucketOf(0)).toBe(0);
+    expect(typeInfoBucketOf(587)).toBe(0);
+    expect(typeInfoBucketOf(1999)).toBe(0);
+    expect(typeInfoBucketOf(2000)).toBe(1);
+    expect(typeInfoBucketOf(97_897)).toBe(48);
+    expect(typeInfoBucketOf(TYPE_INFO_SHARD_COUNT * TYPE_INFO_SHARD_WIDTH)).toBe(
+      TYPE_INFO_SHARD_COUNT
+    );
+  });
+});
 
 describe('bakeTypeInfoShards', () => {
   it('returns every bucket, each type in bucket floor(typeId / width), empty ones as {}', () => {
