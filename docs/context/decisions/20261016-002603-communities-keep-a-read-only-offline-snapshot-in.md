@@ -1,0 +1,8 @@
+# Scope decisions — Communities keep a read-only offline snapshot in settings
+
+_Recorded 2026-10-16._
+
+- The Communities page keeps the last list it read while online, each Community's last roster, and its last Member libraries, in the existing `settings` table under `communitySnapshot:{characterId}:{kind}[:{communityId}]` (`features/communities/communityCache.ts`). No new Dexie table, so no schema bump. Another Character never sees them, `removeCharacter` deletes them with the Character, and "Delete all data" clears them with the rest of IndexedDB.
+- The saved copy is shown read-only under "Showing cached data" with a Retry button, only when the browser is offline or the read failed for want of a connection (a fetch error, Firestore `unavailable`); a refusal (`permission-denied` after a removal) shows as a failure, never as stale data. While the browser knows it is offline the saved copy answers at once. The page also retries when the connection returns. A Community's snapshots are deleted when the Character leaves or deletes it, and pruned after any live list that no longer holds it.
+- The Library keeps showing the live reads when only some Members are unreadable (they read empty, their old copy is kept in the snapshot); the saved libraries show only offline or when every read failed.
+- Writes (create, Manage, My sharing, invites and join requests, Requests and Pledges, Ask to copy, joining by invite link, Leave, a Member's actions) show "Needs a connection" while offline. Requests, Pledges, Fittings and Skill plan content are not snapshotted: they keep their own load-failed states.

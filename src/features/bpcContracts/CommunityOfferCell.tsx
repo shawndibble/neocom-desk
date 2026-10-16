@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
+import { Tooltip } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { useOnline } from '@/stores/network';
 import type { BpcSearchRow } from '@/engine/contracts/bpcSearch';
 
 /**
@@ -22,6 +24,7 @@ export function CommunityOfferCell({
   onAsk: () => void;
 }) {
   const { t } = useTranslation();
+  const online = useOnline();
   return (
     <span
       className={cx(
@@ -38,9 +41,17 @@ export function CommunityOfferCell({
           // cell (DESIGN.md §6c, the inline link look), and the row has no
           // primary action of its own, so the name beside it stays plain. The
           // trailing "…" says it opens a dialog needing more input.
-          <button type="button" className={inlineLinkClassName} onClick={onAsk}>
-            {t('bpcContracts.communityAskToCopyAction', { name: row.memberName })}
-          </button>
+          // Posting a Request needs a connection: offline it explains itself.
+          <Tooltip content={online ? null : t('common.needsConnection')}>
+            <button
+              type="button"
+              className={inlineLinkClassName}
+              aria-disabled={online ? undefined : true}
+              onClick={online ? onAsk : (event) => event.preventDefault()}
+            >
+              {t('bpcContracts.communityAskToCopyAction', { name: row.memberName })}
+            </button>
+          </Tooltip>
         ) : (
           <span>{t('bpcContracts.communityAskToCopy', { name: row.memberName })}</span>
         )}

@@ -76,7 +76,13 @@
     "communitiesNewRequests_one": "Communities, {{count}} new Request",
     "communitiesNewRequests_other": "Communities, {{count}} new Requests"
   },
+  "offline": {
+    "banner": "You're offline — showing data saved on this device. Changes sync when you reconnect."
+  },
   "reauth": {
+    "cachedTitle": "Log in again to refresh.",
+    "cachedHint": "EVE access for this data has lapsed, so what's saved on this device is shown.",
+    "cachedAction": "Log in again with EVE Online",
     "navLocked": "Needs a new login",
     "staleGrantTitle": "EVE access was refused",
     "staleGrantHint": "EVE turned down a request for this character's data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
@@ -4957,6 +4963,7 @@
     }
   },
   "common": {
+    "needsConnection": "Needs a connection",
     "opensInNewTab": "(opens in a new tab)",
     "pricesUnavailableOffline": "Prices unavailable offline",
     "pricesUnavailable": "Prices unavailable right now",
@@ -5009,7 +5016,6 @@
     "contractIndexUnreachableHint": "Public contracts show here once the index answers.",
     "retry": "Try again",
     "loadFailedRetryHint": "Something went wrong loading this. Try again.",
-    "needsConnection": "Needs a connection",
     "connectOnceHint": "You're offline. Connect once and this will load — we'll try again when you're back online.",
     "spaceOption": {
       "highsec": "Highsec",
@@ -7761,6 +7767,7 @@
       "commandCenter": "Command Center",
       "free": "Free: {{cpu}} tf CPU, {{power}} MW power. Links between buildings use a little more.",
       "loadUnknown": "Load can't be read for this colony yet.",
+      "linkLoadUnknown": "Link CPU/PG unknown — planet data not downloaded yet. The figures above leave the links out, so they read low.",
       "launchpad": "Launchpad",
       "capacity": "{{m3}} m³",
       "used": "Used",
@@ -10885,6 +10892,7 @@
     "loadingGroup": "Searching…",
     "groupCapped": "Top {{count}} shown. Keep typing to narrow.",
     "groupError": "Couldn't load these results.",
+    "itemSearchNeedsDownload": "Item search needs a one-time download — connect once.",
     "resultsCount_one": "{{count}} result",
     "resultsCount_other": "{{count}} results",
     "activeCharacter": "Active",
@@ -10931,6 +10939,7 @@
     "pasteTitle": "Paste anywhere",
     "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
     "paste": "Paste",
+    "pasteOffline": "Couldn't read that paste offline — item data isn't downloaded yet.",
     "pasteDestinations": {
       "survey": {
         "label": "Survey scan",
@@ -12437,6 +12446,8 @@
         "stateFocus": "Focus-visible",
         "stateHighlighted": "Highlighted option",
         "stateDisabled": "Disabled",
+        "offlineStrip": "Slim strip with a cloud-slash glyph: you're offline, saved data below",
+        "needsConnection": "Dimmed login control with a \"Needs a connection\" tooltip",
         "stateLoading": "Loading (Button loading)",
         "stateSelected": "Selected / on (aria-pressed)",
         "stateSelectedSegment": "Selected segment",
@@ -12456,6 +12467,8 @@
         "highlighted": "Open any menu or picker with the keyboard and press ArrowDown: 2px accent outline inside the option, shown here whenever the last input was the keyboard. A pointer keeps only the fill.",
         "focus": "Press Tab: 2px accent outline, outset on boxed controls and inline links.",
         "disabled": "opacity-40. aria-disabled keeps the tooltip reachable.",
+        "offlineStrip": "In flow at the top of the page, never fixed. Polite live region; gone on reconnect.",
+        "needsConnection": "Wrap any control that starts EVE's login in NeedsConnection: offline, the press would strand an installed app.",
         "selectedToggle": "On takes the accent tint.",
         "selectedSegment": "Selected takes the accent tint and a 2px accent underline.",
         "fieldCaret": "The box is a control (§6); the caret says it opens a list."
@@ -12510,6 +12523,8 @@
         "boxed": "Boxed control",
         "disabled": "Disabled",
         "ariaDisabled": "aria-disabled",
+        "signIn": "Log in with EVE",
+        "signInOffline": "Log in with EVE (offline)",
         "saving": "Saving",
         "toggleOn": "Toggle on",
         "toggleOff": "Toggle off",

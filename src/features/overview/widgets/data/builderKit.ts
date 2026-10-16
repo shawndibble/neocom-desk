@@ -14,9 +14,16 @@ export const UNKNOWN = '—';
 
 export function statusOf(
   feed: FeedState<unknown> | undefined,
-  over: { needsPermission?: boolean; isEmpty?: boolean; hasData?: boolean; loading?: boolean } = {}
+  over: {
+    needsPermission?: boolean;
+    isEmpty?: boolean;
+    hasData?: boolean;
+    loading?: boolean;
+    hasStaleData?: boolean;
+  } = {}
 ): WidgetStateInput {
   return {
+    hasStaleData: over.hasStaleData ?? false,
     loading: over.loading ?? feed?.loading ?? true,
     needsPermission: over.needsPermission ?? false,
     error: feed?.error ?? false,

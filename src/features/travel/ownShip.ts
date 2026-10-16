@@ -1,12 +1,12 @@
 import { useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { SHIP_CATEGORY_ID } from '@/sde/categories';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 
 /** Device-local (no `sync.` prefix): the ship you fly never reaches Firestore. */
 const OWN_SHIP_KEY = 'dscan.ownShip';
 
-const SHIP_CATEGORY_ID = 6;
 /** Capsules and shuttles: not hulls anyone fits a danger read around. */
 const EXCLUDED_GROUP_IDS: ReadonlySet<number> = new Set([29, 31]);
 

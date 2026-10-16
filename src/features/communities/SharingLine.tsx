@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Button } from '@/components/ui';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 import type { BlueprintSharing, TabSharing } from './sharingSummary';
 
 function blueprintsText(summary: BlueprintSharing, t: TFunction): string {
@@ -47,9 +47,9 @@ export function SharingLine({
       <p className="min-w-0 flex-1 text-xs text-text-dim">
         {sharing === null ? null : sharingText(sharing, t)}
       </p>
-      <Button size="sm" aria-haspopup="dialog" aria-expanded={open} onClick={onOpen}>
+      <NeedsConnectionButton size="sm" aria-haspopup="dialog" aria-expanded={open} onClick={onOpen}>
         {t('communities.sharing.open')}
-      </Button>
+      </NeedsConnectionButton>
     </div>
   );
 }

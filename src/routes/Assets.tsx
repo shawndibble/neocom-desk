@@ -46,6 +46,7 @@ import { ASSETS_TABS } from '@/app/pageTabs';
 import * as Icon from '@/components/ui/icons';
 import type { EsiEndpointId } from '@/esi/registry';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
+import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@/sync';
 import { db, type BuildPlanRecord } from '@/db';
 import { cx } from '@/lib/cx';
@@ -1695,7 +1696,7 @@ export function Assets() {
             </LiveStatus>
           )}
 
-          {tab === 'items' && assetsResult && !assetsNeedsReauth && (
+          {tab === 'items' && assetsResult && (
             <SearchInput
               ref={searchRef}
               value={search}
@@ -1744,7 +1745,9 @@ export function Assets() {
             <div className="flex justify-center py-16">
               <Spinner label={t('common.loading')} />
             </div>
-          ) : assetsNeedsReauth ? (
+          ) : assetsNeedsReauth && !assetsResult ? (
+            // A lapsed grant with nothing saved: the full banner. With a saved
+            // copy the items stay and a small note sits above them.
             <GrantBanner
               characterId={activeCharacterId}
               endpoints={['getCharacterAssets']}
@@ -1758,6 +1761,12 @@ export function Assets() {
             <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col gap-3">
+              {assetsNeedsReauth && (
+                <ReauthCachedNote
+                  characterId={activeCharacterId}
+                  endpoints={['getCharacterAssets']}
+                />
+              )}
               {assetsResult.fromCache && (
                 <p className="text-[0.6875rem] text-warning uppercase">
                   {t('common.offlineTitle')}

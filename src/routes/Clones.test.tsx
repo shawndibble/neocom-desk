@@ -406,6 +406,24 @@ describe('Clones', () => {
     expect(await screen.findByText('Log in again to see your clones')).toBeInTheDocument();
   });
 
+  it('keeps the saved clones on screen, with a small log-in note, when the clones grant lapsed over them', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'clones',
+      value: clonesPayload,
+      fetchedAt: 1,
+    });
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
+    expect(await screen.findAllByText('High-grade Ascendancy Alpha')).not.toHaveLength(0);
+  });
+
   it('shows jumps away on the home clone and each clone, the count opening the route to that station', async () => {
     render(<App />);
     // The Character is in Jita's system, the home and first clone's station: 0 jumps.

@@ -19,7 +19,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, NeedsConnection } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { scopesForGroup } from '@/esi/scopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -117,9 +117,11 @@ export function CorpGrantPrompt() {
       </p>
       <p className="text-xs text-text-dim">{t('corp.grantPromptHint')}</p>
       <div className="flex gap-2">
-        <Button size="sm" variant="primary" onClick={() => void grant()}>
-          {t('corp.grantPromptGrant')}
-        </Button>
+        <NeedsConnection>
+          <Button size="sm" variant="primary" onClick={() => void grant()}>
+            {t('corp.grantPromptGrant')}
+          </Button>
+        </NeedsConnection>
         <Button size="sm" onClick={() => void remember()}>
           {t('corp.grantPromptDismiss')}
         </Button>

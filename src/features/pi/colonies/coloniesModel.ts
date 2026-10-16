@@ -230,6 +230,12 @@ export interface LoadFacts {
   cpuBudget: number | null;
   powerUsed: number | null;
   powerBudget: number | null;
+  /**
+   * The colony has links but its planet's radius was unavailable (the lazy
+   * `pi-planet-radius.json` not downloaded yet), so their CPU/PG draw is left
+   * out of the figures above: they read lower than the truth, never zero.
+   */
+  linkLoadUnknown: boolean;
 }
 
 export interface ColonyCheckRow {
@@ -421,6 +427,8 @@ export function colonyCheckRow(input: RowInput): ColonyCheckRow {
       cpuBudget: built?.budget.cpu ?? null,
       powerUsed: built?.pinLoad.load.powergrid ?? null,
       powerBudget: built?.budget.powergrid ?? null,
+      linkLoadUnknown:
+        built !== null && built.pinLoad.linkCount > 0 && built.pinLoad.linkLoad === null,
     },
     idleFactories,
     tags,

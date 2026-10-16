@@ -7,7 +7,7 @@
  * with no Grant, because granting would change nothing.
  */
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState } from '@/components/ui';
+import { Button, EmptyState, NeedsConnection } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { CorpDenialReason } from './useCorpRouteGate';
@@ -31,12 +31,14 @@ export function CorpDenied({ reason, title, hint }: CorpDeniedProps) {
       title={t('corp.notGrantedTitle')}
       hint={t('corp.notGrantedHint')}
       action={
-        <Button
-          variant="primary"
-          onClick={() => void beginEveLogin({ characterId: activeCharacterId, groups: ['corp'] })}
-        >
-          {t('corp.notGrantedAction')}
-        </Button>
+        <NeedsConnection>
+          <Button
+            variant="primary"
+            onClick={() => void beginEveLogin({ characterId: activeCharacterId, groups: ['corp'] })}
+          >
+            {t('corp.notGrantedAction')}
+          </Button>
+        </NeedsConnection>
       }
     />
   );

@@ -142,16 +142,42 @@ export async function loadMemberLibraries(
   /** `strict`: an unreadable library throws instead of reading as empty (a caller that must tell "none" from "could not read"). */
   { strict = false }: { strict?: boolean } = {}
 ): Promise<MemberLibrary[]> {
+  const { libraries } = await readMemberLibraries(characterId, communityId, memberUids, strict);
+  return libraries;
+}
+
+/**
+ * As `loadMemberLibraries`, but an unreadable Member reads empty AND is named
+ * in `failedUids`, so the caller can tell "shares nothing" from "could not read".
+ */
+export function loadMemberLibrariesDetailed(
+  characterId: number,
+  communityId: string,
+  memberUids: readonly string[]
+): Promise<{ libraries: MemberLibrary[]; failedUids: string[] }> {
+  return readMemberLibraries(characterId, communityId, memberUids, false);
+}
+
+async function readMemberLibraries(
+  characterId: number,
+  communityId: string,
+  memberUids: readonly string[],
+  strict: boolean
+): Promise<{ libraries: MemberLibrary[]; failedUids: string[] }> {
   const standIn = communityBackendOverride()?.loadLibraries;
   if (standIn) {
     const libraries = standIn(communityId);
-    return memberUids.map(
-      (uid) => libraries.find((library) => library.uid === uid) ?? { uid, items: [] }
-    );
+    return {
+      libraries: memberUids.map(
+        (uid) => libraries.find((library) => library.uid === uid) ?? { uid, items: [] }
+      ),
+      failedUids: [],
+    };
   }
   await ensureSignedIn(characterId);
   const db = getSyncFirestore();
-  return Promise.all(
+  const failedUids: string[] = [];
+  const libraries = await Promise.all(
     memberUids.map(async (uid) => {
       // One unreadable Member (just removed, say) must not blank everyone else's column.
       try {
@@ -165,10 +191,12 @@ export async function loadMemberLibraries(
         return { uid, items };
       } catch (err) {
         if (strict) throw err;
+        failedUids.push(uid);
         return { uid, items: [] };
       }
     })
   );
+  return { libraries, failedUids };
 }
 
 /** The pushed-at stamp, only while the Member shares anything (a cleared library has chunkCount 0). */

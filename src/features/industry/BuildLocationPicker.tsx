@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Disclosure, SearchInput, Spinner } from '@/components/ui';
+import { Button, Disclosure, NeedsConnection, SearchInput, Spinner } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -308,12 +308,14 @@ export function BuildLocationPicker({
     ) : (
       <div className="flex flex-col gap-1.5 rounded-xs border border-line p-2 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-text-dim">{t('industry.buildLocationGrantHint')}</span>
-        <Button
-          size="sm"
-          onClick={() => void beginEveLogin({ characterId: characterId ?? undefined })}
-        >
-          {t('industry.buildLocationGrant')}
-        </Button>
+        <NeedsConnection>
+          <Button
+            size="sm"
+            onClick={() => void beginEveLogin({ characterId: characterId ?? undefined })}
+          >
+            {t('industry.buildLocationGrant')}
+          </Button>
+        </NeedsConnection>
       </div>
     );
 

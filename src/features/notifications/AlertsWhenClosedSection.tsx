@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret } from '@/components/ui';
+import { Button, Caret, NeedsConnection } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { beginAlertsLogin } from '@/app/loginFlow';
@@ -163,9 +163,11 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
           )}
         </span>
         {expanded && toAuthorize.length > 1 && (
-          <Button size="sm" onClick={turnOnAll} disabled={busyId !== null}>
-            {t('settings.notifications.alertsWhenClosed.turnOnAll')}
-          </Button>
+          <NeedsConnection>
+            <Button size="sm" onClick={turnOnAll} disabled={busyId !== null}>
+              {t('settings.notifications.alertsWhenClosed.turnOnAll')}
+            </Button>
+          </NeedsConnection>
         )}
       </div>
       {!expanded && enabled.length > 0 && (
@@ -239,25 +241,27 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                     {t('settings.notifications.alertsWhenClosed.turnOff')}
                   </Button>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant={state === 'needs-reauth' ? 'primary' : 'ghost'}
-                    loading={busy}
-                    disabled={busyId !== null}
-                    aria-label={t(
-                      state === 'needs-reauth'
-                        ? 'settings.notifications.alertsWhenClosed.reauthorizeFor'
-                        : 'settings.notifications.alertsWhenClosed.turnOnFor',
-                      { name: character.name }
-                    )}
-                    onClick={() => turnOn(character.characterId)}
-                  >
-                    {t(
-                      state === 'needs-reauth'
-                        ? 'settings.notifications.alertsWhenClosed.reauthorize'
-                        : 'settings.notifications.alertsWhenClosed.turnOn'
-                    )}
-                  </Button>
+                  <NeedsConnection>
+                    <Button
+                      size="sm"
+                      variant={state === 'needs-reauth' ? 'primary' : 'ghost'}
+                      loading={busy}
+                      disabled={busyId !== null}
+                      aria-label={t(
+                        state === 'needs-reauth'
+                          ? 'settings.notifications.alertsWhenClosed.reauthorizeFor'
+                          : 'settings.notifications.alertsWhenClosed.turnOnFor',
+                        { name: character.name }
+                      )}
+                      onClick={() => turnOn(character.characterId)}
+                    >
+                      {t(
+                        state === 'needs-reauth'
+                          ? 'settings.notifications.alertsWhenClosed.reauthorize'
+                          : 'settings.notifications.alertsWhenClosed.turnOn'
+                      )}
+                    </Button>
+                  </NeedsConnection>
                 )}
               </li>
             );

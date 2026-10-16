@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
 import { callableErrorReason } from './callableError';
 import { decideJoinRequest, type JoinRequest } from './communityStore';
+import { NeedsConnectionButton } from './NeedsConnectionButton';
 
 /**
  * The Characters waiting to be let in (a Community that approves new
@@ -59,7 +59,7 @@ export function JoinRequestsList({
           <li key={request.uid} className="py-1.5 text-xs">
             <div className="flex items-center gap-2">
               <span className="min-w-0 flex-1 truncate font-medium">{request.characterName}</span>
-              <Button
+              <NeedsConnectionButton
                 size="sm"
                 variant="primary"
                 disabled={busy !== null}
@@ -67,14 +67,14 @@ export function JoinRequestsList({
                 onClick={() => void decide(request, true)}
               >
                 {t('communities.requests.accept')}
-              </Button>
-              <Button
+              </NeedsConnectionButton>
+              <NeedsConnectionButton
                 size="sm"
                 disabled={busy !== null}
                 onClick={() => void decide(request, false)}
               >
                 {t('communities.requests.decline')}
-              </Button>
+              </NeedsConnectionButton>
             </div>
             {problem?.uid === request.uid && (
               <p role="alert" className="mt-1 text-danger">

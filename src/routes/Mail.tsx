@@ -22,6 +22,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
+import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { CharacterLink } from '@/features/entities';
@@ -718,7 +719,9 @@ function MailView({ scope, scopeControl }: MailViewProps) {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
-      ) : needsReauth ? (
+      ) : needsReauth && (!headersResult || rows.length === 0) ? (
+        // A lapsed grant with no saved mail: the full banner. With saved mail
+        // the list stays and a small note sits above it.
         <GrantBanner
           characterId={activeCharacterId}
           endpoints={['getCharacterMailHeaders']}
@@ -737,6 +740,12 @@ function MailView({ scope, scopeControl }: MailViewProps) {
         />
       ) : (
         <>
+          {needsReauth && (
+            <ReauthCachedNote
+              characterId={activeCharacterId}
+              endpoints={['getCharacterMailHeaders']}
+            />
+          )}
           {offline && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
