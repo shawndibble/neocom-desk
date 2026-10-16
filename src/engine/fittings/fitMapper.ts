@@ -2,10 +2,31 @@ import type { Fit, FitItem, Slot } from '@eveshipfit/dogma-engine';
 import { sideEffectsSwitchedOn } from './boosterSideEffects';
 import { fighterTubes } from './inventoryFlags';
 import { defaultTacticalMode, tacticalModesFor } from './tacticalModes';
-import type { DamageProfile, Fitting, FittingModule, PilotProfile } from './types';
+import type { DamageProfile, Fitting, FittingModule, ItemMutation, PilotProfile } from './types';
 
 /** EVE numbers implant/booster slots starting at 1, not 0 (dogma-engine's own `Slot` doc). */
 const SLOT_INDEX_START = 1;
+
+/**
+ * The engine's `Mutation` for a mutated item: its base, and the rolls when
+ * known. The engine starts from the base type's own attributes and takes
+ * each rolled value as the item's own; with no rolls it states the base
+ * module unchanged (live run, 2026-10-16). It applies any attribute id it is
+ * handed — a cap of 1 on a plain module included — so the rolls must already
+ * be the mutaplasmid's own (`ItemMutation`'s invariant, kept by
+ * `normaliseMutation` where a mutation enters the app), and an abyssal item
+ * with no mutation goes in bare: the engine then knows nothing of it.
+ */
+function toEngineMutation(mutation: ItemMutation | undefined): Pick<FitItem, 'mutation'> {
+  if (!mutation) return {};
+  const rolled = Object.keys(mutation.attributes).length > 0;
+  return {
+    mutation: {
+      base: mutation.baseTypeId,
+      ...(rolled ? { attributes: { ...mutation.attributes } } : {}),
+    },
+  };
+}
 
 function moduleToFitItem(module: FittingModule): FitItem {
   const slot: Slot = { type: module.slot, index: module.slotIndex };
@@ -14,6 +35,7 @@ function moduleToFitItem(module: FittingModule): FitItem {
     slot,
     state: module.state,
     ...(module.chargeTypeId === undefined ? {} : { charge: { type_id: module.chargeTypeId } }),
+    ...toEngineMutation(module.mutation),
   };
 }
 
@@ -79,6 +101,7 @@ export function fittingToDogmaFit(
       // Engine treats a drone given 'online' as launched; its in-bay state is
       // 'offline', so a bay stack ('online' here) goes in as that.
       state: drone.state === 'active' ? 'active' : 'offline',
+      ...toEngineMutation(drone.mutation),
     })),
     // Launched squadrons take the tubes in order; the rest wait in the bay.
     ...launchFighters(fitting),

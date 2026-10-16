@@ -27,6 +27,27 @@ export type FittingItemState = 'offline' | 'online' | 'active' | 'overload';
 /** A fitted module as a fit row's rack icon strip draws it: just its rack and type. */
 export type RackModule = Pick<FittingModule, 'slot' | 'typeId'>;
 
+/**
+ * How a mutated (abyssal) module or drone was made and what it rolled
+ * (GLOSSARY.md **Mutated module**). The item's own `typeId` is the abyssal
+ * type the mutaplasmid produced; `baseTypeId` is the module it was made from,
+ * whose own attributes the engine starts from.
+ *
+ * `attributes` holds the rolled values as absolute dogma values, keyed by
+ * attribute id, and only for the ids the mutaplasmid rolls — every source
+ * (ESI dynamic item, EFT block, share code) is filtered to that list where it
+ * enters (`mutaplasmids.ts`'s `normaliseMutation`), because the engine takes
+ * any attribute it is handed as the item's own value. Empty means the base and
+ * mutaplasmid are known but the rolls are not (`mutationStatus`:
+ * `'rollsUnknown'`). An abyssal item with no `mutation` at all has no known
+ * base either (`'baseUnknown'`).
+ */
+export interface ItemMutation {
+  baseTypeId: number;
+  mutaplasmidTypeId: number;
+  attributes: Readonly<Record<number, number>>;
+}
+
 export interface FittingModule {
   slot: FittingSlotKind;
   /** Position within the slot's own rack, starting at 0. */
@@ -43,6 +64,8 @@ export interface FittingModule {
    * reopened Fitting has none.
    */
   chargeQuantity?: number;
+  /** Set on a mutated (abyssal) module whose base is known; see `ItemMutation`. */
+  mutation?: ItemMutation;
 }
 
 /**
@@ -64,6 +87,12 @@ export interface FittingDrone {
   quantity: number;
   /** Launched and engaging, vs. sitting in the bay. */
   state: 'online' | 'active';
+  /**
+   * A mutated drone's make and rolls (`ItemMutation`). Each mutated drone is
+   * its own item, so a stack carrying one always has `quantity` 1 and is
+   * never merged with another.
+   */
+  mutation?: ItemMutation;
 }
 
 /** One fighter squadron: its size, and whether it is launched from a tube or waits in the bay. */

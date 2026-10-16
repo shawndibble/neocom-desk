@@ -20,6 +20,64 @@ function fitting(overrides: Partial<Fitting> = {}): Fitting {
 }
 
 describe('fittingToDogmaFit', () => {
+  it('hands a mutated module and drone their base and rolls (engine Mutation)', () => {
+    const dogmaFit = fittingToDogmaFit(
+      fitting({
+        modules: [
+          {
+            slot: 'high',
+            slotIndex: 0,
+            typeId: 47832,
+            state: 'active',
+            mutation: {
+              baseTypeId: 16475,
+              mutaplasmidTypeId: 47831,
+              attributes: { 6: 419.25, 97: 591.36 },
+            },
+          },
+        ],
+        drones: [
+          {
+            typeId: 60478,
+            quantity: 1,
+            state: 'active',
+            mutation: { baseTypeId: 2454, mutaplasmidTypeId: 60461, attributes: { 64: 1.9 } },
+          },
+        ],
+      }),
+      emptyProfile
+    );
+
+    expect(dogmaFit.items[0]).toEqual({
+      type_id: 47832,
+      slot: { type: 'high', index: 0 },
+      state: 'active',
+      mutation: { base: 16475, attributes: { 6: 419.25, 97: 591.36 } },
+    });
+    expect(dogmaFit.items[1]).toMatchObject({
+      type_id: 60478,
+      mutation: { base: 2454, attributes: { 64: 1.9 } },
+    });
+  });
+
+  it('hands base-only when the rolls are unknown, so the engine states the base module', () => {
+    const dogmaFit = fittingToDogmaFit(
+      fitting({
+        modules: [
+          {
+            slot: 'high',
+            slotIndex: 0,
+            typeId: 47832,
+            state: 'active',
+            mutation: { baseTypeId: 16475, mutaplasmidTypeId: 47831, attributes: {} },
+          },
+        ],
+      }),
+      emptyProfile
+    );
+    expect(dogmaFit.items[0]?.mutation).toEqual({ base: 16475 });
+  });
+
   it('maps the hull and name straight across', () => {
     const dogmaFit = fittingToDogmaFit(fitting({ name: 'My Vexor Navy Issue' }), emptyProfile);
 

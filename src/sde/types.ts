@@ -500,3 +500,38 @@ export interface ShipTreeData {
   groups: Record<string, ShipTreeGroup>;
   ships: ShipTreeShip[];
 }
+
+/** One attribute a mutaplasmid rolls: base value × a uniform pick in [min, max]. */
+export interface MutaplasmidAttributeRange {
+  /** Dogma attribute id. */
+  id: number;
+  /** Multiplier on the base item's own value, lowest roll. */
+  min: number;
+  /** Multiplier on the base item's own value, highest roll. */
+  max: number;
+  /** A higher value is better — CCP's per-mutaplasmid override where it gives one, else the attribute's own. */
+  highIsGood: boolean;
+}
+
+/** One mutaplasmid: the abyssal type it makes, from which bases, rolling what. */
+export interface MutaplasmidEntry {
+  /** The abyssal (mutated) type it produces. */
+  result: number;
+  /** Base module / drone type ids it applies to, ascending. */
+  bases: number[];
+  attributes: MutaplasmidAttributeRange[];
+}
+
+/**
+ * public/data/mutaplasmids.json (`scripts/lib/mutaplasmids.mjs`), from CCP's
+ * `dynamicItemAttributes.jsonl`. Read through `engine/fittings/mutaplasmids.ts`'s
+ * `mutaplasmidLookup`, not directly.
+ */
+export interface MutaplasmidData {
+  /** Dogma attribute id -> internal name (`capacitorNeed`), every attribute any mutaplasmid rolls. */
+  attributeNames: Record<string, string>;
+  /** Mutaplasmid type id -> what it does. */
+  mutaplasmids: Record<string, MutaplasmidEntry>;
+  /** Every abyssal (mutated) type id, ascending. */
+  abyssalTypeIds: number[];
+}

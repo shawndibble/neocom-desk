@@ -19,6 +19,7 @@ import {
   type FittingSlotKind,
   type FittingStats,
 } from './types';
+import { withoutMutation } from './mutaplasmids';
 
 const RACK_ORDER = new Map(FITTING_SLOT_KINDS.map((slot, index) => [slot, index]));
 
@@ -108,7 +109,7 @@ export function swapModuleType(
   slotIndex: number,
   typeId: number
 ): Fitting {
-  return updateModule(fitting, slot, slotIndex, (module) => ({ ...module, typeId }));
+  return updateModule(fitting, slot, slotIndex, (module) => withoutMutation(module, typeId));
 }
 
 /**

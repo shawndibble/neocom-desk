@@ -262,6 +262,28 @@ describe('a charge leaving a module for one that did not come from cargo', () =>
 });
 
 describe('swapModuleType', () => {
+  it('drops a mutated module’s mutation: the variant is another item', () => {
+    const mutated: Fitting = {
+      ...base,
+      modules: [
+        {
+          slot: 'high',
+          slotIndex: 0,
+          typeId: 47832,
+          state: 'active',
+          mutation: { baseTypeId: 16475, mutaplasmidTypeId: 47831, attributes: { 6: 419.25 } },
+        },
+      ],
+    };
+    expect(swapModuleType(mutated, 'high', 0, 16475).modules[0]).toEqual({
+      slot: 'high',
+      slotIndex: 0,
+      typeId: 16475,
+      state: 'active',
+    });
+    expect(swapModuleType(mutated, 'high', 0, 47832).modules[0]).toBe(mutated.modules[0]);
+  });
+
   it('changes only the addressed module type, keeping its state and charge', () => {
     const next = swapModuleType(base, 'high', 0, 3001);
     expect(next.modules[0]).toEqual({
